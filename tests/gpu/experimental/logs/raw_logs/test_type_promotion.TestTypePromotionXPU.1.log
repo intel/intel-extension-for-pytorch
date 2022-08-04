@@ -1,0 +1,613 @@
+test_add_wrapped_xpu (__main__.TestTypePromotionXPU) ... ok
+test_alpha_mismatch_xpu (__main__.TestTypePromotionXPU) ... ok
+test_alternate_result_xpu (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_bool_bool (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_bool_float16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_bool_float32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_bool_float64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_bool_int16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_bool_int32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_bool_int64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_bool_int8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_bool_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float16_bool (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float16_float16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float16_float32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float16_float64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float16_int16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float16_int32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float16_int64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float16_int8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float16_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float32_bool (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float32_float16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float32_float32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float32_float64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float32_int16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float32_int32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float32_int64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float32_int8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float32_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float64_bool (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float64_float16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float64_float32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float64_float64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float64_int16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float64_int32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float64_int64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float64_int8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_float64_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int16_bool (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int16_float16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int16_float32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int16_float64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int16_int16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int16_int32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int16_int64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int16_int8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int16_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int32_bool (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int32_float16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int32_float32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int32_float64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int32_int16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int32_int32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int32_int64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int32_int8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int32_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int64_bool (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int64_float16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int64_float32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int64_float64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int64_int16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int64_int32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int64_int64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int64_int8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int64_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int8_bool (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int8_float16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int8_float32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int8_float64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int8_int16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int8_int32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int8_int64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int8_int8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_int8_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_uint8_bool (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_uint8_float16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_uint8_float32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_uint8_float64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_uint8_int16 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_uint8_int32 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_uint8_int64 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_uint8_int8 (__main__.TestTypePromotionXPU) ... ok
+test_atan2_type_promotion_xpu_uint8_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_bfloat16_xpu (__main__.TestTypePromotionXPU) ... ok
+test_booleans_xpu (__main__.TestTypePromotionXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_type_promotion.py:319: UserWarning: This overload of add is deprecated:
+	add(Tensor input, Number alpha, Tensor other, *, Tensor out)
+Consider using one of the following signatures instead:
+	add(Tensor input, Tensor other, *, Number alpha, Tensor out) (Triggered internally at  ../torch/csrc/utils/python_arg_parser.cpp:1050.)
+  self.assertEqual(torch.add(torch.tensor(True, device=device),
+ok
+test_can_cast_xpu (__main__.TestTypePromotionXPU) ... ok
+test_cat_different_dtypes_xpu (__main__.TestTypePromotionXPU) ... ok
+test_cat_out_different_dtypes_xpu (__main__.TestTypePromotionXPU) ... ok
+test_comparison_ops_with_type_promotion_xpu (__main__.TestTypePromotionXPU) ... ok
+test_complex_assertraises_xpu (__main__.TestTypePromotionXPU) ... ok
+test_complex_promotion_xpu (__main__.TestTypePromotionXPU) ... ok
+test_complex_scalar_mult_tensor_promotion_xpu (__main__.TestTypePromotionXPU) ... ok
+test_computation_ignores_out_xpu (__main__.TestTypePromotionXPU) ... FAIL
+test_create_bool_tensors_xpu (__main__.TestTypePromotionXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_type_promotion.py:334: UserWarning: Not providing a value for linspace's steps is deprecated and will throw a runtime error in a future release. This warning will appear only once per process. (Triggered internally at  /home/gta/xunsongh/ipex-gpu/csrc/aten/operators/RangeFactories.cpp:96.)
+  self.assertEqual(torch.linspace(False, True, device=device), torch.linspace(0, 1, device=device))
+/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_type_promotion.py:335: UserWarning: Not providing a value for logspace's steps is deprecated and will throw a runtime error in a future release. This warning will appear only once per process. (Triggered internally at  /home/gta/xunsongh/ipex-gpu/csrc/aten/operators/RangeFactories.cpp:174.)
+  self.assertEqual(torch.logspace(False, True, device=device), torch.logspace(0, 1, device=device))
+ok
+test_div_promotion_inplace_xpu_bool (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_float32 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_float64 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_int16 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_int32 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_int64 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_int8 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_out_xpu_bool (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_out_xpu_float32 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_out_xpu_float64 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_out_xpu_int16 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_out_xpu_int32 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_out_xpu_int64 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_out_xpu_int8 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_out_xpu_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_xpu_bool (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_xpu_int16 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_xpu_int32 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_xpu_int64 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_xpu_int8 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_xpu_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_float_promotion_xpu (__main__.TestTypePromotionXPU) ... ok
+test_from_issue_xpu (__main__.TestTypePromotionXPU) ... ok
+test_half_xpu (__main__.TestTypePromotionXPU) ... ok
+test_indexing_fail_xpu (__main__.TestTypePromotionXPU) ... ok
+test_indexing_xpu (__main__.TestTypePromotionXPU) ... ok
+test_inplace_xpu (__main__.TestTypePromotionXPU) ... ok
+test_int_promotion_xpu (__main__.TestTypePromotionXPU) ... ok
+test_int_to_float_xpu (__main__.TestTypePromotionXPU) ... ok
+test_integer_addcdiv_deprecated_xpu_int16 (__main__.TestTypePromotionXPU) ... ok
+test_integer_addcdiv_deprecated_xpu_int32 (__main__.TestTypePromotionXPU) ... ok
+test_integer_addcdiv_deprecated_xpu_int64 (__main__.TestTypePromotionXPU) ... ok
+test_integer_addcdiv_deprecated_xpu_int8 (__main__.TestTypePromotionXPU) ... ok
+test_integer_addcdiv_deprecated_xpu_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_lt_with_type_promotion_xpu (__main__.TestTypePromotionXPU) ... ok
+test_many_promotions_xpu (__main__.TestTypePromotionXPU) ... ok
+test_mixed_type_backward_xpu (__main__.TestTypePromotionXPU) ... ok
+test_non_promoting_ops_xpu (__main__.TestTypePromotionXPU) ... ok
+test_numpy_array_binary_ufunc_promotion_xpu_bool_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_bool_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_bool_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_bool_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_bool_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_bool_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_bool_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_bool_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_bool_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_bool_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_bool_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_complex128_bool (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex128_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex128_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex128_float16 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex128_float32 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex128_float64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex128_int16 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex128_int32 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex128_int64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex128_int8 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex128_uint8 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex64_bool (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex64_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex64_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex64_float16 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex64_float32 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex64_float64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex64_int16 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex64_int32 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex64_int64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex64_int8 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_complex64_uint8 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_float16_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float16_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_float16_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_float16_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float16_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float16_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float16_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float16_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float16_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float16_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float16_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float32_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float32_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_float32_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_float32_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float32_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float32_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float32_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float32_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float32_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float32_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float32_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float64_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float64_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_float64_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_float64_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float64_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float64_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float64_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float64_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float64_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float64_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_float64_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int16_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int16_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_int16_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_int16_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int16_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int16_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int16_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int16_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int16_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int16_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int16_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int32_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int32_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_int32_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_int32_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int32_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int32_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int32_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int32_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int32_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int32_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int32_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int64_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int64_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_int64_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_int64_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int64_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int64_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int64_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int64_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int64_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int64_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int64_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int8_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int8_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_int8_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_int8_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int8_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int8_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int8_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int8_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int8_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int8_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_int8_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_uint8_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_uint8_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_uint8_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_uint8_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_uint8_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_uint8_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_uint8_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_uint8_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_uint8_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_uint8_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_uint8_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_promote_self_xpu (__main__.TestTypePromotionXPU) ... ok
+test_promote_types_xpu (__main__.TestTypePromotionXPU) ... ok
+test_result_type_tensor_vs_scalar_xpu (__main__.TestTypePromotionXPU) ... ok
+test_result_type_xpu_bfloat16_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bfloat16_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bfloat16_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_bfloat16_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_bfloat16_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bfloat16_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bfloat16_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bfloat16_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bfloat16_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bfloat16_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bfloat16_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bfloat16_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bool_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bool_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bool_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_bool_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_bool_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bool_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bool_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bool_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bool_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bool_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bool_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_bool_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_complex128_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex128_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex128_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex128_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex128_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex128_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex128_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex128_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex128_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex128_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex128_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex128_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex64_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex64_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex64_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex64_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex64_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex64_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex64_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex64_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex64_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex64_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex64_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_complex64_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_float16_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float16_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float16_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_float16_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_float16_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float16_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float16_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float16_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float16_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float16_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float16_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float16_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float32_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float32_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float32_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_float32_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_float32_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float32_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float32_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float32_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float32_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float32_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float32_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float32_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float64_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float64_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float64_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_float64_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_float64_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float64_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float64_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float64_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float64_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float64_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float64_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_float64_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int16_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int16_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int16_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_int16_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_int16_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int16_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int16_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int16_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int16_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int16_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int16_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int16_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int32_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int32_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int32_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_int32_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_int32_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int32_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int32_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int32_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int32_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int32_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int32_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int32_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int64_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int64_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int64_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_int64_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_int64_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int64_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int64_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int64_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int64_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int64_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int64_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int64_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int8_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int8_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int8_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_int8_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_int8_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int8_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int8_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int8_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int8_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int8_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int8_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_int8_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_uint8_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_uint8_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_uint8_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_uint8_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_uint8_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_uint8_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_uint8_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_uint8_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_uint8_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_uint8_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_uint8_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_uint8_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_sparse_add_xpu (__main__.TestTypePromotionXPU) ... skipped "not implemented: Could not run 'aten::to_sparse' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::to_sparse' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: fallthrough registered at ../aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_0.cpp:10257 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_sparse_div_promotion_xpu_bool (__main__.TestTypePromotionXPU) ... skipped "not implemented: Could not run 'aten::to_sparse' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::to_sparse' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: fallthrough registered at ../aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_0.cpp:10257 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_sparse_div_promotion_xpu_int16 (__main__.TestTypePromotionXPU) ... skipped "not implemented: Could not run 'aten::to_sparse' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::to_sparse' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: fallthrough registered at ../aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_0.cpp:10257 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_sparse_div_promotion_xpu_int32 (__main__.TestTypePromotionXPU) ... skipped "not implemented: Could not run 'aten::to_sparse' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::to_sparse' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: fallthrough registered at ../aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_0.cpp:10257 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_sparse_div_promotion_xpu_int64 (__main__.TestTypePromotionXPU) ... skipped "not implemented: Could not run 'aten::to_sparse' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::to_sparse' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: fallthrough registered at ../aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_0.cpp:10257 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_sparse_div_promotion_xpu_uint8 (__main__.TestTypePromotionXPU) ... skipped "not implemented: Could not run 'aten::to_sparse' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::to_sparse' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: fallthrough registered at ../aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_0.cpp:10257 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_sparse_div_xpu (__main__.TestTypePromotionXPU) ... skipped "not implemented: Could not run 'aten::to_sparse' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::to_sparse' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: fallthrough registered at ../aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_0.cpp:10257 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_sparse_mul_xpu (__main__.TestTypePromotionXPU) ... skipped "not implemented: Could not run 'aten::to_sparse' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::to_sparse' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: fallthrough registered at ../aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_0.cpp:10257 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_sparse_sub_xpu (__main__.TestTypePromotionXPU) ... skipped "not implemented: Could not run 'aten::to_sparse' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::to_sparse' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: fallthrough registered at ../aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_0.cpp:10257 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_transpose_xpu (__main__.TestTypePromotionXPU) ... ok
+test_unary_op_out_casting_xpu_complex128_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_complex128_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_complex128_float32 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_complex128_float64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_complex128_int64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_complex64_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_complex64_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_complex64_float32 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_complex64_float64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_complex64_int64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_float32_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_float32_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_float32_float32 (__main__.TestTypePromotionXPU) ... ok
+test_unary_op_out_casting_xpu_float32_float64 (__main__.TestTypePromotionXPU) ... ok
+test_unary_op_out_casting_xpu_float32_int64 (__main__.TestTypePromotionXPU) ... ok
+test_unary_op_out_casting_xpu_float64_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_float64_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_float64_float32 (__main__.TestTypePromotionXPU) ... ok
+test_unary_op_out_casting_xpu_float64_float64 (__main__.TestTypePromotionXPU) ... ok
+test_unary_op_out_casting_xpu_float64_int64 (__main__.TestTypePromotionXPU) ... ok
+test_unary_op_out_casting_xpu_int64_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_int64_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_int64_float32 (__main__.TestTypePromotionXPU) ... ok
+test_unary_op_out_casting_xpu_int64_float64 (__main__.TestTypePromotionXPU) ... ok
+test_unary_op_out_casting_xpu_int64_int64 (__main__.TestTypePromotionXPU) ... ok
+test_unsigned_xpu (__main__.TestTypePromotionXPU) ... ok
+
+======================================================================
+FAIL: test_computation_ignores_out_xpu (__main__.TestTypePromotionXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_type_promotion.py", line 951, in test_computation_ignores_out
+    self.assertEqual(result, t + t, exact_dtype=False)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=0.001 and atol=0.001, found 1 element(s) (out of 1) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was inf (65984.0 vs. inf), which occurred at index 0.
+
+----------------------------------------------------------------------
+Ran 438 tests in 51.840s
+
+FAILED (failures=1, skipped=190)
+Raised CalledProcessError: return code 1.

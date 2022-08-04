@@ -1,0 +1,40 @@
+test_advancedindex_mixed_cpu_devices_xpu (__main__.TestDevicePrecisionXPU) ... ok
+test_clamp_xpu_float32 (__main__.TestDevicePrecisionXPU) ... ok
+test_clamp_xpu_float64 (__main__.TestDevicePrecisionXPU) ... ok
+test_clamp_xpu_int64 (__main__.TestDevicePrecisionXPU) ... ok
+test_copy_broadcast_xpu (__main__.TestDevicePrecisionXPU) ... ok
+test_copy_noncontig_xpu (__main__.TestDevicePrecisionXPU) ... ok
+test_device_serialization_xpu (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_float16 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_float32 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_float64 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_int16 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_int32 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_int64 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_int8 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_uint8 (__main__.TestDevicePrecisionXPU) ... ok
+test_index_add_bfloat16_xpu (__main__.TestDevicePrecisionXPU) ... ok
+test_multidevice_serialization_xpu (__main__.TestDevicePrecisionXPU) ... FAIL
+test_type_conversions_same_device_xpu (__main__.TestDevicePrecisionXPU) ... ok
+
+======================================================================
+FAIL: test_multidevice_serialization_xpu (__main__.TestDevicePrecisionXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 905, in multi_fn
+    return fn(slf, devices, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_torch.py", line 7951, in test_multidevice_serialization
+    self.assertEqual(cp.device, original.device)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1959, in assertEqual
+    super().assertEqual(x, y, msg=msg)
+AssertionError: device(type='xpu', index=0) != device(type='xpu', index=1)
+
+----------------------------------------------------------------------
+Ran 18 tests in 12.945s
+
+FAILED (failures=1)
+Raised CalledProcessError: return code 1.

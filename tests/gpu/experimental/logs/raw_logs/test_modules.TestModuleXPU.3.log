@@ -1,0 +1,198 @@
+test_check_inplace_nn_ELU_xpu_float32 (__main__.TestModuleXPU) ... FAIL
+test_check_inplace_nn_ELU_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_check_inplace_nn_ReLU_xpu_float32 (__main__.TestModuleXPU) ... FAIL
+test_check_inplace_nn_ReLU_xpu_float64 (__main__.TestModuleXPU) ... FAIL
+test_factory_kwargs_nn_AvgPool1d_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_factory_kwargs_nn_AvgPool1d_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_factory_kwargs_nn_ELU_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_factory_kwargs_nn_ELU_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_factory_kwargs_nn_L1Loss_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_factory_kwargs_nn_L1Loss_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_factory_kwargs_nn_Linear_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_factory_kwargs_nn_Linear_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_factory_kwargs_nn_NLLLoss_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_factory_kwargs_nn_NLLLoss_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_factory_kwargs_nn_ReLU_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_factory_kwargs_nn_ReLU_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_forward_nn_AvgPool1d_xpu_float32 (__main__.TestModuleXPU) ... FAIL
+test_forward_nn_AvgPool1d_xpu_float64 (__main__.TestModuleXPU) ... skipped 'not ready on XPU'
+test_forward_nn_ELU_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_forward_nn_ELU_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_forward_nn_L1Loss_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_forward_nn_L1Loss_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_forward_nn_Linear_xpu_float32 (__main__.TestModuleXPU) ... FAIL
+test_forward_nn_Linear_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_forward_nn_NLLLoss_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_forward_nn_NLLLoss_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_forward_nn_ReLU_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_forward_nn_ReLU_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_pickle_nn_AvgPool1d_xpu_float32 (__main__.TestModuleXPU) ... FAIL
+test_pickle_nn_AvgPool1d_xpu_float64 (__main__.TestModuleXPU) ... skipped 'not ready on XPU'
+test_pickle_nn_ELU_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_pickle_nn_ELU_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_pickle_nn_L1Loss_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_pickle_nn_L1Loss_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_pickle_nn_Linear_xpu_float32 (__main__.TestModuleXPU) ... FAIL
+test_pickle_nn_Linear_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_pickle_nn_NLLLoss_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_pickle_nn_NLLLoss_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_pickle_nn_ReLU_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_pickle_nn_ReLU_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_repr_nn_AvgPool1d_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_repr_nn_AvgPool1d_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_repr_nn_ELU_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_repr_nn_ELU_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_repr_nn_L1Loss_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_repr_nn_L1Loss_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_repr_nn_Linear_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_repr_nn_Linear_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_repr_nn_NLLLoss_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_repr_nn_NLLLoss_xpu_float64 (__main__.TestModuleXPU) ... ok
+test_repr_nn_ReLU_xpu_float32 (__main__.TestModuleXPU) ... ok
+test_repr_nn_ReLU_xpu_float64 (__main__.TestModuleXPU) ... ok
+
+======================================================================
+FAIL: test_check_inplace_nn_ELU_xpu_float32 (__main__.TestModuleXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_modules.py", line 85, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_modules.py", line 202, in test_check_inplace
+    self.assertEqual(output_op, output_ip)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-05 and atol=1e-05, found 3 element(s) (out of 3) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 2.3719926476478577 (-0.9998119473457336 vs. 1.372180700302124), which occurred at index 0.
+
+======================================================================
+FAIL: test_check_inplace_nn_ReLU_xpu_float32 (__main__.TestModuleXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_modules.py", line 85, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_modules.py", line 202, in test_check_inplace
+    self.assertEqual(output_op, output_ip)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-05 and atol=1e-05, found 65 element(s) (out of 120) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 8.958288192749023 (8.958288192749023 vs. 0.0), which occurred at index (0, 2, 0, 4).
+
+======================================================================
+FAIL: test_check_inplace_nn_ReLU_xpu_float64 (__main__.TestModuleXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_modules.py", line 85, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_modules.py", line 208, in test_check_inplace
+    self.assertEqual(input_args[0].grad, input_arg_copy[0].grad)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-05 and atol=1e-05, found 60 element(s) (out of 120) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 1.612748781736381 (-0.061098763738686494 vs. -1.6738475454750674), which occurred at index (0, 0, 0, 2).
+
+======================================================================
+FAIL: test_forward_nn_AvgPool1d_xpu_float32 (__main__.TestModuleXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_modules.py", line 85, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_modules.py", line 45, in test_forward
+    self.assertEqual(outputs, ref_outputs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-05 and atol=1e-05, found 9 element(s) (out of 9) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 12.573021411895752 (3.9644408226013184 vs. -8.608580589294434), which occurred at index (0, 2).
+
+======================================================================
+FAIL: test_forward_nn_Linear_xpu_float32 (__main__.TestModuleXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_modules.py", line 85, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_modules.py", line 45, in test_forward
+    self.assertEqual(outputs, ref_outputs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-05 and atol=1e-05, found 32 element(s) (out of 32) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 5.115300625562668 (-5.234733581542969 vs. -0.1194329559803009), which occurred at index (0, 0).
+
+======================================================================
+FAIL: test_pickle_nn_AvgPool1d_xpu_float32 (__main__.TestModuleXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_modules.py", line 85, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_modules.py", line 159, in test_pickle
+    self.assertEqual(output, output_from_copy)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-05 and atol=1e-05, found 9 element(s) (out of 9) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 12.520473003387451 (-3.7951560020446777 vs. 8.725317001342773), which occurred at index (0, 1).
+
+======================================================================
+FAIL: test_pickle_nn_Linear_xpu_float32 (__main__.TestModuleXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_modules.py", line 85, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_modules.py", line 159, in test_pickle
+    self.assertEqual(output, output_from_copy)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-05 and atol=1e-05, found 16 element(s) (out of 32) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 8.864778518676758 (-8.864778518676758 vs. 0.0), which occurred at index (0, 0).
+
+----------------------------------------------------------------------
+Ran 52 tests in 13.865s
+
+FAILED (failures=7, skipped=2)
+Raised CalledProcessError: return code 1.

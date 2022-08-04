@@ -1,0 +1,23 @@
+test_default_names_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_dtypes_composition_names_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_name_fn_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_ops_composition_names_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_subtest_expected_failure_x_1_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_subtest_expected_failure_x_2_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_subtest_expected_failure_x_3_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_subtest_names_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_two_things_subtest_expected_failure_x_1_xpu_y_4_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_two_things_subtest_expected_failure_x_1_xpu_y_5_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_two_things_subtest_expected_failure_x_1_xpu_y_6_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_two_things_subtest_expected_failure_x_2_xpu_y_4_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_two_things_subtest_expected_failure_x_2_xpu_y_5_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_two_things_subtest_expected_failure_x_2_xpu_y_6_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_two_things_subtest_expected_failure_x_3_xpu_y_4_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_two_things_subtest_expected_failure_x_3_xpu_y_5_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_two_things_subtest_expected_failure_x_3_xpu_y_6_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_unparametrized_names_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 0.216s
+
+OK (expected failures=8)

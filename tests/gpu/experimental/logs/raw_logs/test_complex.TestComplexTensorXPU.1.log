@@ -1,0 +1,9 @@
+test_dtype_inference_xpu_float32 (__main__.TestComplexTensorXPU) ... ok
+test_dtype_inference_xpu_float64 (__main__.TestComplexTensorXPU) ... ok
+test_to_list_xpu_complex128 (__main__.TestComplexTensorXPU) ... skipped 'dtype not support on XPU'
+test_to_list_xpu_complex64 (__main__.TestComplexTensorXPU) ... skipped 'dtype not support on XPU'
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.036s
+
+OK (skipped=2)

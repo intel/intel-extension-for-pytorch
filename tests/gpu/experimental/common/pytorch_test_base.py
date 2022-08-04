@@ -5,6 +5,7 @@ import contextlib
 import os
 import inspect
 import functools
+import json
 
 import torch
 import intel_extension_for_pytorch
@@ -41,367 +42,30 @@ DISABLED_TORCH_TESTS_ANY = {
     # empty
 }
 
-DISABLED_TORCH_TESTS_XPU_ONLY = {
-    # to be added
-    # "TestBinaryUfuncsXPU": {
-    #     "test_cumulative_trapezoid",    # core dumped ... Floating point exception -> cumsum issue @Yu, Kevin
-    #     "test_int_and_float_pow",   # core dumped ... free(): invalid size -> KernelPointWiseApply2
-    # },
-    # "TestForeachXPU": {
-    #     "test_binary_op_scalar_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
-    #     "test_binary_op_scalarlist_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
-    #     "test_binary_op_tensorlists_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
-    #     "test_minmax_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
-    #     "test_pointwise_op_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
-    #     "test_unary_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
-    # },
-    # "TestAutogradDeviceTypeXPU": {
-    #     "test_cdist_same_inputs",   # too slow    -> no slow in AOT
-    #     "test_cdist",   # too slow   -> no slow in AOT
-    #     "test_sparse_backward",     # core dumped ... Segmentation fault -> no sparse tensor math op?
-    # },
-    # "TestTensorCreationXPU": {
-    #     "test_tensor_ctor_device_inference",    # core dumped ... Segmentation fault
-    # },
-    "TestTorchDeviceTypeXPU": {
-        # We need implemented index_put (used by index_add and index_copy)
-        # with deterministic algorithm, otherwise the UT may meet failures.
-        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1494
-        # for details.
-        "test_index_add_deterministic_xpu",
-        "test_index_copy_deterministic_xpu",
-        "test_index_put_non_accumulate_deterministic_xpu",
 
-        # test_cublas is not needed for XPU
-        "test_cublas_config_nondeterministic_alert",
-        
-        # test_dlpack is not needed for XPU
-        "test_dlpack_capsule_conversion",
-        "test_dlpack_protocol_conversion",
-        "test_dlpack_shared_storage",
-        "test_dlpack_conversion_with_streams",
-        "test_dlpack_conversion_with_diff_streams",
-        "test_dlpack_tensor_invalid_stream",
-        "test_dlpack_error_on_bool_tensor",
-        "test_dlpack_export_requires_grad",
-        "test_dlpack_export_is_conj",
-        "test_dlpack_export_non_strided",
+def get_skip_list_from_json():
+    script_path = os.path.split(os.path.realpath(__file__))[0]
+    skip_list_json = dict()
+    with open(os.path.join(script_path, "skip_list.json"), "r") as load_f:
+        skip_list_json = json.load(load_f)
+    skip_dict = dict()
+    for test_cls in skip_list_json.keys():
+        if test_cls == "_comments":
+            continue
+        skip_dict[test_cls] = set()
+        for cases in skip_list_json[test_cls].values():
+            if isinstance(cases, list):
+                for case in cases:
+                    skip_dict[test_cls].add(case)
+    return skip_dict
 
+def set_skip_list_to_json(skip_dict):
+    data = json.dumps(skip_dict, indent=2)
+    script_path = os.path.split(os.path.realpath(__file__))[0]
+    with open(os.path.join(script_path, "skip_list.json"), "w") as save_f:
+        save_f.write(data)
 
-        # "test_cdist_large_batch",   # too slow  -> not slow with AOT. But `-fno-sycl-id-queries-fit-in-int' to disable range check. -30 (CL_INVALID_VALUE)
-        # "test_cdist_large",     # too slow -> not slow with AOT. But `-fno-sycl-id-queries-fit-in-int' to disable range check. -30 (CL_INVALID_VALUE)
-        "test_conv_transposed_large",   # too slow  -> <deconvolution> start barrier(606us) submit(10387us) end barrier(122us) event wait(75568616us) event_duration_0(74985075us) total(75579744us)
-        # "test_cov",     # core dumped ... free(): invalid size  -> accurate issue.
-        # "test_dim_function_empty",  # core dumped ... Floating point exception -> cumsum issue in handling numel or dim = 0. Should be fixed by Kevin.
-        # "test_index_select",    # core dumped ... munmap_chunk(): invalid pointer  -> RuntimeError: index_select(): Expected dtype int64 for index but got: Int
-        # "test_large_cumprod",   # too slow  -> OOM on my gen9 host
-        # "test_large_cumsum",   # too slow -> OOM on my gen9 host
-    },
-    "TestLinalgXPU": {
-        "test_geqrf",   # core dumped ... Segmentation fault
-        "test_householder_product",     # core dumped ... Segmentation fault
-        "test_inverse_many_batches",    # core dumped ... Segmentation fault
-        "test_inverse",     # core dumped ... Segmentation fault
-        "test_kron_errors_and_warnings",    # core dumped ... Segmentation fault
-        "test_kron_non_contiguous",     # core dumped ... Segmentation fault
-        "test_linalg_lstsq_batch_broadcasting",     # core dumped ... Segmentation fault
-        "test_linalg_qr_autograd_errors",   # core dumped ... Segmentation fault
-        "test_linalg_svd_compute_uv",   # core dumped ... Segmentation fault
-        "test_lu_solve_batched_broadcasting",   # core dumped ... Segmentation fault
-        "test_lu_solve_batched_many_batches",   # core dumped ... Segmentation fault
-        "test_lu_solve_batched_non_contiguous",     # core dumped ... Segmentation fault
-        "test_lu_solve_batched",    # core dumped ... Segmentation fault
-        "test_lu_solve_large_matrices",     # core dumped ... Segmentation fault
-        "test_lu_solve_out_errors_and_warnings",    # core dumped ... Segmentation fault
-        "test_matmul_45724",    # core dumped ... Segmentation fault
-        "test_matrix_exp_batch",    # core dumped ... Segmentation fault
-        "test_matrix_rank_basic",   # core dumped ... Segmentation fault
-        "test_matrix_rank_tol",     # core dumped ... Segmentation fault
-        "test_matrix_rank",     # core dumped ... Segmentation fault
-        "test_mm_bmm_non_memory_dense",     # core dumped ... Segmentation fault
-        "test_mm",  # core dumped ... Segmentation fault
-        "test_norm_fro_2_equivalence_old",  # core dumped ... Segmentation fault
-        "test_norm_fused_type_promotion",   # core dumped ... Segmentation fault
-        "test_norm_matrix_degenerate_shapes",   # core dumped ... Segmentation fault
-        "test_norm_matrix",     # core dumped ... Segmentation fault
-        "test_norm_old",    # core dumped ... Segmentation fault
-        # "test_qr",  # core dumped ... Segmetation fault
-    },
-    "TestReductionsXPU": {
-        # "test_mode_xpu",    # too slow
-        # Kernel performance too slow cause GPU watch dog timeout
-        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1539?filter=-2
-        # for details.
-        "test_mode_large_xpu",
-        # "test_nansum_out_dtype",    # too slow
-        # "test_nansum_vs_numpy",     # too slow
-        # "test_nansum",  # too slow
-        # "test_noncontiguous_all",   # too slow
-        # "test_noncontiguous_expanded",  # too slow
-        # "test_noncontiguous_innermost",     # too slow
-        # "test_noncontiguous_outermost",     # too slow
-        # "test_noncontiguous_transposed",    # too slow
-        # "test_numpy_named_args",    # too slow  -> passed
-        # "test_prod_bool",   # too slow
-        # "test_prod_gpu",    # too slow  -> passed
-        # "test_quantile_backward",   # too slow
-        # "test_quantile_error",  # too slow  -> passed
-        # "test_quantile",    # too slow
-        # "test_reduction_empty_any_all",     # too slow
-        # "test_reduction_split",     # too slow
-        # "test_reduction_vectorize_along_input_corner",  # too slow
-        # "test_reduction_vectorize_along_output",  # too slow -> passed
-        # "test_std_correction_vs_numpy",     # too slow
-        # "test_std_mean_all_dims",   # too slow -> passed
-        # "test_std_mean_correction",     # too slow
-        # "test_std_mean_some_dims",  # too slow -> passed
-        # "test_std_mean",    # too slow
-        # "test_std_vs_numpy",    # too slow
-        # "test_sum_dim_reduction_uint8_overflow",    # too slow
-        # "test_sum_noncontig",   # too slow
-        # "test_sum_vs_numpy",    # too slow
-        # "test_tensor_reduce_ops_empty",     # too slow
-        # "test_var_correction_vs_numpy",     # too slow
-        # "test_var_large_input",     # too slow
-        # "test_var_mean_all_dims",   # too slow
-        # "test_var_mean_correction",     # too slow
-        # "test_var_mean_some_dims",  # too slow
-        # "test_var_mean",    # too slow
-        # "test_var_stability2",  # too slow
-        # "test_var_stability",   # too slow
-        # "test_var_unbiased",    # too slow
-        # "test_var_vs_numpy",    # too slow
-        # "test_var",     # too slow
-    },
-    "TestUnaryUfuncsXPU": {
-        # oneMKL doesn't support non-float and non-double data type for lgamma,
-        # which should be supported by torch and ipex.
-        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1502
-        # for details.
-        "test_contig_size1_large_dim_lgamma_xpu_bfloat16",
-        "test_contig_size1_large_dim_lgamma_xpu_int64",
-        "test_contig_size1_large_dim_lgamma_xpu_uint8",
-        "test_contig_size1_large_dim_mvlgamma_mvlgamma_p_1_xpu_int64",
-        "test_contig_size1_large_dim_mvlgamma_mvlgamma_p_1_xpu_uint8",
-        "test_contig_size1_large_dim_mvlgamma_mvlgamma_p_3_xpu_int64",
-        "test_contig_size1_large_dim_mvlgamma_mvlgamma_p_3_xpu_uint8",
-        "test_contig_size1_large_dim_mvlgamma_mvlgamma_p_5_xpu_int64",
-        "test_contig_size1_large_dim_mvlgamma_mvlgamma_p_5_xpu_uint8",
-        "test_contig_size1_lgamma_xpu_bfloat16",
-        "test_contig_size1_lgamma_xpu_int64",
-        "test_contig_size1_lgamma_xpu_uint8",
-        "test_contig_size1_mvlgamma_mvlgamma_p_1_xpu_int64",
-        "test_contig_size1_mvlgamma_mvlgamma_p_1_xpu_uint8",
-        "test_contig_size1_mvlgamma_mvlgamma_p_3_xpu_int64",
-        "test_contig_size1_mvlgamma_mvlgamma_p_3_xpu_uint8",
-        "test_contig_size1_mvlgamma_mvlgamma_p_5_xpu_int64",
-        "test_contig_size1_mvlgamma_mvlgamma_p_5_xpu_uint8",
-        "test_contig_vs_every_other_lgamma_xpu_bfloat16",
-        "test_contig_vs_every_other_lgamma_xpu_int64",
-        "test_contig_vs_every_other_lgamma_xpu_uint8",
-        "test_contig_vs_every_other_mvlgamma_mvlgamma_p_1_xpu_int64",
-        "test_contig_vs_every_other_mvlgamma_mvlgamma_p_1_xpu_uint8",
-        "test_contig_vs_every_other_mvlgamma_mvlgamma_p_3_xpu_int64",
-        "test_contig_vs_every_other_mvlgamma_mvlgamma_p_3_xpu_uint8",
-        "test_contig_vs_every_other_mvlgamma_mvlgamma_p_5_xpu_int64",
-        "test_contig_vs_every_other_mvlgamma_mvlgamma_p_5_xpu_uint8",
-        "test_contig_vs_transposed_lgamma_xpu_bfloat16",
-        "test_contig_vs_transposed_lgamma_xpu_int64",
-        "test_contig_vs_transposed_lgamma_xpu_uint8",
-        "test_contig_vs_transposed_mvlgamma_mvlgamma_p_1_xpu_int64",
-        "test_contig_vs_transposed_mvlgamma_mvlgamma_p_1_xpu_uint8",
-        "test_contig_vs_transposed_mvlgamma_mvlgamma_p_3_xpu_int64",
-        "test_contig_vs_transposed_mvlgamma_mvlgamma_p_3_xpu_uint8",
-        "test_contig_vs_transposed_mvlgamma_mvlgamma_p_5_xpu_int64",
-        "test_contig_vs_transposed_mvlgamma_mvlgamma_p_5_xpu_uint8",
-        "test_non_contig_expand_lgamma_xpu_bfloat16",
-        "test_non_contig_expand_lgamma_xpu_int64",
-        "test_non_contig_expand_lgamma_xpu_uint8",
-        "test_non_contig_expand_mvlgamma_mvlgamma_p_1_xpu_int64",
-        "test_non_contig_expand_mvlgamma_mvlgamma_p_1_xpu_uint8",
-        "test_non_contig_expand_mvlgamma_mvlgamma_p_3_xpu_int64",
-        "test_non_contig_expand_mvlgamma_mvlgamma_p_3_xpu_uint8",
-        "test_non_contig_expand_mvlgamma_mvlgamma_p_5_xpu_int64",
-        "test_non_contig_expand_mvlgamma_mvlgamma_p_5_xpu_uint8",
-        "test_non_contig_index_lgamma_xpu_bfloat16",
-        "test_non_contig_index_lgamma_xpu_int64",
-        "test_non_contig_index_lgamma_xpu_uint8",
-        "test_non_contig_index_mvlgamma_mvlgamma_p_1_xpu_int64",
-        "test_non_contig_index_mvlgamma_mvlgamma_p_1_xpu_uint8",
-        "test_non_contig_index_mvlgamma_mvlgamma_p_3_xpu_int64",
-        "test_non_contig_index_mvlgamma_mvlgamma_p_3_xpu_uint8",
-        "test_non_contig_index_mvlgamma_mvlgamma_p_5_xpu_int64",
-        "test_non_contig_index_mvlgamma_mvlgamma_p_5_xpu_uint8",
-        "test_non_contig_lgamma_xpu_bfloat16",
-        "test_non_contig_lgamma_xpu_int64",
-        "test_non_contig_lgamma_xpu_uint8",
-        "test_non_contig_mvlgamma_mvlgamma_p_1_xpu_int64",
-        "test_non_contig_mvlgamma_mvlgamma_p_1_xpu_uint8",
-        "test_non_contig_mvlgamma_mvlgamma_p_3_xpu_int64",
-        "test_non_contig_mvlgamma_mvlgamma_p_3_xpu_uint8",
-        "test_non_contig_mvlgamma_mvlgamma_p_5_xpu_int64",
-        "test_non_contig_mvlgamma_mvlgamma_p_5_xpu_uint8",
-        "test_reference_numerics_hard_lgamma_xpu_bfloat16",
-        "test_reference_numerics_hard_lgamma_xpu_int64",
-        "test_reference_numerics_hard_mvlgamma_mvlgamma_p_1_xpu_int64",
-        "test_reference_numerics_hard_mvlgamma_mvlgamma_p_3_xpu_int64",
-        "test_reference_numerics_hard_mvlgamma_mvlgamma_p_5_xpu_int64",
-        "test_reference_numerics_normal_lgamma_xpu_bfloat16",
-        "test_reference_numerics_normal_lgamma_xpu_int64",
-        "test_reference_numerics_normal_lgamma_xpu_uint8",
-        "test_reference_numerics_normal_mvlgamma_mvlgamma_p_1_xpu_int64",
-        "test_reference_numerics_normal_mvlgamma_mvlgamma_p_1_xpu_uint8",
-        "test_reference_numerics_normal_mvlgamma_mvlgamma_p_3_xpu_int64",
-        "test_reference_numerics_normal_mvlgamma_mvlgamma_p_3_xpu_uint8",
-        "test_reference_numerics_normal_mvlgamma_mvlgamma_p_5_xpu_int64",
-        "test_reference_numerics_normal_mvlgamma_mvlgamma_p_5_xpu_uint8",
-
-        # dnnl::concat primitive takes too long time to be constructed for large number of tensors
-        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1536?filter=-2
-        # for details.
-        "test_batch_vs_slicing",
-    #     "test_frexp_out",    # core dumped ... free(): invalid size  -> OOM ../neo/opencl/source/os_interface/linux/drm_command_stream.inl
-    #     "test_out_arg_all_dtypes",   # core dumped ... Segmentation fault
-    },
-    "TestCommonXPU": {
-        # Issue log: "we don't support this path by currently as oneDNN don't support this algorithm!"
-        # This issue may break the legal log and crash the legal run
-        "test_dtypes",  # unknown reason (crash at above onednn issue?)
-        # "test_out",     # core dumped ... free(): invalid size  -> oneDNN assert
-        # "test_variant_consistency_eager",   # core dumped ... Segmentation fault (crashed at linalg_qr)
-        "test_multiple_devices",    # multi device not ready   -> issue in test scripts -> unknown reason (crash at above onednn issue?)
-    },
-    "TestGradientsXPU": {
-    #     "test_fn_grad", # core dumped ... Segmentation fault (crash at linalg_qr)
-
-        # Issue log: "we don't support this path by currently as oneDNN don't support this algorithm!"
-        # This issue may break the legal log and crash the legal run
-        "test_fn_gradgrad", # unknown reason (crash at above onednn issue?)
-        "test_forward_mode_AD", # unknown reason (crash at above onednn issue?)
-        # "test_inplace_forward_mode_AD", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
-        # "test_inplace_grad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
-        "test_inplace_gradgrad", # unknown reason (crash at above onednn issue?)
-    },
-    "TestJitXPU": {
-        # Some unknown GPU hang issue. Need GSE team help.
-        # See Jira: https://jira.devtools.intel.com/browse/XDEPS-4330?filter=-2
-        # for details.
-        "test_variant_consistency_jit",
-    },
-    # "TestMathBitsXPU": {
-        # "test_conj_view",   # core dumped ... munmap_chunk(): invalid pointer
-        # "test_neg_view",  # core dumped ... Segmentation fault (crashed at linalg_qr)  # johnlu segment fault
-    # },
-    # "TestSparseCSRXPU": {
-        # "test_add",     # core dumped ... Floating point exception
-        # "test_coo_to_csr_convert",     # core dumped ... Segmentation fault
-        # "test_csr_matvec",     # core dumped ... Floating point exception
-        # "test_matmul_device_mismatch",  # core dumped ... Segmentation fault
-        # "test_mm",      # core dumped ... Floating point exception
-        # "test_sparse_addmm",    # core dumped ... Floating point exception
-        # "test_sparse_mm",   # core dumped ... Floating point exception
-    # },
-    "TestNNDeviceTypeXPU": {
-        # oneDNN Pooling not support double will cause runtime error:
-        # "could not construct a memory descriptor using a format tag".
-        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1489
-        # for details.
-        "test_AdaptiveMaxPool1d_indices_xpu_float64",
-        "test_AdaptiveMaxPool2d_indices_xpu_float64",
-        "test_AdaptiveMaxPool3d_indices_xpu_float64",
-        "test_AvgPool2d_empty_xpu",
-        "test_AvgPool3d_backward_after_cat_dim1_device_xpu",
-        "test_MaxPool1d_indices_xpu_float64",
-        "test_MaxPool2d_indices_xpu_float64",
-        "test_MaxPool3d_indices_xpu_float64",
-        "test_MaxPool_zero_batch_dim_xpu",
-        "test_MaxUnpool_zero_batch_dim_xpu",
-        "test_avg_pool2d_nhwc_xpu_float64",
-        "test_max_pool2d_nhwc_xpu_float64",
-        "test_max_pool_nan_inf_xpu_float64",
-        "test_maxpool3d_non_square_backward_xpu",
-        "test_maxpool_indices_no_batch_dim_xpu_float64",
-        "test_pool3d_size_one_feature_dim_xpu",
-        "test_pool_large_size_xpu_float64",
-        "test_pooling_shape_xpu",
-
-        # oneDNN Convolution not support double will cause runtime error:
-        # "could not construct a memory descriptor using a format tag".
-        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1490
-        # for details.
-        "test_Conv2d_backward_depthwise_xpu_float64",
-        "test_Conv2d_naive_groups_xpu_float64",
-        "test_Conv2d_size_1_kernel_xpu",
-        "test_ConvTranspose2d_size_1_kernel_xpu",
-        "test_ConvTranspose3d_size_1_kernel_xpu",
-        "test_contig_wrong_stride_xpu",
-        "test_conv1d_same_padding_backward_xpu",
-        "test_conv1d_same_padding_xpu",
-        "test_conv1d_valid_padding_backward_xpu",
-        "test_conv1d_valid_padding_xpu",
-        "test_conv2d_same_padding_backward_xpu",
-        "test_conv2d_same_padding_xpu",
-        "test_conv2d_valid_padding_backward_xpu",
-        "test_conv2d_valid_padding_xpu",
-        "test_conv3d_same_padding_backward_xpu",
-        "test_conv3d_same_padding_xpu",
-        "test_conv3d_valid_padding_backward_xpu",
-        "test_conv3d_valid_padding_xpu",
-        "test_conv_noncontig_weights_xpu",
-
-        # oneDNN RNN not support double will cause runtime error:
-        # "could not construct a memory descriptor using a format tag".
-        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1491
-        # for details.
-        "test_rnn_fused_xpu_float64",
-        "test_rnn_retain_variables_xpu_float64",
-        "test_variable_sequence_xpu_float64",
-
-        # oneDNN Upsample not support double will cause runtime error:
-        # "could not construct a memory descriptor using a format tag".
-        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1492
-        # for details.
-        "test_upsamplingNearest1d_launch_config_xpu",
-        "test_upsamplingNearest2d_launch_config_xpu",
-        "test_upsamplingNearest2d_launch_rocm_xpu",
-        "test_upsamplingNearest2d_xpu",
-        "test_upsamplingNearest3d_launch_config_xpu",
-
-        # "test_conv_ndhwc",  # core dumped ... Segmentation fault
-        # "test_conv_nhwc",   # core dumped ... Segmentation fault
-        "test_conv_transposed_large",   # too slow
-        # "test_grid_sample_large_index_2d",  # too slow
-        # "test_grid_sample_large_index_3d",  # too slow
-        # "test_softmax_64bit_indexing",  # too slow
-        # "test_softmax_results",     # core dumped ... Floating point exception
-    },
-    "TestModuleXPU": {
-        # oneDNN not support double will cause runtime error:
-        # "could not construct a memory descriptor using a format tag".
-        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1489
-        # for details.
-        "test_forward_nn_AvgPool1d_xpu_float64",
-        "test_pickle_nn_AvgPool1d_xpu_float64",
-    },
-    # "TestFFTXPU": {
-        # 'test_batch_istft', # failures
-        # 'test_fft2_fftn_equivalence',   # hang
-        # 'test_fft2_numpy',  # hang
-        # 'test_fft_input_modification',  # hang
-        # 'test_fft_ifft_rfft_irfft',     # failures
-        # 'test_fft_round_trip',  # failures
-        # 'test_fft_type_promotion',  # pass
-        # 'test_fftn_round_trip',     # hang
-        # 'test_istft_of_sine',   # failures
-        # 'test_istft_round_trip_simple_cases',   # failures
-        # 'test_istft_round_trip_various_params',     # failures
-        # 'test_istft_round_trip_with_padding',   # failures
-        # 'test_istft_throws',    # pass
-        # 'test_reference_1d',    # failures
-        # 'test_reference_nd',    # hang
-    # },
-}
-
+DISABLED_TORCH_TESTS_XPU_ONLY = get_skip_list_from_json()
 
 def tf32_is_not_fp32():
     if not torch.xpu.is_available():
@@ -586,36 +250,20 @@ class TestCase(TorchTestCase):
         if self._should_stop_test_suite():
             result.stop()
 
-class MatchSet(object):
-
-    def __init__(self):
-        self.exact = set()
-        self.regex = set()
-
-
-def prepare_match_set(s):
-    ps = dict()
-    for k, v in s.items():
-        mset = MatchSet()
-        for m in v:
-            if re.match(r'\w+$', m):
-                mset.exact.add(m)
-            else:
-                mset.regex.add(m)
-        ps[k] = mset
-    return ps
-
-
-def match_name(name, mset):
-    if not mset:
-        return False
-    if name in mset.exact:
-        return True
-    for m in mset.regex:
-        if re.match(m, name):
+def match_name(name, name_list):
+    for should_skip in name_list:
+        if re.match(should_skip, name, re.M) is not None:
             return True
     return False
 
+def match_dtype(name, dtypes):
+    name_set = set(name.split('_'))
+    for dtype in dtypes:
+        if isinstance(dtype, str) and dtype in name_set:
+            return True
+        if isinstance(dtype, torch.dtype) and str(dtype).split('.')[-1] in name_set:
+            return True
+    return False
 
 def union_of_enabled_tests(sets):
     union = collections.defaultdict(set)
@@ -624,12 +272,22 @@ def union_of_enabled_tests(sets):
             union[k] = union[k] | v
     return union
 
+def _update_param_kwargs(param_kwargs, name, value):
+    """ Adds a kwarg with the specified name and value to the param_kwargs dict. """
+    if isinstance(value, list) or isinstance(value, tuple):
+        # Make name plural (e.g. devices / dtypes) if the value is composite.
+        param_kwargs['{}s'.format(name)] = value
+    elif value:
+        param_kwargs[name] = value
+
+    # Leave param_kwargs as-is when value is None.
+
 DISABLED_TORCH_TESTS_XPU = union_of_enabled_tests(
     [DISABLED_TORCH_TESTS_ANY, DISABLED_TORCH_TESTS_XPU_ONLY])
 
 DISABLED_TORCH_TESTS = {
-    'CPU': prepare_match_set(DISABLED_TORCH_TESTS_ANY),
-    'XPU': prepare_match_set(DISABLED_TORCH_TESTS_XPU),
+    'CPU': DISABLED_TORCH_TESTS_ANY,
+    'XPU': DISABLED_TORCH_TESTS_XPU,
 }
 
 class DPCPPTestBase(DeviceTypeTestBase):
@@ -672,12 +330,35 @@ class DPCPPTestBase(DeviceTypeTestBase):
         # Acquires the current device as the primary (test) device
         cls.primary_device = 'xpu:{0}'.format(torch.xpu.current_device())
 
+    # Returns the dtypes the test has requested.
+    # Prefers device-specific dtype specifications over generic ones.
+    @classmethod
+    def _get_dtypes(cls, test):
+        if not hasattr(test, 'dtypes'):
+            return None
+        return test.dtypes.get(cls.device_type, test.dtypes.get('all', None))
+
+    def _get_precision_override(self, test, dtype):
+        if not hasattr(test, 'precision_overrides'):
+            return self.precision
+        return test.precision_overrides.get(dtype, self.precision)
+
+    def _get_tolerance_override(self, test, dtype):
+        if not hasattr(test, 'tolerance_overrides'):
+            return self.precision, self.rel_tol
+        return test.tolerance_overrides.get(dtype, tol(self.precision, self.rel_tol))
+
+    def _apply_precision_override_for_test(self, test, param_kwargs):
+        dtype = param_kwargs['dtype'] if 'dtype' in param_kwargs else None
+        dtype = param_kwargs['dtypes'] if 'dtypes' in param_kwargs else dtype
+        if dtype:
+            self.precision = self._get_precision_override(test, dtype)
+            self.precision, self.rel_tol = self._get_tolerance_override(test, dtype)
+
     # Overrides to instantiate tests that are known to run quickly
     # and correctly on XPU.
-
     @classmethod
     def instantiate_test(cls, name, test, *, generic_cls=None):
-        test_name = name + '_' + cls.device_type
         reason: str = "not ready on XPU"
         class_name = cls.__name__
         real_device_type = cls.device_type.upper()
@@ -685,67 +366,150 @@ class DPCPPTestBase(DeviceTypeTestBase):
         disabled_torch_tests = DISABLED_TORCH_TESTS[real_device_type]
 
         @wraps(test)
-        def disallowed_test(self, test=test, reason=reason):
+        def disallowed_test(self, test=test, reason="not ready on XPU"):
             raise unittest.SkipTest(reason)
             return test(self, cls.device_type)
 
-        if (match_name(test_name, disabled_torch_tests.get(class_name)) or
-                match_name(name, disabled_torch_tests.get(class_name))):
-            assert not hasattr(
-                cls, test_name), 'Redefinition of test {0}'.format(test_name)
-            setattr(cls, reason, "test")
-            setattr(cls, test_name, disallowed_test)
-        else:  # Test is allowed
-            dtype_combinations = cls._get_dtypes(test)
-            if dtype_combinations is None:  # Tests without dtype variants are instantiated as usual
-                super().instantiate_test(name, copy.deepcopy(test), generic_cls=generic_cls)
-            else:  # Tests with dtype variants have unsupported dtypes skipped
-                # Sets default precision for floating types to bfloat16 precision
-                if not hasattr(test, 'precision_overrides'):
-                    test.precision_overrides = {}
-                xpu_dtypes = []
-                for dtype_combination in dtype_combinations:
-                    if type(dtype_combination) == torch.dtype:
-                        dtype_combination = (dtype_combination,)
-                    dtype_test_name = test_name
-                    skipped = False
-                    for dtype in dtype_combination:
-                        dtype_test_name += '_' + str(dtype).split('.')[1]
-                    for dtype in dtype_combination:
-                        if dtype in cls.unsupported_dtypes:
-                            reason = 'XPU does not support dtype {0}'.format(
-                                str(dtype))
+        @wraps(test)
+        def dissupport_test(self, test=test, reason="dtype not support on XPU"):
+            raise unittest.SkipTest(reason)
+            return test(self, cls.device_type)
 
-                            @wraps(test)
-                            def skipped_test(self, *args, reason=reason, **kwargs):
-                                raise unittest.SkipTest(reason)
+        def instantiate_test_helper(cls, name, *, test, param_kwargs=None):
+            # Constructs the test
+            @wraps(test)
+            def instantiated_test(self, param_kwargs=param_kwargs):
+                # Add the device param kwarg if the test needs device or devices.
+                param_kwargs = {} if param_kwargs is None else param_kwargs
+                test_sig_params = inspect.signature(test).parameters
+                if 'device' in test_sig_params or 'devices' in test_sig_params:
+                    device_arg: str = cls.get_primary_device()
+                    if hasattr(test, 'num_required_devices'):
+                        device_arg = cls.get_all_devices()
+                    _update_param_kwargs(param_kwargs, 'device', device_arg)
 
-                            assert not hasattr(
-                                cls, dtype_test_name), 'Redefinition of test {0}'.format(
-                                dtype_test_name)
-                            skipped = True
-                            setattr(cls, dtype_test_name, skipped_test)
-                            break
-                        if dtype in [torch.float, torch.double, torch.bfloat16]:
-                            floating_precision = DPCPPTestBase._alt_lookup(
-                                TORCH_TEST_PRECISIONS,
-                                [dtype_test_name, test_name, test.__name__],
-                                DEFAULT_FLOATING_PRECISION)
-                            if dtype not in test.precision_overrides or test.precision_overrides[
-                                    dtype] < floating_precision:
-                                test.precision_overrides[dtype] = floating_precision
+                # Sets precision and runs test
+                # Note: precision is reset after the test is run
+                guard_precision = self.precision
+                guard_rel_tol = self.rel_tol
+                try:
+                    self._apply_precision_override_for_test(test, param_kwargs)
+                    result = test(self, **param_kwargs)
+                except RuntimeError as rte:
+                    # check if rte should stop entire test suite.
+                    self._stop_test_suite = self._should_stop_test_suite()
+                    # raise the runtime error as is for the test suite to record.
+                    raise rte
+                finally:
+                    self.precision = guard_precision
+                    self.rel_tol = guard_rel_tol
 
-                    if class_name in disabled_torch_tests and match_name(
-                            dtype_test_name, disabled_torch_tests[class_name]):
-                        skipped = True
-                        setattr(cls, dtype_test_name, disallowed_test)
-                    if not skipped:
-                        xpu_dtypes.append(
-                            dtype_combination
-                            if len(dtype_combination) > 1 else dtype_combination[0])
-                if len(xpu_dtypes) != 0:
-                    test.dtypes[cls.device_type] = xpu_dtypes
-                    super().instantiate_test(name, copy.deepcopy(test), generic_cls=generic_cls)
+                return result
+
+            assert not hasattr(cls, name), "Redefinition of test {0}".format(name)
+            if match_name(name, disabled_torch_tests[class_name]):
+                setattr(cls, name, disallowed_test)
+            elif match_dtype(name, cls.unsupported_dtypes):
+                setattr(cls, name, dissupport_test)
+            else:
+                setattr(cls, name, instantiated_test)
+
+        # Handles tests that need parametrization (e.g. those that run across a set of
+        # ops / modules using the @ops or @modules decorators).
+
+        def default_parametrize_fn(test, generic_cls, cls):
+            # By default, parametrize only over device.
+            test_suffix = cls.device_type
+            yield (test, test_suffix, {})
+
+        parametrize_fn = test.parametrize_fn if hasattr(test, 'parametrize_fn') else default_parametrize_fn
+        for (test, test_suffix, param_kwargs) in parametrize_fn(test, generic_cls, cls):
+            if hasattr(test, 'handles_dtypes') and test.handles_dtypes:
+                full_name = '{}_{}'.format(name, test_suffix)
+                instantiate_test_helper(cls=cls, name=full_name, test=test, param_kwargs=param_kwargs)
+            else:
+                # The parametrize_fn doesn't handle dtypes internally; handle them here instead by generating
+                # a test per dtype.
+                dtypes = cls._get_dtypes(test)
+                dtypes = tuple(dtypes) if dtypes is not None else (None,)
+                for dtype in dtypes:
+                    all_param_kwargs = dict(param_kwargs)
+                    _update_param_kwargs(all_param_kwargs, 'dtype', dtype)
+                    full_name = '{}_{}{}'.format(name, test_suffix, _dtype_test_suffix(dtype))
+                    instantiate_test_helper(cls=cls, name=full_name, test=test, param_kwargs=all_param_kwargs)
+
+
+    # @classmethod
+    # def instantiate_test(cls, name, test, *, generic_cls=None):
+    #     test_name = name + '_' + cls.device_type
+    #     reason: str = "not ready on XPU"
+    #     class_name = cls.__name__
+    #     real_device_type = cls.device_type.upper()
+    #     assert real_device_type in DISABLED_TORCH_TESTS, 'Unsupported device type:' + real_device_type
+    #     disabled_torch_tests = DISABLED_TORCH_TESTS[real_device_type]
+
+    #     @wraps(test)
+    #     def disallowed_test(self, test=test, reason=reason):
+    #         raise unittest.SkipTest(reason)
+    #         return test(self, cls.device_type)
+
+    #     if (match_name(test_name, disabled_torch_tests.get(class_name)) or
+    #             match_name(name, disabled_torch_tests.get(class_name))):
+    #         assert not hasattr(
+    #             cls, test_name), 'Redefinition of test {0}'.format(test_name)
+    #         setattr(cls, reason, "test")
+    #         setattr(cls, test_name, disallowed_test)
+    #     else:  # Test is allowed
+    #         dtype_combinations = cls._get_dtypes(test)
+    #         if dtype_combinations is None:  # Tests without dtype variants are instantiated as usual
+    #             super().instantiate_test(name, copy.deepcopy(test), generic_cls=generic_cls)
+    #         else:  # Tests with dtype variants have unsupported dtypes skipped
+    #             # Sets default precision for floating types to bfloat16 precision
+    #             if not hasattr(test, 'precision_overrides'):
+    #                 test.precision_overrides = {}
+    #             xpu_dtypes = []
+    #             for dtype_combination in dtype_combinations:
+    #                 if type(dtype_combination) == torch.dtype:
+    #                     dtype_combination = (dtype_combination,)
+    #                 dtype_test_name = test_name
+    #                 skipped = False
+    #                 for dtype in dtype_combination:
+    #                     dtype_test_name += '_' + str(dtype).split('.')[1]
+    #                 for dtype in dtype_combination:
+    #                     if dtype in cls.unsupported_dtypes:
+    #                         reason = 'XPU does not support dtype {0}'.format(
+    #                             str(dtype))
+
+    #                         @wraps(test)
+    #                         def skipped_test(self, *args, reason=reason, **kwargs):
+    #                             raise unittest.SkipTest(reason)
+
+    #                         assert not hasattr(
+    #                             cls, dtype_test_name), 'Redefinition of test {0}'.format(
+    #                             dtype_test_name)
+    #                         skipped = True
+    #                         setattr(cls, dtype_test_name, skipped_test)
+    #                         break
+    #                     if dtype in [torch.float, torch.double, torch.bfloat16]:
+    #                         floating_precision = DPCPPTestBase._alt_lookup(
+    #                             TORCH_TEST_PRECISIONS,
+    #                             [dtype_test_name, test_name, test.__name__],
+    #                             DEFAULT_FLOATING_PRECISION)
+    #                         if dtype not in test.precision_overrides or test.precision_overrides[
+    #                                 dtype] < floating_precision:
+    #                             test.precision_overrides[dtype] = floating_precision
+
+    #                 if class_name in disabled_torch_tests and match_name(
+    #                         dtype_test_name, disabled_torch_tests[class_name]):
+    #                     skipped = True
+    #                     setattr(cls, dtype_test_name, disallowed_test)
+    #                 if not skipped:
+    #                     xpu_dtypes.append(
+    #                         dtype_combination
+    #                         if len(dtype_combination) > 1 else dtype_combination[0])
+    #             if len(xpu_dtypes) != 0:
+    #                 test.dtypes[cls.device_type] = xpu_dtypes
+    #                 super().instantiate_test(name, copy.deepcopy(test), generic_cls=generic_cls)
 
 
 class dtypes(object):

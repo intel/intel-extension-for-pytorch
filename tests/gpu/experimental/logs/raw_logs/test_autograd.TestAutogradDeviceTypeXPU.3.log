@@ -1,0 +1,202 @@
+test_advanced_indexing_backwards_large_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_advanced_indexing_backwards_memory_format_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_atleast_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_backward_device_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_cdist_grad_p_lt_1_no_nan_xpu (__main__.TestAutogradDeviceTypeXPU) ... FAIL
+test_cdist_same_inputs_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_cdist_xpu (__main__.TestAutogradDeviceTypeXPU) ... ERROR
+test_copy__xpu (__main__.TestAutogradDeviceTypeXPU) ... skipped 'Only runs on cpu'
+test_copy_r_to_c_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_copysign_subgradient_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_cross_device_reentrant_autograd_xpu (__main__.TestAutogradDeviceTypeXPU) ... /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autocast_mode.py:141: UserWarning: User provided device_type of 'cuda', but CUDA is not available. Disabling
+  warnings.warn('User provided device_type of \'cuda\', but CUDA is not available. Disabling')
+ok
+test_ctc_loss_xpu (__main__.TestAutogradDeviceTypeXPU) ... ERROR
+test_elu_inplace_with_neg_alpha_xpu (__main__.TestAutogradDeviceTypeXPU) ... FAIL
+test_free_unneeded_tensor_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_grad_assignment_xpu (__main__.TestAutogradDeviceTypeXPU) ... FAIL
+test_gradcheck_input_output_different_device_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_multiple_output_view_of_view_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_on_view_backprop_base_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_on_view_backprop_view_of_view_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_on_view_backprop_view_xpu (__main__.TestAutogradDeviceTypeXPU) ... /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_tensor.py:1013: UserWarning: The .grad attribute of a Tensor that is not a leaf Tensor is being accessed. Its .grad attribute won't be populated during autograd.backward(). If you indeed want the .grad field to be populated for a non-leaf Tensor, use .retain_grad() on the non-leaf Tensor. If you access the non-leaf Tensor by mistake, make sure you access the leaf Tensor instead. See github.com/pytorch/pytorch/pull/30531 for more informations. (Triggered internally at  aten/src/ATen/core/TensorBody.h:412.)
+  return self._grad
+ok
+test_inplace_on_view_gradcheck_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_on_view_makes_base_require_grad_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_on_view_modify_base_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_on_view_multi_output_safe_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_on_view_multi_output_unsafe_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_on_view_multiple_outputs_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_on_view_non_contig_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_on_view_of_multiple_output_view_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_on_view_of_view_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_on_view_python_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inplace_on_view_then_no_grad_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_inputbuffer_add_multidevice_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_leaky_relu_inplace_with_neg_slope_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_leaky_relu_inplace_with_zero_slope_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_logcumsumexp_large_value_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_lstmcell_backward_only_one_output_grad_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_min_max_median_backprops_to_all_values_xpu (__main__.TestAutogradDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::nanmedian' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::nanmedian' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: fallthrough registered at ../aten/src/ATen/core/NamedRegistrations.cpp:11 [kernel]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: fallthrough registered at ../aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_4.cpp:9308 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_mv_grad_stride_0_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_non_differentiable_ops_xpu (__main__.TestAutogradDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::isin.Tensor_Tensor_out' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::isin.Tensor_Tensor_out' is only available for these backends: [CPU, Meta, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nMeta: registered at aten/src/ATen/RegisterMeta.cpp:12703 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: registered at ../torch/csrc/autograd/generated/ADInplaceOrViewType_0.cpp:2505 [kernel]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_1.cpp:10664 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_parameter_resize_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_pdist_large_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_pin_memory_xpu (__main__.TestAutogradDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::_pin_memory' with arguments from the 'CUDA' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::_pin_memory' is only available for these backends: [BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nBackendSelect: registered at aten/src/ATen/RegisterBackendSelect.cpp:665 [kernel]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: fallthrough registered at ../aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_0.cpp:10257 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_pyscalar_conversions_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_reentrant_parent_error_on_cpu_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_requires_grad_factory_xpu_float32 (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_requires_grad_factory_xpu_float64 (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_rnn_backward_to_input_but_not_parameters_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_set_requires_grad_only_for_floats_xpu_float16 (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_set_requires_grad_only_for_floats_xpu_float32 (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_set_requires_grad_only_for_floats_xpu_float64 (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_set_requires_grad_only_for_floats_xpu_int16 (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_set_requires_grad_only_for_floats_xpu_int32 (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_set_requires_grad_only_for_floats_xpu_int64 (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_set_requires_grad_only_for_floats_xpu_int8 (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_simple_reentrant_cross_device_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_sparse_backward_xpu_complex128 (__main__.TestAutogradDeviceTypeXPU) ... skipped 'dtype not support on XPU'
+test_sparse_backward_xpu_float64 (__main__.TestAutogradDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::add.out' with arguments from the 'SparseXPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::add.out' is only available for these backends: [CPU, XPU, Meta, MkldnnCPU, SparseCPU, SparseCsrCPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nXPU: registered at /home/gta/xunsongh/ipex-gpu/build/csrc/aten/generated/ATen/RegisterXPU.cpp:11184 [kernel]\nMeta: registered at aten/src/ATen/RegisterMeta.cpp:12703 [kernel]\nMkldnnCPU: registered at aten/src/ATen/RegisterMkldnnCPU.cpp:595 [kernel]\nSparseCPU: registered at aten/src/ATen/RegisterSparseCPU.cpp:958 [kernel]\nSparseCsrCPU: registered at aten/src/ATen/RegisterSparseCsrCPU.cpp:221 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: fallthrough registered at ../aten/src/ATen/core/NamedRegistrations.cpp:11 [kernel]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: registered at ../torch/csrc/autograd/generated/ADInplaceOrViewType_0.cpp:2505 [kernel]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_4.cpp:8932 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_4.cpp:9308 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_sparse_ctor_getter_backward_xpu_complex128 (__main__.TestAutogradDeviceTypeXPU) ... skipped 'dtype not support on XPU'
+test_sparse_ctor_getter_backward_xpu_float64 (__main__.TestAutogradDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::sparse_resize_and_clear_' with arguments from the 'SparseXPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::sparse_resize_and_clear_' is only available for these backends: [Meta, SparseCPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nMeta: registered at aten/src/ATen/RegisterMeta.cpp:12703 [kernel]\nSparseCPU: registered at aten/src/ATen/RegisterSparseCPU.cpp:958 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: registered at ../torch/csrc/autograd/generated/ADInplaceOrViewType_0.cpp:2505 [kernel]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_0.cpp:10257 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_sparse_mask_autograd_xpu (__main__.TestAutogradDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::to_sparse' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::to_sparse' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: fallthrough registered at ../aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_0.cpp:10257 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_strided_leaf_grad_layout_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_unused_output_device_xpu (__main__.TestAutogradDeviceTypeXPU) ... ERROR
+test_where_functional_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_where_scalar_xpu (__main__.TestAutogradDeviceTypeXPU) ... ok
+test_xlogy_xpu (__main__.TestAutogradDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::xlogy.OutTensor' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::xlogy.OutTensor' is only available for these backends: [CPU, Meta, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nMeta: registered at aten/src/ATen/RegisterMeta.cpp:12703 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: registered at ../torch/csrc/autograd/generated/ADInplaceOrViewType_0.cpp:2505 [kernel]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_0.cpp:8878 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_0.cpp:10257 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+
+======================================================================
+ERROR: test_cdist_xpu (__main__.TestAutogradDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 402, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_autograd.py", line 7710, in test_cdist
+    _test_euclidean_large_cdist((2000, 5))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_autograd.py", line 7708, in _test_euclidean_large_cdist
+    loss.backward()
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_tensor.py", line 307, in backward
+    torch.autograd.backward(self, gradient, retain_graph, create_graph, inputs=inputs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 154, in backward
+    Variable._execution_engine.run_backward(
+RuntimeError: Provided range is out of integer limits. Pass `-fno-sycl-id-queries-fit-in-int' to disable range check. -30 (CL_INVALID_VALUE)
+
+======================================================================
+ERROR: test_ctc_loss_xpu (__main__.TestAutogradDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 402, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 597, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_autograd.py", line 8089, in test_ctc_loss
+    gradcheck(ctc_after_softmax, [x])
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2688, in gradcheck
+    return torch.autograd.gradcheck(fn, inputs, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/gradcheck.py", line 1263, in gradcheck
+    return _gradcheck_helper(**args)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/gradcheck.py", line 1276, in _gradcheck_helper
+    _gradcheck_real_imag(gradcheck_fn, func, func_out, tupled_inputs, outputs, eps,
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/gradcheck.py", line 946, in _gradcheck_real_imag
+    gradcheck_fn(func, func_out, tupled_inputs, outputs, eps,
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/gradcheck.py", line 1165, in _fast_gradcheck
+    analytical_vJu = _get_analytical_vJu_backward_mode(inputs, outputs, nondet_tol, check_grad_dtypes, all_v, all_u_dense)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/gradcheck.py", line 555, in _get_analytical_vJu_backward_mode
+    all_vJ = _check_analytical_jacobian_attributes(inputs, output, nondet_tol, check_grad_dtypes,
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/gradcheck.py", line 544, in _check_analytical_jacobian_attributes
+    raise GradcheckError('Backward is not reentrant, i.e., running backward with '
+torch.autograd.gradcheck.GradcheckError: Backward is not reentrant, i.e., running backward with same input and grad_output multiple times gives different values, although analytical gradient matches numerical gradient.The tolerance for nondeterminism was 0.0.
+
+NOTE: If your op relies on non-deterministic operations i.e., it is listed here:
+https://pytorch.org/docs/stable/generated/torch.use_deterministic_algorithms.html
+this failure might be expected.
+
+If you are adding a new operator, please file an issue and then use one of the
+workarounds. The workaround depends on how your test invokes gradcheck/gradgradcheck.
+If the test
+- manually invokes gradcheck/gradgradcheck, then call gradcheck/gradgradcheck
+  with `nondet_tol=<tol>` as a keyword argument.
+- is OpInfo-based (e.g., in test_ops.py), then modify the OpInfo for the test
+  to have `gradcheck_nondet_tol=<tol>`.
+- is a Module test (e.g., in common_nn.py), then modify the corresponding
+  module_test entry to have `gradcheck_nondet_tol=<tol>`
+
+
+======================================================================
+ERROR: test_unused_output_device_xpu (__main__.TestAutogradDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 905, in multi_fn
+    return fn(slf, devices, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_autograd.py", line 8262, in test_unused_output_device
+    outputs = Broadcast.apply(list(range(len(devices))), x)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/parallel/_functions.py", line 23, in forward
+    outputs = comm.broadcast_coalesced(inputs, ctx.target_gpus)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/parallel/comm.py", line 58, in broadcast_coalesced
+    return torch._C._broadcast_coalesced(tensors, devices, buffer_size)
+AttributeError: module 'torch._C' has no attribute '_broadcast_coalesced'
+
+======================================================================
+FAIL: test_cdist_grad_p_lt_1_no_nan_xpu (__main__.TestAutogradDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_autograd.py", line 7721, in test_cdist_grad_p_lt_1_no_nan
+    self.assertFalse(torch.isnan(x.grad).any())
+AssertionError: tensor(True, device='xpu:0') is not false
+
+======================================================================
+FAIL: test_elu_inplace_with_neg_alpha_xpu (__main__.TestAutogradDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_autograd.py", line 8120, in test_elu_inplace_with_neg_alpha
+    b.backward(torch.ones(2, device=device))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1282, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_grad_assignment_xpu (__main__.TestAutogradDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 905, in multi_fn
+    return fn(slf, devices, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_autograd.py", line 8243, in test_grad_assignment
+    x.grad = torch.randn(5, 5, device=devices[1])
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1282, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+----------------------------------------------------------------------
+Ran 65 tests in 44.500s
+
+FAILED (failures=3, errors=3, skipped=10)
+Raised CalledProcessError: return code 1.

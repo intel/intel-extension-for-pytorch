@@ -163,63 +163,99 @@ class TestTorchMethod(TestCase):
 
 ## RUN the Whole Test Suite
 
-* run the shell script under `tests/gpu/experimental` like:
+* run the python script under `tests/gpu/pytorch` like:
 
 ```
-bash tests/gpu/experimental/run_tests.sh
+python tests/gpu/pytorch/run_tests.py [--options opts]
 ```
 
-* the default log file is under `tests/gpu/experimental/logs`, but you can also save your own log file at where you want:
+* the default log file is under `tests/gpu/pytorch/logs/raw_logs`.
+
+## Get the usage of options
+
+* run the python script with `--help` like:
 
 ```
-cd tests/gpu/experimental
-bash run_tests.sh -L <path-to>/full_logfile.log
+python tests/gpu/pytorch/run_tests.py --help
 ```
 
-## RUN ONE Specific Test
-
-* pass necessary flags `-S` and `-F <filename> -V <classname> -K <testcase>` to the shell script like:
+* you may see decriptions of options like:
 
 ```
-cd tests/gpu/experimental
-bash run_tests.sh -S -F test_unary_ufuncs.py -V TestUnaryUfuncsXPU -K test_abs_zero_xpu_float32
+usage: run_tests.py [-h] [--logdir logdir] [--spec spectest] [-c count] [-t timeout]
+                    [--parallel] [--autoskip] [-q] [--ignore] [--clean]
+
+Main script to run all or specific tests
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --logdir logdir       the path of logfile to store, it should be a directory
+  --spec spectest       the full name of a specific test case. It should be in format:
+                        'filename::classname::casename'. In some cases, the case name is
+                        optional like 'filename::classname' and all cases in the test class will
+                        be triggered.
+  -c count, --count count
+                        loop times of each test class. Each round of run will be logged into
+                        different log files.
+  -t timeout, --timeout timeout
+                        time limit for each test class in seconds. A zero stand for non-
+                        limitation.
+  --parallel            run whole test in single process if set
+  --autoskip            auto skip core dumped cases and hang cases an re-run corresponding test
+                        class if set
+  -q, --quiet           don't print out detailed results to screen if set
+  --ignore              ignore common failures and errors, and continue to run next test class
+                        if set
+  --clean               clean raw logs
 ```
 
-## RUN a Serial of a Specific OP or Class
 
-* you can run a specific test class which contains all test cases within it, just leave the `-K` argument as empty
+## Suggested command for running
 
-* you can run a serial specific test cases with different dtypes as also, just pass a prefix of the full test name like:
+* you can run the whole tests with time threshold, multi-epoches and auto skip core dumped or hang cases like:
+
 ```
-bash run_tests.sh -S -F test_unary_ufuncs.py -V TestUnaryUfuncsXPU -K test_abs_zero
+python tests_gpu_pytorch/run_tests.py --clean
+python tests/gpu/pytorch/run_tests.py -c 3 -t 3600 --autoskip --quiet
 ```
 
 ## SKIP ONE Specific Test
 
-* to add the test name with its class into `common/pytorch_test_base.py` like:
+* to add the test name with its class into `common/skip_list.json` with explict reasons.
 
-```
-DISABLED_TORCH_TESTS_XPU_ONLY = {
-    "TestUnaryUfuncsXPU": {
-        'test_abs_zero', # reasons
-    },
-}
-```
-
-* some cases which missed an implementation of without XPU support were skipped by default. If you want to run it anyway, please contact the developer Xunsong, Huang <xunsong.huang@intel.com> for details.
+* strongly recommend skip core dumped issues and hang issues by auto skip mechanism
 
 ## USE the UT Analyzer to get analysis data
 
-* pass `--logfile <path-to>/<filename>` to the UT analyzer under `tests/gpu/experimental/common` like:
+* run python script `ut_analyzer.py` under `tests/gpu/pytorch/common` like:
 
 ```
-python ut_analyzer.py --logfile my_logfile.log
+python tests/gpu/pytorch/common/ut_analyzer.py [--options opts]
 ```
 
-* this analyzer will output a summary of result like pass rate, fail rate, etc. And also it will dump out detailed log list for each classified field under `tests/gpu/pytorch/logs` as well.
+* this analyzer will output a summary of result like pass rate, fail rate, etc. And also it will dump out detailed log list for each classified field under `tests/gpu/pytorch/logs/anls_logs` as well.
 
-## Known Issues
+## Get the usage of options
 
-* the whole test will hang after finishing the TestReductionXPU class. A SIGTERM is necessary for continuing the remained tests.
+* run the python script with `--help` like:
 
+```
+python tests/gpu/pytorch/common/ut_analyzer.py --help
+```
+
+* you may see decriptions of options like:
+
+```
+usage: ut_analyzer.py [-h] [--logdir logdir] [--saveref] [--compare] [--clean]
+
+Auto script for analysing raw logs
+
+optional arguments:
+  -h, --help       show this help message and exit
+  --logdir logdir  the path of logfiles stored, it should be a directory and must have
+                   'raw_logs' under this path
+  --saveref        save reference pass list if no break tests
+  --compare        compare current pass list against reference to see if regression occurred
+  --clean          clean analysis logs
+```
 

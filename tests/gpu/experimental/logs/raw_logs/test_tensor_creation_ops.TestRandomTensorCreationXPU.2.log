@@ -1,0 +1,148 @@
+test_normal_std_error_xpu (__main__.TestRandomTensorCreationXPU) ... ok
+test_normal_xpu_float32 (__main__.TestRandomTensorCreationXPU) ... ok
+test_normal_xpu_float64 (__main__.TestRandomTensorCreationXPU) ... ok
+test_rand_xpu_complex128 (__main__.TestRandomTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_rand_xpu_complex64 (__main__.TestRandomTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_rand_xpu_float32 (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_rand_xpu_float64 (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_randint_inference_xpu (__main__.TestRandomTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_randint_xpu (__main__.TestRandomTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_randn_xpu_bfloat16 (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_randn_xpu_complex128 (__main__.TestRandomTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_randn_xpu_complex64 (__main__.TestRandomTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_randn_xpu_float16 (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_randn_xpu_float32 (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_randn_xpu_float64 (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_random_neg_values_xpu (__main__.TestRandomTensorCreationXPU) ... ok
+test_randperm_device_compatibility_xpu (__main__.TestRandomTensorCreationXPU) ... ERROR
+test_randperm_xpu (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_uniform_from_to_xpu_bfloat16 (__main__.TestRandomTensorCreationXPU) ... ok
+test_uniform_from_to_xpu_float16 (__main__.TestRandomTensorCreationXPU) ... ok
+test_uniform_from_to_xpu_float32 (__main__.TestRandomTensorCreationXPU) ... ok
+test_uniform_from_to_xpu_float64 (__main__.TestRandomTensorCreationXPU) ... ok
+
+======================================================================
+ERROR: test_randperm_device_compatibility_xpu (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 402, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 558, in only_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 3529, in test_randperm_device_compatibility
+    xpu_gen = torch.Generator(device='xpu')
+RuntimeError: Device type XPU is not supported for torch.Generator() api.
+
+======================================================================
+FAIL: test_rand_xpu_float32 (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 3470, in test_rand
+    self.assertEqual(res1, res2)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1.3e-06 and atol=0.001, found 9978 element(s) (out of 10000) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.9853526949882507 (0.9951502084732056 vs. 0.009797513484954834), which occurred at index (4, 22).
+
+======================================================================
+FAIL: test_rand_xpu_float64 (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 3470, in test_rand
+    self.assertEqual(res1, res2)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 9981 element(s) (out of 10000) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.9942158520334675 (0.0024438163871361995 vs. 0.9966596684206037), which occurred at index (36, 75).
+
+======================================================================
+FAIL: test_randn_xpu_bfloat16 (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 3459, in test_randn
+    self.assertEqual(res1, res2)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=0.016 and atol=0.001, found 9923 element(s) (out of 10000) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 5.203125 (-2.765625 vs. 2.4375), which occurred at index (45, 66).
+
+======================================================================
+FAIL: test_randn_xpu_float16 (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 3459, in test_randn
+    self.assertEqual(res1, res2)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=0.001 and atol=0.001, found 9991 element(s) (out of 10000) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 5.783203125 (-2.58203125 vs. 3.201171875), which occurred at index (15, 92).
+
+======================================================================
+FAIL: test_randn_xpu_float32 (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 3459, in test_randn
+    self.assertEqual(res1, res2)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1.3e-06 and atol=0.001, found 9997 element(s) (out of 10000) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 5.690647840499878 (-3.1072824001312256 vs. 2.5833654403686523), which occurred at index (44, 27).
+
+======================================================================
+FAIL: test_randn_xpu_float64 (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 3459, in test_randn
+    self.assertEqual(res1, res2)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 9996 element(s) (out of 10000) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 5.6284040791638175 (-2.875022275705157 vs. 2.7533818034586606), which occurred at index (12, 64).
+
+======================================================================
+FAIL: test_randperm_xpu (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 3488, in test_randperm
+    with torch.random.fork_rng(devices=rng_device):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/contextlib.py", line 119, in __enter__
+    return next(self.gen)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/random.py", line 122, in fork_rng
+    gpu_rng_states.append(torch.cuda.get_rng_state(device))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/cuda/random.py", line 22, in get_rng_state
+    _lazy_init()
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/cuda/__init__.py", line 208, in _lazy_init
+    raise AssertionError("Torch not compiled with CUDA enabled")
+AssertionError: Torch not compiled with CUDA enabled
+
+----------------------------------------------------------------------
+Ran 22 tests in 7.970s
+
+FAILED (failures=7, errors=1, skipped=6)
+Raised CalledProcessError: return code 1.

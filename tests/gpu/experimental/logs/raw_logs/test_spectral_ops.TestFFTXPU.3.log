@@ -1,0 +1,866 @@
+test_batch_istft_xpu (__main__.TestFFTXPU) ... /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/functional.py:647: UserWarning: istft will require a complex-valued input tensor in a future PyTorch release. Matching the output from stft with return_complex=True.  (Triggered internally at  ../aten/src/ATen/native/SpectralOps.cpp:809.)
+  return _VF.istft(input, n_fft, hop_length, win_length, window, center,  # type: ignore[attr-defined]
+FAIL
+test_complex_istft_real_equiv_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_complex_stft_definition_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_complex_stft_onesided_xpu (__main__.TestFFTXPU) ... ok
+test_complex_stft_real_equiv_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_complex_stft_roundtrip_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_complex_stft_roundtrip_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_cufft_plan_cache_xpu_float64 (__main__.TestFFTXPU) ... ERROR
+test_empty_fft_fft_fft_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_fft_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_fft_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_fft_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_fftn_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_fftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_fftn_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_fftn_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_hfft_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_hfft_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_hfft_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_hfft_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_ifft_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_ifft_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_ifft_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_ifft_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_ifftn_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_ifftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_ifftn_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_ifftn_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_ihfft_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_ihfft_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_irfft_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_irfft_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_irfft_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_irfft_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_irfftn_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_irfftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_empty_fft_fft_irfftn_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_irfftn_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_rfft_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_rfft_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_rfftn_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_empty_fft_fft_rfftn_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_fft2_fftn_equivalence_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_fft2_fftn_equivalence_xpu_float32 (__main__.TestFFTXPU) ... FAIL
+test_fft2_invalid_xpu (__main__.TestFFTXPU) ... ok
+test_fft2_numpy_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_fft2_numpy_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_fft_half_and_bfloat16_errors_fft_fft_xpu_bfloat16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_fft_xpu_float16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_fftn_xpu_bfloat16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_fftn_xpu_float16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_hfft_xpu_bfloat16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_hfft_xpu_float16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_ifft_xpu_bfloat16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_ifft_xpu_float16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_ifftn_xpu_bfloat16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_ifftn_xpu_float16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_ihfft_xpu_bfloat16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_ihfft_xpu_float16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_irfft_xpu_bfloat16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_irfft_xpu_float16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_irfftn_xpu_bfloat16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_irfftn_xpu_float16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_rfft_xpu_bfloat16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_rfft_xpu_float16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_rfftn_xpu_bfloat16 (__main__.TestFFTXPU) ... ok
+test_fft_half_and_bfloat16_errors_fft_rfftn_xpu_float16 (__main__.TestFFTXPU) ... ok
+test_fft_ifft_rfft_irfft_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_fft_input_modification_xpu (__main__.TestFFTXPU) ... ok
+test_fft_invalid_dtypes_xpu (__main__.TestFFTXPU) ... ok
+test_fft_plan_repeatable_xpu (__main__.TestFFTXPU) ... ok
+test_fft_round_trip_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_fft_round_trip_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_fft_round_trip_xpu_float32 (__main__.TestFFTXPU) ... FAIL
+test_fft_round_trip_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_fft_type_promotion_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_fft_type_promotion_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_fft_type_promotion_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_fft_type_promotion_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_fft_type_promotion_xpu_int8 (__main__.TestFFTXPU) ... ok
+test_fftfreq_numpy_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_fftfreq_numpy_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_fftfreq_out_xpu_float32 (__main__.TestFFTXPU) ... FAIL
+test_fftfreq_out_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_fftn_invalid_fft_fftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_fftn_invalid_fft_fftn_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_fftn_invalid_fft_ifftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_fftn_invalid_fft_ifftn_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_fftn_invalid_fft_irfftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_fftn_invalid_fft_irfftn_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_fftn_invalid_fft_rfftn_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_fftn_round_trip_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_fftn_round_trip_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_fftn_round_trip_xpu_float32 (__main__.TestFFTXPU) ... FAIL
+test_fftn_round_trip_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_fftshift_frequencies_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_fftshift_frequencies_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_fftshift_numpy_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_fftshift_numpy_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_fftshift_numpy_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_fftshift_numpy_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_istft_linearity_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_istft_of_sine_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_istft_round_trip_simple_cases_xpu_float64 (__main__.TestFFTXPU)
+stft -> istft should recover the original signale ... FAIL
+test_istft_round_trip_various_params_xpu_float64 (__main__.TestFFTXPU)
+stft -> istft should recover the original signale ... FAIL
+test_istft_round_trip_with_padding_xpu_float64 (__main__.TestFFTXPU)
+long hop_length or not centered may cause length mismatch in the inversed signal ... FAIL
+test_istft_throws_xpu (__main__.TestFFTXPU)
+istft should throw exception for invalid parameters ... ok
+test_reference_1d_fft_fft_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_1d_fft_fft_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_1d_fft_fft_xpu_float32 (__main__.TestFFTXPU) ... FAIL
+test_reference_1d_fft_fft_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_reference_1d_fft_hfft_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_1d_fft_hfft_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_1d_fft_hfft_xpu_float32 (__main__.TestFFTXPU) ... FAIL
+test_reference_1d_fft_hfft_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_reference_1d_fft_ifft_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_1d_fft_ifft_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_1d_fft_ifft_xpu_float32 (__main__.TestFFTXPU) ... FAIL
+test_reference_1d_fft_ifft_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_reference_1d_fft_ihfft_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_reference_1d_fft_ihfft_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_reference_1d_fft_irfft_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_1d_fft_irfft_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_1d_fft_irfft_xpu_float32 (__main__.TestFFTXPU) ... FAIL
+test_reference_1d_fft_irfft_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_reference_1d_fft_rfft_xpu_float32 (__main__.TestFFTXPU) ... ok
+test_reference_1d_fft_rfft_xpu_float64 (__main__.TestFFTXPU) ... ok
+test_reference_nd_fft_fftn_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_nd_fft_fftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_nd_fft_fftn_xpu_float32 (__main__.TestFFTXPU) ... ERROR
+test_reference_nd_fft_fftn_xpu_float64 (__main__.TestFFTXPU) ... ERROR
+test_reference_nd_fft_ifftn_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_nd_fft_ifftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_nd_fft_ifftn_xpu_float32 (__main__.TestFFTXPU) ... FAIL
+test_reference_nd_fft_ifftn_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_reference_nd_fft_irfftn_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_nd_fft_irfftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_reference_nd_fft_irfftn_xpu_float32 (__main__.TestFFTXPU) ... FAIL
+test_reference_nd_fft_irfftn_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_reference_nd_fft_rfftn_xpu_float32 (__main__.TestFFTXPU) ... FAIL
+test_reference_nd_fft_rfftn_xpu_float64 (__main__.TestFFTXPU) ... FAIL
+test_stft_requires_complex_xpu (__main__.TestFFTXPU) ... /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/functional.py:572: UserWarning: stft will soon require the return_complex parameter be given for real inputs, and will further require that return_complex=True in a future PyTorch release. (Triggered internally at  ../aten/src/ATen/native/SpectralOps.cpp:656.)
+  return _VF.stft(input, n_fft, hop_length, win_length, window,  # type: ignore[attr-defined]
+ok
+test_stft_roundtrip_complex_window_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_stft_roundtrip_complex_window_xpu_float64 (__main__.TestFFTXPU) ... skipped "not implemented: Could not run 'aten::replication_pad1d.out' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::replication_pad1d.out' is only available for these backends: [CPU, Meta, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nMeta: registered at aten/src/ATen/RegisterMeta.cpp:12703 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: registered at ../torch/csrc/autograd/generated/ADInplaceOrViewType_0.cpp:2505 [kernel]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_1.cpp:10664 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_stft_window_device_xpu (__main__.TestFFTXPU) ... ok
+test_stft_xpu_float64 (__main__.TestFFTXPU) ... skipped 'librosa not found'
+
+======================================================================
+ERROR: test_cufft_plan_cache_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 905, in multi_fn
+    return fn(slf, devices, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 558, in only_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 752, in test_cufft_plan_cache
+    with plan_cache_max_size(devices[0], max(1, torch.backends.xpu.cufft_plan_cache.size - 10)):
+AttributeError: module 'torch.backends' has no attribute 'xpu'
+
+======================================================================
+ERROR: test_reference_nd_fft_fftn_xpu_float32 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 402, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 402, in test_reference_nd
+    actual = op(input, s, dim, norm)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_methods_invocations.py", line 626, in __call__
+    return self.op(*args, **kwargs)
+RuntimeError: FFT_INVALID_DESCRIPTOR
+
+======================================================================
+ERROR: test_reference_nd_fft_fftn_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 402, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 402, in test_reference_nd
+    actual = op(input, s, dim, norm)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_methods_invocations.py", line 626, in __call__
+    return self.op(*args, **kwargs)
+RuntimeError: FFT_INVALID_DESCRIPTOR
+
+======================================================================
+FAIL: test_batch_istft_xpu (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 1386, in test_batch_istft
+    self.assertEqual(i_original.repeat(4, 1), i_multi, atol=1e-6, rtol=0, exact_dtype=True)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=0 and atol=0.001, found 10 element(s) (out of 16) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.3333333432674408 (0.3333333432674408 vs. 0.0), which occurred at index (0, 3).
+
+======================================================================
+FAIL: test_complex_stft_roundtrip_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 910, in test_complex_stft_roundtrip
+    self.assertEqual(x_roundtrip, x)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 600 element(s) (out of 600) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 2.9093207825523946 (0.5267105336240665 vs. -2.382610248928328), which occurred at index 103.
+
+======================================================================
+FAIL: test_fft2_fftn_equivalence_xpu_float32 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 560, in test_fft2_fftn_equivalence
+    self.assertEqual(actual, expect)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1.3e-06 and atol=0.001, found 16 element(s) (out of 32) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 6.5532802845430505e+31 (-6.5532802845430505e+31 vs. 464282419200.0), which occurred at index (0, 3).
+
+======================================================================
+FAIL: test_fft2_numpy_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 510, in test_fft2_numpy
+    self.assertEqual(actual, expected)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 32 element(s) (out of 32) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.5896743348805236 (0.3395114060340461 vs. -0.2501629288464775), which occurred at index (3, 1).
+
+======================================================================
+FAIL: test_fft_ifft_rfft_irfft_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 735, in test_fft_ifft_rfft_irfft
+    self._test_fft_ifft_rfft_irfft(device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 705, in _test_fft_ifft_rfft_irfft
+    _test_real((10, 1, 10, 100), 1)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 697, in _test_real
+    self.assertEqual(x, rec, atol=1e-8, rtol=0, msg='rfft and irfft')
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=0 and atol=0.001, found 9931 element(s) (out of 10000) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 4.776879745525556 (-4.015970163553798 vs. 0.7609095819717576), which occurred at index (0, 0, 6, 87).
+rfft and irfft
+
+======================================================================
+FAIL: test_fft_round_trip_xpu_float32 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 297, in test_fft_round_trip
+    self.assertEqual(x, y, exact_dtype=(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1.3e-06 and atol=0.001, found 67 element(s) (out of 67) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 1.4127989541214936 ((1.7787799835205078+0j) vs. (0.8708786964416504-1.0824583768844604j)), which occurred at index 57.
+
+======================================================================
+FAIL: test_fft_round_trip_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 297, in test_fft_round_trip
+    self.assertEqual(x, y, exact_dtype=(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 67 element(s) (out of 67) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 1.4964797017777414 ((-1.0053842878897732+0j) vs. (-0.4646791797099389-1.3953814832586218j)), which occurred at index 39.
+
+======================================================================
+FAIL: test_fftfreq_out_xpu_float32 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 622, in test_fftfreq_out
+    func(n=100, d=.5, out=actual)
+AssertionError: UserWarning not triggered
+
+======================================================================
+FAIL: test_fftfreq_out_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 622, in test_fftfreq_out
+    func(n=100, d=.5, out=actual)
+AssertionError: UserWarning not triggered
+
+======================================================================
+FAIL: test_fftn_round_trip_xpu_float32 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 441, in test_fftn_round_trip
+    self.assertEqual(x, y, exact_dtype=(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1.3e-06 and atol=0.001, found 20 element(s) (out of 20) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 3.4963780641555786 (2.097452402114868 vs. -1.3989256620407104), which occurred at index (2, 2).
+
+======================================================================
+FAIL: test_fftn_round_trip_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 441, in test_fftn_round_trip
+    self.assertEqual(x, y, exact_dtype=(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 19 element(s) (out of 20) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 3.257927508194685 (-0.7197807647949503 vs. 2.5381467433997345), which occurred at index (1, 3).
+
+======================================================================
+FAIL: test_istft_linearity_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 1367, in test_istft_linearity
+    _test(data_size, kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 1319, in _test
+    self.assertEqual(istft, estimate, atol=1e-5, rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=0 and atol=0.001, found 27 element(s) (out of 36) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 3.0552757364304775 (-1.3704627974962695 vs. 1.6848129389342081), which occurred at index (0, 15).
+
+======================================================================
+FAIL: test_istft_of_sine_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 1295, in test_istft_of_sine
+    _test(amplitude=123, L=5, n=1)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 1293, in _test
+    self.assertEqual(inverse, original, atol=1e-3, rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=0 and atol=0.001, found 4 element(s) (out of 9) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 116.92285336488216 (0.05709813942173425 vs. 116.9799515043039), which occurred at index 1.
+
+======================================================================
+FAIL: test_istft_round_trip_simple_cases_xpu_float64 (__main__.TestFFTXPU)
+stft -> istft should recover the original signale
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 1112, in test_istft_round_trip_simple_cases
+    _test(torch.ones(4, dtype=dtype, device=device), 4, 4)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 1110, in _test
+    self.assertEqual(input, inverse, exact_dtype=True)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 4 element(s) (out of 4) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 1.0 (1.0 vs. 0.0), which occurred at index 0.
+
+======================================================================
+FAIL: test_istft_round_trip_various_params_xpu_float64 (__main__.TestFFTXPU)
+stft -> istft should recover the original signale
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 1184, in test_istft_round_trip_various_params
+    _test_istft_is_inverse_of_stft(pattern)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 1132, in _test_istft_is_inverse_of_stft
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=0 and atol=0.001, found 40 element(s) (out of 40) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 2.5155471131534872 (-1.0312184519581384 vs. 1.4843286611953488), which occurred at index (0, 11).
+istft comparison against original
+
+======================================================================
+FAIL: test_istft_round_trip_with_padding_xpu_float64 (__main__.TestFFTXPU)
+long hop_length or not centered may cause length mismatch in the inversed signal
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 1251, in test_istft_round_trip_with_padding
+    _test_istft_is_inverse_of_stft_with_padding(pattern)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 1218, in _test_istft_is_inverse_of_stft_with_padding
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=0 and atol=0.001, found 699 element(s) (out of 764) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 21.776832720833248 (21.296867143038114 vs. -0.47996557779513566), which occurred at index (1, 377).
+istft comparison against original
+
+======================================================================
+FAIL: test_reference_1d_fft_fft_xpu_float32 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 260, in test_reference_1d
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1.3e-06 and atol=0.001, found 33 element(s) (out of 67) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 3.539890532688576e+35 ((-3.539890532688576e+35+1.8574450016021729j) vs. (-5.043888985497318-6.560290727130878j)), which occurred at index 65.
+
+======================================================================
+FAIL: test_reference_1d_fft_fft_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 260, in test_reference_1d
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 33 element(s) (out of 67) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 14.689121309975976 (0j vs. (-8.695170594124926+11.83910018532893j)), which occurred at index 49.
+
+======================================================================
+FAIL: test_reference_1d_fft_hfft_xpu_float32 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 260, in test_reference_1d
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1.3e-06 and atol=0.001, found 288 element(s) (out of 312) whose difference(s) exceeded the margin of error (including 1 nan comparisons). The greatest difference was nan (nan vs. -0.45237601286473217), which occurred at index (7, 4).
+
+======================================================================
+FAIL: test_reference_1d_fft_hfft_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 260, in test_reference_1d
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 288 element(s) (out of 312) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 25.669579745678565 (-18.659951698416258 vs. 7.009628047262308), which occurred at index (3, 1).
+
+======================================================================
+FAIL: test_reference_1d_fft_ifft_xpu_float32 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 260, in test_reference_1d
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1.3e-06 and atol=0.001, found 33 element(s) (out of 67) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 5.726920386217242e+37 ((5.726920386217242e+37+1.6495599746704102j) vs. (-0.018896812639919904+0.10659181305932831j)), which occurred at index 53.
+
+======================================================================
+FAIL: test_reference_1d_fft_ifft_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 260, in test_reference_1d
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 33 element(s) (out of 67) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 19.198593703432827 ((8.34859565922831+17.18237250677133j) vs. (-0.07266466438014463-0.07069605367636245j)), which occurred at index 58.
+
+======================================================================
+FAIL: test_reference_1d_fft_irfft_xpu_float32 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 260, in test_reference_1d
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1.3e-06 and atol=0.001, found 288 element(s) (out of 312) whose difference(s) exceeded the margin of error (including 4 nan comparisons). The greatest difference was nan (nan vs. -0.22625753413642283), which occurred at index (5, 25).
+
+======================================================================
+FAIL: test_reference_1d_fft_irfft_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 260, in test_reference_1d
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 287 element(s) (out of 312) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 3.498091334686046 (3.0926796065315396 vs. -0.4054117281545066), which occurred at index (11, 0).
+
+======================================================================
+FAIL: test_reference_nd_fft_ifftn_xpu_float32 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 403, in test_reference_nd
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1.3e-06 and atol=0.0001, found 20 element(s) (out of 20) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 1.4365151673555374 ((-0.1805017590522766+0j) vs. (1.2560134083032608+0j)), which occurred at index (2, 0).
+
+======================================================================
+FAIL: test_reference_nd_fft_ifftn_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 403, in test_reference_nd
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 20 element(s) (out of 20) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 1.2884023621326648 ((0.6060525706755597-0.05168587749402208j) vs. (-0.6158235819677758+0.35696961843200914j)), which occurred at index (1, 2).
+
+======================================================================
+FAIL: test_reference_nd_fft_irfftn_xpu_float32 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 403, in test_reference_nd
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1.3e-06 and atol=0.0001, found 32 element(s) (out of 32) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 2.582175530585768e+27 (-2.582175530585768e+27 vs. -0.0510114062719296), which occurred at index (0, 3).
+
+======================================================================
+FAIL: test_reference_nd_fft_irfftn_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 403, in test_reference_nd
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 32 element(s) (out of 32) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.7901499497150577 (0.30929025999418297 vs. -0.4808596897208748), which occurred at index (3, 4).
+
+======================================================================
+FAIL: test_reference_nd_fft_rfftn_xpu_float32 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 403, in test_reference_nd
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1.3e-06 and atol=0.0001, found 80 element(s) (out of 80) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 10.078277724104082 ((-3.0262110233306885+0.8638086915016174j) vs. (-6.400388330221176-8.632854374325127j)), which occurred at index (0, 3, 1).
+
+======================================================================
+FAIL: test_reference_nd_fft_rfftn_xpu_float64 (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 769, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 734, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_spectral_ops.py", line 403, in test_reference_nd
+    self.assertEqual(actual, expected, exact_dtype=exact_dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1899, in assertEqual
+    self.assertEqual(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1e-07 and atol=0.001, found 80 element(s) (out of 80) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 22.126701632791658 ((-15.978145568072087+8.232724637520162j) vs. (4.287459352754637-0.649627660128734j)), which occurred at index (2, 3, 2).
+
+----------------------------------------------------------------------
+Ran 146 tests in 432.064s
+
+FAILED (failures=30, errors=3, skipped=48)
+Raised CalledProcessError: return code 1.

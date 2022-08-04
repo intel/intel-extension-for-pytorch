@@ -1,0 +1,109 @@
+{
+  "_comments": "0. This file is for store pair of <test_file, test_class>, each test_file has at least one test_class and the test classes should be in a list. 1. If a test_class should be skipped, please add a leading '#' before its class name and don't forget to write down the reason after the class name separated by a '/'. For example, if you want to skip classA with reasonB, please write '#classA/reasonB' as a part of recorresponding test file. 2. Please keep each key with its values within a single line. This may make the shell script happy in parsing.",
+  "test_shape_ops.py": [
+    "TestShapeOps"
+  ],
+  "test_binary_ufuncs.py": [
+    "TestBinaryUfuncs"
+  ],
+  "test_modules.py": [
+    "TestModule"
+  ],
+  "test_spectral_ops.py": [
+    "TestFFT",
+    "#TestFFTDocExamples/only_for_cpu"
+  ],
+  "test_indexing.py": [
+    "TestIndexing",
+    "NumpyTests"
+  ],
+  "test_buffer_protocol.py": [
+    "#TestBufferProtocol/only_for_cpu"
+  ],
+  "test_foreach.py": [
+    "TestForeach"
+  ],
+  "test_fx.py": [
+    "#TestOperatorSignatures/need_module_named_fx"
+  ],
+  "test_tensor_creation_ops.py": [
+    "#TestTensorCreation/Timeout",
+    "TestRandomTensorCreation",
+    "TestLikeTensorCreation"
+  ],
+  "test_sort_and_select.py": [
+    "TestSortAndSelect"
+  ],
+  "test_autograd.py": [
+    "TestAutogradDeviceType"
+  ],
+  "test_torch.py": [
+    "#TestViewOps/it_is_empty",
+    "#TestVitalSignsCuda/only_for_cuda",
+    "#TestTensorDeviceOps/it_is_empty",
+    "TestTorchDeviceType",
+    "TestDevicePrecision"
+  ],
+  "test_reductions.py": [
+    "TestReductions"
+  ],
+  "test_serialization.py": [
+    "TestBothSerialization"
+  ],
+  "test_testing.py": [
+    "#TestThatContainsCUDAAssertFailure/only_for_cuda",
+    "TestTesting",
+    "#TestAssertCloseMultiDevice/only_for_cuda",
+    "TestTestParametrizationDeviceType"
+  ],
+  "test_linalg.py": [
+    "TestLinalg"
+  ],
+  "test_unary_ufuncs.py": [
+    "TestUnaryUfuncs"
+  ],
+  "test_fx_experimental.py": [
+    "#TestNormalizeOperators/only_for_cpu"
+  ],
+  "test_module_init.py": [
+    "TestModuleInit"
+  ],
+  "test_type_promotion.py": [
+    "TestTypePromotion"
+  ],
+  "test_view_ops.py": [
+    "TestViewOps",
+    "TestOldViewOps"
+  ],
+  "test_jit_fuser_te.py": [
+    "#TestNNCOpInfo/only_for_cpu_and_cuda"
+  ],
+  "test_sparse.py": [
+    "TestSparseUnaryUfuncs",
+    "TestSparse"
+  ],
+  "test_ops.py": [
+    "TestCommon",
+    "TestGradients",
+    "TestJit",
+    "TestMathBits"
+  ],
+  "test_vmap.py": [
+    "TestVmapBatchedGradient"
+  ],
+  "test_complex.py": [
+    "TestComplexTensor"
+  ],
+  "test_sparse_csr.py": [
+    "TestSparseCSR"
+  ],
+  "test_numpy_interop.py": [
+    "TestNumPyInterop"
+  ],
+  "test_segment_reductions.py": [
+    "TestSegmentReductions"
+  ],
+  "test_nn.py": [
+    "#TestNNDeviceType/return -6"
+  ]
+}

@@ -1,0 +1,648 @@
+test_arange_bfloat16_xpu (__main__.TestTensorCreationXPU) ... ok
+test_arange_device_vs_cpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_arange_device_vs_cpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_arange_device_vs_cpu_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_arange_device_vs_cpu_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_arange_inference_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_arange_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_as_strided_neg_xpu (__main__.TestTensorCreationXPU) ... ok
+test_as_tensor_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_block_diag_scipy_xpu (__main__.TestTensorCreationXPU) ... ok
+test_block_diag_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cartesian_prod_xpu (__main__.TestTensorCreationXPU) ... /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/functional.py:1069: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at  ../aten/src/ATen/native/TensorShape.cpp:2156.)
+  return _VF.cartesian_prod(tensors)  # type: ignore[attr-defined]
+ok
+test_cat2_xpu_float16 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_cat2_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_cat2_xpu_int32 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_cat_all_dtypes_and_devices_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cat_bad_input_sizes_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_cat_big_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_cat_different_devices_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cat_empty_legacy_xpu (__main__.TestTensorCreationXPU) ... ERROR
+test_cat_empty_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cat_in_channels_last_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cat_mem_overlap_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cat_out_channels_last_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cat_out_memory_format_xpu (__main__.TestTensorCreationXPU) ... FAIL
+test_cat_out_xpu (__main__.TestTensorCreationXPU) ... FAIL
+test_cat_preserve_channels_last_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cat_scalars_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_cat_stack_cross_devices_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cat_xpu (__main__.TestTensorCreationXPU) ... ok
+test_combinations_xpu (__main__.TestTensorCreationXPU) ... ok
+test_complex_type_conversions_xpu (__main__.TestTensorCreationXPU) ... skipped 'real and imag not implemented for complex'
+test_constructor_device_legacy_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_constructor_dtypes_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_ctor_with_numpy_array_xpu (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py:1639: DeprecationWarning: `np.float` is a deprecated alias for the builtin `float`. To silence this warning, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+Deprecated in NumPy 1.20; for more details and guidance: https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+  np.float,
+/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py:1646: DeprecationWarning: `np.bool` is a deprecated alias for the builtin `bool`. To silence this warning, use `bool` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.bool_` here.
+Deprecated in NumPy 1.20; for more details and guidance: https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+  np.bool,
+ok
+test_device_rounding_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_device_rounding_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_device_rounding_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_diag_embed_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_diagflat_xpu (__main__.TestTensorCreationXPU) ... ok
+test_dsplit_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_dsplit_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_dsplit_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_dstack_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_dstack_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_dstack_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_dstack_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_dstack_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_dstack_xpu_int16 (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py:967: DeprecationWarning: an integer is required (got type float).  Implicit conversion to integers using __int__ is deprecated, and may be removed in a future version of Python.
+  input_t = [torch.tensor(random.uniform(0, 10), device=device, dtype=dtype) for i in range(num_tensors)]
+ok
+test_dstack_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_dstack_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_dstack_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_dstack_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_empty_full_xpu (__main__.TestTensorCreationXPU) ... ok
+test_empty_strided_xpu (__main__.TestTensorCreationXPU) ... ok
+test_empty_tensor_props_xpu (__main__.TestTensorCreationXPU) ... ok
+test_eye_xpu (__main__.TestTensorCreationXPU) ... ok
+test_fill_all_dtypes_and_devices_xpu (__main__.TestTensorCreationXPU) ... ok
+test_float_to_int_conversion_finite_xpu_bool (__main__.TestTensorCreationXPU) ... ok
+test_float_to_int_conversion_finite_xpu_int16 (__main__.TestTensorCreationXPU) ... FAIL
+test_float_to_int_conversion_finite_xpu_int32 (__main__.TestTensorCreationXPU) ... FAIL
+test_float_to_int_conversion_finite_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_float_to_int_conversion_finite_xpu_int8 (__main__.TestTensorCreationXPU) ... FAIL
+test_float_to_int_conversion_finite_xpu_uint8 (__main__.TestTensorCreationXPU) ... FAIL
+test_float_to_int_conversion_nonfinite_xpu_bool (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_float_to_int_conversion_nonfinite_xpu_int16 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_float_to_int_conversion_nonfinite_xpu_int32 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_float_to_int_conversion_nonfinite_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_float_to_int_conversion_nonfinite_xpu_int8 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_float_to_int_conversion_nonfinite_xpu_uint8 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_full_inference_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_full_inference_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_full_inference_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_full_out_xpu (__main__.TestTensorCreationXPU) ... ok
+test_hsplit_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_hsplit_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_hsplit_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_hstack_column_stack_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_hstack_column_stack_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_hstack_column_stack_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_hstack_column_stack_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_hstack_column_stack_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_hstack_column_stack_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_hstack_column_stack_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_hstack_column_stack_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_hstack_column_stack_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_hstack_column_stack_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_large_linspace_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_large_linspace_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_like_fn_stride_proparation_vs_tensoriterator_unary_op_xpu (__main__.TestTensorCreationXPU) ... ERROR
+test_linlogspace_mem_overlap_xpu (__main__.TestTensorCreationXPU) ... ok
+test_linspace_deduction_xpu (__main__.TestTensorCreationXPU) ... ok
+test_linspace_device_vs_cpu_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_device_vs_cpu_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_device_vs_cpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_device_vs_cpu_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_device_vs_cpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_device_vs_cpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_special_steps_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_special_steps_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_special_steps_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_special_steps_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_special_steps_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_special_steps_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_steps_warning_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_vs_numpy_complex_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_vs_numpy_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_vs_numpy_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_vs_numpy_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_vs_numpy_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_base2_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_base2_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_base2_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_deduction_xpu (__main__.TestTensorCreationXPU) ... ok
+test_logspace_device_vs_cpu_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_device_vs_cpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_device_vs_cpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_special_steps_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_special_steps_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_special_steps_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_steps_warning_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_vs_numpy_complex_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_logspace_vs_numpy_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_vs_numpy_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_int16 (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py:3103: DeprecationWarning: an integer is required (got type float).  Implicit conversion to integers using __int__ is deprecated, and may be removed in a future version of Python.
+  self.assertEqual(torch.tensor([2. ** (i / 8.) for i in range(49)], device=device, dtype=dtype),
+ok
+test_logspace_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_default_indexing_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_empty_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_ij_indexing_is_default_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_ij_indexing_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_inconsistent_device_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_inconsistent_dtype_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_non_1d_tensor_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_unsupported_indexing_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_vs_numpy_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_warns_if_no_indexing_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_xy_indexing_xpu (__main__.TestTensorCreationXPU) ... ok
+test_new_empty_strided_xpu (__main__.TestTensorCreationXPU) ... ok
+test_new_methods_requires_grad_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_new_tensor_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_offset_scalar_cast_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_ones_xpu (__main__.TestTensorCreationXPU) ... ok
+test_random_bool_xpu (__main__.TestTensorCreationXPU) ... FAIL
+test_random_default_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_float16 (__main__.TestTensorCreationXPU) ... FAIL
+test_random_default_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_bool_xpu (__main__.TestTensorCreationXPU) ... FAIL
+test_random_from_to_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_float16 (__main__.TestTensorCreationXPU) ... FAIL
+test_random_from_to_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_float16 (__main__.TestTensorCreationXPU) ... FAIL
+test_random_full_range_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_random_to_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py:1906: UserWarning: to - 1 is out of bounds [-(2^8), 2^8]. Due to precision limitations c10::BFloat16 can support discrete uniform distribution only within this range. This warning will become an error in version 1.7 release, please fix the code in advance (Triggered internally at  /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/include/ATen/native/DistributionTemplates.h:92.)
+  t.random_(to_)
+ok
+test_random_to_xpu_float16 (__main__.TestTensorCreationXPU) ... FAIL
+test_random_to_xpu_float32 (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py:1906: UserWarning: to - 1 is out of bounds [-(2^24), 2^24]. Due to precision limitations float can support discrete uniform distribution only within this range. This warning will become an error in version 1.7 release, please fix the code in advance (Triggered internally at  /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/include/ATen/native/DistributionTemplates.h:92.)
+  t.random_(to_)
+ok
+test_random_to_xpu_float64 (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py:1906: UserWarning: to - 1 is out of bounds [-(2^53), 2^53]. Due to precision limitations double can support discrete uniform distribution only within this range. This warning will become an error in version 1.7 release, please fix the code in advance (Triggered internally at  /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/include/ATen/native/DistributionTemplates.h:92.)
+  t.random_(to_)
+ok
+test_random_to_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_random_to_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_random_to_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_random_to_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_random_to_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_random_xpu_float32 (__main__.TestTensorCreationXPU) ... FAIL
+test_random_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_random_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_random_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_random_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_random_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_range_factories_64bit_indexing_xpu (__main__.TestTensorCreationXPU) ... skipped 'Insufficient xpu:0 memory'
+test_range_warning_xpu (__main__.TestTensorCreationXPU) ... ok
+test_range_xpu (__main__.TestTensorCreationXPU) ... ok
+test_repeat_interleave_xpu (__main__.TestTensorCreationXPU) ... ok
+test_roll_xpu (__main__.TestTensorCreationXPU) ... ok
+test_signal_window_functions_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ERROR
+test_signal_window_functions_xpu_float16 (__main__.TestTensorCreationXPU) ... FAIL
+test_signal_window_functions_xpu_float32 (__main__.TestTensorCreationXPU) ... ERROR
+test_signal_window_functions_xpu_float64 (__main__.TestTensorCreationXPU) ... ERROR
+test_signal_window_functions_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_simple_scalar_cast_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_stack_out_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_stack_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_strided_mismatched_stride_shape_xpu (__main__.TestTensorCreationXPU) ... ok
+test_tensor_ctor_device_inference_xpu (__main__.TestTensorCreationXPU) ... ok
+test_tensor_device_xpu (__main__.TestTensorCreationXPU) ... ERROR
+test_tensor_factories_empty_xpu (__main__.TestTensorCreationXPU) ... ok
+test_tensor_factory_copy_var_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_tensor_factory_gpu_type_inference_xpu (__main__.TestTensorCreationXPU) ... ok
+test_tensor_factory_gpu_type_xpu (__main__.TestTensorCreationXPU) ... ok
+test_tensor_factory_type_inference_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_tensor_factory_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_tensor_from_non_writable_numpy_xpu (__main__.TestTensorCreationXPU) ... ok
+test_tensor_from_sequence_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_torch_complex_floating_dtype_error_xpu_bool (__main__.TestTensorCreationXPU) ... ok
+test_torch_complex_floating_dtype_error_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_torch_complex_floating_dtype_error_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_torch_complex_floating_dtype_error_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_torch_complex_floating_dtype_error_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_torch_complex_floating_dtype_error_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_torch_complex_floating_dtype_error_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_torch_complex_floating_dtype_error_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_torch_complex_floating_dtype_error_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_torch_complex_out_dtype_error_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "not_implemented: Could not run 'aten::polar.out' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::polar.out' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: registered at ../torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:2399 [kernel]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_1.cpp:10664 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_torch_complex_out_dtype_error_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "not_implemented: Could not run 'aten::polar.out' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::polar.out' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: registered at ../torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:2399 [kernel]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_1.cpp:10664 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_torch_complex_same_dtype_error_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "not_implemented: Could not run 'aten::polar.out' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::polar.out' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: registered at ../torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:2399 [kernel]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_1.cpp:10664 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_torch_complex_same_dtype_error_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "not_implemented: Could not run 'aten::polar.out' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::polar.out' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: registered at ../torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:2399 [kernel]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_1.cpp:10664 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_torch_complex_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_torch_complex_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_torch_polar_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "not implemented: Could not run 'aten::polar.out' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::polar.out' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: registered at ../torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:2399 [kernel]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_1.cpp:10664 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_torch_polar_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "not implemented: Could not run 'aten::polar.out' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::polar.out' is only available for these backends: [CPU, BackendSelect, Python, Named, Conjugate, Negative, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradXLA, AutogradLazy, AutogradXPU, AutogradMLC, AutogradHPU, AutogradNestedTensor, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, Tracer, UNKNOWN_TENSOR_TYPE_ID, Autocast, Batched, VmapMode].\n\nCPU: registered at aten/src/ATen/RegisterCPU.cpp:18433 [kernel]\nBackendSelect: fallthrough registered at ../aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at ../aten/src/ATen/core/PythonFallbackKernel.cpp:47 [backend fallback]\nNamed: registered at ../aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at ../aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at ../aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nADInplaceOrView: registered at ../torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:2399 [kernel]\nAutogradOther: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradCUDA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXLA: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradLazy: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradXPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradMLC: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradHPU: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradNestedTensor: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse1: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse2: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nAutogradPrivateUse3: registered at ../torch/csrc/autograd/generated/VariableType_1.cpp:9548 [autograd kernel]\nTracer: registered at ../torch/csrc/autograd/generated/TraceType_1.cpp:10664 [kernel]\nUNKNOWN_TENSOR_TYPE_ID: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:466 [backend fallback]\nAutocast: fallthrough registered at ../aten/src/ATen/autocast_mode.cpp:305 [backend fallback]\nBatched: registered at ../aten/src/ATen/BatchingRegistrations.cpp:1016 [backend fallback]\nVmapMode: fallthrough registered at ../aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\n"
+test_trilu_indices_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_triu_tril_bfloat16_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_triu_tril_indices_bfloat16_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_triu_tril_xpu (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py:250: UserWarning: where received a uint8 condition tensor. This behavior is deprecated and will be removed in a future version of PyTorch. Use a boolean condition instead. (Triggered internally at  ../aten/src/ATen/native/TensorCompare.cpp:328.)
+  return torch.where(pred, true_tensor, false_tensor)
+FAIL
+test_unpack_double_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_unpack_double_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_vander_types_xpu_bool (__main__.TestTensorCreationXPU) ... ok
+test_vander_types_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_vander_types_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_vander_types_xpu_float32 (__main__.TestTensorCreationXPU) ... ERROR
+test_vander_types_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_vander_types_xpu_int16 (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py:134: DeprecationWarning: an integer is required (got type float).  Implicit conversion to integers using __int__ is deprecated, and may be removed in a future version of Python.
+  pt_x = torch.tensor(x, device=device, dtype=dtype)
+ok
+test_vander_types_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_vander_types_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_vander_types_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_vander_types_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_vander_xpu (__main__.TestTensorCreationXPU) ... ok
+test_vsplit_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_vsplit_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_vsplit_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_vstack_row_stack_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_vstack_row_stack_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_vstack_row_stack_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_vstack_row_stack_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_vstack_row_stack_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_vstack_row_stack_xpu_int16 (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py:967: DeprecationWarning: an integer is required (got type float).  Implicit conversion to integers using __int__ is deprecated, and may be removed in a future version of Python.
+  input_t = [torch.tensor(random.uniform(0, 10), device=device, dtype=dtype) for i in range(num_tensors)]
+ok
+test_vstack_row_stack_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_vstack_row_stack_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_vstack_row_stack_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_vstack_row_stack_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_zeros_dtype_out_match_xpu (__main__.TestTensorCreationXPU) ... ok
+test_zeros_out_xpu (__main__.TestTensorCreationXPU) ... ok
+test_zeros_xpu (__main__.TestTensorCreationXPU) ... ok
+
+======================================================================
+ERROR: test_cat_empty_legacy_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 402, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 589, in test_cat_empty_legacy
+    res2 = torch.cat([empty, x], dim=1)
+RuntimeError: Tensors must have same number of dimensions
+
+======================================================================
+ERROR: test_like_fn_stride_proparation_vs_tensoriterator_unary_op_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 402, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 869, in test_like_fn_stride_proparation_vs_tensoriterator_unary_op
+    torch.empty_strided((4, 3, 2), (10, 0, 3), device=device).fill_(1.0),
+RuntimeError: unsupported operation: more than one element of the written-to tensor refers to a single memory location. Please clone() the tensor before performing the operation.
+
+======================================================================
+ERROR: test_signal_window_functions_xpu_bfloat16 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 402, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 2817, in test_signal_window_functions
+    test('kaiser', kwargs={'beta': random.random() * 30})
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 2804, in test
+    res = torch_method(size, periodic=periodic, **kwargs, device=device, dtype=dtype)
+RuntimeError: DispatchStub: unsupported device typexpu
+
+======================================================================
+ERROR: test_signal_window_functions_xpu_float32 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 402, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 2817, in test_signal_window_functions
+    test('kaiser', kwargs={'beta': random.random() * 30})
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 2804, in test
+    res = torch_method(size, periodic=periodic, **kwargs, device=device, dtype=dtype)
+RuntimeError: DispatchStub: unsupported device typexpu
+
+======================================================================
+ERROR: test_signal_window_functions_xpu_float64 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 402, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 2817, in test_signal_window_functions
+    test('kaiser', kwargs={'beta': random.random() * 30})
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 2804, in test
+    res = torch_method(size, periodic=periodic, **kwargs, device=device, dtype=dtype)
+RuntimeError: DispatchStub: unsupported device typexpu
+
+======================================================================
+ERROR: test_tensor_device_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1023, in wrapper
+    fn(*args, **kwargs)
+TypeError: only_fn() missing 1 required positional argument: 'device'
+
+======================================================================
+ERROR: test_vander_types_xpu_float32 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 402, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 137, in test_vander_types
+    pt_res = torch.vander(pt_x, increasing=inc) if n is None else torch.vander(pt_x, n, inc)
+RuntimeError: could not create a primitive descriptor for a reorder primitive
+
+======================================================================
+FAIL: test_cat_out_memory_format_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 558, in only_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 736, in test_cat_out_memory_format
+    self.assertTrue(res1_xpu.is_contiguous(memory_format=torch.contiguous_format))
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_cat_out_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 669, in test_cat_out
+    self.assertEqual(x, expected_x)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=1.3e-06 and atol=0.001, found 32 element(s) (out of 100) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 3.0 (3.0 vs. 0.0), which occurred at index (0, 4, 0).
+
+======================================================================
+FAIL: test_float_to_int_conversion_finite_xpu_int16 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1122, in test_float_to_int_conversion_finite
+    self._float_to_int_conversion_helper(vals, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1097, in _float_to_int_conversion_helper
+    self.assertEqual(torch.from_numpy(a), t.cpu())
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!Found 1 different element(s) (out of 8), with the greatest difference of 32768 (0 vs. -32768) occuring at index 0.
+
+======================================================================
+FAIL: test_float_to_int_conversion_finite_xpu_int32 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1122, in test_float_to_int_conversion_finite
+    self._float_to_int_conversion_helper(vals, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1097, in _float_to_int_conversion_helper
+    self.assertEqual(torch.from_numpy(a), t.cpu())
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!Found 2 different element(s) (out of 8), with the greatest difference of 1 (-1 vs. -2) occuring at index 2.
+
+======================================================================
+FAIL: test_float_to_int_conversion_finite_xpu_int8 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1122, in test_float_to_int_conversion_finite
+    self._float_to_int_conversion_helper(vals, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1097, in _float_to_int_conversion_helper
+    self.assertEqual(torch.from_numpy(a), t.cpu())
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!Found 3 different element(s) (out of 8), with the greatest difference of 128 (0 vs. -128) occuring at index 0.
+
+======================================================================
+FAIL: test_float_to_int_conversion_finite_xpu_uint8 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1122, in test_float_to_int_conversion_finite
+    self._float_to_int_conversion_helper(vals, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1097, in _float_to_int_conversion_helper
+    self.assertEqual(torch.from_numpy(a), t.cpu())
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!Found 3 different element(s) (out of 8), with the greatest difference of 255 (255 vs. 0) occuring at index 2.
+
+======================================================================
+FAIL: test_random_bool_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1692, in test_random_bool
+    self.assertEqual(t.min(), False)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1788, in assertEqual
+    self.assertEqual(x.item(), y, atol=atol, rtol=rtol, msg=msg,
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1948, in assertEqual
+    super().assertTrue(x == y, msg=msg)
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_random_default_xpu_float16 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1942, in test_random_default
+    self.assertTrue(0 <= t.to(torch.double).min() < alpha * to_inc)
+AssertionError: tensor(False, device='xpu:0') is not true
+
+======================================================================
+FAIL: test_random_from_to_bool_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1734, in test_random_from_to_bool
+    self.assertTrue(from_ <= t.to(torch.int).min() < (from_ + delta))
+AssertionError: tensor(False, device='xpu:0') is not true
+
+======================================================================
+FAIL: test_random_from_to_xpu_float16 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1858, in test_random_from_to
+    self.assertTrue((to_ - delta) <= t.to(torch.double).max() < to_)
+AssertionError: tensor(False, device='xpu:0') is not true
+
+======================================================================
+FAIL: test_random_full_range_xpu_float16 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1775, in test_random_full_range
+    self.assertTrue((to_inc_ - delta) < t.to(torch.double).max() <= to_inc_)
+AssertionError: tensor(False, device='xpu:0') is not true
+
+======================================================================
+FAIL: test_random_to_xpu_float16 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1916, in test_random_to
+    self.assertTrue((to_ - delta) <= t.to(torch.double).max() < to_)
+AssertionError: tensor(False, device='xpu:0') is not true
+
+======================================================================
+FAIL: test_random_xpu_float32 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 1684, in test_random
+    self.assertEqual(t.max(), ub - 1)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1788, in assertEqual
+    self.assertEqual(x.item(), y, atol=atol, rtol=rtol, msg=msg,
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1957, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Scalars failed to compare as equal! Comparing 0.0 and 3 gives a difference of 3.0, but the allowed difference with rtol=1.3e-06 and atol=0.001 is only 0.0010039!
+
+======================================================================
+FAIL: test_signal_window_functions_xpu_float16 (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 575, in only_fn
+    return fn(self, device, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 2814, in test_signal_window_functions
+    test(window, kwargs={})
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 2807, in test
+    self.assertEqual(res, ref, exact_dtype=False)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!With rtol=0.001 and atol=0.001, found 3 element(s) (out of 50) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.0017415028125262744 (0.65625 vs. 0.6545084971874737), which occurred at index 35.
+
+======================================================================
+FAIL: test_triu_tril_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1396, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/common/pytorch_test_base.py", line 397, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 980, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 314, in test_triu_tril
+    run_test(s, device, d, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/pytorch/test_tensor_creation_ops.py", line 291, in run_test
+    self.assertEqual(output, expected.expand(expanded_size), atol=0, rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1877, in assertEqual
+    super().assertTrue(result, msg=self._get_assert_msg(msg, debug_msg=debug_msg))
+AssertionError: False is not true : Tensors failed to compare as equal!Found 179 different element(s) (out of 225), with the greatest difference of 251 (253 vs. 2) occuring at index (4, 1, 0, 0).
+
+----------------------------------------------------------------------
+Ran 278 tests in 1649.383s
+
+FAILED (failures=15, errors=7, skipped=62)
+Raised CalledProcessError: return code 1.
