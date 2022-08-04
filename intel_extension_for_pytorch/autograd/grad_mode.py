@@ -9,6 +9,7 @@ class inference_mode(_DecoratorContextManager):
     use `torch.inference_mode()` instead after PyTorch 1.9
 
     """
+
     def __init__(self, mode=True):
         if not torch._jit_internal.is_scripting():
             super().__init__()

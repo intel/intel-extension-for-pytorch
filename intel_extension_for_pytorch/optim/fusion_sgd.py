@@ -60,7 +60,8 @@ class FusionSGD(Optimizer):
                         # p.add_(buf, alpha=-group['lr'])
 
                         # update p, buf.
-                        intel_extension_for_pytorch._C.fusion_amdd(p.data, d_p, param_state['momentum_buffer'], weight_decay, momentum,
+                        intel_extension_for_pytorch._C.fusion_amdd(p.data, d_p, param_state['momentum_buffer'],
+                                                                   weight_decay, momentum,
                                                                    1 - dampening, -group['lr'])
                         # print('p.data = ', p.data.cpu())
                         # print('buf = ', param_state['momentum_buffer'].cpu())

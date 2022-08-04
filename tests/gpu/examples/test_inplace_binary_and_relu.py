@@ -1,14 +1,15 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+import intel_extension_for_pytorch # noqa
 
 """
-    Motivation: When running block format ResNet-XX with using inplaced binary add and relu, layer output will be flushed to shape zero. In this UT, it may throw a segmentfault error.
-    This issue was fixed in commit: 193ef42, PR: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/pull/668/commits
+    Motivation: When running block format ResNet-XX with using inplaced binary add and relu, 
+                layer output will be flushed to shape zero. In this UT, it may throw a segmentfault error.
+    This issue was fixed in commit: 193ef42, 
+    PR: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/pull/668/commits
 """
 
-import intel_extension_for_pytorch
-import os
 import pytest
 
 dpcpp_device = torch.device("xpu")

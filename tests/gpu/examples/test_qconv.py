@@ -1,8 +1,7 @@
 import torch
-import intel_extension_for_pytorch
 from torch.nn.modules.utils import _pair
 import pytest
-
+import intel_extension_for_pytorch # noqa
 from torch.testing._internal.common_utils import TestCase
 
 
@@ -33,9 +32,12 @@ class TestTorchMethod(TestCase):
         q_filters = torch.quantize_per_tensor(filters, scale_weight, zero_point, dtype_filters)
 
         packed_params = torch.ops.quantized.conv3d_prepack(q_filters, bias, (1, 1, 1), (0, 0, 0), (1, 1, 1), 1)
-        output_int8 = torch.ops.quantized.conv3d_relu(q_inputs, packed_params, (1, 1, 1), (0, 0, 0), (1, 1, 1), 1, scale_out, zero_point)
-        output_int8_2 = torch.ops.quantized.conv3d_relu(q_inputs, packed_params, (1, 1, 1), (0, 0, 0), (1, 1, 1), 1, scale_out_2, zero_point)
-        output_int8_3 = torch.ops.quantized.conv3d_relu(q_inputs, packed_params, (1, 1, 1), (0, 0, 0), (1, 1, 1), 1, scale_out_2, zero_point)
+        output_int8 = torch.ops.quantized.conv3d_relu(
+            q_inputs, packed_params, (1, 1, 1), (0, 0, 0), (1, 1, 1), 1, scale_out, zero_point)
+        output_int8_2 = torch.ops.quantized.conv3d_relu(
+            q_inputs, packed_params, (1, 1, 1), (0, 0, 0), (1, 1, 1), 1, scale_out_2, zero_point)
+        output_int8_3 = torch.ops.quantized.conv3d_relu(
+            q_inputs, packed_params, (1, 1, 1), (0, 0, 0), (1, 1, 1), 1, scale_out_2, zero_point)
 
         inputs_gpu = inputs.to("xpu")
         filters_gpu = filters.to("xpu")
@@ -44,7 +46,8 @@ class TestTorchMethod(TestCase):
         q_inputs_gpu = torch.quantize_per_tensor(inputs_gpu, scale_in, zero_point, dtype_inputs)
         q_filters_gpu = torch.quantize_per_tensor(filters_gpu, scale_weight, zero_point, dtype_filters)
 
-        packed_params_gpu = torch.ops.quantized.conv3d_prepack(q_filters_gpu, bias_gpu, (1, 1, 1), (0, 0, 0), (1, 1, 1), 1)
+        packed_params_gpu = torch.ops.quantized.conv3d_prepack(
+            q_filters_gpu, bias_gpu, (1, 1, 1), (0, 0, 0), (1, 1, 1), 1)
         output_gpu_int8 = torch.ops.quantized.conv3d_relu(q_inputs_gpu, packed_params_gpu, scale_out, zero_point)
         output_gpu_int8_2 = torch.ops.quantized.conv3d_relu(q_inputs_gpu, packed_params_gpu, scale_out_2, zero_point)
         output_gpu_int8_3 = torch.ops.quantized.conv3d_relu(q_inputs_gpu, packed_params_gpu, scale_out_2, zero_point)
@@ -87,9 +90,12 @@ class TestTorchMethod(TestCase):
         q_filters = torch.quantize_per_tensor(filters, scale_weight, zero_point, dtype_filters)
 
         packed_params = torch.ops.quantized.conv2d_prepack(q_filters, bias, _pair(1), _pair(0), _pair(1), 1)
-        output_int8 = torch.ops.quantized.conv2d_relu(q_inputs, packed_params, _pair(1), _pair(0), _pair(1), 1, scale_out, zero_point)
-        output_int8_2 = torch.ops.quantized.conv2d_relu(q_inputs, packed_params, _pair(1), _pair(0), _pair(1), 1, scale_out_2, zero_point)
-        output_int8_3 = torch.ops.quantized.conv2d_relu(q_inputs, packed_params, _pair(1), _pair(0), _pair(1), 1, scale_out_2, zero_point)
+        output_int8 = torch.ops.quantized.conv2d_relu(q_inputs, packed_params, _pair(1),
+                                                      _pair(0), _pair(1), 1, scale_out, zero_point)
+        output_int8_2 = torch.ops.quantized.conv2d_relu(q_inputs, packed_params, _pair(1),
+                                                        _pair(0), _pair(1), 1, scale_out_2, zero_point)
+        output_int8_3 = torch.ops.quantized.conv2d_relu(q_inputs, packed_params, _pair(1),
+                                                        _pair(0), _pair(1), 1, scale_out_2, zero_point)
 
         inputs_gpu = inputs.to("xpu")
         filters_gpu = filters.to("xpu")

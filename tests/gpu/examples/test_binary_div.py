@@ -1,8 +1,6 @@
 import torch
-import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
-
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -10,7 +8,8 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(), reason="doesn't enable channels last 1d or channels last does not support onednn block format")
+    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(),
+                        reason="doesn't enable channels last 1d or channels last does not support onednn block format")
     def test_binary_div_channels_last_1d(self, dtype=torch.float):
         shapes = [(1, 2, 4), (2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
                   (4, 1, 1), (1, 4, 4), (1, 4, 1)]

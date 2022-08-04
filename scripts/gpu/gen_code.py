@@ -1,20 +1,17 @@
 import sys
 import argparse
-import copy
 from copy import deepcopy
 import os
 import yaml
 import re
 import scripts.gpu.common_with_cwrap as common_with_cwrap
 import ast
-from scripts.gpu.model import *
 import scripts.gpu.local as local
 from scripts.gpu.api import legacy_dispatcher
 from scripts.gpu.api.types import TensorOptionsArguments
 import itertools
 from scripts.gpu.code_template import CodeTemplate
-from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Tuple, NamedTuple
+from typing import Dict, List, Tuple, NamedTuple
 
 
 try:
@@ -81,6 +78,7 @@ class FileManager(object):
         if len(self.filenames) > 0:
             raise Exception("Outputs declared with 'will_write' were " +
                             "never written: {}".format(self.filenames))
+
 
 TYPE_FORMAL_GENERIC = {
     'THTensor*': 'Tensor &',
@@ -159,7 +157,8 @@ def load_aten_declarations(path):
         declaration['args'] = [arg['name'] for arg in declaration['arguments']]
         declaration['schema_order_args'] = [arg['name'] for arg in declaration['schema_order_arguments']]
         if has_tensoroptions_argument(declaration):
-            declaration['schema_order_args'] = [process_schema_order_arg(arg) for arg in declaration['schema_order_args']]
+            declaration['schema_order_args'] = [process_schema_order_arg(
+                arg) for arg in declaration['schema_order_args']]
         declaration['api_name'] = declaration['name']
         # NB: keep this in sync with common_with_cwrap.py
         if declaration.get('overload_name'):
@@ -510,6 +509,7 @@ def native_get_formals(option, schema_order, use_optional_tensor):
     result = [native_translate_formals(argument, option) for argument in arguments]
     return result
 
+
 def create_derived(backend_type_env, declarations):
     # type: (Environment, List[FunctionOption]) -> Tuple[List[str], List[str], List[OpRegistration], List[str], List[str]]
     type_object_declarations = []  # type: List[str]
@@ -681,7 +681,8 @@ def preprocess_decl(declarations):
                 option['actuals'] = [elem[1] for elem in lazy_reorder]
                 native_formals = native_get_formals(option, False, True)
                 option['native_formals'] = [format_formal(f) for f in native_formals]
-                native_order_cpp_signature = '{} ( {} )' .format(option['return_type'], ', '.join([f['type'] for f in native_formals]))
+                native_order_cpp_signature = '{} ( {} )' .format(
+                    option['return_type'], ', '.join([f['type'] for f in native_formals]))
                 option['native_order_cpp_signature'] = native_order_cpp_signature
             elif declaration['use_c10_dispatcher'] == 'with_codegenerated_unboxing_wrapper':
                 option['declaration_formals'] = declaration['formals']
@@ -690,17 +691,20 @@ def preprocess_decl(declarations):
                 option['actuals'] = [elem[1] for elem in lazy_reorder]
                 native_formals = native_get_formals(option, False, True)
                 option['native_formals'] = [format_formal(f) for f in native_formals]
-                native_order_cpp_signature = '{} ( {} )' .format(option['return_type'], ', '.join([f['type'] for f in native_formals]))
+                native_order_cpp_signature = '{} ( {} )' .format(
+                    option['return_type'], ', '.join([f['type'] for f in native_formals]))
                 option['native_order_cpp_signature'] = native_order_cpp_signature
             else:
                 assert declaration['use_c10_dispatcher'] == 'hacky_wrapper_for_legacy_signatures'
                 option['declaration_formals'] = declaration['schema_order_formals']
-                lazy_reorder = [get_lazy_reorder(option['name'], argument) for argument in option['schema_order_arguments']]
+                lazy_reorder = [get_lazy_reorder(option['name'], argument)
+                                for argument in option['schema_order_arguments']]
                 option['lazy_reorder'] = [elem[0] for elem in lazy_reorder]
                 option['actuals'] = [elem[1] for elem in lazy_reorder]
                 native_formals = native_get_formals(option, False, True)
                 option['native_formals'] = [format_formal(f) for f in native_formals]
-                native_order_cpp_signature = '{} ( {} )' .format(option['return_type'], ', '.join([f['type'] for f in native_formals]))
+                native_order_cpp_signature = '{} ( {} )' .format(
+                    option['return_type'], ', '.join([f['type'] for f in native_formals]))
                 option['native_order_cpp_signature'] = native_order_cpp_signature
 
         declaration['options'] = handle_outputs_taken_as_arguments(

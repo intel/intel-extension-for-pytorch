@@ -1,3 +1,4 @@
+import torch.autograd
 from contextlib import contextmanager
 
 try:
@@ -24,10 +25,12 @@ def range_push(msg):
     """
     return _itt.rangePush(msg)
 
+
 def range_pop():
     """
     """
     return _itt.rangePop()
+
 
 def mark(msg):
     """
@@ -36,6 +39,7 @@ def mark(msg):
       msg (string): ASCII message to associate with the event.
     """
     return _itt.mark(msg)
+
 
 @contextmanager
 def range(msg, *args, **kwargs):
@@ -50,8 +54,6 @@ def range(msg, *args, **kwargs):
     yield
     range_pop()
 
-
-import torch.autograd
 
 class emit_itt(object):
     def __init__(self, enabled=True, record_shapes=False):

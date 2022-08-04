@@ -1,9 +1,7 @@
 import torch
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 from torch.testing._internal.common_utils import TestCase
 import torch.nn as nn
-import numpy
-import pytest
 
 class TestNet(nn.Module):
     def __init__(self, in_planes, out_planes, stride=1):

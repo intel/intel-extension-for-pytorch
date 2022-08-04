@@ -1,7 +1,6 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
-
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 
 import numpy as np
 
@@ -31,7 +30,8 @@ class TestTorchMethod(TestCase):
             _test(input, indcies, 2)
             _test(input, indcies, 3)
 
-        # x = torch.linspace(0, dim_size ** dims - 1, steps=dim_size ** dims, dtype=torch.double, device=dpcpp_device).view([dim_size for d in range(dims)])
+        # x = torch.linspace(0, dim_size ** dims - 1, steps=dim_size ** dims, dtype=torch.double,
+        #                    device=dpcpp_device).view([dim_size for d in range(dims)])
 
         x = torch.linspace(0, 6 * 7 * 8 * 9 - 1, steps=6 * 7 * 8 * 9).view(6, 7, 8, 9)
         indices = torch.LongTensor([0, 2])

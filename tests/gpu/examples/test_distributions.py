@@ -22,34 +22,17 @@ change. This file contains two types of randomized tests:
    wrong).
 """
 import math
-import numbers
-import unittest
 from collections import namedtuple
-from itertools import product
-from random import shuffle
 
 import torch
-from torch._six import inf
-from torch.autograd import grad, gradcheck
+from torch.autograd import gradcheck
 from torch.distributions import (Bernoulli, Exponential, Multinomial, Normal,
                                  Uniform)
-from torch.distributions.transforms import (AbsTransform, AffineTransform,
-                                            CatTransform, ComposeTransform,
-                                            ExpTransform,
-                                            LowerCholeskyTransform,
-                                            PowerTransform, SigmoidTransform,
-                                            SoftmaxTransform, StackTransform,
-                                            StickBreakingTransform,
-                                            TanhTransform, identity_transform)
-from torch.distributions.utils import lazy_property, probs_to_logits
-from torch.nn.functional import softmax
-from torch.testing._internal.common_utils import (TEST_WITH_UBSAN, TestCase,
-                                                  load_tests, run_tests,
+from torch.testing._internal.common_utils import (TestCase, load_tests,
                                                   set_rng_seed)
 
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 
-import numpy as np
 import pytest
 import scipy
 

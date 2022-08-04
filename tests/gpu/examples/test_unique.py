@@ -1,9 +1,8 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 
-import pytest
 
 N = 1024
 M = 5
@@ -75,7 +74,7 @@ class TestTorchMethod(TestCase):
 
     def test_corner_unique(self):
         # this case is aimed to check https://jira.devtools.intel.com/browse/PYTORCHDGQ-1225
-        a_cpu = torch.tensor([i for i in range(2048)])
+        a_cpu = torch.tensor(list(range(2048)))
         a_cpu[1023] = 1022
         a_cpu[2047] = 2046
         a_xpu = a_cpu.xpu()

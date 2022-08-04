@@ -150,7 +150,8 @@ def get_build_version(ipex_git_sha):
             print("ERROR:", v, "is not found in", version_file)
             sys.exit(1)
     version = versions['VERSION_MAJOR'] + '.' + versions['VERSION_MINOR'] + '.' + versions['VERSION_PATCH']
-    version_backend = version + (('+' + _get_env_backend() if (_get_env_backend() in ['xpu', 'cpu', 'gpu']) else 'Unknown'))
+    version_backend = version + (('+' + _get_env_backend() if (_get_env_backend()
+                                 in ['xpu', 'cpu', 'gpu']) else 'Unknown'))
     version_sha = version + (('+' + ipex_git_sha) if (ipex_git_sha != 'Unknown') else '')
     return version, version_backend, version_sha
 

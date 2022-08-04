@@ -1,11 +1,14 @@
 from .. import _C
 from enum import Enum
 
+
 def has_onemkl():
     return _C._is_onemkl_enabled()
 
+
 def has_itt():
     return _C._itt_is_enabled()
+
 
 def has_channels_last_1d():
     return _C._is_channels_last_1d_enabled()
@@ -40,8 +43,10 @@ class VerbLevel(EnumBase):
     OFF = 0
     ON = 1
 
+
 def get_verbose_level():
     return VerbLevel.get_value(_C._get_verbose_level)
+
 
 def set_verbose_level(level):
     VerbLevel.set_value(_C._set_verbose_level, level)
@@ -53,9 +58,11 @@ class OnednnVerbLevel(EnumBase):
     ON = 1
     ON_DETAIL = 2
 
+
 def set_onednn_verbose(level):
     st = OnednnVerbLevel.set_value(_C._set_onednn_verbose, level)
     assert bool(st), "WARNING: Failed to turn on oneDNN verbose!"
+
 
 class onednn_verbose(object):
     def __init__(self, level):
@@ -77,9 +84,11 @@ class OnemklVerbLevel(EnumBase):
     ON = 1
     ON_SYNC = 2
 
+
 def set_onemkl_verbose(level):
     st = OnemklVerbLevel.set_value(_C._set_onemkl_verbose, level)
     assert bool(st), "WARNING: Failed to turn on oneMKL verbose!"
+
 
 class onemkl_verbose(object):
     def __init__(self, level):
@@ -101,6 +110,7 @@ class FP32MathMode(EnumBase):
     TF32 = int(_C.FP32MathMode.TF32)
     BF32 = int(_C.FP32MathMode.BF32)
 
+
 def get_fp32_math_mode():
     r"""
     Get the current fpmath_mode setting.
@@ -119,6 +129,7 @@ def get_fp32_math_mode():
         >>> torch.xpu.get_fp32_math_mode()
     """
     return FP32MathMode.get_value(_C._get_fp32_math_mode)
+
 
 def set_fp32_math_mode(mode):
     r"""
@@ -145,6 +156,7 @@ def set_fp32_math_mode(mode):
     """
     st = FP32MathMode.set_value(_C._set_fp32_math_mode, mode)
     assert bool(st), "WARNING: Failed to set FP32 math mode!"
+
 
 class fp32_math_mode(object):
     def __init__(self, mode):
@@ -186,11 +198,14 @@ class OnOff():
 def using_sync_mode():
     return _C._is_sync_mode()
 
+
 def enable_sync_mode():
     _C._enable_sync_mode()
 
+
 def disable_sync_mode():
     _C._disable_sync_mode()
+
 
 class sync_mode(OnOff):
     def __init__(self):
@@ -201,11 +216,14 @@ class sync_mode(OnOff):
 def using_onednn_layout():
     return _C._is_onednn_layout_enabled()
 
+
 def enable_onednn_layout():
     _C._enable_onednn_layout()
 
+
 def disable_onednn_layout():
     _C._disable_onednn_layout()
+
 
 class onednn_layout(OnOff):
     def __init__(self):
@@ -216,11 +234,14 @@ class onednn_layout(OnOff):
 def using_simple_trace():
     return _C._is_simple_trace_enabled()
 
+
 def enable_simple_trace():
     _C._enable_simple_trace()
 
+
 def disable_simple_trace():
     _C._disable_simple_trace()
+
 
 class simple_trace(OnOff):
     def __init__(self):
@@ -239,8 +260,10 @@ class Backend(EnumBase):
     CPU = int(_C.XPUBackend.CPU)
     AUTO = int(_C.XPUBackend.AUTO)
 
+
 def get_backend():
     return Backend.get_value(_C._get_backend)
+
 
 def set_backend(backend):
     st = Backend.set_value(_C._set_backend, backend)

@@ -1,5 +1,3 @@
-from scripts.gpu.model import *
-
 from scripts.gpu.api.types import TensorOptionsArguments, LegacyDispatcherArgument, ThisArgument
 import scripts.gpu.api.cpp as cpp
 

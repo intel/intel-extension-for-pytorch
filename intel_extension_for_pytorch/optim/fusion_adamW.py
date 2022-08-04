@@ -1,9 +1,6 @@
-from typing import Callable, Iterable, Tuple
-
 import torch
 import intel_extension_for_pytorch
 from torch.optim import Optimizer
-import math
 
 
 class AdamWMasterWeight(Optimizer):
@@ -68,7 +65,7 @@ class AdamWMasterWeight(Optimizer):
             for p in group["params"]:
                 p_master_weight = p.detach().clone()
                 # p.master_weight keeps the original datatype of the parameter, for example, fp32.
-                setattr(p, "master_weight", p_master_weight)
+                p.master_weight = p_master_weight
 
     def __setstate__(self, state):
         super(AdamWMasterWeight, self).__setstate__(state)

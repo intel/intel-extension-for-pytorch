@@ -1,10 +1,8 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
-
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 
 #  import matplotlib.pyplot as plt
-import pytest
 
 
 def remove_w(weight, i):
@@ -87,10 +85,14 @@ class TestTorchMethod(TestCase):
 #  n_weights = (1- weights)
 #  print("1- weights", n_weights)
 #  weights[torch.argmax(weights)] = 0
-#  w0 = weights[1]*renorm_1d(remove_w(weights, 1))[0] + weights[2]*renorm_1d(remove_w(weights, 2))[0] + weights[3]*renorm_1d(remove_w(weights, 3))[0]
-#  w1 = weights[0]*renorm_1d(remove_w(weights, 0))[1] + weights[2]*renorm_1d(remove_w(weights, 2))[1] + weights[3]*renorm_1d(remove_w(weights, 3))[1]
-#  w2 = weights[0]*renorm_1d(remove_w(weights, 0))[2] + weights[1]*renorm_1d(remove_w(weights, 1))[2] + weights[3]*renorm_1d(remove_w(weights, 3))[2]
-#  w3 = weights[0]*renorm_1d(remove_w(weights, 0))[3] + weights[1]*renorm_1d(remove_w(weights, 1))[3] + weights[2]*renorm_1d(remove_w(weights, 2))[3]
+#  w0 = weights[1]*renorm_1d(remove_w(weights, 1))[0] +
+#       weights[2]*renorm_1d(remove_w(weights, 2))[0] + weights[3]*renorm_1d(remove_w(weights, 3))[0]
+#  w1 = weights[0]*renorm_1d(remove_w(weights, 0))[1] + 
+#       weights[2]*renorm_1d(remove_w(weights, 2))[1] + weights[3]*renorm_1d(remove_w(weights, 3))[1]
+#  w2 = weights[0]*renorm_1d(remove_w(weights, 0))[2] + 
+#       weights[1]*renorm_1d(remove_w(weights, 1))[2] + weights[3]*renorm_1d(remove_w(weights, 3))[2]
+#  w3 = weights[0]*renorm_1d(remove_w(weights, 0))[3] + 
+#       weights[1]*renorm_1d(remove_w(weights, 1))[3] + weights[2]*renorm_1d(remove_w(weights, 2))[3]
 #  w1 = weights[1]*weights[0] + weights[1]*weights[2] + weights[1]*weights[3]
 #  w2 = weights[2]*weights[0] + weights[2]*weights[1] + weights[2]*weights[3]
 #  w3 = weights[3]*weights[0] + weights[3]*weights[1] + weights[3]*weights[2]

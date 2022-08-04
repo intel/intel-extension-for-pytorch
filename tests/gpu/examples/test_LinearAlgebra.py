@@ -1,10 +1,8 @@
 import torch
-import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 
-import matplotlib.pyplot as plt
 import pytest
 
 cpu_device = torch.device('cpu')

@@ -2,9 +2,8 @@ import torch
 import torch.nn.functional
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 import copy
-import pytest
 
 
 class TestNNMethod(TestCase):

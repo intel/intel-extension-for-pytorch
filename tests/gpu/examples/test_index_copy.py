@@ -1,10 +1,10 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
-
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")
+
 
 class TestTorchMethod(TestCase):
     def test_index_copy_dim_0(self, dtype=torch.float):
@@ -70,7 +70,8 @@ class TestTorchMethod(TestCase):
         x = torch.zeros([3, 5, 100], device=cpu_device)
         t = torch.tensor([[[1, 2, 3], [4, 5, 6], [9, 10, 11], [11, 22, 33], [44, 55, 66]],
                           [[99, 10, 11], [111, 222, 333], [444, 555, 666], [999, 10, 11], [1111, 2222, 3333]],
-                          [[4444, 5555, 6666], [9999, 10, 11], [11111, 22222, 33333], [44444, 55555, 66666], [99999, 10, 11]]], dtype=torch.float)
+                          [[4444, 5555, 6666], [9999, 10, 11], [11111, 22222, 33333], [44444, 55555, 66666],
+                           [99999, 10, 11]]], dtype=torch.float)
         index = torch.tensor([0, 66, 88])
         x.index_copy_(2, index, t)
 

@@ -1,13 +1,13 @@
 import torch
-import intel_extension_for_pytorch
 from torch.nn.modules.utils import _pair
 import pytest
-
+import intel_extension_for_pytorch # noqa
 from torch.testing._internal.common_utils import TestCase
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif('fbgemm' not in torch.backends.quantized.supported_engines, reason="No qengine found. USE_FBGEMM=1 is needed for building pytorch")
+    @pytest.mark.skipif('fbgemm' not in torch.backends.quantized.supported_engines,
+                        reason="No qengine found. USE_FBGEMM=1 is needed for building pytorch")
     def test_qconv_simple_channels_last(self, dtype=torch.float):
         zero_point = 0
         dtype_inputs = torch.quint8
@@ -25,7 +25,8 @@ class TestTorchMethod(TestCase):
         q_filters = torch.quantize_per_tensor(filters, scale_weight, zero_point, dtype_filters)
 
         packed_params = torch.ops.quantized.conv2d_prepack(q_filters, bias, _pair(1), _pair(0), _pair(1), 1)
-        output_int8 = torch.ops.quantized.conv2d_relu(q_inputs, packed_params, _pair(1), _pair(0), _pair(1), 1, scale_out, zero_point)
+        output_int8 = torch.ops.quantized.conv2d_relu(q_inputs, packed_params,
+                                                      _pair(1), _pair(0), _pair(1), 1, scale_out, zero_point)
 
         inputs = inputs.to(memory_format=torch.channels_last)
         inputs_gpu = inputs.to("xpu")
@@ -46,7 +47,8 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(cpu_result, gpu_result)
 
-    @pytest.mark.skipif('fbgemm' not in torch.backends.quantized.supported_engines, reason="No qengine found. USE_FBGEMM=1 is needed for building pytorch")
+    @pytest.mark.skipif('fbgemm' not in torch.backends.quantized.supported_engines,
+                        reason="No qengine found. USE_FBGEMM=1 is needed for building pytorch")
     def test_qconv_simple_channels_last_3d(self, dtype=torch.float):
         zero_point = 0
         dtype_inputs = torch.quint8
@@ -67,7 +69,8 @@ class TestTorchMethod(TestCase):
         padding = (0, 0, 0)
         dilation = (1, 1, 1)
         packed_params = torch.ops.quantized.conv3d_prepack(q_filters, bias, stride, padding, dilation, 1)
-        output_int8 = torch.ops.quantized.conv3d_relu(q_inputs, packed_params, stride, padding, dilation, 1, scale_out, zero_point)
+        output_int8 = torch.ops.quantized.conv3d_relu(
+            q_inputs, packed_params, stride, padding, dilation, 1, scale_out, zero_point)
 
         inputs = inputs.to(memory_format=torch.channels_last_3d)
         inputs_gpu = inputs.to("xpu")

@@ -1,8 +1,5 @@
 import torch
-from torch._C import parse_ir
-import intel_extension_for_pytorch
-import torch.nn.functional as F
-import time
+import intel_extension_for_pytorch # noqa
 from torch.testing._internal.common_utils import TestCase
 torch.set_printoptions(profile="full")
 

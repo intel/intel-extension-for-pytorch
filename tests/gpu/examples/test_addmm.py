@@ -1,15 +1,13 @@
 import torch
-import torch.nn as nn
 from torch.testing._internal.common_utils import (TestCase,
                                                   repeat_test_for_types)
-import pytest
-
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 
 xpu_device = torch.device("xpu")
 cpu_device = torch.device("cpu")
 checking_atol = 3e-2
 checking_rtol = 3e-2
+
 
 class TestTorchMethod(TestCase):
     def test_admm(self, dtype=torch.float):
@@ -80,13 +78,17 @@ class TestTorchMethod(TestCase):
         dst_xpu.backward(grad_xpu)
 
         # check output
-        self.assertEqual(dst_cpu, dst_xpu.to(device=cpu_device, dtype=torch.float), atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(dst_cpu, dst_xpu.to(device=cpu_device, dtype=torch.float),
+                         atol=checking_atol, rtol=checking_rtol)
 
         # check src1 grad
-        self.assertEqual(src1_cpu.grad, src1_xpu.grad.to(device=cpu_device, dtype=torch.float), atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(src1_cpu.grad, src1_xpu.grad.to(device=cpu_device, dtype=torch.float),
+                         atol=checking_atol, rtol=checking_rtol)
 
         # check src2 grad
-        self.assertEqual(src2_cpu.grad, src2_xpu.grad.to(device=cpu_device, dtype=torch.float), atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(src2_cpu.grad, src2_xpu.grad.to(device=cpu_device, dtype=torch.float),
+                         atol=checking_atol, rtol=checking_rtol)
 
         # check bias grad
-        self.assertEqual(bias_cpu.grad, bias_xpu.grad.to(device=cpu_device, dtype=torch.float), atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(bias_cpu.grad, bias_xpu.grad.to(device=cpu_device, dtype=torch.float),
+                         atol=checking_atol, rtol=checking_rtol)

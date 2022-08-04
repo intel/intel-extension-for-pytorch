@@ -1,10 +1,7 @@
-import os
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
-
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -338,7 +335,8 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(real.cpu(), ref)
 
-    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(), reason="doesn't enable channels last 1d or channels last does not support onednn block format")
+    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(),
+                        reason="doesn't enable channels last 1d or channels last does not support onednn block format")
     def test_channels_last_1d_fwd(self, dtype=torch.float):
         shapes = [(2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
                   (4, 1, 1), (1, 4, 4), (1, 4, 1)]
@@ -396,7 +394,8 @@ class TestNNMethod(TestCase):
 
                 self.assertEqual(real.contiguous().cpu(), ref)
 
-    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(), reason="doesn't enable channels last 1d or channels last does not support onednn block format")
+    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(),
+                        reason="doesn't enable channels last 1d or channels last does not support onednn block format")
     def test_channels_last_1d_bwd(self, dtype=torch.float):
         shapes = [(1, 7, 15000), (2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
                   (4, 1, 1), (1, 4, 4), (1, 4, 1)]

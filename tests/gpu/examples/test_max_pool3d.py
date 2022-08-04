@@ -3,10 +3,8 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import (TestCase,
                                                   repeat_test_for_types)
 
-import intel_extension_for_pytorch
-import pytest
+import intel_extension_for_pytorch # noqa
 
-import numpy
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")

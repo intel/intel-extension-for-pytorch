@@ -1,11 +1,9 @@
 import torch
-import torch.nn as nn
 from torch.distributions import Geometric
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 
-import pytest
 
 cpu_device = torch.device("cpu")
 sycl_device = torch.device("xpu")

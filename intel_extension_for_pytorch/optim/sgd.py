@@ -72,10 +72,10 @@ class SGDMasterWeight(Optimizer):
             if isinstance(p, dict):
                 for pi in p["params"]:
                     p_master_weight = pi.detach().clone()
-                    setattr(pi, "master_weight", p_master_weight)
+                    pi.master_weight = p_master_weight
             else:
                 p_master_weight = p.detach().clone()
-                setattr(p, "master_weight", p_master_weight)
+                p.master_weight = p_master_weight
 
         super(SGDMasterWeight, self).__init__(params_list, defaults)
 

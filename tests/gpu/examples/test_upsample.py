@@ -2,10 +2,8 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
+import intel_extension_for_pytorch # noqa
 
-import intel_extension_for_pytorch
-
-import numpy
 
 cpu_device = torch.device("cpu")
 sycl_device = torch.device("xpu")
@@ -43,8 +41,11 @@ class TestNNMethod(TestCase):
 
     def test_upsamle(self, dtype=torch.float):
         x_cpu = torch.tensor([[[[1, 2, 3, 4, 5], [4, 5, 6, 7, 8]], [[1, 2, 3, 4, 5], [4, 5, 6, 7, 8]]], [
-                             [[1, 2, 3, 4, 5], [4, 5, 6, 7, 8]], [[1, 2, 3, 4, 5], [4, 5, 6, 7, 8]]]], dtype=torch.float32, device=cpu_device)
-        # x_sycl = torch.tensor([[[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]],[[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]]], dtype=torch.float32, device = sycl_device)
+                             [[1, 2, 3, 4, 5], [4, 5, 6, 7, 8]], [[1, 2, 3, 4, 5], [4, 5, 6, 7, 8]]]],
+                             dtype=torch.float32, device=cpu_device)
+        # x_sycl = torch.tensor([[[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]],
+        #                       [[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]]],
+        #                       dtype=torch.float32, device = sycl_device)
         x_sycl = x_cpu.to("xpu")
 
         print("cpu result", torch.nn.functional.upsample_nearest(x_cpu, [2, 5]))
@@ -63,8 +64,10 @@ class TestNNMethod(TestCase):
             x_cpu, [2, 5]), torch.nn.functional.upsample_nearest(x_sycl, [2, 5]).cpu())
         self.assertEqual(torch.nn.functional.upsample_nearest(
             x_cpu, [4, 10]), torch.nn.functional.upsample_nearest(x_sycl, [4, 10]).cpu())
-        # self.assertEqual(torch.nn.functional.upsample_nearest(x_cpu,[3,8]), torch.nn.functional.upsample_nearest(x_sycl,[3,8]).cpu())
-        # self.assertEqual(torch.nn.functional.upsample_nearest(x_cpu,[1,3]), torch.nn.functional.upsample_nearest(x_sycl,[1,3]).cpu())
+        # self.assertEqual(torch.nn.functional.upsample_nearest(x_cpu,[3,8]),
+        #                  torch.nn.functional.upsample_nearest(x_sycl,[3,8]).cpu())
+        # self.assertEqual(torch.nn.functional.upsample_nearest(x_cpu,[1,3]),
+        #                  torch.nn.functional.upsample_nearest(x_sycl,[1,3]).cpu())
 
         x_cpu = torch.arange(8).view(1, 2, 2, 2).type(torch.FloatTensor)
         x_sycl = x_cpu.to("xpu")
@@ -106,7 +109,8 @@ class TestNNMethod(TestCase):
         self.assertEqual(x_cpu.grad, x_sycl.grad.cpu())
 
         '''only available in dpcpp build
-      x_cpu = torch.tensor([[[[1,2,3,4],[4,5,6,7],[1,2,3,4],[4,5,6,7]],[[1,2,3,4],[4,5,6,7],[1,2,3,4],[4,5,6,7]]]], dtype=torch.double, device = cpu_device)
+      x_cpu = torch.tensor([[[[1,2,3,4],[4,5,6,7],[1,2,3,4],[4,5,6,7]],[[1,2,3,4],[4,5,6,7],[1,2,3,4],[4,5,6,7]]]],
+      dtype=torch.double, device = cpu_device)
       x_sycl=x_cpu.to("xpu")
       x_cpu.requires_grad_(True)
       x_sycl.requires_grad_(True)

@@ -14,8 +14,8 @@ def file_exists(filename):
 def compare(file1, file2):
     fp1 = open(file1, 'r')
     fp2 = open(file2, 'r')
-    file_list1 = [i for i in fp1]
-    file_list2 = [i for i in fp2]
+    file_list1 = list(fp1)
+    file_list2 = list(fp2)
     if (len(file_list1) != len(file_list2)):
         return False
     else:

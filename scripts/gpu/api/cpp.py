@@ -1,4 +1,3 @@
-from scripts.gpu.model import *
 from scripts.gpu.api.types import TensorOptionsArguments, CppArgument, ThisArgument
 import scripts.gpu.local as local
 from typing import Optional, Sequence, Union, Callable, List

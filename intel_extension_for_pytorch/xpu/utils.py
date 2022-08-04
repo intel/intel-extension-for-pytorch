@@ -8,13 +8,11 @@ import shlex
 import sys
 import torch
 import warnings
-from torch.utils.cpp_extension import _TORCH_PATH, CppExtension
 
-from typing import List, Optional, Union, Tuple
+from typing import List, Optional, Tuple
 from torch.torch_version import TorchVersion
 
 from setuptools.command.build_ext import build_ext
-from pkg_resources import packaging
 
 IS_WINDOWS = sys.platform == 'win32'
 IS_MACOS = sys.platform.startswith('darwin')
@@ -30,8 +28,9 @@ MINIMUM_MSVC_VERSION = (19, 0, 24215)
 
 COMMON_DPCPP_FLAGS = ['-fPIC']
 
+
 def get_dpcpp_complier():
-    # build cxx via dpcpp    
+    # build cxx via dpcpp
     dpcpp_cmp = shutil.which('dpcpp')
     if dpcpp_cmp is None:
         raise RuntimeError("Failed to find compiler path from OS PATH")
@@ -40,15 +39,17 @@ def get_dpcpp_complier():
         dpcpp_cmp = _cxxbin
     return dpcpp_cmp
 
+
 def get_icx_complier():
-    # build cc via icx    
+    # build cc via icx
     icx_cmp = shutil.which('icx')
     if icx_cmp is None:
         raise RuntimeError("Failed to find compiler path from OS PATH")
     _ccbin = os.getenv("CC")
     if _ccbin is not None:
-        dpcpp_cmp = _ccbin    
+        dpcpp_cmp = _ccbin
     return icx_cmp
+
 
 def is_ninja_available():
     r'''
@@ -71,13 +72,16 @@ def verify_ninja_availability():
     if not is_ninja_available():
         raise RuntimeError("Ninja is required to load C++ extensions")
 
+
 def _is_cpp_file(path: str) -> bool:
     valid_ext = ['.cpp', '.hpp']
     return os.path.splitext(path)[1] in valid_ext
 
+
 def _is_c_file(path: str) -> bool:
     valid_ext = ['.c', '.h']
     return os.path.splitext(path)[1] in valid_ext
+
 
 class DpcppBuildExtension(build_ext, object):
     r'''
@@ -207,7 +211,7 @@ class DpcppBuildExtension(build_ext, object):
                     if isinstance(cflags, dict):
                         cflags = cflags['cxx']
                     else:
-                        cflags = unix_dpcpp_flags(cflags)                    
+                        cflags = unix_dpcpp_flags(cflags)
                 elif isinstance(cflags, dict):
                     cflags = cflags['cxx']
                 append_std17_if_no_std_present(cflags)
@@ -267,7 +271,7 @@ class DpcppBuildExtension(build_ext, object):
                 verbose=True)
 
             # Return *all* object filenames, not just the ones we just built.
-            return objects            
+            return objects
 
         if self.compiler.compiler_type == 'msvc':
             raise 'Not implemented'
@@ -301,6 +305,7 @@ class DpcppBuildExtension(build_ext, object):
         # use the same CXX ABI as what PyTorch was compiled with
         self._add_compile_flag(extension, '-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)))
 
+
 SUBPROCESS_DECODE_ARGS = ('oem',) if IS_WINDOWS else ()
 
 ABI_INCOMPATIBILITY_WARNING = '''
@@ -330,6 +335,7 @@ with compiling PyTorch from source.
 
 BUILT_FROM_SOURCE_VERSION_PATTERN = re.compile(r'\d+\.\d+\.\d+\w+\+\w+')
 
+
 def _is_binary_build() -> bool:
     return not BUILT_FROM_SOURCE_VERSION_PATTERN.match(torch.version.__version__)
 
@@ -337,6 +343,7 @@ def _is_binary_build() -> bool:
 def _accepted_compilers_for_platform() -> List[str]:
     # gnu-c++ and gnu-cc are the conda gcc compilers
     return ['clang++', 'clang'] if IS_MACOS else ['dpcpp', 'icx']
+
 
 def check_compiler_ok_for_platform(compiler: str) -> bool:
     r'''
@@ -374,6 +381,7 @@ def check_compiler_ok_for_platform(compiler: str) -> bool:
         # Check for 'clang' or 'clang++'
         return version_string.startswith("Apple clang")
     return False
+
 
 def get_compiler_abi_compatibility_and_version(compiler) -> Tuple[bool, TorchVersion]:
     r'''
@@ -425,6 +433,7 @@ def get_compiler_abi_compatibility_and_version(compiler) -> Tuple[bool, TorchVer
 
     return (False, TorchVersion('.'.join(version)))
 
+
 def _write_ninja_file_and_compile_objects(
         sources: List[str],
         objects,
@@ -459,10 +468,12 @@ def _write_ninja_file_and_compile_objects(
         # that failed to build but there isn't a good way to get it here.
         error_prefix='Error compiling objects for extension')
 
+
 PLAT_TO_VCVARS = {
-    'win32' : 'x86',
-    'win-amd64' : 'x86_amd64',
+    'win32': 'x86',
+    'win-amd64': 'x86_amd64',
 }
+
 
 def _get_num_workers(verbose: bool) -> Optional[int]:
     max_jobs = os.environ.get('MAX_JOBS')
@@ -474,6 +485,7 @@ def _get_num_workers(verbose: bool) -> Optional[int]:
         print('Allowing ninja to set a default number of workers... '
               '(overridable by setting the environment variable MAX_JOBS=N)')
     return None
+
 
 def _run_ninja_build(build_directory: str, verbose: bool, error_prefix: str) -> None:
     command = ['ninja', '-v']
@@ -528,6 +540,7 @@ def _run_ninja_build(build_directory: str, verbose: bool, error_prefix: str) -> 
         if hasattr(error, 'output') and error.output:  # type: ignore[union-attr]
             message += f": {error.output.decode(*SUBPROCESS_DECODE_ARGS)}"  # type: ignore[union-attr]
         raise RuntimeError(message) from e
+
 
 def _write_ninja_file(path,
                       cflags,
@@ -628,20 +641,24 @@ def _write_ninja_file(path,
             lines = '\n'.join(block)
             build_file.write(f'{lines}\n\n')
 
+
 def _get_dpcpp_root():
     # TODO: Need to decouple with toolchain env scripts
     dpcpp_root = os.getenv('CMPLR_ROOT')
     return dpcpp_root
+
 
 def _get_onemkl_root():
     # TODO: Need to decouple with toolchain env scripts
     path = os.getenv('MKLROOT')
     return path
 
+
 def _get_onednn_root():
     # TODO: Need to decouple with toolchain env scripts
     path = os.getenv('DNNLROOT')
     return path
+
 
 class _one_api_help:
     __dpcpp_root = None
@@ -669,11 +686,12 @@ class _one_api_help:
         if self.__onednn_root is None:
             raise 'Didn\'t detect dnnl root. Please source <oneapi_dir>/dnnl/<version>/env/vars.sh '
         else:
-            warnings.warn("This extension has static linked onednn library. Please attaction to that, this path of onednn version maybe not match with the built-in version.")
+            warnings.warn("This extension has static linked onednn library. Please attaction to that,\
+                          this path of onednn version maybe not match with the built-in version.")
 
     def check_dpcpp_cfg(self):
         if self.__dpcpp_root is None:
-            raise 'Didn\'t detect dpcpp root. Please source <oneapi_dir>/compiler/<version>/env/vars.sh '        
+            raise 'Didn\'t detect dpcpp root. Please source <oneapi_dir>/compiler/<version>/env/vars.sh '
 
     def get_default_include_dir(self):
         return [os.path.join(self.__default_root, 'include')]
@@ -729,6 +747,7 @@ class _one_api_help:
             f'{MKLROOT}/lib/intel64/libmkl_core.a',
         ]
 
+
 def get_pytorch_include_dir():
     lib_include = os.path.join(_TORCH_PATH, 'include')
     paths = [
@@ -740,6 +759,7 @@ def get_pytorch_include_dir():
         os.path.join(lib_include, 'TH')
     ]
     return paths
+
 
 def get_pytorch_lib_dir():
     return [os.path.join(_TORCH_PATH, 'lib')]
@@ -793,7 +813,7 @@ def DPCPPExtension(name, sources, *args, **kwargs):
     kwargs['language'] = 'c++'
 
     extra_compile_args = kwargs.get('extra_compile_args', {})
-    extra_link_args = kwargs.get('extra_link_args', [])    
+    extra_link_args = kwargs.get('extra_link_args', [])
 
     # Append oneMKL link parameters, detailed please reference:
     # https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-advisor.html

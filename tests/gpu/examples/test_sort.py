@@ -1,14 +1,11 @@
 import torch
-import intel_extension_for_pytorch
-import numpy as np
 import random
-import pytest
 from torch.testing._internal.common_utils import TestCase
-
+import intel_extension_for_pytorch # noqa
 
 class TestNNMethod(TestCase):
-    def test_sort(self, dtypes=[torch.bfloat16, torch.half]):
-        for dtype in dtypes:
+    def test_sort(self):
+        for dtype in [torch.bfloat16, torch.half]:
             for i in range(100):
                 a = random.randint(1, 3)
                 b = random.randint(1, 5)

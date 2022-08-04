@@ -4,10 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 
 from torch.quantization.quantize_jit import (convert_jit, prepare_jit)
-from torch.quantization import default_qconfig
 from torch.jit._recursive import wrap_cpp_module
 
 import pytest

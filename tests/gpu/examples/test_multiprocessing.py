@@ -3,7 +3,7 @@ import os
 import torch
 import torch.multiprocessing as mp
 from torch.testing._internal.common_utils import (TestCase, IS_WINDOWS, TEST_WITH_TSAN)
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 
 import pytest
 

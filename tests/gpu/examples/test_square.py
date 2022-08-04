@@ -1,7 +1,5 @@
-from pickle import TRUE
 import torch
-import intel_extension_for_pytorch
-import pytest
+import intel_extension_for_pytorch # noqa
 
 from torch.testing._internal.common_utils import TestCase
 

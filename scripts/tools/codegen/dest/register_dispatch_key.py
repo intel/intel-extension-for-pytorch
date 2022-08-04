@@ -26,6 +26,7 @@ import tools.codegen.api.structured as structured
 from tools.codegen.api.translate import translate
 from tools.codegen.selective_build.selector import SelectiveBuilder
 
+
 def gen_registration_headers(
         backend_index: BackendIndex,
         per_operator_headers: bool,
@@ -51,6 +52,7 @@ def gen_registration_headers(
         headers.append("#include <ATen/Functions.h>")
 
     return headers
+
 
 def gen_create_out_helper(backend_index: BackendIndex) -> List[str]:
     if backend_index.dispatch_key == DispatchKey.Meta:
@@ -117,6 +119,7 @@ void resize_out(const Tensor &out, IntArrayRef sizes, IntArrayRef strides, const
   }
 }
 """]
+
 
 def gen_check_inplace_helper(backend_index: BackendIndex) -> List[str]:
     return ["""
@@ -402,7 +405,8 @@ ${temp_name} = c10::optional<Tensor>(AtenIpexTypeXPU::to_plain_if_needed(${name}
                     return self.LAZY_REORDER_OPTIONAL_TENSOR.substitute(change_dict), change_dict['temp_name']
                 elif not arg.type.startswith('const'):
                     return self.LAZY_REORDER_TENSOR.substitute(change_dict), change_dict['name']
-                elif schema_name in self.lazy_reorder_no_variable_list.keys() and arg.name in self.lazy_reorder_no_variable_list[schema_name]:
+                elif schema_name in self.lazy_reorder_no_variable_list.keys() and \
+                        arg.name in self.lazy_reorder_no_variable_list[schema_name]:
                     return self.LAZY_REORDER_CONST_NO_VARIABLE_TENSOR.substitute(change_dict), change_dict['name']
                 else:
                     return self.LAZY_REORDER_CONST_TENSOR.substitute(change_dict), change_dict['temp_name']
@@ -827,7 +831,8 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
                     f.func.arguments.out,
                     f.func.arguments.flat_positional
                 )
-                sig_body.append(RegisterDispatchKey.gen_device_check(f.device_check, list(device_check_args), sig.name()))
+                sig_body.append(RegisterDispatchKey.gen_device_check(
+                    f.device_check, list(device_check_args), sig.name()))
 
             if k is SchemaKind.functional:
                 sig_body.append(f"{class_name} op;")
@@ -869,7 +874,6 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
                 sig_body.append("(void)precompute;")
             else:
                 sig_body.append(f"op.meta({meta_exprs});")
-
 
             # After running meta, op.outputs_ is guaranteed to be valid;
             # add it to the context

@@ -1,14 +1,10 @@
-import copy
-import os
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 
-import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")

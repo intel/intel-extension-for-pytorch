@@ -2,17 +2,14 @@ import copy
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
-
-import intel_extension_for_pytorch
-
-import pytest
+import intel_extension_for_pytorch # noqa
 
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")
 ATOL = 1e-5
 RTOL = 1e-5
+
 
 class TestTorchMethod(TestCase):
     def test_embedding_bag_all(self, dtype=torch.float32):
@@ -21,7 +18,8 @@ class TestTorchMethod(TestCase):
             for mode in ['sum', 'mean', 'max']:
                 for include_last_offset in [False, True]:
                     for padding_idx in [None, 29, 10]:
-                        embedding = nn.EmbeddingBag(weight_elem, weight_feature_size, mode=mode, scale_grad_by_freq=False, include_last_offset=include_last_offset, padding_idx=padding_idx)
+                        embedding = nn.EmbeddingBag(weight_elem, weight_feature_size, mode=mode, scale_grad_by_freq=False,
+                                                    include_last_offset=include_last_offset, padding_idx=padding_idx)
                         input = torch.Tensor([9, 29, 49, 39, 19, 29, 19, 9, 0], device=cpu_device).long()
                         offsets = torch.Tensor([0, 1, 2, 4, 7, 9], device=cpu_device).long()
                         output = embedding(input, offsets)
@@ -37,7 +35,8 @@ class TestTorchMethod(TestCase):
                         embedding_xpu = embedding.to(xpu_device, dtype=dtype)
                         grad_xpu = grad_cpu.to(xpu_device, dtype=dtype)
                         print('weight_elem = ', weight_elem, '. weight_feature_size = ', weight_feature_size)
-                        print('mode = ', mode, '. dtype = ', dtype, '. include_last_offset = ', include_last_offset, '. padding_idx = ', padding_idx)
+                        print('mode = ', mode, '. dtype = ', dtype, '. include_last_offset = ',
+                              include_last_offset, '. padding_idx = ', padding_idx)
                         output_xpu = embedding_xpu(input_xpu, offsets_xpu)
 
                         embedding_xpu.zero_grad()

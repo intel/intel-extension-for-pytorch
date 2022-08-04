@@ -3,14 +3,12 @@ import copy
 from torch.testing._internal.common_utils import TestCase
 
 import time
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa
 
-from torch.jit._recursive import wrap_cpp_module
 from torch.quantization.quantize_jit import (
     convert_jit,
     prepare_jit,
 )
-from torch.quantization import default_qconfig
 
 checking_atol = 3e-2
 checking_rtol = 3e-2

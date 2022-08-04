@@ -49,7 +49,7 @@ class AdamMasterWeight(optimizer.Optimizer):
         params_list = list(params)
         for p in params_list:
             p_master_weight = p.detach().clone()
-            setattr(p, "master_weight", p_master_weight)
+            p.master_weight = p_master_weight
 
         super(AdamMasterWeight, self).__init__(params_list, defaults)
 
@@ -100,7 +100,8 @@ class AdamMasterWeight(optimizer.Optimizer):
                         state['exp_avg_sq'] = torch.zeros_like(p.master_weight, memory_format=torch.preserve_format)
                         if group['amsgrad']:
                             # Maintains max of all exp. moving avg. of sq. grad. values
-                            state['max_exp_avg_sq'] = torch.zeros_like(p.master_weight, memory_format=torch.preserve_format)
+                            state['max_exp_avg_sq'] = torch.zeros_like(
+                                p.master_weight, memory_format=torch.preserve_format)
 
                     exp_avgs.append(state['exp_avg'])
                     exp_avg_sqs.append(state['exp_avg_sq'])

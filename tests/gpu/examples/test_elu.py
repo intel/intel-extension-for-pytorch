@@ -1,14 +1,11 @@
-import copy
 
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch
-import pytest
+import intel_extension_for_pytorch # noqa
 
-import numpy
 
 dtype = torch.float32
 cpu_device = torch.device("cpu")

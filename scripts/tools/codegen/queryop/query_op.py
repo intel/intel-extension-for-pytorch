@@ -23,11 +23,11 @@ elif key == XPU:
     python query_op.py --cpu_queried_file "/path/cpu" --cuda_queried_file "/path/cuda" --output filename
 """
 
+from tools.codegen.model import FunctionSchema
 import argparse
 import sys
 import os
 import subprocess
-import torch
 import pandas as pd
 import numpy as np
 
@@ -40,7 +40,6 @@ from functools import reduce
 scripts_root = pathlib.Path(__file__).parent.parent.parent.parent.absolute()
 sys.path.append(scripts_root.as_posix())
 
-from tools.codegen.model import FunctionSchema
 # Safely load fast C Yaml loader/dumper if they are available
 try:
     from yaml import CSafeLoader as YamlLoader
@@ -49,17 +48,22 @@ except ImportError:
 
 parser = argparse.ArgumentParser(description='Query operator registrations')
 parser.add_argument('--key', default='XPU', type=str, help='Dispatch keys')
-# torch contains aten ops and other ops such as caffe2, quantized, sparse, static_runtime..., and we are querying the aten ops, and so use aten as default values.
+# torch contains aten ops and other ops such as caffe2, quantized, sparse, static_runtime..., 
+# and we are querying the aten ops, and so use aten as default values.
 parser.add_argument('--type', default='aten', type=str, help='Operator types')
 parser.add_argument('--output', help='Output Files')
 parser.add_argument('--cpu_queried_file', type=str, help='Path of the cpu file')
 parser.add_argument('--cuda_queried_file', type=str, help='Path of the cuda file')
 
+
 def get_opvector(args, backend=''):
     if args.key == 'CUDA':
-        cmd = "python -c 'import torch; torch._C._dispatch_print_registrations_for_dispatch_key(\"" + backend + "\")' > /tmp/log.txt"
+        cmd = "python -c 'import torch; torch._C._dispatch_print_registrations_for_dispatch_key(\"" + \
+            backend + "\")' > /tmp/log.txt"
     else:
-        cmd = "python -c 'import torch; import intel_extension_for_pytorch; torch._C._dispatch_print_registrations_for_dispatch_key(\"" + backend + "\")' > /tmp/log.txt"
+        cmd = "python -c 'import torch; import intel_extension_for_pytorch; \
+               torch._C._dispatch_print_registrations_for_dispatch_key(\"" + \
+            backend + "\")' > /tmp/log.txt"
     subprocess.check_call(cmd, shell=True)
     op_vector = []
     with open("/tmp/log.txt", 'r') as f:
@@ -68,7 +72,7 @@ def get_opvector(args, backend=''):
     return op_vector
 
 
-def query_ops_key(op_all, key_types, args):  
+def query_ops_key(op_all, key_types, args):
     len_op = len(op_all)
     len_keytpye = len(key_types)
 
@@ -76,7 +80,7 @@ def query_ops_key(op_all, key_types, args):
     for k in range(len_keytpye):
         dispatch_key = key_types[k] + args.key
         op_key_alltype = get_opvector(args, dispatch_key)
-        op_key = list(filter(lambda x : args.type in x , op_key_alltype))
+        op_key = list(filter(lambda x: args.type in x, op_key_alltype))
 
         # get op number and percent for each key type
         op_registration[0][k] = len(op_key)    # number
@@ -86,7 +90,7 @@ def query_ops_key(op_all, key_types, args):
         for i in range(len_op):
             if op_all[i] in op_key:
                 op_registration[i + 2][k] = 'Y'
-    return op_registration             
+    return op_registration
 
 
 def filter_op(path):
@@ -131,14 +135,15 @@ def filter_op(path):
             op_register_name[opname_str] = 'No'
     return op_structured_delegate, op_register_name, op_register_simple, op_cuda_specific
 
-def main():            
+
+def main():
     args = parser.parse_args()
     native_yaml_path = os.path.join(scripts_root, 'tools/codegen/yaml/native_functions.yaml')
 
     # get all operators
     op_alltype = get_opvector(args)
     # filter the aten operators
-    op_all = list(filter(lambda x : args.type in x , op_alltype))
+    op_all = list(filter(lambda x: args.type in x, op_alltype))
     op_all.sort()
 
     # get operators for a specific backend
@@ -146,7 +151,7 @@ def main():
     op_registration_backend = query_ops_key(op_all, key_types, args)
 
     # set a dataframe and output to csv
-    col_name = [key_type + args.key for key_type in key_types] 
+    col_name = [key_type + args.key for key_type in key_types]
     row_name = ['Number', 'Percent'] + op_all
     output_data = pd.DataFrame(columns=col_name, index=row_name, data=op_registration_backend)
 
@@ -203,7 +208,6 @@ def main():
         if op_all[i] in op_register_name.keys():
             op_category[i + 2][1] = op_register_name[op_all[i]]
             op_category[i + 2][2] = op_register_simple[op_all[i]]
-
 
     op_category_df = pd.DataFrame(columns=['structure delegate', 'register', 'register or not'], data=op_category)
 
