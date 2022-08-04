@@ -6,6 +6,8 @@
 #include <stdexcept>
 #include <type_traits>
 
+#define SYCL_MAX_SUB_GROUP_SIZE dpcppMaxSubGroupSize()
+
 using namespace at;
 
 namespace xpu {
@@ -45,6 +47,18 @@ static inline int64_t dpcppMaxWorkGroupSize(
     DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   return dev_prop->max_work_group_size;
+}
+
+static inline int64_t dpcppMaxSubGroupSize(
+    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  auto subgroup_sizes = dev_prop->subgroup_sizes;
+  int64_t max_val = 0;
+  for (auto i : subgroup_sizes) {
+    if (i > max_val)
+      max_val = i;
+  }
+  return max_val;
 }
 
 static inline int64_t dpcppMaxComputeUnitSize(
