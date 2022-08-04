@@ -59,12 +59,12 @@ inline void update_feature_kernel(
     for (int i = start; i < end; i++) {
       int fetch_time_idx = std::min(time_idxs_ptr[i], max_len - 1);
 
-      // f is a view of x: f = x[:, 0, :].unsqueeze(1), f.data_ptr() ==
+      // f is a view of x: f = x[:, 0, :], f.data_ptr() ==
       // x.data_ptr() x has been transposed: x.transpose(0, 1) shape of x: [64,
       // 545, 1024] (bs * t * feature) stride of x: [1024, 65536, 1]
 
-      // shape of f: [64, 1, 1024]
-      // stride of f: [1024, 1024, 1]
+      // shape of f: [64, 1024]
+      // stride of f: [1024, 1]
       auto x_pos =
           fetch_time_idx * batch_size * feature_size + i * feature_size;
       auto f_pos = i * feature_size;
@@ -270,7 +270,7 @@ bool rnnt_update_batch_kernel_impl(
 
   // if blankness.nonzero().size(0) > 0:
   //     fetch_time_idxs = time_idxs.min(max_lens)
-  //     f = x[label_row_list, fetch_time_idxs, :].unsqueeze(1)
+  //     f = x[label_row_list, fetch_time_idxs, :]
   update_feature_idx_kernel(
       blankness_out, x, f, time_idxs, batch_size, max_len);
   return BatchStatus::UnFinished;
@@ -345,12 +345,11 @@ bool rnnt_update_batch_kernel_impl(
     // fetch_time_idxs = time_idxs.min(max_lens)
     auto fetch_time_idxs = time_idxs.min(max_lens);
 
-    // f = x[list(range(x.size(0))), fetch_time_idxs.to(torch.int64),
-    // :].unsqueeze(1)
-    f.copy_(x.index({label_row,
-                     fetch_time_idxs.to(at::ScalarType::Long),
-                     at::indexing::Slice()})
-                .unsqueeze(1));
+    // f = x[list(range(x.size(0))), fetch_time_idxs.to(torch.int64), :]
+    f.copy_(x.index(
+        {label_row,
+         fetch_time_idxs.to(at::ScalarType::Long),
+         at::indexing::Slice()}));
   }
 
   // label_for_next_loop = label_tensor.gather(1,

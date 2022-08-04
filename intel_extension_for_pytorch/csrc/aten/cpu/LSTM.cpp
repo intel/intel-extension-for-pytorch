@@ -1,6 +1,5 @@
 #include <torch/script.h>
 #include <torch/custom_class.h>
-#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 #include "LSTM.h"
 
@@ -58,7 +57,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> optimized_lstm_batch(
     int64_t num_layers,
     bool bidirectional,
     bool batch_first) {
-  IPEX_RECORD_FUNCTION("optimized_lstm_batch", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("optimized_lstm_batch", c10::ArrayRef<c10::IValue>({}));
 
 #if defined(IPEX_DISP_OP)
   printf("optimized_lstm_batch\n");
@@ -88,7 +87,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> optimized_lstm_packed(
     bool has_biases,
     int64_t num_layers,
     bool bidirectional) {
-  IPEX_RECORD_FUNCTION("optimized_lstm_packed", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("optimized_lstm_packed", c10::ArrayRef<c10::IValue>({}));
 
 #if defined(IPEX_DISP_OP)
   printf("optimized_lstm_packed\n");

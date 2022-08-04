@@ -7,7 +7,7 @@ from common_utils import TestCase
 
 class TestRNNTUpdateBatch(TestCase):
     def _test_org(self, hidden, hidden_prime, x, batch_size, max_symbol, blank_id, loop_cnt):
-        f = x[:, 0, :].unsqueeze(1)
+        f = x[:, 0, :]
 
         max_lens = torch.tensor([self.max_len-1 for i in range(batch_size)], dtype=torch.int64)
 
@@ -56,12 +56,12 @@ class TestRNNTUpdateBatch(TestCase):
 
             if blankness.nonzero().size(0) > 0:
                 fetch_time_idxs = time_idxs.min(max_lens)
-                f = x[list(range(x.size(0))), fetch_time_idxs, :].unsqueeze(1)
+                f = x[list(range(x.size(0))), fetch_time_idxs, :]
 
         return blank_vec, blankness, label_col, time_idxs, symbols_added, not_blank, label_tensor, hidden, f
 
     def _test_rnnt_update_batch_kernel(self, hidden, hidden_prime, x, batch_size, max_symbol, blank_id, loop_cnt):
-        f = x[:, 0, :].unsqueeze(1)
+        f = x[:, 0, :]
 
         time_idxs = torch.zeros((batch_size), dtype=torch.int)
         out_lens = torch.tensor([i for i in range(batch_size)], dtype=torch.int)
