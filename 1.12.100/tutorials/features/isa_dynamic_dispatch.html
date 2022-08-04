@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ISA Dynamic Dispatching &mdash; intel_extension_for_pytorch 1.12.100 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Channels Last" href="nhwc.html" />
+    <link rel="prev" title="Features" href="../features.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../versions.html">1.12.100 ▼</a>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ease-of-use-python-api">Ease-of-use Python API</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#isa-dynamic-dispatching">ISA Dynamic Dispatching</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">ISA Dynamic Dispatching</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#cpu-isa-build-compiler-requirement">CPU ISA build compiler requirement</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#select-isa-level">Select ISA Level</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#example">Example:</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#cpu-feature-check">CPU feature check</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-optimization">Graph Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#operator-optimization">Operator Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#runtime-extension">Runtime Extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#int8-quantization">INT8 Quantization</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../features.html">Features</a> &raquo;</li>
+      <li>ISA Dynamic Dispatching</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/isa_dynamic_dispatch.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="isa-dynamic-dispatching">
+<h1>ISA Dynamic Dispatching<a class="headerlink" href="#isa-dynamic-dispatching" title="Permalink to this headline"></a></h1>
+<p>This document explains the dynamic kernel dispatch mechanism for Intel® Extension for PyTorch* (Intel® Extension for PyTorch*) based on CPU ISA. It is an extension to the similar mechanism in PyTorch.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline"></a></h2>
+<p>Forked from PyTorch, Intel® Extension for PyTorch* adds additional CPU ISA level support, such as <code class="docutils literal notranslate"><span class="pre">AVX512_VNNI</span></code>, <code class="docutils literal notranslate"><span class="pre">AVX512_BF16</span></code> and <code class="docutils literal notranslate"><span class="pre">AMX</span></code>.</p>
+<p>PyTorch &amp; Intel® Extension for PyTorch* CPU ISA support statement:</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th></th>
+<th align="center">DEFAULT</th>
+<th align="center">AVX2</th>
+<th align="center">AVX2_VNNI</th>
+<th align="center">AVX512</th>
+<th align="center">AVX512_VNNI</th>
+<th align="center">AVX512_BF16</th>
+<th align="center">AMX</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PyTorch</td>
+<td align="center">✔</td>
+<td align="center">✔</td>
+<td align="center">✘</td>
+<td align="center">✔</td>
+<td align="center">✘</td>
+<td align="center">✘</td>
+<td align="center">✘</td>
+</tr>
+<tr>
+<td>Intel® Extension for PyTorch* 1.11</td>
+<td align="center">✘</td>
+<td align="center">✔</td>
+<td align="center">✘</td>
+<td align="center">✔</td>
+<td align="center">✘</td>
+<td align="center">✘</td>
+<td align="center">✘</td>
+</tr>
+<tr>
+<td>Intel® Extension for PyTorch* 1.12</td>
+<td align="center">✘</td>
+<td align="center">✔</td>
+<td align="center">✘</td>
+<td align="center">✔</td>
+<td align="center">✔</td>
+<td align="center">✔</td>
+<td align="center">✔</td>
+</tr>
+</tbody>
+</table><p>* <code class="docutils literal notranslate"><span class="pre">DEFAULT</span></code> in Intel® Extension for PyTorch* 1.12 implies <code class="docutils literal notranslate"><span class="pre">AVX2</span></code>.</p>
+<section id="cpu-isa-build-compiler-requirement">
+<h3>CPU ISA build compiler requirement<a class="headerlink" href="#cpu-isa-build-compiler-requirement" title="Permalink to this headline"></a></h3>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th>ISA Level</th>
+<th align="center">GCC requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AVX2</td>
+<td align="center">Any</td>
+</tr>
+<tr>
+<td>AVX512</td>
+<td align="center">GCC 9.2+</td>
+</tr>
+<tr>
+<td>AVX512_VNNI</td>
+<td align="center">GCC 9.2+</td>
+</tr>
+<tr>
+<td>AVX512_BF16</td>
+<td align="center">GCC 10.3+</td>
+</tr>
+<tr>
+<td>AVX2_VNNI</td>
+<td align="center">GCC 11.2+</td>
+</tr>
+<tr>
+<td>AMX</td>
+<td align="center">GCC 11.2+</td>
+</tr>
+</tbody>
+</table><p>* Check with <code class="docutils literal notranslate"><span class="pre">cmake/Modules/FindAVX.cmake</span></code> for detailed compiler checks.</p>
+</section>
+</section>
+<section id="select-isa-level">
+<h2>Select ISA Level<a class="headerlink" href="#select-isa-level" title="Permalink to this headline"></a></h2>
+<p>By default, Intel® Extension for PyTorch* dispatches to kernels with the maximum ISA level supported on the underlying CPU hardware. This ISA level can be overridden by an environment variable <code class="docutils literal notranslate"><span class="pre">ATEN_CPU_CAPABILITY</span></code> (same environment variable as PyTorch). Available values are {<code class="docutils literal notranslate"><span class="pre">avx2</span></code>, <code class="docutils literal notranslate"><span class="pre">avx512</span></code>, <code class="docutils literal notranslate"><span class="pre">avx512_vnni</span></code>, <code class="docutils literal notranslate"><span class="pre">avx512_bf16</span></code>, <code class="docutils literal notranslate"><span class="pre">amx</span></code>}. The effective ISA level would be the minimal level between <code class="docutils literal notranslate"><span class="pre">ATEN_CPU_CAPABILITY</span></code> and the maximum level supported by the hardware.</p>
+<section id="example">
+<h3>Example:<a class="headerlink" href="#example" title="Permalink to this headline"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ python -c <span class="s1">&#39;import intel_extension_for_pytorch._C as core;print(core._get_current_isa_level())&#39;</span>
+AMX
+$ <span class="nv">ATEN_CPU_CAPABILITY</span><span class="o">=</span>avx2 python -c <span class="s1">&#39;import intel_extension_for_pytorch._C as core;print(core._get_current_isa_level())&#39;</span>
+AVX2
+</pre></div>
+</div>
+<blockquote>
+<div><p><strong>Note:</strong></p>
+<p><code class="docutils literal notranslate"><span class="pre">core._get_current_isa_level()</span></code> is an Intel® Extension for PyTorch* internal function used for checking the current effective ISA level. It is used for debugging purpose only and subject to change.</p>
+</div></blockquote>
+</section>
+</section>
+<section id="cpu-feature-check">
+<h2>CPU feature check<a class="headerlink" href="#cpu-feature-check" title="Permalink to this headline"></a></h2>
+<p>An addtional CPU feature check tool in the subfolder: <code class="docutils literal notranslate"><span class="pre">tests/cpu/isa</span></code></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ cmake .
+-- The C compiler identification is GNU <span class="m">11</span>.2.1
+-- The CXX compiler identification is GNU <span class="m">11</span>.2.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - <span class="k">done</span>
+-- Check <span class="k">for</span> working C compiler: /opt/rh/gcc-toolset-11/root/usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - <span class="k">done</span>
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - <span class="k">done</span>
+-- Check <span class="k">for</span> working CXX compiler: /opt/rh/gcc-toolset-11/root/usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - <span class="k">done</span>
+-- Configuring <span class="k">done</span>
+-- Generating <span class="k">done</span>
+-- Build files have been written to: tests/cpu/isa
+
+$ make
+<span class="o">[</span> <span class="m">33</span>%<span class="o">]</span> Building CXX object CMakeFiles/cpu_features.dir/intel_extension_for_pytorch/csrc/cpu/isa/cpu_feature.cpp.o
+<span class="o">[</span> <span class="m">66</span>%<span class="o">]</span> Building CXX object CMakeFiles/cpu_features.dir/intel_extension_for_pytorch/csrc/cpu/isa/cpu_feature_main.cpp.o
+<span class="o">[</span><span class="m">100</span>%<span class="o">]</span> Linking CXX executable cpu_features
+<span class="o">[</span><span class="m">100</span>%<span class="o">]</span> Built target cpu_features
+
+$ ./cpu_features
+XCR0: 00000000000602e7
+os --&gt; avx: <span class="nb">true</span>
+os --&gt; avx2: <span class="nb">true</span>
+os --&gt; avx512: <span class="nb">true</span>
+os --&gt; amx: <span class="nb">true</span>
+mmx:                    <span class="nb">true</span>
+sse:                    <span class="nb">true</span>
+sse2:                   <span class="nb">true</span>
+sse3:                   <span class="nb">true</span>
+ssse3:                  <span class="nb">true</span>
+sse4_1:                 <span class="nb">true</span>
+sse4_2:                 <span class="nb">true</span>
+aes_ni:                 <span class="nb">true</span>
+sha:                    <span class="nb">true</span>
+xsave:                  <span class="nb">true</span>
+fma:                    <span class="nb">true</span>
+f16c:                   <span class="nb">true</span>
+avx:                    <span class="nb">true</span>
+avx2:                   <span class="nb">true</span>
+avx_vnni:                       <span class="nb">true</span>
+avx512_f:                       <span class="nb">true</span>
+avx512_cd:                      <span class="nb">true</span>
+avx512_pf:                      <span class="nb">false</span>
+avx512_er:                      <span class="nb">false</span>
+avx512_vl:                      <span class="nb">true</span>
+avx512_bw:                      <span class="nb">true</span>
+avx512_dq:                      <span class="nb">true</span>
+avx512_ifma:                    <span class="nb">true</span>
+avx512_vbmi:                    <span class="nb">true</span>
+avx512_vpopcntdq:               <span class="nb">true</span>
+avx512_4fmaps:                  <span class="nb">false</span>
+avx512_4vnniw:                  <span class="nb">false</span>
+avx512_vbmi2:                   <span class="nb">true</span>
+avx512_vpclmul:                 <span class="nb">true</span>
+avx512_vnni:                    <span class="nb">true</span>
+avx512_bitalg:                  <span class="nb">true</span>
+avx512_fp16:                    <span class="nb">true</span>
+avx512_bf16:                    <span class="nb">true</span>
+avx512_vp2intersect:            <span class="nb">true</span>
+amx_bf16:                       <span class="nb">true</span>
+amx_tile:                       <span class="nb">true</span>
+amx_int8:                       <span class="nb">true</span>
+prefetchw:                      <span class="nb">true</span>
+prefetchwt1:                    <span class="nb">false</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../features.html" class="btn btn-neutral float-left" title="Features" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="nhwc.html" class="btn btn-neutral float-right" title="Channels Last" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

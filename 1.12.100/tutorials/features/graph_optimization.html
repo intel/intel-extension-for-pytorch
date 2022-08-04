@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Graph Optimization &mdash; intel_extension_for_pytorch 1.12.100 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Optimizer Fusion" href="optimizer_fusion.html" />
+    <link rel="prev" title="Auto Mixed Precision (AMP)" href="amp.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../versions.html">1.12.100 ▼</a>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ease-of-use-python-api">Ease-of-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#isa-dynamic-dispatching">ISA Dynamic Dispatching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#graph-optimization">Graph Optimization</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Graph Optimization</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#ease-of-use-graph-optimization-api">Ease-of-use graph optimization API</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#fp32-and-bf16-models">FP32 and BF16 models</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#int8-models">INT8 models</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#methodology">Methodology</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#fusion">Fusion</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#fp32-and-bf16-fusion-patterns">FP32 and BF16 fusion patterns</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#int8-fusion-patterns">INT8 fusion patterns</a></li>
+</ul>
+</li>
+<li class="toctree-l5"><a class="reference internal" href="#folding">Folding</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#operator-optimization">Operator Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#runtime-extension">Runtime Extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#int8-quantization">INT8 Quantization</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../features.html">Features</a> &raquo;</li>
+      <li>Graph Optimization</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/graph_optimization.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="graph-optimization">
+<h1>Graph Optimization<a class="headerlink" href="#graph-optimization" title="Permalink to this headline"></a></h1>
+<p>Most Deep Learning models could be described as a DAG (directed acyclic graph). Optimizing a deep learning model from a graph perspective is straight forward. Compared to the operator optimization and algorithm optimization, the graph optimization is at a higher level. It covers not only the graph but also the runtime. From the operator perspective, the graph optimization contains the operator fusing and constant folding. From the runtime perspective, the graph optimization contains the operator scheduling, computation resources management, and memory management.</p>
+<p>The Intel® Extension for PyTorch* focuses on operator related graph optimizations. The extension also provides some experimental features for the related runtime optimizations. Refer to the runtime extension for more details about runtime optimization.</p>
+<section id="ease-of-use-graph-optimization-api">
+<h2>Ease-of-use graph optimization API<a class="headerlink" href="#ease-of-use-graph-optimization-api" title="Permalink to this headline"></a></h2>
+<p>The graph optimizations of Intel® Extension for PyTorch* are enabled by default. Users can disable it by calling:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipex</span><span class="o">.</span><span class="n">enable_onednn_fusion</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<section id="fp32-and-bf16-models">
+<h3>FP32 and BF16 models<a class="headerlink" href="#fp32-and-bf16-models" title="Permalink to this headline"></a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+
+<span class="c1"># Import the Intel Extension for PyTorch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="s2">&quot;resnet50 &quot;</span><span class="p">](</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+
+<span class="c1"># Apply some fusions at the front end</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">check_trace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+    <span class="c1"># Fold the BatchNormalization and propagate constant</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+    <span class="c1"># Print the graph</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">graph_for</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Compared to the original code, the model launcher needs to add a few lines of code and the extension will automatically accelerate the model. Regarding the RN50, the extension will automatically fuse the Conv + ReLU and Conv + Sum + ReLU as ConvReLU and ConvSumReLU. If you check the output of <code class="docutils literal notranslate"><span class="pre">graph_for</span></code>, you will observe the fused operators.</p>
+</section>
+<section id="int8-models">
+<h3>INT8 models<a class="headerlink" href="#int8-models" title="Permalink to this headline"></a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+
+
+<span class="c1"># First-time quantization flow</span>
+<span class="c1"># define the model</span>
+<span class="k">def</span> <span class="nf">MyModel</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+ <span class="o">...</span>
+
+<span class="c1"># construct the model</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="n">qconfig</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">default_static_qconfig</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">example_inputs</span> <span class="o">=</span> <span class="o">..</span>
+<span class="n">prepared_model</span> <span class="o">=</span> <span class="n">prepare</span><span class="p">(</span><span class="n">user_model</span><span class="p">,</span> <span class="n">qconfig</span><span class="p">,</span> <span class="n">example_inputs</span><span class="o">=</span><span class="n">example_inputs</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">images</span> <span class="ow">in</span> <span class="n">calibration_data_loader</span><span class="p">():</span>
+        <span class="n">prepared_model</span><span class="p">(</span><span class="n">images</span><span class="p">)</span>
+
+<span class="n">convert_model</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">prepared_model</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">convert_model</span><span class="p">,</span> <span class="n">example_input</span><span class="p">)</span>
+    <span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">traced_model</span><span class="p">)</span>
+
+<span class="n">traced_model</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;quantized_model.pt&quot;</span><span class="p">)</span>
+<span class="c1"># Deployment</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="n">quantized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;quantized_model.pt&quot;</span><span class="p">)</span>
+<span class="n">quantized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">quantized_model</span><span class="o">.</span><span class="n">eval</span><span class="p">())</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">quantized_model</span><span class="p">(</span><span class="n">images</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="methodology">
+<h2>Methodology<a class="headerlink" href="#methodology" title="Permalink to this headline"></a></h2>
+<section id="fusion">
+<h3>Fusion<a class="headerlink" href="#fusion" title="Permalink to this headline"></a></h3>
+<section id="fp32-and-bf16-fusion-patterns">
+<h4>FP32 and BF16 fusion patterns<a class="headerlink" href="#fp32-and-bf16-fusion-patterns" title="Permalink to this headline"></a></h4>
+<ul class="simple">
+<li><p>Conv1D/Conv2D/Conv3D/Linear/ConvTranspose2D/ConvTranspose3D + Abs/Clamp/Elu/Exp/GELU/HardTanh/HardSwish/Log/Mish/Sigmoid/Pow/ReLU/Round/Sqrt/Square/Tanh/Leaky_ReLU/SiLU</p></li>
+<li><p>Conv1D/Conv2D/Conv3D/Linear/ConvTranspose2D/ConvTranspose3D + Sigmoid + MUL</p></li>
+<li><p>Conv1D/Conv2D/Conv3D/Linear + SUM</p></li>
+<li><p>Conv1D/Conv2D/Conv3D + SUM + ReLU</p></li>
+<li><p>Add + LayerNorm</p></li>
+<li><p>Div + Add + Softmax</p></li>
+<li><p>Linear + Linear + Linear</p></li>
+<li><p>View + Transpose + Contiguous + View</p></li>
+</ul>
+</section>
+<section id="int8-fusion-patterns">
+<h4>INT8 fusion patterns<a class="headerlink" href="#int8-fusion-patterns" title="Permalink to this headline"></a></h4>
+<p>The <code class="docutils literal notranslate"><span class="pre">ipex.quantization.convert(model,</span> <span class="pre">conf,</span> <span class="pre">inputs)</span></code> API will convert an FP32 <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code> to a quantized JIT ScriptModule according to the given quantization recipes.</p>
+<p>For example, for a FP32 model of one single convolution, the graph before and after conversion will be:
+<img alt="image" src="../../_images/int8_pattern.png" /></p>
+<p>The oneDNN graph backend will select <code class="docutils literal notranslate"><span class="pre">dequantize</span></code> and <code class="docutils literal notranslate"><span class="pre">convolution</span></code> into one partition. During execution, this partition will execute a convolution with int8 as input and fp32 as output.</p>
+<p>Here listed all the currently supported int8 patterns in Intel® Extension for PyTorch* using oneDNN graph backend:</p>
+<ol>
+<li><p>Conv/Linear/Matmul related fusion patterns</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>                                         <span class="o">|</span>
+                                     <span class="p">[</span><span class="n">Quantize</span><span class="p">]</span><span class="o">*</span>
+                <span class="o">|</span>                        <span class="o">|</span>
+           <span class="n">Dequantize</span>                <span class="n">Dequantize</span>
+                \                      <span class="o">/</span>
+           <span class="n">Conv1D</span><span class="o">/</span><span class="n">Conv2D</span><span class="o">/</span><span class="n">Conv3D</span><span class="o">/</span><span class="n">Linear</span><span class="o">/</span><span class="n">MatMul</span>
+                             <span class="o">|</span>
+         <span class="p">[</span><span class="n">Abs</span><span class="o">/</span><span class="n">Elu</span><span class="o">/</span><span class="n">GELU</span><span class="o">/</span><span class="n">HardTanh</span><span class="o">/</span><span class="n">Leaky_ReLU</span><span class="o">/</span><span class="n">Sigmoid</span><span class="o">/</span>
+    <span class="n">ReLU</span><span class="o">/</span><span class="n">Sqrt</span><span class="o">/</span><span class="n">Square</span><span class="o">/</span><span class="n">Tanh</span><span class="o">/</span><span class="p">[</span><span class="n">Dequantize</span><span class="o">+</span><span class="n">Add</span><span class="p">]</span><span class="o">*</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span> <span class="p">]</span><span class="o">*</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+                             <span class="o">|</span>
+                         <span class="p">[</span><span class="n">Quantize</span><span class="p">]</span><span class="o">*</span>
+                             <span class="o">|</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>     <span class="o">|</span>              <span class="o">|</span>
+   <span class="n">Dequantize</span>   <span class="n">Dequantize</span>
+      \<span class="n">___</span>      <span class="n">___</span><span class="o">/</span>
+          <span class="n">MatMul</span>
+             \    <span class="o">/</span>
+             <span class="n">Divide</span>
+                \   <span class="o">/</span>
+                <span class="p">[</span><span class="n">Add</span><span class="p">]</span><span class="o">*</span>
+                  <span class="o">|</span>
+</pre></div>
+</div>
+</li>
+<li><p>Non-Conv/Linear/Matmul related fusion patterns</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>           <span class="o">|</span>
+       <span class="n">Dequantize</span>
+           <span class="o">|</span>
+       <span class="n">MaxPool2D</span>
+           <span class="o">|</span>
+        <span class="n">Quantize</span>
+</pre></div>
+</div>
+</li>
+<li><p>INT8-BF16 mixed-precision fusion patterns</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>     <span class="o">|</span>              <span class="o">|</span>
+   <span class="n">Dequantize</span>   <span class="n">Dequantize</span>
+     <span class="o">|</span>              <span class="o">|</span>
+    <span class="n">To</span>             <span class="n">To</span>
+      \<span class="n">___</span>      <span class="n">___</span><span class="o">/</span>
+          <span class="n">MatMul</span>
+             \      <span class="o">/</span>
+             <span class="p">[</span><span class="n">Divide</span><span class="p">]</span><span class="o">*</span>
+                 \     <span class="o">/</span>
+                  <span class="p">[</span><span class="n">Add</span><span class="p">]</span><span class="o">*</span>
+                    <span class="o">|</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>     <span class="o">|</span>              <span class="o">|</span>
+   <span class="n">Dequantize</span>   <span class="n">Dequantize</span>
+     <span class="o">|</span>              <span class="o">|</span>
+    <span class="n">To</span>             <span class="n">To</span>
+      \<span class="n">___</span>      <span class="n">___</span><span class="o">/</span>
+          <span class="n">MatMul</span>
+            <span class="o">|</span>
+          <span class="p">[</span><span class="n">GeLU</span><span class="p">]</span><span class="o">*</span>
+            <span class="o">|</span>
+           <span class="n">To</span>
+            <span class="o">|</span>
+         <span class="n">Quantize</span>
+            <span class="o">|</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>     <span class="o">|</span>              <span class="o">|</span>
+   <span class="n">Dequantize</span>   <span class="n">Dequantize</span>
+     <span class="o">|</span>              <span class="o">|</span>
+     <span class="n">To</span>            <span class="n">To</span>     <span class="n">Dequantize</span>
+      \<span class="n">___</span>      <span class="n">___</span><span class="o">/</span>          <span class="o">|</span>
+          <span class="n">MatMul</span>              <span class="n">To</span>
+             \<span class="n">_____</span>        <span class="n">___</span><span class="o">/</span>
+                    <span class="p">[</span><span class="n">Add</span><span class="p">]</span><span class="o">*</span>
+                      <span class="o">|</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+</section>
+<section id="folding">
+<h3>Folding<a class="headerlink" href="#folding" title="Permalink to this headline"></a></h3>
+<p>Stock PyTorch provids constant propagation and BatchNormalization folding. These optimizations are automatically applied to the jit model by invoking <code class="docutils literal notranslate"><span class="pre">torch.jit.freeze</span></code>. Take the Resnet50 as an example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="s2">&quot;resnet50 &quot;</span><span class="p">](</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">check_trace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+    <span class="c1"># Fold the BatchNormalization and propagate constant</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+    <span class="c1"># Print the graph</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">graph_for</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>If the model owner does not invoke the <code class="docutils literal notranslate"><span class="pre">torch.jit.freeze</span></code>, the <code class="docutils literal notranslate"><span class="pre">BatchNormalization</span></code> still exists on the graph. Otheriwse, the <code class="docutils literal notranslate"><span class="pre">BatchNormalization</span></code> will be folded on the graph to save the compuation and then improve the performance. Refer to the <a class="reference external" href="https://en.wikipedia.org/wiki/Constant_folding">Constant Folding Wikipedia page</a> for more details.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="amp.html" class="btn btn-neutral float-left" title="Auto Mixed Precision (AMP)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="optimizer_fusion.html" class="btn btn-neutral float-right" title="Optimizer Fusion" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
