@@ -1308,16 +1308,19 @@ class Tester(TestCase):
                 self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
 
                 # test norm dim is not last dim, expect RuntimeError
-                # here in the case, norm dim is mid dim with seq_len size, not the last dim
+                # here in the a/b error input case, norm dim is mid dim but last dim is seq_len
                 # which is expected as unsupported RuntimeError
                 try:
-                    model_except_error = AddLayerNorm(seq_len)
-                    torch.jit.trace(model_except_error,(a, b))
+                    model_except_error = AddLayerNorm(dim)
+                    model_except_error = torch.jit.trace(model_except_error,(a, b))
+                    a_error = torch.randn(bs, dim, seq_len)
+                    b_error = torch.randn(bs, dim, seq_len)
+                    model_except_error(a_error, b_error)
                     #it is not excepted if no RuntimeError exception is found
                     #so end with assert
                     self.assertTrue(False)
                 except RuntimeError as e:
-                    expected_error = f"Given normalized_shape=[{seq_len}], expected input with shape [*, {seq_len}]"
+                    expected_error = f"Given normalized_shape=[{dim}], expected input with shape [*, {dim}]"
                     self.assertTrue(expected_error in str(e))
                     logging.info("expected RuntimeError is found")
                 finally:
