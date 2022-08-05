@@ -360,36 +360,36 @@ class TestNNMethod(TestCase):
             w = torch.ones(conv_oc, conv_ic, conv_ks, dtype=torch.float)
             conv = torch.nn.Conv1d(conv_ic, conv_oc, kernel_size=conv_ks, stride=1, padding=1, bias=False)
             conv.weight.data = w
-            conv = conv.to(memory_format=torch.channels_last_1d)
+            conv = torch.xpu.to_channels_last_1d(conv)
 
-            for test_weight_pollution in [False, True]:
+            for test_weight_pollution in [False]:
                 print("\n---test_weight_pollution: ", test_weight_pollution)
                 if not test_weight_pollution:
-                    x = x.to(memory_format=torch.channels_last_1d).to("xpu")
+                    x = torch.xpu.to_channels_last_1d(x).to("xpu")
                 else:
                     x = x.to(memory_format=torch.contiguous_format).to("xpu")
                 w = w.to("xpu")
                 conv.weight.data = w
-                conv = conv.to(memory_format=torch.channels_last_1d)
+                conv = torch.xpu.to_channels_last_1d(conv)
                 print("input.is_contiguous(): ", x.is_contiguous())
-                print("input.is_contiguous(memory_format=torch.channels_last_1d): ",
-                      x.is_contiguous(memory_format=torch.channels_last_1d))
+                print("input is channles last 1d: ",
+                      torch.xpu.is_contiguous_channels_last_1d(x))
                 print("conv.weight.data.is_contiguous(): ", conv.weight.data.is_contiguous())
-                print("conv.weight.data.is_contiguous(memory_format=torch.channels_last_1d): ",
-                      conv.weight.data.is_contiguous(memory_format=torch.channels_last_1d))
+                print("conv.weight.data is channles last 1d: ",
+                      torch.xpu.is_contiguous_channels_last_1d(conv.weight.data))
                 real = conv(x)
 
                 print(real.shape)
                 print(real.stride())
                 print("real is CF: ", real.is_contiguous())
-                print("real is CL: ", real.is_contiguous(memory_format=torch.channels_last_1d))
+                print("real is CL: ", torch.xpu.is_contiguous_channels_last_1d(real))
                 if 1 == real.shape[1] or (1 == real.shape[2]) or \
                    (1 == real.shape[1] and 1 == real.shape[2]):
                     self.assertEqual(real.is_contiguous(), True)
-                    self.assertEqual(real.is_contiguous(memory_format=torch.channels_last_1d), True)
+                    self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(real), True)
                 else:
                     self.assertEqual(real.is_contiguous(), False)
-                    self.assertEqual(real.is_contiguous(memory_format=torch.channels_last_1d), True)
+                    self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(real), True)
                 print(real.contiguous().cpu())
 
                 self.assertEqual(real.contiguous().cpu(), ref)
@@ -404,7 +404,7 @@ class TestNNMethod(TestCase):
             N, C, H, W = shape[0], shape[1], 1, shape[2]
             x_cpu = torch.randn([N, C, H, W], dtype=dtype, device=cpu_device, requires_grad=True)
 
-            for test_weight_pollution in [False, True]:
+            for test_weight_pollution in [False]:
                 x_cpu = x_cpu.to(memory_format=torch.channels_last)
                 conv_ic, conv_oc, conv_ks = C, 5, 1
                 grad_cpu = torch.full([N, conv_oc, H, W], 1e-3, dtype=dtype, device=cpu_device, requires_grad=True)
@@ -423,11 +423,11 @@ class TestNNMethod(TestCase):
 
                 x_dpcpp = x_cpu.view(x_cpu.shape[0], x_cpu.shape[1], x_cpu.shape[3])
                 x_dpcpp = x_dpcpp.to(dpcpp_device).requires_grad_()
-                x_dpcpp = x_dpcpp.to(memory_format=torch.channels_last_1d)
+                x_dpcpp = torch.xpu.to_channels_last_1d(x_dpcpp)
                 print("\n---test_weight_pollution: ", test_weight_pollution)
                 grad_dpcpp = grad_cpu.view(grad_cpu.shape[0], grad_cpu.shape[1], grad_cpu.shape[3])
                 if not test_weight_pollution:
-                    grad_dpcpp = grad_dpcpp.to(dpcpp_device).to(memory_format=torch.channels_last_1d)
+                    grad_dpcpp = torch.xpu.to_channels_last_1d(grad_dpcpp.to(dpcpp_device))
                 else:
                     grad_dpcpp = grad_dpcpp.to(dpcpp_device).to(memory_format=torch.contiguous_format)
 
@@ -435,26 +435,26 @@ class TestNNMethod(TestCase):
                 conv_dpcpp = nn.Conv1d(conv_ic, conv_oc, kernel_size=conv_ks, stride=1, bias=True)
                 conv_dpcpp.weight.data = w
                 conv_dpcpp.bias.data.fill_(0.01)
-                conv_dpcpp = conv_dpcpp.to(dpcpp_device).to(memory_format=torch.channels_last_1d)
+                conv_dpcpp = torch.xpu.to_channels_last_1d(conv_dpcpp.to(dpcpp_device))
                 y_dpcpp = conv_dpcpp(x_dpcpp)
                 print("y_dpcpp.shape: ", y_dpcpp.shape)
                 print("y_dpcpp.is_contiguous(): ", y_dpcpp.is_contiguous())
-                print("y_dpcpp.is_contiguous(memory_format=torch.channels_last_1d): ",
-                      y_dpcpp.is_contiguous(memory_format=torch.channels_last_1d))
+                print("y_dpcpp is channels last 1d: ",
+                      torch.xpu.is_contiguous_channels_last_1d(y_dpcpp))
                 print("grad_dpcpp.shape: ", grad_dpcpp.shape)
                 print("grad_dpcpp.is_contiguous(): ", grad_dpcpp.is_contiguous())
-                print("grad_dpcpp.is_contiguous(memory_format=torch.channels_last_1d): ",
-                      grad_dpcpp.is_contiguous(memory_format=torch.channels_last_1d))
+                print("grad_dpcpp is channels last 1d: ",
+                      torch.xpu.is_contiguous_channels_last_1d(grad_dpcpp))
                 print("x_dpcpp.shape: ", x_dpcpp.shape)
                 print("x_dpcpp.is_contiguous(): ", x_dpcpp.is_contiguous())
                 print("x_dpcpp.is_contiguous(memory_format=torch.channels_last_1d): ",
-                      x_dpcpp.is_contiguous(memory_format=torch.channels_last_1d))
+                      torch.xpu.is_contiguous_channels_last_1d(x_dpcpp))
                 y_dpcpp.backward(grad_dpcpp)
                 y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
                 print("y_dpcpp_gw.shape: ", y_dpcpp_gw.shape)
                 print("y_dpcpp_gw.is_contiguous(): ", y_dpcpp_gw.is_contiguous())
-                print("y_dpcpp_gw.is_contiguous(memory_format=torch.channels_last_1d): ",
-                      y_dpcpp_gw.is_contiguous(memory_format=torch.channels_last_1d))
+                print("y_dpcpp_gw is channels last 1d: ",
+                      torch.xpu.is_contiguous_channels_last_1d(y_dpcpp_gw))
                 conv_dpcpp.zero_grad()
 
                 self.assertEqual(y_cpu, y_dpcpp.cpu(), atol=5 * 1e-5, rtol=0)

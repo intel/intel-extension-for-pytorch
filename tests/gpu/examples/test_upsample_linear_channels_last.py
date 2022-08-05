@@ -13,7 +13,8 @@ class TestNNMethod(TestCase):
                         reason="doesn't enable channels last 1d or channels last does not support onednn block format")
     def test_upsamle_linear_1d_channels_last(self, dtype=torch.float):
         input_cpu = torch.randn((2, 3, 5), dtype=torch.float32, device=cpu_device)
-        input_dpcpp = input_cpu.to("xpu").to(memory_format=torch.channels_last_1d)
+        input_dpcpp = input_cpu.to("xpu")
+        input_dpcpp = torch.xpu.to_channels_last_1d(input_dpcpp)
         scales = [6]
         input_cpu.requires_grad = True
         input_dpcpp.requires_grad = True
@@ -25,10 +26,11 @@ class TestNNMethod(TestCase):
         output_dpcpp = torch.nn.functional.interpolate(
             input_dpcpp, scale_factor=scales, mode='linear', align_corners=alc, recompute_scale_factor=rsf)
         self.assertEqual(output_cpu, output_dpcpp.cpu())
-        self.assertEqual(output_dpcpp.is_contiguous(memory_format=torch.channels_last_1d), True)
+        self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(output_dpcpp), True)
 
         grad_out_cpu = torch.randn((2, 3, 30), dtype=torch.float32, device=cpu_device)
-        grad_out_dpcpp = grad_out_cpu.to("xpu").to(memory_format=torch.channels_last_1d)
+        grad_out_dpcpp = grad_out_cpu.to("xpu")
+        grad_out_dpcpp = torch.xpu.to_channels_last_1d(grad_out_dpcpp)
         grad_out_cpu = Variable(grad_out_cpu, requires_grad=True)
         grad_out_dpcpp = Variable(grad_out_dpcpp, requires_grad=True)
 
@@ -37,7 +39,7 @@ class TestNNMethod(TestCase):
         grad_cpu = input_cpu.grad
         grad_dpcpp = input_dpcpp.grad
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
-        self.assertEqual(grad_dpcpp.is_contiguous(memory_format=torch.channels_last_1d), True)
+        self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(grad_dpcpp), True)
 
     @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
     def test_upsamle_linear_2d_channels_last(self, dtype=torch.float):

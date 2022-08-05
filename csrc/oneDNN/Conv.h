@@ -138,8 +138,6 @@ static inline bool onednn_conv_use_channels_last(
   // src and weight are in contiguous memory format, the
   // operator produces output in contiguous memory format.
   // Otherwise, output will be in channels last memory format.
-  auto src_sug_mem_fmt = src.suggest_memory_format();
-  auto wgh_sug_mem_fmt = weight.suggest_memory_format();
   return (is_smf_channels_last(src) || is_smf_channels_last(weight));
 }
 

@@ -2,14 +2,12 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch # noqa
-import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d(), reason="doesn't enable channels last 1d")
     def test_cat_1d_array(self, dtype=torch.float):
         shapes = [(8, 7, 2), (4, 4, 4), (4, 4, 1), (4, 1, 4),
                   (4, 1, 1), (1, 4, 4), (1, 4, 1)]
@@ -20,15 +18,16 @@ class TestTorchMethod(TestCase):
             user_cpu2 = torch.randn([N, C, W], device=cpu_device, dtype=dtype)
             user_cpu3 = torch.randn([N, C, W], device=cpu_device, dtype=dtype)
 
-            user_cpu1 = user_cpu1.to(memory_format=torch.channels_last_1d)
-            user_cpu2 = user_cpu2.to(memory_format=torch.channels_last_1d)
-            user_cpu3 = user_cpu3.to(memory_format=torch.channels_last_1d)
+            user_cpu1 = torch.xpu.to_channels_last_1d(user_cpu1)
+            user_cpu2 = torch.xpu.to_channels_last_1d(user_cpu2)
+            user_cpu3 = torch.xpu.to_channels_last_1d(user_cpu3)
+
 
             dim_idx = 1
             res_cpu = torch.cat((user_cpu1, user_cpu2, user_cpu3), dim=dim_idx)
             print("\n-------------CPU Result:--------------")
             print(res_cpu.shape)
-            print("res_cpu is cl: ", res_cpu.is_contiguous(memory_format=torch.channels_last_1d))
+            print("res_cpu is cl: ", torch.xpu.is_contiguous_channels_last_1d(res_cpu))
 
             user_xpu1 = user_cpu1.to(dpcpp_device)
             user_xpu2 = user_cpu2.to(dpcpp_device)
@@ -38,30 +37,30 @@ class TestTorchMethod(TestCase):
             res_dpcpp = torch.cat((user_xpu1, user_xpu2, user_xpu3), dim=dim_idx)
             print("SYCL Result:")
             print(res_dpcpp.cpu().shape)
-            print("res_dpcpp is cl: ", res_dpcpp.is_contiguous(memory_format=torch.channels_last_1d))
+            print("res_dpcpp is cl: ", torch.xpu.is_contiguous_channels_last_1d(res_dpcpp))
             self.assertEqual(res_cpu, res_dpcpp.to(cpu_device))
 
             if 1 == res_dpcpp.shape[1] or 1 == res_dpcpp.shape[2] or \
                (1 == res_dpcpp.shape[1] and 1 == res_dpcpp.shape[2]):
                 self.assertEqual(res_dpcpp.is_contiguous(), True)
-                self.assertEqual(res_dpcpp.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(res_dpcpp), True)
             else:
                 self.assertEqual(res_dpcpp.is_contiguous(), False)
-                self.assertEqual(res_dpcpp.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(res_dpcpp), True)
 
             user_cpu1 = torch.randn([N, C, W], device=cpu_device, dtype=dtype)
             user_cpu2 = torch.randn([N, C, W], device=cpu_device, dtype=dtype)
             user_cpu3 = torch.randn([N, C, W], device=cpu_device, dtype=dtype)
 
-            user_cpu1 = user_cpu1.to(memory_format=torch.channels_last_1d)
+            user_cpu1 = torch.xpu.to_channels_last_1d(user_cpu1)
             user_cpu2 = user_cpu2.to(memory_format=torch.contiguous_format)
-            user_cpu3 = user_cpu3.to(memory_format=torch.channels_last_1d)
+            user_cpu3 = torch.xpu.to_channels_last_1d(user_cpu3)
 
             dim_idx = 1
             res_cpu = torch.cat((user_cpu1, user_cpu2, user_cpu3), dim=dim_idx)
             print("\n-------------CPU Result:--------------")
             print(res_cpu.shape)
-            print("res_cpu is cl: ", res_cpu.is_contiguous(memory_format=torch.channels_last_1d))
+            print("res_cpu is cl: ", torch.xpu.is_contiguous_channels_last_1d(res_cpu))
 
             user_xpu1 = user_cpu1.to(dpcpp_device)
             user_xpu2 = user_cpu2.to(dpcpp_device)
@@ -71,30 +70,31 @@ class TestTorchMethod(TestCase):
             res_dpcpp = torch.cat((user_xpu1, user_xpu2, user_xpu3), dim=dim_idx)
             print("SYCL Result:")
             print(res_dpcpp.cpu().shape)
-            print("res_dpcpp is cl: ", res_dpcpp.is_contiguous(memory_format=torch.channels_last_1d))
+            print("res_dpcpp is cl: ", torch.xpu.is_contiguous_channels_last_1d(res_dpcpp))
             self.assertEqual(res_cpu, res_dpcpp.to(cpu_device))
 
             if 1 == res_dpcpp.shape[1] or 1 == res_dpcpp.shape[2] or \
                (1 == res_dpcpp.shape[1] and 1 == res_dpcpp.shape[2]):
                 self.assertEqual(res_dpcpp.is_contiguous(), True)
-                self.assertEqual(res_dpcpp.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(res_dpcpp), True)
             else:
                 self.assertEqual(res_dpcpp.is_contiguous(), False)
-                self.assertEqual(res_dpcpp.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(res_dpcpp), True)
 
             user_cpu1 = torch.randn([N, C, W], device=cpu_device, dtype=dtype)
             user_cpu2 = torch.randn([N, C, W], device=cpu_device, dtype=dtype)
             user_cpu3 = torch.randn([N, C, W], device=cpu_device, dtype=dtype)
 
             user_cpu1 = user_cpu1.to(memory_format=torch.contiguous_format)
-            user_cpu2 = user_cpu2.to(memory_format=torch.channels_last_1d)
-            user_cpu3 = user_cpu3.to(memory_format=torch.channels_last_1d)
+            user_cpu2 = torch.xpu.to_channels_last_1d(user_cpu2)
+            user_cpu3 = torch.xpu.to_channels_last_1d(user_cpu3)
+
 
             dim_idx = 1
             res_cpu = torch.cat((user_cpu1, user_cpu2, user_cpu3), dim=dim_idx)
             print("\n-------------CPU Result:--------------")
             print(res_cpu.shape)
-            print("res_cpu is cl: ", res_cpu.is_contiguous(memory_format=torch.channels_last_1d))
+            print("res_cpu is cl: ", torch.xpu.is_contiguous_channels_last_1d(res_cpu))
 
             user_xpu1 = user_cpu1.to(dpcpp_device)
             user_xpu2 = user_cpu2.to(dpcpp_device)
@@ -104,16 +104,16 @@ class TestTorchMethod(TestCase):
             res_dpcpp = torch.cat((user_xpu1, user_xpu2, user_xpu3), dim=dim_idx)
             print("SYCL Result:")
             print(res_dpcpp.cpu().shape)
-            print("res_dpcpp is cl: ", res_dpcpp.is_contiguous(memory_format=torch.channels_last_1d))
+            print("res_dpcpp is cl: ", torch.xpu.is_contiguous_channels_last_1d(res_dpcpp))
             self.assertEqual(res_cpu, res_dpcpp.to(cpu_device))
 
             if 1 == res_dpcpp.shape[1] or 1 == res_dpcpp.shape[2] or \
                (1 == res_dpcpp.shape[1] and 1 == res_dpcpp.shape[2]):
                 self.assertEqual(res_dpcpp.is_contiguous(), True)
-                self.assertEqual(res_dpcpp.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(res_dpcpp), True)
             else:
                 self.assertEqual(res_dpcpp.is_contiguous(), True)
-                self.assertEqual(res_dpcpp.is_contiguous(memory_format=torch.channels_last_1d), False)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(res_dpcpp), False)
 
     def test_cat_array(self, dtype=torch.float):
         shapes = [(8, 7, 3, 2), (4, 4, 4, 4), (4, 4, 1, 1), (4, 1, 4, 4),

@@ -355,7 +355,13 @@ static void upsample_linear_out_dpcpp_kernel(
 
   Tensor input = input_;
   if (is_smf_channels_last(input_)) {
-    output.resize_(dst_dims, get_cl_tag_by_ndim(ndims));
+    auto cl_tag = get_cl_tag_by_ndim(ndims);
+    if (CHANNELSLAST1D_DPCPP == cl_tag) {
+      output.resize_(dst_dims);
+      convert_tensor_to_channels_last_1d(output);
+    } else {
+      output.resize_(dst_dims, get_cl_tag_by_ndim(ndims));
+    }
   } else {
     input = input_.contiguous(input_.suggest_memory_format());
     output.resize_(dst_dims, input_.suggest_memory_format());
@@ -446,8 +452,16 @@ static void upsample_linear_backward_out_dpcpp_kernel(
 
   Tensor grad_output;
   if (is_smf_channels_last(grad_output_)) {
-    grad_input.resize_(src_dims, get_cl_tag_by_ndim(ndims));
-    grad_output = grad_output_.contiguous(get_cl_tag_by_ndim(ndims));
+    auto cl_tag = get_cl_tag_by_ndim(ndims);
+    if (CHANNELSLAST1D_DPCPP == cl_tag) {
+      grad_input.resize_(src_dims);
+      convert_tensor_to_channels_last_1d(grad_input);
+      auto tmp = grad_output_.contiguous(at::MemoryFormat::Contiguous);
+      grad_output = convert_tensor_to_channels_last_1d(tmp);
+    } else {
+      grad_input.resize_(src_dims, get_cl_tag_by_ndim(ndims));
+      grad_output = grad_output_.contiguous(get_cl_tag_by_ndim(ndims));
+    }
   } else {
     grad_input.resize_(src_dims, grad_output_.suggest_memory_format());
     grad_output = grad_output_.contiguous(grad_output_.suggest_memory_format());

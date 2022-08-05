@@ -129,11 +129,12 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_normalization(
   auto dst_md = bn_fwd_pd.dst_desc();
   if (!src_ctx.is_plain()) {
     dst = onednn_bn_use_channels_last(src)
-        ? empty_opaque_tensor(dst_md, src.options(), src_cl_mfmt)
+        ? xpu::dpcpp::empty_opaque_tensor_dpcpp(
+              dst_md, src.options(), src_cl_mfmt)
         : empty_opaque_tensor(dst_md, src.options(), c10::nullopt);
   } else {
     dst = onednn_bn_use_channels_last(src)
-        ? at::empty_like(src, src.options(), src_cl_mfmt)
+        ? xpu::dpcpp::empty_like_dpcpp(src, src.options(), src_cl_mfmt)
         : at::empty_like(src);
   }
 

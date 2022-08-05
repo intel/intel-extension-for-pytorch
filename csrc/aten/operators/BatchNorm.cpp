@@ -10,6 +10,7 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 static inline at::Tensor condition_contiguous(const at::Tensor& t) {
+  auto ndim = t.ndimension();
   if (!t.defined()) {
     return t;
   }
@@ -19,7 +20,13 @@ static inline at::Tensor condition_contiguous(const at::Tensor& t) {
   }
 
   // if (t.defined() && is_smf_channels_last(t))
-  return t.contiguous(get_cl_tag_by_ndim(t.ndimension()));
+  auto cl_tag = get_cl_tag_by_ndim(t.ndimension());
+  if (CHANNELSLAST1D_DPCPP == cl_tag) {
+    auto tmp = t.contiguous();
+    return convert_tensor_to_channels_last_1d(tmp);
+  }
+
+  return t.contiguous(cl_tag);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm(

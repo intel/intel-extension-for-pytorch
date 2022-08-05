@@ -48,10 +48,12 @@ class TestNNMethod(TestCase):
         for shape in shapes:
             print("\n================== test shape: ", shape, "==================")
             N, C, W = shape[0], shape[1], shape[2]
-            x_cpu = torch.ones([N, C, W], device=cpu_device, dtype=dtype)
-            grad_cpu = torch.ones([N, C, W], device=cpu_device, dtype=dtype)
-            x_dpcpp = x_cpu.to("xpu").to(memory_format=torch.channels_last_1d)
-            grad_dpcpp = grad_cpu.to("xpu").to(memory_format=torch.channels_last_1d)
+            x_cpu = torch.randn([N, C, W], device=cpu_device, dtype=dtype)
+            grad_cpu = torch.randn([N, C, W], device=cpu_device, dtype=dtype)
+            x_dpcpp = x_cpu.to("xpu")
+            x_dpcpp = torch.xpu.to_channels_last_1d(x_dpcpp)
+            grad_dpcpp = grad_cpu.to("xpu")
+            grad_dpcpp = torch.xpu.to_channels_last_1d(grad_dpcpp)
             max_pool = nn.MaxPool1d(kernel_size=3, stride=1,
                                     padding=1, return_indices=True)
             x_cpu.requires_grad_(True)
@@ -70,10 +72,10 @@ class TestNNMethod(TestCase):
             if 1 == y_dpcpp[0].shape[1] or (1 == y_dpcpp[0].shape[2]) or \
                (1 == y_dpcpp[0].shape[1] and 1 == y_dpcpp[0].shape[2]):
                 self.assertEqual(y_dpcpp[0].is_contiguous(), True)
-                self.assertEqual(y_dpcpp[0].is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(y_dpcpp[0]), True)
             else:
                 self.assertEqual(y_dpcpp[0].is_contiguous(), False)
-                self.assertEqual(y_dpcpp[0].is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(y_dpcpp[0]), True)
 
             self.assertEqual(y_cpu[0], y_dpcpp[0].cpu())
             self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())

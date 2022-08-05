@@ -23,7 +23,19 @@ static void upsample_nearest_out_dpcpp_kernel(
     const double& scales_w = 0.0,
     const double& scales_h = 0.0,
     const double& scales_d = 0.0) {
-  auto input = input_.contiguous(input_.suggest_memory_format());
+  auto ndims = input_.ndimension();
+  auto input = input_;
+  if (is_smf_channels_last(input_)) {
+    auto cl_tag = get_cl_tag_by_ndim(ndims);
+    if (CHANNELSLAST1D_DPCPP == cl_tag) {
+      input = input_.contiguous();
+      convert_tensor_to_channels_last_1d(input);
+    } else {
+      input = input_.contiguous(input_.suggest_memory_format());
+    }
+  } else {
+    input = input_.contiguous(input_.suggest_memory_format());
+  }
 
   auto strm = GpuStreamManager::Instance().get_stream();
   Device curDevice = Device(kXPU, current_device());
@@ -32,7 +44,6 @@ static void upsample_nearest_out_dpcpp_kernel(
   bool is_customer_scales =
       scales_w != 0.0 || scales_h != 0.0 || scales_d != 0.0;
 
-  int64_t ndims = input.ndimension();
   IntArrayRef input_size = input.sizes();
   memory::dims src_dims, dst_dims;
   std::vector<float> factors;
@@ -47,7 +58,17 @@ static void upsample_nearest_out_dpcpp_kernel(
       scales_h,
       scales_d);
 
-  output.resize_(dst_dims, input_.suggest_memory_format());
+  if (is_smf_channels_last(input_)) {
+    auto cl_tag = get_cl_tag_by_ndim(ndims);
+    if (CHANNELSLAST1D_DPCPP == cl_tag) {
+      output.resize_(dst_dims);
+      convert_tensor_to_channels_last_1d(output);
+    } else {
+      output.resize_(dst_dims, input_.suggest_memory_format());
+    }
+  } else {
+    output.resize_(dst_dims, input_.suggest_memory_format());
+  }
 
   auto data_format =
       get_dnnl_default_format(ndims, is_smf_channels_last(input_));
@@ -110,8 +131,20 @@ static void upsample_nearest_backward_out_dpcpp_kernel(
     const double& scales_w = 0.0,
     const double& scales_h = 0.0,
     const double& scales_d = 0.0) {
-  auto grad_output =
-      grad_output_.contiguous(grad_output_.suggest_memory_format());
+  auto ndims = grad_output_.ndimension();
+  auto grad_output = grad_output_;
+  if (is_smf_channels_last(grad_output_)) {
+    auto cl_tag = get_cl_tag_by_ndim(ndims);
+    if (CHANNELSLAST1D_DPCPP == cl_tag) {
+      grad_output = grad_output_.contiguous();
+      convert_tensor_to_channels_last_1d(grad_output);
+    } else {
+      grad_output =
+          grad_output_.contiguous(grad_output_.suggest_memory_format());
+    }
+  } else {
+    grad_output = grad_output_.contiguous(grad_output_.suggest_memory_format());
+  }
 
   auto strm = GpuStreamManager::Instance().get_stream();
   Device curDevice = Device(kXPU, current_device());
@@ -120,7 +153,6 @@ static void upsample_nearest_backward_out_dpcpp_kernel(
   bool is_customer_scales =
       scales_w != 0.0 || scales_h != 0.0 || scales_d != 0.0;
 
-  int64_t ndims = grad_output.ndimension();
   memory::dims src_dims, dst_dims;
   std::vector<float> factors;
   set_params(
@@ -134,7 +166,17 @@ static void upsample_nearest_backward_out_dpcpp_kernel(
       scales_h,
       scales_d);
 
-  grad_input.resize_(src_dims, grad_output_.suggest_memory_format());
+  if (is_smf_channels_last(grad_output_)) {
+    auto cl_tag = get_cl_tag_by_ndim(ndims);
+    if (CHANNELSLAST1D_DPCPP == cl_tag) {
+      grad_input.resize_(src_dims);
+      convert_tensor_to_channels_last_1d(grad_input);
+    } else {
+      grad_input.resize_(src_dims, grad_output_.suggest_memory_format());
+    }
+  } else {
+    grad_input.resize_(src_dims, grad_output_.suggest_memory_format());
+  }
 
   auto data_format =
       get_dnnl_default_format(ndims, is_smf_channels_last(grad_output_));

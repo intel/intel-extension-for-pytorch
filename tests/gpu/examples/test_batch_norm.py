@@ -192,8 +192,8 @@ class TestNNMethod(TestCase):
             x_i = torch.randn([N, C, W], device=cpu_device)
             grad_i = torch.randn([N, C, W], device=cpu_device)
 
-            x_dpcpp_i = x_i.to(dpcpp_device).to(memory_format=torch.channels_last_1d)
-            grad_dpcpp_i = grad_i.to(dpcpp_device).to(memory_format=torch.channels_last_1d)
+            x_dpcpp_i = torch.xpu.to_channels_last_1d(x_i.to(dpcpp_device))
+            grad_dpcpp_i = torch.xpu.to_channels_last_1d(grad_i.to(dpcpp_device))
 
             x_cpu = Variable(x_i, requires_grad=True)
             grad_cpu = Variable(grad_i, requires_grad=True)
@@ -218,18 +218,18 @@ class TestNNMethod(TestCase):
             if 1 == y_dpcpp.shape[1] or 1 == y_dpcpp.shape[2] or \
                (1 == y_dpcpp.shape[1] and 1 == y_dpcpp.shape[2]):
                 self.assertEqual(y_dpcpp.is_contiguous(), True)
-                self.assertEqual(y_dpcpp.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(y_dpcpp), True)
             else:
                 self.assertEqual(y_dpcpp.is_contiguous(), False)
-                self.assertEqual(y_dpcpp.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(y_dpcpp), True)
 
             if 1 == x_dpcpp.grad.shape[1] or 1 == x_dpcpp.grad.shape[2] or \
                (1 == x_dpcpp.grad.shape[1] and 1 == x_dpcpp.grad.shape[2]):
                 self.assertEqual(x_dpcpp.grad.is_contiguous(), True)
-                self.assertEqual(x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(x_dpcpp.grad), True)
             else:
                 self.assertEqual(x_dpcpp.grad.is_contiguous(), False)
-                self.assertEqual(x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(x_dpcpp.grad), True)
 
             print("y_dpcpp = ", y_dpcpp.cpu())
             print("x_dpcpp.grad", x_dpcpp.grad.cpu())

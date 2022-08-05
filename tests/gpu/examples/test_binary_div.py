@@ -27,33 +27,36 @@ class TestTorchMethod(TestCase):
             self.assertEqual(a_cpu, a_xpu.cpu())
             if 1 == C or 1 == W:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), True)
             else:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), False)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), False)
             print("passed")
 
             a_cpu = torch.randn(N, C, W)
             b_cpu = torch.randn(N, C, W)
             print("\na is channels_last_1d, b is channels_last_1d:")
-            a_xpu = a_cpu.to("xpu").to(memory_format=torch.channels_last_1d)
-            b_xpu = b_cpu.to("xpu").to(memory_format=torch.channels_last_1d)
+            a_xpu = a_cpu.to("xpu")
+            a_xpu = torch.xpu.to_channels_last_1d(a_xpu)
+            b_xpu = b_cpu.to("xpu")
+            b_xpu = torch.xpu.to_channels_last_1d(b_xpu)
 
             a_cpu.div_(b_cpu)
             a_xpu.div_(b_xpu)
             self.assertEqual(a_cpu, a_xpu.cpu())
             if 1 == C or 1 == W:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), True)
             else:
                 self.assertEqual(a_xpu.is_contiguous(), False)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), True)
             print("passed")
 
             a_cpu = torch.randn(N, C, W)
             b_cpu = torch.randn(N, C, W)
             print("\na is channels_last_1d, b is contiguous:")
-            a_xpu = a_cpu.to("xpu").to(memory_format=torch.channels_last_1d)
+            a_xpu = a_cpu.to("xpu")
+            a_xpu = torch.xpu.to_channels_last_1d(a_xpu)
             b_xpu = b_cpu.to("xpu").to(memory_format=torch.contiguous_format)
 
             a_cpu.div_(b_cpu)
@@ -61,27 +64,28 @@ class TestTorchMethod(TestCase):
             self.assertEqual(a_cpu, a_xpu.cpu())
             if 1 == C or 1 == W:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), True)
             else:
                 self.assertEqual(a_xpu.is_contiguous(), False)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), True)
             print("passed")
 
             a_cpu = torch.randn(N, C, W)
             b_cpu = torch.randn(N, C, W)
             print("\na is contiguous, b is channels_last_1d:")
             a_xpu = a_cpu.to("xpu").to(memory_format=torch.contiguous_format)
-            b_xpu = b_cpu.to("xpu").to(memory_format=torch.channels_last_1d)
+            b_xpu = b_cpu.to("xpu")
+            b_xpu = torch.xpu.to_channels_last_1d(b_xpu)
 
             a_cpu.div_(b_cpu)
             a_xpu.div_(b_xpu)
             self.assertEqual(a_cpu, a_xpu.cpu())
             if 1 == C or 1 == W:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), True)
             else:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), False)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), False)
             print("passed")
 
             a_cpu = torch.randn(N, C, W)
@@ -94,42 +98,45 @@ class TestTorchMethod(TestCase):
             self.assertEqual(y_cpu, y_xpu.cpu())
             if 1 == C or 1 == W:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), True)
             else:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), False)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), False)
             print("passed")
 
             a_cpu = torch.randn(N, C, W)
             b_cpu = torch.randn(N, C, W)
             y_cpu = a_cpu / b_cpu
             print("\na is channels_last_1d, b is channels_last_1d:")
-            a_xpu = a_cpu.to("xpu").to(memory_format=torch.channels_last_1d)
-            b_xpu = b_cpu.to("xpu").to(memory_format=torch.channels_last_1d)
+            a_xpu = a_cpu.to("xpu")
+            a_xpu = torch.xpu.to_channels_last_1d(a_xpu)
+            b_xpu = b_cpu.to("xpu")
+            b_xpu = torch.xpu.to_channels_last_1d(b_xpu)
             y_xpu = a_xpu / b_xpu
             self.assertEqual(y_cpu, y_xpu.cpu())
             if 1 == C or 1 == W:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), True)
             else:
                 self.assertEqual(a_xpu.is_contiguous(), False)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), True)
             print("passed")
 
             a_cpu = torch.randn(N, C, W)
             b_cpu = torch.randn(N, C, W)
             y_cpu = a_cpu / b_cpu
             print("\na is channels_last_1d, b is contiguous:")
-            a_xpu = a_cpu.to("xpu").to(memory_format=torch.channels_last_1d)
+            a_xpu = a_cpu.to("xpu")
+            a_xpu = torch.xpu.to_channels_last_1d(a_xpu)
             b_xpu = b_cpu.to("xpu").to(memory_format=torch.contiguous_format)
             y_xpu = a_xpu / b_xpu
             self.assertEqual(y_cpu, y_xpu.cpu())
             if 1 == C or 1 == W:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), True)
             else:
                 self.assertEqual(a_xpu.is_contiguous(), False)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), True)
             print("passed")
 
             a_cpu = torch.randn(N, C, W)
@@ -137,15 +144,16 @@ class TestTorchMethod(TestCase):
             y_cpu = a_cpu / b_cpu
             print("\na is contiguous, b is channels_last_1d:")
             a_xpu = a_cpu.to("xpu").to(memory_format=torch.contiguous_format)
-            b_xpu = b_cpu.to("xpu").to(memory_format=torch.channels_last_1d)
+            b_xpu = b_cpu.to("xpu")
+            b_xpu = torch.xpu.to_channels_last_1d(b_xpu)
             y_xpu = a_xpu / b_xpu
             self.assertEqual(y_cpu, y_xpu.cpu())
             if 1 == C or 1 == W:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), True)
             else:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), False)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), False)
             print("passed")
 
     @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")

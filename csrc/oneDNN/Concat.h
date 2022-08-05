@@ -60,7 +60,7 @@ static void concat(Tensor& dst, const TensorList srcs, int dimension) {
   TORCH_CHECK(dimension >= 0, "invalid dimension");
 
   bool is_channels_last = is_smf_channels_last(srcs[0]);
-  auto smf = srcs[0].suggest_memory_format();
+  auto smf = suggest_memory_format_dpcpp(srcs[0]);
 
   // prepare srcs
   std::vector<Tensor> valid_srcs;
@@ -84,7 +84,13 @@ static void concat(Tensor& dst, const TensorList srcs, int dimension) {
       dst_tz.push_back(valid_srcs[0].size(dim));
     }
   }
-  dst.resize_(dst_tz, smf);
+
+  if (CHANNELSLAST1D_DPCPP == smf) {
+    dst.resize_(dst_tz, at::MemoryFormat::Contiguous);
+    dst = convert_tensor_to_channels_last_1d(dst);
+  } else {
+    dst.resize_(dst_tz, smf);
+  }
 
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});

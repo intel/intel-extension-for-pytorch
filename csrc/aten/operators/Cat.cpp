@@ -301,7 +301,7 @@ static void cat(
   TORCH_CHECK(dimension >= 0, "invalid dimension");
 
   Tensor first_tensor = inputs[0];
-  auto ft_smf = first_tensor.suggest_memory_format();
+  auto ft_smf = suggest_memory_format_dpcpp(first_tensor);
 
   std::vector<int64_t> size(nDims);
 
@@ -322,7 +322,13 @@ static void cat(
     }
     size[dim] = result_dim_size;
   }
-  result.resize_(size, ft_smf);
+
+  if (CHANNELSLAST1D_DPCPP == ft_smf) {
+    result.resize_(size, at::MemoryFormat::Contiguous);
+    result = convert_tensor_to_channels_last_1d(result);
+  } else {
+    result.resize_(size, ft_smf);
+  }
 
   const bool all32BitIndexable =
       std::all_of(inputs.begin(), inputs.end(), [](const Tensor& t) {
