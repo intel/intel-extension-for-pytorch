@@ -95,6 +95,15 @@ Tensor dpcpp_convolution_backward_input(
   auto bias_md =
       bias_defined ? memory::desc(bias_tz, bias_t, format_any) : memory::desc();
 
+  primitive_attr pattr;
+  if (data_grad == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
   auto conv_forward_desc = convolution_forward::desc(
       prop_kind::forward,
       algorithm::convolution_direct,
@@ -108,7 +117,7 @@ Tensor dpcpp_convolution_backward_input(
       _padding_back_bottom_right);
 
   auto conv_forward_pd =
-      convolution_forward::primitive_desc(conv_forward_desc, engine);
+      convolution_forward::primitive_desc(conv_forward_desc, pattr, engine);
 
   auto conv_backward_data_desc = convolution_backward_data::desc(
       algorithm::convolution_direct,
@@ -120,14 +129,6 @@ Tensor dpcpp_convolution_backward_input(
       _padding_front_top_left,
       _padding_back_bottom_right);
 
-  primitive_attr pattr;
-  if (data_grad == memory::data_type::f32) {
-    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
-  }
-
-#ifdef USE_SCRATCHPAD_MODE
-  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-#endif
   auto conv_backward_data_pd = convolution_backward_data::primitive_desc(
       conv_backward_data_desc, pattr, engine, conv_forward_pd);
 

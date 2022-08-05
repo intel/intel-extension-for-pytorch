@@ -71,11 +71,16 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
   auto src_m = dpcpp_onednn_memory(md, engine, src.data_ptr());
   auto dst_m = dpcpp_onednn_memory(md, engine, dst.data_ptr());
 
+  primitive_attr pattr;
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
   auto ln_fwd_desc = training
       ? layer_normalization_forward::desc(prop, md, stats_md, epsilon, flags)
       : layer_normalization_forward::desc(prop, md, epsilon, flags);
   auto ln_fwd_pd =
-      layer_normalization_forward::primitive_desc(ln_fwd_desc, engine);
+      layer_normalization_forward::primitive_desc(ln_fwd_desc, pattr, engine);
 
   std::unordered_map<int, memory> args = {
       {DNNL_ARG_SRC, src_m},
@@ -206,23 +211,20 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
       ? memory::desc({stats_tz}, stats_dt, stats_fmt)
       : rstd_ctx.meta();
 
+  primitive_attr pattr;
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
   auto ln_fwd_desc = layer_normalization_forward::desc(
       dnnl::prop_kind::forward_training, exp_md, mean_md, epsilon, flags);
   auto ln_fwd_pd =
-      layer_normalization_forward::primitive_desc(ln_fwd_desc, engine);
+      layer_normalization_forward::primitive_desc(ln_fwd_desc, pattr, engine);
 
   auto ln_bwd_desc = layer_normalization_backward::desc(
       dnnl::prop_kind::backward, exp_md, exp_md, mean_md, epsilon, flags);
-
-#ifdef USE_SCRATCHPAD_MODE
-  primitive_attr attr;
-  attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
   auto ln_bwd_pd = layer_normalization_backward::primitive_desc(
-      ln_bwd_desc, attr, engine, ln_fwd_pd);
-#else
-  auto ln_bwd_pd = layer_normalization_backward::primitive_desc(
-      ln_bwd_desc, engine, ln_fwd_pd);
-#endif
+      ln_bwd_desc, pattr, engine, ln_fwd_pd);
 
   Tensor src_;
   memory src_m = dpcpp_onednn_memory(src_md, engine, src.data_ptr());

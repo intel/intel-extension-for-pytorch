@@ -64,12 +64,9 @@ static inline void eltwise(
 #ifdef USE_SCRATCHPAD_MODE
   primitive_attr attr;
   attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
   auto eltwise_forward_pd =
       eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, attr, engine);
-#else
-  auto eltwise_forward_pd =
-      eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, engine);
-#endif
 
   memory dst_memory;
   if (!Settings::I().is_onednn_layout_enabled()) {
@@ -201,10 +198,15 @@ static inline void eltwise_backward(
   create_key(key, alg_kind, src_dst_md, alpha, beta);
 #endif
 
+#ifdef USE_SCRATCHPAD_MODE
+  primitive_attr attr;
+  attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
   eltwise_forward::desc eltwise_eltwiseFwd_desc(
       prop_kind::forward_training, alg_kind, src_dst_md, alpha, beta);
   auto eltwise_forward_pd =
-      eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, engine);
+      eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, attr, engine);
 
   Tensor diff_dst__;
   auto expected_dst_md = eltwise_forward_pd.dst_desc();
@@ -225,16 +227,8 @@ static inline void eltwise_backward(
 
   eltwise_backward::desc eltwise_eltwiseBwd_desc(
       alg_kind, diff_dst_md, src_dst_md, alpha, beta);
-
-#ifdef USE_SCRATCHPAD_MODE
-  primitive_attr attr;
-  attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
   auto eltwise_backward_pd = eltwise_backward::primitive_desc(
       eltwise_eltwiseBwd_desc, attr, engine, eltwise_forward_pd);
-#else
-  auto eltwise_backward_pd = eltwise_backward::primitive_desc(
-      eltwise_eltwiseBwd_desc, engine, eltwise_forward_pd);
-#endif
 
   memory diff_src_memory;
   if (!Settings::I().is_onednn_layout_enabled()) {

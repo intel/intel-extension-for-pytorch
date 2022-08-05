@@ -109,15 +109,12 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_normalization(
   auto bn_fwd_desc =
       batch_normalization_forward::desc(prop, src_md, epsilon, flag);
 
+  primitive_attr pattr;
 #ifdef USE_SCRATCHPAD_MODE
-  primitive_attr attr;
-  attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-  auto bn_fwd_pd =
-      batch_normalization_forward::primitive_desc(bn_fwd_desc, attr, engine);
-#else
-  auto bn_fwd_pd =
-      batch_normalization_forward::primitive_desc(bn_fwd_desc, engine);
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+  auto bn_fwd_pd =
+      batch_normalization_forward::primitive_desc(bn_fwd_desc, pattr, engine);
 
   auto ndim = src.ndimension();
   auto src_cl_mfmt = at::MemoryFormat::ChannelsLast;
@@ -287,8 +284,13 @@ batch_normalization_backward(
 
   batch_normalization_forward::desc bn_fwd_desc(
       prop_kind::forward_training, src_md, epsilon, flags);
+
+  primitive_attr pattr;
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
   auto bn_fwd_pd =
-      batch_normalization_forward::primitive_desc(bn_fwd_desc, engine);
+      batch_normalization_forward::primitive_desc(bn_fwd_desc, pattr, engine);
 
   at::Tensor diff_dst_;
   auto diff_dst_m = diff_dst_usr_m;
@@ -316,16 +318,8 @@ batch_normalization_backward(
 
   auto bwd_desc = batch_normalization_backward::desc(
       p_kind, diff_dst_md, src_md, epsilon, flags);
-
-#ifdef USE_SCRATCHPAD_MODE
-  primitive_attr attr;
-  attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
   auto bn_bwd_pd = batch_normalization_backward::primitive_desc(
-      bwd_desc, attr, engine, bn_fwd_pd);
-#else
-  auto bn_bwd_pd =
-      batch_normalization_backward::primitive_desc(bwd_desc, engine, bn_fwd_pd);
-#endif
+      bwd_desc, pattr, engine, bn_fwd_pd);
 
   memory mean_m, var_m;
   if (training) {

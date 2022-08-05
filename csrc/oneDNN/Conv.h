@@ -258,9 +258,10 @@ static at::Tensor convolution(
       _dilation,
       _padding_front_top_left,
       _padding_back_bottom_right);
+
+  primitive_attr pattr;
   float src_scale;
   std::vector<float> wgh_scales, conv_scale = {1};
-  primitive_attr pattr;
   int conv_zero_point = 0;
   if (src.is_quantized()) {
     auto wgh_ctx = DPCPPTensorContext::get_tensor_ctx(wgh);
@@ -302,6 +303,18 @@ static at::Tensor convolution(
     pattr.set_zero_points(DNNL_ARG_DST, mask_ac, {conv_zero_point});
   }
 
+  post_ops po;
+  attr.extract_post_ops(po, dst);
+  pattr.set_post_ops(po);
+
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
+  if (src_data_t == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key_pd;
   create_key(
@@ -318,18 +331,6 @@ static at::Tensor convolution(
       conv_scale,
       conv_zero_point);
 #endif
-
-  post_ops po;
-  attr.extract_post_ops(po, dst);
-  pattr.set_post_ops(po);
-
-#ifdef USE_SCRATCHPAD_MODE
-  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-#endif
-
-  if (src_data_t == memory::data_type::f32) {
-    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
-  }
 
   auto conv_fwd_pd =
       convolution_forward::primitive_desc(conv_fwd_desc, pattr, engine);
@@ -625,7 +626,17 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
                                        _padding_front_top_left,
                                        _padding_back_bottom_right);
 
-  auto conv_fwd_pd = convolution_forward::primitive_desc(conv_fwd_desc, engine);
+  primitive_attr pattr;
+  if (src_dt == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
+  auto conv_fwd_pd =
+      convolution_forward::primitive_desc(conv_fwd_desc, pattr, engine);
 
   if (Settings::I().is_onednn_layout_enabled()) {
     src_md = memory::desc(src_tz, src_dt, any_fmt);
@@ -654,14 +665,6 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
                                          _padding_front_top_left,
                                          _padding_back_bottom_right);
 
-  primitive_attr pattr;
-  if (src_dt == memory::data_type::f32) {
-    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
-  }
-
-#ifdef USE_SCRATCHPAD_MODE
-  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-#endif
   auto conv_bwd_w_pd = convolution_backward_weights::primitive_desc(
       conv_bwd_w_desc, pattr, engine, conv_fwd_pd);
 
