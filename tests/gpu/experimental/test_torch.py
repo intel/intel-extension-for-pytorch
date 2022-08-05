@@ -2241,18 +2241,19 @@ tensor([[[1.+1.j, 1.+1.j, 1.+1.j,  ..., 1.+1.j, 1.+1.j, 1.+1.j],
             self.assertRaises(RuntimeError, lambda: x.new(z.storage()))
 
         def test_pin_memory(self):
+            device = "xpu" # Hard code here
             x = torch.randn(3, 5)
-            self.assertFalse(x.is_pinned())
+            self.assertFalse(x.is_pinned(device=device))
             if not torch.xpu.is_available():
                 self.assertRaises(RuntimeError, lambda: x.pin_memory())
             else:
-                pinned = x.pin_memory()
-                self.assertTrue(pinned.is_pinned())
+                pinned = x.pin_memory(device=device)
+                self.assertTrue(pinned.is_pinned(device=device))
                 self.assertEqual(pinned, x)
                 self.assertNotEqual(pinned.data_ptr(), x.data_ptr())
                 # test that pin_memory on already pinned tensor has no effect
-                self.assertIs(pinned, pinned.pin_memory())
-                self.assertEqual(pinned.data_ptr(), pinned.pin_memory().data_ptr())
+                self.assertIs(pinned, pinned.pin_memory(device=device))
+                self.assertEqual(pinned.data_ptr(), pinned.pin_memory(device=device).data_ptr())
 
         def test_error_msg_type_translation(self):
             with self.assertRaisesRegex(

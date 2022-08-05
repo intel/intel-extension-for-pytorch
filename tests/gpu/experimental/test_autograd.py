@@ -8142,11 +8142,11 @@ class TestAutogradDeviceType(TestCase):
     @onlyXPU
     def test_pin_memory(self, device):
         x = torch.randn(2, 2, dtype=torch.double, requires_grad=True)
-        self.assertEqual(x, x.pin_memory())
-        self.assertIsNot(x, x.pin_memory())
-        self.assertTrue(x.pin_memory().requires_grad)
-        gradcheck(lambda x: x.pin_memory(), [x])
-        gradgradcheck(lambda x: x.pin_memory(), [x])
+        self.assertEqual(x, x.pin_memory(device=device))
+        self.assertIsNot(x, x.pin_memory(device=device))
+        self.assertTrue(x.pin_memory(device=device).requires_grad)
+        gradcheck(lambda x: x.pin_memory(device=device), [x])
+        gradgradcheck(lambda x: x.pin_memory(device=device), [x])
 
     @onlyXPU
     def test_rnn_backward_to_input_but_not_parameters(self, device):

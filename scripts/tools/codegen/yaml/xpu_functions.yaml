@@ -42,6 +42,7 @@ supported:
   - _make_per_tensor_quantized_tensor
   - _pdist_backward
   - _pdist_forward
+  - _pin_memory
   - _reshape_alias  # newly added
   - _s_where
   - _softmax
@@ -278,6 +279,7 @@ supported:
   - inverse.out
   - is_set_to
   - isnan
+  - is_pinned
   - kthvalue.values
   - l1_loss
   - l1_loss.out
