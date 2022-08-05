@@ -628,7 +628,7 @@ def _has_sufficient_memory(device, size):
             return False
         gc.collect()
         torch.xpu.empty_cache()
-        return torch.xpu.get_device_properties(device).global_memory_size - torch.xpu.memory_allocated(device) >= size
+        return torch.xpu.get_device_properties(device).total_memory - torch.xpu.memory_allocated(device) >= size
     else:
         raise unittest.SkipTest('Unknown device type')
 

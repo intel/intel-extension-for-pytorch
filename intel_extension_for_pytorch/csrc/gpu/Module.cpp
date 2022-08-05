@@ -409,7 +409,7 @@ static void register_xpu_device_properties(PyObject* module) {
   py::class_<DeviceProp>(m, "_DeviceProperties")
       .def_readonly("name", &DeviceProp::dev_name)
       .def_readonly("platform_name", &DeviceProp::platform_name)
-      .def_readonly("global_memory_size", &DeviceProp::global_mem_size)
+      .def_readonly("total_memory", &DeviceProp::global_mem_size)
       .def_readonly("max_compute_units", &DeviceProp::max_compute_units)
       .def_readonly("max_sub_devices", &DeviceProp::max_sub_devices)
       .def_property_readonly(
@@ -420,8 +420,7 @@ static void register_xpu_device_properties(PyObject* module) {
                << "', platform_name='" << prop.platform_name << "', dev_type='"
                << get_dev_type(prop)
                << "', max_sub_devices=" << prop.max_sub_devices
-               << ", global_memory_size="
-               << prop.global_mem_size / (1024 * 1024)
+               << ", total_memory=" << prop.global_mem_size / (1024 * 1024)
                << "MB, max_compute_units=" << prop.max_compute_units << ")";
         return stream.str();
       });
