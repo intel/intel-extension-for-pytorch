@@ -123,7 +123,8 @@ def get_submodule_commit(base_dir, submodule_dir):
 
 def check_flake8_errors(base_dir, filepath):
     if shutil.which('flake8') is None:
-        print("WARNING: Please install flake8 by pip!")
+        print("WARNING: Please install flake8 by pip install -r requirements-flake8.txt to check format!")
+        return
     flak8_cmd = ['flake8']  # '--quiet'
     if os.path.isdir(filepath):
         for root, dirs, files in os.walk(filepath):
@@ -135,7 +136,8 @@ def check_flake8_errors(base_dir, filepath):
     ret = subprocess.call(flak8_cmd, cwd=base_dir)
     if ret != 0:
         print("ERROR: flake8 found format errors in", filepath, "!")
-        sys.exit(1)
+        print("WARNING: Please check requirements-flake8.txt to align flake8 version")
+        # sys.exit(1)
 
 
 def get_build_version(ipex_git_sha):
@@ -171,7 +173,7 @@ def create_version_files(base_dir, version, git_sha_dict):
 
 check_flake8_errors(base_dir, os.path.abspath(__file__))
 check_flake8_errors(base_dir, ipex_pydir)
-check_flake8_errors(base_dir, ipex_scripts)
+# check_flake8_errors(base_dir, ipex_scripts)
 check_flake8_errors(base_dir, ipex_examples)
 
 git_sha_dict = {

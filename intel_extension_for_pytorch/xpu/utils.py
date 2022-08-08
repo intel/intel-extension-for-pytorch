@@ -8,7 +8,7 @@ import shlex
 import sys
 import torch
 import warnings
-
+from torch.utils.cpp_extension import _TORCH_PATH
 from typing import List, Optional, Tuple
 from torch.torch_version import TorchVersion
 

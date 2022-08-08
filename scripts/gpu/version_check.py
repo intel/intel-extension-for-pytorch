@@ -54,8 +54,7 @@ def main():
     op_list, new_op, removed_op = analyzer.report()
     print("Checking versions..")
     if len(op_list) > 0:
-        print("Warning: The Pytorch Extension has conflicting operation declarations with currently installed Pytorch, \
-              you should consider upgrading them.")
+        print("Warning: The Pytorch Extension has conflicting operation declarations with currently installed Pytorch, you should consider upgrading them.")
         print("Warning: The following Op have conflicting definition: ", ', '.join(op_list))
     if len(new_op) > 0:
         print("Warning:", ', '.join(new_op), " is not supported in Pytorch!")

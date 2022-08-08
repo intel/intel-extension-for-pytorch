@@ -1,3 +1,4 @@
+from scripts.gpu.model import *
 from dataclasses import dataclass
 from typing import Optional, Union, Sequence
 

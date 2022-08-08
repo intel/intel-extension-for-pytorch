@@ -1,3 +1,5 @@
+from tools.codegen.model import *
+
 from tools.codegen.api.types import CppArgument, DispatcherExpr, TensorOptionsArguments, \
     DispatcherArgument, ThisArgument, LegacyDispatcherArgument
 import tools.codegen.api.cpp as cpp
