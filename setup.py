@@ -53,7 +53,6 @@ from setuptools.command.egg_info import egg_info
 
 from subprocess import check_call, check_output
 from setuptools import setup, distutils
-from packaging.version import Version
 from sysconfig import get_paths
 
 import distutils.ccompiler
@@ -219,6 +218,7 @@ def which(thefile):
 
 
 def get_cmake_command():
+    from packaging.version import Version
     def _get_version(cmd):
         for line in check_output([cmd, '--version']).decode('utf-8').split('\n'):
             if 'version' in line:
