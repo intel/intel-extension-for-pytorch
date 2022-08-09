@@ -242,10 +242,6 @@ def optimize(
         opt_properties.fuse_update_step = fuse_update_step
     if auto_kernel_selection is not None:
         opt_properties.auto_kernel_selection = auto_kernel_selection        
-    if sample_input is not None:
-        if isinstance(sample_input, torch.Tensor):
-            sample_input = (sample_input,)
-        utils._weight_prepack.record_input_shape_for_prepack(model, sample_input)
 
     if inplace:
         optimized_model = model
@@ -253,6 +249,11 @@ def optimize(
     else:
         optimized_model, optimized_optimizer = _copy_model_and_optimizer(model, optimizer)
 
+    if sample_input is not None:
+        if isinstance(sample_input, torch.Tensor):
+            sample_input = (sample_input,)
+        utils._weight_prepack.record_input_shape_for_prepack(optimized_model, sample_input)
+    
     if not model.training:
         if opt_properties.conv_bn_folding:
             try:

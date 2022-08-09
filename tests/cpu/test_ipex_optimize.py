@@ -262,10 +262,8 @@ class TestOptimizeCases(TestCase):
             else:
                 optimizer = torch.optim.SGD(M.parameters(), lr=0.01)
                 opt_M, _ = ipex.optimize(M, optimizer=optimizer, sample_input=input, auto_kernel_selection=True)
-            self.assertEqual(M.l1.input_shape, (2, 2))
             self.assertEqual(opt_M.l1.batch_size_collapsed, 2)
             if isinstance(M, TwoLayerMLP):
-                self.assertEqual(M.l2.input_shape, (3, 3))
                 self.assertEqual(opt_M.l2.batch_size_collapsed, 3)
 
     def test_traced_model_serialization(self):
@@ -299,6 +297,18 @@ class TestOptimizeCases(TestCase):
                     # get optimized results
                     out = traced_M(input)
                     self.assertEqual(ref_out, out)
+
+    def test_optimized_model_with_sample_input(self):
+        for module in [ConvBatchNorm, OneLayerMLP, ConvTranspose2d]:
+            model = module().train()
+            input = model.input1
+            optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+            origin_model_state = copy.deepcopy(model.state_dict())
+            ipex_model, _ = ipex.optimize(model, dtype=torch.float32, inplace=False, optimizer=optimizer, sample_input=input)
+            ipex_model_state = ipex_model.state_dict()
+            for var_name in origin_model_state:
+                self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
+
 
 if __name__ == '__main__':
     test = unittest.main()

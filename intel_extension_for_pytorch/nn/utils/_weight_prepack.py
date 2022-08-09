@@ -367,6 +367,8 @@ def record_input_shape_for_prepack(module, sample_input):
         for child in module.children():
             register_hook_function_rec(child)
 
+    origin_state_dict = copy.deepcopy(module.state_dict())
     hook_function.name = "input_shape"
     register_hook_function_rec(module)
     module(*sample_input)
+    module.load_state_dict(origin_state_dict)
