@@ -267,15 +267,15 @@ def _should_prepack(module, auto_kernel_selection):
     # If hook is on `weight` or `bias`, will not prepack.
     if module._forward_pre_hooks is not None:
         for _, hook in module._forward_pre_hooks.items():
-            if hook.name == 'weight' or hook.name == 'bias':
+            if hasattr(hook, 'name') and (hook.name == 'weight' or hook.name == 'bias'):
                 return False
     if module._forward_hooks is not None:
         for _, hook in module._forward_hooks.items():
-            if hook.name == 'weight' or hook.name == 'bias':
+            if hasattr(hook, 'name') and (hook.name == 'weight' or hook.name == 'bias'):
                 return False
     if module._backward_hooks is not None:
         for _, hook in module._backward_hooks.items():
-            if hook.name == 'weight' or hook.name == 'bias':
+            if hasattr(hook, 'name') and (hook.name == 'weight' or hook.name == 'bias'):
                 return False
     # When the auto_kernel_selection is on, dtype is float, IPEX will use the prepack MKL backend
     # for FP32 Linear in the inference mode.
@@ -368,7 +368,6 @@ def record_input_shape_for_prepack(module, sample_input):
             register_hook_function_rec(child)
 
     origin_state_dict = copy.deepcopy(module.state_dict())
-    hook_function.name = "input_shape"
     register_hook_function_rec(module)
     module(*sample_input)
     module.load_state_dict(origin_state_dict)

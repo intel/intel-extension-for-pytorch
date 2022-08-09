@@ -720,6 +720,91 @@ class TestPrepackCases(TestCase):
     def test_deconv_3d_training(self):
         self._test_deconv(dims=3, inference=False)
 
+    def test_hook(self):
+        class ConvNd(torch.nn.Module):
+            def __init__(self, dim, in_channels, out_channels, kernel_size, stride, padding, dilation, bias, groups):
+                super(ConvNd, self).__init__()
+                self.conv = conv_module[dim](in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, bias=bias, groups=groups)
+
+            def forward(self, x):
+                return self.conv(x)
+
+        input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
+        options = itertools.product([True, False], [1, 2], [1, 4])
+        for dim in [1, 2, 3]:
+            for bias, dilation, groups in options:
+                N = torch.randint(3, 10, (1,)).item()
+                M = torch.randint(1, 3, (1,)).item() * groups
+                C = torch.randint(1, 3, (1,)).item() * groups
+                x_shape = (N, C) + input_shapes[dim]
+                x = torch.randn(x_shape, dtype=torch.float32)
+                model_base = ConvNd(
+                    dim=dim,
+                    in_channels=C,
+                    out_channels=M,
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
+                    dilation=dilation,
+                    bias=bias,
+                    groups=groups).float().eval()
+
+                module_type = torch.nn.Conv1d
+                if dim == 2:
+                    module_type = torch.nn.Conv2d
+                if dim == 3:
+                    module_type = torch.nn.Conv3d
+
+                # IPEX will replace Conv with IPEX Conv
+                model = copy.deepcopy(model_base)
+                ipex_model = ipex.optimize(model, dtype=torch.float32, level='O1')
+                ipex_model(x)
+                self.assertFalse(isinstance(ipex_model.conv, module_type))
+
+                # Use torch.nn.utils.weight_norm to hook weight in model.conv,
+                # hook function here is WeightNorm, it has 'name' attribute,
+                # IPEX will not do prepack and not replace Conv with IPEX Conv.
+                hook_weight_model = copy.deepcopy(model_base)
+                hook_weight_model.conv = torch.nn.utils.weight_norm(hook_weight_model.conv, name="weight")
+                hook_weight_model = ipex.optimize(hook_weight_model, dtype=torch.float32, level='O1', inplace=True)
+                hook_weight_model(x)
+                self.assertTrue(isinstance(hook_weight_model.conv, module_type))
+
+                # User-defined hook function, it maybe has 'name' attribute or not,
+                # hook.name maybe is 'weight' or 'bias' or not. Only when hook function
+                # has 'name' attribute and hook on 'weight' or 'bias', IPEX will
+                # not do prepack. In other situations, IPEX will do prepack as usual.
+                dict_features = {}
+                options = itertools.product(['pre', 'forward', 'backward'], [True, False], ['weight', 'bias', 'others'])
+                for hook_type, has_name_attr, name in options:
+                    hook_model = copy.deepcopy(model_base)
+                    if hook_type == 'pre':
+                        def forward_pre_hook(self, input):
+                            dict_features['input'] = input
+                        if has_name_attr:
+                            forward_pre_hook.name = name
+                        hook_model.conv.register_forward_pre_hook(forward_pre_hook)
+                    elif hook_type == 'forward':
+                        def forward_hook(self, input, output):
+                            dict_features['input'] = input
+                            dict_features['output'] = output
+                        if has_name_attr:
+                            forward_hook.name = name
+                        hook_model.conv.register_forward_hook(forward_hook)
+                    else:
+                        def backward_hook(self, grad_input, grad_output):
+                            dict_features['grad_input'] = grad_input
+                            dict_features['grad_output'] = grad_output
+                        if has_name_attr:
+                            backward_hook.name = name
+                        hook_model.conv.register_backward_hook(backward_hook)
+                    hook_model = ipex.optimize(hook_model, dtype=torch.float32, level='O1')
+                    hook_model(x)
+                    if has_name_attr and (name == 'weight' or name == 'bias'):
+                        self.assertTrue(isinstance(hook_model.conv, module_type))
+                    else:
+                        self.assertFalse(isinstance(hook_model.conv, module_type))
+
 if __name__ == '__main__':
     torch.manual_seed(2020)
     test = unittest.main()
