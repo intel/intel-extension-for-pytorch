@@ -13,7 +13,7 @@ import threading
 
 from .streams import Stream, Event
 from .intrinsic import *
-from .settings import *
+from .cpp_extension import *
 from .itt import emit_itt
 from .amp import *
 from .utils import *
@@ -35,7 +35,7 @@ class _LazySeedTracker:
     def __init__(self):
         self.manual_seed_all_cb = None
         self.manual_seed_cb = None
-        self.call_order = [] 
+        self.call_order = []
 
     def queue_seed_all(self, cb, traceback):
         self.manual_seed_all_cb = (cb, traceback)
@@ -56,46 +56,6 @@ _lazy_seed_tracker = _LazySeedTracker()
 default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
 
-def to_channels_last_1d(t):
-    if isinstance(t, torch.nn.Module):
-        for m in t.modules():
-            for param in m.parameters():
-                if isinstance(m, (torch.nn.Conv1d, torch.nn.BatchNorm1d, torch.nn.MaxPool1d)):
-                    if 3 == param.data.dim():
-                        if 1 == param.data.size(0):
-                            param.data = param.data.transpose(1, -1).contiguous().transpose(1, -1)
-                        elif 1 == param.data.size(1):
-                            param.data = param.data.as_strided(
-                                param.data.size(), (param.data.size(1) * param.data.size(-1), 1, param.data.size(1)))
-                        else:
-                            param.data = param.data.view(
-                                param.data.size(0), param.data.size(1), 1, param.data.size(2))
-                            param.data = param.data.to(
-                                memory_format=torch.channels_last)
-                            param.data = param.data.view(
-                                param.data.size(0), param.data.size(1), param.data.size(3))
-        return t
-
-    if 3 == t.dim():
-        if 1 == t.size(0):
-            t = t.transpose(1, -1).contiguous().transpose(1, -1)
-        elif 1 == t.size(1):
-            t = t.as_strided(t.size(), (t.size(1) * t.size(-1), 1, t.size(1)))
-        else:
-            t = t.view(t.size(0), t.size(1), 1, t.size(2))
-            t = t.to(memory_format=torch.channels_last)
-            t = t.view(t.size(0), t.size(1), t.size(3))
-    return t
-
-def is_contiguous_channels_last_1d(input):
-    if 3 != input.dim():
-        return False
-
-    tmpTen = input.view(input.size(0), input.size(1), 1, input.size(2))
-    if tmpTen.is_contiguous(memory_format=torch.channels_last):
-        return True
-    else:
-        return False
 
 def is_initialized():
     r"""Returns whether XPU state has been initialized."""
