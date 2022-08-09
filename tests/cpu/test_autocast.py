@@ -405,8 +405,6 @@ class TestLSTM(TorchTestCase):
 
             model_cpu = M(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
             model_cpu.train() if training else model_cpu.eval()
-            if bf16:
-                model_cpu = self._cast_dtype(model_cpu, bf16)
 
             input_ipex = input.clone().requires_grad_(training)
             h_ipex = h.clone().requires_grad_(training)
@@ -418,14 +416,14 @@ class TestLSTM(TorchTestCase):
             with torch.cpu.amp.autocast(enabled=bf16, dtype=torch.bfloat16):
                 if empty_state:
                     torch.manual_seed(rand_seed)
-                    y_cpu, hy_cpu = model_cpu(self._cast_dtype(input_cpu, bf16))
+                    y_cpu, hy_cpu = self._cast_dtype(model_cpu, bf16)(self._cast_dtype(input_cpu, bf16))
 
                     torch.manual_seed(rand_seed)
                     y_ipex, hy_ipex = model_ipex(input_ipex)
 
                 else:
                     torch.manual_seed(rand_seed)
-                    y_cpu, hy_cpu = model_cpu(self._cast_dtype(input_cpu, bf16), (self._cast_dtype(h_cpu, bf16), self._cast_dtype(c_cpu, bf16)))
+                    y_cpu, hy_cpu = self._cast_dtype(model_cpu, bf16)(self._cast_dtype(input_cpu, bf16), (self._cast_dtype(h_cpu, bf16), self._cast_dtype(c_cpu, bf16)))
 
                     torch.manual_seed(rand_seed)
                     y_ipex, hy_ipex = model_ipex(input_ipex, (h_ipex, c_ipex))
@@ -451,7 +449,7 @@ class TestLSTM(TorchTestCase):
                         hy_ipex[1].sum().backward(retain_graph=True)
                         self.assertEqual(c_ipex.grad, c_cpu.grad, rtol=rtol, atol=atol)
 
-    def _test_lstm_pack_padded_sequence(self, training):
+    def _test_lstm_pack_padded_sequence(self):
         embedding_dim = 1024
         hidden_dim = 10
         batch_size = 24
@@ -474,10 +472,9 @@ class TestLSTM(TorchTestCase):
         hidden_1 = hid_1.clone().requires_grad_(False)
         embeds = torch.nn.utils.rnn.pack_padded_sequence(sentences, sent_lens, batch_first=True, enforce_sorted=False)
 
-        model = M(embedding_dim, hidden_dim, num_layers=num_layers, bidirectional=bidirectional, bias=True, dropout=0.4, batch_first=True)
+        model = nn.LSTM(embedding_dim, hidden_dim, num_layers=num_layers, bidirectional=bidirectional, batch_first=True)
 
         model_ipex = copy.deepcopy(model)
-        model_ipex.train() if training else model_ipex.eval()
         ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model_ipex)
 
         lstm_out, hidden_out = model(embeds, (hidden_0, hidden_1))
@@ -500,9 +497,7 @@ class TestLSTM(TorchTestCase):
         self._test_lstm(training=True, bf16=True, rtol=0.02, atol=0.03)
 
     def test_lstm_pack_padded_sequence(self):
-        self._test_lstm_pack_padded_sequence(training=False)
-
-        self._test_lstm_pack_padded_sequence(training=True)
+        self._test_lstm_pack_padded_sequence()
 
 class TestAutocastOperations(TestCase):
     def setUp(self):

@@ -1,9 +1,8 @@
 import torch
-from torch import Tensor
-from torch.nn.utils.rnn import PackedSequence
 import copy
 import warnings
-from typing import Optional
+
+from torch.nn.utils.rnn import PackedSequence
 
 class _LSTM(torch.nn.LSTM):
     # This is a solution to swap the lstm module with the ipex counterpart
@@ -20,7 +19,7 @@ class _LSTM(torch.nn.LSTM):
         # xxx: isinstance check needs to be in conditional for TorchScript to compile
         if isinstance(orig_input, PackedSequence):
             # fallback to PyTorch LSTM since PackedSequence unsupported in oneDNN
-            return super(_LSTM, self).forward(input, hx)
+            return super(LSTM, self).forward(input, hx)
         else:
             batch_sizes = None
             max_batch_size = input.size(0) if self.batch_first else input.size(1)
@@ -50,79 +49,16 @@ class _LSTM(torch.nn.LSTM):
 
         return output, self.permute_hidden(hidden, unsorted_indices)
 
-class _OptimizedLSTM(torch.nn.LSTM):
-    # This is an optimized LSTM, only for FP32 inference.
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.dropout = 0
-        self.training = False
-
-    def forward(self, input, hx: Optional[Tensor] = None):  # noqa: F811
-        orig_input = input
-        # xxx: isinstance check needs to be in conditional for TorchScript to compile
-        if isinstance(orig_input, PackedSequence):
-            input, batch_sizes, sorted_indices, unsorted_indices = input
-            max_batch_size = batch_sizes[0]
-            max_batch_size = int(max_batch_size)
-        else:
-            batch_sizes = None
-            max_batch_size = input.size(0) if self.batch_first else input.size(1)
-            sorted_indices = None
-            unsorted_indices = None
-
-        if hx is None:
-            num_directions = 2 if self.bidirectional else 1
-            real_hidden_size = self.proj_size if self.proj_size > 0 else self.hidden_size
-            h_zeros = torch.zeros(self.num_layers * num_directions,
-                                  max_batch_size, real_hidden_size,
-                                  dtype=input.dtype, device=input.device)
-            c_zeros = torch.zeros(self.num_layers * num_directions,
-                                  max_batch_size, self.hidden_size,
-                                  dtype=input.dtype, device=input.device)
-            hx = (h_zeros, c_zeros)
-        else:
-            # Each batch of the hidden state should match the input sequence that
-            # the user believes he/she is passing in.
-            hx = self.permute_hidden(hx, sorted_indices)
-
-        self.check_forward_args(input, hx, batch_sizes)
-
-        if batch_sizes is None:
-            result = torch.ops.torch_ipex.optimized_lstm_batch(input, hx, self._flat_weights,
-                    self.input_size, self.hidden_size, self.proj_size, self.bias,
-                    self.num_layers, self.bidirectional, self.batch_first)
-        else:
-            result = torch.ops.torch_ipex.optimized_lstm_packed(input, batch_sizes, hx,
-                    self._flat_weights, self.input_size, self.hidden_size, self.proj_size,
-                    self.bias, self.num_layers, self.bidirectional)
-
-        output = result[0]
-        hidden = result[1:]
-        # xxx: isinstance check needs to be in conditional for TorchScript to compile
-        if isinstance(orig_input, PackedSequence):
-            output_packed = PackedSequence(output, batch_sizes, sorted_indices, unsorted_indices)
-            return output_packed, self.permute_hidden(hidden, unsorted_indices)
-        else:
-            return output, self.permute_hidden(hidden, unsorted_indices)
-
 def replace_lstm_with_ipex_lstm(model):
     # replace lstm with ipex lstm during inference
     # does not support the case where model itself is torch.nn.LSTM
     for child_name, child in model.named_children():
         if isinstance(child, torch.nn.LSTM):
             assert hasattr(child, "weight_ih_l0"), "torch.nn.LSTM should have weight_ih_l0"
-            if child.weight_ih_l0.dtype == torch.float32 and model.training == False:
-                # customized optimized LSTM
-                ipex_lstm = _OptimizedLSTM(child.input_size, child.hidden_size,
-                    child.num_layers, child.bias, child.batch_first,
-                    child.dropout, child.bidirectional, child.proj_size,
-                    child.weight_ih_l0.device, child.weight_ih_l0.dtype)
-            else:
-                # oneDNN LSTM
-                ipex_lstm = _LSTM(child.input_size, child.hidden_size,
-                    child.num_layers, child.bias, child.batch_first,
-                    child.dropout, child.bidirectional, child.proj_size,
-                    child.weight_ih_l0.device, child.weight_ih_l0.dtype)
+            ipex_lstm = _LSTM(child.input_size, child.hidden_size,
+                child.num_layers, child.bias, child.batch_first,
+                child.dropout, child.bidirectional, child.proj_size,
+                child.weight_ih_l0.device, child.weight_ih_l0.dtype)
             ipex_lstm.__dict__ = copy.deepcopy(child.__dict__)
             setattr(model, child_name, ipex_lstm)
         else:
