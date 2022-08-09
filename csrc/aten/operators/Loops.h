@@ -10,6 +10,7 @@
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include "MemoryAccess.h"
+#include "comm/Load.h"
 
 #define UNROLLED_ELEM_PER_WORK_ITEM 4
 #define LOOPS_UNROLL_WORK_SIZE 16
@@ -373,9 +374,119 @@ static inline bool can_use_unroll_load_vec_store(
   return vec_size > 1;
 }
 
+template <int vec_size, typename func_t>
+static inline void elementwise_kernel(
+    DPCPP::nd_item<1>& item,
+    int N,
+    func_t f,
+    int group_size) {
+  int group_work_size = group_size * vec_size;
+  int idx = group_work_size * item.get_group(0) + item.get_local_id(0);
+#pragma unroll
+  for (int i = 0; i < vec_size; i++) {
+    if (idx < N) {
+      f(idx);
+      idx += group_size;
+    }
+  }
+}
+
+template <int vec_size, typename func_t>
+static inline void launch_legacy_kernel(int64_t N, const func_t& f) {
+  TORCH_INTERNAL_ASSERT(N >= 0 && N <= std::numeric_limits<int32_t>::max());
+  if (N == 0) {
+    return;
+  }
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto max_group_size = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
+  auto num_groups =
+      (N + max_group_size * vec_size - 1) / (max_group_size * vec_size);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      elementwise_kernel<vec_size, func_t>(item_id, N, f, max_group_size);
+    };
+
+    cgh.parallel_for(
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(num_groups * max_group_size),
+            DPCPP::range<1>(max_group_size)),
+        kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+template <typename traits, typename func_t, typename index_t, size_t... INDEX>
+typename traits::result_type invoke_impl(
+    const func_t& f,
+    char* const C10_RESTRICT data[],
+    const index_t strides[],
+    int i,
+    std::index_sequence<INDEX...>) {
+  (void)strides;
+  (void)i;
+  return f(
+      at::AtenIpexTypeXPU::load<typename traits::template arg<INDEX>::type>(
+          data[INDEX] + i * strides[INDEX])...);
+}
+
+template <
+    typename func_t,
+    typename index_t,
+    typename traits = function_traits<func_t>>
+typename traits::result_type invoke(
+    const func_t& f,
+    char* const C10_RESTRICT data[],
+    const index_t strides[],
+    int i) {
+  using Indices = std::make_index_sequence<traits::arity>;
+  return invoke_impl<traits>(f, data, strides, i, Indices{});
+}
+
+template <
+    bool REMOVE_DOUBLE,
+    typename traits,
+    typename func_t,
+    typename index_t,
+    size_t... I>
+typename traits::result_type invoke_with_cast_impl(
+    const func_t& f,
+    char* const C10_RESTRICT data[],
+    const index_t strides[],
+    const ScalarType dtypes[],
+    int i,
+    std::index_sequence<I...>) {
+  (void)strides;
+  (void)i;
+  if constexpr (REMOVE_DOUBLE) {
+    return f(at::native::Memory::no_double_fetch_and_cast<
+             typename traits::template arg<I>::type>(
+        dtypes[I], data[I] + i * strides[I])...);
+  } else {
+    return f(c10::fetch_and_cast<typename traits::template arg<I>::type>(
+        dtypes[I], data[I] + i * strides[I])...);
+  }
+}
+
+template <
+    bool REMOVE_DOUBLE,
+    typename func_t,
+    typename index_t,
+    typename traits = function_traits<func_t>>
+typename traits::result_type invoke_with_cast(
+    const func_t& f,
+    char* const C10_RESTRICT data[],
+    const index_t strides[],
+    const ScalarType dtypes[],
+    int i) {
+  using Indices = std::make_index_sequence<traits::arity>;
+  return invoke_with_cast_impl<REMOVE_DOUBLE, traits>(
+      f, data, strides, dtypes, i, Indices{});
+}
+
 template <typename func_t, bool singed_strides = false, bool fast_mode = false>
 void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
   using traits = function_traits<func_t>;
+  using arg0_t = typename traits::result_type;
   constexpr int ntensors = traits::arity + 1;
 
   TORCH_INTERNAL_ASSERT(iter.can_use_32bit_indexing());
@@ -445,18 +556,14 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
           return;
         }
       }
-      auto output_offset_calculator =
-          make_output_offset_calculator<1, singed_strides>(iter);
-      auto loader = at::native::Memory::LoadWithoutCast();
-      auto storer = at::native::Memory::StoreWithoutCast();
-      launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(
-          numel,
-          f,
-          data,
-          input_offset_calculator,
-          output_offset_calculator,
-          loader,
-          storer);
+      auto offset_calc =
+          make_offset_calculator<traits::arity + 1, singed_strides>(iter);
+      constexpr int unroll_factor = 16 / sizeof(arg0_t);
+      launch_legacy_kernel<unroll_factor>(numel, [=](int idx) {
+        auto offsets = offset_calc.get(idx);
+        arg0_t* out = (arg0_t*)(data[0] + offsets[0]);
+        *out = invoke(f, &data.data[1], &offsets.data[1], 1);
+      });
     }
   } else {
     at::detail::Array<ScalarType, traits::arity> dtypes;
@@ -466,12 +573,12 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
 
 #define HANDLE_DYNAMIC_CAST(REMOVE_DOUBLE)                                     \
   {                                                                            \
-    auto loader =                                                              \
-        at::native::Memory::LoadWithCast<traits::arity, REMOVE_DOUBLE>(        \
-            dtypes);                                                           \
-    auto storer = at::native::Memory::StoreWithCast<REMOVE_DOUBLE>(            \
-        iter.tensor(0).scalar_type());                                         \
     if (contiguous) {                                                          \
+      auto loader =                                                            \
+          at::native::Memory::LoadWithCast<traits::arity, REMOVE_DOUBLE>(      \
+              dtypes);                                                         \
+      auto storer = at::native::Memory::StoreWithCast<REMOVE_DOUBLE>(          \
+          iter.tensor(0).scalar_type());                                       \
       auto input_offset_calculator = TrivialOffsetCalculator<traits::arity>(); \
       auto output_offset_calculator = TrivialOffsetCalculator<1>();            \
       launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(                     \
@@ -483,18 +590,23 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
           loader,                                                              \
           storer);                                                             \
     } else {                                                                   \
-      auto input_offset_calculator =                                           \
-          make_input_offset_calculator<traits::arity, singed_strides>(iter);   \
-      auto output_offset_calculator =                                          \
-          make_output_offset_calculator<1, singed_strides>(iter);              \
-      launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(                     \
-          numel,                                                               \
-          f,                                                                   \
-          data,                                                                \
-          input_offset_calculator,                                             \
-          output_offset_calculator,                                            \
-          loader,                                                              \
-          storer);                                                             \
+      at::detail::Array<ScalarType, ntensors> dtypes;                          \
+      for (int i = 0; i < ntensors; i++) {                                     \
+        dtypes[i] = iter.dtype(i);                                             \
+      }                                                                        \
+      auto offset_calc =                                                       \
+          make_offset_calculator<traits::arity + 1, singed_strides>(iter);     \
+      launch_legacy_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(numel, [=](int idx) {  \
+        auto offsets = offset_calc.get(idx);                                   \
+        void* out = data[0] + offsets[0];                                      \
+        arg0_t result = invoke_with_cast<REMOVE_DOUBLE>(                       \
+            f, &data.data[1], &offsets.data[1], &dtypes.data[1], 1);           \
+        if constexpr (REMOVE_DOUBLE)                                           \
+          at::native::Memory::no_double_cast_and_store<arg0_t>(                \
+              dtypes[0], out, result);                                         \
+        else                                                                   \
+          c10::cast_and_store<arg0_t>(dtypes[0], out, result);                 \
+      });                                                                      \
     }                                                                          \
   }
 
