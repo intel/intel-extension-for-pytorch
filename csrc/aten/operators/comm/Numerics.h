@@ -534,6 +534,9 @@ struct Numerics<at::Half> {
   static inline at::Half atan2(at::Half a, at::Half b) {
     return dpl::atan2(float(a), float(b));
   }
+  static inline at::Half hypot(at::Half a, at::Half b) {
+    return dpl::hypot(float(a), float(b));
+  }
   static inline at::Half cinv(at::Half a) {
     return 1.0f / a;
   }
@@ -746,6 +749,9 @@ struct Numerics<at::BFloat16> {
   static inline at::BFloat16 atan2(at::BFloat16 a, at::BFloat16 b) {
     return dpl::atan2(float(a), float(b));
   }
+  static inline at::BFloat16 hypot(at::BFloat16 a, at::BFloat16 b) {
+    return dpl::hypot(float(a), float(b));
+  }
   static inline at::BFloat16 cinv(at::BFloat16 a) {
     return 1.0f / a;
   }
@@ -930,6 +936,9 @@ struct Numerics<float> {
   }
   static inline float atan2(float a, float b) {
     return dpl::atan2(a, b);
+  }
+  static inline float hypot(float a, float b) {
+    return dpl::hypot(a, b);
   }
   static inline float min(float a, float b) {
     if (a != a) {
@@ -1118,6 +1127,9 @@ struct Numerics<double> {
   }
   static inline double atan2(double a, double b) {
     return dpl::atan2(a, b);
+  }
+  static inline double hypot(double a, double b) {
+    return dpl::hypot(a, b);
   }
   static inline double min(double a, double b) {
     if (a != a) {

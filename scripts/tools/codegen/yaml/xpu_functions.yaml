@@ -264,6 +264,7 @@ supported:
   - huber_loss
   - huber_loss.out
   - huber_loss_backward.out
+  - hypot.out
   - i0.out
   - im2col
   - im2col.out
