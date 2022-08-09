@@ -858,15 +858,32 @@ void FuseLinearSwishCustomized(std::shared_ptr<Graph>& graph) {
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
   std::string max_pool2d = R"(
       graph(%a, %kernel_size:int[], %stride:int[], %padding:int[], %dilation:int[], %ceil_mode:bool):
-        %r = aten::max_pool2d(%a, %kernel_size, %stride, %padding, %dilation, %ceil_mode)
-        return (%r) )";
+        %res = aten::max_pool2d(%a, %kernel_size, %stride, %padding, %dilation, %ceil_mode)
+        return (%res) )";
   std::string ipex_max_pool2d = R"(
       graph(%a, %kernel_size:int[], %stride:int[], %padding:int[], %dilation:int[], %ceil_mode:bool):
-        %r = ipex::max_pool2d(%a, %kernel_size, %stride, %padding, %dilation, %ceil_mode)
-        return (%r) )";
+        %res = ipex::max_pool2d(%a, %kernel_size, %stride, %padding, %dilation, %ceil_mode)
+        return (%res) )";
   SubgraphRewriter rewriter_max_pool2d;
   rewriter_max_pool2d.RegisterRewritePattern(max_pool2d, ipex_max_pool2d);
-  rewriter_max_pool2d.runOnGraph(graph);
+  auto filter = [](const Match& match,
+                   const std::unordered_map<std::string, Value*>& vmap) {
+    auto pool_node = match.values_map.at(vmap.at("res"))->node();
+    auto input = pool_node->inputs().at(0);
+    if (!input->type()->cast<TensorType>()) {
+      return false;
+    }
+    auto dtype_option = input->type()->cast<TensorType>()->scalarType();
+    if (!dtype_option) {
+      return false;
+    }
+    if (dtype_option.value() != c10::ScalarType::BFloat16 ||
+        dtype_option.value() != c10::ScalarType::Float) {
+      return false;
+    }
+    return true;
+  };
+  rewriter_max_pool2d.runOnGraph(graph, filter);
 }
 
 } // namespace graph_rewrite

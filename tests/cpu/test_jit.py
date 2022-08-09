@@ -3456,6 +3456,26 @@ class Tester(TestCase):
             kind_in_graph="ipex::batch_norm",
             prec=5e-3)
 
+    def test_max_pool2d_int8(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super(Model, self).__init__()
+                self.pool = torch.nn.MaxPool2d(3, stride=2)
+
+            def forward(self, x):
+                x = torch.quantize_per_tensor(x, 0.1, 10, torch.quint8)
+                return self.pool(x)
+
+        model = Model().eval()
+        x = torch.randn(1, 3, 24, 24)
+        with torch.no_grad():
+            ref_out = model(x)
+            traced_model = torch.jit.trace(model, x)
+            traced_out = traced_model(x)
+            self.assertEqual(ref_out, traced_out)
+            trace_graph = traced_model.graph_for(x)
+            self.assertTrue(any(n.kind() == "aten::max_pool2d" for n in trace_graph.nodes()))
+
     def test_restore_inplace(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn, params_dict={}):
