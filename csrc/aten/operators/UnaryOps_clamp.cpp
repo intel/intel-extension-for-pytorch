@@ -125,7 +125,8 @@ Tensor& clamp_out(
                 if (Numerics<scalar_t>::isnan(in)) {
                   return in;
                 } else {
-                  return std::min(std::max(in, min_val), max_val);
+                  return Numerics<scalar_t>::min(
+                      Numerics<scalar_t>::max(in, min_val), max_val);
                 }
               });
         });
@@ -168,7 +169,7 @@ Tensor& clamp_max_out(const Tensor& self, const Tensor& max, Tensor& result) {
               if (Numerics<scalar_t>::isnan(in)) {
                 return in;
               } else {
-                return std::min(in, max_val);
+                return Numerics<scalar_t>::min(in, max_val);
               }
             });
       });
@@ -188,7 +189,7 @@ Tensor& clamp_min_out(const Tensor& self, const Tensor& min, Tensor& result) {
               if (Numerics<scalar_t>::isnan(in)) {
                 return in;
               } else {
-                return std::max(in, min_val);
+                return Numerics<scalar_t>::max(in, min_val);
               }
             });
       });

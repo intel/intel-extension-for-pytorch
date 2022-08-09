@@ -28,7 +28,7 @@ void geometric_scalar_dpcpp(
         auto p = static_cast<accscalar_t>(p_);
         auto geometric_func = [p](accscalar_t rand) {
           // https://en.wikipedia.org/wiki/Geometric_distribution#Related_distributions
-          return static_cast<scalar_t>(::ceil(
+          return static_cast<scalar_t>(Numerics<accscalar_t>::ceil(
               at::log(rand) / at::log(static_cast<accscalar_t>(1.0) - p)));
         };
         AtenIpexTypeXPU::distribution_nullary_kernel<scalar_t, accscalar_t>(

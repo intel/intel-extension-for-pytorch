@@ -56,9 +56,12 @@ void bce_kernel(TensorIterator& iter) {
         dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t input, scalar_t target) -> scalar_t {
               return (target - scalar_t(1)) *
-                  std::max(
-                         scalar_t(::log(scalar_t(1) - input)), scalar_t(-100)) -
-                  target * std::max(scalar_t(::log(input)), scalar_t(-100));
+                  Numerics<scalar_t>::max(
+                         scalar_t(Numerics<scalar_t>::log(scalar_t(1) - input)),
+                         scalar_t(-100)) -
+                  target *
+                  Numerics<scalar_t>::max(
+                      scalar_t(Numerics<scalar_t>::log(input)), scalar_t(-100));
             });
       });
 }
@@ -87,7 +90,8 @@ void soft_margin_kernel(TensorIterator& iter) {
       [&iter]() {
         dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t input, scalar_t target) -> scalar_t {
-              return ::log(scalar_t(1.) + ::exp(-input * target));
+              return Numerics<scalar_t>::log(
+                  scalar_t(1.) + Numerics<scalar_t>::exp(-input * target));
             });
       });
 }
@@ -103,7 +107,7 @@ void soft_margin_backward_kernel(TensorIterator& iter, Scalar norm) {
             iter,
             [norm_val](scalar_t input, scalar_t target, scalar_t grad_output)
                 -> scalar_t {
-              auto z = ::exp(-target * input);
+              auto z = Numerics<scalar_t>::exp(-target * input);
               return -norm_val * target * z / (scalar_t(1.) + z) * grad_output;
             });
       });
@@ -119,7 +123,7 @@ void smooth_l1_kernel(TensorIterator& iter, double beta) {
         scalar_t beta_val(beta);
         dpcpp_kernel_for_tensor_iter(
             iter, [beta_val](scalar_t input, scalar_t target) -> scalar_t {
-              auto z = ::abs(input - target);
+              auto z = Numerics<scalar_t>::abs(input - target);
               return z < beta_val ? scalar_t(0.5) * z * z / beta_val
                                   : z - scalar_t(0.5) * beta_val;
             });
@@ -190,7 +194,7 @@ void l1_kernel(TensorIterator& iter) {
       [&iter]() {
         dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t input, scalar_t target) -> scalar_t {
-              return ::abs(input - target);
+              return Numerics<scalar_t>::abs(input - target);
             });
       });
 }

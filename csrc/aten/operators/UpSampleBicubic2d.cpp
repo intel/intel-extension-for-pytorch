@@ -9,6 +9,7 @@
 #include "comm/RegistrationDeclarations.h"
 
 #include "UpSample.h"
+#include "comm/Numerics.h"
 
 using namespace xpu::dpcpp;
 
@@ -69,12 +70,12 @@ static void upsample_bicubic2d_out_frame(
         scalar_t real_x = area_pixel_compute_source_index(
             width_scale, output_x, align_corners, /*cubic=*/true);
         // TODO: floor should support at dispatch to half type
-        int in_x = DPCPP::floor(real_x);
+        int in_x = Numerics<scalar_t>::floor(real_x);
         scalar_t t_x = real_x - in_x;
 
         scalar_t real_y = area_pixel_compute_source_index(
             height_scale, output_y, align_corners, /*cubic=*/true);
-        int in_y = DPCPP::floor(real_y);
+        int in_y = Numerics<scalar_t>::floor(real_y);
         scalar_t t_y = real_y - in_y;
         for (int n = 0; n < nbatch; n++) {
           for (int c = 0; c < channels; c++) {
@@ -190,12 +191,12 @@ static void upsample_bicubic2d_backward_out_frame(
 
         scalar_t real_x = area_pixel_compute_source_index(
             width_scale, output_x, align_corners, /*cubic=*/true);
-        int input_x = DPCPP::floor(real_x);
+        int input_x = Numerics<scalar_t>::floor(real_x);
         scalar_t t_x = real_x - input_x;
 
         scalar_t real_y = area_pixel_compute_source_index(
             height_scale, output_y, align_corners, /*cubic=*/true);
-        int input_y = DPCPP::floor(real_y);
+        int input_y = Numerics<scalar_t>::floor(real_y);
         scalar_t t_y = real_y - input_y;
 
         scalar_t x_coeffs[4];

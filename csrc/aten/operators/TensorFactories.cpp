@@ -186,7 +186,7 @@ inline int64_t resolve_root_int(
   int64_t bXb_cX4 = b * b - cX4;
   // potential precision loss could occur here when casting int64_t (63 bits
   // precision) to double (52 bits precision)
-  double sr = DPCPP::sqrt((double)bXb_cX4);
+  double sr = Numerics<double>::sqrt((double)bXb_cX4);
   //
   // TODO: PyTorch uses ::__double2ll_rd. No corresponding API in DPCPP.
   // uses std::llround or std::ceil or std::float will cause error:

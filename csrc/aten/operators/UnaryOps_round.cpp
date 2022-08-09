@@ -9,6 +9,8 @@
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
 #include "comm/zmath.h"
+#include "oneapi/dpl/cmath"
+namespace dpl = oneapi::dpl;
 
 #include "Loops.h"
 
@@ -22,7 +24,9 @@ IPEX_OUT_FLOAT_UNARY_FUNC_OPS(ceil_out, Numerics<scalar_t>::ceil, Real);
 
 IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL(
     round_out,
-    [](scalar_t a) -> scalar_t { return ::nearbyintf(static_cast<float>(a)); },
+    [](scalar_t a) -> scalar_t {
+      return dpl::nearbyintf(static_cast<float>(a));
+    },
     unary_op);
 
 IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(remainder_out, TensorRemainderOp);

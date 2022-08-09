@@ -7,6 +7,8 @@
 #include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
 
+#include "comm/Numerics.h"
+
 using namespace xpu::dpcpp;
 
 namespace at {
@@ -53,7 +55,7 @@ static void RowwiseMomentsDPCPPKernel(
               sum2 = T_ACC(0);
             }
             mean[i] = sum1;
-            rstd[i] = DPCPP::rsqrt(sum2 + static_cast<T_ACC>(eps));
+            rstd[i] = Numerics<T_ACC>::rsqrt(sum2 + static_cast<T_ACC>(eps));
           }
         });
   };

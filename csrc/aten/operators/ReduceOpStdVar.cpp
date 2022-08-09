@@ -16,6 +16,9 @@
 #include "Reduce.h"
 #include "ReduceOpsUtils.h"
 
+#include <oneapi/dpl/cmath>
+namespace dpl = oneapi::dpl;
+
 using namespace xpu::dpcpp;
 using namespace at::native;
 
@@ -77,7 +80,7 @@ struct WelfordOps {
     auto mean = acc.mean;
     combine_t divisor = unbiased ? (acc.nf - 1) : acc.nf;
     auto ret = (divisor > 0)
-        ? (take_sqrt ? DPCPP::sqrt(acc.m2 / divisor) : (acc.m2 / divisor))
+        ? (take_sqrt ? dpl::sqrt(acc.m2 / divisor) : (acc.m2 / divisor))
         : NAN;
 
     std::pair<scalar_t, scalar_t> results{(scalar_t)ret, (scalar_t)mean};

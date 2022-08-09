@@ -99,8 +99,8 @@ static inline scalar_t reflect_coordinates_set_grad(
     grad_in_mult_ = 1;
   }
   // `fmod` returns same sign as `in`, which is positive after the `if` above.
-  scalar_t extra = DPCPP::fmod((float)in, (float)span);
-  int flips = DPCPP::floor((float)in / span);
+  scalar_t extra = Numerics<float>::fmod((float)in, (float)span);
+  int flips = Numerics<float>::floor((float)in / span);
   if (flips % 2 == 0) {
     *grad_in = static_cast<scalar_t>(grad_in_mult_);
     return extra + min;
@@ -203,8 +203,8 @@ static inline scalar_t reflect_coordinates(
   scalar_t span = static_cast<scalar_t>(twice_high - twice_low) / 2;
   in = Numerics<scalar_t>::fabs(in - min);
   // `fmod` returns same sign as `in`, which is positive after the `fabs`above.
-  scalar_t extra = DPCPP::fmod((float)in, (float)span);
-  int flips = DPCPP::floor((float)in / span);
+  scalar_t extra = Numerics<float>::fmod((float)in, (float)span);
+  int flips = Numerics<float>::floor((float)in / span);
   if (flips % 2 == 0) {
     return extra + min;
   } else {
@@ -424,8 +424,8 @@ void grid_sampler_2d_kernel(
 
       if (interpolation_mode == GridSamplerInterpolation::Bilinear) {
         // get NE, NW, SE, SW pixel values from (x, y)
-        index_t ix_nw = static_cast<index_t>(DPCPP::floor((float)ix));
-        index_t iy_nw = static_cast<index_t>(DPCPP::floor((float)iy));
+        index_t ix_nw = static_cast<index_t>(Numerics<float>::floor((float)ix));
+        index_t iy_nw = static_cast<index_t>(Numerics<float>::floor((float)iy));
         index_t ix_ne = ix_nw + 1;
         index_t iy_ne = iy_nw;
         index_t ix_sw = ix_nw;
@@ -459,8 +459,10 @@ void grid_sampler_2d_kernel(
           }
         }
       } else if (interpolation_mode == GridSamplerInterpolation::Nearest) {
-        index_t ix_nearest = static_cast<index_t>(::round(ix));
-        index_t iy_nearest = static_cast<index_t>(::round(iy));
+        index_t ix_nearest =
+            static_cast<index_t>(Numerics<scalar_t>::round(ix));
+        index_t iy_nearest =
+            static_cast<index_t>(Numerics<scalar_t>::round(iy));
 
         // assign nearest neighor pixel value to output pixel
         auto inp_ptr_NC = input_data + n * inp_sN;
@@ -478,8 +480,8 @@ void grid_sampler_2d_kernel(
         ix = grid_sampler_unnormalize(x, inp_W, align_corners);
         iy = grid_sampler_unnormalize(y, inp_H, align_corners);
 
-        scalar_t ix_nw = ::floor(ix);
-        scalar_t iy_nw = ::floor(iy);
+        scalar_t ix_nw = Numerics<scalar_t>::floor(ix);
+        scalar_t iy_nw = Numerics<scalar_t>::floor(iy);
 
         const scalar_t tx = ix - ix_nw;
         const scalar_t ty = iy - iy_nw;
@@ -619,8 +621,8 @@ void grid_sampler_2d_backward_kernel(
 
       if (interpolation_mode == GridSamplerInterpolation::Bilinear) {
         // get NE, NW, SE, SW pixel values from (x, y)
-        index_t ix_nw = static_cast<index_t>(DPCPP::floor((float)ix));
-        index_t iy_nw = static_cast<index_t>(DPCPP::floor((float)iy));
+        index_t ix_nw = static_cast<index_t>(Numerics<float>::floor((float)ix));
+        index_t iy_nw = static_cast<index_t>(Numerics<float>::floor((float)iy));
         index_t ix_ne = ix_nw + 1;
         index_t iy_ne = iy_nw;
         index_t ix_sw = ix_nw;
@@ -714,8 +716,10 @@ void grid_sampler_2d_backward_kernel(
         gGrid_ptr_NHW[0] = gix_mult * gix;
         gGrid_ptr_NHW[1] = giy_mult * giy;
       } else if (interpolation_mode == GridSamplerInterpolation::Nearest) {
-        index_t ix_nearest = static_cast<index_t>(::round(ix));
-        index_t iy_nearest = static_cast<index_t>(::round(iy));
+        index_t ix_nearest =
+            static_cast<index_t>(Numerics<scalar_t>::round(ix));
+        index_t iy_nearest =
+            static_cast<index_t>(Numerics<scalar_t>::round(iy));
 
         // assign nearest neighor pixel value to output pixel
         scalar_t* gOut_ptr_NCHW =
@@ -748,8 +752,8 @@ void grid_sampler_2d_backward_kernel(
         iy = grid_sampler_unnormalize_set_grad(
             y, inp_H, align_corners, &giy_mult);
 
-        scalar_t ix_nw = ::floor(ix);
-        scalar_t iy_nw = ::floor(iy);
+        scalar_t ix_nw = Numerics<scalar_t>::floor(ix);
+        scalar_t iy_nw = Numerics<scalar_t>::floor(iy);
 
         const scalar_t tx = ix - ix_nw;
         const scalar_t ty = iy - iy_nw;
@@ -893,9 +897,12 @@ void grid_sampler_3d_kernel(
         // get corner pixel values from (x, y, z)
         // for 4d, we used north-east-south-west
         // for 5d, we add top-bottom
-        index_t ix_tnw = static_cast<index_t>(DPCPP::floor((float)ix));
-        index_t iy_tnw = static_cast<index_t>(DPCPP::floor((float)iy));
-        index_t iz_tnw = static_cast<index_t>(DPCPP::floor((float)iz));
+        index_t ix_tnw =
+            static_cast<index_t>(Numerics<float>::floor((float)ix));
+        index_t iy_tnw =
+            static_cast<index_t>(Numerics<float>::floor((float)iy));
+        index_t iz_tnw =
+            static_cast<index_t>(Numerics<float>::floor((float)iz));
 
         index_t ix_tne = ix_tnw + 1;
         index_t iy_tne = iy_tnw;
@@ -999,9 +1006,12 @@ void grid_sampler_3d_kernel(
           }
         }
       } else if (interpolation_mode == GridSamplerInterpolation::Nearest) {
-        index_t ix_nearest = static_cast<index_t>(::round(ix));
-        index_t iy_nearest = static_cast<index_t>(::round(iy));
-        index_t iz_nearest = static_cast<index_t>(::round(iz));
+        index_t ix_nearest =
+            static_cast<index_t>(Numerics<scalar_t>::round(ix));
+        index_t iy_nearest =
+            static_cast<index_t>(Numerics<scalar_t>::round(iy));
+        index_t iz_nearest =
+            static_cast<index_t>(Numerics<scalar_t>::round(iz));
 
         // assign nearest neighor pixel value to output pixel
         auto inp_ptr_NC = input_data + n * inp_sN;
@@ -1108,9 +1118,12 @@ void grid_sampler_3d_backward_kernel(
         // get corner pixel values from (x, y, z)
         // for 4d, we used north-east-south-west
         // for 5d, we add top-bottom
-        index_t ix_tnw = static_cast<index_t>(DPCPP::floor((float)ix));
-        index_t iy_tnw = static_cast<index_t>(DPCPP::floor((float)iy));
-        index_t iz_tnw = static_cast<index_t>(DPCPP::floor((float)iz));
+        index_t ix_tnw =
+            static_cast<index_t>(Numerics<float>::floor((float)ix));
+        index_t iy_tnw =
+            static_cast<index_t>(Numerics<float>::floor((float)iy));
+        index_t iz_tnw =
+            static_cast<index_t>(Numerics<float>::floor((float)iz));
 
         index_t ix_tne = ix_tnw + 1;
         index_t iy_tne = iy_tnw;
@@ -1330,9 +1343,9 @@ void grid_sampler_3d_backward_kernel(
         gGrid_ptr_NDHW[1] = giy_mult * giy;
         gGrid_ptr_NDHW[2] = giz_mult * giz;
       } else if (interpolation_mode == GridSamplerInterpolation::Nearest) {
-        auto ix_nearest = static_cast<index_t>(::round(ix));
-        auto iy_nearest = static_cast<index_t>(::round(iy));
-        auto iz_nearest = static_cast<index_t>(::round(iz));
+        auto ix_nearest = static_cast<index_t>(Numerics<scalar_t>::round(ix));
+        auto iy_nearest = static_cast<index_t>(Numerics<scalar_t>::round(iy));
+        auto iz_nearest = static_cast<index_t>(Numerics<scalar_t>::round(iz));
 
         // assign nearest neighor pixel value to output pixel
         scalar_t* gOut_ptr_NCDHW = grad_output_data + n * gOut_sN +
