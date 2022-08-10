@@ -76,7 +76,7 @@ inline void elementwise_kernel_helper(func_t f, policy_t policy) {
 }
 
 template <
-    int vec_size,
+    int ITEM_WORK_SIZE,
     typename func_t,
     typename array_t,
     typename inp_calc_t,
@@ -84,7 +84,7 @@ template <
     typename loader_t,
     typename storer_t>
 static inline void unrolled_elementwise_kernel(
-    DPCPP::item<1> item_id,
+    DPCPP::nd_item<1>& item,
     int numel,
     func_t f,
     array_t data,
@@ -92,17 +92,23 @@ static inline void unrolled_elementwise_kernel(
     out_calc_t oc,
     loader_t l,
     storer_t s) {
-  int thread_idx = item_id.get_linear_id();
-
-  int remaining = numel - thread_idx * vec_size;
-  auto policy = at::native::Memory::policies::
-      unroll<vec_size, array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(
-          data, remaining, ic, oc, l, s, thread_idx);
-  elementwise_kernel_helper<vec_size>(f, policy);
+  int group_items = item.get_local_range(0);
+  int thread_idx = item.get_local_id(0);
+  int group_idx = item.get_group(0);
+  int remaining = numel - ITEM_WORK_SIZE * group_items * group_idx;
+  auto policy = at::native::Memory::policies::unroll<
+      ITEM_WORK_SIZE,
+      array_t,
+      inp_calc_t,
+      out_calc_t,
+      loader_t,
+      storer_t>(
+      data, remaining, ic, oc, l, s, thread_idx, group_idx, group_items);
+  elementwise_kernel_helper<ITEM_WORK_SIZE>(f, policy);
 }
 
 template <
-    int vec_size,
+    int ITEM_WORK_SIZE,
     typename func_t,
     typename array_t,
     typename inp_calc_t,
@@ -117,105 +123,74 @@ static inline void launch_unrolled_kernel(
     out_calc_t oc,
     loader_t l,
     storer_t s) {
-  using traits = function_traits<func_t>;
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
-  using ret_t = typename traits::result_type;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int thread_num = (N + vec_size - 1) / vec_size;
+  int group_items = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
+  int group_work_size = ITEM_WORK_SIZE * group_items;
+  int num_groups = (N + group_work_size - 1) / group_work_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      unrolled_elementwise_kernel<vec_size>(item_id, N, f, data, ic, oc, l, s);
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+      unrolled_elementwise_kernel<ITEM_WORK_SIZE>(
+          item, N, f, data, ic, oc, l, s);
     };
 
-    cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_num), kfn);
+    cgh.parallel_for(
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(num_groups * group_items),
+            DPCPP::range<1>(group_items)),
+        kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <
+    int ITEM_WORK_SIZE,
     int vec_size,
     typename func_t,
     typename array_t,
-    typename inp_calc_t,
-    typename outp_calc_t>
+    typename inp_calc_t>
 void vectorized_elementwise_kernel(
     DPCPP::nd_item<1>& item,
     int numel,
-    const func_t& fn,
+    func_t fn,
     array_t data,
-    inp_calc_t& input_calc,
-    outp_calc_t& output_calc) {
-  using traits = function_traits<func_t>;
-  int thread_idx = item.get_global_linear_id();
-  int remaining = numel - vec_size * thread_idx;
-
-  if (remaining < vec_size) { // if this thread handles the remaining, just do a
-                              // naive unrolled loop
-    auto input_calc = TrivialOffsetCalculator<traits::arity>();
+    inp_calc_t input_calc) {
+  int group_items = item.get_local_range(0);
+  int thread_idx = item.get_local_id(0);
+  int group_idx = item.get_group(0);
+  int group_work_size = ITEM_WORK_SIZE * group_items;
+  int remaining = numel - group_idx * group_work_size;
+  if (remaining <
+      group_work_size) { // if this thread handles the remaining, just do a
+    // naive unrolled loop
     auto output_calc = TrivialOffsetCalculator<1>();
     auto loader = at::native::Memory::LoadWithoutCast();
     auto storer = at::native::Memory::StoreWithoutCast();
     auto policy = at::native::Memory::policies::unroll<
-        vec_size,
+        ITEM_WORK_SIZE,
         array_t,
         decltype(input_calc),
         decltype(output_calc),
         at::native::Memory::LoadWithoutCast,
         at::native::Memory::StoreWithoutCast>(
-        data, remaining, input_calc, output_calc, loader, storer, thread_idx);
-    elementwise_kernel_helper<LOOPS_UNROLL_WORK_SIZE>(fn, policy);
+        data,
+        remaining,
+        input_calc,
+        output_calc,
+        loader,
+        storer,
+        thread_idx,
+        group_idx,
+        group_items);
+    elementwise_kernel_helper<ITEM_WORK_SIZE>(fn, policy);
   } else { // if this block has a full `block_work_size` data to handle, use
     // vectorized memory access
     auto policy = at::native::Memory::policies::
-        vectorized<vec_size, array_t, inp_calc_t, outp_calc_t>(
-            data, input_calc, output_calc, thread_idx);
-    elementwise_kernel_helper<vec_size>(fn, policy);
-  }
-}
-
-template <
-    int vec_size,
-    typename func_t,
-    typename array_t,
-    typename inp_calc_t,
-    typename outp_calc_t>
-void unroll_load_vec_store_elementwise_kernel(
-    DPCPP::nd_item<1>& item,
-    int numel,
-    const func_t& fn,
-    array_t data,
-    inp_calc_t& input_calc,
-    outp_calc_t& output_calc) {
-  using traits = function_traits<func_t>;
-  int thread_idx = item.get_global_linear_id();
-  int remaining = numel - vec_size * thread_idx;
-
-  if (remaining < vec_size) { // if this thread handles the remaining, just do a
-                              // naive unrolled loop
-    auto output_calc = TrivialOffsetCalculator<1>();
-    auto loader = at::native::Memory::LoadWithoutCast();
-    auto storer = at::native::Memory::StoreWithoutCast();
-    auto policy = at::native::Memory::policies::unroll<
-        vec_size,
-        array_t,
-        decltype(input_calc),
-        decltype(output_calc),
-        at::native::Memory::LoadWithoutCast,
-        at::native::Memory::StoreWithoutCast>(
-        data, remaining, input_calc, output_calc, loader, storer, thread_idx);
-    elementwise_kernel_helper<LOOPS_UNROLL_WORK_SIZE>(fn, policy);
-  } else { // if this block has a full `block_work_size` data to handle, use
-    // vectorized memory access
-    auto loader = at::native::Memory::LoadWithoutCast();
-    auto policy = at::native::Memory::policies::unroll_load_vec_store<
-        vec_size,
-        array_t,
-        inp_calc_t,
-        outp_calc_t,
-        decltype(loader)>(data, input_calc, output_calc, loader, thread_idx);
-    elementwise_kernel_helper<vec_size>(fn, policy);
+        vectorized<ITEM_WORK_SIZE, vec_size, array_t, inp_calc_t>(
+            data, input_calc, thread_idx, group_idx, group_items);
+    elementwise_kernel_helper<ITEM_WORK_SIZE>(fn, policy);
   }
 }
 
@@ -268,20 +243,13 @@ static inline bool has_double_arg(TensorIteratorBase& iter) {
 
 // Assumption:
 // this function assume trivial 1d and no dynamic casting
-template <
-    bool unroll_load_vec_store,
-    typename func_t,
-    typename array_t,
-    typename inp_calc_t,
-    typename outp_calc_t>
+template <typename func_t, typename array_t, typename inp_calc_t>
 static inline void launch_vectorized_kernel(
     int64_t N,
     const func_t& fn,
     array_t data,
-    inp_calc_t& input_calc,
-    outp_calc_t& output_calc,
+    inp_calc_t input_calc,
     int vec_size) {
-  using traits = function_traits<func_t>;
   constexpr auto max_scalar_bytes = max_scalar_size<func_t>();
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -299,12 +267,9 @@ static inline void launch_vectorized_kernel(
                 DPCPP::range<1>(num_groups * group_size),             \
                 DPCPP::range<1>(group_size)),                         \
             [=](DPCPP::nd_item<1> itemId) {                           \
-              if constexpr (unroll_load_vec_store) {                  \
-                unroll_load_vec_store_elementwise_kernel<vec_size>(   \
-                    itemId, N, fn, data, input_calc, output_calc);    \
-              } else {                                                \
-                vectorized_elementwise_kernel<vec_size>(              \
-                    itemId, N, fn, data, input_calc, output_calc);    \
+              {                                                       \
+                vectorized_elementwise_kernel<vec_size, vec_size>(    \
+                    itemId, N, fn, data, input_calc);                 \
               }                                                       \
             });                                                       \
       };                                                              \
@@ -338,40 +303,6 @@ static inline void launch_vectorized_kernel(
   }
 
 #undef VEC_LOOPS_KERNEL
-}
-
-static inline bool can_use_broadcast_vectorize(
-    TensorIteratorBase& iter,
-    int& vec_size) {
-  if (iter.is_contiguous() || (vec_size <= 1) ||
-      !iter.has_contiguous_first_dim())
-    return false;
-  int last_compute_dim_size = iter.shape()[0];
-  while (last_compute_dim_size % vec_size)
-    vec_size >>= 1;
-  for (int i = 0; i < iter.ntensors(); i++) {
-    auto strides = iter.strides(i);
-    for (int dim = 1; dim < strides.size(); dim++) {
-      while (strides[dim] % (strides[0] * vec_size))
-        vec_size >>= 1;
-    }
-  }
-  return vec_size > 1;
-}
-
-template <typename func_t, typename array_t>
-static inline bool can_use_unroll_load_vec_store(
-    TensorIteratorBase& iter,
-    const func_t& fn,
-    array_t data,
-    int& vec_size) {
-  using traits = function_traits<func_t>;
-  using return_t = typename traits::result_type;
-  if (iter.is_contiguous() || !iter.tensor(0).is_contiguous())
-    return false;
-  vec_size = at::native::Memory::can_vectorize_up_to_loop<return_t>(
-      getDeviceIdOfCurrentQueue(), data[0]);
-  return vec_size > 1;
 }
 
 template <int vec_size, typename func_t>
@@ -483,7 +414,32 @@ typename traits::result_type invoke_with_cast(
       f, data, strides, dtypes, i, Indices{});
 }
 
-template <typename func_t, bool singed_strides = false, bool fast_mode = false>
+template <typename func_t, typename data_t>
+static inline bool can_use_broadcast_vectorize(
+    TensorIteratorBase& iter,
+    const data_t& data,
+    int& vec_size) {
+  if (iter.is_contiguous() || !iter.has_contiguous_first_dim() ||
+      !iter.tensor(0).is_contiguous())
+    return false;
+  vec_size = at::native::Memory::can_vectorize_up_to_loop<func_t>(
+      getDeviceIdOfCurrentQueue(), data);
+  if (vec_size <= 1)
+    return false;
+  int last_compute_dim_size = iter.shape()[0];
+  while (last_compute_dim_size % vec_size)
+    vec_size >>= 1;
+  for (int i = 0; i < iter.ntensors(); i++) {
+    auto strides = iter.strides(i);
+    for (int dim = 1; dim < strides.size(); dim++) {
+      while (strides[dim] % (strides[0] * vec_size))
+        vec_size >>= 1;
+    }
+  }
+  return vec_size > 1;
+}
+
+template <typename func_t, bool signed_strides = false, bool fast_mode = false>
 void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
   using traits = function_traits<func_t>;
   using arg0_t = typename traits::result_type;
@@ -504,60 +460,26 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
   bool dynamic_casting = at::native::needs_dynamic_casting<func_t>::check(iter);
 
   if (!dynamic_casting) {
-    int vec_size = at::native::Memory::can_vectorize_up_to_loop<func_t>(
-        getDeviceIdOfCurrentQueue(), data);
     if (contiguous) {
+      int vec_size = at::native::Memory::can_vectorize_up_to_loop<func_t>(
+          getDeviceIdOfCurrentQueue(), data);
       auto input_offset_calculator = TrivialOffsetCalculator<traits::arity>();
-      auto output_offset_calculator = TrivialOffsetCalculator<1>();
-      launch_vectorized_kernel<false>(
-          numel,
-          f,
-          data,
-          input_offset_calculator,
-          output_offset_calculator,
-          vec_size);
+      launch_vectorized_kernel(
+          numel, f, data, input_offset_calculator, vec_size);
     } else {
-      auto input_offset_calculator =
-          make_input_offset_calculator<traits::arity, singed_strides>(iter);
       if constexpr (fast_mode) {
-        if (can_use_broadcast_vectorize(iter, vec_size) && !singed_strides) {
-          if (iter.tensor(0).is_contiguous()) {
-            auto output_offset_calculator = TrivialOffsetCalculator<1>();
-            launch_vectorized_kernel<false>(
-                numel,
-                f,
-                data,
-                input_offset_calculator,
-                output_offset_calculator,
-                vec_size);
-          } else {
-            auto output_offset_calculator =
-                make_output_offset_calculator<1, singed_strides>(iter);
-            launch_vectorized_kernel<false>(
-                numel,
-                f,
-                data,
-                input_offset_calculator,
-                output_offset_calculator,
-                vec_size);
-          }
-          return;
-        } else if (
-            can_use_unroll_load_vec_store(iter, f, data, vec_size) &&
-            !singed_strides) {
-          auto output_offset_calculator = TrivialOffsetCalculator<1>();
-          launch_vectorized_kernel<true>(
-              numel,
-              f,
-              data,
-              input_offset_calculator,
-              output_offset_calculator,
-              vec_size);
+        int vec_size;
+        if (can_use_broadcast_vectorize<func_t>(iter, data, vec_size) &&
+            !signed_strides) {
+          auto input_offset_calculator =
+              make_input_offset_calculator<traits::arity, signed_strides>(iter);
+          launch_vectorized_kernel(
+              numel, f, data, input_offset_calculator, vec_size);
           return;
         }
       }
       auto offset_calc =
-          make_offset_calculator<traits::arity + 1, singed_strides>(iter);
+          make_offset_calculator<traits::arity + 1, signed_strides>(iter);
       constexpr int unroll_factor = 16 / sizeof(arg0_t);
       launch_legacy_kernel<unroll_factor>(numel, [=](int idx) {
         auto offsets = offset_calc.get(idx);
@@ -595,7 +517,7 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
         dtypes[i] = iter.dtype(i);                                             \
       }                                                                        \
       auto offset_calc =                                                       \
-          make_offset_calculator<traits::arity + 1, singed_strides>(iter);     \
+          make_offset_calculator<traits::arity + 1, signed_strides>(iter);     \
       launch_legacy_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(numel, [=](int idx) {  \
         auto offsets = offset_calc.get(idx);                                   \
         void* out = data[0] + offsets[0];                                      \
@@ -623,7 +545,7 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
   }
 }
 
-template <typename func_t, bool singed_strides = false>
+template <typename func_t, bool signed_strides = false>
 void dpcpp_kernel_for_tensor_iter(TensorIteratorBase& iter, const func_t& f) {
   for (int arg = 0; arg < iter.ntensors(); arg++) {
     TORCH_INTERNAL_ASSERT(
@@ -640,15 +562,15 @@ void dpcpp_kernel_for_tensor_iter(TensorIteratorBase& iter, const func_t& f) {
 
   if (!iter.can_use_32bit_indexing()) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
-      dpcpp_kernel_for_tensor_iter<func_t, singed_strides>(sub_iter, f);
+      dpcpp_kernel_for_tensor_iter<func_t, signed_strides>(sub_iter, f);
     }
     return;
   }
 
-  dpcpp_loops_kernel<func_t, singed_strides, false>(iter, f);
+  dpcpp_loops_kernel<func_t, signed_strides, false>(iter, f);
 }
 
-template <typename func_t, bool singed_strides = false>
+template <typename func_t, bool signed_strides = false>
 void dpcpp_fast_mode_kernel_for_tensor_iter(
     TensorIteratorBase& iter,
     const func_t& f) {
@@ -667,13 +589,13 @@ void dpcpp_fast_mode_kernel_for_tensor_iter(
 
   if (!iter.can_use_32bit_indexing()) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
-      dpcpp_fast_mode_kernel_for_tensor_iter<func_t, singed_strides>(
+      dpcpp_fast_mode_kernel_for_tensor_iter<func_t, signed_strides>(
           sub_iter, f);
     }
     return;
   }
 
-  dpcpp_loops_kernel<func_t, singed_strides, true>(iter, f);
+  dpcpp_loops_kernel<func_t, signed_strides, true>(iter, f);
 }
 
 template <typename arg1_t, typename arg2_t, typename return_t, typename func_t>

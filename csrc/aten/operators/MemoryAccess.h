@@ -63,12 +63,13 @@ struct vectorized_load_helper {
       policy_t& self,
       args_t* args,
       offset_t offset,
-      int num_outputs) {
+      int args_vec_base) {
     using arg_t = std::tuple_element_t<arg_index, args_t>;
-    auto ptr = reinterpret_cast<arg_t*>(self.data[arg_index + num_outputs]) +
-        offset[arg_index];
-    auto args_accessor = [&args](int thread_unroll_idx) -> arg_t& {
-      return std::get<arg_index>(args[thread_unroll_idx]);
+    auto ptr =
+        reinterpret_cast<arg_t*>(self.data[arg_index + 1]) + offset[arg_index];
+    auto args_accessor = [&args,
+                          args_vec_base](int thread_unroll_idx) -> arg_t& {
+      return std::get<arg_index>(args[args_vec_base + thread_unroll_idx]);
     };
     self.load_single_arg(args_accessor, ptr);
   }
@@ -286,12 +287,35 @@ struct alignas(sizeof(scalar_t) * vec_size) aligned_vector_loop {
   }
 };
 
+template <int vec_size, typename scalar_t>
+inline aligned_vector_loop<scalar_t, vec_size> load_vector(
+    const scalar_t* base_ptr,
+    uint32_t offset) {
+  using vec_t = aligned_vector_loop<scalar_t, vec_size>;
+  auto* from = reinterpret_cast<const vec_t*>(base_ptr);
+  return from[offset];
+}
+
+template <int vec_size>
+inline aligned_vector_loop<bool, vec_size> load_vector(
+    const bool* base_ptr,
+    uint32_t offset) {
+  // See NOTE [Loading boolean values]
+  auto tmp =
+      load_vector<vec_size>(reinterpret_cast<const uint8_t*>(base_ptr), offset);
+  aligned_vector_loop<bool, vec_size> ret;
+  for (int i = 0; i < vec_size; ++i) {
+    ret.val[i] = bool(tmp.val[i]);
+  }
+  return ret;
+}
+
 namespace policies {
 
 // Assumption:
 // all tensors are contiguous, that is: stride == sizeof(type) for all tensors
 template <
-    int vec_size,
+    int ITEM_WORK_SIZE,
     typename data_t,
     typename inp_calc_t,
     typename out_calc_t,
@@ -306,6 +330,9 @@ struct unroll {
   loader_t loader;
   storer_t storer;
   int thread_idx;
+  int group_idx;
+  int group_items;
+  int group_work_size;
 
   unroll(
       data_t data,
@@ -314,44 +341,53 @@ struct unroll {
       out_calc_t oc,
       loader_t l,
       storer_t s,
-      int thread_idx)
+      int thread_idx,
+      int group_idx,
+      int group_items)
       : data(data),
         remaining(remaining),
         input_offset_calculator(ic),
         output_offset_calculator(oc),
         loader(l),
         storer(s),
-        thread_idx(thread_idx) {}
+        thread_idx(thread_idx),
+        group_idx(group_idx),
+        group_items(group_items),
+        group_work_size(ITEM_WORK_SIZE * group_items) {}
 
   inline bool check_inbounds(int thread_work_elem) const {
-    return (thread_work_elem < remaining);
+    return (thread_idx + thread_work_elem * group_items < remaining);
   }
 
   template <typename args_t>
   inline void load(args_t* args) {
     constexpr int arity = std::tuple_size<args_t>::value;
+    int thread_idx_ = thread_idx;
 #pragma unroll
-    for (int i = 0; i < vec_size; i++) {
-      if (i >= remaining) {
+    for (int i = 0; i < ITEM_WORK_SIZE; i++) {
+      if (thread_idx_ >= remaining) {
         return;
       }
-      int linear_idx = thread_idx * vec_size + i;
+      int linear_idx = thread_idx_ + group_work_size * group_idx;
       auto offset = input_offset_calculator.get(linear_idx);
       detail::static_unroll<detail::unroll_load_helper, arity>::with_args(
           *this, args, offset, loader, i, num_outputs);
+      thread_idx_ += group_items;
     }
   }
 
   template <typename scalar_t>
   inline void store(scalar_t* from) {
+    int thread_idx_ = thread_idx;
 #pragma unroll
-    for (int i = 0; i < vec_size; i++) {
-      if (i >= remaining) {
+    for (int i = 0; i < ITEM_WORK_SIZE; i++) {
+      if (thread_idx_ >= remaining) {
         return;
       }
-      int linear_idx = thread_idx * vec_size + i;
+      int linear_idx = thread_idx_ + group_work_size * group_idx;
       int offset = output_offset_calculator.get(linear_idx)[0];
       storer.store(from[i], data[0], offset);
+      thread_idx_ += group_items;
     }
   }
 };
@@ -364,28 +400,35 @@ struct unroll {
 // caller manually.
 // all tensors are contiguous, that is: stride == sizeof(type) for all tensors
 template <
+    int ITEM_WORK_SIZE,
     int vec_size,
     typename data_t,
-    typename input_offset_calc,
-    typename output_offset_calc,
-    int num_outputs = 1>
+    typename inp_calc_t>
 struct vectorized {
+  static_assert(
+      ITEM_WORK_SIZE % vec_size == 0,
+      "The workload per thread must be a multiple of vec_size");
+  static constexpr int loop_size = ITEM_WORK_SIZE / vec_size;
+
   data_t data;
-  input_offset_calc& input_offset_calculator;
-  output_offset_calc& output_offset_calculator;
+  inp_calc_t input_offset_calculator;
   int thread_idx;
-  int vec_idx;
+  int group_idx;
+  int group_items;
+  int group_work_size;
 
   vectorized(
       data_t data,
-      input_offset_calc& ic,
-      output_offset_calc& oc,
-      int thread_idx)
+      inp_calc_t ic,
+      int thread_idx,
+      int group_idx,
+      int group_items)
       : data(data),
         input_offset_calculator(ic),
-        output_offset_calculator(oc),
         thread_idx(thread_idx),
-        vec_idx(thread_idx * vec_size) {}
+        group_idx(group_idx),
+        group_items(group_items),
+        group_work_size(ITEM_WORK_SIZE * group_items) {}
 
   inline constexpr bool check_inbounds(int thread_work_elem) const {
     return true;
@@ -393,92 +436,43 @@ struct vectorized {
 
   template <typename accessor_t, typename scalar_t>
   inline void load_single_arg(accessor_t to, scalar_t* from) {
-    using vec_t = aligned_vector_loop<scalar_t, vec_size>;
-    vec_t v = reinterpret_cast<vec_t*>(from)[0];
+    auto v = load_vector<vec_size>(from, 0);
 #pragma unroll
-    for (int i = 0; i < vec_size; i++) {
-      to(i) = v.val[i];
+    for (int j = 0; j < vec_size; j++) {
+      to(j) = v.val[j];
     }
   }
 
   template <typename args_t>
   inline void load(args_t* args) {
     constexpr int arity = std::tuple_size<args_t>::value;
-    auto offset = input_offset_calculator.get(vec_idx);
-    detail::static_unroll<detail::vectorized_load_helper, arity>::with_args(
-        *this, args, offset, num_outputs);
-  }
-
-  template <typename scalar_t>
-  inline void store(scalar_t* from) {
-    using vec_t = aligned_vector_loop<scalar_t, vec_size>;
-    auto offset = output_offset_calculator.get(vec_idx);
-    auto ptr = reinterpret_cast<scalar_t*>(data[0]) + offset[0];
-    vec_t* to = reinterpret_cast<vec_t*>(ptr);
-    vec_t v;
+    int group_offset = group_work_size * group_idx;
 #pragma unroll
-    for (int j = 0; j < vec_size; j++) {
-      v.val[j] = from[j];
-    }
-    *to = v;
-  }
-};
-
-template <
-    int vec_size,
-    typename data_t,
-    typename input_offset_calc,
-    typename output_offset_calc,
-    typename loader_t,
-    int num_outputs = 1>
-struct unroll_load_vec_store {
-  data_t data;
-  input_offset_calc& input_offset_calculator;
-  output_offset_calc& output_offset_calculator;
-  loader_t& loader;
-  int thread_idx;
-  int vec_idx;
-
-  unroll_load_vec_store(
-      data_t data,
-      input_offset_calc& ic,
-      output_offset_calc& oc,
-      loader_t& l,
-      int thread_idx)
-      : data(data),
-        input_offset_calculator(ic),
-        output_offset_calculator(oc),
-        loader(l),
-        thread_idx(thread_idx),
-        vec_idx(thread_idx * vec_size) {}
-
-  inline constexpr bool check_inbounds(int thread_work_elem) const {
-    return true;
-  }
-
-  template <typename args_t>
-  inline void load(args_t* args) {
-    constexpr int arity = std::tuple_size<args_t>::value;
-#pragma unroll
-    for (int i = 0; i < vec_size; i++) {
-      auto offset = input_offset_calculator.get(vec_idx + i);
-      detail::static_unroll<detail::unroll_load_helper, arity>::with_args(
-          *this, args, offset, loader, i, num_outputs);
+    for (int i = 0; i < loop_size; i++) {
+      auto linear_idx =
+          group_offset + (thread_idx + i * group_items) * vec_size;
+      auto offset = input_offset_calculator.get(linear_idx);
+      detail::static_unroll<detail::vectorized_load_helper, arity>::with_args(
+          *this, args, offset, vec_size * i);
     }
   }
 
   template <typename scalar_t>
   inline void store(scalar_t* from) {
     using vec_t = aligned_vector_loop<scalar_t, vec_size>;
-    auto offset = output_offset_calculator.get(vec_idx);
-    auto ptr = reinterpret_cast<scalar_t*>(data[0]) + offset[0];
-    vec_t* to = reinterpret_cast<vec_t*>(ptr);
-    vec_t v;
+    scalar_t* to =
+        reinterpret_cast<scalar_t*>(data[0]) + group_work_size * group_idx;
+    vec_t* to_ = reinterpret_cast<vec_t*>(to);
 #pragma unroll
-    for (int j = 0; j < vec_size; j++) {
-      v.val[j] = from[j];
+    for (int i = 0; i < loop_size; i++) {
+      int index = thread_idx + i * group_items;
+      vec_t v;
+#pragma unroll
+      for (int j = 0; j < vec_size; j++) {
+        v.val[j] = from[vec_size * i + j];
+      }
+      to_[index] = v;
     }
-    *to = v;
   }
 };
 
