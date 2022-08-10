@@ -1301,7 +1301,13 @@ inline void dpcpp_reduce_kernel(
     auto allocator = getDeviceAllocator();
     buffer = allocator->allocate(config.global_memory_size());
     semaphores = allocator->allocate(config.semaphore_size());
-    dpcppMemset(semaphores.get(), 0, config.semaphore_size());
+    at::detail::Array<char*, 1> data;
+    data[0] = (char*)semaphores.get();
+    auto fn = []() -> char { return 0; };
+    int vec_size = at::native::Memory::can_vectorize_up_to_loop<decltype(fn)>(
+        getDeviceIdOfCurrentQueue(), data);
+    auto ic = TrivialOffsetCalculator<traits::arity>();
+    launch_vectorized_kernel(config.semaphore_size(), fn, data, ic, vec_size);
   }
 
   AT_ASSERT(can_use_32bit_indexing);
