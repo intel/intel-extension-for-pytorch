@@ -21,10 +21,6 @@ def queue_get_exception(inqueue, outqueue):
 @pytest.mark.skipif(TEST_WITH_TSAN, reason="TSAN is not fork-safe since we're forking in a multi-threaded environment")
 class TestTorchMethod(TestCase):
 
-    def tearDown(self):
-        # Temporarily missing a function that keep tests isolated from each-other. 
-        pass
-
     @pytest.mark.skipif(IS_WINDOWS, reason='not applicable to Windows (only fails with fork)')
     def test_xpu_bad_call(self):
         # Initialize XPU
@@ -36,20 +32,6 @@ class TestTorchMethod(TestCase):
         inq.put(t)
         p.join()
         self.assertIsInstance(outq.get(), RuntimeError)
-
-    @pytest.mark.skip(reason='tearDown is not available, so only test bad fork case.')
-    @pytest.mark.skipif(IS_WINDOWS, reason='not applicable to Windows (only fails with fork)')
-    def test_good_xpu_fork(self):
-        size = 2
-        processes = []
-        for _ in range(size):
-            q = mp.Queue()
-            p = mp.Process(target=queue_get_exception, args=(None, q))
-            processes.append((q, p))
-            p.start()
-        for q, p in processes:
-            p.join()
-            self.assertEqual(q.get(), 'no exception')
 
     @pytest.mark.skipif(IS_WINDOWS, reason='not applicable to Windows (only fails with fork)')
     def test_wrong_xpu_fork(self):
