@@ -383,70 +383,18 @@ class ComplexFloatStorage(_XPULegacyStorage):
 del _LegacyStorage
 del _XPULegacyStorage
 
-# class _UntypedStorage(intel_extension_for_pytorch._C.ByteStorageBase, _StorageBase):
-#     @classmethod
-#     def from_buffer(cls, *args, **kwargs):
-#         raise RuntimeError('from_buffer: Not available for XPU storage')
-#
-#     @classmethod
-#     def _new_with_weak_ptr(cls, *args, **kwargs):
-#         raise RuntimeError('_new_with_weak_ptr: Not available for XPU storage')
-#
-#     @classmethod
-#     def _new_shared_filename(cls, manager, obj, size, *, device=None, dtype=None):
-#         raise RuntimeError('_new_shared_filename: Not available for XPU storage')
-#
-#
-# class ByteStorage(_LegacyStorage):
-#     @classproperty
-#     def dtype(self):
-#         return torch.uint8
-
-# class ShortStorage(intel_extension_for_pytorch._C.ShortStorageBase, _StorageBase):
-#     pass
-#
-#
-# class CharStorage(intel_extension_for_pytorch._C.CharStorageBase, _StorageBase):
-#     pass
-#
-#
-# class IntStorage(intel_extension_for_pytorch._C.IntStorageBase, _StorageBase):
-#     pass
-#
-#
-# class LongStorage(intel_extension_for_pytorch._C.LongStorageBase, _StorageBase):
-#     pass
-#
-#
-# class BoolStorage(intel_extension_for_pytorch._C.BoolStorageBase, _StorageBase):
-#     pass
-#
-#
-# class HalfStorage(intel_extension_for_pytorch._C.HalfStorageBase, _StorageBase):
-#     pass
-#
-#
-# class DoubleStorage(intel_extension_for_pytorch._C.DoubleStorageBase, _StorageBase):
-#     pass
-#
-#
-# class FloatStorage(intel_extension_for_pytorch._C.FloatStorageBase, _StorageBase):
-#     pass
-#
-#
-# class BFloat16Storage(intel_extension_for_pytorch._C.BFloat16StorageBase, _StorageBase):
-#     pass
-#
-#
-# torch._storage_classes.add(ShortStorage)
-# torch._storage_classes.add(CharStorage)
-# torch._storage_classes.add(IntStorage)
-# torch._storage_classes.add(LongStorage)
-# torch._storage_classes.add(BoolStorage)
-# torch._storage_classes.add(HalfStorage)
-# torch._storage_classes.add(DoubleStorage)
-# torch._storage_classes.add(FloatStorage)
-# torch._storage_classes.add(BFloat16Storage)
+torch._storage_classes.add(DoubleStorage)
+torch._storage_classes.add(FloatStorage)
+torch._storage_classes.add(LongStorage)
+torch._storage_classes.add(IntStorage)
+torch._storage_classes.add(ShortStorage)
+torch._storage_classes.add(CharStorage)
+torch._storage_classes.add(ByteStorage)
+torch._storage_classes.add(HalfStorage)
+torch._storage_classes.add(BoolStorage)
+torch._storage_classes.add(BFloat16Storage)
+torch._storage_classes.add(ComplexDoubleStorage)
+torch._storage_classes.add(ComplexFloatStorage)
 intel_extension_for_pytorch._C._initExtension()
 
 
