@@ -66,7 +66,7 @@ inline Tensor& _all(Tensor& result, TensorIterator& iter) {
   return result;
 }
 
-Tensor& all_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
+Tensor& all_out(const Tensor& self, int64_t dim, bool keepdim, Tensor& result) {
   check_result_is_bytebool("all", self, result);
   dim = maybe_wrap_dim(dim, self.dim());
   if (_dimreduce_return_trivial(result, self, 1, dim, keepdim)) {
@@ -85,7 +85,7 @@ Tensor& all_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
 }
 
 // Implementation of all.all_out
-Tensor& all_out(at::Tensor& out, const at::Tensor& self) {
+Tensor& all_out(const at::Tensor& self, at::Tensor& out) {
   check_result_is_bytebool("all_out", self, out);
   if (self.numel() == 0) {
     out.fill_(1);
@@ -120,7 +120,7 @@ inline Tensor& _any(Tensor& result, TensorIterator& iter) {
   return result;
 }
 
-Tensor& any_out(at::Tensor& out, const at::Tensor& self) {
+Tensor& any_out(const at::Tensor& self, at::Tensor& out) {
   check_result_is_bytebool("any_out", self, out);
   if (self.numel() == 0) {
     out.fill_(0);

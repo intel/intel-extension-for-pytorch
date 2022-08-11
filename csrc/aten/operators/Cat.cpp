@@ -365,7 +365,7 @@ static void cat(
 
 } // namespace impl
 
-Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
+Tensor& cat_out(TensorList tensors, int64_t dim, Tensor& out) {
   // Inputs cannot alias the output tensor
   for (const auto i : c10::irange(tensors.size())) {
     auto lap = at::get_overlap_status(out, tensors[i]);
@@ -405,7 +405,7 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
 Tensor _cat(TensorList tensors, int64_t dim) {
   auto high_type = at::native::result_type(tensors);
   auto out = at::empty({0}, tensors[0].options().dtype(high_type));
-  return at::AtenIpexTypeXPU::_cat_out(out, tensors, dim);
+  return at::AtenIpexTypeXPU::cat_out(tensors, dim, out);
 }
 
 } // namespace AtenIpexTypeXPU

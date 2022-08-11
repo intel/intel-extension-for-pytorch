@@ -416,14 +416,14 @@ Tensor avg_pool2d_backward(
 namespace AtenIpexTypeQuantizedXPU {
 
 Tensor& avg_pool2d_out(
-    Tensor& output,
     const Tensor& input,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
     bool ceil_mode,
     bool count_include_pad,
-    c10::optional<int64_t> divisor_override) {
+    c10::optional<int64_t> divisor_override,
+    Tensor& output) {
   TORCH_CHECK(
       !divisor_override.has_value(),
       "dpcpp_avg_pool2d operator does not support divisor");
