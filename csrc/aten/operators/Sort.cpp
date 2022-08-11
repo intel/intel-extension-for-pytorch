@@ -41,12 +41,12 @@ std::tuple<Tensor, Tensor> sort(
 }
 
 std::tuple<Tensor&, Tensor&> sort_out(
-    Tensor& values,
-    Tensor& indices,
     const Tensor& self,
     c10::optional<bool> stable,
     int64_t dim,
-    bool descending) {
+    bool descending,
+    Tensor& values,
+    Tensor& indices) {
   return sort_out_stable(self, stable, dim, descending, values, indices);
 }
 

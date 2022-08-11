@@ -12,11 +12,10 @@ namespace dpcpp {
 /// Device Allocator
 class DeviceAllocator final : public at::Allocator {
  public:
+  DeviceAllocator() {}
+
   // Singleton
-  static DeviceAllocator* Instance() {
-    static DeviceAllocator myInstance;
-    return &myInstance;
-  }
+  static DeviceAllocator* Instance();
 
   static void deleter(void* ptr) {
     auto* ctx = static_cast<at::AtenIpexTypeXPU::DPCPPTensorContext*>(ptr);
@@ -93,7 +92,6 @@ class DeviceAllocator final : public at::Allocator {
   }
 
  private:
-  DeviceAllocator() {}
 
   Queue* DPCPPStreamToQueue(DPCPPStream stream) const {
     auto di = stream.device_index();
@@ -113,6 +111,14 @@ class DeviceAllocator final : public at::Allocator {
     return CachingDeviceAllocator::Instance();
   }
 };
+
+static DeviceAllocator myInstance;
+
+REGISTER_ALLOCATOR(kXPU, &myInstance);
+
+DeviceAllocator* DeviceAllocator::Instance(){
+  return &myInstance;
+}
 
 at::Allocator* getDeviceAllocator() {
   return DeviceAllocator::Instance();

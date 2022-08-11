@@ -361,7 +361,7 @@ Tensor upsample_nearest2d(
 
 Tensor upsample_nearest2d(
     const Tensor& input,
-    c10::optional<IntArrayRef> output_size,
+    OptionalIntArrayRef output_size,
     c10::optional<ArrayRef<double>> scale_factors) {
   Tensor output = at::_empty_affine_quantized(
       input.sizes(),
