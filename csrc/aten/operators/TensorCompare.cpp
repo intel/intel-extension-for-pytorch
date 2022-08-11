@@ -139,7 +139,8 @@ Tensor& isneginf_out(const Tensor& self, Tensor& out) {
   if (c10::isIntegralType(self.scalar_type(), /*includeBool=*/true)) {
     out.fill_(false);
   } else {
-    auto iter = TensorIterator::unary_op(out, self);
+    TensorIterator iter;
+    iter.build_borrowing_unary_force_boolean_op(out, self);
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
@@ -162,7 +163,8 @@ Tensor& isposinf_out(const Tensor& self, Tensor& out) {
   if (c10::isIntegralType(self.scalar_type(), /*includeBool=*/true)) {
     out.fill_(false);
   } else {
-    auto iter = TensorIterator::unary_op(out, self);
+    TensorIterator iter;
+    iter.build_borrowing_unary_force_boolean_op(out, self);
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,

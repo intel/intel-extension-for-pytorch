@@ -12,7 +12,7 @@ supported:
   - _amp_update_scale_
   - _assert_async
 #  - _cat
-#  - _cat.out
+  - cat.out
 #  - _cdist_backward
 #  - _cdist_forward
   - _compute_linear_combination
@@ -635,7 +635,7 @@ supported:
 #  - upsample_nearest1d_backward.grad_input
 #  - upsample_nearest1d_backward.vec
 #  - upsample_nearest2d
-#  - upsample_nearest2d.out
+  - upsample_nearest2d.out
 #  - upsample_nearest2d.vec
 #  - upsample_nearest2d_backward
 #  - upsample_nearest2d_backward.grad_input
