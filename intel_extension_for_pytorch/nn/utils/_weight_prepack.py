@@ -5,6 +5,7 @@ import copy
 import logging
 
 from intel_extension_for_pytorch import optim, frontend
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import _using_dnnl
 
 logger = logging.getLogger(__name__)
 
@@ -302,7 +303,7 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
             if weight not in params_attr:
                 params_attr[weight] = {}
             if type(m) is torch.nn.Linear:
-                if m.weight.dtype == torch.float32 and optimizer is None and frontend.get_fp32_math_mode(device="cpu") == frontend.FP32MathMode.FP32:
+                if m.weight.dtype == torch.float32 and optimizer is None and frontend.get_fp32_math_mode(device="cpu") == frontend.FP32MathMode.FP32 and not _using_dnnl():
                     new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = False)
                 else:
                     new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = True)

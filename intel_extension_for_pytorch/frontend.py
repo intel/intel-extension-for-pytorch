@@ -241,7 +241,7 @@ def optimize(
     if fuse_update_step is not None:
         opt_properties.fuse_update_step = fuse_update_step
     if auto_kernel_selection is not None:
-        opt_properties.auto_kernel_selection = auto_kernel_selection        
+        opt_properties.auto_kernel_selection = auto_kernel_selection
 
     if inplace:
         optimized_model = model
