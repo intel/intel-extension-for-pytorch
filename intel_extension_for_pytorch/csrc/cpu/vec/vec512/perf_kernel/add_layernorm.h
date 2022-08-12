@@ -21,32 +21,33 @@ std::pair<float, float> _add_and_compute_mean_var(
     float* out) {
   // compute add and mean/var of the value after add
   // we should firstly store add value
-  auto vec_a = _load_f32_data(a_ptr);
-  auto vec_b = _load_f32_data(b_ptr);
+  auto vec_a = _loadu(a_ptr);
+  auto vec_b = _loadu(b_ptr);
   auto vec_add = _mm512_add_ps(vec_a, vec_b);
   auto vec_acc_mean = vec_add;
   auto vec_acc_pow = _mm512_mul_ps(vec_add, vec_add);
-  _mm512_store_ps(out, vec_add);
+  _mm512_storeu_ps(out, vec_add);
 
   int i = 16;
   for (; i <= size - 16; i += 16) {
-    vec_a = _load_f32_data(a_ptr + i);
-    vec_b = _load_f32_data(b_ptr + i);
+    vec_a = _loadu(a_ptr + i);
+    vec_b = _loadu(b_ptr + i);
     vec_add = _mm512_add_ps(vec_a, vec_b);
     vec_acc_mean = _mm512_add_ps(vec_add, vec_acc_mean);
-    _mm512_store_ps(out + i, vec_add);
+    _mm512_storeu_ps(out + i, vec_add);
     vec_acc_pow = _mm512_fmadd_ps(vec_add, vec_add, vec_acc_pow);
   }
 
   if (i < size) {
     __mmask16 mask = (1 << (size - i)) - 1;
-    vec_a = _maskz_load_f32_data(a_ptr + i, mask);
-    vec_b = _maskz_load_f32_data(b_ptr + i, mask);
+    vec_a = _maskz_loadu(a_ptr + i, mask);
+    vec_b = _maskz_loadu(b_ptr + i, mask);
     vec_add = _mm512_add_ps(vec_a, vec_b);
     auto vec_zero = _mm512_set1_ps(0);
-    _mm512_mask_store_ps(out + i, mask, vec_add);
-    vec_acc_mean = _mm512_maskz_add_ps(mask, vec_add, vec_acc_mean);
-    vec_acc_pow = _mm512_maskz_fmadd_ps(mask, vec_add, vec_add, vec_acc_pow);
+
+    vec_acc_mean = _mm512_add_ps(vec_add, vec_acc_mean);
+    _mm512_mask_storeu_ps(out + i, mask, vec_add);
+    vec_acc_pow = _mm512_fmadd_ps(vec_add, vec_add, vec_acc_pow);
   }
   float mean_var = _mm512_reduce_add_ps(vec_acc_mean) / float(size);
   float var_val = _mm512_reduce_add_ps(vec_acc_pow);
@@ -68,35 +69,35 @@ void _normalize_kernel(
   auto vec_bias = _mm512_set1_ps(bias);
   int i = 0;
   for (; i <= size - 16; i += 16) {
-    auto vec_input = _load_f32_data(input_ptr + i);
+    auto vec_input = _loadu(input_ptr + i);
     auto vec_gamma = vec_one;
     auto vec_beta = vec_zero;
     if (gamma_ptr) {
-      vec_gamma = _load_f32_data(gamma_ptr + i);
+      vec_gamma = _loadu(gamma_ptr + i);
     }
     if (beta_ptr) {
-      vec_beta = _load_f32_data(beta_ptr + i);
+      vec_beta = _loadu(beta_ptr + i);
     }
     //(a_ptr[i] * scale + bias) * gamma + beta;
     auto vec_norm = _mm512_fmadd_ps(vec_input, vec_scale, vec_bias);
     auto vec_res = _mm512_fmadd_ps(vec_norm, vec_gamma, vec_beta);
-    _store_data(out_ptr + i, vec_res);
+    _storeu(out_ptr + i, vec_res);
   }
   if (i < size) {
     __mmask16 mask = (1 << (size - i)) - 1;
-    auto vec_input = _maskz_load_f32_data(input_ptr + i, mask);
+    auto vec_input = _maskz_loadu(input_ptr + i, mask);
     auto vec_gamma = vec_one;
     auto vec_beta = vec_zero;
-    if (!gamma_ptr) {
-      vec_gamma = _maskz_load_f32_data(gamma_ptr + i, mask);
+    if (gamma_ptr) {
+      vec_gamma = _maskz_loadu(gamma_ptr + i, mask);
     }
-    if (!beta_ptr) {
-      vec_beta = _maskz_load_f32_data(beta_ptr + i, mask);
+    if (beta_ptr) {
+      vec_beta = _maskz_loadu(beta_ptr + i, mask);
     }
     //(a_ptr[i] * scale + bias) * gamma + beta;
-    auto vec_norm = _mm512_maskz_fmadd_ps(mask, vec_input, vec_scale, vec_bias);
-    auto vec_res = _mm512_maskz_fmadd_ps(mask, vec_norm, vec_gamma, vec_beta);
-    _mask_store_data(out_ptr + i, vec_res, mask);
+    auto vec_norm = _mm512_fmadd_ps(vec_input, vec_scale, vec_bias);
+    auto vec_res = _mm512_fmadd_ps(vec_norm, vec_gamma, vec_beta);
+    _mask_storeu(out_ptr + i, vec_res, mask);
   }
 }
 

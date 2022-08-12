@@ -209,22 +209,37 @@ void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
   rewriter_aten.runOnGraph(graph);
 }
 
-void FuseMatmulDiv(std::shared_ptr<Graph>& graph) {
+void FuseMatmulDivOrMul(std::shared_ptr<Graph>& graph) {
   const std::string div_str = R"(div)";
   const std::string div_inplace_str = R"(div_)";
   std::vector<std::string> div_ops = {div_str, div_inplace_str};
+  const std::string mul_str = R"(mul)";
+  const std::string mul_inplace_str = R"(mul_)";
+  std::vector<std::string> mul_ops = {mul_str, mul_inplace_str};
 
-  auto aten_pattern = at::jit::CodeTemplate(R"(
+  auto aten_div_pattern = at::jit::CodeTemplate(R"(
       graph(%x, %y, %z):
         %mm_res = aten::matmul(%x, %y)
         %div_res = aten::${div_op}(%mm_res, %z)
         return (%div_res) )");
 
-  auto aten_pattern_with_out = at::jit::CodeTemplate(R"(
+  auto aten_div_pattern_with_out = at::jit::CodeTemplate(R"(
       graph(%x, %y, %z, %out):
         %mm_res = aten::matmul(%x, %y, %out)
         %div_res = aten::${div_op}(%mm_res, %z)
         return (%div_res) )");
+
+  auto aten_mul_pattern = at::jit::CodeTemplate(R"(
+      graph(%x, %y, %z):
+        %mm_res = aten::matmul(%x, %y)
+        %mul_res = aten::${mul_op}(%mm_res, %z)
+        return (%mul_res) )");
+
+  auto aten_mul_pattern_with_out = at::jit::CodeTemplate(R"(
+      graph(%x, %y, %z, %out):
+        %mm_res = aten::matmul(%x, %y, %out)
+        %mul_res = aten::${mul_op}(%mm_res, %z)
+        return (%mul_res) )");
 
   std::string fused_matmul_div = R"(
       graph(%x, %y, %z):
@@ -234,14 +249,38 @@ void FuseMatmulDiv(std::shared_ptr<Graph>& graph) {
       graph(%x, %y, %z, %out):
         %r = ipex::matmul_div(%x, %y, %out, %z)
         return (%r) )";
+  std::string fused_matmul_mul = R"(
+      graph(%x, %y, %z):
+        %ones : float = prim::Constant[value=1.0]()
+        %z_ = aten::div(%ones, %z)
+        %r = ipex::matmul_div(%x, %y, %z_)
+        return (%r) )";
+  std::string fused_matmul_mul_with_out = R"(
+      graph(%x, %y, %z, %out):
+        %ones : float = prim::Constant[value=1.0]()
+        %z_ = aten::div(%ones, %z)
+        %r = ipex::matmul_div(%x, %y, %out, %z_)
+        return (%r) )";
   for (auto const& it : div_ops) {
     at::jit::TemplateEnv env;
     env.s("div_op", it);
 
     SubgraphRewriter rewriter;
-    rewriter.RegisterRewritePattern(aten_pattern.format(env), fused_matmul_div);
     rewriter.RegisterRewritePattern(
-        aten_pattern_with_out.format(env), fused_matmul_div_with_out);
+        aten_div_pattern.format(env), fused_matmul_div);
+    rewriter.RegisterRewritePattern(
+        aten_div_pattern_with_out.format(env), fused_matmul_div_with_out);
+    rewriter.runOnGraph(graph);
+  }
+  for (auto const& it : mul_ops) {
+    at::jit::TemplateEnv env;
+    env.s("mul_op", it);
+
+    SubgraphRewriter rewriter;
+    rewriter.RegisterRewritePattern(
+        aten_mul_pattern.format(env), fused_matmul_mul);
+    rewriter.RegisterRewritePattern(
+        aten_mul_pattern_with_out.format(env), fused_matmul_mul_with_out);
     rewriter.runOnGraph(graph);
   }
 }
@@ -261,7 +300,7 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
       graph(%qk: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %fill:float, %softmax_dim:int, %dtype): )";
 
   std::string args_div_matmul_expand_maskedfill_softmax = R"(
-      graph(%q: Tensor, %k: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %transpose_dim_a:int, %transpose_dim_b:int, %fill:float, %dim_per_head:float, %softmax_dim:int, %dtype): )";
+      graph(%q: Tensor, %k: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %fill:float, %dim_per_head:float, %softmax_dim:int, %dtype): )";
 
   std::string div_matmul_add = R"(
         %_q = aten::div(%q, %dim_per_head)
@@ -275,8 +314,7 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
 
   std::string div_transpose_matmul = R"(
         %_q = aten::div(%q, %dim_per_head)
-        %_k = aten::transpose(%k, %transpose_dim_a, %transpose_dim_b)
-        %qk = aten::matmul(%_q, %_k) )";
+        %qk = aten::matmul(%_q, %k) )";
 
   std::string expand = R"(
         %_mask_qk_view = aten::view(%mask_qk, %mask_qk_reshp)
@@ -323,8 +361,8 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
         return (%scores) )";
 
   std::string div_matmul_maskedfill_softmax_fusion = R"(
-      graph(%q: Tensor, %k: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %transpose_dim_a:int, %transpose_dim_b:int, %fill:float, %dim_per_head:float, %softmax_dim:int, %dtype):
-        %scores = ipex::distil_mha_scores_calc(%q, %k, %mask_qk, %mask_qk_reshp, %transpose_dim_a, %transpose_dim_b, %fill, %dim_per_head)
+      graph(%q: Tensor, %k: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %fill:float, %dim_per_head:float, %softmax_dim:int, %dtype):
+        %scores = ipex::distil_mha_scores_calc(%q, %k, %mask_qk, %mask_qk_reshp, %fill, %dim_per_head)
         return (%scores) )";
 
   std::string expand_maskedfill_softmax_fusion = R"(
@@ -375,14 +413,6 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
         // Only support qk.dim >=2D
         bool not_one_dim = qk_value->dim().value() >= 2;
         if (!not_one_dim) {
-          return false;
-        }
-
-        // Only support 64byte aligned
-        auto qk_tensor = *qk_value;
-        bool aligned_64_bytes =
-            qk_tensor.sizes()[qk_value->dim().value() - 1].value() % 16 == 0;
-        if (!aligned_64_bytes) {
           return false;
         }
 

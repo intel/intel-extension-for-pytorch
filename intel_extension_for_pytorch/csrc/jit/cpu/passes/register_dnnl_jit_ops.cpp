@@ -913,21 +913,17 @@ torch::jit::RegisterOperators op({
 
     Operator(
         "ipex::distil_mha_scores_calc(Tensor q, Tensor k, Tensor mask_qk, "
-        "int[] mask_qk_reshp, int transpose_dim_a, int transpose_dim_b, "
-        "Scalar fill, Scalar dim_per_head) "
+        "int[] mask_qk_reshp, Scalar fill, Scalar dim_per_head) "
         "-> Tensor",
         [](Stack& stack) {
           auto result = dil_distil_mha_scores_calc(
-              peek(stack, 0, 8).toTensor(),
-              peek(stack, 1, 8).toTensor(),
-              peek(stack, 2, 8).toTensor(),
-              peek(stack, 3, 8).toIntVector(),
-              peek(stack, 4, 8).toInt(),
-              peek(stack, 5, 8).toInt(),
-              peek(stack, 6, 8).toScalar(),
-              peek(stack, 7, 8).toScalar());
-          drop(stack, 8);
-
+              peek(stack, 0, 6).toTensor(),
+              peek(stack, 1, 6).toTensor(),
+              peek(stack, 2, 6).toTensor(),
+              peek(stack, 3, 6).toIntVector(),
+              peek(stack, 4, 6).toScalar(),
+              peek(stack, 5, 6).toScalar());
+          drop(stack, 6);
           torch::jit::pack(stack, std::move(result));
         },
         aliasAnalysisFromSchema()),
@@ -944,7 +940,77 @@ torch::jit::RegisterOperators op({
               peek(stack, 2, 4).toIntVector(),
               peek(stack, 3, 4).toScalar());
           drop(stack, 4);
+          torch::jit::pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
 
+    Operator(
+        "ipex::transfree_mha(Tensor qkv, Tensor rel_qk, Scalar alpha, "
+        "Scalar dim_per_head, int softmax_dim, ScalarType ? dtype, "
+        "int head_num, int head_size) -> Tensor",
+        [](Stack& stack) {
+          auto result = dil_transfree_mha(
+              peek(stack, 0, 8).toTensor(),
+              peek(stack, 1, 8).toTensor(),
+              peek(stack, 2, 8).toScalar(),
+              peek(stack, 3, 8).toScalar(),
+              peek(stack, 4, 8).toInt(),
+              peek(stack, 5, 8),
+              peek(stack, 6, 8).toInt(),
+              peek(stack, 7, 8).toInt());
+          drop(stack, 8);
+          torch::jit::pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::transfree_distil_mha(Tensor qkv, Tensor mask_qk, "
+        "int[] mask_qk_reshp, Scalar fill, Scalar dim_per_head, "
+        "int head_num, int head_size) -> Tensor",
+        [](Stack& stack) {
+          auto result = dil_transfree_distil_mha(
+              peek(stack, 0, 7).toTensor(),
+              peek(stack, 1, 7).toTensor(),
+              peek(stack, 2, 7).toIntVector(),
+              peek(stack, 3, 7).toScalar(),
+              peek(stack, 4, 7).toScalar(),
+              peek(stack, 5, 7).toInt(),
+              peek(stack, 6, 7).toInt());
+          drop(stack, 7);
+          torch::jit::pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::transfree_vit_mha(Tensor qkv, Tensor dim_per_head, "
+        "int softmax_dim, ScalarType ? dtype, "
+        "int head_num, int head_size) -> Tensor",
+        [](Stack& stack) {
+          auto result = dil_transfree_vit_mha(
+              peek(stack, 0, 6).toTensor(),
+              peek(stack, 1, 6).toTensor(),
+              peek(stack, 2, 6).toInt(),
+              peek(stack, 3, 6),
+              peek(stack, 4, 6).toInt(),
+              peek(stack, 5, 6).toInt());
+          drop(stack, 6);
+          torch::jit::pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::transfree_vit_mha(Tensor qkv, float dim_per_head, "
+        "int softmax_dim, ScalarType ? dtype, "
+        "int head_num, int head_size) -> Tensor",
+        [](Stack& stack) {
+          auto result = dil_transfree_vit_mha(
+              peek(stack, 0, 6).toTensor(),
+              peek(stack, 1, 6).toDouble(),
+              peek(stack, 2, 6).toInt(),
+              peek(stack, 3, 6),
+              peek(stack, 4, 6).toInt(),
+              peek(stack, 5, 6).toInt());
+          drop(stack, 6);
           torch::jit::pack(stack, std::move(result));
         },
         aliasAnalysisFromSchema()),

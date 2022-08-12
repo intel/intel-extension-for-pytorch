@@ -64,7 +64,7 @@ void fuseLinearWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseLinearAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
 
 void FuseAddLayerNorm(std::shared_ptr<torch::jit::Graph>& graph);
-void FuseMatmulDiv(std::shared_ptr<torch::jit::Graph>& graph);
+void FuseMatmulDivOrMul(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseConcatBnRelu(std::shared_ptr<torch::jit::Graph>& graph);
 
 void insertPrePackedConvTransposeOp(std::shared_ptr<torch::jit::Graph>& graph);
@@ -78,6 +78,7 @@ void FusedEinsumPost(std::shared_ptr<torch::jit::Graph>& graph);
 void replaceAtenToWithIPEXTo(std::shared_ptr<torch::jit::Graph>& graph);
 void replaceIPEXToWithAtenTo(std::shared_ptr<torch::jit::Graph>& graph);
 
+void FusedTransFreeMha(std::shared_ptr<torch::jit::Graph>& graph);
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch_ipex

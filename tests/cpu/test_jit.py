@@ -784,6 +784,15 @@ class MatmulDivInplace(nn.Module):
         else:
             return mm_res.div_(torch.ones(mm_res_shape,dtype=x.dtype)+1)
 
+class TransposedMatmulDiv(nn.Module):
+    def __init__(self):
+        super(TransposedMatmulDiv, self).__init__()
+
+    def forward(self, batch1, batch2):
+        bmm_res = torch.matmul(batch1, batch2)
+        res = bmm_res * 0.3
+        return res
+
 class BmmAdd(nn.Module):
     def __init__(self):
         super(BmmAdd, self).__init__()
@@ -874,8 +883,9 @@ class AddLayerNorm(torch.nn.Module):
         super(AddLayerNorm, self).__init__()
         self.layernorm = torch.nn.LayerNorm(dim)
     def forward(self, x, y):
-        x = torch.add(x,y)
-        return self.layernorm(x)
+        z = torch.add(x,y)
+        return self.layernorm(z)
+
 
 class AddLayerNorm_v1(torch.nn.Module):
     def __init__(self, dim=32):
@@ -884,6 +894,14 @@ class AddLayerNorm_v1(torch.nn.Module):
     def forward(self, x, y, z):
         x = x + y + z
         return self.layernorm(x)
+
+class AddLayerNorm_v2(torch.nn.Module):
+    def __init__(self, dim=32):
+        super(AddLayerNorm_v2, self).__init__()
+        self.dim = dim
+    def forward(self, x, y, w):
+        z = torch.add(x,y)
+        return torch.nn.functional.layer_norm(z, [self.dim,], weight=w)
 
 class ConcatBnRelu(torch.nn.Module):
     def __init__(self, dim, cat_dim, in_channels, **kwargs):
@@ -1223,54 +1241,58 @@ class Tester(TestCase):
             self.assertEqual(linear_count_ori, 2)
 
     def test_add_layernorm(self):
-        bs = 56
-        seq_len = 384
-        dim = 768
-        a = torch.randn(bs, seq_len, dim)
-        b = torch.randn(bs, seq_len, dim)
-        model = AddLayerNorm(dim)
-        pre_te_enable_status = torch._C._jit_texpr_fuser_enabled()
-        torch._C._jit_set_texpr_fuser_enabled(False)
-        jit_model = torch.jit.trace(model,(a, b))
-        trace_graph = jit_model.graph_for(a, b)
-        jit_res = jit_model(a, b)
-        ori_res = model(a, b)
-        self.assertEqual(jit_res, ori_res)
-        node = "ipex::add_layernorm"
-        self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+        for dim in [768, 100]:
+            with torch.no_grad():
+                bs = 56
+                seq_len = 384
+                a = torch.randn(bs, seq_len, dim)
+                b = torch.randn(bs, seq_len, dim)
+                w = torch.ones(dim)
+                model = AddLayerNorm(dim)
+                pre_te_enable_status = torch._C._jit_texpr_fuser_enabled()
+                torch._C._jit_set_texpr_fuser_enabled(False)
+                jit_model = torch.jit.trace(model,(a, b))
+                trace_graph = jit_model.graph_for(a, b)
+                jit_res = jit_model(a, b)
+                ori_res = model(a, b)
+                self.assertEqual(jit_res, ori_res)
+                node = "ipex::add_layernorm"
+                self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
 
-        # not contiguous
-        a_not_cont = a.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
-        b_not_cont = b.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
-        ori_res = model(a_not_cont, b_not_cont)
-        jit_model = torch.jit.trace(model,(a, b))
-        trace_graph = jit_model.graph_for(a, b)
-        jit_res = jit_model(a_not_cont, b_not_cont)
-        node = "ipex::add_layernorm"
-        self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
-        self.assertEqual(jit_res, ori_res)
+                # not contiguous
+                a_not_cont = a.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
+                b_not_cont = b.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
+                ori_res = model(a_not_cont, b_not_cont)
+                jit_model = torch.jit.trace(model,(a, b))
+                trace_graph = jit_model.graph_for(a, b)
+                jit_res = jit_model(a_not_cont, b_not_cont)
+                node = "ipex::add_layernorm"
+                self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+                self.assertEqual(jit_res, ori_res)
 
-        a_bf16 = a.to(torch.bfloat16)
-        b_bf16 = b.to(torch.bfloat16)
-        with torch.cpu.amp.autocast():
-            ori_res = model(a_bf16, b_bf16)
-            model_jit = jit_model = torch.jit.trace(model,(a, b))
-            trace_graph = jit_model.graph_for(a, b)
-            jit_res = jit_model(a_bf16, b_bf16)
-            node = "ipex::add_layernorm"
-            self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
-            self.assertEqual(jit_res, ori_res, prec=5e-2)
+                a_bf16 = a.to(torch.bfloat16)
+                b_bf16 = b.to(torch.bfloat16)
+                w_bf16 = w.to(torch.bfloat16)
+                model = AddLayerNorm_v2(dim)
+                jit_model = torch.jit.trace(model,(a, b, w))
+                ori_res = model(a_bf16, b_bf16, w)
+                trace_graph = jit_model.graph_for(a_bf16, b_bf16, w_bf16)
+                jit_res = jit_model(a_bf16, b_bf16, w_bf16)
+                node = "ipex::add_layernorm"
+                self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+                self.assertEqual(jit_res, ori_res, prec=5e-2)
 
-        model = AddLayerNorm_v1(dim)
-        c = torch.randn(bs, seq_len, dim)
-        jit_model = torch.jit.trace(model,(a, b, c))
-        trace_graph = jit_model.graph_for(a, b, c)
-        jit_res = jit_model(a, b, c)
-        ori_res = model(a, b, c)
-        self.assertEqual(jit_res, ori_res)
-        node = "ipex::add_layernorm"
-        torch._C._jit_set_texpr_fuser_enabled(pre_te_enable_status)
-        self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+                model = AddLayerNorm_v1(dim)
+                c = torch.randn(bs, seq_len, dim)
+                jit_model = torch.jit.trace(model,(a, b, c))
+                trace_graph = jit_model.graph_for(a, b, c)
+                
+                jit_res = jit_model(a, b, c)
+                ori_res = model(a, b, c)
+                self.assertEqual(jit_res, ori_res)
+                node = "ipex::add_layernorm"
+                torch._C._jit_set_texpr_fuser_enabled(pre_te_enable_status)
+                self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
 
     def test_concat_bn_relu(self):
         batch_size = 3
@@ -1473,56 +1495,57 @@ class Tester(TestCase):
             res_jit = trace_model(qk_bf16, mask_bf16)
             self.assertEqual(res_ref, res_jit, prec=prec)
             _check_match_mha_parts(trace_model, qk_bf16, mask)
+        
+        for sequance_length in [128, 100]:
+            mat1 = torch.randn(56, 12, sequance_length, sequance_length)
+            mat2 = torch.randn(56, 12, sequance_length, sequance_length)
+            mask = torch.randn(56, sequance_length)
+            qk = torch.matmul(mat1,mat2)
+            mask = (mask > 0.5)
 
-        mat1 = torch.randn(56, 12, 384, 384)
-        mat2 = torch.randn(56, 12, 384, 384)
-        mask = torch.randn(56, 384)
-        qk = torch.matmul(mat1,mat2)
-        mask = (mask > 0.5)
+            mha_v1 = DistilMHAScoresCalculation_v1(4, -1)
+            with torch.no_grad():
+                mha_jit = torch.jit.trace(mha_v1, (mat1, mat2, mask))
+                mha_jit.eval()
 
-        mha_v1 = DistilMHAScoresCalculation_v1(4, -1)
-        with torch.no_grad():
-            mha_jit = torch.jit.trace(mha_v1, (mat1, mat2, mask))
-            mha_jit.eval()
+                res_ref = mha_v1(mat1, mat2, mask)
+                res_jit = mha_jit(mat1, mat2, mask)
+                self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, mask)
+                _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
 
-            res_ref = mha_v1(mat1, mat2, mask)
-            res_jit = mha_jit(mat1, mat2, mask)
-            self.assertEqual(res_ref, res_jit)
-            _check_match_mha(mha_jit, mat1, mat2, mask)
-            _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
+            mha_v2 = DistilMHAScoresCalculation_v2(4)
+            with torch.no_grad():
+                mha_jit = torch.jit.trace(mha_v2, (mat1, mat2, mask))
+                mha_jit.eval()
 
-        mha_v2 = DistilMHAScoresCalculation_v2(4)
-        with torch.no_grad():
-            mha_jit = torch.jit.trace(mha_v2, (mat1, mat2, mask))
-            mha_jit.eval()
+                res_ref = mha_v2(mat1, mat2, mask)
+                res_jit = mha_jit(mat1, mat2, mask)
+                self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, mask)
+                _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
 
-            res_ref = mha_v2(mat1, mat2, mask)
-            res_jit = mha_jit(mat1, mat2, mask)
-            self.assertEqual(res_ref, res_jit)
-            _check_match_mha(mha_jit, mat1, mat2, mask)
-            _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
+            mha_v3 = Maskedfill__softmax()
+            with torch.no_grad():
+                mha_jit = torch.jit.trace(mha_v3, (qk, mask))
+                mha_jit.eval()
 
-        mha_v3 = Maskedfill__softmax()
-        with torch.no_grad():
-            mha_jit = torch.jit.trace(mha_v3, (qk, mask))
-            mha_jit.eval()
+                res_ref = mha_v3(qk, mask)
+                res_jit = mha_jit(qk, mask)
+                self.assertEqual(res_ref, res_jit)
+                _check_match_mha_parts(mha_jit, qk, mask)
+                _test_pure_bf16_parts(mha_v3, mha_jit, qk, mask)
 
-            res_ref = mha_v3(qk, mask)
-            res_jit = mha_jit(qk, mask)
-            self.assertEqual(res_ref, res_jit)
-            _check_match_mha_parts(mha_jit, qk, mask)
-            _test_pure_bf16_parts(mha_v3, mha_jit, qk, mask)
+            mha_v4 = Maskedfill_softmax()
+            with torch.no_grad():
+                mha_jit = torch.jit.trace(mha_v4, (qk, mask))
+                mha_jit.eval()
 
-        mha_v4 = Maskedfill_softmax()
-        with torch.no_grad():
-            mha_jit = torch.jit.trace(mha_v4, (qk, mask))
-            mha_jit.eval()
-
-            res_ref = mha_v4(qk, mask)
-            res_jit = mha_jit(qk, mask)
-            self.assertEqual(res_ref, res_jit)
-            _check_match_mha_parts(mha_jit, qk, mask)
-            _test_pure_bf16_parts(mha_v4, mha_jit, qk, mask)
+                res_ref = mha_v4(qk, mask)
+                res_jit = mha_jit(qk, mask)
+                self.assertEqual(res_ref, res_jit)
+                _check_match_mha_parts(mha_jit, qk, mask)
+                _test_pure_bf16_parts(mha_v4, mha_jit, qk, mask)
 
     def _test_conv_unary_fusion(self, op_list, seed=None):
         batch_size = 8
@@ -3020,16 +3043,100 @@ class Tester(TestCase):
                 kind_in_graph=None,
                 kind_not_in_graph="ipex::matmul_div")
 
+    def test_transposed_matmuldiv(self):
+        M = torch.randn(32, 13, 27, 27)
+
+        x1 = [torch.randn(32, 13, 27, 25),
+              torch.randn(32, 27, 13, 25).transpose(1, 2),
+              torch.randn(32, 13, 25, 27).transpose(2, 3),
+              torch.randn(32, 25, 13, 27).transpose(2, 3).transpose(1, 3)]
+
+        y1 = [torch.randn(32, 13, 25, 27),
+              torch.randn(32, 25, 13, 27).transpose(1, 2),
+              torch.randn(32, 13, 27, 25).transpose(2, 3),
+              torch.randn(32, 27, 13, 25).transpose(2, 3).transpose(1, 3)]
+
+        model = TransposedMatmulDiv().eval()
+        model_fp32 = ipex.optimize(model, dtype=torch.float32, level="O1")
+        model_bf16 = ipex.optimize(model, dtype=torch.bfloat16, level="O1")
+        for i in range(len(x1)):
+            for j in range(len(y1)):
+                with torch.no_grad():
+                    traced_mod = torch.jit.trace(model, (M, x1[i], y1[j]))
+                    fused_mod = traced_mod.graph_for(M, x1[i], y1[j])
+                    out = traced_mod(M, x1[i], y1[j])
+                    expected = torch.baddbmm(M, x1[i], y1[j])
+                    self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fused_mod.nodes()))
+                    self.assertEqual(out, expected, prec=1e-6)
+                with torch.cpu.amp.autocast(), torch.no_grad():
+                    traced_mod = torch.jit.trace(model, (M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16()))
+                    fused_mod = traced_mod.graph_for(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
+                    out = traced_mod(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
+                    expected = torch.baddbmm(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
+                    self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fused_mod.nodes()))
+                    self.assertEqual(out, expected, prec=1e-4)
+
     def test_bmm_add(self):
-        M = torch.randn(10, 3, 5)
-        batch1 = torch.randn(10, 3, 4)
-        batch2 = torch.randn(10, 4, 5)
-        mod = BmmAdd()
-        traced_mod = torch.jit.trace(mod, (M, batch1, batch2))
-        fused_mod = traced_mod.graph_for(M, batch1, batch2)
-        out = traced_mod(M, batch1, batch2)
-        expected = torch.baddbmm(M, batch1, batch2)
-        self.assertTrue(torch.allclose(out, expected))
+        M = torch.randn(60, 30, 50)
+
+        x1 = [torch.randn(60, 30, 40),
+              torch.randn(60, 40, 30).transpose(1, 2),
+              torch.randn(30, 60, 40).transpose(0, 1)]
+
+        y1 = [torch.randn(60, 40, 50),
+              torch.randn(60, 50, 40).transpose(1, 2),
+              torch.randn(50, 40, 60).transpose(0, 2)]
+
+        model = BmmAdd().eval()
+        model_fp32 = ipex.optimize(model, dtype=torch.float32, level="O1")
+        model_bf16 = ipex.optimize(model, dtype=torch.bfloat16, level="O1")
+        for i in range(len(x1)):
+            for j in range(len(y1)):
+                with torch.no_grad():
+                    traced_mod = torch.jit.trace(model, (M, x1[i], y1[j]))
+                    fused_mod = traced_mod.graph_for(M, x1[i], y1[j])
+                    out = traced_mod(M, x1[i], y1[j])
+                    expected = torch.baddbmm(M, x1[i], y1[j])
+                    self.assertTrue(any(n.kind() == "ipex::bmm_add" for n in fused_mod.nodes()))
+                    self.assertEqual(out, expected, prec=1e-4)
+                with torch.cpu.amp.autocast(), torch.no_grad():
+                    traced_mod = torch.jit.trace(model, (M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16()))
+                    fused_mod = traced_mod.graph_for(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
+                    out = traced_mod(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
+                    expected = torch.baddbmm(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
+                    self.assertTrue(any(n.kind() == "ipex::bmm_add" for n in fused_mod.nodes()))
+                    self.assertEqual(out, expected, prec=1e-1)
+
+    def test_transposed_matmuldiv(self):
+        x1 = [torch.randn(53, 23, 27, 25),
+              torch.randn(53, 27, 23, 25).transpose(1, 2),
+              torch.randn(53, 23, 25, 27).transpose(2, 3),
+              torch.randn(53, 25, 23, 27).transpose(2, 3).transpose(1, 3)]
+
+        y1 = [torch.randn(53, 23, 25, 27),
+              torch.randn(53, 25, 23, 27).transpose(1, 2),
+              torch.randn(53, 23, 27, 25).transpose(2, 3),
+              torch.randn(53, 27, 23, 25).transpose(2, 3).transpose(1, 3)]
+
+        model = TransposedMatmulDiv().eval()
+        model_fp32 = ipex.optimize(model, dtype=torch.float32, level="O1")
+        model_bf16 = ipex.optimize(model, dtype=torch.bfloat16, level="O1")
+        for i in range(len(x1)):
+            for j in range(len(y1)):
+                with torch.no_grad():
+                    traced_mod = torch.jit.trace(model, (x1[i], y1[j]))
+                    fused_mod = traced_mod.graph_for(x1[i], y1[j])
+                    out = traced_mod(x1[i], y1[j])
+                    expected = model(x1[i], y1[j])
+                    self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fused_mod.nodes()))
+                    self.assertEqual(out, expected, prec=1e-4)
+                with torch.cpu.amp.autocast(), torch.no_grad():
+                    traced_mod = torch.jit.trace(model, (x1[i].bfloat16(), y1[j].bfloat16()))
+                    fused_mod = traced_mod.graph_for(x1[i].bfloat16(), y1[j].bfloat16())
+                    out = traced_mod(x1[i].bfloat16(), y1[j].bfloat16())
+                    expected = model(x1[i].bfloat16(), y1[j].bfloat16())
+                    self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fused_mod.nodes()))
+                    self.assertEqual(out, expected, prec=1e-1)
 
     def test_einsum_add(self):
         def _test_fp32(model_test, input1, input2, bias=None, kind_in_graph='ipex::einsum_binary', prec=1e-3):

@@ -315,6 +315,8 @@ struct matmul_forward : public dnnl::matmul,
 
     dst_data_type = dst_type == data_type::undef ? dst_data_type : dst_type;
     tensor::desc dst_desc(dst_dims, dst_data_type, tag::any);
+    if (!dst.is_empty())
+      dst_desc = dst.get_desc().to_type(dst_data_type);
     auto key = utils::create_key(
         src_desc,
         weights_desc,

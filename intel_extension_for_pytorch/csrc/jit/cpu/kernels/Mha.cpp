@@ -1,4 +1,5 @@
 #include "Mha.h"
+#include "Matmul.h"
 #include "Softmax.h"
 #include "csrc/aten/cpu/AddSoftmax.h"
 #include "csrc/aten/cpu/DivSoftmax.h"
@@ -76,8 +77,6 @@ at::Tensor dil_distil_mha_scores_calc(
     const at::Tensor& k,
     const at::Tensor& mask_qk,
     const at::IntArrayRef& mask_qk_reshp,
-    const int64_t& transpose_dim_a,
-    const int64_t& transpose_dim_b,
     const at::Scalar& fill,
     const at::Scalar& dim_per_head) {
   IPEX_RECORD_FUNCTION(
@@ -85,9 +84,8 @@ at::Tensor dil_distil_mha_scores_calc(
   auto _dim_per_head = dim_per_head.to<float>();
   auto _fill = fill.to<float>();
   auto qk = at::Tensor();
-  auto _k = k.transpose(transpose_dim_a, transpose_dim_b);
-  qk = at::matmul(q, _k);
-  // convert the mask to float for creating vec mask for kernel computation
+  qk = at::matmul(q, k);
+  //  convert the mask to float for creating vec mask for kernel computation
   auto _mask_qk = mask_qk.toType(at::kFloat);
   return DivMaskedfillSoftmax(
       qk, _mask_qk, mask_qk_reshp, _fill, _dim_per_head);
@@ -114,5 +112,202 @@ at::Tensor dil_maskedfill_softmax(
       qk, _mask_qk, mask_qk_reshp, _fill, _dim_per_head);
 }
 
+at::Tensor dil_transfree_mha(
+    const at::Tensor& qkv,
+    const at::Tensor& rel_kv,
+    const at::Scalar& alpha,
+    const at::Scalar& dim_per_head,
+    const int64_t& softmax_dim,
+    const at::IValue& dtype,
+    const int64_t& head_num,
+    const int64_t& head_size) {
+  RECORD_FUNCTION("dil_transfree_mha", c10::ArrayRef<c10::IValue>({}));
+
+  auto _dim_per_head = dim_per_head.to<float>();
+  auto _alpha = alpha.to<float>();
+  int64_t batchSize = qkv.dim() > 2 ? qkv.size(0) : 1;
+  int64_t sequenceSize = qkv.dim() > 2 ? qkv.size(1) : qkv.size(0);
+  int64_t hiddenSize = head_num * head_size;
+  at::Tensor qk =
+      at::empty({batchSize, head_num, sequenceSize, sequenceSize}, qkv.dtype());
+  at::Tensor output = at::empty_strided(
+      {batchSize, head_num, sequenceSize, head_size},
+      {sequenceSize * hiddenSize, head_size, hiddenSize, 1},
+      qkv.dtype());
+
+  // Currently, oneDNN Matmul primitive has some limitations to enable AMX
+  // instructions. One critical condition is that the input tensor A should meet
+  // the following requirement: A.size(0) * A.stride(0) == A.numel(), which
+  // means the input tensor should not be a part of the other bigger tensor.
+  // Since the Query, Key, and Value matrices are horizontally connected due to
+  // the ConcatLinear optimization, they do not meet the above condition.
+  // Thus they should be split before sending into the Matmul OP to enalbe AMX.
+  auto qkv_mat = (qkv.dtype() == at::kFloat) ? dil_qkv_split<float>(qkv)
+                                             : dil_qkv_split<at::BFloat16>(qkv);
+  auto query = std::get<0>(qkv_mat);
+  auto key = std::get<1>(qkv_mat);
+  auto value = std::get<2>(qkv_mat);
+  query.resize_({batchSize, sequenceSize, head_num, head_size})
+      .transpose_(1, 2);
+  key.resize_({batchSize, sequenceSize, head_num, head_size})
+      .transpose_(1, 2)
+      .transpose_(2, 3);
+  value.resize_({batchSize, sequenceSize, head_num, head_size})
+      .transpose_(1, 2);
+
+  bmm_impl(query, key, qk, ideep::attr_t(), {}, 1.f);
+  if (dtype.isNone() && _alpha == 1.0f) {
+    qk = DivAddSoftmax(qk, rel_kv, _dim_per_head);
+  } else {
+    qk = at::div(qk, dim_per_head);
+    qk = at::add(qk, rel_kv, _alpha);
+    qk = dil_softmax(qk, softmax_dim, dtype);
+  }
+  bmm_impl(qk, value, output, ideep::attr_t(), {}, 1.f);
+
+  output.transpose_(1, 2);
+
+  return output;
+}
+
+at::Tensor dil_transfree_distil_mha(
+    const at::Tensor& qkv,
+    const at::Tensor& mask_qk,
+    const at::IntArrayRef& mask_qk_reshp,
+    const at::Scalar& fill,
+    const at::Scalar& dim_per_head,
+    const int64_t& head_num,
+    const int64_t& head_size) {
+  RECORD_FUNCTION("dil_distil_transfree_mha", c10::ArrayRef<c10::IValue>({}));
+
+  auto _fill = fill.to<float>();
+  auto _dim_per_head = dim_per_head.to<float>();
+  int64_t batchSize = qkv.dim() > 2 ? qkv.size(0) : 1;
+  int64_t sequenceSize = qkv.dim() > 2 ? qkv.size(1) : qkv.size(0);
+  int64_t hiddenSize = head_num * head_size;
+  at::Tensor qk =
+      at::empty({batchSize, head_num, sequenceSize, sequenceSize}, qkv.dtype());
+  at::Tensor output = at::empty_strided(
+      {batchSize, head_num, sequenceSize, head_size},
+      {sequenceSize * hiddenSize, head_size, hiddenSize, 1},
+      qkv.dtype());
+
+  auto qkv_mat = (qkv.dtype() == at::kFloat) ? dil_qkv_split<float>(qkv)
+                                             : dil_qkv_split<at::BFloat16>(qkv);
+  auto query = std::get<0>(qkv_mat);
+  auto key = std::get<1>(qkv_mat);
+  auto value = std::get<2>(qkv_mat);
+  query.resize_({batchSize, sequenceSize, head_num, head_size})
+      .transpose_(1, 2);
+  key.resize_({batchSize, sequenceSize, head_num, head_size})
+      .transpose_(1, 2)
+      .transpose_(2, 3);
+  value.resize_({batchSize, sequenceSize, head_num, head_size})
+      .transpose_(1, 2);
+
+  bmm_impl(query, key, qk, ideep::attr_t(), {}, 1.f);
+  auto _mask_qk = mask_qk.toType(at::kFloat);
+  qk = DivMaskedfillSoftmax(qk, _mask_qk, mask_qk_reshp, _fill, _dim_per_head);
+  bmm_impl(qk, value, output, ideep::attr_t(), {}, 1.f);
+
+  output.transpose_(1, 2);
+
+  return output;
+}
+
+at::Tensor dil_transfree_vit_mha(
+    const at::Tensor& qkv,
+    const at::Tensor& dim_per_head,
+    const int64_t& softmax_dim,
+    const at::IValue& dtype,
+    const int64_t& head_num,
+    const int64_t& head_size) {
+  auto scale = dim_per_head.data_ptr<float>()[0];
+  return dil_transfree_vit_mha(
+      qkv, scale, softmax_dim, dtype, head_num, head_size);
+}
+
+at::Tensor dil_transfree_vit_mha(
+    const at::Tensor& qkv,
+    const double& dim_per_head,
+    const int64_t& softmax_dim,
+    const at::IValue& dtype,
+    const int64_t& head_num,
+    const int64_t& head_size) {
+  RECORD_FUNCTION("dil_transfree_vit_mha", c10::ArrayRef<c10::IValue>({}));
+
+  int64_t batchSize = qkv.dim() > 2 ? qkv.size(0) : 1;
+  int64_t sequenceSize = qkv.dim() > 2 ? qkv.size(1) : qkv.size(0);
+  int64_t hiddenSize = head_num * head_size;
+  at::Tensor qk =
+      at::empty({batchSize, head_num, sequenceSize, sequenceSize}, qkv.dtype());
+  at::Tensor output = at::empty_strided(
+      {batchSize, head_num, sequenceSize, head_size},
+      {sequenceSize * hiddenSize, head_size, hiddenSize, 1},
+      qkv.dtype());
+
+  auto qkv_mat = (qkv.dtype() == at::kFloat) ? dil_qkv_split<float>(qkv)
+                                             : dil_qkv_split<at::BFloat16>(qkv);
+  auto query = std::get<0>(qkv_mat);
+  auto key = std::get<1>(qkv_mat);
+  auto value = std::get<2>(qkv_mat);
+  query.resize_({batchSize, sequenceSize, head_num, head_size})
+      .transpose_(1, 2);
+  key.resize_({batchSize, sequenceSize, head_num, head_size})
+      .transpose_(1, 2)
+      .transpose_(2, 3);
+  value.resize_({batchSize, sequenceSize, head_num, head_size})
+      .transpose_(1, 2);
+
+  bmm_impl(query, key, qk, ideep::attr_t(), {}, 1.f / dim_per_head);
+  qk = dil_softmax_(qk, softmax_dim, dtype);
+  bmm_impl(qk, value, output, ideep::attr_t(), {}, 1.f);
+
+  output.transpose_(1, 2);
+
+  return output;
+}
+
+template <typename T>
+std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_qkv_split(
+    const at::Tensor& qkv) {
+  int64_t batchSize = qkv.dim() > 2 ? qkv.size(0) : 1;
+  int64_t sequenceSize = qkv.dim() > 2 ? qkv.size(1) : qkv.size(0);
+  int64_t hiddenSize = (qkv.dim() > 2 ? qkv.size(2) : qkv.size(1)) / 3;
+
+  at::Tensor query =
+      at::empty({batchSize, sequenceSize, hiddenSize}, qkv.dtype());
+  at::Tensor key =
+      at::empty({batchSize, sequenceSize, hiddenSize}, qkv.dtype());
+  at::Tensor value =
+      at::empty({batchSize, sequenceSize, hiddenSize}, qkv.dtype());
+
+  T* src = qkv.data_ptr<T>();
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+#pragma omp parallel for simd schedule( \
+    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#else
+#pragma omp parallel for schedule( \
+    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#endif
+#endif
+  for (int i = 0; i < batchSize * sequenceSize; ++i) {
+    memcpy(
+        query.data_ptr<T>() + i * hiddenSize,
+        src + i * hiddenSize * 3,
+        sizeof(T) * hiddenSize);
+    memcpy(
+        key.data_ptr<T>() + i * hiddenSize,
+        src + i * hiddenSize * 3 + hiddenSize,
+        sizeof(T) * hiddenSize);
+    memcpy(
+        value.data_ptr<T>() + i * hiddenSize,
+        src + i * hiddenSize * 3 + 2 * hiddenSize,
+        sizeof(T) * hiddenSize);
+  }
+
+  return std::make_tuple(query, key, value);
+}
 } // namespace cpu
 } // namespace torch_ipex
