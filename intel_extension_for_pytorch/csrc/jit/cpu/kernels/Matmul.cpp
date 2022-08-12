@@ -22,7 +22,12 @@ namespace cpu {
  * @param out Optinal output provided by user for matmul
  * @attr Attribute for matmul oneDNN primitive
  * @return output Tensor.
- */
+ * Since oneDNN 2.6.0, AMX and AVX512 brgemm are enabled for the DNNL MATMUL
+ * primitive if the input tensors are with the following tags:
+ * 3-dim - abc, acb; 4-dim - abcd, acbd, adbc, abdc.
+ * If the input tensor has one of the above layouts, the contiguous should NOT
+ * be applied to avoid unnecessary transpose (copy).
+ **/
 at::Tensor bmm_impl(
     const at::Tensor& tensor1,
     const at::Tensor& tensor2,
@@ -30,8 +35,29 @@ at::Tensor bmm_impl(
     const ideep::attr_t& attr,
     const std::vector<ideep::tensor>& postop_tensors,
     const float dst_coeff = 1.0f) {
-  auto tensor1_ = tensor1.is_contiguous() ? tensor1 : tensor1.contiguous();
-  auto tensor2_ = tensor2.is_contiguous() ? tensor2 : tensor2.contiguous();
+  // The following conditions are strict to exclude some extreme cases when the
+  // tensors have the undefined stride values. For the sake of reliability of
+  // transpose-free Matmul kernel, contiguous will be applied to these tensors.
+  auto check_tensor_layout = [](at::Tensor tensor) {
+    // Check if the Tensor is 3-dim or 4-dim
+    if (tensor.dim() != 3 && tensor.dim() != 4)
+      return false;
+    // Check if 'a' is the first dim
+    for (int64_t i = 1; i < tensor.dim(); ++i) {
+      if (tensor.stride(0) < tensor.stride(i))
+        return false;
+    }
+    // Check if the tensor has one of the above memory tags:
+    // The strides of the tensor should not be out of the tensor's ranges.
+    // 4-dim: 'b' should not be the last dim.
+    if (tensor.stride(0) * tensor.size(0) != tensor.numel() ||
+        (tensor.dim() == 4 && tensor.stride(1) == 1))
+      return false;
+    return true;
+  };
+  auto tensor1_ = check_tensor_layout(tensor1) ? tensor1 : tensor1.contiguous();
+  auto tensor2_ = check_tensor_layout(tensor2) ? tensor2 : tensor2.contiguous();
+
   const int64_t dim = tensor1.dim();
   const ideep::tensor mkldnn_input = itensor_view_from_dense(tensor1_);
   const ideep::tensor mkldnn_tensor2 = itensor_view_from_dense(tensor2_);

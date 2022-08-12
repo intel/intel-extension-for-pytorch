@@ -162,7 +162,7 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
 
   // Fuse operators as shuffle
   graph_rewrite::FuseShuffle(graph);
-  graph_rewrite::FuseMatmulDiv(graph);
+  graph_rewrite::FuseMatmulDivOrMul(graph);
   // replace aten softmax with ipex softmax
   graph_rewrite::replaceAtenSoftmaxWithIpexSoftmax(graph);
 
@@ -170,6 +170,14 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // after TensorExprs fix the performance issue(IPB-808).
   graph_rewrite::replaceAtenBatchNormWithIpexBatchNorm(graph);
   // TODO: Some post processing?? ECS/EDC/Peephole???
+
+  // Fuse BF16 Mha for BERT and ViT
+  // This path depends on the FuseMHAScoreCalc and FuseMatmulDivOrMul
+  // because it uses the fused OPs from the above two pathes.
+  // TODO: We will merge the transpose-free MHA fusion into FuseMHAScoreCalc
+  // in the future for simplicity.
+  graph_rewrite::FusedTransFreeMha(graph);
+
   ConstantPropagation(graph);
   GRAPH_DUMP("Before PrePackingOpsFolder", graph);
   // folding prepacking ops.
