@@ -189,7 +189,7 @@ Tensor _coalesce(const Tensor& self) {
       uniqueOffsets_ptr, uniqueOffsets_ptr + nnz, (int64_t)0);
 
   auto indices1D_ptr = indices1D.data_ptr<int64_t>();
-  xpu::pstl::merge_sort<int64_t, int64_t>(
+  xpu::pstl::sort<int64_t, int64_t>(
       indices1D_ptr,
       origIndices_ptr,
       indices1D.size(0),

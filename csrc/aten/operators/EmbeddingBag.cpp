@@ -26,8 +26,6 @@ constexpr int MODE_SUM = 0;
 constexpr int MODE_MEAN = 1;
 constexpr int MODE_MAX = 2;
 
-constexpr int64_t WARP_SIZE = 64;
-
 std::pair<Tensor, Tensor> promoteIndicesAndOffsets(
     const Tensor& indices,
     const Tensor& offsets) {
@@ -551,10 +549,8 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
   {
     sorted_indices.copy_(indices);
     xpu::pstl::iota(orig_begin, orig_begin + numel, (index_t)0);
-    xpu::pstl::merge_sort<index_t, index_t>(
-        sorted_begin, orig_begin, numel, [](index_t a, index_t b) {
-          return Numerics<index_t>::lt(a, b);
-        });
+    xpu::pstl::sort<index_t, index_t>(
+        indices.data_ptr<index_t>(), sorted_begin, orig_begin, numel, false);
   }
 
   Tensor count;

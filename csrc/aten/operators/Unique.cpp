@@ -51,7 +51,7 @@ Tensor compute_inverse(
         ScalarConvert<float, index_t>::to(0.0),
         AddOp<index_t>());
 
-    xpu::pstl::merge_sort<index_t, index_t>(
+    xpu::pstl::sort<index_t, index_t>(
         sorted_indices_ptr,
         inv_loc_ptr,
         sorted_indices.size(0),
@@ -119,11 +119,12 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
 
   if (num_inp > 0) {
     if (!consecutive) {
-      xpu::pstl::merge_sort<scalar_t, int64_t>(
+      xpu::pstl::sort<scalar_t, int64_t>(
+          self.data_ptr<scalar_t>(),
           output.data_ptr<scalar_t>(),
           sorted_indices.data_ptr<int64_t>(),
           num_inp,
-          [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::lt(a, b); });
+          false);
     }
 
     int64_t num_out;
@@ -240,7 +241,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
   };
 
   if (!consecutive) {
-    xpu::pstl::merge_sort<int64_t, int64_t>(
+    xpu::pstl::sort<int64_t, int64_t>(
         indices_begin, indices_idx.data_ptr<int64_t>(), num_inp, less_comp);
   }
   Tensor origin_indices = indices.clone();

@@ -4,7 +4,10 @@
 #include <utils/DPCPP.h>
 #include "BitonicMergeSort.h"
 #include "Scan.h"
+#include "SortingDeviceRadixSort.h"
+#include "SortingGroupRadixSort.h"
 #include "comm/Atomics.h"
+#include "comm/KeyTraits.h"
 #include "comm/MathReduce.h"
 #include "comm/SimpleReduce.h"
 
@@ -948,6 +951,84 @@ void merge_sort(
   if (data_in_tmp) {
     copy_to_dst<KeyType, ValueType>(
         key, tmp_key_data, val, tmp_val_data, sort_sz);
+  }
+}
+
+// xpu::pstl::sort for non-batched tensor sort case.
+// we have two sort API: one for user defined compare function; one for
+// descending/ascending
+//
+// sort (out_key, out_val, sort_sz, comp_t)
+// out_key: result of sort, it is a copy of tensor to be sorted
+// out_val: indices of sort, it is initialized by [0, 1, 2, ...]
+// sort_sz: element number to be sorted
+// comp_t: compare function defined by user
+
+// sort (in_key, out_key, out_val, sort_sz, descending)
+// in_key: input tensor to be sorted
+// out_key: result of sort, it is a copy of tensor to be sorted
+// out_val: indices of sort, it is initialized by [0, 1, 2, ...]
+// sort_sz: element number to be sorted
+// descending: True for descending, False for ascending.
+template <typename KeyType, typename ValueType, typename CompFunc>
+void sort(
+    KeyType* out_key,
+    ValueType* out_val,
+    const int64_t sort_sz,
+    const CompFunc comp_t) {
+  RECORD_FUNCTION("pstl::sort", {});
+  merge_sort<KeyType, ValueType>(out_key, out_val, sort_sz, comp_t);
+}
+
+template <typename KeyType, typename ValueType>
+void sort(
+    const KeyType* in_key,
+    KeyType* out_key,
+    ValueType* out_val,
+    const int64_t sort_sz,
+    bool descending) {
+  RECORD_FUNCTION("pstl::sort", {});
+  int stride = 1;
+  using offset_t = uint32_t;
+  SegmentedGroupRadixSortDesc desc(1, sort_sz, stride, descending, true);
+
+  if (desc.valid()) {
+    if (!desc.need_temp()) {
+      segmented_group_radix_sort_kernel<KeyType, int64_t, uint16_t, true>(
+          desc,
+          in_key,
+          (KeyType*)out_key,
+          nullptr,
+          (int64_t*)out_val,
+          [=](offset_t slice) -> offset_t { return slice * sort_sz; });
+    } else {
+      auto key_options = map_options<KeyType>();
+      auto val_options = map_options<ValueType>();
+      Tensor tmp_key = at::empty({sort_sz}, key_options);
+      Tensor tmp_val = at::empty({sort_sz}, val_options);
+
+      segmented_group_radix_sort_kernel<KeyType, int64_t, uint16_t, true>(
+          desc,
+          in_key,
+          (KeyType*)out_key,
+          nullptr,
+          (int64_t*)out_val,
+          [=](offset_t slice) -> offset_t { return slice * sort_sz; },
+          (KeyType*)tmp_key.data_ptr(),
+          (int64_t*)tmp_val.data_ptr());
+    }
+  } else {
+    if (descending) {
+      merge_sort<KeyType, ValueType>(
+          out_key, out_val, sort_sz, [](KeyType a, KeyType b) {
+            return Numerics<KeyType>::gt(a, b);
+          });
+    } else {
+      merge_sort<KeyType, ValueType>(
+          out_key, out_val, sort_sz, [](KeyType a, KeyType b) {
+            return Numerics<KeyType>::lt(a, b);
+          });
+    }
   }
 }
 

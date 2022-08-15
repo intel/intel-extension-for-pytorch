@@ -134,13 +134,12 @@ Tensor embedding_dense_backward(
                 sorted_indices.copy_(indices);
                 xpu::pstl::iota(
                     orig_begin, orig_begin + num_indices, (index_t)0);
-                xpu::pstl::merge_sort<index_t, index_t>(
+                xpu::pstl::sort<index_t, index_t>(
+                    indices.data_ptr<index_t>(),
                     sorted_begin,
                     orig_begin,
-                    num_indices, // prb_size
-                    [](index_t a, index_t b) {
-                      return Numerics<index_t>::lt(a, b);
-                    });
+                    num_indices,
+                    false);
               }
 
               if (scale_grad_by_freq) {

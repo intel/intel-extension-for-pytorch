@@ -19,7 +19,7 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-constexpr int64_t NROWS_PER_THREAD = 10;
+constexpr int64_t NROWS_PER_THREAD = 64;
 
 template <typename index_t>
 void krn_partials_per_segment(
@@ -107,8 +107,9 @@ void compute_grad_weight_bags(
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
 
   int64_t work_group_size = dpcppMaxWorkGroupSize(dev_id);
-  int64_t stride_warped = CeilDiv(stride, work_group_size) * work_group_size;
-  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(dev_id));
+  int64_t stride_warped =
+      CeilDiv(stride, SYCL_MAX_SUB_GROUP_SIZE) * SYCL_MAX_SUB_GROUP_SIZE;
+  int64_t group_size = std::min(stride_warped, work_group_size);
   auto num_groups = CeilDiv(num_of_segments * stride_warped, group_size);
   auto total_items = num_groups * group_size;
 
@@ -203,8 +204,9 @@ void compute_grad_weight(
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
 
   int64_t work_group_size = dpcppMaxWorkGroupSize(dev_id);
-  int64_t stride_warped = CeilDiv(stride, work_group_size) * work_group_size;
-  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(dev_id));
+  int64_t stride_warped =
+      CeilDiv(stride, SYCL_MAX_SUB_GROUP_SIZE) * SYCL_MAX_SUB_GROUP_SIZE;
+  int64_t group_size = std::min(stride_warped, work_group_size);
   auto num_groups = CeilDiv(num_of_segments * stride_warped, group_size);
   auto total_items = num_groups * group_size;
 
