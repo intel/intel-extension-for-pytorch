@@ -1078,7 +1078,7 @@ class Tester(TestCase):
                 if kind_not_in_graph is not None:
                     self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
-    def _test_mkl_fp32(self, model, input, kind_in_graph=None, prec=5e-3):
+    def _test_blas_backend_fp32(self, model, input, kind_in_graph=None, prec=5e-3):
         model = model.eval()
         model = ipex.optimize(model, dtype=torch.float32, auto_kernel_selection=True)
         with torch.no_grad():
@@ -1210,6 +1210,7 @@ class Tester(TestCase):
             linear_count_ori = check_op_count(graph_opt, ["aten::linear"])
             self.assertEqual(linear_count_ori, 2)
 #call prepack mkl path(fp32)
+        ipex._set_blas_backend("mkl")
         model = ipex.optimize(origin_model, dtype=torch.float32, auto_kernel_selection=True)
         ori_res = model(test_val1)
         with torch.no_grad():
@@ -1217,12 +1218,15 @@ class Tester(TestCase):
             graph_ori = str(model_jit.graph_for(test_val1))
             linear_count_ori = check_op_count(graph_ori, ["torch_ipex::ipex_MKLSGEMM"])
             self.assertEqual(linear_count_ori, 4)
+
             model_jit = torch.jit.freeze(model_jit)
             jit_res = model_jit(test_val1)
             self.assertEqual(ori_res, jit_res)
+
             graph_opt = str(model_jit.graph_for(test_val1))
             linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::mkl_sgemm_run"])
             self.assertEqual(linear_count_ori, 2)
+        ipex._set_blas_backend("dnnl")
 
         model = ipex.optimize(origin_model, dtype=torch.bfloat16)
         test_val1 = test_val1.bfloat16()
@@ -1286,7 +1290,7 @@ class Tester(TestCase):
                 c = torch.randn(bs, seq_len, dim)
                 jit_model = torch.jit.trace(model,(a, b, c))
                 trace_graph = jit_model.graph_for(a, b, c)
-                
+
                 jit_res = jit_model(a, b, c)
                 ori_res = model(a, b, c)
                 self.assertEqual(jit_res, ori_res)
@@ -1495,7 +1499,7 @@ class Tester(TestCase):
             res_jit = trace_model(qk_bf16, mask_bf16)
             self.assertEqual(res_ref, res_jit, prec=prec)
             _check_match_mha_parts(trace_model, qk_bf16, mask)
-        
+
         for sequance_length in [128, 100]:
             mat1 = torch.randn(56, 12, sequance_length, sequance_length)
             mat2 = torch.randn(56, 12, sequance_length, sequance_length)
@@ -2618,8 +2622,9 @@ class Tester(TestCase):
 
     def test_linear_auto_kernel_selection_fp32(self):
         x = torch.rand(32, 3)
-        options = itertools.product(['O0', 'O1'], [True, False])
-        for level, auto_select_kernel in options:
+        options = itertools.product(['O0', 'O1'], [True, False], ["mkl", "dnnl"])
+        for level, auto_select_kernel, blas_backend in options:
+            ipex._set_blas_backend(blas_backend)
             model = LinearRelu(3, 32, bias=True).eval()
             model = ipex.optimize(model, dtype=torch.float32, level=level, auto_kernel_selection=auto_select_kernel)
             with torch.no_grad():
@@ -2629,10 +2634,11 @@ class Tester(TestCase):
                 trace_graph = traced_model.graph_for(x)
 
                 if auto_select_kernel and level == 'O1':
-# for auto_select_kernel is True and level is O1, we will use ipex prepacked MKL linear
-                    self.assertTrue(any(n.kind() == 'ipex_prepack::mkl_sgemm_run' for n in trace_graph.nodes()))
+                    if ipex._is_mkl_blas_backend():
+                        self.assertTrue(any(n.kind() == 'ipex_prepack::mkl_sgemm_run' for n in trace_graph.nodes()))
+                    else:
+                        self.assertTrue(any(n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
                 else:
-# auto_select_kernel is false, we will use mkl linear
                     self.assertTrue(any(n.kind() == 'aten::linear' for n in trace_graph.nodes()))
 
     def test_linear_auto_kernel_selection_bf16(self):
@@ -2788,10 +2794,22 @@ class Tester(TestCase):
                     m,
                     x,
                     kind_in_graph="aten::linear")
-                self._test_mkl_fp32(
+
+                blas_backend = {"mkl":"ipex_prepack::mkl_sgemm_run"}
+                for _blas in blas_backend.keys():
+                    ipex._set_blas_backend(_blas)
+                    self._test_blas_backend_fp32(
+                        m,
+                        x,
+                        kind_in_graph=blas_backend[_blas])
+
+                ipex._set_blas_backend("dnnl")
+                self._test_blas_backend_fp32(
                     m,
                     x,
-                    kind_in_graph="ipex_prepack::mkl_sgemm_run")
+                    kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
+                    prec=prec)
+
                 if bf16_supported:
                     self._test_output_bf16(
                         m,
@@ -2836,10 +2854,16 @@ class Tester(TestCase):
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="aten::linear")
-        self._test_mkl_fp32(
-            LinearAdd(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::mkl_sgemm_run")
+
+        blas_backend = {"mkl":"ipex_prepack::mkl_sgemm_run", "dnnl":"ipex_prepack::linear_run"}
+        for _blas in blas_backend.keys():
+            ipex._set_blas_backend(_blas)
+            self._test_blas_backend_fp32(
+                LinearAdd(3, 32, bias=True),
+                torch.rand(32, 3),
+                kind_in_graph=blas_backend[_blas])
+        ipex._set_blas_backend("dnnl")
+
         self._test_output_bf16(
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
@@ -2855,10 +2879,16 @@ class Tester(TestCase):
                 m,
                 x,
                 kind_in_graph="aten::linear")
-            self._test_mkl_fp32(
-                m,
-                x,
-                kind_in_graph="ipex_prepack::mkl_sgemm_run")
+
+            blas_backend = {"mkl":"ipex_prepack::mkl_sgemm_run", "dnnl":"ipex_prepack::linear_run"}
+            for _blas in blas_backend.keys():
+                ipex._set_blas_backend(_blas)
+                self._test_blas_backend_fp32(
+                    m,
+                    x,
+                    kind_in_graph=blas_backend[_blas])
+            ipex._set_blas_backend("dnnl")
+
             self._test_output_bf16(
                 m,
                 x,
@@ -2885,14 +2915,21 @@ class Tester(TestCase):
             kind_in_graph="aten::linear")
 
     def test_output_linear_swish(self):
-        self._test_mkl_fp32(
-            LinearSigmoidMul(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::mkl_sgemm_run")
-        self._test_mkl_fp32(
-            LinearSigmoidMul(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::mkl_sgemm_run")
+
+        blas_backend = {"mkl":"ipex_prepack::mkl_sgemm_run", "dnnl":"ipex_prepack::linear_swish_run"}
+        for _blas in blas_backend.keys():
+            ipex._set_blas_backend(_blas)
+
+            self._test_blas_backend_fp32(
+                LinearSigmoidMul(3, 32, bias=True),
+                torch.rand(32, 3),
+                kind_in_graph=blas_backend[_blas])
+            self._test_blas_backend_fp32(
+                LinearSigmoidMul(3, 32, bias=False),
+                torch.rand(32, 3),
+                kind_in_graph=blas_backend[_blas])
+        ipex._set_blas_backend("dnnl")
+
         self._test_output_bf16(
             LinearSigmoidMul(3, 32, bias=True),
             torch.rand(32, 3),

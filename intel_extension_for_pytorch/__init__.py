@@ -29,4 +29,4 @@ from . import profiler
 from . import autocast
 
 from .utils.verbose import verbose
-from .frontend import optimize, enable_onednn_fusion, set_fp32_math_mode, get_fp32_math_mode, FP32MathMode
+from .frontend import optimize, enable_onednn_fusion, set_fp32_math_mode, get_fp32_math_mode, FP32MathMode, _set_blas_backend, _is_mkl_blas_backend, _is_dnnl_blas_backend

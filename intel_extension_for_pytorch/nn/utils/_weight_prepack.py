@@ -8,6 +8,21 @@ from intel_extension_for_pytorch import optim, frontend
 
 logger = logging.getLogger(__name__)
 
+class BlasBackend:
+    _blas_backend = "dnnl"
+
+    @classmethod
+    def set_backend(cls, backend="dnnl"):
+        cls._blas_backend = backend
+
+    @classmethod
+    def is_mkl(cls):
+        return cls._blas_backend == "mkl"
+
+    @classmethod
+    def is_dnnl(cls):
+        return cls._blas_backend == "dnnl"
+
 class _IPEXConvNd(nn.Module):
     __constants__ = ['stride', 'padding', 'dilation', 'groups',
                      'out_channels', 'kernel_size']
@@ -302,7 +317,7 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
             if weight not in params_attr:
                 params_attr[weight] = {}
             if type(m) is torch.nn.Linear:
-                if m.weight.dtype == torch.float32 and optimizer is None and frontend.get_fp32_math_mode(device="cpu") == frontend.FP32MathMode.FP32:
+                if BlasBackend.is_mkl() and m.weight.dtype == torch.float32 and optimizer is None and frontend.get_fp32_math_mode(device="cpu") == frontend.FP32MathMode.FP32:
                     new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = False)
                 else:
                     new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = True)

@@ -182,7 +182,7 @@ class TestPrepackCases(TestCase):
 
     def test_conv2d_training(self):
         self._test_convolution_training_base(dim=2, dtype=torch.float)
-        if core.onednn_has_bf16_support(): 
+        if core.onednn_has_bf16_support():
             self._test_convolution_training_base(dim=2, dtype=torch.bfloat16, rtol=1e-2, atol=1e-03)
 
         # TODO: add inference case.
@@ -436,6 +436,47 @@ class TestPrepackCases(TestCase):
         model = torchvision.models.resnet.resnext50_32x4d(pretrained=False)
         self._test_imagenet_model(model)
 
+    def test_blas_backend(self):
+        class L(torch.nn.Module):
+            def __init__(self, in_f, out_f, bias):
+                super(L, self).__init__()
+                self.linear = torch.nn.Linear(in_f, out_f, bias=bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        out_features = torch.randint(3, 10, (1,)).item()
+        in_features = torch.randint(3, 10, (1,)).item()
+
+        input_shape = (8, in_features)
+        x = torch.randn(input_shape, dtype=torch.float32)
+        model = L(in_features, out_features, True)
+        origin_model = copy.deepcopy(model).eval()
+
+        def test_dnnl():
+            self.assertTrue(ipex._is_dnnl_blas_backend())
+            ipex_model_dnnl = ipex.optimize(origin_model, dtype=torch.float32, level='O1', auto_kernel_selection=True)
+            with torch.no_grad():
+                dnnl_graph = torch.jit.trace(ipex_model_dnnl.eval(), x)
+                dnnl_graph = torch.jit.freeze(dnnl_graph)
+                dnnl_graph(x)
+                trace_graph = dnnl_graph.graph_for(x)
+                self.assertTrue(any(n.kind() == "ipex_prepack::linear_run" for n in trace_graph.nodes()))
+        test_dnnl()
+
+        ipex._set_blas_backend("mkl")
+        self.assertTrue(ipex._is_mkl_blas_backend())
+        ipex_model_dnnl = ipex.optimize(origin_model, dtype=torch.float32, level='O1', auto_kernel_selection=True)
+        with torch.no_grad():
+            dnnl_graph = torch.jit.trace(ipex_model_dnnl.eval(), x)
+            dnnl_graph = torch.jit.freeze(dnnl_graph)
+            dnnl_graph(x)
+            trace_graph = dnnl_graph.graph_for(x)
+            self.assertTrue(any(n.kind() == "ipex_prepack::mkl_sgemm_run" for n in trace_graph.nodes()))
+
+        ipex._set_blas_backend("dnnl")
+        test_dnnl()
+
     def test_linear_inference(self):
         class L(torch.nn.Module):
             def __init__(self, in_f, out_f, bias):
@@ -479,7 +520,7 @@ class TestPrepackCases(TestCase):
         input_shapes = []
         for s in in_feature:
             input_shapes += [(128, s), (2, 64, s), (2, 2, 32, s)]
-        
+
         options = itertools.product(out_feature, [True, False], input_shapes, [torch.bfloat16], [True, False])
         for out_features, bias, x_shape, dtype, feed_sample_input in options:
             in_features = x_shape[-1]
@@ -564,12 +605,12 @@ class TestPrepackCases(TestCase):
             "groups": 1,
             "dilation": 3,
         }
-        
+
         params_list = []
 
         for key, value in params_dict.items():
             params_list.append(value)
-        return params_list        
+        return params_list
 
     # mkldnn does not support the case where:
     # padding - output_padding + stride <= 0
@@ -594,7 +635,7 @@ class TestPrepackCases(TestCase):
 
         for key, value in params_dict.items():
             params_list.append(value)
-        return params_list        
+        return params_list
 
     def _test_deconv(self, dims, inference):
         class Deconv2d(torch.nn.Module):
@@ -667,14 +708,14 @@ class TestPrepackCases(TestCase):
                             ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
                         else:
                             ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
-                        
+
                         if padding - output_padding + stride <= 0:
                             # unsupported in mkldnn, should not replace the original ConvTranspose module
                             self.assertTrue(module_found(ipex_model, torch.nn.ConvTranspose2d if dims == 2 else torch.nn.ConvTranspose3d))
                             continue
                         else:
-                            self.assertFalse(module_found(ipex_model, torch.nn.ConvTranspose2d if dims == 2 else torch.nn.ConvTranspose3d))                        
-                        
+                            self.assertFalse(module_found(ipex_model, torch.nn.ConvTranspose2d if dims == 2 else torch.nn.ConvTranspose3d))
+
                         x1 = x.clone().requires_grad_()
                         x2 = x.clone().requires_grad_()
 

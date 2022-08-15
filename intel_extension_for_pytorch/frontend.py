@@ -159,7 +159,7 @@ def optimize(
             input data will impact the block format of packed weight. If not feed a sample
             input, Intel® Extension for PyTorch* will pack the weight per some predefined heuristics.
             If feed a sample input with real input shape, Intel® Extension for PyTorch* can get
-            best block format.            
+            best block format.
         auto_kernel_selection (bool) [experimental]: Different backends may have
             different performances with different dtypes/shapes. Default value
             is False. Intel® Extension for PyTorch* will try to optimize the
@@ -241,7 +241,7 @@ def optimize(
     if fuse_update_step is not None:
         opt_properties.fuse_update_step = fuse_update_step
     if auto_kernel_selection is not None:
-        opt_properties.auto_kernel_selection = auto_kernel_selection        
+        opt_properties.auto_kernel_selection = auto_kernel_selection
 
     if inplace:
         optimized_model = model
@@ -253,7 +253,7 @@ def optimize(
         if isinstance(sample_input, torch.Tensor):
             sample_input = (sample_input,)
         utils._weight_prepack.record_input_shape_for_prepack(optimized_model, sample_input)
-    
+
     if not model.training:
         if opt_properties.conv_bn_folding:
             try:
@@ -384,3 +384,12 @@ def get_fp32_math_mode(device="cpu"):
     """
 
     return core.get_fp32_math_mode()
+
+def _set_blas_backend(backend="dnnl"):
+    utils._weight_prepack.BlasBackend.set_backend(backend)
+
+def _is_mkl_blas_backend():
+    return utils._weight_prepack.BlasBackend.is_mkl()
+
+def _is_dnnl_blas_backend():
+    return utils._weight_prepack.BlasBackend.is_dnnl()
