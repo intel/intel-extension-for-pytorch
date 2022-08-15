@@ -74,7 +74,7 @@ import re
 #TORCH_VERSION = '1.13.0'
 #TORCH_VERSION = os.getenv('TORCH_VERSION', TORCH_VERSION)
 
-TORCH_IPEX_VERSION = '1.12.100+cpu'
+TORCH_IPEX_VERSION = '1.12.200+cpu'
 PYTHON_VERSION = sys.version_info
 
 package_name = "intel_extension_for_pytorch"
