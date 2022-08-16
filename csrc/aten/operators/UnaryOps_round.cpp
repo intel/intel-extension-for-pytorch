@@ -29,17 +29,6 @@ IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL(
     },
     unary_op);
 
-IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(remainder_out, TensorRemainderOp);
-
-Tensor remainder(const Tensor& self, const Scalar& other) {
-  auto out = at::empty_like(self);
-  return at::AtenIpexTypeXPU::remainder_out(out, self, other);
-}
-
-Tensor& remainder_(Tensor& self, const Scalar& other) {
-  return at::AtenIpexTypeXPU::remainder_out(self, self, other);
-}
-
 IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(fmod_out, TensorFmodOp);
 
 Tensor fmod(const Tensor& self, const Scalar& other) {
