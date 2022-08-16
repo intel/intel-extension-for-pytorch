@@ -124,17 +124,12 @@ float DPCPPEvent::elapsed_time(const DPCPPEvent& other) const {
   float time_ms = 0;
   auto self_last = *events_.rbegin();
   auto other_last = *other.events_.rbegin();
-  auto self_end =
+  long double self_end =
       self_last.template get_profiling_info<dpcpp_event_profiling_end>();
-  auto other_end =
+  long double other_end =
       other_last.template get_profiling_info<dpcpp_event_profiling_end>();
-  if (other_end <= self_end) {
-    // nanoseconds to milliseconds
-    time_ms = (self_end - other_end) / (1000.0 * 1000.0);
-  } else {
-    // nanoseconds to milliseconds
-    time_ms = (other_end - self_end) / (1000.0 * 1000.0);
-  }
+  // nanoseconds to milliseconds
+  time_ms = (other_end - self_end) / (1000.0 * 1000.0);
   return time_ms;
 }
 

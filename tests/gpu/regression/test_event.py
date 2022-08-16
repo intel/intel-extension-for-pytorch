@@ -27,3 +27,6 @@ class TestTorchXPUMethod(TestCase):
         t = start_event.elapsed_time(end_event)
         print(t)
         self.assertTrue(t > 0)
+        t = end_event.elapsed_time(start_event)
+        print(t)
+        self.assertTrue(t < 0)
