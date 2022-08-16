@@ -12,6 +12,8 @@ bool isViewOp(torch::jit::Node* n);
 
 bool isEltwiseOp(torch::jit::Node* n);
 
+bool isSupportedAsInputToDequant(torch::jit::Node* n);
+
 } // namespace utils
 } // namespace onednn
 } // namespace fuser

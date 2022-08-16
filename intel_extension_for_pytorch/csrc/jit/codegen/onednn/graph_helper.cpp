@@ -1,5 +1,6 @@
 #include "graph_helper.h"
 #include "fusion_group_name.h"
+#include "utils.h"
 
 #include "csrc/jit/codegen/LlgaTensorImpl.h"
 #include "csrc/jit/codegen/onednn/interface.h"
@@ -356,7 +357,11 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     //   ---/-----/-----\-----\---
     // dequant q_scale  q_zp  dtype
     // REQ(node->output(0)->uses().size() <= 2);
+    auto scale = toIValue(node->input(1));
+    REQ(scale.has_value() && scale->isDouble());
 
+    auto zero_point = toIValue(node->input(2));
+    REQ(zero_point.has_value() && zero_point->isInt());
     return Operator(node, opkind::Quantize)
         .setInput(0)
         .setOutput(0)
@@ -374,12 +379,7 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
   } else if (nodeKind == Symbol::aten("dequantize")) {
     if (node->numAttributes() == 0) {
       Node* input_node = node->input(0)->node();
-      TORCH_CHECK(
-          input_node->kind() == prim::Constant ||
-              input_node->kind() == Symbol::aten("quantize_per_tensor") ||
-              input_node->kind() == Symbol::aten("quantize_per_channel"),
-          "Unsupported input node kind to dequant ",
-          input_node->kind().toQualString());
+      REQ(utils::isSupportedAsInputToDequant(input_node));
 
       return makeDequantOp(node, input_node);
     } else {
