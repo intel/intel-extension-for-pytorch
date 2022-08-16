@@ -106,8 +106,13 @@ class AnlsLogBase():
             assert self.error == len(self.error_set), "{}::{} numeric error is {} but error set has {} cases".format(self.fname, self.clsname, self.error, len(self.error_set))
 
             self.valid_skip = len(self.not_ready_set)
-            self.total_ran = self.total_ran - self.total_skip + self.valid_skip
-            assert self.total_ran == len(self.pass_set) + len(self.fail_set) + len(self.error_set) + len(self.not_ready_set), "{}::{} numeric total ran is {} but case set has {} cases as total".format(self.fname, self.clsname, self.total_ran, len(self.pass_set) + len(self.fail_set) + len(self.error_set) + len(self.not_ready_set))
+            # This is an old version, we include xpu_not_ready(skipped) into total
+            # self.total_ran = self.total_ran - self.total_skip + self.valid_skip
+            # assert self.total_ran == len(self.pass_set) + len(self.fail_set) + len(self.error_set) + len(self.not_ready_set), "{}::{} numeric total ran is {} but case set has {} cases as total".format(self.fname, self.clsname, self.total_ran, len(self.pass_set) + len(self.fail_set) + len(self.error_set) + len(self.not_ready_set))
+
+            # This is an temp version, we exclude xpu_not_ready(skipped) out of total
+            self.total_ran = self.total_ran - self.total_skip
+            assert self.total_ran == len(self.pass_set) + len(self.fail_set) + len(self.error_set), "{}::{} numeric total ran is {} but case set has {} cases at total".format(self.fname, self.clsname, self.total_ran, len(self.pass_set) + len(self.fail_set) + len(self.error_set))
 
             if not hasResult:
                 self.errMsg = "This test not ran to an end. Please re-check the raw log and re-run it."
