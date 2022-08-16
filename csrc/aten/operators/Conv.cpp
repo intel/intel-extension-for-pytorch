@@ -766,8 +766,8 @@ Tensor convolution_sum_relu(
   attr.append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
   attr.append_post_eltwise( // append post relu
       /* relu_scale */ 1.f,
-      /* alpha */ 1.f,
-      /* beta */ 1.f,
+      /* alpha */ 0.f,
+      /* beta */ 0.f,
       attr.kind_with_relu);
   return _convolution_out(
       accumu,
