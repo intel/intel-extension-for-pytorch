@@ -500,7 +500,9 @@ supported:
   - softshrink.out
   - softshrink_backward.grad_input
   - sort
+  - sort.stable
   - sort.values
+  - sort.values_stable
   - sqrt.out
   - std.correction
   - std_mean.correction

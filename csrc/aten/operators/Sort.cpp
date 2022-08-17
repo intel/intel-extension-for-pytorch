@@ -31,5 +31,24 @@ std::tuple<at::Tensor, at::Tensor> sort(
   return sort_out_stable(self, true, dim, descending, sorted, indices);
 }
 
+std::tuple<Tensor, Tensor> sort(
+    const Tensor& self,
+    c10::optional<bool> stable,
+    int64_t dim,
+    bool descending) {
+  Tensor sorted, indices;
+  return sort_out_stable(self, stable, dim, descending, sorted, indices);
+}
+
+std::tuple<Tensor&, Tensor&> sort_out(
+    Tensor& values,
+    Tensor& indices,
+    const Tensor& self,
+    c10::optional<bool> stable,
+    int64_t dim,
+    bool descending) {
+  return sort_out_stable(self, stable, dim, descending, values, indices);
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
