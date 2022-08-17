@@ -402,7 +402,6 @@ setup(
     # Exclude the build files.
     packages=['intel_extension_for_pytorch',
               'intel_extension_for_pytorch.xpu',
-              'intel_extension_for_pytorch.autograd',
               'intel_extension_for_pytorch.xpu.intrinsic',
               'intel_extension_for_pytorch.xpu.intrinsic.modules',
               'intel_extension_for_pytorch.xpu.amp',

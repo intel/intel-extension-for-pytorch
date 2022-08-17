@@ -7,7 +7,6 @@ from ._version import (__version__, __ipex_git_sha__,
                        __ittapi_git_sha__, __onednn_git_sha__)
 
 from . import optim
-from .autograd import inference_mode
 
 
 def version():

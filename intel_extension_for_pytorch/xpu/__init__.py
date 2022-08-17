@@ -20,8 +20,6 @@ from .utils import *
 
 from intel_extension_for_pytorch._utils import _get_device_index  # , _dummy_type
 import intel_extension_for_pytorch.optim as optim
-import intel_extension_for_pytorch.autograd as autograd
-from intel_extension_for_pytorch.autograd import inference_mode
 
 _initialized = False
 _tls = threading.local()

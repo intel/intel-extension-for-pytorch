@@ -426,12 +426,6 @@ static void register_xpu_device_properties(PyObject* module) {
       });
 }
 
-static void register_inference_mode(PyObject* module) {
-  // Add _DeviceProperties class to intel_extension_for_pytorch._C
-  auto m = py::handle(module).cast<py::module>();
-  py::class_<c10::InferenceMode>(m, "_InferenceMode").def(py::init<bool>());
-}
-
 static void bindGetDeviceProperties(PyObject* module) {
   // Add method to intel_extension_for_pytorch._C
   auto m = py::handle(module).cast<py::module>();
@@ -727,6 +721,5 @@ void init_module(pybind11::module& m) {
   THDPStorage_init(module);
   PyModule_AddFunctions(module, _THPModule_methods);
   register_xpu_device_properties(module);
-  register_inference_mode(module);
   bindGetDeviceProperties(module);
 }
