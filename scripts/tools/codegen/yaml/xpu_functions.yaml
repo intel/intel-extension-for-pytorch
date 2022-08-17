@@ -281,6 +281,8 @@ supported:
   - inverse.out
   - is_set_to
   - isnan
+  - isneginf.out
+  - isposinf.out
   - is_pinned
   - kthvalue.values
   - l1_loss
