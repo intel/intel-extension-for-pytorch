@@ -790,7 +790,8 @@ struct ReduceOp {
     pos.barrier(dpcpp_local_fence);
 
     if (pos.get_local_linear_id() == 0) {
-      dpcpp_atomic_ref_t<int> count(semaphores[pos.get_group(1)]);
+      dpcpp_atomic_ref_rlx_dev_global_t<int> count(
+          semaphores[pos.get_group(1)]);
       int prev_groups_finished = count.fetch_add(
           1, dpcpp_mem_odr_acq_rel
           /* , default memory scope is device */);

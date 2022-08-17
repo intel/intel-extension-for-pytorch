@@ -29,3 +29,13 @@ class TestTorchMethod(TestCase):
         self.assertEqual(x_cpu2, x_dpcpp2.cpu())
         self.assertEqual(torch.median(x_cpu2),
                          torch.median(x_dpcpp2).to("cpu"))
+        x_cpu3 = torch.tensor([1, 3, 5, float('nan'), 2, 4, 6])
+        x_dpcpp3 = x_cpu3.clone().to(dpcpp_device)
+        self.assertEqual(torch.median(x_cpu3), torch.median(x_dpcpp3).to(cpu_device))
+
+    def test_nanmedian(self, dtype=torch.float):
+        x_base = torch.randn(100)
+        x_nan = torch.tensor([1., 2., float('nan'), 0.5])
+        x_cpu = torch.cat((x_base, x_nan))
+        x_dpcpp = x_cpu.clone().to(dpcpp_device)
+        self.assertEqual(torch.nanmedian(x_cpu), torch.nanmedian(x_dpcpp).to(cpu_device))

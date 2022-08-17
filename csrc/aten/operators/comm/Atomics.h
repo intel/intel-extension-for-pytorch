@@ -14,7 +14,7 @@ namespace AtenIpexTypeXPU {
 static inline DPCPP_DEVICE void atomicAdd(
     const dpcpp_global_ptr_pt<float>& address,
     float val) {
-  dpcpp_atomic_ref_relaxed_t<float> target(*address);
+  dpcpp_atomic_ref_rlx_dev_global_t<float> target(*address);
   target.fetch_add(val);
 }
 
@@ -24,7 +24,7 @@ static inline DPCPP_DEVICE void atomicAdd(
   unsigned long long* address_as_ull = (unsigned long long*)address;
   unsigned long long assumed = *address_as_ull;
   unsigned long long newval;
-  dpcpp_atomic_ref_relaxed_t<unsigned long long> target(*address_as_ull);
+  dpcpp_atomic_ref_rlx_dev_global_t<unsigned long long> target(*address_as_ull);
 
   do {
     newval = __double_as_long_long(val + __long_long_as_double(assumed));
@@ -38,7 +38,7 @@ static inline DPCPP_DEVICE void atomicAdd(
       (unsigned int*)((char*)address - ((size_t)address & 2));
   unsigned int assumed = *address_as_ui;
   unsigned int newval;
-  dpcpp_atomic_ref_relaxed_t<unsigned int> target(*address_as_ui);
+  dpcpp_atomic_ref_rlx_dev_global_t<unsigned int> target(*address_as_ui);
 
   do {
     newval = assumed;
@@ -57,7 +57,7 @@ static inline DPCPP_DEVICE void atomicAdd(
       (unsigned int*)((char*)address - ((size_t)address & 2));
   unsigned int assumed = *address_as_ui;
   unsigned int newval;
-  dpcpp_atomic_ref_relaxed_t<unsigned int> target(*address_as_ui);
+  dpcpp_atomic_ref_rlx_dev_global_t<unsigned int> target(*address_as_ui);
 
   do {
     newval = assumed;
@@ -72,14 +72,14 @@ static inline DPCPP_DEVICE void atomicAdd(
 static inline DPCPP_DEVICE void atomicAdd(
     const dpcpp_global_ptr_pt<int>& address,
     int val) {
-  dpcpp_atomic_ref_relaxed_t<int> target(*address);
+  dpcpp_atomic_ref_rlx_dev_global_t<int> target(*address);
   target.fetch_add(val);
 }
 
 static inline DPCPP_DEVICE void atomicAdd(
     const dpcpp_global_ptr_pt<long>& address,
     int val) {
-  dpcpp_atomic_ref_relaxed_t<long> target(*address);
+  dpcpp_atomic_ref_rlx_dev_global_t<long> target(*address);
   target.fetch_add(val);
 }
 
@@ -96,7 +96,7 @@ struct AtomicAddIntegerImpl<T, 1> {
     uint32_t newval;
     uint32_t newval_byte;
 
-    dpcpp_atomic_ref_relaxed_t<uint32_t> target(*address_as_ui);
+    dpcpp_atomic_ref_rlx_dev_global_t<uint32_t> target(*address_as_ui);
     do {
       newval = assumed;
       newval_byte = (newval >> shift) & 0xff;
@@ -117,7 +117,7 @@ struct AtomicAddIntegerImpl<T, 2> {
     uint32_t assumed = *address_as_ui;
     uint32_t newval;
     uint32_t newval_bytes;
-    dpcpp_atomic_ref_relaxed_t<uint32_t> target(*address_as_ui);
+    dpcpp_atomic_ref_rlx_dev_global_t<uint32_t> target(*address_as_ui);
 
     do {
       newval = assumed;
@@ -153,6 +153,20 @@ static inline DPCPP_DEVICE void atomicAdd(
     const dpcpp_global_ptr_pt<bool>& address,
     bool val) {
   *address = address && val;
+}
+
+static inline DPCPP_DEVICE void atomicAdd(
+    const dpcpp_local_ptr_pt<uint32_t>& address,
+    uint32_t val) {
+  dpcpp_atomic_ref_rlx_wg_local_t<uint32_t> target(*address);
+  target.fetch_add(val);
+}
+
+static inline DPCPP_DEVICE void atomicAdd(
+    const dpcpp_local_ptr_pt<uint64_t>& address,
+    uint64_t val) {
+  dpcpp_atomic_ref_rlx_wg_local_t<uint64_t> target(*address);
+  target.fetch_add(val);
 }
 
 template <typename T>

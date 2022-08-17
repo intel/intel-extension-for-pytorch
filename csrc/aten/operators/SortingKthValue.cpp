@@ -9,10 +9,12 @@
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
+#include "ReduceOpsUtils.h"
 #include "SortingCommon.h"
 #include "SortingRadixSelect.h"
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
+#include "comm/Atomics.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
@@ -111,6 +113,110 @@ void gatherKthValue(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
+// kernel to find the median, and its index, of the values along dimension dim
+template <typename scalar_t, typename index_t, int Dim>
+void gatherMedian(
+    TensorInfo<scalar_t, index_t> values,
+    TensorInfo<int64_t, index_t> indices,
+    TensorInfo<scalar_t, index_t> input,
+    index_t inputSliceSize,
+    index_t numInputSlices,
+    index_t inputWithinSliceStride,
+    bool ignore_nan) {
+  // Shared memory for the subroutine RadixSelect. Note that RadixSelect
+  // converts the floating point type to int with the same relative ordering.
+
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto values_data = values.data;
+    auto indices_data = indices.data;
+    auto in_data = input.data;
+
+    auto smem = dpcpp_local_acc_t<int>(32, cgh);
+    auto num_nan = dpcpp_local_acc_t<index_t>(1, cgh);
+
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+      index_t slice = item.get_group_linear_id();
+
+      // Finds the start offset for our slice
+      index_t valuesSliceStartIndex =
+          IndexToOffset<scalar_t, index_t, Dim>::get(slice, values);
+      index_t indicesSliceStartIndex =
+          IndexToOffset<int64_t, index_t, Dim>::get(slice, indices);
+      index_t inputSliceStartIndex =
+          IndexToOffset<scalar_t, index_t, Dim>::get(slice, input);
+
+      scalar_t* valuesSliceStart = values_data + valuesSliceStartIndex;
+      int64_t* indicesSliceStart = indices_data + indicesSliceStartIndex;
+      scalar_t* inputSliceStart = in_data + inputSliceStartIndex;
+
+      index_t nan_count = 0;
+      for (index_t i = item.get_local_id(0); i < inputSliceSize;
+           i += item.get_local_range(0)) {
+        scalar_t val = inputSliceStart[i * inputWithinSliceStride];
+        nan_count += Numerics<scalar_t>::isnan(val) ? 1 : 0;
+      }
+
+      // Counts number of nan values
+      // This code performs a parallel sum reduction
+      if (item.get_local_id(0) == 0) {
+        num_nan[0] = 0;
+      }
+
+      item.barrier(dpcpp_local_fence);
+      if (nan_count > 0) {
+        atomicAdd(num_nan.get_pointer().get(), nan_count);
+      }
+      item.barrier(dpcpp_local_fence);
+
+      // For torch.median, if we found nan set k to last index so the computed
+      // value is nan, otherwise set k to the middle element of the non-nan
+      // values
+      index_t k = (!ignore_nan && num_nan[0] > 0)
+          ? inputSliceSize - 1
+          : (inputSliceSize - num_nan[0] - 1) / 2;
+
+      // Find the median
+      scalar_t median = static_cast<scalar_t>(0);
+      radixSelect<
+          scalar_t,
+          typename TopKTypeConfig<scalar_t>::RadixType,
+          index_t,
+          false>(
+          (dpcpp_global_ptr_pt<scalar_t>)inputSliceStart,
+          k + 1,
+          inputSliceSize,
+          inputWithinSliceStride,
+          smem,
+          &median,
+          item);
+
+      valuesSliceStart[0] = median;
+
+      // Find the index of the median value in the slice
+      for (index_t i = item.get_local_id(0); i < inputSliceSize;
+           i += item.get_local_range(0)) {
+        scalar_t val = inputSliceStart[i * inputWithinSliceStride];
+        if (Numerics<scalar_t>::eq(val, median)) {
+          indicesSliceStart[0] = i;
+          break;
+        }
+      }
+    };
+
+    cgh.parallel_for(
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(numInputSlices * local_size),
+            DPCPP::range<1>(local_size)),
+        kfn);
+  };
+
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
 struct KthValueLauncher {
   int64_t k;
 
@@ -139,12 +245,39 @@ struct KthValueLauncher {
   }
 };
 
+struct MedianLauncher {
+  bool ignore_nan;
+
+  MedianLauncher(bool ignore_nan) : ignore_nan(ignore_nan) {}
+
+  template <typename scalar_t, typename index_t, int all_dims>
+  inline void launch(
+      TensorInfo<scalar_t, index_t> values_info,
+      int collapse_values_dim,
+      TensorInfo<int64_t, index_t> indices_info,
+      int collapse_indices_dim,
+      TensorInfo<scalar_t, index_t> self_info,
+      int collapse_self_dim,
+      int64_t num_slices,
+      int64_t slice_size) {
+    gatherMedian<scalar_t, index_t, all_dims>(
+        values_info,
+        indices_info,
+        self_info,
+        slice_size,
+        num_slices,
+        self_info.strides[collapse_self_dim],
+        ignore_nan);
+  }
+};
+
 std::tuple<Tensor&, Tensor&> median_with_indices_impl(
     Tensor& values,
     Tensor& indices,
     const Tensor& self,
     int64_t dim,
-    bool keepdim) {
+    bool keepdim,
+    bool ignore_nan) {
   at::globalContext().alertNotDeterministic("median XPU with indices output");
 
   dim = at::maybe_wrap_dim(dim, self.dim());
@@ -157,7 +290,7 @@ std::tuple<Tensor&, Tensor&> median_with_indices_impl(
       " dimensions");
 
   std::vector<int64_t> out_shape = self.sizes().vec();
-  at::native::zero_numel_check_dims(self, dim, "median()");
+  zero_numel_check_dims(self, dim, "median()");
   if (self.dim() > 0) {
     if (keepdim) {
       out_shape[dim] = 1;
@@ -177,20 +310,10 @@ std::tuple<Tensor&, Tensor&> median_with_indices_impl(
           if (canUse32BitIndexMath(vals) && canUse32BitIndexMath(inds) &&
               canUse32BitIndexMath(in)) {
             run_launcher<scalar_t, uint32_t>(
-                vals,
-                inds,
-                in,
-                dim,
-                KthValueLauncher(
-                    (in.size(dim) + 1) / 2)); // KthValue is 1-based
+                vals, inds, in, dim, MedianLauncher(ignore_nan));
           } else {
             run_launcher<scalar_t, uint64_t>(
-                vals,
-                inds,
-                in,
-                dim,
-                KthValueLauncher(
-                    (in.size(dim) + 1) / 2)); // KthValue is 1-based
+                vals, inds, in, dim, MedianLauncher(ignore_nan));
           }
         });
   }
@@ -502,7 +625,7 @@ std::tuple<Tensor, Tensor> mode(const Tensor& self, int64_t dim, bool keepdim) {
 }
 
 Tensor median(const Tensor& self) {
-  return impl::median_impl(self, /*ignore_nan=*/true);
+  return impl::median_impl(self, /*ignore_nan=*/false);
 }
 
 std::tuple<Tensor&, Tensor&> median_out(
@@ -511,7 +634,8 @@ std::tuple<Tensor&, Tensor&> median_out(
     bool keepdim,
     Tensor& values,
     Tensor& indices) {
-  return impl::median_with_indices_impl(values, indices, self, dim, keepdim);
+  return impl::median_with_indices_impl(
+      values, indices, self, dim, keepdim, /*ignore_nan=*/false);
 }
 
 std::tuple<Tensor&, Tensor&> kthvalue_out(
@@ -527,6 +651,20 @@ std::tuple<Tensor&, Tensor&> kthvalue_out(
             self, k, dim, keepdim, values, indices);
       });
   return std::forward_as_tuple(values, indices);
+}
+
+std::tuple<Tensor&, Tensor&> nanmedian_out(
+    const Tensor& self,
+    int64_t dim,
+    bool keepdim,
+    Tensor& values,
+    Tensor& indices) {
+  return impl::median_with_indices_impl(
+      values, indices, self, dim, keepdim, /*ignore_nan=*/true);
+}
+
+Tensor nanmedian(const Tensor& self) {
+  return impl::median_impl(self, /*ignore_nan=*/true);
 }
 
 } // namespace AtenIpexTypeXPU

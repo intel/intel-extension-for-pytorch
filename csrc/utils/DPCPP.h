@@ -430,8 +430,9 @@ DPCPP_HOST using dpcpp_host_acc_t =
 
 // dpcpp atomic
 template <typename T>
-using dpcpp_atomic_ref_relaxed_t = DPCPP::
+using dpcpp_atomic_ref_rlx_dev_global_t = DPCPP::
     atomic_ref<T, dpcpp_mem_odr_rlx, dpcpp_mem_scp_dev, dpcpp_global_space>;
 
 template <typename T>
-using dpcpp_atomic_ref_t = dpcpp_atomic_ref_relaxed_t<T>;
+using dpcpp_atomic_ref_rlx_wg_local_t = DPCPP::
+    atomic_ref<T, dpcpp_mem_odr_rlx, dpcpp_mem_scp_wg, dpcpp_local_space>;

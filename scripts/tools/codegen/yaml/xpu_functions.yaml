@@ -384,6 +384,8 @@ supported:
   - mvlgamma
   - mvlgamma_
   - nan_to_num.out
+  - nanmedian
+  - nanmedian.dim_values
   - narrow_copy
   - native_batch_norm
   - native_batch_norm_backward
