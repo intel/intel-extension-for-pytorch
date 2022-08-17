@@ -488,7 +488,16 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{xpu::dequant_pixelshuffle_sym,
       Symbol::fromQualString("aten::quantize_per_tensor")},
      xpu::dequant_pixelshuffle_quant_sym},
-};
+    {{Symbol::fromQualString("aten::_convolution"),
+      Symbol::fromQualString("aten::relu_")},
+     xpu::_convolution_relu__sym},
+    {{Symbol::fromQualString("aten::_convolution"), aten::add_},
+     xpu::_convolution_sum_sym},
+    {{xpu::_convolution_sum_sym, Symbol::fromQualString("aten::relu_")},
+     xpu::_convolution_sum_relu_sym},
+    {{Symbol::fromQualString("aten::_convolution"),
+      Symbol::fromQualString("aten::silu_")},
+     xpu::convolution_silu_sym}};
 
 void FusionPass(std::shared_ptr<Graph>& graph) {
   // Pattern based fusion was lack of alias analysis

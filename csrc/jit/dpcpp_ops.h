@@ -248,6 +248,70 @@ at::Tensor trans_addmm_dropout(
     bool train,
     bool inplace);
 
+at::Tensor _convolution_relu(
+    at::Tensor& input_r,
+    const at::Tensor& weight_r,
+    const at::Tensor& bias_r,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32);
+
+at::Tensor _convolution_sum(
+    at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    at::Tensor& accum,
+    at::Scalar scale);
+
+at::Tensor _convolution_sum_relu(
+    at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    at::Tensor& accum,
+    at::Scalar scale);
+
+at::Tensor _convolution_silu(
+    const at::Tensor& input_r,
+    const at::Tensor& weight_r,
+    const at::Tensor& bias_r,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32);
+
 } // namespace xpu
 } // namespace jit
 } // namespace torch

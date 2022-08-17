@@ -79,6 +79,34 @@ at::Tensor convolution_sum(
     at::Scalar alpha = 0.f,
     at::Scalar beta = 0.f);
 
+at::Tensor _convolution_relu_(
+    at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    bool transposed,
+    at::IntArrayRef output_padding,
+    int64_t groups,
+    at::Scalar scale = 1.0,
+    at::Scalar alpha = 0.f,
+    at::Scalar beta = 0.f);
+
+at::Tensor convolution_silu(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    bool transposed,
+    at::IntArrayRef output_padding,
+    int64_t groups,
+    at::Scalar scale = 1.0,
+    at::Scalar alpha = 1.f,
+    at::Scalar beta = 0.f);
+
 at::Tensor convolution_sum_relu(
     const at::Tensor& input,
     const at::Tensor& weight,

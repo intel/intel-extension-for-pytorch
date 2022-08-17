@@ -110,6 +110,7 @@ class Attr {
   algorithm kind_with_gelu = algorithm::eltwise_gelu_tanh;
   algorithm kind_with_mish = algorithm::eltwise_mish;
   algorithm kind_with_linear = algorithm::eltwise_linear;
+  algorithm kind_with_swish = algorithm::eltwise_swish;
 
   // append sum post op
   void append_post_sum(

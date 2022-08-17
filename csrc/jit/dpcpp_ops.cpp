@@ -3,6 +3,7 @@
 #include <ATen/DeviceGuard.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/record_function.h>
+#include <grp.h>
 #include <intrinsic/intrinsic.h>
 #include <oneapi/dnnl/dnnl.hpp>
 
@@ -982,6 +983,140 @@ at::Tensor fusion_amdd(
   const OptionalDeviceGuard device_guard(device_of(p));
   return at::AtenIpexTypeXPU::fusion_amdd(
       p, d_p, buf, weight_decay, momentum, dampening, lr);
+}
+
+at::Tensor _convolution_relu(
+    at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32) {
+  RECORD_FUNCTION(
+      "_convolution_relu", std::vector<c10::IValue>({input, weight, bias}));
+  const OptionalDeviceGuard device_guard(device_of(input));
+  return at::AtenIpexTypeXPU::convolution_relu(
+      input,
+      weight,
+      bias,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      1.0,
+      0.0,
+      0.0);
+}
+
+at::Tensor _convolution_sum(
+    at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    at::Tensor& accum,
+    at::Scalar scale) {
+  RECORD_FUNCTION(
+      "_convolution_sum", std::vector<c10::IValue>({input, weight, bias}));
+  const OptionalDeviceGuard device_guard(device_of(input));
+  return at::AtenIpexTypeXPU::convolution_sum(
+      input,
+      weight,
+      bias,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      accum,
+      scale,
+      0.0,
+      0.0);
+}
+
+at::Tensor _convolution_sum_relu(
+    at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    at::Tensor& accum,
+    at::Scalar scale) {
+  RECORD_FUNCTION(
+      "_convolution_sum_add", std::vector<c10::IValue>({input, weight, bias}));
+  const OptionalDeviceGuard device_guard(device_of(input));
+  return at::AtenIpexTypeXPU::convolution_sum_relu(
+      input,
+      weight,
+      bias,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      accum,
+      scale,
+      0.0,
+      0.0);
+}
+
+at::Tensor _convolution_silu(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32) {
+  RECORD_FUNCTION(
+      "_convolution_silu", std::vector<c10::IValue>({input, weight, bias}));
+  const OptionalDeviceGuard device_guard(device_of(input));
+  return at::AtenIpexTypeXPU::convolution_silu(
+      input,
+      weight,
+      bias,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      1.0,
+      1.0,
+      0.0);
 }
 
 } // namespace xpu

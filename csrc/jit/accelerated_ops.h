@@ -16,6 +16,12 @@ static auto conv2d_relu_sym = Symbol::fromQualString("xpu::conv2d_relu");
 static auto conv2d_sum_sym = Symbol::fromQualString("xpu::conv2d_sum");
 static auto conv2d_relu_sum_sym =
     Symbol::fromQualString("xpu::conv2d_relu_sum");
+static auto _convolution_relu__sym =
+    Symbol::fromQualString("xpu::_convolution_relu");
+static auto _convolution_sum_sym =
+    Symbol::fromQualString("xpu::_convolution_sum");
+static auto _convolution_sum_relu_sym =
+    Symbol::fromQualString("xpu::_convolution_sum_relu");
 static auto conv2d_sum_relu_sym =
     Symbol::fromQualString("xpu::conv2d_sum_relu");
 static auto conv2d_sigmoid_sym = Symbol::fromQualString("xpu::conv2d_sigmoid");
@@ -65,6 +71,8 @@ static auto dequant_pixelshuffle_quant_sym =
     Symbol::fromQualString("xpu::dequant_pixelshuffle_quant");
 static auto permute_contiguous_sym =
     Symbol::fromQualString("xpu::permute_contiguous");
+static auto convolution_silu_sym =
+    Symbol::fromQualString("xpu::_convolution_silu");
 
 // Fold weights of batch_norm with conv2d's
 static auto fold_weight_sym = Symbol::fromQualString("xpu::fold_weight");
