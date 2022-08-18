@@ -121,23 +121,6 @@ def get_submodule_commit(base_dir, submodule_dir):
         ['git', 'submodule', 'status', submodule_dir], cwd=base_dir).decode('ascii').strip().split()[0]
 
 
-def check_flake8_errors(base_dir, filepath):
-    if shutil.which('flake8') is None:
-        print("WARNING: Please install flake8 by pip install -r requirements-flake8.txt to check format!")
-        return
-    flak8_cmd = ['flake8']  # '--quiet'
-    if os.path.isdir(filepath):
-        for root, dirs, files in os.walk(filepath):
-            for file in files:
-                if(file.endswith('.py')):
-                    flak8_cmd.append(os.path.join(root, file))
-    elif os.path.isfile(filepath):
-        flak8_cmd.append(filepath)
-    ret = subprocess.call(flak8_cmd, cwd=base_dir)
-    if ret != 0:
-        print("ERROR: flake8 found format errors in", filepath, "!")
-        print("WARNING: Please check requirements-flake8.txt to align flake8 version")
-        # sys.exit(1)
 
 
 def get_build_version(ipex_git_sha):
@@ -171,10 +154,6 @@ def create_version_files(base_dir, version, git_sha_dict):
             f.write("{key} = '{value}'\n".format(key=k, value=v))
 
 
-check_flake8_errors(base_dir, os.path.abspath(__file__))
-check_flake8_errors(base_dir, ipex_pydir)
-# check_flake8_errors(base_dir, ipex_scripts)
-check_flake8_errors(base_dir, ipex_examples)
 
 git_sha_dict = {
     "__ipex_git_sha__": get_git_head_sha(base_dir),

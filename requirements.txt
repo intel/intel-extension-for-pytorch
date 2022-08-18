@@ -1,5 +1,4 @@
 # for install
-flake8
 future
 pyyaml
 setuptools
