@@ -18,7 +18,7 @@ inline std::pair<int64_t, int64_t> get_index_mapping1d(
     int64_t output_w,
     int64_t output_x,
     int64_t pad_l,
-    const DPCPP::nd_item<3> item) {
+    const sycl::nd_item<3> item) {
   auto input_offset =
       (item.get_group(1) + item.get_group(2) * item.get_group_range(1)) *
       input_w;
@@ -45,7 +45,7 @@ inline std::pair<int64_t, int64_t> get_index_mapping2d(
     int64_t pad_l,
     int64_t pad_t,
     int64_t output_xy,
-    const DPCPP::nd_item<3> item) {
+    const sycl::nd_item<3> item) {
   // 3D grid of 1D blocks
   auto input_offset =
       (item.get_group(1) + item.get_group(2) * item.get_group_range(1)) *
@@ -92,7 +92,7 @@ void reflection_pad1d_out_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto input_data = input;
     auto output_data = output;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
       auto input_ptr = input_data;
       auto output_ptr = output_data;
       auto output_x = item.get_global_id(0);
@@ -105,9 +105,9 @@ void reflection_pad1d_out_kernel(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range<3>(
-            DPCPP::range<3>(work_group_size * work_group_num, nplane, nbatch),
-            DPCPP::range<3>(work_group_size, 1, 1)),
+        sycl::nd_range<3>(
+            sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
+            sycl::range<3>(work_group_size, 1, 1)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -136,7 +136,7 @@ void reflection_pad2d_out_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto input_data = input;
     auto output_data = output;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
       auto input_ptr = input_data;
       auto output_ptr = output_data;
       auto output_xy = item.get_global_id(0);
@@ -156,9 +156,9 @@ void reflection_pad2d_out_kernel(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range<3>(
-            DPCPP::range<3>(work_group_size * work_group_num, nplane, nbatch),
-            DPCPP::range<3>(work_group_size, 1, 1)),
+        sycl::nd_range<3>(
+            sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
+            sycl::range<3>(work_group_size, 1, 1)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -354,7 +354,7 @@ void reflection_pad1d_backward_out_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto grad_input_data = grad_input;
     auto grad_output_data = grad_output;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
       auto grad_input_ptr = grad_input_data;
       auto grad_output_ptr = grad_output_data;
       auto output_x = item.get_global_id(0);
@@ -369,9 +369,9 @@ void reflection_pad1d_backward_out_kernel(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range<3>(
-            DPCPP::range<3>(work_group_size * work_group_num, nplane, nbatch),
-            DPCPP::range<3>(work_group_size, 1, 1)),
+        sycl::nd_range<3>(
+            sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
+            sycl::range<3>(work_group_size, 1, 1)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -399,7 +399,7 @@ void reflection_pad2d_backward_out_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto grad_input_data = grad_input;
     auto grad_output_data = grad_output;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
       auto grad_input_ptr = grad_input_data;
       auto grad_output_ptr = grad_output_data;
       auto output_xy = item.get_global_id(0);
@@ -421,9 +421,9 @@ void reflection_pad2d_backward_out_kernel(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range<3>(
-            DPCPP::range<3>(work_group_size * work_group_num, nplane, nbatch),
-            DPCPP::range<3>(work_group_size, 1, 1)),
+        sycl::nd_range<3>(
+            sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
+            sycl::range<3>(work_group_size, 1, 1)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);

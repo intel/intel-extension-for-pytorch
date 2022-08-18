@@ -149,7 +149,7 @@ static inline void packed_add_kernel(
     auto LSB_data = w_LSB;
     auto gw_data = gw;
 
-    cgh.parallel_for(DPCPP::range<1>(num_elem), [=](DPCPP::item<1> item) {
+    cgh.parallel_for(sycl::range<1>(num_elem), [=](sycl::item<1> item) {
       int64_t gid = item.get_linear_id();
       auto MSB_p = MSB_data;
       auto LSB_p = LSB_data;
@@ -198,7 +198,7 @@ static inline void sparse_packed_add_kernel(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     // auto newValues_data = newValues.data_ptr<scalar_t>();
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
       auto MSB_p = w_MSB;
       auto LSB_p = w_LSB;
       auto uniqueOffsets_ptr = uniqueOffsets;
@@ -238,9 +238,9 @@ static inline void sparse_packed_add_kernel(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<2>(
-            DPCPP::range<2>(num_group_0 * 4, num_group_1 * 64),
-            DPCPP::range<2>(4, 64)),
+        sycl::nd_range<2>(
+            sycl::range<2>(num_group_0 * 4, num_group_1 * 64),
+            sycl::range<2>(4, 64)),
         kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -329,7 +329,7 @@ static inline void fusion_amdd_kernel(
     auto m_buf = buf;
     auto gw = d_p;
 
-    cgh.parallel_for(DPCPP::range<1>(num_element), [=](DPCPP::item<1> item) {
+    cgh.parallel_for(sycl::range<1>(num_element), [=](sycl::item<1> item) {
       auto id = item.get_linear_id();
       gw[id] += w[id] * weight_decay;
       m_buf[id] = m_buf[id] * momentum + gw[id];

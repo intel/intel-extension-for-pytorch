@@ -58,12 +58,12 @@ static PyObject* THDPStream_get_xpu_stream(THDPStream* self, void* unused) {
   HANDLE_TH_ERRORS
   auto& dpcpp_queue = self->dpcpp_stream.dpcpp_queue();
   return PyCapsule_New(
-      reinterpret_cast<void*>(new DPCPP::queue(dpcpp_queue)),
+      reinterpret_cast<void*>(new sycl::queue(dpcpp_queue)),
       "SyclQueueRef",
       [](PyObject* cap) {
         if (PyCapsule_IsValid(cap, "SyclQueueRef")) {
           void* ptr = PyCapsule_GetPointer(cap, "SyclQueueRef");
-          DPCPP::queue* q_ptr = reinterpret_cast<DPCPP::queue*>(ptr);
+          sycl::queue* q_ptr = reinterpret_cast<sycl::queue*>(ptr);
           delete q_ptr;
         }
       });

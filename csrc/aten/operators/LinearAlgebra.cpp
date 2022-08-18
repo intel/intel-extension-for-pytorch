@@ -28,7 +28,7 @@ namespace impl {
 #ifdef USE_ONEMKL
 template <typename scalar_t>
 void mkl_dot(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t n,
     scalar_t* x,
     int64_t incx,
@@ -42,7 +42,7 @@ void mkl_dot(
 // mkl dotu: Computes the dot product of two complex vectors.
 template <>
 void mkl_dot<c10::complex<double>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t n,
     c10::complex<double>* x,
     int64_t incx,
@@ -63,7 +63,7 @@ void mkl_dot<c10::complex<double>>(
 
 template <>
 void mkl_dot<c10::complex<float>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t n,
     c10::complex<float>* x,
     int64_t incx,
@@ -84,7 +84,7 @@ void mkl_dot<c10::complex<float>>(
 
 template <typename scalar_t>
 void mkl_vdot(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t n,
     scalar_t* x,
     int64_t incx,
@@ -98,7 +98,7 @@ void mkl_vdot(
 // first vector.
 template <>
 void mkl_vdot<c10::complex<double>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t n,
     c10::complex<double>* x,
     int64_t incx,
@@ -119,7 +119,7 @@ void mkl_vdot<c10::complex<double>>(
 
 template <>
 void mkl_vdot<c10::complex<float>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t n,
     c10::complex<float>* x,
     int64_t incx,
@@ -150,7 +150,7 @@ void copy_triangle_symmetric_template(Tensor& self, bool upper) {
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto data_ptr = (scalar_t*)self.data_ptr();
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto linear_id = item_id.get_linear_id();
       float triangle_row_ =
           (Numerics<float>::sqrt(1 + 8.0 * linear_id) - 1) / 2;
@@ -173,7 +173,7 @@ void copy_triangle_symmetric_template(Tensor& self, bool upper) {
       data_ptr[dst_off] = data_ptr[src_off];
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(work_item_num), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(work_item_num), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -233,7 +233,7 @@ void addr_kernel_out(
     auto input_ptr = self.data_ptr<scalar_t>();
     auto vec1_ptr = vec1.data_ptr<scalar_t>();
     auto vec2_ptr = vec2.data_ptr<scalar_t>();
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
       auto item_id = item.get_id(0);
       auto vec2_elem = static_cast<accscalar_t>(alpha_scalar) *
           static_cast<accscalar_t>(vec2_ptr[item_id]);
@@ -264,7 +264,7 @@ void addr_kernel_out(
         }
       }
     };
-    cgh.parallel_for(DPCPP::range<1>(total_items), kfn);
+    cgh.parallel_for(sycl::range<1>(total_items), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }

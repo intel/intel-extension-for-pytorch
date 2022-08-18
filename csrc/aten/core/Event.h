@@ -20,7 +20,7 @@ namespace dpcpp {
 struct DPCPPEvent {
   // Constructors
   DPCPPEvent() {}
-  DPCPPEvent(DPCPP::event);
+  DPCPPEvent(sycl::event);
 
   ~DPCPPEvent() {}
 
@@ -37,7 +37,7 @@ struct DPCPPEvent {
 
   DeviceIndex device_index() const;
 
-  std::vector<DPCPP::event> event() const;
+  std::vector<sycl::event> event() const;
 
   bool query() const;
 
@@ -57,7 +57,7 @@ struct DPCPPEvent {
 
  private:
   DeviceIndex device_index_ = -1;
-  std::vector<DPCPP::event> events_;
+  std::vector<sycl::event> events_;
 
   void moveHelper(DPCPPEvent&& other);
 };

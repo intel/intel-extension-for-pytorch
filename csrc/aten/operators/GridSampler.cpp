@@ -404,7 +404,7 @@ void grid_sampler_2d_kernel(
   auto output_data = output.data;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       auto index = item_id.get_global_linear_id();
       if (index >= nthreads)
         return;
@@ -548,7 +548,7 @@ void grid_sampler_2d_kernel(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
+        sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -599,7 +599,7 @@ void grid_sampler_2d_backward_kernel(
   auto grad_grid_data = grad_grid.data;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       auto index = item_id.get_global_linear_id();
       if (index >= nthreads)
         return;
@@ -822,7 +822,7 @@ void grid_sampler_2d_backward_kernel(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
+        sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -869,7 +869,7 @@ void grid_sampler_3d_kernel(
   auto output_data = output.data;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       auto index = item_id.get_global_linear_id();
       if (index >= nthreads)
         return;
@@ -1031,7 +1031,7 @@ void grid_sampler_3d_kernel(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
+        sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -1088,7 +1088,7 @@ void grid_sampler_3d_backward_kernel(
   auto grad_grid_data = grad_grid.data;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       auto index = item_id.get_global_linear_id();
       if (index >= nthreads)
         return;
@@ -1380,7 +1380,7 @@ void grid_sampler_3d_backward_kernel(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
+        sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

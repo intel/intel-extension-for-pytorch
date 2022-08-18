@@ -121,8 +121,8 @@ void roll_dpcpp_kernel(
     auto in_data = in_tensor.data_ptr<scalar_t>();
     auto out_data = out_tensor.data_ptr<scalar_t>();
     cgh.parallel_for(
-        DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
-        [=](DPCPP::nd_item<1> item) {
+        sycl::nd_range<1>(sycl::range<1>(GRange), sycl::range<1>(tileSize)),
+        [=](sycl::nd_item<1> item) {
           int64_t linear_index = item.get_global_id(0);
           auto in_ptr = in_data;
           auto out_ptr = out_data;

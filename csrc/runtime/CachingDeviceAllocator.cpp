@@ -139,14 +139,14 @@ int CachingDeviceAllocator::malloc_with_retry(
     size_t size) {
   auto syclDev = dpcppGetRawDevice(di);
   // Our minimum allocated memory is 512. Thus we set mem align to 512.
-  *devPtr = DPCPP::aligned_alloc_device(
+  *devPtr = sycl::aligned_alloc_device(
       kDevAlignment, size, syclDev, dpcppGetDeviceContext(di));
 
   if (*devPtr == NULL) {
     DeviceStats& stats = get_stats_for_device(di);
     stats.num_alloc_retries += 1;
     free_cached_blocks(di);
-    *devPtr = DPCPP::aligned_alloc_device(
+    *devPtr = sycl::aligned_alloc_device(
         kDevAlignment, size, syclDev, dpcppGetDeviceContext(di));
     if (*devPtr == NULL) {
       return DPCPP_FAILURE;
@@ -514,7 +514,7 @@ void CachingDeviceAllocator::free_blocks(
   while (it != end) {
     Block* block = *it;
     if (!block->m_prev && !block->m_next) {
-      DPCPP::free(
+      sycl::free(
           (void*)block->m_buffer, dpcppGetDeviceContext(block->m_device));
 
       DeviceStats& stats = get_stats_for_device(block->m_device);
@@ -556,7 +556,7 @@ void CachingDeviceAllocator::synchronize_and_free_events(
   auto remaining_events = decltype(dpcpp_events)();
 
   for (auto& e : dpcpp_events) {
-    DPCPP::event event = e.first;
+    sycl::event event = e.first;
     Block* block = e.second;
     if (di.has_value() && block->m_device != *di) {
       remaining_events.push_back(e);

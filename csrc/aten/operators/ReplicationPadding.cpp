@@ -41,7 +41,7 @@ void replication_pad_forward_kernel2d(
   int workgroup_size = outputPlaneSize > 256 ? 256 : outputPlaneSize;
   // clcle
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
       int outputPointId =
           item.get_local_id(0) + item.get_group(0) * item.get_local_range(0);
       int plane = item.get_group(1);
@@ -66,12 +66,12 @@ void replication_pad_forward_kernel2d(
       output[out_] = valueToCopy;
     };
     cgh.parallel_for(
-        DPCPP::nd_range<3>(
-            DPCPP::range<3>(
+        sycl::nd_range<3>(
+            sycl::range<3>(
                 CeilDiv(outputPlaneSize, workgroup_size) * workgroup_size,
                 o1,
                 o0),
-            DPCPP::range<3>(workgroup_size, 1, 1)),
+            sycl::range<3>(workgroup_size, 1, 1)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -210,7 +210,7 @@ void replication_pad_backward_kernel(
   int workgroup_size = outputPlaneSize > 256 ? 256 : outputPlaneSize;
   // clcle
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
       int outputPointId =
           item.get_local_id(0) + item.get_group(0) * item.get_local_range(0);
       int plane = item.get_group(1);
@@ -235,12 +235,12 @@ void replication_pad_backward_kernel(
       atomicAdd((dpcpp_global_ptr_pt<scalar_t>)&gradInput[gi_], valueToCopy);
     };
     cgh.parallel_for(
-        DPCPP::nd_range<3>(
-            DPCPP::range<3>(
+        sycl::nd_range<3>(
+            sycl::range<3>(
                 CeilDiv(outputPlaneSize, workgroup_size) * workgroup_size,
                 go1,
                 go0),
-            DPCPP::range<3>(workgroup_size, 1, 1)),
+            sycl::range<3>(workgroup_size, 1, 1)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);

@@ -191,7 +191,7 @@ inline int64_t resolve_root_int(
   // TODO: PyTorch uses ::__double2ll_rd. No corresponding API in DPCPP.
   // uses std::llround or std::ceil or std::float will cause error:
   // terminate called after throwing an instance of
-  // 'DPCPP::compile_program_error'.
+  // 'sycl::compile_program_error'.
   //
   int64_t res = static_cast<int64_t>((-b + sign * sr) / 2);
 
@@ -251,7 +251,7 @@ void triu_indices_dpcpp_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto data = tensor;
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto tensor_ptr = data;
       int64_t r, c;
       for (int64_t linearIndex = item.get_global_id(0);
@@ -274,8 +274,8 @@ void triu_indices_dpcpp_kernel(
     };
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
   };
 
@@ -300,7 +300,7 @@ void tril_indices_dpcpp_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto data = tensor;
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto tensor_ptr = data;
       int64_t r, c;
       for (int64_t linearIndex = item.get_global_id(0);
@@ -325,8 +325,8 @@ void tril_indices_dpcpp_kernel(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
   };
 

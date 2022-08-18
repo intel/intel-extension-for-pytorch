@@ -241,7 +241,7 @@ DPCPP_DEVICE void countRadixUsingMask(
     IndexType sliceSize,
     IndexType withinSliceStride,
     const dpcpp_global_ptr_pt<DataType>& data_ptr,
-    const DPCPP::nd_item<1>& item_id) {
+    const sycl::nd_item<1>& item_id) {
   // Clear out per-thread counts from a previous round
   auto local_id = item_id.get_local_id(0);
   for (int i = 0; i < RADIX_SIZE; ++i) {
@@ -268,7 +268,7 @@ DPCPP_DEVICE void countRadixUsingMask(
   }
 
   for (unsigned int i = 0; i < RADIX_SIZE; i++) {
-    DPCPP::
+    sycl::
         atomic_ref<int, dpcpp_mem_odr_rlx, dpcpp_mem_scp_wg, dpcpp_local_space>
             smem_var(smem_acc[i]);
     smem_var.fetch_add(counts[i]);
@@ -293,7 +293,7 @@ DPCPP_DEVICE DataType findPattern(
     IndexType withinSliceStride,
     BitDataType desired,
     BitDataType desiredMask,
-    const DPCPP::nd_item<1>& item_id) {
+    const sycl::nd_item<1>& item_id) {
   auto local_id = item_id.get_local_id(0);
   auto smem_ptr =
       static_cast<DataType*>(static_cast<void*>(smem_acc.get_pointer().get()));
@@ -341,7 +341,7 @@ DPCPP_DEVICE void radixSelect(
     const IndexType withinSliceStride,
     const dpcpp_local_acc_t<int>& smem_acc,
     DataType* topK,
-    const DPCPP::nd_item<1>& item_id) {
+    const sycl::nd_item<1>& item_id) {
   // Per-thread buckets into which we accumulate digit counts in our radix
   int counts[RADIX_SIZE];
 
@@ -456,7 +456,7 @@ void gatherTopK(
     auto indices_data = indices.data;
     auto smem_acc = dpcpp_local_acc_t<int>(32, cgh);
     auto smem_scan_acc = dpcpp_local_acc_t<int>(local_size, cgh);
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       IndexType local_id = item_id.get_local_id(0);
       // Find the start offset for our slice
       IndexType slice = item_id.get_group_linear_id();
@@ -556,9 +556,9 @@ void gatherTopK(
     };
 
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(numInputSlices * local_size),
-            DPCPP::range<1>(local_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(numInputSlices * local_size),
+            sycl::range<1>(local_size)),
         kfn);
   };
 

@@ -23,7 +23,7 @@ namespace dpcpp {
         lineno);                                                  \
     throw;                                                        \
   }                                                               \
-  catch (DPCPP::exception & e) {                                  \
+  catch (sycl::exception & e) {                                   \
     TORCH_WARN(                                                   \
         "DPCPP Exception: ",                                      \
         e.what(),                                                 \
@@ -46,7 +46,7 @@ namespace dpcpp {
         "line = ",                                                \
         lineno);                                                  \
   }                                                               \
-  catch (DPCPP::exception & e) {                                  \
+  catch (sycl::exception & e) {                                   \
     TORCH_WARN(                                                   \
         "DPCPP Exception: ",                                      \
         e.what(),                                                 \
@@ -58,7 +58,7 @@ namespace dpcpp {
 #else
 #define AT_DPCPP_CATCH_RETHROW(filename, lineno) \
   }                                              \
-  catch (DPCPP::exception & e) {                 \
+  catch (sycl::exception & e) {                  \
     TORCH_WARN(                                  \
         "DPCPP Exception: ",                     \
         e.what(),                                \
@@ -71,7 +71,7 @@ namespace dpcpp {
 
 #define AT_DPCPP_CATCH_NOTHROW(filename, lineno) \
   }                                              \
-  catch (DPCPP::exception & e) {                 \
+  catch (sycl::exception & e) {                  \
     TORCH_WARN(                                  \
         "DPCPP Exception: ",                     \
         e.what(),                                \
@@ -124,7 +124,7 @@ namespace dpcpp {
     }                                             \
   } while (0)
 
-static DPCPP::async_handler dpcppAsyncHandler = [](DPCPP::exception_list eL) {
+static sycl::async_handler dpcppAsyncHandler = [](sycl::exception_list eL) {
   for (auto& e : eL) {
     AT_DPCPP_TRY
     std::rethrow_exception(e);

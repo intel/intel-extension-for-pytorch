@@ -41,22 +41,22 @@ C10_HOST_DEVICE static inline scalar_t zeta(scalar_t _x, scalar_t _q) {
   }
 
   if (q <= zero) {
-    if (q == DPCPP::floor(q)) {
+    if (q == sycl::floor(q)) {
       return std::numeric_limits<scalar_t>::infinity();
     }
-    if (x != DPCPP::floor(x)) {
+    if (x != sycl::floor(x)) {
       return std::numeric_limits<scalar_t>::quiet_NaN();
     }
   }
 
-  s = DPCPP::pow(q, -x);
+  s = sycl::pow(q, -x);
   a = q;
   i = 0;
   b = zero;
   while ((i < 9) || (a <= acc_t{9.0})) {
     i += 1;
     a += one;
-    b = DPCPP::pow(a, -x);
+    b = sycl::pow(a, -x);
     s += b;
     if ((-MACHEP * s < b) && (b < MACHEP * s)) {
       return static_cast<scalar_t>(s);
@@ -73,7 +73,7 @@ C10_HOST_DEVICE static inline scalar_t zeta(scalar_t _x, scalar_t _q) {
     b /= w;
     t = a * b / A[i];
     s = s + t;
-    t = DPCPP::fabs(t / s);
+    t = sycl::fabs(t / s);
     if (t < MACHEP) {
       return static_cast<scalar_t>(s);
     }
@@ -123,8 +123,8 @@ static inline C10_HOST_DEVICE scalar_t calc_digamma(scalar_t in) {
     // a periodicity of pi, in practice the computation of pi * x is a source of
     // error (when |x| > 1).
     double q, r;
-    r = DPCPP::modf(static_cast<double>(x), &q);
-    result = static_cast<accscalar_t>(-PI_f64 / DPCPP::tan(PI_f64 * r));
+    r = sycl::modf(static_cast<double>(x), &q);
+    result = static_cast<accscalar_t>(-PI_f64 / sycl::tan(PI_f64 * r));
     x = 1 - x;
   }
 
@@ -148,7 +148,7 @@ static inline C10_HOST_DEVICE scalar_t calc_digamma(scalar_t in) {
   }
 
   return static_cast<scalar_t>(
-      DPCPP::log(x) - (static_cast<accscalar_t>(0.5) / x) - y + result);
+      sycl::log(x) - (static_cast<accscalar_t>(0.5) / x) - y + result);
 }
 
 template <typename scalar_t>
@@ -160,7 +160,7 @@ static inline C10_HOST_DEVICE scalar_t calc_trigamma(scalar_t in) {
   accscalar_t result = 0;
   if (x < 0.5f) {
     sign = -1;
-    accscalar_t sin_pi_x = DPCPP::sin(PI * x);
+    accscalar_t sin_pi_x = sycl::sin(PI * x);
     result -= (PI * PI) / (sin_pi_x * sin_pi_x);
     x = 1 - x;
   }
@@ -178,8 +178,8 @@ static inline C10_HOST_DEVICE scalar_t calc_trigamma(scalar_t in) {
 
 template <typename scalar_t>
 static inline C10_HOST_DEVICE scalar_t calc_gcd(scalar_t a_in, scalar_t b_in) {
-  scalar_t a = DPCPP::abs(a_in);
-  scalar_t b = DPCPP::abs(b_in);
+  scalar_t a = sycl::abs(a_in);
+  scalar_t b = sycl::abs(b_in);
   while (a != 0) {
     scalar_t c = a;
     a = b % a;
@@ -280,22 +280,22 @@ static inline C10_HOST_DEVICE scalar_t calc_i0(scalar_t _x) {
       "don't instantiate with low precision type");
   // Upcast input for numerical accuracy purposes
   // Needed for accurate results if input is bfloat16 or float16
-  scalar_t x = DPCPP::abs(_x);
+  scalar_t x = sycl::abs(_x);
 
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i0e_A<scalar_t>();
     auto A = std::get<0>(coeff_pair);
     auto len = std::get<1>(coeff_pair);
     scalar_t y = (x / scalar_t{2.0}) - scalar_t{2.0};
-    return (DPCPP::exp(x) * chbevl(y, A, len));
+    return (sycl::exp(x) * chbevl(y, A, len));
   }
 
   auto coeff_pair = chebyshev_coefficients_i0e_B<scalar_t>();
   auto B = std::get<0>(coeff_pair);
   auto len = std::get<1>(coeff_pair);
   return (
-      DPCPP::exp(x) * chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len) /
-      DPCPP::sqrt(x));
+      sycl::exp(x) * chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len) /
+      sycl::sqrt(x));
 }
 
 template <typename T>
@@ -409,13 +409,13 @@ C10_HOST_DEVICE inline typename std::
 
 template <typename scalar_t>
 static inline C10_HOST_DEVICE scalar_t calc_i1(scalar_t _x) {
-  const auto x = DPCPP::abs(_x);
+  const auto x = sycl::abs(_x);
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i1e_A<scalar_t>();
     auto A = std::get<0>(coeff_pair);
     auto len = std::get<1>(coeff_pair);
     scalar_t y = x / scalar_t{2.0} - scalar_t{2.0};
-    const scalar_t out = DPCPP::exp(x) * x * chbevl(y, A, len);
+    const scalar_t out = sycl::exp(x) * x * chbevl(y, A, len);
     return (_x < scalar_t{0.0}) ? -out : out;
   }
 
@@ -423,14 +423,14 @@ static inline C10_HOST_DEVICE scalar_t calc_i1(scalar_t _x) {
   auto B = std::get<0>(coeff_pair);
   auto len = std::get<1>(coeff_pair);
   const scalar_t out =
-      (DPCPP::exp(x) * chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len)) /
-      DPCPP::sqrt(x);
+      (sycl::exp(x) * chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len)) /
+      sycl::sqrt(x);
   return (_x < scalar_t{0.0}) ? -out : out;
 }
 
 template <typename scalar_t>
 static inline C10_HOST_DEVICE scalar_t calc_i1e(scalar_t _x) {
-  const auto x = DPCPP::abs(_x);
+  const auto x = sycl::abs(_x);
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i1e_A<scalar_t>();
     auto A = std::get<0>(coeff_pair);
@@ -444,7 +444,7 @@ static inline C10_HOST_DEVICE scalar_t calc_i1e(scalar_t _x) {
   auto B = std::get<0>(coeff_pair);
   auto len = std::get<1>(coeff_pair);
   const scalar_t out =
-      chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len) / DPCPP::sqrt(x);
+      chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len) / sycl::sqrt(x);
   return (_x < scalar_t{0.0}) ? -out : out;
 }
 
@@ -453,7 +453,7 @@ static inline C10_HOST_DEVICE scalar_t calc_polygamma(scalar_t x, int n) {
   // already blocked if n <= 1
   const auto one = scalar_t{1};
   return ((n % 2) ? one : -one) *
-      DPCPP::exp(std::lgamma(static_cast<scalar_t>(n) + one)) *
+      sycl::exp(std::lgamma(static_cast<scalar_t>(n) + one)) *
       zeta<scalar_t>(static_cast<scalar_t>(n + 1), x);
 }
 

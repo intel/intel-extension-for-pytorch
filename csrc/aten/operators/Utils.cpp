@@ -19,7 +19,7 @@ DPCPP_HOST void dpcppMemoryScale(
   auto total_threads = n_elements;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
+    cgh.parallel_for(sycl::range<1>(total_threads), [=](sycl::item<1> item) {
       auto idx = item.get_id(0);
       dst[idx] = src[idx] * alpha;
     });
@@ -52,7 +52,7 @@ DPCPP_HOST void dpcppMemoryScale1(
   auto total_threads = n_elements;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
+    cgh.parallel_for(sycl::range<1>(total_threads), [=](sycl::item<1> item) {
       auto idx = item.get_id(0);
       dst[idx] = src[idx] * eps + dst[idx] * (1 - eps);
     });
@@ -86,7 +86,7 @@ DPCPP_HOST void dpcppMemoryScale2(
   auto total_threads = n_elements;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
+    cgh.parallel_for(sycl::range<1>(total_threads), [=](sycl::item<1> item) {
       auto idx = item.get_id(0);
       dst[idx] = src[idx] * alpha * eps + dst[idx] * (1 - eps);
     });
@@ -123,14 +123,13 @@ DPCPP_HOST void dtype_convert_by_scalar(
   auto total_threads = dpcppMaxWorkGroupSize(dev_id);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(
-        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-          auto in_ptr = src;
-          auto out_ptr = dst;
-          auto id = itemId.get_id(0);
-          for (auto i = id; i < n_elements; i += itemId.get_range()[0])
-            out_ptr[i] = (dst_dt)in_ptr[i];
-        });
+    cgh.parallel_for(sycl::range<1>(total_threads), [=](sycl::item<1> itemId) {
+      auto in_ptr = src;
+      auto out_ptr = dst;
+      auto id = itemId.get_id(0);
+      for (auto i = id; i < n_elements; i += itemId.get_range()[0])
+        out_ptr[i] = (dst_dt)in_ptr[i];
+    });
   };
 
   // launch kernel
@@ -150,22 +149,22 @@ DT_CONVERT_EXPLICIT_BI_INST(int, int64_t);
 DT_CONVERT_EXPLICIT_BI_INST(at::Half, float);
 DT_CONVERT_EXPLICIT_BI_INST(at::BFloat16, float);
 
-DPCPP_HOST DPCPP::event dpcpp_q_barrier(DPCPP::queue& q) {
+DPCPP_HOST sycl::event dpcpp_q_barrier(sycl::queue& q) {
 #ifdef USE_QUEUE_BARRIER
   return q.ext_oneapi_submit_barrier();
 #else
-  auto cgf = [&](DPCPP::handler& cgh) { cgh.single_task([=]() {}); };
+  auto cgf = [&](sycl::handler& cgh) { cgh.single_task([=]() {}); };
   return q.submit(cgf);
 #endif
 }
 
-DPCPP_HOST DPCPP::event dpcpp_q_barrier(
-    DPCPP::queue& q,
-    std::vector<DPCPP::event>& events) {
+DPCPP_HOST sycl::event dpcpp_q_barrier(
+    sycl::queue& q,
+    std::vector<sycl::event>& events) {
 #ifdef USE_QUEUE_BARRIER
   return q.ext_oneapi_submit_barrier(events);
 #else
-  auto cgf = [&](DPCPP::handler& cgh) {
+  auto cgf = [&](sycl::handler& cgh) {
     cgh.depends_on(events);
     cgh.single_task([=]() {});
   };

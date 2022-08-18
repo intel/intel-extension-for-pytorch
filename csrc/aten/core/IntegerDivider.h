@@ -100,7 +100,7 @@ struct IntDivider<unsigned int> {
 
   inline unsigned int div(unsigned int n) const {
 #if defined(__SYCL_DEVICE_ONLY__)
-    uint32_t t = DPCPP::mul_hi(m1, n);
+    uint32_t t = sycl::mul_hi(m1, n);
     return (t + n) >> shift;
 #else
     // Using uint64_t so that the addition does not overflow.

@@ -21,20 +21,20 @@ enum class QueueType : uint8_t {
 
 class Queue {
  public:
-  Queue(DeviceId di, DPCPP::async_handler asyncHandler = dpcppAsyncHandler)
-      : queue_(std::make_unique<DPCPP::queue>(DPCPP::queue(
+  Queue(DeviceId di, sycl::async_handler asyncHandler = dpcppAsyncHandler)
+      : queue_(std::make_unique<sycl::queue>(sycl::queue(
             dpcppGetDeviceContext(di),
             dpcppGetRawDevice(di),
             asyncHandler,
-            {DPCPP::property::queue::in_order(),
-             DPCPP::property::queue::enable_profiling()}))),
+            {sycl::property::queue::in_order(),
+             sycl::property::queue::enable_profiling()}))),
         device_id_(di) {}
 
   DeviceId getDeviceId() const {
     return device_id_;
   }
 
-  DPCPP::queue& getDpcppQueue() {
+  sycl::queue& getDpcppQueue() {
     return *queue_;
   }
 
@@ -43,7 +43,7 @@ class Queue {
   IPEX_DISABLE_COPY_AND_ASSIGN(Queue);
 
  private:
-  std::unique_ptr<DPCPP::queue> queue_;
+  std::unique_ptr<sycl::queue> queue_;
   DeviceId device_id_;
 };
 

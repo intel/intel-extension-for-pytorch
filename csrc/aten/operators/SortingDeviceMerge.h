@@ -205,7 +205,7 @@ inline void segmented_device_merge(
   int group_sz = (nsort + chunk_size - 1) / chunk_size;
   auto& q = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(h) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto offset = item.get_group_linear_id() * nsort;
       auto key_slice_start = key_ptr + offset;
       auto value_slice_start = value_ptr + offset;
@@ -223,8 +223,8 @@ inline void segmented_device_merge(
           item);
     };
     h.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(nsegments * group_sz), DPCPP::range<1>(group_sz)),
+        sycl::nd_range<1>(
+            sycl::range<1>(nsegments * group_sz), sycl::range<1>(group_sz)),
         kfn);
   };
   DPCPP_Q_SUBMIT(q, cgf);

@@ -41,7 +41,7 @@ class IPEX_API DPCPPStream {
     return DPCPPStream(Stream::unpack(bits));
   }
 
-  DPCPP::queue& dpcpp_queue() const;
+  sycl::queue& dpcpp_queue() const;
 
  private:
   Stream stream_;

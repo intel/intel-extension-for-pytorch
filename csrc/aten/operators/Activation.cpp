@@ -67,7 +67,7 @@ static void RReLU_updateOutput(
         auto in_data = input_.data_ptr<scalar_t>();
         auto noise_data = noise.data_ptr<scalar_t>();
         cgh.parallel_for(
-            DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
+            sycl::range<1>(total_threads), [=](sycl::item<1> itemId) {
               auto in_ptr = in_data;
               auto noise_ptr = noise_data;
               auto id = itemId.get_id(0);
@@ -100,7 +100,7 @@ static void RReLU_updateOutput(
         auto out_data = output.data_ptr<scalar_t>();
         auto noise_data = noise.data_ptr<scalar_t>();
         cgh.parallel_for(
-            DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
+            sycl::range<1>(total_threads), [=](sycl::item<1> itemId) {
               auto in_ptr = in_data;
               auto out_ptr = out_data;
               auto noise_ptr = noise_data;
@@ -195,22 +195,21 @@ void inline prelu_backward_kernel_share_weights(
     auto in_data = input.data_ptr<scalar_t>();
     auto grad_out_data = grad_out.data_ptr<scalar_t>();
 
-    cgh.parallel_for(
-        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-          auto in_grad_ptr = in_grad_data;
-          auto weight_grad_collector_ptr = weight_grad_collector_data;
-          auto in_ptr = in_data;
-          auto grad_out_ptr = grad_out_data;
-          auto id = itemId.get_id(0);
+    cgh.parallel_for(sycl::range<1>(total_threads), [=](sycl::item<1> itemId) {
+      auto in_grad_ptr = in_grad_data;
+      auto weight_grad_collector_ptr = weight_grad_collector_data;
+      auto in_ptr = in_data;
+      auto grad_out_ptr = grad_out_data;
+      auto id = itemId.get_id(0);
 
-          in_grad_ptr[id] = (in_ptr[id] > 0)
-              ? grad_out_ptr[id]
-              : (*weight_val) * static_cast<scalar_t>(grad_out_ptr[id]);
-          weight_grad_collector_ptr[id] = (in_ptr[id] > 0)
-              ? scalar_t(0)
-              : static_cast<scalar_t>(in_ptr[id]) *
-                  static_cast<scalar_t>(grad_out_ptr[id]);
-        });
+      in_grad_ptr[id] = (in_ptr[id] > 0)
+          ? grad_out_ptr[id]
+          : (*weight_val) * static_cast<scalar_t>(grad_out_ptr[id]);
+      weight_grad_collector_ptr[id] = (in_ptr[id] > 0)
+          ? scalar_t(0)
+          : static_cast<scalar_t>(in_ptr[id]) *
+              static_cast<scalar_t>(grad_out_ptr[id]);
+    });
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -236,25 +235,24 @@ void inline prelu_backward_kernel_multi_weights(
     auto in_grad_data = input_grad.data_ptr<scalar_t>();
     auto weight_grad_collector_data =
         weight_grad_collector.data_ptr<scalar_t>();
-    cgh.parallel_for(
-        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-          auto in_ptr = in_data;
-          auto weight_ptr = weight_data;
-          auto grad_out_ptr = gred_out_data;
-          auto in_grad_ptr = in_grad_data;
-          auto weight_grad_collector_ptr = weight_grad_collector_data;
-          auto id = itemId.get_id(0);
+    cgh.parallel_for(sycl::range<1>(total_threads), [=](sycl::item<1> itemId) {
+      auto in_ptr = in_data;
+      auto weight_ptr = weight_data;
+      auto grad_out_ptr = gred_out_data;
+      auto in_grad_ptr = in_grad_data;
+      auto weight_grad_collector_ptr = weight_grad_collector_data;
+      auto id = itemId.get_id(0);
 
-          int64_t channel = (id % input_stride0) / input_stride1;
-          scalar_t input_data_val = in_ptr[id];
-          scalar_t grad_out_data_val = grad_out_ptr[id];
-          in_grad_ptr[id] = (input_data_val > 0)
-              ? grad_out_data_val
-              : static_cast<scalar_t>(weight_ptr[channel]) * grad_out_data_val;
-          weight_grad_collector_ptr[id] = (input_data_val > 0)
-              ? scalar_t(0)
-              : input_data_val * grad_out_data_val;
-        });
+      int64_t channel = (id % input_stride0) / input_stride1;
+      scalar_t input_data_val = in_ptr[id];
+      scalar_t grad_out_data_val = grad_out_ptr[id];
+      in_grad_ptr[id] = (input_data_val > 0)
+          ? grad_out_data_val
+          : static_cast<scalar_t>(weight_ptr[channel]) * grad_out_data_val;
+      weight_grad_collector_ptr[id] = (input_data_val > 0)
+          ? scalar_t(0)
+          : input_data_val * grad_out_data_val;
+    });
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

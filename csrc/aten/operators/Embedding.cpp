@@ -24,11 +24,11 @@ static inline void indices_count(
     int64_t indices_num) {
   auto& queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
       auto row = indices[item.get_id(0)];
       atomicAdd((dpcpp_global_ptr_pt<IdxType>)(&indices_cnt[row]), 1);
     };
-    __cgh.parallel_for(DPCPP::range<1>(indices_num), kfn);
+    __cgh.parallel_for(sycl::range<1>(indices_num), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }

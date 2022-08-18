@@ -31,7 +31,7 @@ static inline bool dpcppIsDeviceAvailable(
   return dev_prop->is_available;
 }
 
-static inline DPCPP::queue& dpcppGetCurrentQueue() {
+static inline sycl::queue& dpcppGetCurrentQueue() {
   return getCurrentQueue()->getDpcppQueue();
 }
 
@@ -108,7 +108,7 @@ uint32_t dpcppPrefVectorWidth(DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
   if (std::is_same<T, double>::value) {
     return dev_prop->pref_vec_width_double;
   }
-  if (std::is_same<T, DPCPP::half>::value) {
+  if (std::is_same<T, sycl::half>::value) {
     return dev_prop->pref_vec_width_half;
   }
   throw std::invalid_argument(
@@ -136,7 +136,7 @@ uint32_t dpcppNativeVectorWidth(DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
   if (std::is_same<T, double>::value) {
     return dev_prop->native_vec_width_double;
   }
-  if (std::is_same<T, DPCPP::half>::value) {
+  if (std::is_same<T, sycl::half>::value) {
     return dev_prop->native_vec_width_half;
   }
   throw std::invalid_argument(

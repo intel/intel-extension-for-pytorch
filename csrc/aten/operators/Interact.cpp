@@ -45,25 +45,25 @@ void interaction_kernel(
   constexpr int local_size = 32;
   constexpr int total_local_size = TILE_BN * local_size;
   // Computation Mapping
-  DPCPP::range<2> local{TILE_BN, local_size};
+  sycl::range<2> local{TILE_BN, local_size};
   // Virtual Padding for group mapping to HW
-  DPCPP::range<2> global{Batch, local_size};
+  sycl::range<2> global{Batch, local_size};
 
   // Computation in GPU
   auto& queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(h) {
     // Local Memory Management
     auto in_local_data =
-        DPCPP::accessor<float, 3, dpcpp_rw_mode, DPCPP::access::target::local>(
-            DPCPP::range<3>{TILE_BN, 32, TILE_INPUT_COL_FLOAT}, h);
+        sycl::accessor<float, 3, dpcpp_rw_mode, sycl::access::target::local>(
+            sycl::range<3>{TILE_BN, 32, TILE_INPUT_COL_FLOAT}, h);
     auto index =
-        DPCPP::accessor<char, 1, dpcpp_rw_mode, DPCPP::access::target::local>(
-            DPCPP::range<1>{local_size * 2}, h);
+        sycl::accessor<char, 1, dpcpp_rw_mode, sycl::access::target::local>(
+            sycl::range<1>{local_size * 2}, h);
     float* in_mlp_ptr = reinterpret_cast<float*>(input_mlp);
     float* in_ptr = reinterpret_cast<float*>(input);
 
     h.parallel_for(
-        DPCPP::nd_range<2>(global, local), [=](DPCPP::nd_item<2> item) {
+        sycl::nd_range<2>(global, local), [=](sycl::nd_item<2> item) {
           // variables for loading data to SLM
           int group_id = item.get_group(0); // batch-dimension
           int local_id = item.get_local_linear_id();

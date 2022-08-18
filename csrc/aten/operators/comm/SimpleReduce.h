@@ -15,14 +15,14 @@ DPCPP_DEVICE static inline void simple_reduce(
 
   decltype(group_size) __k = 1;
   do {
-    item_id.barrier(DPCPP::access::fence_space::local_space);
+    item_id.barrier(sycl::access::fence_space::local_space);
     if (local_idx % (2 * __k) == 0 && local_idx + __k < group_size) {
       local_shared_mem[local_idx] = bin_op(
           local_shared_mem[local_idx], local_shared_mem[local_idx + __k]);
     }
     __k *= 2;
   } while (__k < group_size);
-  item_id.barrier(DPCPP::access::fence_space::local_space);
+  item_id.barrier(sycl::access::fence_space::local_space);
 }
 
 template <typename nd_item_id, typename local_shared>
@@ -34,14 +34,14 @@ DPCPP_DEVICE static inline void up_sweep(
 
   decltype(group_size) __k = 1;
   do {
-    item_id.barrier(DPCPP::access::fence_space::local_space);
+    item_id.barrier(sycl::access::fence_space::local_space);
     if (local_idx % (2 * __k) == 0 && local_idx + __k < group_size) {
       local_shared_mem[local_idx + 2 * __k - 1] +=
           local_shared_mem[local_idx + __k - 1];
     }
     __k *= 2;
   } while (__k < group_size);
-  item_id.barrier(DPCPP::access::fence_space::local_space);
+  item_id.barrier(sycl::access::fence_space::local_space);
 }
 
 template <typename nd_item_id, typename local_shared, typename T>
@@ -55,7 +55,7 @@ DPCPP_DEVICE static inline void down_sweep(
   decltype(group_size) __k = group_size / 2;
   local_shared_mem[2 * __k - 1] = init;
   do {
-    item_id.barrier(DPCPP::access::fence_space::local_space);
+    item_id.barrier(sycl::access::fence_space::local_space);
     if (local_idx % (2 * __k) == 0 && local_idx + __k < group_size) {
       auto t = local_shared_mem[local_idx + __k - 1];
       local_shared_mem[local_idx + __k - 1] =
@@ -64,7 +64,7 @@ DPCPP_DEVICE static inline void down_sweep(
     }
     __k /= 2;
   } while (__k > 0);
-  item_id.barrier(DPCPP::access::fence_space::local_space);
+  item_id.barrier(sycl::access::fence_space::local_space);
 }
 
 } // namespace AtenIpexTypeXPU

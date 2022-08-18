@@ -26,7 +26,7 @@ bool CachingHostAllocator::BlockState::hasEvent() {
   return !mEvents.empty();
 }
 
-void CachingHostAllocator::BlockState::insertEvent(DPCPP::event& e) {
+void CachingHostAllocator::BlockState::insertEvent(sycl::event& e) {
   mEvents.emplace_back(e);
 }
 
@@ -67,8 +67,8 @@ void CachingHostAllocator::processEvents() {
 }
 
 bool CachingHostAllocator::isHostPtr(void* ptr) {
-  return DPCPP::usm::alloc::host ==
-      DPCPP::get_pointer_type(ptr, dpcppGetDeviceContext());
+  return sycl::usm::alloc::host ==
+      sycl::get_pointer_type(ptr, dpcppGetDeviceContext());
 }
 
 void CachingHostAllocator::emptyCache() {
@@ -78,14 +78,14 @@ void CachingHostAllocator::emptyCache() {
   for (auto& blk : mAvailable) {
     auto it = mBlocks.find(blk.getPtr());
     AT_ASSERT(it != mBlocks.end() && !it->second.isAllocated());
-    DPCPP::free(blk.getPtr(), dpcppGetDeviceContext());
+    sycl::free(blk.getPtr(), dpcppGetDeviceContext());
     mBlocks.erase(it);
   }
 
   mAvailable.clear();
 }
 
-void CachingHostAllocator::recordEvent(void* ptr, DPCPP::event& e) {
+void CachingHostAllocator::recordEvent(void* ptr, sycl::event& e) {
   std::lock_guard<std::mutex> lock(mMutex);
 
   auto it = mBlocks.find(ptr);
@@ -118,10 +118,10 @@ int CachingHostAllocator::malloc(void** ptr, size_t size) {
   }
 
   *ptr =
-      DPCPP::aligned_alloc_host(kHostAlignment, size, dpcppGetDeviceContext());
+      sycl::aligned_alloc_host(kHostAlignment, size, dpcppGetDeviceContext());
   if (*ptr == NULL) {
-    *ptr = DPCPP::aligned_alloc_host(
-        kHostAlignment, size, dpcppGetDeviceContext());
+    *ptr =
+        sycl::aligned_alloc_host(kHostAlignment, size, dpcppGetDeviceContext());
     if (*ptr == NULL) {
       return DPCPP_FAILURE;
     }

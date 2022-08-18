@@ -17,9 +17,9 @@ using namespace torch::autograd::profiler;
 struct DPCPPEventStubImpl : public KernelEventBase {
  public:
   DPCPPEventStubImpl() = delete;
-  DPCPPEventStubImpl(DPCPP::event event)
+  DPCPPEventStubImpl(sycl::event event)
       : event_(std::move(event)), is_ext_mark(false){};
-  DPCPPEventStubImpl(DPCPP::event start_evt, DPCPP::event end_evt)
+  DPCPPEventStubImpl(sycl::event start_evt, sycl::event end_evt)
       : event_(std::move(start_evt)),
         event_end_(std::move(end_evt)),
         is_ext_mark(true){};
@@ -31,8 +31,8 @@ struct DPCPPEventStubImpl : public KernelEventBase {
   virtual ~DPCPPEventStubImpl() = default;
 
  private:
-  DPCPP::event event_;
-  DPCPP::event event_end_;
+  sycl::event event_;
+  sycl::event event_end_;
   bool is_ext_mark; // True to mark the external lib kernels
 };
 
@@ -167,7 +167,7 @@ bool is_profiler_enabled() {
 #endif
 }
 
-void dpcpp_mark(std::string name, DPCPP::event& event) {
+void dpcpp_mark(std::string name, sycl::event& event) {
 #if defined(USE_PROFILER)
   KernelEventStub dpcpp_evt_stub;
   dpcpp_evt_stub.reset(new DPCPPEventStubImpl(event));
@@ -177,8 +177,8 @@ void dpcpp_mark(std::string name, DPCPP::event& event) {
 
 void dpcpp_mark(
     std::string name,
-    DPCPP::event& start_event,
-    DPCPP::event& end_event) {
+    sycl::event& start_event,
+    sycl::event& end_event) {
 #if defined(USE_PROFILER)
   KernelEventStub dpcpp_evt_stub;
   dpcpp_evt_stub.reset(new DPCPPEventStubImpl(start_event, end_event));
@@ -186,7 +186,7 @@ void dpcpp_mark(
 #endif
 }
 
-void dpcpp_log(std::string name, DPCPP::event& event) {
+void dpcpp_log(std::string name, sycl::event& event) {
   if (is_profiler_enabled()) {
     dpcpp_mark(name, event);
   }
@@ -194,8 +194,8 @@ void dpcpp_log(std::string name, DPCPP::event& event) {
 
 void dpcpp_log(
     std::string name,
-    DPCPP::event& start_event,
-    DPCPP::event& end_event) {
+    sycl::event& start_event,
+    sycl::event& end_event) {
   if (is_profiler_enabled()) {
     dpcpp_mark(name, start_event, end_event);
   }

@@ -87,7 +87,7 @@ void ClassNLLCriterion_updateOutput(
           ? weights_cont.data_ptr<scalar_t>()
           : input_data; // use the input as the dummy data.
       auto output_data = output.data_ptr<scalar_t>();
-      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
         auto input_ptr = input_data;
         auto target_ptr = target_data;
         auto weights_ptr = has_weights ? weights_data : NULL;
@@ -109,7 +109,7 @@ void ClassNLLCriterion_updateOutput(
         }
       };
 
-      cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
+      cgh.parallel_for(sycl::range<1>(local_size), kfn);
     };
 
     DPCPP_Q_SUBMIT(queue, cgf);
@@ -144,7 +144,7 @@ void ClassNLLCriterion_updateOutput(
       auto target_data = _target_data;
       auto total_weight_data = _total_weight_data;
       auto output_data = _output_data;
-      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
         auto input_ptr = input_data;
         auto target_ptr = target_data;
         auto weights_ptr = has_weights ? weights_data : NULL;
@@ -162,7 +162,7 @@ void ClassNLLCriterion_updateOutput(
           output_ptr[0] /= total_weight_ptr[0];
         }
       };
-      cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
+      cgh.parallel_for(sycl::range<1>(local_size), kfn);
     };
 
     DPCPP_Q_SUBMIT(queue, cgf);
@@ -184,7 +184,7 @@ void ClassNLLCriterion_updateOutput(
       auto local_total_weight_acc =
           dpcpp_local_acc_t<scalar_t>(local_size, cgh);
 
-      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
         auto input_ptr = input_data;
         auto target_ptr = target_data;
         auto weights_ptr = has_weights ? weights_data : NULL;
@@ -223,8 +223,8 @@ void ClassNLLCriterion_updateOutput(
         }
       };
       cgh.parallel_for(
-          DPCPP::nd_range<1>(
-              DPCPP::range<1>(local_size), DPCPP::range<1>(local_size)),
+          sycl::nd_range<1>(
+              sycl::range<1>(local_size), sycl::range<1>(local_size)),
           kfn);
     };
 
@@ -310,7 +310,7 @@ void ClassNLLCriterion_updateGradInput(
           ? weights_cont.data_ptr<scalar_t>()
           : gradOutput_data; // Use gradOutput handler as dummy weights
       auto gradInput_data = gradInput.data_ptr<scalar_t>();
-      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
         auto target_ptr = target_data;
         auto gradOutput_ptr = gradOutput_data;
         auto weights_ptr = has_weights ? weights_data : NULL;
@@ -335,8 +335,8 @@ void ClassNLLCriterion_updateGradInput(
       };
 
       cgh.parallel_for(
-          DPCPP::nd_range<1>(
-              DPCPP::range<1>(global_size), DPCPP::range<1>(local_size)),
+          sycl::nd_range<1>(
+              sycl::range<1>(global_size), sycl::range<1>(local_size)),
           kfn);
     };
 
@@ -364,7 +364,7 @@ void ClassNLLCriterion_updateGradInput(
       auto gradInput_data = gradInput.data_ptr<scalar_t>();
       auto target_data = target_cont.data_ptr<int64_t>();
       auto total_weight_data = total_weight.data_ptr<scalar_t>();
-      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
         auto gradOutput_ptr = gradOutput_data;
         auto weights_ptr = has_weights ? weights_data : NULL;
         auto gradInput_ptr = gradInput_data;
@@ -384,7 +384,7 @@ void ClassNLLCriterion_updateGradInput(
               norm * gradOutput_ptr[0];
         }
       };
-      cgh.parallel_for(DPCPP::range<1>(1), kfn);
+      cgh.parallel_for(sycl::range<1>(1), kfn);
     };
     DPCPP_Q_SUBMIT(queue, cgf);
   } else {
@@ -399,7 +399,7 @@ void ClassNLLCriterion_updateGradInput(
       auto gradInput_data = gradInput.data_ptr<scalar_t>();
       auto target_data = target_cont.data_ptr<int64_t>();
       auto total_weight_data = total_weight.data_ptr<scalar_t>();
-      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
         auto gradOutput_ptr = gradOutput_data;
         auto weights_ptr = has_weights ? weights_data : NULL;
         auto gradInput_ptr = gradInput_data;
@@ -425,7 +425,7 @@ void ClassNLLCriterion_updateGradInput(
           }
         }
       };
-      cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
+      cgh.parallel_for(sycl::range<1>(local_size), kfn);
     };
 
     DPCPP_Q_SUBMIT(queue, cgf);
@@ -513,7 +513,7 @@ void spatial_class_nll_criterion_update_output_no_reduce_kernel(
     auto target_data = target.data_ptr<long>();
     auto weight_data = weight.data_ptr<scalar_t>();
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto out_ptr = out_data;
       auto self_ptr = self_data;
       auto target_ptr = target_data;
@@ -542,7 +542,7 @@ void spatial_class_nll_criterion_update_output_no_reduce_kernel(
       }
     };
 
-    cgh.parallel_for(DPCPP::range</*dim=*/1>(count), kfn);
+    cgh.parallel_for(sycl::range</*dim=*/1>(count), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -582,12 +582,12 @@ void spatial_class_nll_criterion_update_output_kernel(
     auto self_data = self.data_ptr<scalar_t>();
     auto target_data = target.data_ptr<long>();
     auto weight_data = weight.data_ptr<scalar_t>();
-    DPCPP::accessor<accscalar_t, 1, dpcpp_rw_mode, DPCPP::access::target::local>
+    sycl::accessor<accscalar_t, 1, dpcpp_rw_mode, sycl::access::target::local>
         partial_sums(wgroup_size, cgh);
-    DPCPP::accessor<accscalar_t, 1, dpcpp_rw_mode, DPCPP::access::target::local>
+    sycl::accessor<accscalar_t, 1, dpcpp_rw_mode, sycl::access::target::local>
         partial_weight(wgroup_size, cgh);
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       auto out_ptr = out_data;
       auto total_weight_ptr = total_weight_data;
       auto self_ptr = self_data;
@@ -645,9 +645,9 @@ void spatial_class_nll_criterion_update_output_kernel(
     };
 
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(num_groups * wgroup_size),
-            DPCPP::range<1>(wgroup_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(num_groups * wgroup_size),
+            sycl::range<1>(wgroup_size)),
         kfn);
   };
 
@@ -658,7 +658,7 @@ void spatial_class_nll_criterion_update_output_kernel(
       auto out_data = output.data_ptr<scalar_t>();
       auto total_weight_data = total_weight.data_ptr<scalar_t>();
 
-      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
         auto out_ptr = out_data;
         auto total_weight_ptr = total_weight_data;
         if (total_weight_ptr[0] != 0) {
@@ -666,7 +666,7 @@ void spatial_class_nll_criterion_update_output_kernel(
         }
       };
 
-      cgh.parallel_for(DPCPP::range</*dim=*/1>(1), kfn);
+      cgh.parallel_for(sycl::range</*dim=*/1>(1), kfn);
     };
 
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -707,7 +707,7 @@ void spatial_class_nll_criterion_update_grad_input_no_reduce_kernel(
     auto target_data = target.data_ptr<long>();
     auto weight_data = weight.data_ptr<scalar_t>();
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto grad_input_ptr = grad_input_data;
       auto grad_output_ptr = grad_output_data;
       auto target_ptr = target_data;
@@ -736,7 +736,7 @@ void spatial_class_nll_criterion_update_grad_input_no_reduce_kernel(
       }
     };
 
-    cgh.parallel_for(DPCPP::range</*dim=*/1>(count), kfn);
+    cgh.parallel_for(sycl::range</*dim=*/1>(count), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -776,7 +776,7 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
     auto weight_data = weight.data_ptr<scalar_t>();
     auto total_weight_data = total_weight.data_ptr<scalar_t>();
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto total_weight_ptr = total_weight_data;
       scalar_t total_weight = total_weight_ptr[0];
       if (total_weight <= 0)
@@ -811,7 +811,7 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
       }
     };
 
-    cgh.parallel_for(DPCPP::range</*dim=*/1>(count), kfn);
+    cgh.parallel_for(sycl::range</*dim=*/1>(count), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

@@ -42,7 +42,7 @@ bool check_broadcast(const Tensor& src, const IntArrayRef& shape) {
 #ifdef USE_ONEMKL
 template <typename scalar_t>
 void gemm_batch(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     oneapi::mkl::transpose transa,
     oneapi::mkl::transpose transb,
     int64_t m,
@@ -85,7 +85,7 @@ void gemm_batch(
 
 template <>
 void gemm_batch<c10::complex<double>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     oneapi::mkl::transpose transa,
     oneapi::mkl::transpose transb,
     int64_t m,
@@ -128,7 +128,7 @@ void gemm_batch<c10::complex<double>>(
 
 template <>
 void gemm_batch<c10::complex<float>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     oneapi::mkl::transpose transa,
     oneapi::mkl::transpose transb,
     int64_t m,

@@ -35,7 +35,7 @@ class CachingHostAllocator final {
 
     bool hasEvent();
 
-    void insertEvent(DPCPP::event& e);
+    void insertEvent(sycl::event& e);
 
     void processEvents();
 
@@ -45,7 +45,7 @@ class CachingHostAllocator final {
 
    private:
     bool mAllocated;
-    std::deque<DPCPP::event> mEvents;
+    std::deque<sycl::event> mEvents;
   };
 
   CachingHostAllocator();
@@ -65,7 +65,7 @@ class CachingHostAllocator final {
 
   void emptyCache();
 
-  void recordEvent(void* ptr, DPCPP::event& e);
+  void recordEvent(void* ptr, sycl::event& e);
 
   int malloc(void** ptr, size_t size);
 

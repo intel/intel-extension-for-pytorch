@@ -221,9 +221,8 @@ void kernelPointwiseApply1(
   auto cgf = DPCPP_Q_CGF(cgh) {
     void* a_pointer = a.data;
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
-        [=](DPCPP::nd_item<1> item) {
+        sycl::nd_range<1>(sycl::range<1>(tileSize), sycl::range<1>(tileSize)),
+        [=](sycl::nd_item<1> item) {
           for (IndexType linearIndex = item.get_global_id(0) * step;
                linearIndex < totalElements;
                linearIndex += item.get_global_range()[0] * step) {
@@ -231,7 +230,7 @@ void kernelPointwiseApply1(
                 a,
                 op,
                 a_pointer,
-                DPCPP::min(step, static_cast<int>(totalElements - linearIndex)),
+                sycl::min(step, static_cast<int>(totalElements - linearIndex)),
                 linearIndex);
           }
         });
@@ -426,9 +425,8 @@ void kernelPointwiseApply2(
     void* in_ptr = input.data;
     void* out_ptr = output.data;
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
-        [=](DPCPP::nd_item<1> item) {
+        sycl::nd_range<1>(sycl::range<1>(tileSize), sycl::range<1>(tileSize)),
+        [=](sycl::nd_item<1> item) {
           for (IndexType linearIndex = item.get_global_id(0) * step;
                linearIndex < totalElements;
                linearIndex += item.get_global_range()[0] * step) {
@@ -447,7 +445,7 @@ void kernelPointwiseApply2(
                     op,
                     out_ptr,
                     in_ptr,
-                    DPCPP::min(
+                    sycl::min(
                         step, static_cast<int>(totalElements - linearIndex)),
                     linearIndex);
           }
@@ -638,9 +636,8 @@ void kernelPointwiseApply3(
     void* in2_ptr = input2.data;
     void* out_ptr = output.data;
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
-        [=](DPCPP::nd_item<1> item) {
+        sycl::nd_range<1>(sycl::range<1>(tileSize), sycl::range<1>(tileSize)),
+        [=](sycl::nd_item<1> item) {
           for (IndexType linearIndex = item.get_global_id(0) * step;
                linearIndex < totalElements;
                linearIndex += item.get_global_range()[0] * step) {
@@ -662,7 +659,7 @@ void kernelPointwiseApply3(
                     out_ptr,
                     in1_ptr,
                     in2_ptr,
-                    DPCPP::min(
+                    sycl::min(
                         step, static_cast<int>(totalElements - linearIndex)),
                     linearIndex);
           }
@@ -888,9 +885,8 @@ void kernelPointwiseApply4(
     void* in3_ptr = input3.data;
     void* out_ptr = output.data;
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
-        [=](DPCPP::nd_item<1> item) {
+        sycl::nd_range<1>(sycl::range<1>(tileSize), sycl::range<1>(tileSize)),
+        [=](sycl::nd_item<1> item) {
           for (IndexType linearIndex = item.get_global_id(0) * step;
                linearIndex < totalElements;
                linearIndex += item.get_global_range()[0] * step) {
@@ -916,7 +912,7 @@ void kernelPointwiseApply4(
                     in1_ptr,
                     in2_ptr,
                     in3_ptr,
-                    DPCPP::min(
+                    sycl::min(
                         step, static_cast<int>(totalElements - linearIndex)),
                     linearIndex);
           }

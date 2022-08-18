@@ -69,7 +69,7 @@ void vec_chunk_kernel_embeddingbag(
     const bool include_last_offset,
     const index_t padding_idx,
     const bool if_align_vector,
-    DPCPP::nd_item<1> item) {
+    sycl::nd_item<1> item) {
   auto globalId = item.get_global_linear_id();
 
   // global chunk id
@@ -442,7 +442,7 @@ void EmbeddingBag_updateOutputKernel(
       auto max_indices = mode == MODE_MAX ? max_indices_data : nullptr;       \
       using vec_t =                                                           \
           at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;        \
-      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {                        \
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {                         \
         vec_chunk_kernel_embeddingbag<                                        \
             vec_size,                                                         \
             vec_t,                                                            \
@@ -476,8 +476,8 @@ void EmbeddingBag_updateOutputKernel(
             item);                                                            \
       };                                                                      \
       cgh.parallel_for(                                                       \
-          DPCPP::nd_range<1>(                                                 \
-              DPCPP::range<1>(global_range), DPCPP::range<1>(local_range)),   \
+          sycl::nd_range<1>(                                                  \
+              sycl::range<1>(global_range), sycl::range<1>(local_range)),     \
           kfn);                                                               \
     };                                                                        \
     DPCPP_Q_SUBMIT(queue, cgf);                                               \
@@ -598,7 +598,7 @@ void EmbeddingBag_accGradParametersKernel_max(
     auto gradOutput_data = gradOutput;
     auto gradWeight_data = gradWeight;
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
       auto max_indices_ptr = max_indices_data;
       auto gradOutput_ptr = gradOutput_data;
       auto gradWeight_ptr = gradWeight_data;
@@ -627,8 +627,8 @@ void EmbeddingBag_accGradParametersKernel_max(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<2>(
-            DPCPP::range<2>(kernel_range, 4), DPCPP::range<2>(64, 4)),
+        sycl::nd_range<2>(
+            sycl::range<2>(kernel_range, 4), sycl::range<2>(64, 4)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);

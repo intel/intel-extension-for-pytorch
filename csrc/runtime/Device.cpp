@@ -20,20 +20,20 @@ static std::vector<DeviceProp> device_properties;
 static thread_local DeviceId cur_dev_index = 0;
 
 struct DPCPPDevicePool {
-  std::vector<std::unique_ptr<DPCPP::device>> devices;
+  std::vector<std::unique_ptr<sycl::device>> devices;
 #if defined(USE_MULTI_CONTEXT)
-  std::vector<std::unique_ptr<DPCPP::context>> contexts;
+  std::vector<std::unique_ptr<sycl::context>> contexts;
 #endif
   std::mutex devices_mutex;
 } gDevPool;
 
 // It should be call only once. (std::call_once)
 static void initGlobalDevicePoolState() {
-  auto plaform_list = DPCPP::platform::get_platforms();
-  std::vector<DPCPP::device> root_devices;
+  auto plaform_list = sycl::platform::get_platforms();
+  std::vector<sycl::device> root_devices;
   // Enumerated root devices(GPU cards) from GPU Platform firstly.
   for (const auto& platform : plaform_list) {
-    if (platform.get_backend() != DPCPP::backend::ext_oneapi_level_zero)
+    if (platform.get_backend() != sycl::backend::ext_oneapi_level_zero)
       continue;
     auto device_list = platform.get_devices();
     for (const auto& device : device_list) {
@@ -47,36 +47,35 @@ static void initGlobalDevicePoolState() {
   // If IPEX_TILE_AS_DEVICE disabled, mapping framework device to
   // physical device.
   if (Settings::I().is_tile_as_device_enabled()) {
-    constexpr DPCPP::info::partition_property partition_by_affinity =
-        DPCPP::info::partition_property::partition_by_affinity_domain;
-    constexpr DPCPP::info::partition_affinity_domain next_partitionable =
-        DPCPP::info::partition_affinity_domain::next_partitionable;
+    constexpr sycl::info::partition_property partition_by_affinity =
+        sycl::info::partition_property::partition_by_affinity_domain;
+    constexpr sycl::info::partition_affinity_domain next_partitionable =
+        sycl::info::partition_affinity_domain::next_partitionable;
     for (const auto& root_device : root_devices) {
       try {
         auto sub_devices =
             root_device.create_sub_devices<partition_by_affinity>(
                 next_partitionable);
         for (auto& s_dev : sub_devices) {
-          gDevPool.devices.push_back(std::make_unique<DPCPP::device>(s_dev));
+          gDevPool.devices.push_back(std::make_unique<sycl::device>(s_dev));
         }
       } catch (sycl::exception& e) {
         // FIXME: should only check feature_not_supported here.
         // But for now we got invalid here if partition is not supported.
-        if (e.code() != DPCPP::errc::feature_not_supported &&
-            e.code() != DPCPP::errc::invalid) {
+        if (e.code() != sycl::errc::feature_not_supported &&
+            e.code() != sycl::errc::invalid) {
           throw std::runtime_error(
               std::string("Failed to apply tile partition: ") + e.what());
         }
         TORCH_WARN(
             "Tile partition is UNSUPPORTED : ",
             root_device.get_info<dpcpp_dev_name>());
-        gDevPool.devices.push_back(
-            std::make_unique<DPCPP::device>(root_device));
+        gDevPool.devices.push_back(std::make_unique<sycl::device>(root_device));
       }
     }
   } else {
     for (const auto& root_device : root_devices) {
-      gDevPool.devices.push_back(std::make_unique<DPCPP::device>(root_device));
+      gDevPool.devices.push_back(std::make_unique<sycl::device>(root_device));
     }
   }
 
@@ -88,8 +87,8 @@ static void initGlobalDevicePoolState() {
 #if defined(USE_MULTI_CONTEXT)
   gDevPool.contexts.resize(device_count);
   for (int i = 0; i < device_count; i++) {
-    gDevPool.contexts[i] = std::make_unique<DPCPP::context>(
-        DPCPP::context({*gDevPool.devices[i]}, dpcppAsyncHandler));
+    gDevPool.contexts[i] = std::make_unique<sycl::context>(
+        sycl::context({*gDevPool.devices[i]}, dpcppAsyncHandler));
   }
 #endif
 }
@@ -124,7 +123,7 @@ int dpcppSetDevice(DeviceId device_id) {
   return DPCPP_SUCCESS;
 }
 
-DPCPP::device dpcppGetRawDevice(DeviceId device_id) {
+sycl::device dpcppGetRawDevice(DeviceId device_id) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
   if (device_id >= (DeviceId)gDevPool.devices.size()) {
@@ -133,10 +132,10 @@ DPCPP::device dpcppGetRawDevice(DeviceId device_id) {
   return *gDevPool.devices[device_id];
 }
 
-DeviceId dpcppGetDeviceIndex(DPCPP::device device) {
+DeviceId dpcppGetDeviceIndex(sycl::device device) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
-  auto comp_op = [&](std::unique_ptr<DPCPP::device>& dev) -> bool {
+  auto comp_op = [&](std::unique_ptr<sycl::device>& dev) -> bool {
     return device == *dev;
   };
   auto it =
@@ -147,7 +146,7 @@ DeviceId dpcppGetDeviceIndex(DPCPP::device device) {
   return -1;
 }
 
-DPCPP::context dpcppGetDeviceContext(DeviceId device) {
+sycl::context dpcppGetDeviceContext(DeviceId device) {
   initDevicePoolCallOnce();
   DeviceId device_id = device;
   if (device_id == -1) {
@@ -162,7 +161,7 @@ DPCPP::context dpcppGetDeviceContext(DeviceId device) {
 }
 
 int dpcppGetDeviceIdFromPtr(DeviceId* device_id, void* ptr) {
-  auto raw_device = DPCPP::get_pointer_device(ptr, dpcppGetDeviceContext());
+  auto raw_device = sycl::get_pointer_device(ptr, dpcppGetDeviceContext());
   *device_id = dpcppGetDeviceIndex(raw_device);
   return DPCPP_SUCCESS;
 }

@@ -42,7 +42,7 @@ void upsample_bilinear2d_out_frame(
     auto in_data = idata;
     auto out_data = odata;
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto in_ptr = idata;
       auto out_ptr = out_data;
       int index = item.get_global_linear_id();
@@ -103,8 +103,8 @@ void upsample_bilinear2d_out_frame(
     };
 
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(num_group * 1024), DPCPP::range<1>(1024)),
+        sycl::nd_range<1>(
+            sycl::range<1>(num_group * 1024), sycl::range<1>(1024)),
         kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -145,7 +145,7 @@ void upsample_bilinear2d_backward_out_frame(
     auto in_data = idata;
     auto out_data = odata;
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto in_ptr = in_data;
       auto out_ptr = out_data;
 
@@ -197,8 +197,8 @@ void upsample_bilinear2d_backward_out_frame(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(num_groups * 1024), DPCPP::range<1>(1024)),
+        sycl::nd_range<1>(
+            sycl::range<1>(num_groups * 1024), sycl::range<1>(1024)),
         kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

@@ -29,7 +29,7 @@ void distribution_elementwise_grid_stride_kernel(
     int stride0 = strides[0];
     auto cgf = DPCPP_Q_CGF(cgh) {
       auto out_data = (char*)iter.data_ptr(0);
-      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
         int gid = item.get_group(0);
         int tid = item.get_local_id(0);
         RandomState<Philox4_32_10> state(
@@ -49,9 +49,9 @@ void distribution_elementwise_grid_stride_kernel(
         }
       };
       cgh.parallel_for(
-          DPCPP::nd_range<1>(
-              DPCPP::range<1>(num_groups * group_items),
-              DPCPP::range<1>(group_items)),
+          sycl::nd_range<1>(
+              sycl::range<1>(num_groups * group_items),
+              sycl::range<1>(group_items)),
           kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -59,7 +59,7 @@ void distribution_elementwise_grid_stride_kernel(
     auto offset_calc = make_offset_calculator<1>(iter);
     auto cgf = DPCPP_Q_CGF(cgh) {
       auto out_data = (char*)iter.data_ptr(0);
-      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
         int gid = item.get_group(0);
         int tid = item.get_local_id(0);
         RandomState<Philox4_32_10> state(
@@ -79,9 +79,9 @@ void distribution_elementwise_grid_stride_kernel(
         }
       };
       cgh.parallel_for(
-          DPCPP::nd_range<1>(
-              DPCPP::range<1>(num_groups * group_items),
-              DPCPP::range<1>(group_items)),
+          sycl::nd_range<1>(
+              sycl::range<1>(num_groups * group_items),
+              sycl::range<1>(group_items)),
           kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);

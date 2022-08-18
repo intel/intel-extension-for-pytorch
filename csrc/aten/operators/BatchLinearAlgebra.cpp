@@ -67,7 +67,7 @@ namespace impl {
 #ifdef USE_ONEMKL
 template <typename scalar_t>
 int64_t mkl_getrf_scratchpad(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t m,
     int64_t n,
     int64_t lda,
@@ -80,7 +80,7 @@ int64_t mkl_getrf_scratchpad(
 
 template <>
 int64_t mkl_getrf_scratchpad<c10::complex<double>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t m,
     int64_t n,
     int64_t lda,
@@ -93,7 +93,7 @@ int64_t mkl_getrf_scratchpad<c10::complex<double>>(
 
 template <>
 int64_t mkl_getrf_scratchpad<c10::complex<float>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t m,
     int64_t n,
     int64_t lda,
@@ -106,7 +106,7 @@ int64_t mkl_getrf_scratchpad<c10::complex<float>>(
 
 template <typename scalar_t>
 int64_t mkl_getrs_scratchpad(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     oneapi::mkl::transpose trans,
     int64_t n,
     int64_t nrhs,
@@ -131,7 +131,7 @@ int64_t mkl_getrs_scratchpad(
 
 template <>
 int64_t mkl_getrs_scratchpad<c10::complex<double>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     oneapi::mkl::transpose trans,
     int64_t n,
     int64_t nrhs,
@@ -156,7 +156,7 @@ int64_t mkl_getrs_scratchpad<c10::complex<double>>(
 
 template <>
 int64_t mkl_getrs_scratchpad<c10::complex<float>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     oneapi::mkl::transpose trans,
     int64_t n,
     int64_t nrhs,
@@ -181,7 +181,7 @@ int64_t mkl_getrs_scratchpad<c10::complex<float>>(
 
 template <typename scalar_t>
 int64_t mkl_getri_scratchpad(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t n,
     int64_t lda,
     int64_t stride_a,
@@ -193,7 +193,7 @@ int64_t mkl_getri_scratchpad(
 
 template <>
 int64_t mkl_getri_scratchpad<c10::complex<double>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t n,
     int64_t lda,
     int64_t stride_a,
@@ -205,7 +205,7 @@ int64_t mkl_getri_scratchpad<c10::complex<double>>(
 
 template <>
 int64_t mkl_getri_scratchpad<c10::complex<float>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t n,
     int64_t lda,
     int64_t stride_a,
@@ -217,7 +217,7 @@ int64_t mkl_getri_scratchpad<c10::complex<float>>(
 
 template <typename scalar_t>
 void mkl_getrf(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t m,
     int64_t n,
     scalar_t* a,
@@ -246,7 +246,7 @@ void mkl_getrf(
 
 template <>
 void mkl_getrf<c10::complex<double>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t m,
     int64_t n,
     c10::complex<double>* a,
@@ -275,7 +275,7 @@ void mkl_getrf<c10::complex<double>>(
 
 template <>
 void mkl_getrf<c10::complex<float>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t m,
     int64_t n,
     c10::complex<float>* a,
@@ -304,7 +304,7 @@ void mkl_getrf<c10::complex<float>>(
 
 template <typename scalar_t>
 void mkl_getrs(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     oneapi::mkl::transpose trans,
     int64_t n,
     int64_t nrhs,
@@ -341,7 +341,7 @@ void mkl_getrs(
 
 template <>
 void mkl_getrs<c10::complex<double>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     oneapi::mkl::transpose trans,
     int64_t n,
     int64_t nrhs,
@@ -378,7 +378,7 @@ void mkl_getrs<c10::complex<double>>(
 
 template <>
 void mkl_getrs<c10::complex<float>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     oneapi::mkl::transpose trans,
     int64_t n,
     int64_t nrhs,
@@ -415,7 +415,7 @@ void mkl_getrs<c10::complex<float>>(
 
 template <typename scalar_t>
 void mkl_getri(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t n,
     scalar_t* a,
     int64_t lda,
@@ -442,7 +442,7 @@ void mkl_getri(
 
 template <>
 void mkl_getri<c10::complex<double>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t n,
     c10::complex<double>* a,
     int64_t lda,
@@ -469,7 +469,7 @@ void mkl_getri<c10::complex<double>>(
 
 template <>
 void mkl_getri<c10::complex<float>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t n,
     c10::complex<float>* a,
     int64_t lda,
@@ -496,7 +496,7 @@ void mkl_getri<c10::complex<float>>(
 
 template <typename scalar_t>
 int64_t mkl_geqrf_batch_scratchpad_size(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t m,
     int64_t n,
     int64_t lda,
@@ -509,7 +509,7 @@ int64_t mkl_geqrf_batch_scratchpad_size(
 
 template <>
 int64_t mkl_geqrf_batch_scratchpad_size<c10::complex<float>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t m,
     int64_t n,
     int64_t lda,
@@ -522,7 +522,7 @@ int64_t mkl_geqrf_batch_scratchpad_size<c10::complex<float>>(
 
 template <>
 int64_t mkl_geqrf_batch_scratchpad_size<c10::complex<double>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t m,
     int64_t n,
     int64_t lda,
@@ -535,7 +535,7 @@ int64_t mkl_geqrf_batch_scratchpad_size<c10::complex<double>>(
 
 template <typename scalar_t>
 void mkl_geqrf_batch(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t m,
     int64_t n,
     scalar_t* a,
@@ -564,7 +564,7 @@ void mkl_geqrf_batch(
 
 template <>
 void mkl_geqrf_batch<c10::complex<float>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t m,
     int64_t n,
     c10::complex<float>* a,
@@ -593,7 +593,7 @@ void mkl_geqrf_batch<c10::complex<float>>(
 
 template <>
 void mkl_geqrf_batch<c10::complex<double>>(
-    DPCPP::queue& queue,
+    sycl::queue& queue,
     int64_t m,
     int64_t n,
     c10::complex<double>* a,
@@ -635,7 +635,7 @@ void error_handle(
                 << "\nWhat: " << e.what() << "\nInfo: " << e.info()
                 << "\nDetail: " << e.detail() << std::endl;
       infos[i] = e.info();
-    } catch (DPCPP::exception e) {
+    } catch (sycl::exception e) {
       std::cout << "Catched SYCL exception:"
                 << "\nWhat: " << e.what() << "\nInfo: -1" << std::endl;
       infos[i] = -1;
@@ -666,7 +666,7 @@ void apply_triu_tril(Tensor& result, const Tensor& self, const int64_t k) {
   scalar_t* self_ptr = (scalar_t*)(self.data_ptr());
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       for (size_t linearIndex = item.get_global_id(0); linearIndex < (size_t)N;
            linearIndex += item.get_global_range()[0]) {
         IndexType batch_id = linearIndex / (self_size_0 * self_size_1);
@@ -687,8 +687,8 @@ void apply_triu_tril(Tensor& result, const Tensor& self, const int64_t k) {
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
   };
 
@@ -1082,7 +1082,7 @@ static inline std::tuple<Tensor, Tensor, Tensor> _create_U_S_VT(
 
 template <typename scalar_t, typename value_t>
 static void apply_svd(
-    DPCPP::queue& dpcpp_queue,
+    sycl::queue& dpcpp_queue,
     scalar_t* self_data,
     int64_t lda,
     int64_t self_stride,
@@ -1148,7 +1148,7 @@ static void apply_svd(
 
 template <>
 void apply_svd<c10::complex<double>, double>(
-    DPCPP::queue& dpcpp_queue,
+    sycl::queue& dpcpp_queue,
     c10::complex<double>* self_data,
     int64_t lda,
     int64_t self_stride,
@@ -1214,7 +1214,7 @@ void apply_svd<c10::complex<double>, double>(
 
 template <>
 void apply_svd<c10::complex<float>, float>(
-    DPCPP::queue& dpcpp_queue,
+    sycl::queue& dpcpp_queue,
     c10::complex<float>* self_data,
     int64_t lda,
     int64_t self_stride,

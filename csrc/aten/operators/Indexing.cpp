@@ -146,7 +146,7 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
 
       // restore flatten idx to indices
       auto cgf = DPCPP_Q_CGF(__cgh) {
-        auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+        auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
           auto global_id = item_id.get_global_linear_id();
 
           if (global_id < N) {
@@ -158,7 +158,7 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
         };
 
         __cgh.parallel_for(
-            DPCPP::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
+            sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
       };
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     }
@@ -374,8 +374,8 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
     int64_t stride1 = src.stride(1);
     int64_t size0 = src.size(0);
     int64_t size1 = src.size(1);
-    int64_t size = (k > 0) ? DPCPP::min((int64_t)size0, (int64_t)size1 - k)
-                           : DPCPP::min((int64_t)size0 + k, (int64_t)size1);
+    int64_t size = (k > 0) ? sycl::min((int64_t)size0, (int64_t)size1 - k)
+                           : sycl::min((int64_t)size0 + k, (int64_t)size1);
     int64_t size_[1] = {size};
     TensorImpl_resizeNd(TensorImpl_Unwrap(dst), 1, size_, nullptr);
     if (size > 0) {
@@ -386,12 +386,12 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
       auto& dpcpp_queue = dpcppGetCurrentQueue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+        auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
           size_t id = item_id.get_id(0);
           const int64_t bOffset = start + (stride0 + stride1) * id;
           out[strideSelf * id] = in[bOffset];
         };
-        cgh.parallel_for(DPCPP::range<1>(dst.numel()), kfn);
+        cgh.parallel_for(sycl::range<1>(dst.numel()), kfn);
       };
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     }
@@ -411,12 +411,12 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
       auto& dpcpp_queue = dpcppGetCurrentQueue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+        auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
           size_t id = item_id.get_id(0);
           const int64_t aOffset = start + (stride0 + stride1) * id;
           out[aOffset] = in[strideSrc * id];
         };
-        cgh.parallel_for(DPCPP::range<1>(src.numel()), kfn);
+        cgh.parallel_for(sycl::range<1>(src.numel()), kfn);
       };
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     }
@@ -485,7 +485,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
     auto tensor_data = tensor.data_ptr<scalar_t>();
 
     // kernel function
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       int64_t linear_index = item.get_global_linear_id();
       if (linear_index < size) {
         if (mask_data[linear_index]) {
@@ -496,7 +496,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
     };
 
     cgh.parallel_for(
-        DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
+        sycl::nd_range<1>(sycl::range<1>(GRange), sycl::range<1>(tileSize)),
         kfn);
   };
 
@@ -564,7 +564,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
     auto acc_tensor_data = tensorContig.data_ptr<scalar_t>();
 
     // kernel function per work-item
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       int64_t linear_index = item.get_global_linear_id();
 
       auto src_ptr = acc_src_data;
@@ -585,7 +585,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
+        sycl::nd_range<1>(sycl::range<1>(GRange), sycl::range<1>(tileSize)),
         kfn);
   };
 
@@ -627,7 +627,7 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
     auto indices_data = index.data_ptr<long>();
     auto source_data = source.data_ptr<scalar_t>();
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto out_ptr = (char*)out_data;
       auto indices_ptr = indices_data;
       auto source_ptr = (char*)source_data;
@@ -651,7 +651,7 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
       f(out_ptr, source_ptr + src_offset, out_offset);
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(numel), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(numel), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -762,7 +762,7 @@ void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
     auto dst_data = dst.data_ptr<scalar_t>();
     auto idx_data = index.data_ptr<int64_t>();
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto linear_idx = item.get_global_linear_id();
       if (linear_idx < dst_num_elem) {
         auto idx_offset = linear_idx;
@@ -787,7 +787,7 @@ void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
     };
 
     cgh.parallel_for(
-        DPCPP::nd_range<1>({wgroup_range * wgroup_size}, {wgroup_size}), kfn);
+        sycl::nd_range<1>({wgroup_range * wgroup_size}, {wgroup_size}), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

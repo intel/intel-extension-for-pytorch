@@ -33,7 +33,7 @@ void launch_cross_kernel(
           auto x = static_cast<const scalar_t*>(iter.data_ptr(1));
           auto y = static_cast<const scalar_t*>(iter.data_ptr(2));
 
-          auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+          auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
             int64_t linear_index = item_id.get_global_id(0);
             for (int64_t i = linear_index; i < N;
                  i += work_group_num * work_group_size) {
@@ -60,9 +60,9 @@ void launch_cross_kernel(
             }
           };
           cgh.parallel_for(
-              DPCPP::nd_range<1>(
-                  DPCPP::range<1>(work_group_num * work_group_size),
-                  DPCPP::range<1>(work_group_size)),
+              sycl::nd_range<1>(
+                  sycl::range<1>(work_group_num * work_group_size),
+                  sycl::range<1>(work_group_size)),
               kfn);
         };
 

@@ -177,7 +177,7 @@ void _unfold_backward_elementwise_kernel(int total_n_elems, func_t f) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(
-        DPCPP::range<1>(total_work_items), [=](DPCPP::item<1> itemId) {
+        sycl::range<1>(total_work_items), [=](sycl::item<1> itemId) {
           int idx = itemId.get_linear_id();
 #pragma unroll
           for (int i = 0; i < n_elems_per_work_item; ++i) {

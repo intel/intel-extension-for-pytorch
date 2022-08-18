@@ -45,7 +45,7 @@ void fillSliceWithIndex(
   int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto out_data = out.data;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       IndexType local_id = item_id.get_local_id(0);
       IndexType slice = item_id.get_group_linear_id();
       const uint64_t offset =
@@ -59,9 +59,9 @@ void fillSliceWithIndex(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(totalSlices * local_size),
-            DPCPP::range<1>(local_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(totalSlices * local_size),
+            sycl::range<1>(local_size)),
         kfn);
   };
 

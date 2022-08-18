@@ -37,7 +37,7 @@ void coalesce_values_kernel(
     auto value_indices_data = value_indices.data_ptr<int64_t>();
     auto values_data = values.data_ptr<scalar_t>();
     auto newValues_data = newValues.data_ptr<scalar_t>();
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
       auto segment_offsets_ptr = segment_offsets_data;
       auto value_indices_ptr = value_indices_data;
       auto values_ptr = values_data;
@@ -66,9 +66,9 @@ void coalesce_values_kernel(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<2>(
-            DPCPP::range<2>(num_group_0 * 4, num_group_1 * 64),
-            DPCPP::range<2>(4, 64)),
+        sycl::nd_range<2>(
+            sycl::range<2>(num_group_0 * 4, num_group_1 * 64),
+            sycl::range<2>(4, 64)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);

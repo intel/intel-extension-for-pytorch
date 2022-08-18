@@ -88,7 +88,7 @@ void MultilabelMarginCriterion_updateOutput(
     auto local_output_data = dpcpp_local_acc_t<scalar_t>(local_size, cgh);
 
     if (reduction == Reduction::None && output.dim() > 0) {
-      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
         auto input_ptr = input_data;
         auto target_ptr = target_data;
         auto output_ptr = output_data;
@@ -120,9 +120,9 @@ void MultilabelMarginCriterion_updateOutput(
           output_ptr[i] = sum;
         }
       };
-      cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
+      cgh.parallel_for(sycl::range<1>(local_size), kfn);
     } else {
-      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
         auto input_ptr = input_data;
         auto target_ptr = target_data;
         auto output_ptr = output_data;
@@ -168,8 +168,8 @@ void MultilabelMarginCriterion_updateOutput(
         output_ptr[0] = local_output_data[0];
       };
       cgh.parallel_for(
-          DPCPP::nd_range<1>(
-              DPCPP::range<1>(local_size), DPCPP::range<1>(local_size)),
+          sycl::nd_range<1>(
+              sycl::range<1>(local_size), sycl::range<1>(local_size)),
           kfn);
     }
   };
@@ -257,7 +257,7 @@ void MultilabelMarginCriterion_updateGradInput(
     auto target_data = target_contiguous.data_ptr<int64_t>();
     auto is_target_data = is_target_contiguous.data_ptr<scalar_t>();
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto grad_input_ptr = grad_input_data;
       auto grad_output_ptr = grad_output_data;
       auto input_ptr = input_data;
@@ -288,7 +288,7 @@ void MultilabelMarginCriterion_updateGradInput(
               : grad_output_ptr[0];
       }
     };
-    cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
+    cgh.parallel_for(sycl::range<1>(local_size), kfn);
   };
 
   DPCPP_Q_SUBMIT(queue, cgf);

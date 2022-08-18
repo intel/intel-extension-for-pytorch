@@ -37,7 +37,7 @@ void max_unpooling2d_forward_kernel(
     auto output_data = output;
     auto input_data = input;
     auto indices_data = indices;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto output_ptr = output_data;
       auto input_ptr = input_data;
       auto indices_ptr = indices_data;
@@ -63,8 +63,8 @@ void max_unpooling2d_forward_kernel(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
   };
 
@@ -94,7 +94,7 @@ void max_unpooling3d_forward_kernel(
     auto output_data = output;
     auto input_data = input;
     auto indices_data = indices;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
       auto output_ptr = output_data;
       auto input_ptr = input_data;
       auto indices_ptr = indices_data;
@@ -117,9 +117,9 @@ void max_unpooling3d_forward_kernel(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<3>(
-            DPCPP::range<3>(32 * num_groups_0, 8 * num_groups_1, totalZ),
-            DPCPP::range<3>(32, 8, 1)),
+        sycl::nd_range<3>(
+            sycl::range<3>(32 * num_groups_0, 8 * num_groups_1, totalZ),
+            sycl::range<3>(32, 8, 1)),
         kfn);
   };
 
@@ -149,7 +149,7 @@ void max_unpooling3d_cl_forward_kernel(
     auto output_data = output;
     auto input_data = input;
     auto indices_data = indices;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto output_ptr = output_data;
       auto input_ptr = input_data;
       auto indices_ptr = indices_data;
@@ -169,8 +169,8 @@ void max_unpooling3d_cl_forward_kernel(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
   };
 
@@ -199,7 +199,7 @@ void max_unpooling2d_backward_kernel(
     auto output_data = output;
     auto input_data = input;
     auto indices_data = indices;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto output_ptr = output_data;
       auto input_ptr = input_data;
       auto indices_ptr = indices_data;
@@ -225,8 +225,8 @@ void max_unpooling2d_backward_kernel(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
   };
 
@@ -256,7 +256,7 @@ void max_unpooling3d_backward_kernel(
     auto gradInput_data = gradInput;
     auto gradOutput_data = gradOutput;
     auto indices_data = indices;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
       auto gradInput_ptr = gradInput_data;
       auto gradOutput_ptr = gradOutput_data;
       auto indices_ptr = indices_data;
@@ -281,9 +281,9 @@ void max_unpooling3d_backward_kernel(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<3>(
-            DPCPP::range<3>(32 * num_groups_0, 8 * num_groups_1, totalZ),
-            DPCPP::range<3>(32, 8, 1)),
+        sycl::nd_range<3>(
+            sycl::range<3>(32 * num_groups_0, 8 * num_groups_1, totalZ),
+            sycl::range<3>(32, 8, 1)),
         kfn);
   };
 
@@ -313,7 +313,7 @@ void max_unpooling3d_cl_backward_kernel(
     auto output_data = output;
     auto input_data = input;
     auto indices_data = indices;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto output_ptr = output_data;
       auto input_ptr = input_data;
       auto indices_ptr = indices_data;
@@ -333,8 +333,8 @@ void max_unpooling3d_cl_backward_kernel(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
   };
 

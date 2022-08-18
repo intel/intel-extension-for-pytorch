@@ -18,13 +18,13 @@ int dpcppSetDevice(DeviceId device_id);
 
 int dpcppGetDeviceIdFromPtr(DeviceId* device_id, void* ptr);
 
-DPCPP::device dpcppGetRawDevice(DeviceId device_id);
+sycl::device dpcppGetRawDevice(DeviceId device_id);
 
 DeviceProp* dpcppGetCurrentDeviceProperties();
 
 DeviceProp* dpcppGetDeviceProperties(DeviceId device_id = -1);
 
-DPCPP::context dpcppGetDeviceContext(DeviceId device_id = -1);
+sycl::context dpcppGetDeviceContext(DeviceId device_id = -1);
 
 } // namespace dpcpp
 } // namespace xpu

@@ -139,7 +139,7 @@ struct scan {
     // 1. reduce
     decltype(__group_size) __k = 1;
     do {
-      __item_id.barrier(DPCPP::access::fence_space::local_space);
+      __item_id.barrier(sycl::access::fence_space::local_space);
       if (__local_idx % (2 * __k) == 0 && __local_idx + __k < __group_size &&
           __global_idx < __n && __global_idx + __k < __n) {
         __local_mem[__local_idx + 2 * __k - 1] = __bin_op(
@@ -148,7 +148,7 @@ struct scan {
       }
       __k *= 2;
     } while (__k < __group_size);
-    __item_id.barrier(DPCPP::access::fence_space::local_space);
+    __item_id.barrier(sycl::access::fence_space::local_space);
 
     // 2. scan
     auto __partial_sums = __local_mem[__local_idx];
@@ -162,9 +162,9 @@ struct scan {
       }
       __k *= 2;
     } while (__k < __group_size);
-    __item_id.barrier(DPCPP::access::fence_space::local_space);
+    __item_id.barrier(sycl::access::fence_space::local_space);
     __local_mem[__local_idx] = __partial_sums;
-    __item_id.barrier(DPCPP::access::fence_space::local_space);
+    __item_id.barrier(sycl::access::fence_space::local_space);
 
     // 4. Write result to global memory
     write_to_global<_Inclusive>(
@@ -200,7 +200,7 @@ struct reduce {
 
     decltype(__group_size) __k = 1;
     do {
-      __item_id.barrier(DPCPP::access::fence_space::local_space);
+      __item_id.barrier(sycl::access::fence_space::local_space);
       if (__local_idx % (2 * __k) == 0 && __local_idx + __k < __group_size &&
           __global_idx < __n && __global_idx + __k < __n) {
         __local_mem[__local_idx] =

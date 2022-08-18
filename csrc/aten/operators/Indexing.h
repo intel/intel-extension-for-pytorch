@@ -221,7 +221,7 @@ class IndexKernel {
     return si + pi * stride + bi * stride * cfg_.problem_;
   }
 
-  DPCPP_DEVICE void operator()(DPCPP::nd_item<2> item) const {
+  DPCPP_DEVICE void operator()(sycl::nd_item<2> item) const {
     auto id = cfg_.get_item_desc(item);
 
     if (id.glb_problem >= cfg_.problem_ ||
@@ -294,7 +294,7 @@ static inline void launch_index_kernel(IdxConfig& cfg) {
   auto cgf = DPCPP_Q_CGF(__cgh) {
     IndexKernel<IdxConfig> idx_ker(cfg);
     __cgh.parallel_for(
-        DPCPP::nd_range<2>(cfg.global_size(), cfg.group_size()), idx_ker);
+        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), idx_ker);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -510,14 +510,14 @@ void dpcpp_small_index_kernel_impl(
       index_ptrs[i] = (char*)iter.data_ptr(i + 2);
     }
 
-    using local_accessor_t = DPCPP::accessor<
+    using local_accessor_t = sycl::accessor<
         int64_t,
         1,
-        DPCPP::access::mode::read_write,
-        DPCPP::access::target::local>;
+        sycl::access::mode::read_write,
+        sycl::access::target::local>;
     auto local_offset = local_accessor_t(indices_size, __cgh);
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       auto local_id = item_id.get_local_id(0);
       auto group_id = item_id.get_group(0);
 
@@ -551,7 +551,7 @@ void dpcpp_small_index_kernel_impl(
       }
       auto out_ptr = out_data;
       auto in_ptr = in_data;
-      item_id.barrier(DPCPP::access::fence_space::local_space);
+      item_id.barrier(sycl::access::fence_space::local_space);
 
       // compute the in/out/indices offsets and perform memory copy
       for (int64_t local_index = local_id; local_index < group_numel_range;
@@ -571,8 +571,8 @@ void dpcpp_small_index_kernel_impl(
       }
     };
     __cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(global_size), DPCPP::range<1>(wgroup_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(global_size), sycl::range<1>(wgroup_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -605,7 +605,7 @@ void dpcpp_index_kernel_impl(
     }
 
     auto offset_calc = make_offset_calculator<3>(iter);
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto linear_idx = item_id.get_linear_id();
       auto offsets = offset_calc.get(linear_idx);
       auto out_ptr = out_data + offsets[0];
@@ -629,7 +629,7 @@ void dpcpp_index_kernel_impl(
       }
       f(out_ptr, in_ptr, offset);
     };
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(numel), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(numel), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

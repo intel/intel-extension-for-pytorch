@@ -383,20 +383,20 @@ static struct PyMethodDef _THPModule_methods[] = {
 std::string get_dev_type(const DeviceProp& prop) {
   std::ostringstream stream;
   switch (prop.dev_type) {
-    case DPCPP::info::device_type::cpu:
+    case sycl::info::device_type::cpu:
       stream << "cpu";
       break;
-    case DPCPP::info::device_type::gpu:
+    case sycl::info::device_type::gpu:
       stream << "gpu";
       break;
-    case DPCPP::info::device_type::accelerator:
+    case sycl::info::device_type::accelerator:
       stream << "accelerator";
       break;
     default:
       stream
           << "unknown device type:"
           << static_cast<
-                 typename std::underlying_type<DPCPP::info::device_type>::type>(
+                 typename std::underlying_type<sycl::info::device_type>::type>(
                  prop.dev_type);
       break;
   }

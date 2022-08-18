@@ -108,7 +108,7 @@ struct Log2<N, 0, COUNT> {
 
 template <typename T, int STEPS>
 inline void SubgroupScan(
-    DPCPP::sub_group& sg,
+    sycl::sub_group& sg,
     int sgid,
     const T input,
     T& inclusive_sum,
@@ -116,7 +116,7 @@ inline void SubgroupScan(
   inclusive_sum = input;
 #pragma unroll
   for (int i = 0, offset = 1; i < STEPS; ++i, offset <<= 1) {
-    T temp = DPCPP::shift_group_right(sg, inclusive_sum, offset);
+    T temp = sycl::shift_group_right(sg, inclusive_sum, offset);
     if (sgid >= offset)
       inclusive_sum += temp;
   }
@@ -129,7 +129,7 @@ template <
     int WORK_ITEMS,
     int SUBGROUP_SIZE,
     bool EXCLUSIVE = true>
-inline Type GroupSum(Type* storage, DPCPP::nd_item<1>& item_id) {
+inline Type GroupSum(Type* storage, sycl::nd_item<1>& item_id) {
   static_assert(
       WORK_ITEMS % SUBGROUP_SIZE == 0,
       "WORK_ITEMS should be n * SUBGROUP_SIZE. (n = 1, 2, 3, ...)");
@@ -199,13 +199,13 @@ inline Type GroupSum(Type* storage, DPCPP::nd_item<1>& item_id) {
 }
 
 template <typename Type, int COUNTER_LANES, int WORK_ITEMS, int SUBGROUP_SIZE>
-inline Type GroupExclusiveSum(Type* slm_storage, DPCPP::nd_item<1>& item_id) {
+inline Type GroupExclusiveSum(Type* slm_storage, sycl::nd_item<1>& item_id) {
   return GroupSum<Type, COUNTER_LANES, WORK_ITEMS, SUBGROUP_SIZE, true>(
       slm_storage, item_id);
 }
 
 template <typename Type, int COUNTER_LANES, int WORK_ITEMS, int SUBGROUP_SIZE>
-inline Type GroupInclusiveSum(Type* slm_storage, DPCPP::nd_item<1>& item_id) {
+inline Type GroupInclusiveSum(Type* slm_storage, sycl::nd_item<1>& item_id) {
   return GroupSum<Type, COUNTER_LANES, WORK_ITEMS, SUBGROUP_SIZE, false>(
       slm_storage, item_id);
 }

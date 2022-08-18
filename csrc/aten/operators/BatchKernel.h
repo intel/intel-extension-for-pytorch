@@ -60,11 +60,11 @@ class BatchKernelConfig {
     problem_glb_range_ = problem_along_x_ ? glb_range_x_ : glb_range_y_;
   }
 
-  DPCPP::range<2> global_size() const {
+  sycl::range<2> global_size() const {
     return {glb_range_y_, glb_range_x_};
   }
 
-  DPCPP::range<2> group_size() const {
+  sycl::range<2> group_size() const {
     return {wg_range_y_, wg_range_x_};
   }
 
@@ -77,7 +77,7 @@ class BatchKernelConfig {
     /* global problem id */ int64_t glb_problem;
   };
 
-  DPCPP_DEVICE ItemDesc get_item_desc(DPCPP::nd_item<2> item) const {
+  DPCPP_DEVICE ItemDesc get_item_desc(sycl::nd_item<2> item) const {
     auto lix = item.get_local_id(1);
     auto liy = item.get_local_id(0);
     auto lrx = item.get_local_range(1);

@@ -68,14 +68,14 @@ void sample_multinomial_with_replacement(
   // Each work item in a work group will generate a sample from one
   // distribution concurrently
   work_group_size = std::min(work_group_size, (size_t)num_samples);
-  DPCPP::range<2> global_range(distributions, work_group_size),
+  sycl::range<2> global_range(distributions, work_group_size),
       local_range(1, work_group_size);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto result_data = result.data_ptr<long>();
     auto norm_dist_prefix_sum_data = norm_dist_prefix_sum.data_ptr<scalar_t>();
     auto norm_dist_data = norm_dist.data_ptr<scalar_t>();
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
       size_t dist_id = item_id.get_group(0);
       size_t sample_id = item_id.get_local_id(1);
       size_t global_linear_id = item_id.get_global_linear_id();
@@ -103,7 +103,7 @@ void sample_multinomial_with_replacement(
       }
     };
 
-    cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -126,13 +126,13 @@ void sample_multinomial_without_replacement(
   // Each work item in a work group will generate a sample from one
   // distribution concurrently
   work_group_size = std::min(work_group_size, (size_t)num_samples);
-  DPCPP::range<1> range(distributions);
+  sycl::range<1> range(distributions);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto result_data = result.data_ptr<long>();
     auto norm_dist_prefix_sum_data = norm_dist_prefix_sum.data_ptr<scalar_t>();
     auto norm_dist_data = norm_dist.data_ptr<scalar_t>();
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       size_t dist_id = item_id.get_id(0);
       size_t linear_id = item_id.get_linear_id();
       long* result_ptr = result_data;

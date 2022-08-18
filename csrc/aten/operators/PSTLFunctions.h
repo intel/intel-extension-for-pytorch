@@ -33,7 +33,7 @@ DPCPP_DEVICE static inline OutputIt _scan_kernel(
     auto cgf = DPCPP_Q_CGF(__cgh) {
       dpcpp_local_acc_t<T> local_scan(N, __cgh);
 
-      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
         auto local_id = item_id.get_local_linear_id();
 
         // initialize local_input
@@ -61,7 +61,7 @@ DPCPP_DEVICE static inline OutputIt _scan_kernel(
         // flush result into dst
         d_first[local_id] = local_scan[local_id];
       };
-      __cgh.parallel_for(DPCPP::nd_range</*dim=*/1>(N, N), kfn);
+      __cgh.parallel_for(sycl::nd_range</*dim=*/1>(N, N), kfn);
     };
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
@@ -75,7 +75,7 @@ DPCPP_DEVICE static inline OutputIt _scan_kernel(
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
     dpcpp_local_acc_t<T> local_scan(wgroup_size, __cgh);
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       auto local_id = item_id.get_local_linear_id();
       auto global_id = item_id.get_global_linear_id();
       auto group_id = item_id.get_group_linear_id();
@@ -120,7 +120,7 @@ DPCPP_DEVICE static inline OutputIt _scan_kernel(
     };
 
     __cgh.parallel_for(
-        DPCPP::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
+        sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
@@ -131,7 +131,7 @@ DPCPP_DEVICE static inline OutputIt _scan_kernel(
   auto cgf_3 = DPCPP_Q_CGF(__cgh) {
     dpcpp_local_acc_t<T> local_carry(1, __cgh);
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       auto local_id = item_id.get_local_linear_id();
       auto global_id = item_id.get_global_linear_id();
       auto group_id = item_id.get_group_linear_id();
@@ -145,7 +145,7 @@ DPCPP_DEVICE static inline OutputIt _scan_kernel(
       }
     };
     __cgh.parallel_for(
-        DPCPP::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
+        sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_3);
 
@@ -191,7 +191,7 @@ DPCPP_DEVICE static inline OutputIt copy_if(
 
   // 1. get mask for `if` positions
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       if (first) {
         gmask_ptr[item_id] =
             static_cast<index_t>(static_cast<bool>(pred(first[item_id])));
@@ -201,7 +201,7 @@ DPCPP_DEVICE static inline OutputIt copy_if(
       }
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
@@ -210,7 +210,7 @@ DPCPP_DEVICE static inline OutputIt copy_if(
 
   // 3. copy selected data into dst
   auto cgf_3 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       if (gmask_ptr[item_id] != 0) {
         if (first) {
           d_first[tpos_ptr[item_id] - /*inclusive shift*/ 1] = first[item_id];
@@ -220,7 +220,7 @@ DPCPP_DEVICE static inline OutputIt copy_if(
       }
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_3);
 
@@ -243,11 +243,11 @@ DPCPP_DEVICE static inline OutputIt transform(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       d_first[item_id] = static_cast<output_t>(unary_op(first1[item_id]));
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
@@ -271,12 +271,12 @@ DPCPP_DEVICE static inline OutputIt transform(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       d_first[item_id] =
           static_cast<output_t>(binary_op(first1[item_id], first2[item_id]));
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
@@ -300,13 +300,13 @@ DPCPP_DEVICE static inline OutputIt transform_first_true(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       first1[0] = 1;
       d_first[item_id] =
           static_cast<output_t>(binary_op(first1[item_id], first2[item_id]));
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
@@ -320,11 +320,11 @@ DPCPP_DEVICE static inline void iota(ForwardIt first, ForwardIt last, T value) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       first[item_id] = value + static_cast<T>(item_id);
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -345,7 +345,7 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
 
   // 1. get mask for `if` positions
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       if (item_id > 0)
         gmask_ptr[item_id] = static_cast<index_t>(
             static_cast<bool>(!p(first[item_id - 1], first[item_id])));
@@ -353,7 +353,7 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
         gmask_ptr[item_id] = static_cast<index_t>(1);
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
@@ -365,12 +365,12 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
   T* scratchpad_ptr = scratchpad.data_ptr<T>();
 
   auto cgf_3 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       if (gmask_ptr[item_id] != 0)
         scratchpad_ptr[tpos_ptr[item_id]] = first[item_id];
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/>(N), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_3);
 
@@ -378,11 +378,11 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
       target_pos[N - 1].template item<index_t>();
 
   auto cgf_4 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       first[item_id] = scratchpad_ptr[item_id];
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/>(M), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/>(M), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_4);
 
@@ -416,7 +416,7 @@ std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
 
   // 1. get mask for `if` positions
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       if (item_id > 0)
         gmask_ptr[item_id] = static_cast<index_t>(
             static_cast<bool>(!p(first[item_id - 1], first[item_id])));
@@ -424,7 +424,7 @@ std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
         gmask_ptr[item_id] = static_cast<index_t>(1);
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
@@ -438,14 +438,14 @@ std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
   zT* z_scratchpad_ptr = z_scratchpad.data_ptr<zT>();
 
   auto cgf_3 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       if (gmask_ptr[item_id] != 0) {
         scratchpad_ptr[tpos_ptr[item_id]] = first[item_id];
         z_scratchpad_ptr[tpos_ptr[item_id]] = z_first[item_id];
       }
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/>(N), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_3);
 
@@ -453,12 +453,12 @@ std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
       target_pos[N - 1].template item<index_t>();
 
   auto cgf_4 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       first[item_id] = scratchpad_ptr[item_id];
       z_first[item_id] = z_scratchpad_ptr[item_id];
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/>(M), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/>(M), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_4);
 
@@ -488,7 +488,7 @@ OutputIt adjacent_difference(
   }
 
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       if (item_id > 0)
         adiff[item_id] =
             static_cast<output_t>(op(first[item_id - 1], first[item_id]));
@@ -496,17 +496,17 @@ OutputIt adjacent_difference(
         adiff[item_id] = static_cast<output_t>(first[item_id]);
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
   if (is_inplace) {
     auto cgf_2 = DPCPP_Q_CGF(__cgh) {
-      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
         d_first[item_id] = adiff[item_id];
       };
 
-      __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+      __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
     };
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf_2);
   }
@@ -546,7 +546,7 @@ OutputIt count_by_segment(
 
   // 1. get mask for `if` positions
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       if (item_id > 0)
         gmask_ptr[item_id] = static_cast<index_t>(
             static_cast<bool>(!p(first[item_id - 1], first[item_id])));
@@ -554,7 +554,7 @@ OutputIt count_by_segment(
         gmask_ptr[item_id] = static_cast<index_t>(1);
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
@@ -583,11 +583,11 @@ OutputIt count_by_segment(
 
   // 4. flush range to every elements of counts
   auto cgf_4 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       d_first[item_id] = range_ptr[tpos_ptr[item_id]];
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_4);
 
@@ -597,7 +597,7 @@ OutputIt count_by_segment(
 // bubble sort for the first round sorting
 template <typename KeyType, typename ValueType, typename CompFunc>
 inline void leaf_sort(
-    const DPCPP::item<1>& item,
+    const sycl::item<1>& item,
     KeyType* key,
     ValueType* val,
     size_t n,
@@ -788,7 +788,7 @@ void vec_copy_kernel_impl(
   val_vec_t* tmp_val_vec_ptr = reinterpret_cast<val_vec_t*>(tmp_val_data);
   auto num_work_item = CeilDiv(sort_sz, (size_t)vec_size);
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
       auto item_id = item.get_linear_id();
       int remaining = sort_sz - item_id * vec_size;
       if (remaining < vec_size) {
@@ -806,7 +806,7 @@ void vec_copy_kernel_impl(
       }
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(num_work_item), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(num_work_item), kfn);
   };
   DPCPP_Q_SUBMIT(q, cgf);
 }
@@ -868,10 +868,10 @@ void merge_sort(
   auto& q = dpcppGetCurrentQueue();
   // 1, leaf sort
   auto cgf_1 = DPCPP_Q_CGF(h) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
       leaf_sort<KeyType, ValueType>(item, key, val, leaf, sort_sz, comp_t);
     };
-    h.parallel_for(DPCPP::range<1>(leaf_step), kfn);
+    h.parallel_for(sycl::range<1>(leaf_step), kfn);
   };
   DPCPP_Q_SUBMIT(q, cgf_1);
 
@@ -901,7 +901,7 @@ void merge_sort(
     size_t steps = full_pair_steps + incomplete_pair_steps;
 
     auto cgf_2 = DPCPP_Q_CGF(h) {
-      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item) {
+      auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
         const size_t idx = item.get_linear_id();
         const size_t sq1_start =
             std::min(sorted_pair * ((idx * chunk) / sorted), sort_sz);
@@ -939,7 +939,7 @@ void merge_sort(
               comp_t);
         }
       };
-      h.parallel_for(DPCPP::range<1>(steps), kfn);
+      h.parallel_for(sycl::range<1>(steps), kfn);
     };
     DPCPP_Q_SUBMIT(q, cgf_2);
 

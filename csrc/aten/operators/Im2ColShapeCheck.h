@@ -12,7 +12,6 @@
 #include "comm/ApplyUtils.h"
 
 using namespace at;
-using namespace DPCPP;
 using namespace xpu::dpcpp;
 
 static inline void col2im_shape_check(

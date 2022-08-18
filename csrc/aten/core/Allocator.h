@@ -41,7 +41,7 @@ std::mutex* getFreeMutexOfDevAlloc();
 Allocator* getHostAllocator();
 
 // Record the event on queue where the host allocation is using
-void recordEventInHostAlloc(void* ptr, DPCPP::event& e);
+void recordEventInHostAlloc(void* ptr, sycl::event& e);
 
 // Releases all cached host memory allocations
 void emptyCacheInHostAlloc();

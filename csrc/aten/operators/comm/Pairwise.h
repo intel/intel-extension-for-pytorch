@@ -59,11 +59,11 @@ template <>
 struct TensorRemainderOp<float> {
   TensorRemainderOp(float v) : val(v) {}
   void operator()(float& out, float& in) const {
-    out = in - val * DPCPP::floor(in / val);
+    out = in - val * sycl::floor(in / val);
   }
 
   void operator()(float& v) const {
-    v = v - val * DPCPP::floor(v / val);
+    v = v - val * sycl::floor(v / val);
   }
 
   const float val;
@@ -73,11 +73,11 @@ template <>
 struct TensorRemainderOp<double> {
   TensorRemainderOp(double v) : val(v) {}
   void operator()(double& out, double& in) const {
-    out = in - val * DPCPP::floor(in / val);
+    out = in - val * sycl::floor(in / val);
   }
 
   void operator()(double& v) const {
-    v = v - val * DPCPP::floor(v / val);
+    v = v - val * sycl::floor(v / val);
   }
 
   const double val;
@@ -88,11 +88,11 @@ struct TensorRemainderOp<at::Half> {
   TensorRemainderOp(at::Half v) : val(v) {}
 
   void operator()(at::Half& out, at::Half& in) const {
-    out = in - val * DPCPP::floor(float(in / val));
+    out = in - val * sycl::floor(float(in / val));
   }
 
   void operator()(at::Half& v) const {
-    v = v - val * DPCPP::floor(float(v / val));
+    v = v - val * sycl::floor(float(v / val));
   }
 
   const at::Half val;
@@ -103,11 +103,11 @@ struct TensorRemainderOp<at::BFloat16> {
   TensorRemainderOp(at::BFloat16 v) : val(v) {}
 
   void operator()(at::BFloat16& out, at::BFloat16& in) const {
-    out = in - val * DPCPP::floor(float(in / val));
+    out = in - val * sycl::floor(float(in / val));
   }
 
   void operator()(at::BFloat16& v) const {
-    v = v - val * DPCPP::floor(float(v / val));
+    v = v - val * sycl::floor(float(v / val));
   }
 
   const at::BFloat16 val;
@@ -117,11 +117,11 @@ template <typename T>
 struct TensorFmodOp {
   TensorFmodOp(T v) : val((float)v) {}
   void operator()(T& out, T& in) const {
-    out = (T)DPCPP::fmod((float)in, val);
+    out = (T)sycl::fmod((float)in, val);
   }
 
   void operator()(T& v) const {
-    v = (T)DPCPP::fmod((float)v, val);
+    v = (T)sycl::fmod((float)v, val);
   }
 
   const float val;
@@ -131,11 +131,11 @@ template <>
 struct TensorFmodOp<double> {
   TensorFmodOp(double v) : val(v) {}
   void operator()(double& out, double& in) const {
-    out = DPCPP::fmod(in, val);
+    out = sycl::fmod(in, val);
   }
 
   void operator()(double v) const {
-    v = DPCPP::fmod(v, val);
+    v = sycl::fmod(v, val);
   }
 
   const double val;

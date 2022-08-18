@@ -32,7 +32,7 @@ void krn_partials_per_segment(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto ret_data = ret;
     auto offsets_data = segment_offsets;
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
       auto ret_ptr = ret_data;
       auto offsets_ptr = offsets_data;
       auto id = item.get_linear_id();
@@ -47,7 +47,7 @@ void krn_partials_per_segment(
     };
 
     // kick off kernel
-    cgh.parallel_for(DPCPP::range<1>(num_of_segments), kfn);
+    cgh.parallel_for(sycl::range<1>(num_of_segments), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -66,7 +66,7 @@ void krn_partial_segment_offset(
     auto partials_per_segment_data = partials_per_segment;
     auto partials_per_segment_offset_data = partials_per_segment_offset;
     auto segment_offsets_data = segment_offsets;
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
       auto ret_ptr = ret_data;
       auto partials_per_segment_ptr = partials_per_segment_data;
       auto partials_per_segment_offset_ptr = partials_per_segment_offset_data;
@@ -84,7 +84,7 @@ void krn_partial_segment_offset(
     };
 
     // kick off kernel
-    cgh.parallel_for(DPCPP::range<1>(num_of_segments), kfn);
+    cgh.parallel_for(sycl::range<1>(num_of_segments), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -135,7 +135,7 @@ void compute_grad_weight_bags(
                            // buffer.
     auto segment_offsets_data = segment_offsets.data_ptr<index_t>();
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto grad_weight_per_segment_ptr = grad_weight_per_segment_data;
       auto indices_ptr = indices_data;
       auto gradOutput_ptr = gradOutput_data;
@@ -183,8 +183,8 @@ void compute_grad_weight_bags(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -222,7 +222,7 @@ void compute_grad_weight(
         : indices_data; // use the indices_data handler as the dummy buffer.
     auto segment_offsets_data = segment_offsets.data_ptr<index_t>();
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto grad_weight_per_segment_ptr = grad_weight_per_segment_data;
       auto indices_ptr = indices_data;
       auto grad_output_ptr = grad_output_data;
@@ -254,8 +254,8 @@ void compute_grad_weight(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -289,7 +289,7 @@ void sum_and_scatter(
         grad_weight_per_segment.data_ptr<acc_type<scalar_t>>();
     auto segment_sizes_offsets_data = segment_sizes_offsets.data_ptr<index_t>();
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto grad_weight_ptr = grad_weight_data;
       auto input_ptr = input_data;
       auto segment_offsets_ptr = segment_offsets_data;
@@ -323,8 +323,8 @@ void sum_and_scatter(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);

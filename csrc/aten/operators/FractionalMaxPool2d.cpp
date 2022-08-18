@@ -71,7 +71,7 @@ void fractional_max_pool2d_out_frame(
     auto output_data = output;
     auto indices_data = indices;
     auto samples_data = samples;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto input_ptr = input_data;
       auto output_ptr = output_data;
       auto indices_ptr = indices_data;
@@ -139,9 +139,9 @@ void fractional_max_pool2d_out_frame(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(work_group_size * work_group_num),
-            DPCPP::range<1>(work_group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(work_group_size * work_group_num),
+            sycl::range<1>(work_group_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -211,7 +211,7 @@ void fractional_max_pool2d_backward_out_frame(
     auto gradInput_data = gradInput;
     auto gradOutput_data = gradOutput;
     auto indices_data = indices;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto gradInput_ptr = gradInput_data;
       auto gradOutput_ptr = gradOutput_data;
       auto indices_ptr = indices_data;
@@ -254,9 +254,9 @@ void fractional_max_pool2d_backward_out_frame(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(work_group_size * work_group_num),
-            DPCPP::range<1>(work_group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(work_group_size * work_group_num),
+            sycl::range<1>(work_group_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);

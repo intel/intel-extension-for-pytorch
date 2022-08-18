@@ -87,13 +87,13 @@ void _fft_conjugate_copy_kernel(
   int thread_num = numel;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto in_offset = ic.get(item_id)[0];
       auto out_offset = oc.get(item_id)[0];
       out_data[out_offset] = std::conj(in_data[in_offset]);
     };
 
-    cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_num), kfn);
+    cgh.parallel_for(sycl::range</*dim=*/1>(thread_num), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -324,7 +324,7 @@ class dft_desc_t {
   using mkl_desc_t = descriptor<prec, dom>;
 
   dft_desc_t(
-      DPCPP::queue& q,
+      sycl::queue& q,
       std::vector<std::int64_t>& dimensions,
       std::shared_ptr<dft_config_t> configs)
       : desc_(dimensions), configs_(configs) {
@@ -367,7 +367,7 @@ class dft_desc_handle
     : public lru_handle<at::AtenIpexTypeXPU::impl::dft_desc_t<prec, dom>*> {
  public:
   dft_desc_handle(
-      DPCPP::queue& q,
+      sycl::queue& q,
       std::vector<std::int64_t>& dimensions,
       std::shared_ptr<at::AtenIpexTypeXPU::impl::dft_config_t> configs) {
     at::AtenIpexTypeXPU::impl::dft_desc_t<prec, dom>* dft_desc =

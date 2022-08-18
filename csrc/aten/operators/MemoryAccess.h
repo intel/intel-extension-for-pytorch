@@ -270,7 +270,7 @@ struct aligned_element<8> {
 template <typename scalar_t, int vec_size>
 struct aligned_vector {
   using element_type = typename aligned_element<sizeof(scalar_t)>::element_type;
-  using type = DPCPP::vec<element_type, vec_size>;
+  using type = sycl::vec<element_type, vec_size>;
 };
 
 // aligned vector generates vectorized load/store on XPU

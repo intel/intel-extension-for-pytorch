@@ -17,9 +17,9 @@ void eltwise_binary_naive_kernel(
   uint64_t wg_num = nelem / subgp_size + 1;
   auto cgf = DPCPP_Q_CGF(__cgh) {
     __cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(wg_num * subgp_size), DPCPP::range<1>(subgp_size)),
-        [=](DPCPP::nd_item<1> item_id) {
+        sycl::nd_range<1>(
+            sycl::range<1>(wg_num * subgp_size), sycl::range<1>(subgp_size)),
+        [=](sycl::nd_item<1> item_id) {
           auto off = item_id.get_global_linear_id();
           if (off < nelem)
             op(res_ptr + off, op1_ptr + off, op2_ptr + off);

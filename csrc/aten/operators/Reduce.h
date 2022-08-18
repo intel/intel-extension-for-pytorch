@@ -123,16 +123,16 @@ struct ReduceConfig {
   }
 
   // Becareful of the geometry order
-  DPCPP::range<2> group_sz() const {
+  sycl::range<2> group_sz() const {
     return {(size_t)group_height, (size_t)group_width};
   }
-  DPCPP::range<2> global_sz() const {
+  sycl::range<2> global_sz() const {
     return {
         (size_t)(groups_per_output * group_height),
         (size_t)(
             group_width * div_up(num_outputs / output_vec_size, step_output))};
   }
-  DPCPP::range<2> n_groups() const {
+  sycl::range<2> n_groups() const {
     return {
         (size_t)(groups_per_output),
         (size_t)(div_up(num_outputs / output_vec_size, step_output))};
@@ -150,18 +150,18 @@ struct ReduceConfig {
     return input_mult[GROUP] != 0;
   }
 
-  bool should_store(DPCPP::nd_item<2> pos, int output_idx) const {
+  bool should_store(sycl::nd_item<2> pos, int output_idx) const {
     return output_idx < num_outputs &&
         (!should_group_x_reduce() || pos.get_local_id(1) == 0) &&
         (!should_group_y_reduce() || pos.get_local_id(0) == 0);
   }
 
-  bool should_reduce_tail(DPCPP::nd_item<2> pos) const {
+  bool should_reduce_tail(sycl::nd_item<2> pos) const {
     return (!should_group_y_reduce() || pos.get_local_id(0) == 0) &&
         (!should_global_reduce() || pos.get_group(0) == 0);
   }
 
-  int input_idx(DPCPP::nd_item<2> pos) const {
+  int input_idx(sycl::nd_item<2> pos) const {
     int lane = pos.get_local_id(1);
     int thread = pos.get_local_id(0);
     int group_y = pos.get_group(0);
@@ -171,7 +171,7 @@ struct ReduceConfig {
   }
 
   template <int output_vec_size>
-  int output_idx(DPCPP::nd_item<2> pos) const {
+  int output_idx(sycl::nd_item<2> pos) const {
     int lane = pos.get_local_id(1);
     int thread = pos.get_local_id(0);
     int group_x = pos.get_group(1);
@@ -180,12 +180,12 @@ struct ReduceConfig {
         output_vec_size;
   }
 
-  int slm_offset(DPCPP::nd_item<2> pos, int offset) const {
+  int slm_offset(sycl::nd_item<2> pos, int offset) const {
     return pos.get_local_id(1) +
         (pos.get_local_id(0) + offset) * pos.get_local_range(1);
   }
 
-  int staging_memory_offset(DPCPP::nd_item<2> pos, int wg_y) const {
+  int staging_memory_offset(sycl::nd_item<2> pos, int wg_y) const {
     int offset = wg_y + pos.get_group(1) * pos.get_group_range(0);
     if (!should_group_x_reduce()) {
       offset = pos.get_local_id(1) + offset * pos.get_local_range(1);
@@ -233,7 +233,7 @@ class reduce_kernel {
       dpcpp_local_acc_t<bool> finished)
       : reduction(reduction), shared(shared), finished(finished) {}
 
-  void operator()(DPCPP::nd_item<2> pos) const {
+  void operator()(sycl::nd_item<2> pos) const {
     reduction.template run<output_vec_size>(pos, shared, finished);
   }
 
@@ -369,7 +369,7 @@ struct ReduceOp {
 
   template <int output_vec_size>
   void run(
-      DPCPP::nd_item<2> pos,
+      sycl::nd_item<2> pos,
       dpcpp_local_ptr<char> shared,
       dpcpp_local_ptr<bool> finished) const {
     index_t output_idx = config.output_idx<output_vec_size>(pos);
@@ -463,7 +463,7 @@ struct ReduceOp {
 
   template <int output_vec_size>
   at::detail::Array<arg_t, output_vec_size> item_reduce(
-      DPCPP::nd_item<2> pos,
+      sycl::nd_item<2> pos,
       const scalar_t* data) const {
     if (config.vectorize_input) {
       // assert(output_vec_size == 1);
@@ -500,7 +500,7 @@ struct ReduceOp {
 
   template <int input_vec_size>
   SYCL_EXTERNAL arg_t input_vectorized_item_reduce_impl(
-      DPCPP::nd_item<2> pos,
+      sycl::nd_item<2> pos,
       const scalar_t* data) const {
     index_t end = config.num_inputs;
     // Handle the head of input slice where data is not aligned
@@ -575,7 +575,7 @@ struct ReduceOp {
 
   template <int output_vec_size, typename offset_calc_t>
   at::detail::Array<arg_t, output_vec_size> item_reduce_impl(
-      DPCPP::nd_item<2> pos,
+      sycl::nd_item<2> pos,
       const scalar_t* data_,
       offset_calc_t calc) const {
     index_t idx = config.input_idx(pos);
@@ -651,7 +651,7 @@ struct ReduceOp {
 
   template <int output_vec_size>
   at::detail::Array<arg_t, output_vec_size> group_reduce(
-      DPCPP::nd_item<2> pos,
+      sycl::nd_item<2> pos,
       at::detail::Array<arg_t, output_vec_size> value,
       dpcpp_local_ptr<void> shared_memory) const {
     auto sg = pos.get_sub_group();
@@ -717,7 +717,7 @@ struct ReduceOp {
 
   template <int output_vec_size>
   at::detail::Array<arg_t, output_vec_size> group_x_reduce(
-      DPCPP::nd_item<2> pos,
+      sycl::nd_item<2> pos,
       at::detail::Array<arg_t, output_vec_size> value,
       dpcpp_local_ptr<void> shared_memory) const {
     using args_vec_t = at::detail::Array<arg_t, output_vec_size>;
@@ -760,7 +760,7 @@ struct ReduceOp {
 
   template <int output_vec_size>
   at::detail::Array<arg_t, output_vec_size> group_y_reduce(
-      DPCPP::nd_item<2> pos,
+      sycl::nd_item<2> pos,
       at::detail::Array<arg_t, output_vec_size> value,
       dpcpp_local_ptr<void> shared_memory) const {
     using args_vec_t = at::detail::Array<arg_t, output_vec_size>;
@@ -784,9 +784,8 @@ struct ReduceOp {
   }
 
   // In/out from slm pointers
-  void mark_group_finished(
-      DPCPP::nd_item<2> pos,
-      dpcpp_local_ptr<bool> finished) const {
+  void mark_group_finished(sycl::nd_item<2> pos, dpcpp_local_ptr<bool> finished)
+      const {
     pos.barrier(dpcpp_local_fence);
 
     if (pos.get_local_linear_id() == 0) {
@@ -881,7 +880,7 @@ struct ReduceOp {
 
   template <int output_vec_size>
   at::detail::Array<arg_t, output_vec_size> global_reduce(
-      DPCPP::nd_item<2> pos,
+      sycl::nd_item<2> pos,
       at::detail::Array<arg_t, output_vec_size> value,
       at::detail::Array<arg_t, output_vec_size>* acc,
       dpcpp_local_ptr<char> shared_memory,
@@ -989,26 +988,26 @@ static void launch_reduce_kernel(
   auto& queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    DPCPP::range<1> slm_sz{static_cast<uint32_t>(config.slm_sz())};
+    sycl::range<1> slm_sz{static_cast<uint32_t>(config.slm_sz())};
     dpcpp_local_acc_t<char> shared(slm_sz, cgh);
     dpcpp_local_acc_t<bool> finished({1}, cgh);
     switch (config.output_vec_size) {
       case 4: {
         reduce_kernel<4, R> ker(reduction, shared, finished);
         cgh.parallel_for(
-            DPCPP::nd_range<2>(config.global_sz(), config.group_sz()), ker);
+            sycl::nd_range<2>(config.global_sz(), config.group_sz()), ker);
         break;
       }
       case 2: {
         reduce_kernel<2, R> ker(reduction, shared, finished);
         cgh.parallel_for(
-            DPCPP::nd_range<2>(config.global_sz(), config.group_sz()), ker);
+            sycl::nd_range<2>(config.global_sz(), config.group_sz()), ker);
         break;
       }
       default: {
         reduce_kernel<1, R> ker(reduction, shared, finished);
         cgh.parallel_for(
-            DPCPP::nd_range<2>(config.global_sz(), config.group_sz()), ker);
+            sycl::nd_range<2>(config.global_sz(), config.group_sz()), ker);
         break;
       }
     }

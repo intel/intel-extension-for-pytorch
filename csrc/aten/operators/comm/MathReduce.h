@@ -93,11 +93,11 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
 
   // initialize tgt2
   auto cgf_0 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       tgt2_ptr[item_id] = item_id % size_rdim;
     };
 
-    __cgh.parallel_for(DPCPP::range<1>(src.numel()), kfn);
+    __cgh.parallel_for(sycl::range<1>(src.numel()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_0);
 
@@ -105,7 +105,7 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
     wgroup_size = std::min(max_wgroup_size, num_of_reduce_line);
     ngroups = (num_of_reduce_line + wgroup_size - 1) / wgroup_size;
     auto cgf = DPCPP_Q_CGF(__cgh) {
-      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
         auto local_id = item_id.get_local_linear_id();
         auto global_id = item_id.get_global_linear_id();
 
@@ -123,7 +123,7 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
       };
 
       __cgh.parallel_for(
-          DPCPP::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
+          sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
     };
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     return;
@@ -136,7 +136,7 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
     wgroup_size = std::min(max_wgroup_size, remained);
     auto cgf = DPCPP_Q_CGF(__cgh) {
       dpcpp_local_acc_t<max_t> local_max_buf(wgroup_size, __cgh);
-      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
         auto local_id = item_id.get_local_linear_id();
         auto global_id = item_id.get_global_linear_id();
         auto group_id = item_id.get_group_linear_id();
@@ -161,7 +161,7 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
       };
 
       __cgh.parallel_for(
-          DPCPP::nd_range<1>(total_ngroups * wgroup_size, wgroup_size), kfn);
+          sycl::nd_range<1>(total_ngroups * wgroup_size, wgroup_size), kfn);
     };
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     remained = ng;
@@ -198,11 +198,11 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
 
   // initialize tgt2
   auto cgf_0 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       tgt2_ptr[item_id] = item_id / stride_rdim % size_rdim;
     };
 
-    __cgh.parallel_for(DPCPP::range<1>(src.numel()), kfn);
+    __cgh.parallel_for(sycl::range<1>(src.numel()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_0);
 
@@ -210,7 +210,7 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
     wgroup_size = std::min(max_wgroup_size, num_of_reduce_line);
     ngroups = (num_of_reduce_line + wgroup_size - 1) / wgroup_size;
     auto cgf = DPCPP_Q_CGF(__cgh) {
-      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
         auto local_id = item_id.get_local_linear_id();
         auto global_id = item_id.get_global_linear_id();
 
@@ -229,7 +229,7 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
       };
 
       __cgh.parallel_for(
-          DPCPP::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
+          sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
     };
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     return;
@@ -242,7 +242,7 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
     wgroup_size = std::min(max_wgroup_size, remained);
     auto cgf = DPCPP_Q_CGF(__cgh) {
       dpcpp_local_acc_t<max_t> local_max_buf(wgroup_size, __cgh);
-      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
         auto local_id = item_id.get_local_linear_id();
         auto global_id = item_id.get_global_linear_id();
         auto group_id = item_id.get_group_linear_id();
@@ -269,7 +269,7 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
       };
 
       __cgh.parallel_for(
-          DPCPP::nd_range<1>(total_ngroups * wgroup_size, wgroup_size), kfn);
+          sycl::nd_range<1>(total_ngroups * wgroup_size, wgroup_size), kfn);
     };
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     remained = ng;

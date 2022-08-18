@@ -62,7 +62,7 @@ void kernelHistogram1D(
     auto in_data = b.data;
     auto weight_data = c.data;
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto out_ptr = out_data;
       auto in_ptr = in_data;
       auto weight_ptr = weight_data;
@@ -84,7 +84,7 @@ void kernelHistogram1D(
       }
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(totalElements), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(totalElements), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

@@ -51,8 +51,8 @@ void vec_fused_dropout_kernel_impl(
   int max_group_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t num_group =
       (numel + max_group_size * vec_size - 1) / (max_group_size * vec_size);
-  DPCPP::range<1> global_range{num_group * max_group_size};
-  DPCPP::range<1> local_range{max_group_size};
+  sycl::range<1> global_range{num_group * max_group_size};
+  sycl::range<1> local_range{max_group_size};
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(
         sycl::nd_range<1>{global_range, local_range},
@@ -153,7 +153,7 @@ void masked_scale_kernel(
     auto ret_ptr = ret.data_ptr<scalar_t>();
     auto mask_ptr = mask.data_ptr<uint8_t>();
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto index = item_id.get_linear_id();
       auto self_offset =
           IndexToOffset<scalar_t, uint64_t>::get(index, self_info);
@@ -162,7 +162,7 @@ void masked_scale_kernel(
       ret_ptr[index] = self_ptr[self_offset] *
           static_cast<uint8_t>(mask_ptr[mask_offset]) * scale;
     };
-    cgh.parallel_for(DPCPP::range<1>(numel), kfn);
+    cgh.parallel_for(sycl::range<1>(numel), kfn);
   };
   DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
@@ -185,8 +185,8 @@ void vec_masked_scale_kernel_impl(
   int max_group_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t num_group =
       (numel + max_group_size * vec_size - 1) / (max_group_size * vec_size);
-  DPCPP::range<1> global_range{num_group * max_group_size};
-  DPCPP::range<1> local_range{max_group_size};
+  sycl::range<1> global_range{num_group * max_group_size};
+  sycl::range<1> local_range{max_group_size};
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(
         sycl::nd_range<1>{global_range, local_range},

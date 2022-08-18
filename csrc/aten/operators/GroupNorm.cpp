@@ -29,9 +29,9 @@ static void RowwiseMomentsDPCPPKernel(
   auto global_size = total_size * local_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(global_size), DPCPP::range<1>(local_size)),
-        [=](DPCPP::nd_item<1> item_id) {
+        sycl::nd_range<1>(
+            sycl::range<1>(global_size), sycl::range<1>(local_size)),
+        [=](sycl::nd_item<1> item_id) {
           auto local_id = item_id.get_local_id(0);
           auto i = item_id.get_group(0);
           auto g = item_id.get_group();
@@ -77,19 +77,18 @@ static void ComputeFusedParamsDPCPPKernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = N * C;
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(
-        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-          auto id = itemId.get_id(0);
+    cgh.parallel_for(sycl::range<1>(total_threads), [=](sycl::item<1> itemId) {
+      auto id = itemId.get_id(0);
 
-          const int64_t ng = id / (C / group);
-          const int64_t c = id % C;
-          const T_ACC x = (gamma == nullptr)
-              ? static_cast<T_ACC>(rstd[ng])
-              : static_cast<T_ACC>(rstd[ng]) * static_cast<T_ACC>(gamma[c]);
-          a[id] = x;
-          b[id] = -x * static_cast<T_ACC>(mean[ng]) +
-              (beta == nullptr ? T_ACC(0) : static_cast<T_ACC>(beta[c]));
-        });
+      const int64_t ng = id / (C / group);
+      const int64_t c = id % C;
+      const T_ACC x = (gamma == nullptr)
+          ? static_cast<T_ACC>(rstd[ng])
+          : static_cast<T_ACC>(rstd[ng]) * static_cast<T_ACC>(gamma[c]);
+      a[id] = x;
+      b[id] = -x * static_cast<T_ACC>(mean[ng]) +
+          (beta == nullptr ? T_ACC(0) : static_cast<T_ACC>(beta[c]));
+    });
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -112,9 +111,9 @@ void GroupNormForwardDPCPPKernel(
         ((N * C * HxW + local_size - 1) / local_size) * local_size;
     auto cgf = DPCPP_Q_CGF(cgh) {
       cgh.parallel_for(
-          DPCPP::nd_range<1>(
-              DPCPP::range<1>(total_threads), DPCPP::range<1>(local_size)),
-          [=](DPCPP::nd_item<1> item_id) {
+          sycl::nd_range<1>(
+              sycl::range<1>(total_threads), sycl::range<1>(local_size)),
+          [=](sycl::nd_item<1> item_id) {
             auto local_id = item_id.get_local_id(0);
             auto group_id = item_id.get_group(0);
             const int64_t index = group_id * local_size + local_id;
@@ -129,9 +128,9 @@ void GroupNormForwardDPCPPKernel(
     auto total_threads = N * C * local_size;
     auto cgf = DPCPP_Q_CGF(cgh) {
       cgh.parallel_for(
-          DPCPP::nd_range<1>(
-              DPCPP::range<1>(total_threads), DPCPP::range<1>(local_size)),
-          [=](DPCPP::nd_item<1> item_id) {
+          sycl::nd_range<1>(
+              sycl::range<1>(total_threads), sycl::range<1>(local_size)),
+          [=](sycl::nd_item<1> item_id) {
             auto local_id = item_id.get_local_id(0);
             auto group_id = item_id.get_group(0);
             const int64_t nc = group_id;
@@ -203,9 +202,9 @@ void ComputeInternalGradientsDPCPPKernel(
   auto global_size = total_size * local_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(global_size), DPCPP::range<1>(local_size)),
-        [=](DPCPP::nd_item<1> item_id) {
+        sycl::nd_range<1>(
+            sycl::range<1>(global_size), sycl::range<1>(local_size)),
+        [=](sycl::nd_item<1> item_id) {
           auto local_id = item_id.get_local_id(0);
           auto nc = item_id.get_group(0);
           auto g = item_id.get_group();
@@ -242,15 +241,14 @@ void ComputeGradOutputCoeffientDPCPPKernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = N * C;
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(
-        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-          auto nc = itemId.get_id(0);
+    cgh.parallel_for(sycl::range<1>(total_threads), [=](sycl::item<1> itemId) {
+      auto nc = itemId.get_id(0);
 
-          const int64_t ng = nc / (C / group);
-          const int64_t c = nc % C;
-          c1[nc] = static_cast<T_ACC>(rstd[ng]) *
-              (gamma == nullptr ? T_ACC(1) : static_cast<T_ACC>(gamma[c]));
-        });
+      const int64_t ng = nc / (C / group);
+      const int64_t c = nc % C;
+      c1[nc] = static_cast<T_ACC>(rstd[ng]) *
+          (gamma == nullptr ? T_ACC(1) : static_cast<T_ACC>(gamma[c]));
+    });
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -274,10 +272,10 @@ void ComputeBackwardFusedParamsDPCPPKernel(
   auto total_threads = N * local_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(
-        DPCPP::nd_range<2>(
-            DPCPP::range<2>(total_threads, group),
-            DPCPP::range<2>(local_size, 1)),
-        [=](DPCPP::nd_item<2> itemId) {
+        sycl::nd_range<2>(
+            sycl::range<2>(total_threads, group),
+            sycl::range<2>(local_size, 1)),
+        [=](sycl::nd_item<2> itemId) {
           using T_ACC = acc_type<T>;
           auto G = group;
           auto D = C / G;
@@ -335,9 +333,9 @@ void GroupNormBackwardDPCPPKernel(
         ((N * C * HxW + local_size - 1) / local_size) * local_size;
     auto cgf = DPCPP_Q_CGF(cgh) {
       cgh.parallel_for(
-          DPCPP::nd_range<1>(
-              DPCPP::range<1>(total_threads), DPCPP::range<1>(local_size)),
-          [=](DPCPP::nd_item<1> itemId) {
+          sycl::nd_range<1>(
+              sycl::range<1>(total_threads), sycl::range<1>(local_size)),
+          [=](sycl::nd_item<1> itemId) {
             auto index = itemId.get_global_linear_id();
             if (index < N * C * HxW) {
               auto nc = index / HxW;
@@ -352,9 +350,9 @@ void GroupNormBackwardDPCPPKernel(
     auto total_threads = N * C * local_size;
     auto cgf = DPCPP_Q_CGF(cgh) {
       cgh.parallel_for(
-          DPCPP::nd_range<1>(
-              DPCPP::range<1>(total_threads), DPCPP::range<1>(local_size)),
-          [=](DPCPP::nd_item<1> itemId) {
+          sycl::nd_range<1>(
+              sycl::range<1>(total_threads), sycl::range<1>(local_size)),
+          [=](sycl::nd_item<1> itemId) {
             auto local_id = itemId.get_local_id(0);
             auto group_id = itemId.get_group(0);
             auto D = C / group;
@@ -389,9 +387,9 @@ void GammaBetaBackwardDPCPPKernel(
   auto total_threads = ((C + local_size - 1) / local_size) * local_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_threads), DPCPP::range<1>(local_size)),
-        [=](DPCPP::nd_item<1> itemId) {
+        sycl::nd_range<1>(
+            sycl::range<1>(total_threads), sycl::range<1>(local_size)),
+        [=](sycl::nd_item<1> itemId) {
           auto index = itemId.get_global_linear_id();
           if (index < C) {
             auto G = group;
@@ -424,9 +422,9 @@ void GammaBetaBackwardDPCPPKernel(
   auto local_size = dpcppMaxWorkGroupSize(dev_id);
     const int64_t B = ((C + kReduceTileSize - 1) / kReduceTileSize) *
   kReduceTileSize; constexpr int kThreadX = kReduceTileSize; constexpr int
-  kThreadY = kReduceTileSize / 2; cgh.parallel_for( DPCPP::nd_range<2>(
-          DPCPP::range<2>(B, kThreadY), DPCPP::range<2>(kThreadX, kThreadY)),
-      [=](DPCPP::nd_item<2> itemId) {
+  kThreadY = kReduceTileSize / 2; cgh.parallel_for( sycl::nd_range<2>(
+          sycl::range<2>(B, kThreadY), sycl::range<2>(kThreadX, kThreadY)),
+      [=](sycl::nd_item<2> itemId) {
     const int64_t c = blockIdx.x * blockDim.x + threadIdx.x;
     T_ACC dg_sum1 = 0;
     T_ACC dg_sum2 = 0;

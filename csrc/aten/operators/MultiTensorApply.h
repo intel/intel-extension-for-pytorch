@@ -50,13 +50,13 @@ void multi_tensor_apply_kernel(
   int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t kChunkSize = max_wg_size * kElementPerThread;
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       callable(kChunkSize, tlAddressMeta, tlWGMeta, item_id, args...);
     };
     __cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(global_size * max_wg_size),
-            DPCPP::range<1>(max_wg_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(global_size * max_wg_size),
+            sycl::range<1>(max_wg_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

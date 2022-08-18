@@ -84,10 +84,10 @@ template <class T>
 void fillDevice(T* dst, T value, size_t n_elems, bool async) {
   auto& queue = getCurrentQueue()->getDpcppQueue();
   auto e = queue.submit(DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       *(dst + item_id) = value;
     };
-    __cgh.parallel_for(DPCPP::range<1>(n_elems), kfn);
+    __cgh.parallel_for(sycl::range<1>(n_elems), kfn);
   });
 
   if (!async) {
@@ -103,10 +103,10 @@ void fillDevice(T* dst, T value, size_t n_elems, bool async) {
   void fillDevice(T* dst, T value, size_t n_elems, bool async) { \
     auto& queue = getCurrentQueue()->getDpcppQueue();            \
     auto e = queue.submit(DPCPP_Q_CGF(__cgh) {                   \
-      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {           \
+      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {            \
         *(dst + item_id) = value;                                \
       };                                                         \
-      __cgh.parallel_for(DPCPP::range<1>(n_elems), kfn);         \
+      __cgh.parallel_for(sycl::range<1>(n_elems), kfn);          \
     });                                                          \
                                                                  \
     if (!async) {                                                \

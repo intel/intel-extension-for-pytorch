@@ -60,11 +60,11 @@ void dpcpp_elementwise_kernel_with_index_impl(
   int64_t thread_number = std::min(N, (int64_t)std::numeric_limits<int>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto idx = item_id.get_linear_id();
       out_ptr[idx] = f(idx);
     };
-    cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_number), kfn);
+    cgh.parallel_for(sycl::range</*dim=*/1>(thread_number), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -364,7 +364,7 @@ Tensor& arange_dpcpp_out(
           dpcpp_local_acc_t<accscalar_t> slm_xstep(1, cgh);
 
           // kernel function per work-item
-          auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+          auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
             slm_xstart[0] = xstart;
             slm_xstep[0] = xstep;
             auto ptr = acc;
@@ -375,9 +375,9 @@ Tensor& arange_dpcpp_out(
           };
           // kick off kernel
           cgh.parallel_for(
-              DPCPP::nd_range</*dim=*/1>(
-                  DPCPP::range<1>(wgroup_num_col * wgroup_size_col),
-                  DPCPP::range<1>(wgroup_size_col)),
+              sycl::nd_range</*dim=*/1>(
+                  sycl::range<1>(wgroup_num_col * wgroup_size_col),
+                  sycl::range<1>(wgroup_size_col)),
               kfn);
         };
 

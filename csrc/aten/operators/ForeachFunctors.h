@@ -77,7 +77,7 @@ struct UnaryOpFunctor {
       const int64_t chunk_size,
       TLA tlAddress,
       TLW tlWGMeta,
-      DPCPP::nd_item<1> item_id,
+      sycl::nd_item<1> item_id,
       Op op) const {
     auto item_idx = item_id.get_local_id(0);
     auto item_range = item_id.get_local_range(0);
@@ -133,7 +133,7 @@ struct ZeroFunctor {
       const int64_t chunk_size,
       TLA tlAddress,
       TLW tlWGMeta,
-      DPCPP::nd_item<1> item_id) const {
+      sycl::nd_item<1> item_id) const {
     auto item_idx = item_id.get_local_id(0);
     auto item_range = item_id.get_local_range(0);
     auto group_idx = item_id.get_group(0);

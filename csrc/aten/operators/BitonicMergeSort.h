@@ -45,10 +45,10 @@ inline void compare_and_swap(
 template <
     typename KeyType,
     typename ValueType,
-    DPCPP::access::fence_space fence_space,
+    sycl::access::fence_space fence_space,
     typename CompFunc>
 inline void bitonic_sort(
-    const DPCPP::nd_item<1>& item,
+    const sycl::nd_item<1>& item,
     KeyType* key,
     ValueType* val,
     const CompFunc& comp_t,
@@ -143,7 +143,7 @@ void bitonic_merge_sort_kernel(
   auto cgf = DPCPP_Q_CGF(h) {
     auto s_key = dpcpp_local_acc_t<KeyType>(bitonic_blk_sort_sz, h);
     auto s_val = dpcpp_local_acc_t<ValueType>(bitonic_blk_sort_sz, h);
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto item_id = item.get_local_id(0);
       auto batch = item.get_group(0);
       auto outer = batch / inner_sz;
@@ -230,9 +230,9 @@ void bitonic_merge_sort_kernel(
     };
 
     h.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(outer_sz * inner_sz * local_sz),
-            DPCPP::range<1>(local_sz)),
+        sycl::nd_range<1>(
+            sycl::range<1>(outer_sz * inner_sz * local_sz),
+            sycl::range<1>(local_sz)),
         kfn);
   };
 

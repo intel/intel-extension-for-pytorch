@@ -205,7 +205,7 @@ void countRadixUsingMask(
     index_t sliceSize,
     index_t withinSliceStride,
     const dpcpp_global_ptr_pt<scalar_t>& data,
-    DPCPP::nd_item<1>& item_id) {
+    sycl::nd_item<1>& item_id) {
   // Clear out per-thread counts from a previous round
   for (int i = 0; i < RadixSize; ++i) {
     counts[i] = 0;
@@ -216,7 +216,7 @@ void countRadixUsingMask(
     smem[local_id] = 0;
   }
 
-  item_id.barrier(DPCPP::access::fence_space::local_space);
+  item_id.barrier(sycl::access::fence_space::local_space);
   // Scan over all the data. Upon a read, the warp will accumulate
   // counts per each digit in the radix using warp voting.
   for (index_t i = local_id; i < sliceSize; i += item_id.get_local_range(0)) {
@@ -232,20 +232,20 @@ void countRadixUsingMask(
   }
 
   for (uint32_t i = 0; i < RadixSize; ++i) {
-    DPCPP::
+    sycl::
         atomic_ref<int, dpcpp_mem_odr_rlx, dpcpp_mem_scp_wg, dpcpp_local_space>
             smem_var(smem[i]);
     smem_var.fetch_add(counts[i]);
   }
 
-  item_id.barrier(DPCPP::access::fence_space::local_space);
+  item_id.barrier(sycl::access::fence_space::local_space);
 
   // For each thread, read in the total counts
   for (uint32_t i = 0; i < RadixSize; ++i) {
     counts[i] = smem[i];
   }
 
-  item_id.barrier(DPCPP::access::fence_space::local_space);
+  item_id.barrier(sycl::access::fence_space::local_space);
 }
 
 // Over what radix we are selecting values
@@ -263,7 +263,7 @@ scalar_t findPattern(
     index_t withinSliceStride,
     bitwise_t desired,
     bitwise_t desiredMask,
-    DPCPP::nd_item<1>& item_id) {
+    sycl::nd_item<1>& item_id) {
   auto local_id = item_id.get_local_id(0);
   auto smem_ptr =
       static_cast<scalar_t*>(static_cast<void*>(smem.get_pointer().get()));
@@ -271,7 +271,7 @@ scalar_t findPattern(
     smem_ptr[RADIX_SIZE] = ScalarConvert<int, scalar_t>::to(0);
   }
 
-  item_id.barrier(DPCPP::access::fence_space::local_space);
+  item_id.barrier(sycl::access::fence_space::local_space);
 
   // All threads participate in the loop, in order to sync on the flag
   index_t numIterations =
@@ -290,12 +290,12 @@ scalar_t findPattern(
       smem_ptr[1] = v; // can't use val as the flag, since it could be 0
     }
 
-    item_id.barrier(DPCPP::access::fence_space::local_space);
+    item_id.barrier(sycl::access::fence_space::local_space);
 
     scalar_t found = smem_ptr[0];
     scalar_t val = smem_ptr[1];
 
-    item_id.barrier(DPCPP::access::fence_space::local_space);
+    item_id.barrier(sycl::access::fence_space::local_space);
 
     // Check to see if a thread found the value
     if (Numerics<scalar_t>::ne(found, ScalarConvert<int, scalar_t>::to(0))) {
@@ -317,7 +317,7 @@ void radixSelect(
     index_t withinSliceStride,
     const dpcpp_local_acc_t<int>& smem,
     scalar_t* topK,
-    DPCPP::nd_item<1>& item_id) {
+    sycl::nd_item<1>& item_id) {
   // Per-thread buckets into which we accumulate digit counts in our
   // radix
   int counts[RADIX_SIZE];

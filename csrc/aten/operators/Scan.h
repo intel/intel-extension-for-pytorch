@@ -16,7 +16,7 @@ typedef enum {
 // group x scan by using up down sweep algorithm(call uds for short)
 template <class LSConfig, class T, class BinaryFunction>
 DPCPP_DEVICE T group_x_scan_by_uds_for_loop_scan(
-    DPCPP::nd_item<2> item,
+    sycl::nd_item<2> item,
     const T pre_max_carr,
     int64_t base_off,
     dpcpp_local_ptr<T> slm,
@@ -133,7 +133,7 @@ DPCPP_DEVICE T group_x_scan_by_uds_for_loop_scan(
 
 template <class T, class BinaryFunction>
 DPCPP_DEVICE T
-subgroup_scan(DPCPP::nd_item<2> item, T value, BinaryFunction func) {
+subgroup_scan(sycl::nd_item<2> item, T value, BinaryFunction func) {
   const auto sg = item.get_sub_group();
   const auto lane = sg.get_local_linear_id();
   const auto sg_size = sg.get_local_range()[0];
@@ -150,7 +150,7 @@ subgroup_scan(DPCPP::nd_item<2> item, T value, BinaryFunction func) {
 
 template <class T, class BinaryFunction>
 DPCPP_DEVICE T group_x_scan(
-    DPCPP::nd_item<2> item,
+    sycl::nd_item<2> item,
     T value,
 #ifndef SG_SCAN
     dpcpp_local_ptr<T> slm,
@@ -224,7 +224,7 @@ DPCPP_DEVICE T group_x_scan(
 
 template <class T, class BinaryFunction>
 DPCPP_DEVICE T group_y_scan(
-    DPCPP::nd_item<2> item,
+    sycl::nd_item<2> item,
     T value,
     dpcpp_local_ptr<T> temp,
     BinaryFunction func) {
@@ -306,11 +306,11 @@ class LoopScanConfig {
     return {input_info, output_info, batch, problem, init, type, func};
   }
 
-  DPCPP::range<2> global_size() const {
+  sycl::range<2> global_size() const {
     return {glb_range_y_, glb_range_x_};
   }
 
-  DPCPP::range<2> group_size() const {
+  sycl::range<2> group_size() const {
     return {wg_range_y_, wg_range_x_};
   }
 
@@ -323,7 +323,7 @@ class LoopScanConfig {
     /* current global assignment id */ int64_t glb_problem;
   };
 
-  item_desc get_item_desc(DPCPP::nd_item<2> item) const {
+  item_desc get_item_desc(sycl::nd_item<2> item) const {
     auto giy = item.get_global_id(0);
     auto gix = item.get_global_id(1);
 
@@ -352,7 +352,7 @@ class loop_scan_kernel {
   loop_scan_kernel(const LSConfig& cfg) : cfg(cfg) {}
 
   DPCPP_DEVICE void lrun(
-      DPCPP::nd_item<2> item,
+      sycl::nd_item<2> item,
       dpcpp_local_acc_t<T> slm,
       dpcpp_local_acc_t<T> max_carr) const {
     const int loops = cfg.loops_;
@@ -382,7 +382,7 @@ class loop_scan {
       dpcpp_local_acc_t<T> max_carr)
       : ker_(ker), shared_(shared), max_carr_(max_carr) {}
 
-  void operator()(DPCPP::nd_item<2> item) const {
+  void operator()(sycl::nd_item<2> item) const {
     ker_.lrun(item, shared_, max_carr_);
   }
 
@@ -410,7 +410,7 @@ static inline void launch_loop_scan(const LSConfig& cfg) {
 
     loop_scan sscan(ker, shared, max_carr);
     __cgh.parallel_for(
-        DPCPP::nd_range<2>(cfg.global_size(), cfg.group_size()), sscan);
+        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), sscan);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -500,7 +500,7 @@ class segment_scan_kernel {
   segment_scan_kernel(const SSConfig& cfg) : cfg(cfg) {}
 
  public:
-  DPCPP_DEVICE void srun(DPCPP::nd_item<2> item, dpcpp_local_acc_t<T> slm)
+  DPCPP_DEVICE void srun(sycl::nd_item<2> item, dpcpp_local_acc_t<T> slm)
       const {
     auto id = cfg.get_item_desc(item);
     int64_t si, pi, bi, glb_ldr_off, glb_str_off, glb_str_off_0,
@@ -579,7 +579,7 @@ class segment_scan {
   segment_scan(const SKer& ker, dpcpp_local_acc_t<T> shared)
       : ker_(ker), shared_(shared) {}
 
-  void operator()(DPCPP::nd_item<2> item) const {
+  void operator()(sycl::nd_item<2> item) const {
     ker_.srun(item, shared_);
   }
 
@@ -611,7 +611,7 @@ static inline void launch_segment_scan(const SSConfig& cfg) {
         ker(cfg);
     segment_scan gscan(ker, shared);
     __cgh.parallel_for(
-        DPCPP::nd_range<2>(cfg.global_size(), cfg.group_size()), gscan);
+        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), gscan);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -623,7 +623,7 @@ static inline void accumulate_carrier(const SSConfig& cfg) {
   auto& queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
       auto id = cfg.get_item_desc(item);
       int64_t si, pi, bi, glb_off, crr_off;
 
@@ -639,7 +639,7 @@ static inline void accumulate_carrier(const SSConfig& cfg) {
       }
     };
     __cgh.parallel_for(
-        DPCPP::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
+        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -648,7 +648,7 @@ template <typename T, class BinaryOp, int Power2ScanSize>
 DPCPP_DEVICE void inclusivePrefixScan(
     T* smem,
     BinaryOp binop,
-    const DPCPP::nd_item<1>& item_id) {
+    const sycl::nd_item<1>& item_id) {
   // Reduce step ("upsweep")
   int threadIdx = item_id.get_local_id(0);
   for (int stride = 1; stride < Power2ScanSize; stride <<= 1) {
@@ -676,7 +676,7 @@ DPCPP_DEVICE void inclusivePrefixScan(
     T in,
     T* out,
     BinaryFunction binop,
-    const DPCPP::nd_item<1>& item_id) {
+    const sycl::nd_item<1>& item_id) {
   // FIXME: this is slow
   int threadIdx = item_id.get_local_id(0);
   smem[threadIdx] = in;
@@ -708,7 +708,7 @@ DPCPP_DEVICE void exclusivePrefixScan(
     T* out,
     T* carry,
     BinaryFunction binop,
-    const DPCPP::nd_item<1>& item_id) {
+    const sycl::nd_item<1>& item_id) {
   inclusivePrefixScan<T, BinaryFunction>(smem, in, out, binop, item_id);
 
   *out -= in;

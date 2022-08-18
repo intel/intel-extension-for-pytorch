@@ -116,11 +116,11 @@ void CatArrayBatchedCopy(
     numWG = 64;
   else
     numWG = 128;
-  DPCPP::range<2> global_range(batchCounter, numWG * numWI);
-  DPCPP::range<2> local_range(1, numWI);
+  sycl::range<2> global_range(batchCounter, numWG * numWI);
+  sycl::range<2> local_range(1, numWI);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
       IndexType tid = item.get_global_id(1);
       IndexType in = item.get_group(0);
 
@@ -144,7 +144,7 @@ void CatArrayBatchedCopy(
         tid += stride;
       }
     };
-    cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf)
 }

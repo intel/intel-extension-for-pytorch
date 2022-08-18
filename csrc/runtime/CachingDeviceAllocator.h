@@ -78,7 +78,7 @@ class CachingDeviceAllocator final {
   BlockPool large_blocks;
   BlockPool small_blocks;
   std::unordered_map<void*, Block*> allocated_blocks;
-  std::deque<std::pair<DPCPP::event, Block*>> dpcpp_events;
+  std::deque<std::pair<sycl::event, Block*>> dpcpp_events;
 
   CachingDeviceAllocator();
 

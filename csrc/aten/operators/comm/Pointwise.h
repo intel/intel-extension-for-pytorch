@@ -375,7 +375,7 @@ struct TensorDigammaOp {
       return;
     }
 
-    bool x_is_integer = (x == DPCPP::floor(x));
+    bool x_is_integer = (x == sycl::floor(x));
     compute_type result = 0;
 
     if (x < 0) {
@@ -387,7 +387,7 @@ struct TensorDigammaOp {
       // Rounding errors in tan's input can really affect the output
       // for extreme values, so we always perform this computation in double.
       result = scalar_cast<compute_type>(
-          -PI_f64 / DPCPP::tan(PI_f64 * scalar_cast<double>(x)));
+          -PI_f64 / sycl::tan(PI_f64 * scalar_cast<double>(x)));
       x = 1 - x;
     }
 
@@ -411,7 +411,7 @@ struct TensorDigammaOp {
       y = z * polevl_result;
     }
 
-    out = scalar_cast<T>(DPCPP::log(x) - (0.5 / x) - y + result);
+    out = scalar_cast<T>(sycl::log(x) - (0.5 / x) - y + result);
     return;
   }
 
@@ -436,7 +436,7 @@ struct TensorDigammaOp {
       return;
     }
 
-    bool x_is_integer = (x == DPCPP::floor(x));
+    bool x_is_integer = (x == sycl::floor(x));
     compute_type result = 0;
 
     if (x < 0) {
@@ -448,7 +448,7 @@ struct TensorDigammaOp {
       // Rounding errors in tan's input can really affect the output
       // for extreme values, so we always perform this computation in double.
       result = scalar_cast<compute_type>(
-          -PI_f64 / DPCPP::tan(PI_f64 * scalar_cast<double>(x)));
+          -PI_f64 / sycl::tan(PI_f64 * scalar_cast<double>(x)));
       x = 1 - x;
     }
 
@@ -472,7 +472,7 @@ struct TensorDigammaOp {
       y = z * polevl_result;
     }
 
-    v = scalar_cast<T>(DPCPP::log(x) - (0.5 / x) - y + result);
+    v = scalar_cast<T>(sycl::log(x) - (0.5 / x) - y + result);
     return;
   }
 };
@@ -496,17 +496,17 @@ struct TensorErfinvOp {
     static const compute_type d[2] = {3.543889200, 1.637067800};
 
     auto x = scalar_cast<compute_type>(in);
-    if (DPCPP::fabs(x) > 1.0f) {
+    if (sycl::fabs(x) > 1.0f) {
       out = scalar_cast<T>(NAN);
       return;
     }
-    if (DPCPP::fabs(x) == 1.0f) {
+    if (sycl::fabs(x) == 1.0f) {
       out = scalar_cast<T>(
-          (DPCPP::copysign(1.0, scalar_cast<double>(x))) *
+          (sycl::copysign(1.0, scalar_cast<double>(x))) *
           (std::numeric_limits<double>::infinity()));
       return;
     }
-    if (DPCPP::fabs(x) <= 0.7f) {
+    if (sycl::fabs(x) <= 0.7f) {
       z = x * x;
       num = (((a[3] * z + a[2]) * z + a[1]) * z + a[0]);
       dem =
@@ -515,22 +515,22 @@ struct TensorErfinvOp {
       out = x * num / dem;
     } else {
       z = scalar_cast<compute_type>(
-          DPCPP::sqrt(-DPCPP::log((1.0 - DPCPP::fabs(x)) / 2.0)));
+          sycl::sqrt(-sycl::log((1.0 - sycl::fabs(x)) / 2.0)));
       num = ((c[3] * z + c[2]) * z + c[1]) * z + c[0];
       dem = (d[1] * z + d[0]) * z + scalar_cast<compute_type>(1.0);
       out = scalar_cast<T>(
           scalar_cast<compute_type>(
-              DPCPP::copysign(1.0, scalar_cast<double>(x))) *
+              sycl::copysign(1.0, scalar_cast<double>(x))) *
           num / dem);
     }
     out = out -
         scalar_cast<T>(
-              (DPCPP::erf(scalar_cast<double>(out)) - x) /
-              ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
+              (sycl::erf(scalar_cast<double>(out)) - x) /
+              ((2.0 / sycl::sqrt(PI_f64)) * sycl::exp(-x * x)));
     out = out -
         scalar_cast<T>(
-              (DPCPP::erf(scalar_cast<double>(out)) - x) /
-              ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
+              (sycl::erf(scalar_cast<double>(out)) - x) /
+              ((2.0 / sycl::sqrt(PI_f64)) * sycl::exp(-x * x)));
     return;
   }
 
@@ -551,17 +551,17 @@ struct TensorErfinvOp {
     static const compute_type d[2] = {3.543889200, 1.637067800};
 
     auto x = scalar_cast<compute_type>(v);
-    if (DPCPP::fabs(x) > 1.0) {
+    if (sycl::fabs(x) > 1.0) {
       v = scalar_cast<T>(NAN);
       return;
     }
-    if (DPCPP::fabs(x) == 1.0) {
+    if (sycl::fabs(x) == 1.0) {
       v = scalar_cast<T>(
-          (DPCPP::copysign(1.0, scalar_cast<double>(x))) *
+          (sycl::copysign(1.0, scalar_cast<double>(x))) *
           (std::numeric_limits<double>::infinity()));
       return;
     }
-    if (DPCPP::fabs(x) <= 0.7) {
+    if (sycl::fabs(x) <= 0.7) {
       z = x * x;
       num = (((a[3] * z + a[2]) * z + a[1]) * z + a[0]);
       dem =
@@ -570,22 +570,22 @@ struct TensorErfinvOp {
       v = x * num / dem;
     } else {
       z = scalar_cast<compute_type>(
-          DPCPP::sqrt(-DPCPP::log((1.0 - DPCPP::fabs(x)) / 2.0)));
+          sycl::sqrt(-sycl::log((1.0 - sycl::fabs(x)) / 2.0)));
       num = ((c[3] * z + c[2]) * z + c[1]) * z + c[0];
       dem = (d[1] * z + d[0]) * z + scalar_cast<compute_type>(1.0);
       v = scalar_cast<T>(
           scalar_cast<compute_type>(
-              DPCPP::copysign(1.0, scalar_cast<double>(x))) *
+              sycl::copysign(1.0, scalar_cast<double>(x))) *
           num / dem);
     }
     v = v -
         scalar_cast<T>(
-            (DPCPP::erf(scalar_cast<double>(v)) - x) /
-            ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
+            (sycl::erf(scalar_cast<double>(v)) - x) /
+            ((2.0 / sycl::sqrt(PI_f64)) * sycl::exp(-x * x)));
     v = v -
         scalar_cast<T>(
-            (DPCPP::erf(scalar_cast<double>(v)) - x) /
-            ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
+            (sycl::erf(scalar_cast<double>(v)) - x) /
+            ((2.0 / sycl::sqrt(PI_f64)) * sycl::exp(-x * x)));
     return;
   }
 };
@@ -834,45 +834,45 @@ struct TensorCRemainderOp {
 template <>
 struct TensorCRemainderOp<float> {
   void operator()(float& out, float& in) const {
-    out = in != 0.f ? out - in * DPCPP::floor(out / in) : NAN;
+    out = in != 0.f ? out - in * sycl::floor(out / in) : NAN;
   }
 
   void operator()(float& out, float& in1, float& in2) const {
-    out = in2 != 0.f ? in1 - in2 * DPCPP::floor(in1 / in2) : NAN;
+    out = in2 != 0.f ? in1 - in2 * sycl::floor(in1 / in2) : NAN;
   }
 };
 
 template <>
 struct TensorCRemainderOp<double> {
   void operator()(double& out, double& in) const {
-    out = in != 0. ? out - in * DPCPP::floor(out / in) : NAN;
+    out = in != 0. ? out - in * sycl::floor(out / in) : NAN;
   }
 
   void operator()(double& out, double& in1, double& in2) const {
-    out = in2 != 0. ? in1 - in2 * DPCPP::floor(in1 / in2) : NAN;
+    out = in2 != 0. ? in1 - in2 * sycl::floor(in1 / in2) : NAN;
   }
 };
 
 template <>
 struct TensorCRemainderOp<at::Half> {
   void operator()(at::Half& out, at::Half& in) const {
-    out = in != 0.f ? out - in * DPCPP::floor(float(out / in)) : NAN;
+    out = in != 0.f ? out - in * sycl::floor(float(out / in)) : NAN;
   }
 
   void operator()(at::Half& out, at::Half& in1, at::Half& in2) const {
-    out = in2 != 0.f ? in1 - in2 * DPCPP::floor(float(in1 / in2)) : NAN;
+    out = in2 != 0.f ? in1 - in2 * sycl::floor(float(in1 / in2)) : NAN;
   }
 };
 
 template <>
 struct TensorCRemainderOp<at::BFloat16> {
   void operator()(at::BFloat16& out, at::BFloat16& in) const {
-    out = in != 0.f ? out - in * DPCPP::floor(float(out / in)) : NAN;
+    out = in != 0.f ? out - in * sycl::floor(float(out / in)) : NAN;
   }
 
   void operator()(at::BFloat16& out, at::BFloat16& in1, at::BFloat16& in2)
       const {
-    out = in2 != 0.f ? in1 - in2 * DPCPP::floor(float(in1 / in2)) : NAN;
+    out = in2 != 0.f ? in1 - in2 * sycl::floor(float(in1 / in2)) : NAN;
   }
 };
 
@@ -890,45 +890,45 @@ struct TensorCFmodOp {
 template <>
 struct TensorCFmodOp<float> {
   void operator()(float& out, float& in) const {
-    out = DPCPP::fmod(out, in);
+    out = sycl::fmod(out, in);
   }
 
   void operator()(float& out, float& in1, float& in2) const {
-    out = DPCPP::fmod(in1, in2);
+    out = sycl::fmod(in1, in2);
   }
 };
 
 template <>
 struct TensorCFmodOp<double> {
   void operator()(double& out, double& in) const {
-    out = DPCPP::fmod(out, in);
+    out = sycl::fmod(out, in);
   }
 
   void operator()(double& out, double& in1, double& in2) const {
-    out = DPCPP::fmod(in1, in2);
+    out = sycl::fmod(in1, in2);
   }
 };
 
 template <>
 struct TensorCFmodOp<at::Half> {
   void operator()(at::Half& out, at::Half& in) const {
-    out = DPCPP::fmod(float(out), float(in));
+    out = sycl::fmod(float(out), float(in));
   }
 
   void operator()(at::Half& out, at::Half& in1, at::Half& in2) const {
-    out = DPCPP::fmod(float(in1), float(in2));
+    out = sycl::fmod(float(in1), float(in2));
   }
 };
 
 template <>
 struct TensorCFmodOp<at::BFloat16> {
   void operator()(at::BFloat16& out, at::BFloat16& in) const {
-    out = DPCPP::fmod(float(out), float(in));
+    out = sycl::fmod(float(out), float(in));
   }
 
   void operator()(at::BFloat16& out, at::BFloat16& in1, at::BFloat16& in2)
       const {
-    out = DPCPP::fmod(float(in1), float(in2));
+    out = sycl::fmod(float(in1), float(in2));
   }
 };
 
@@ -946,22 +946,22 @@ struct TensorCPowOp {
 template <>
 struct TensorCPowOp<float> {
   void operator()(float& out, float& in) const {
-    out = DPCPP::pow(out, in);
+    out = sycl::pow(out, in);
   }
 
   void operator()(float& out, float& in1, float& in2) const {
-    out = DPCPP::pow(in1, in2);
+    out = sycl::pow(in1, in2);
   }
 };
 
 template <>
 struct TensorCPowOp<double> {
   void operator()(double& out, double& in) const {
-    out = DPCPP::pow(out, in);
+    out = sycl::pow(out, in);
   }
 
   void operator()(double& out, double& in1, double& in2) const {
-    out = DPCPP::pow(in1, in2);
+    out = sycl::pow(in1, in2);
   }
 };
 

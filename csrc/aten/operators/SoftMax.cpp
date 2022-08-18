@@ -214,8 +214,8 @@ void dispatch_softmax_forward(
 
   int loops_end = dim_size / vec_size;
   int local_size = SIMD * sub_group_num;
-  DPCPP::range<1> local_range{local_size};
-  DPCPP::range<1> global_range{outer_size * local_size};
+  sycl::range<1> local_range{local_size};
+  sycl::range<1> global_range{outer_size * local_size};
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto local_max = dpcpp_local_acc_t<accscalar_t>(sub_group_num, cgh);
@@ -334,15 +334,15 @@ void softmax_forward_kernel(
 
   int local_size = get_wgroup_size<SIMD>(vec_size, dim_size);
   int sub_group_num = local_size / SIMD;
-  DPCPP::range<1> local_range{local_size};
-  DPCPP::range<1> global_range{local_size * outer_size};
+  sycl::range<1> local_range{local_size};
+  sycl::range<1> global_range{local_size * outer_size};
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto local_max = dpcpp_local_acc_t<accscalar_t>(sub_group_num, cgh);
     auto local_sum = dpcpp_local_acc_t<accscalar_t>(sub_group_num, cgh);
     cgh.parallel_for(
-        DPCPP::nd_range<1>(global_range, local_range),
-        [=](DPCPP::nd_item<1> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
+        sycl::nd_range<1>(global_range, local_range),
+        [=](sycl::nd_item<1> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
           int local_id = item_id.get_local_id(0);
           auto group_offset = item_id.get_group(0) * dim_size;
           int start = ((uint64_t)(in_data + group_offset)) % align_bytes /
@@ -460,15 +460,15 @@ void spatial_softmax_forward(
       outer_size, dim_size, inner_size, local_size, block_row);
   int group_num =
       (inner_size + local_size * vec_size - 1) / (local_size * vec_size);
-  DPCPP::range<3> global_range{outer_size, block_row, group_num * local_size};
-  DPCPP::range<3> local_range{1, block_row, local_size};
+  sycl::range<3> global_range{outer_size, block_row, group_num * local_size};
+  sycl::range<3> local_range{1, block_row, local_size};
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto local_data = dpcpp_local_acc_t<accscalar_t, dpcpp_rw_mode, 3>(
-        DPCPP::range<3>{block_row, local_size, vec_size}, cgh);
+        sycl::range<3>{block_row, local_size, vec_size}, cgh);
     cgh.parallel_for(
-        DPCPP::nd_range<3>(global_range, local_range),
-        [=](DPCPP::nd_item<3> item_id) {
+        sycl::nd_range<3>(global_range, local_range),
+        [=](sycl::nd_item<3> item_id) {
           auto global_col = item_id.get_global_id(2);
           auto local_row_id = item_id.get_local_id(1);
           auto local_col_id = item_id.get_local_id(2);
@@ -661,14 +661,14 @@ void dispatch_softmax_backward(
 
   int loops_end = dim_size / vec_size;
   int local_size = SIMD * sub_group_num;
-  DPCPP::range<1> local_range{local_size};
-  DPCPP::range<1> global_range{outer_size * local_size};
+  sycl::range<1> local_range{local_size};
+  sycl::range<1> global_range{outer_size * local_size};
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto local_sum = dpcpp_local_acc_t<accscalar_t>(sub_group_num, cgh);
     cgh.parallel_for(
-        DPCPP::nd_range<1>(global_range, local_range),
-        [=](DPCPP::nd_item<1> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
+        sycl::nd_range<1>(global_range, local_range),
+        [=](sycl::nd_item<1> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
           auto local_id = item_id.get_local_id(0);
           auto group_offset = item_id.get_group(0) * dim_size;
 
@@ -739,13 +739,13 @@ void softmax_backward_kernel(
 
   int local_size = get_wgroup_size<SIMD>(vec_size, dim_size);
   int sub_group_num = local_size / SIMD;
-  DPCPP::range<1> local_range{local_size};
-  DPCPP::range<1> global_range{local_size * outer_size};
+  sycl::range<1> local_range{local_size};
+  sycl::range<1> global_range{local_size * outer_size};
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto local_data = dpcpp_local_acc_t<accscalar_t>(sub_group_num, cgh);
     cgh.parallel_for(
-        DPCPP::nd_range<1>(global_range, local_range),
-        [=](DPCPP::nd_item<1> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
+        sycl::nd_range<1>(global_range, local_range),
+        [=](sycl::nd_item<1> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
           int local_id = item_id.get_local_id(0);
           auto group_offset = item_id.get_group(0) * dim_size;
           int start = ((uint64_t)(output + group_offset)) % align_bytes /
@@ -850,15 +850,15 @@ void spatial_softmax_backward_kernel(
       outer_size, dim_size, inner_size, local_size, block_row);
   int group_num =
       (inner_size + local_size * vec_size - 1) / (local_size * vec_size);
-  DPCPP::range<3> global_range{outer_size, block_row, group_num * local_size};
-  DPCPP::range<3> local_range{1, block_row, local_size};
+  sycl::range<3> global_range{outer_size, block_row, group_num * local_size};
+  sycl::range<3> local_range{1, block_row, local_size};
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto local_data = dpcpp_local_acc_t<accscalar_t, dpcpp_rw_mode, 3>(
-        DPCPP::range<3>{block_row, local_size, vec_size}, cgh);
+        sycl::range<3>{block_row, local_size, vec_size}, cgh);
     cgh.parallel_for(
-        DPCPP::nd_range<3>(global_range, local_range),
-        [=](DPCPP::nd_item<3> item_id) {
+        sycl::nd_range<3>(global_range, local_range),
+        [=](sycl::nd_item<3> item_id) {
           auto global_col = item_id.get_global_id(2);
           auto local_row_id = item_id.get_local_id(1);
           auto local_col_id = item_id.get_local_id(2);

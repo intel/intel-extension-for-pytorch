@@ -42,7 +42,7 @@ template <
     typename CounterT,
     int RADIX_BITS>
 inline void device_radix_sort_kernel(
-    DPCPP::nd_item<1>& item,
+    sycl::nd_item<1>& item,
     const KeyT* key_in,
     KeyT* key_out,
     const ValueT* value_in,
@@ -185,52 +185,52 @@ inline void device_radix_sort_impl(
   int keys_per_thread = (nsort + GROUP_THREADS - 1) / GROUP_THREADS;
   int slm_size =
       buckets_slm_bytes<GROUP_THREADS, DigitT, CounterT, RADIX_BITS>();
-#define DISPATCH_SG(SGSZ)                                 \
-  {                                                       \
-    auto& q = dpcppGetCurrentQueue();                     \
-    auto cgf = DPCPP_Q_CGF(h) {                           \
-      auto slm = dpcpp_local_acc_t<char>(slm_size, h);    \
-      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item)      \
-          [[intel::reqd_sub_group_size(SGSZ)]] {          \
-        auto slice = item.get_group_linear_id();          \
-        auto offset_s = f(slice);                         \
-        auto key_in_begin = key_in + offset_s;            \
-        auto key_out_begin = key_out + offset_s;          \
-        auto key_temp_begin = key_temp + offset_s;        \
-        auto value_in_begin = value_in + offset_s;        \
-        auto value_out_begin = value_out + offset_s;      \
-        auto value_temp_begin = value_temp + offset_s;    \
-        device_radix_sort_kernel<                         \
-            KeyT,                                         \
-            ValueT,                                       \
-            OffsetCalT,                                   \
-            GROUP_THREADS,                                \
-            SGSZ,                                         \
-            DigitT,                                       \
-            CounterT,                                     \
-            RADIX_BITS>(                                  \
-            item,                                         \
-            key_in_begin,                                 \
-            key_out_begin,                                \
-            value_in_begin,                               \
-            value_out_begin,                              \
-            f,                                            \
-            key_temp_begin,                               \
-            value_temp_begin,                             \
-            keys_per_thread,                              \
-            nsort,                                        \
-            stride,                                       \
-            (void*)slm.get_pointer().get(),               \
-            is_descending,                                \
-            use_indices);                                 \
-      };                                                  \
-      h.parallel_for(                                     \
-          DPCPP::nd_range<1>(                             \
-              DPCPP::range<1>(nsegments * GROUP_THREADS), \
-              DPCPP::range<1>(GROUP_THREADS)),            \
-          kfn);                                           \
-    };                                                    \
-    DPCPP_Q_SUBMIT(q, cgf);                               \
+#define DISPATCH_SG(SGSZ)                                \
+  {                                                      \
+    auto& q = dpcppGetCurrentQueue();                    \
+    auto cgf = DPCPP_Q_CGF(h) {                          \
+      auto slm = dpcpp_local_acc_t<char>(slm_size, h);   \
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item)      \
+          [[intel::reqd_sub_group_size(SGSZ)]] {         \
+        auto slice = item.get_group_linear_id();         \
+        auto offset_s = f(slice);                        \
+        auto key_in_begin = key_in + offset_s;           \
+        auto key_out_begin = key_out + offset_s;         \
+        auto key_temp_begin = key_temp + offset_s;       \
+        auto value_in_begin = value_in + offset_s;       \
+        auto value_out_begin = value_out + offset_s;     \
+        auto value_temp_begin = value_temp + offset_s;   \
+        device_radix_sort_kernel<                        \
+            KeyT,                                        \
+            ValueT,                                      \
+            OffsetCalT,                                  \
+            GROUP_THREADS,                               \
+            SGSZ,                                        \
+            DigitT,                                      \
+            CounterT,                                    \
+            RADIX_BITS>(                                 \
+            item,                                        \
+            key_in_begin,                                \
+            key_out_begin,                               \
+            value_in_begin,                              \
+            value_out_begin,                             \
+            f,                                           \
+            key_temp_begin,                              \
+            value_temp_begin,                            \
+            keys_per_thread,                             \
+            nsort,                                       \
+            stride,                                      \
+            (void*)slm.get_pointer().get(),              \
+            is_descending,                               \
+            use_indices);                                \
+      };                                                 \
+      h.parallel_for(                                    \
+          sycl::nd_range<1>(                             \
+              sycl::range<1>(nsegments * GROUP_THREADS), \
+              sycl::range<1>(GROUP_THREADS)),            \
+          kfn);                                          \
+    };                                                   \
+    DPCPP_Q_SUBMIT(q, cgf);                              \
   }
 
   auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());

@@ -26,7 +26,7 @@ namespace dpcpp {
   }
 #endif
 
-DPCPPEvent::DPCPPEvent(DPCPP::event event) {
+DPCPPEvent::DPCPPEvent(sycl::event event) {
   events_.push_back(event);
 }
 
@@ -55,7 +55,7 @@ DeviceIndex DPCPPEvent::device_index() const {
   return device_index_;
 }
 
-std::vector<DPCPP::event> DPCPPEvent::event() const {
+std::vector<sycl::event> DPCPPEvent::event() const {
   return events_;
 }
 

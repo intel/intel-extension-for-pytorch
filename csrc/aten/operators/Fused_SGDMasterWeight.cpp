@@ -46,7 +46,7 @@ void vec_kernel_sgdmw(
     const bool nesterov,
     const double lr,
     int64_t total_element,
-    DPCPP::item<1> item) {
+    sycl::item<1> item) {
   auto id = item.get_id(0);
 
   auto remaining = total_element - id * vec_size;
@@ -293,7 +293,7 @@ static void ComputeSGDMasterWeightDecayKernel(
       using vec_w_t = vec_grad_t;                                             \
       using elem_w_t = elem_grad_t;                                           \
       using accscalar_t = acc_type<scalar_t>;                                 \
-      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item) {                           \
+      auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {                            \
         vec_kernel_sgdmw<                                                     \
             vec_size,                                                         \
             vec_grad_t,                                                       \
@@ -317,7 +317,7 @@ static void ComputeSGDMasterWeightDecayKernel(
             total_element,                                                    \
             item);                                                            \
       };                                                                      \
-      cgh.parallel_for(DPCPP::range<1>(global_range), kfn);                   \
+      cgh.parallel_for(sycl::range<1>(global_range), kfn);                    \
     };                                                                        \
     DPCPP_Q_SUBMIT(queue, cgf);                                               \
   } // namespace impl

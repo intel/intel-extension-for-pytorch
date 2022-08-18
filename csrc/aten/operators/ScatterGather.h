@@ -113,7 +113,7 @@ void THDPCPPTensor_gatherKernel(
     auto src_data = src.data;
     auto index_data = index.data;
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto tensor_ptr = tensor_data;
       auto src_ptr = src_data;
       auto index_ptr = index_data;
@@ -145,7 +145,7 @@ void THDPCPPTensor_gatherKernel(
       //        add warning
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(totalElements), kfn);
+    __cgh.parallel_for(sycl::range</*dim=*/1>(totalElements), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -167,7 +167,7 @@ void THSyclTensor_scatterKernel(
     auto out_data = tensor.data;
     auto src_data = src.data;
     auto index_data = index.data;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto tensor_ptr = out_data;
       auto src_ptr = src_data;
       auto index_ptr = index_data;
@@ -198,8 +198,8 @@ void THSyclTensor_scatterKernel(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
   };
 
@@ -223,7 +223,7 @@ void THSyclTensor_scatterAddKernel(
     auto out_data = tensor.data;
     auto src_data = src.data;
     auto index_data = index.data;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto tensor_ptr = out_data;
       auto src_ptr = src_data;
       auto index_ptr = index_data;
@@ -257,8 +257,8 @@ void THSyclTensor_scatterAddKernel(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -280,7 +280,7 @@ void THSyclTensor_scatterFillKernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto out_data = tensor.data;
     auto index_data = index.data;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto tensor_ptr = out_data;
       auto index_ptr = index_data;
       for (IndexType linearIndex = (IndexType)item.get_global_id(0);
@@ -302,8 +302,8 @@ void THSyclTensor_scatterFillKernel(
 
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
   };
 

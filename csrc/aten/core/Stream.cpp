@@ -86,7 +86,7 @@ uint64_t DPCPPStream::pack() const noexcept {
   return stream_.pack();
 }
 
-DPCPP::queue& DPCPPStream::dpcpp_queue() const {
+sycl::queue& DPCPPStream::dpcpp_queue() const {
   auto queue = DPCPPStreamToQueue(*this);
   return queue->getDpcppQueue();
 }

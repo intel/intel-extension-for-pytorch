@@ -37,7 +37,7 @@ static void upsample_bicubic2d_out_frame(
     auto in_data = idata;
     auto out_data = odata;
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto in_ptr = in_data;
       auto out_ptr = out_data;
       int global_id = item.get_global_linear_id();
@@ -132,7 +132,7 @@ static void upsample_bicubic2d_out_frame(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)),
+        sycl::nd_range<1>(sycl::range<1>(grng), sycl::range<1>(tile_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -159,7 +159,7 @@ static void upsample_bicubic2d_backward_out_frame(
     auto in_data = idata;
     auto out_data = odata;
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto in_ptr = in_data;
       auto out_ptr = out_data;
       int global_id = item.get_global_linear_id();
@@ -229,7 +229,7 @@ static void upsample_bicubic2d_backward_out_frame(
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)),
+        sycl::nd_range<1>(sycl::range<1>(grng), sycl::range<1>(tile_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

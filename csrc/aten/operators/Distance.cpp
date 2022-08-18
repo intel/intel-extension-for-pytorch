@@ -216,10 +216,10 @@ static void pdist_kernel_impl(
     auto out_data = result.data_ptr<scalar_t>();
     auto in_data = self.data_ptr<scalar_t>();
     // Create the local shared memory for reducing
-    DPCPP::accessor<scalar_t, 1, dpcpp_rw_mode, DPCPP::access::target::local>
+    sycl::accessor<scalar_t, 1, dpcpp_rw_mode, sycl::access::target::local>
         shared(wgroup_size, __cgh);
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       auto out_ptr = out_data;
       auto in_ptr = in_data;
 
@@ -250,7 +250,7 @@ static void pdist_kernel_impl(
     };
 
     __cgh.parallel_for(
-        DPCPP::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
+        sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -276,10 +276,10 @@ static void pdist_backward_kernel_impl(
   // TODO: this is not optimized if the m is smaller than 256. The work item is
   // wasted (m-256).
   int64_t m_round = ((m + wgroup_size - 1) / (wgroup_size));
-  DPCPP::range<2> global_range(
+  sycl::range<2> global_range(
       dist.numel() /**wgroup_size*/, m_round * wgroup_size);
-  DPCPP::range<2> local_range(/*wgroup_size*/ 1, wgroup_size);
-  DPCPP::nd_range<2> work_load(global_range, local_range);
+  sycl::range<2> local_range(/*wgroup_size*/ 1, wgroup_size);
+  sycl::nd_range<2> work_load(global_range, local_range);
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto out_data = buffer.data_ptr<scalar_t>();
@@ -287,7 +287,7 @@ static void pdist_backward_kernel_impl(
     auto grad_data = grad.data_ptr<scalar_t>();
     auto dist_data = dist.data_ptr<scalar_t>();
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
       auto out_ptr = out_data;
       auto in_ptr = in_data;
       auto grad_ptr = grad_data;
@@ -487,10 +487,10 @@ static void cdist_forward_kernel_impl(
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     // Create the local shared memory for reducing
-    DPCPP::accessor<scalar_t, 1, dpcpp_rw_mode, DPCPP::access::target::local>
+    sycl::accessor<scalar_t, 1, dpcpp_rw_mode, sycl::access::target::local>
         shared(wgroup_size, __cgh);
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       const int64_t group_id = item_id.get_group_linear_id();
       const int64_t local_id = item_id.get_local_linear_id();
       const int64_t l = group_id / r_size;
@@ -519,7 +519,7 @@ static void cdist_forward_kernel_impl(
     };
 
     __cgh.parallel_for(
-        DPCPP::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
+        sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -664,10 +664,10 @@ static void cdist_backward_kernel_impl(
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t m_round = ((r_size * batch + wgroup_size - 1) / (wgroup_size));
-  DPCPP::range<2> global_range(
+  sycl::range<2> global_range(
       /**wgroup_size*/ wgroup_size, m_round * wgroup_size);
-  DPCPP::range<2> local_range(/*wgroup_size*/ 1, wgroup_size);
-  DPCPP::nd_range<2> work_load(global_range, local_range);
+  sycl::range<2> local_range(/*wgroup_size*/ 1, wgroup_size);
+  sycl::nd_range<2> work_load(global_range, local_range);
 
   auto buff_ptr = buffer.data_ptr<scalar_t>();
   auto grad_ptr = grad.data_ptr<scalar_t>();
@@ -676,7 +676,7 @@ static void cdist_backward_kernel_impl(
   auto x2_ptr = x2.data_ptr<scalar_t>();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
       const int64_t y = item_id.get_global_id(1);
       const int64_t init = item_id.get_global_id(0);
       if (y >= count || init >= m) {

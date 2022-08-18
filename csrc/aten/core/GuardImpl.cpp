@@ -113,7 +113,7 @@ bool DPCPPGuardImpl::queryStream(const Stream& stream) const {
   // event.
   //  DPCPPStream dpcpp_stream{stream};
   //  auto queue = dpcpp_stream.dpcpp_queue();
-  //  queue.get_info<DPCPP::info::queue::>();
+  //  queue.get_info<sycl::info::queue::>();
   //  return dpcpp_stream.query();
   return false;
 }

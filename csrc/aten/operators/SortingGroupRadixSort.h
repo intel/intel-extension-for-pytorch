@@ -49,7 +49,7 @@ class GroupRadixSort {
   };
 
  private:
-  DPCPP::nd_item<1>& item_id;
+  sycl::nd_item<1>& item_id;
   int lid;
   char* local_storage;
   int tiles;
@@ -65,7 +65,7 @@ class GroupRadixSort {
   }
 
   inline GroupRadixSort(
-      DPCPP::nd_item<1>& item_id,
+      sycl::nd_item<1>& item_id,
       char* local_storage,
       int tid = 0)
       : item_id(item_id), local_storage(local_storage), tid(tid) {
@@ -268,7 +268,7 @@ inline void segmented_group_radix_sort_impl_(
   auto cgf = DPCPP_Q_CGF(h) {
     auto slm =
         dpcpp_local_acc_t<char>(SortMethod::GetSharedLocalStorageSize(), h);
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item)
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item)
         [[intel::reqd_sub_group_size(SUBGROUP_SIZE)]] {
       auto gid = item.get_group_linear_id();
       auto slice = gid % nsegments;
@@ -311,9 +311,9 @@ inline void segmented_group_radix_sort_impl_(
           value_out_begin, pvalue, remain_length, stride_out);
     };
     h.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(tiles * nsegments * GROUP_THREADS),
-            DPCPP::range<1>(GROUP_THREADS)),
+        sycl::nd_range<1>(
+            sycl::range<1>(tiles * nsegments * GROUP_THREADS),
+            sycl::range<1>(GROUP_THREADS)),
         kfn);
   };
   DPCPP_Q_SUBMIT(q, cgf);
@@ -578,7 +578,7 @@ inline void segmented_group_radix_sort_kernel(
       // reorder if need
       auto& q = dpcppGetCurrentQueue();
       auto cgf = DPCPP_Q_CGF(h) {
-        auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+        auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
           int gid = item.get_group(0);
           auto offset_in = gid * desc.nsort;
           auto offset_out = f(gid);
@@ -593,9 +593,9 @@ inline void segmented_group_radix_sort_kernel(
           }
         };
         h.parallel_for(
-            DPCPP::nd_range<1>(
-                DPCPP::range<1>(desc.nsegments * desc.max_group_sz),
-                DPCPP::range<1>(desc.max_group_sz)),
+            sycl::nd_range<1>(
+                sycl::range<1>(desc.nsegments * desc.max_group_sz),
+                sycl::range<1>(desc.max_group_sz)),
             kfn);
       };
       DPCPP_Q_SUBMIT(q, cgf);

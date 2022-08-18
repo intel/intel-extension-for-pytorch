@@ -30,7 +30,7 @@ static void repeat_interleave_dpcpp_kernel(
     auto cum_data = cumsum_ptr;
     auto res_data = result_ptr;
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto rep_ptr = rep_data;
       auto cum_ptr = cum_data;
       auto res_ptr = res_data;
@@ -47,7 +47,7 @@ static void repeat_interleave_dpcpp_kernel(
     };
     // kick off kernel
     cgh.parallel_for(
-        DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)),
+        sycl::nd_range<1>(sycl::range<1>(grng), sycl::range<1>(tile_size)),
         kfn);
   };
 

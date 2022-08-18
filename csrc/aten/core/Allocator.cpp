@@ -193,7 +193,7 @@ class HostAllocator final : public at::Allocator {
     alloc()->emptyCache();
   }
 
-  void recordEvent(void* ptr, DPCPP::event& e) {
+  void recordEvent(void* ptr, sycl::event& e) {
     alloc()->recordEvent(ptr, e);
   }
 
@@ -211,7 +211,7 @@ Allocator* getHostAllocator() {
   return HostAllocator::Instance();
 }
 
-void recordEventInHostAlloc(void* ptr, DPCPP::event& e) {
+void recordEventInHostAlloc(void* ptr, sycl::event& e) {
   HostAllocator::Instance()->recordEvent(ptr, e);
 }
 

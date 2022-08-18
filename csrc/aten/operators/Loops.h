@@ -84,7 +84,7 @@ template <
     typename loader_t,
     typename storer_t>
 static inline void unrolled_elementwise_kernel(
-    DPCPP::nd_item<1>& item,
+    sycl::nd_item<1>& item,
     int numel,
     func_t f,
     array_t data,
@@ -130,15 +130,15 @@ static inline void launch_unrolled_kernel(
   int num_groups = (N + group_work_size - 1) / group_work_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       unrolled_elementwise_kernel<ITEM_WORK_SIZE>(
           item, N, f, data, ic, oc, l, s);
     };
 
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(num_groups * group_items),
-            DPCPP::range<1>(group_items)),
+        sycl::nd_range<1>(
+            sycl::range<1>(num_groups * group_items),
+            sycl::range<1>(group_items)),
         kfn);
   };
 
@@ -152,7 +152,7 @@ template <
     typename array_t,
     typename inp_calc_t>
 void vectorized_elementwise_kernel(
-    DPCPP::nd_item<1>& item,
+    sycl::nd_item<1>& item,
     int numel,
     func_t fn,
     array_t data,
@@ -263,10 +263,10 @@ static inline void launch_vectorized_kernel(
         int group_work_size = group_size * vec_size;                  \
         int num_groups = (N + group_work_size - 1) / group_work_size; \
         cgh.parallel_for(                                             \
-            DPCPP::nd_range<1>(                                       \
-                DPCPP::range<1>(num_groups * group_size),             \
-                DPCPP::range<1>(group_size)),                         \
-            [=](DPCPP::nd_item<1> itemId) {                           \
+            sycl::nd_range<1>(                                        \
+                sycl::range<1>(num_groups * group_size),              \
+                sycl::range<1>(group_size)),                          \
+            [=](sycl::nd_item<1> itemId) {                            \
               {                                                       \
                 vectorized_elementwise_kernel<vec_size, vec_size>(    \
                     itemId, N, fn, data, input_calc);                 \
@@ -307,7 +307,7 @@ static inline void launch_vectorized_kernel(
 
 template <int vec_size, typename func_t>
 static inline void elementwise_kernel(
-    DPCPP::nd_item<1>& item,
+    sycl::nd_item<1>& item,
     int N,
     func_t f,
     int group_size) {
@@ -333,14 +333,14 @@ static inline void launch_legacy_kernel(int64_t N, const func_t& f) {
   auto num_groups =
       (N + max_group_size * vec_size - 1) / (max_group_size * vec_size);
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       elementwise_kernel<vec_size, func_t>(item_id, N, f, max_group_size);
     };
 
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(num_groups * max_group_size),
-            DPCPP::range<1>(max_group_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(num_groups * max_group_size),
+            sycl::range<1>(max_group_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
