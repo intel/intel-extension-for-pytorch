@@ -81,7 +81,7 @@ package_name = "intel_extension_for_pytorch"
 
 # build mode
 pytorch_install_dir = ''
-mkl_install_dir = ''
+mkl_install_dir = os.path.abspath(os.path.join(os.path.dirname(sys.executable), ".."))
 USE_CXX11_ABI = 0
 mode = ''
 if len(sys.argv) > 1:
@@ -535,7 +535,6 @@ elif mode == 'python':
     _install_requirements()
 
     # Find the oneMKL library path
-    mkl_install_dir = os.path.abspath(os.path.join(os.path.dirname(sys.executable), ".."))
     mkl_lib_path = mkl_install_dir + "/lib/"
     mkl_include_path = mkl_install_dir + "/include/"
 
