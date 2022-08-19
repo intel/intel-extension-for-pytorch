@@ -15,9 +15,6 @@
 namespace xpu {
 namespace dpcpp {
 
-static constexpr int QueuePoolShift = 5;
-static constexpr int QueuePerPool = 32;
-
 static int dpcpp_num_devices;
 static std::once_flag init_flag;
 static std::vector<std::shared_ptr<Queue>> default_queues;

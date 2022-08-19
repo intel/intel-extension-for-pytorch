@@ -12,6 +12,9 @@
 namespace xpu {
 namespace dpcpp {
 
+static constexpr int QueuePoolShift = 5;
+static constexpr int QueuePerPool = 32;
+
 using QueueId = int32_t;
 
 enum class QueueType : uint8_t {

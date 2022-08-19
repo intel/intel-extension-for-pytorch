@@ -78,7 +78,14 @@ struct GpuStreamManager {
   dnnl::stream& get_stream() {
     int device_index = current_device();
     TORCH_INTERNAL_ASSERT(device_index < xpu::dpcpp::device_count());
-    return *stream_pool.at(device_index);
+    int queue_id = getQueueId(getCurrentQueue(device_index));
+    if (stream_pool[device_index][queue_id] == nullptr) {
+      stream_pool[device_index][queue_id] =
+          std::make_shared<dnnl::stream>(dnnl::sycl_interop::make_stream(
+              GpuEngineManager::Instance().get_engine({kXPU, device_index}),
+              getCurrentQueue(device_index)->getDpcppQueue()));
+    }
+    return *(stream_pool[device_index][queue_id].get());
   }
 #else
   dnnl::stream get_stream() {
@@ -86,7 +93,7 @@ struct GpuStreamManager {
     TORCH_INTERNAL_ASSERT(device_index < xpu::dpcpp::device_count());
     return dnnl::sycl_interop::make_stream(
         GpuEngineManager::Instance().get_engine({kXPU, device_index}),
-        getDefaultDPCPPStream(device_index).dpcpp_queue());
+        getCurrentQueue(device_index).getDpcppQueue());
   }
 #endif
 
@@ -98,11 +105,12 @@ struct GpuStreamManager {
 #ifdef USE_PERSIST_STREAM
     int deviceCount = xpu::dpcpp::device_count();
     TORCH_INTERNAL_ASSERT(deviceCount > 0);
+    stream_pool.clear();
+    stream_pool.resize(deviceCount);
     for (DeviceIndex dev = 0; dev < deviceCount; dev++) {
-      stream_pool.push_back(
-          std::make_shared<dnnl::stream>(dnnl::sycl_interop::make_stream(
-              GpuEngineManager::Instance().get_engine({kXPU, dev}),
-              getDefaultDPCPPStream(dev).dpcpp_queue())));
+      for (QueueId qid = 0; qid <= QueuePerPool; qid++) {
+        stream_pool[dev][qid] = nullptr;
+      }
     }
 #endif
   }
@@ -110,7 +118,9 @@ struct GpuStreamManager {
 
  private:
 #ifdef USE_PERSIST_STREAM
-  std::vector<std::shared_ptr<dnnl::stream>> stream_pool;
+  // For each device, we have 1 default queue + 32 (QueuePerPool) reserved queues.
+  std::vector<std::array<std::shared_ptr<dnnl::stream>, QueuePerPool + 1>>
+      stream_pool;
 #endif
 };
 
