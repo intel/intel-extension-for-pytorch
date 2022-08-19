@@ -653,6 +653,12 @@ this_directory = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
+entry_points = {
+    'console_scripts': [
+        'ipexrun = intel_extension_for_pytorch.cpu.launch:main',
+    ]
+}
+
 setup(
     name='intel_extension_for_pytorch',
     version=ipex_build_version,
@@ -674,4 +680,5 @@ setup(
     zip_safe=False,
     ext_modules=ext_modules,
     cmdclass=cmdclass,
+    entry_points=entry_points,
     )
