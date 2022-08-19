@@ -677,7 +677,9 @@ supported:
   - _foreach_neg
   - _foreach_neg_
   - _foreach_zero_
+  - _thnn_fused_gru_cell
+  - _thnn_fused_gru_cell_backward
 autograd:
   - cdist
   - lstm.input
-  - gru.input
+  # - gru.input
