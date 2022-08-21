@@ -216,5 +216,131 @@ class TransFreeMHATester(TestCase):
             for i in range(7):
                 self.assertEqual(fake_mha_ref[i], fake_mha_jit[i], prec=1e-2)
 
+    def test_transfree_mha_fp32(self):
+        for i in range(len(bs)):
+            mat = torch.randn(bs[i], seq[i], num_heads[i] * head_dims[i]).to(torch.float)
+            mask_base = torch.randn(bs[i], 1, 1, seq[i]).to(torch.float)
+            mask_distil = torch.randn(bs[i], seq[i]).to(torch.float)
+
+            mha_model = MHA_Model_BERT(scales[i], num_heads[i], head_dims[i], [0, 2, 1, 3], -1, -2).eval()
+            mha_ipex = ipex.optimize(mha_model, dtype=torch.float, level="O1")
+
+            distil_mha_model = MHA_Model_Distil(scales[i], num_heads[i], head_dims[i], 1, 2, 3).eval()
+            distil_mha_ipex = ipex.optimize(distil_mha_model, dtype=torch.float, level="O1")
+
+            vit_mha_model = MHA_Model_ViT(scales[i], num_heads[i], head_dims[i], [2, 0, 3, 1, 4], -2, -1, 1, 2).eval()
+            vit_mha_ipex = ipex.optimize(vit_mha_model, dtype=torch.float, level="O1")
+
+            with torch.no_grad():
+                mha_ipex = torch.jit.trace(mha_ipex, (mat, mask_base, ))
+                mha_ipex = torch.jit.freeze(mha_ipex)
+
+                distil_mha_ipex = torch.jit.trace(distil_mha_ipex, (mat, mask_distil, ))
+                distil_mha_ipex = torch.jit.freeze(distil_mha_ipex)
+
+                vit_mha_ipex = torch.jit.trace(vit_mha_ipex, (mat, ))
+                vit_mha_ipex = torch.jit.freeze(vit_mha_ipex)
+
+                for _ in range(2):
+                    mha_jit = mha_ipex(mat, mask_base)
+                    distil_mha_jit = distil_mha_ipex(mat, mask_distil)
+                    vit_mha_jit = vit_mha_ipex(mat)
+                
+                mha_ref = mha_model(mat, mask_base)
+                distil_mha_ref = distil_mha_model(mat, mask_distil)
+                vit_mha_ref = vit_mha_model(mat)
+
+                self.assertEqual(mha_ref, mha_jit, prec=1e-5)
+                self.assertEqual(distil_mha_ref, distil_mha_jit, prec=1e-5)
+                self.assertEqual(vit_mha_ref, vit_mha_jit, prec=1e-5)
+
+                mha_graph = mha_ipex.graph_for(mat, mask_base)
+                distil_mha_graph = distil_mha_ipex.graph_for(mat, mask_distil)
+                vit_mha_graph = vit_mha_ipex.graph_for(mat)
+
+                self.assertTrue(any(n.kind() == "ipex::matmul_outtrans" for n in mha_graph.nodes()))
+                self.assertTrue(any(n.kind() == "ipex::matmul_outtrans" for n in distil_mha_graph.nodes()))
+                self.assertTrue(any(n.kind() == "ipex::matmul_outtrans" for n in vit_mha_graph.nodes()))
+                
+    def test_fake_mha_fp32(self):
+        mat = torch.randn(16, 16, 256)
+        mask_base = torch.randn(16, 1, 1, 16)
+        mask_distil = torch.randn(16, 16)
+
+        fake_mha_model = []
+        fake_mha_ipex = []
+
+        fake_mha_model.append(MHA_Model_BERT(16, 16, 16, [0, 2, 3, 1], -1, -2).eval())
+        fake_mha_model.append(MHA_Model_BERT(16, 16, 16, [0, 2, 1, 3], -2, -3).eval())
+        fake_mha_ipex.append(ipex.optimize(fake_mha_model[0], dtype=torch.float, level="O1"))
+        fake_mha_ipex.append(ipex.optimize(fake_mha_model[1], dtype=torch.float, level="O1"))
+
+        fake_mha_model.append(MHA_Model_Distil(16, 16, 16, 1, 2, 1).eval())
+        fake_mha_model.append(MHA_Model_Distil(16, 16, 16, 2, 1, 3).eval())
+        fake_mha_ipex.append(ipex.optimize(fake_mha_model[2], dtype=torch.float, level="O1"))
+        fake_mha_ipex.append(ipex.optimize(fake_mha_model[3], dtype=torch.float, level="O1"))
+
+        fake_mha_model.append(MHA_Model_ViT(16, 16, 16, [2, 0, 1, 3, 4], -2, -1, 1, 2).eval())
+        fake_mha_model.append(MHA_Model_ViT(16, 16, 16, [2, 0, 3, 1, 4], -2, -3, 1, 2).eval())
+        fake_mha_model.append(MHA_Model_ViT(16, 16, 16, [2, 0, 3, 1, 4], -2, -1, 0, 2).eval())
+        fake_mha_ipex.append(ipex.optimize(fake_mha_model[4], dtype=torch.float, level="O1"))
+        fake_mha_ipex.append(ipex.optimize(fake_mha_model[5], dtype=torch.float, level="O1"))
+        fake_mha_ipex.append(ipex.optimize(fake_mha_model[6], dtype=torch.float, level="O1"))
+
+        with torch.no_grad():
+            fake_mha_jit = []
+            fake_mha_ref = []
+
+            for i in range(0, 2):
+                fake_mha_ipex[i] = torch.jit.trace(fake_mha_ipex[i], (mat, mask_base, ))
+                fake_mha_ipex[i] = torch.jit.freeze(fake_mha_ipex[i])
+                for _ in range(2):
+                    fake_mha_ipex[i](mat, mask_base)
+                fake_mha_jit.append(fake_mha_ipex[i](mat, mask_base))
+                fake_mha_ref.append(fake_mha_model[i](mat, mask_base))
+                fake_mha_graph = fake_mha_ipex[i].graph_for(mat, mask_base)
+                self.assertTrue(any(n.kind() == "ipex::mha_scores_calc" for n in fake_mha_graph.nodes()))
+                with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU]) as p:
+                    fake_mha_ipex[i](mat, mask_base)
+                if i == 0:
+                    self.assertTrue("dil_matmul" in str(p.key_averages()))
+                else:
+                    self.assertTrue("dil_mha_bmm" in str(p.key_averages()))
+            
+            for i in range(2, 4):
+                fake_mha_ipex[i] = torch.jit.trace(fake_mha_ipex[i], (mat, mask_distil, ))
+                fake_mha_ipex[i] = torch.jit.freeze(fake_mha_ipex[i])
+                for _ in range(2):
+                    fake_mha_ipex[i](mat, mask_distil)
+                fake_mha_jit.append(fake_mha_ipex[i](mat, mask_distil))
+                fake_mha_ref.append(fake_mha_model[i](mat, mask_distil))
+                fake_mha_graph = fake_mha_ipex[i].graph_for(mat, mask_distil)
+                self.assertTrue(any(n.kind() == "ipex::distil_mha_scores_calc" for n in fake_mha_graph.nodes()))
+                with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU]) as p:
+                    fake_mha_ipex[i](mat, mask_distil)
+                if i == 2:
+                    self.assertTrue("dil_mha_bmm" in str(p.key_averages()))
+                else:
+                    self.assertTrue("dil_matmul" in str(p.key_averages()))
+
+            for i in range(4, 7):
+                fake_mha_ipex[i] = torch.jit.trace(fake_mha_ipex[i], mat)
+                fake_mha_ipex[i] = torch.jit.freeze(fake_mha_ipex[i])
+                for _ in range(2):
+                    fake_mha_ipex[i](mat)
+                fake_mha_jit.append(fake_mha_ipex[i](mat))
+                fake_mha_ref.append(fake_mha_model[i](mat))
+                fake_mha_graph = fake_mha_ipex[i].graph_for(mat)
+                self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fake_mha_graph.nodes()))
+                with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU]) as p:
+                    fake_mha_ipex[i](mat)
+                if i == 6:
+                    self.assertTrue("dil_matmul" in str(p.key_averages()))
+                else:
+                    self.assertTrue("dil_mha_bmm" in str(p.key_averages()))
+
+            for i in range(7):
+                self.assertEqual(fake_mha_ref[i], fake_mha_jit[i], prec=1e-5)
+
 if __name__ == '__main__':
     test = unittest.main()

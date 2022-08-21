@@ -68,6 +68,10 @@ at::Tensor dil_transfree_vit_mha(
     const int64_t& head_num,
     const int64_t& head_size);
 
+at::Tensor dil_mha_matmul_trans(
+    const at::Tensor& left,
+    const at::Tensor& right);
+
 template <typename T>
 std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_qkv_split(
     const at::Tensor& qkv);

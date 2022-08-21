@@ -38,7 +38,7 @@ at::Tensor dil_mha_scores_calc(
 
   auto q_dim = q.dim();
   auto k_dim = k.dim();
-  qk = at::matmul(q, k);
+  qk = bmm_impl(q, k, qk, ideep::attr_t(), {}, 1.f);
 
   // Only support last dimension
   bool is_last_dim = (softmax_dim == -1);
@@ -80,7 +80,7 @@ at::Tensor dil_distil_mha_scores_calc(
   auto _dim_per_head = dim_per_head.to<float>();
   auto _fill = fill.to<float>();
   auto qk = at::Tensor();
-  qk = at::matmul(q, k);
+  qk = bmm_impl(q, k, qk, ideep::attr_t(), {}, 1.f);
   //  convert the mask to float for creating vec mask for kernel computation
   auto _mask_qk = mask_qk.toType(at::kFloat);
   return DivMaskedfillSoftmax(
@@ -125,10 +125,6 @@ at::Tensor dil_transfree_mha(
   int64_t hiddenSize = head_num * head_size;
   at::Tensor qk =
       at::empty({batchSize, head_num, sequenceSize, sequenceSize}, qkv.dtype());
-  at::Tensor output = at::empty_strided(
-      {batchSize, head_num, sequenceSize, head_size},
-      {sequenceSize * hiddenSize, head_size, hiddenSize, 1},
-      qkv.dtype());
 
   // Currently, oneDNN Matmul primitive has some limitations to enable AMX
   // instructions. One critical condition is that the input tensor A should meet
@@ -158,9 +154,8 @@ at::Tensor dil_transfree_mha(
     qk = at::add(qk, rel_kv, _alpha);
     qk = dil_softmax(qk, softmax_dim, dtype);
   }
-  bmm_impl(qk, value, output, ideep::attr_t(), {}, 1.f);
 
-  output.transpose_(1, 2);
+  auto output = dil_mha_matmul_trans(qk, value);
 
   return output;
 }
@@ -182,10 +177,6 @@ at::Tensor dil_transfree_distil_mha(
   int64_t hiddenSize = head_num * head_size;
   at::Tensor qk =
       at::empty({batchSize, head_num, sequenceSize, sequenceSize}, qkv.dtype());
-  at::Tensor output = at::empty_strided(
-      {batchSize, head_num, sequenceSize, head_size},
-      {sequenceSize * hiddenSize, head_size, hiddenSize, 1},
-      qkv.dtype());
 
   auto qkv_mat = (qkv.dtype() == at::kFloat) ? dil_qkv_split<float>(qkv)
                                              : dil_qkv_split<at::BFloat16>(qkv);
@@ -203,9 +194,8 @@ at::Tensor dil_transfree_distil_mha(
   bmm_impl(query, key, qk, ideep::attr_t(), {}, 1.f);
   auto _mask_qk = mask_qk.toType(at::kFloat);
   qk = DivMaskedfillSoftmax(qk, _mask_qk, mask_qk_reshp, _fill, _dim_per_head);
-  bmm_impl(qk, value, output, ideep::attr_t(), {}, 1.f);
 
-  output.transpose_(1, 2);
+  auto output = dil_mha_matmul_trans(qk, value);
 
   return output;
 }
@@ -236,10 +226,6 @@ at::Tensor dil_transfree_vit_mha(
   int64_t hiddenSize = head_num * head_size;
   at::Tensor qk =
       at::empty({batchSize, head_num, sequenceSize, sequenceSize}, qkv.dtype());
-  at::Tensor output = at::empty_strided(
-      {batchSize, head_num, sequenceSize, head_size},
-      {sequenceSize * hiddenSize, head_size, hiddenSize, 1},
-      qkv.dtype());
 
   auto qkv_mat = (qkv.dtype() == at::kFloat) ? dil_qkv_split<float>(qkv)
                                              : dil_qkv_split<at::BFloat16>(qkv);
@@ -256,11 +242,34 @@ at::Tensor dil_transfree_vit_mha(
 
   bmm_impl(query, key, qk, ideep::attr_t(), {}, 1.f / dim_per_head);
   qk = dil_softmax_(qk, softmax_dim, dtype);
-  bmm_impl(qk, value, output, ideep::attr_t(), {}, 1.f);
 
-  output.transpose_(1, 2);
+  auto output = dil_mha_matmul_trans(qk, value);
 
   return output;
+}
+
+/**
+ * This BMM OP is designed for the second Batched-Matmul of MHA as
+ * the output is fused with transpose OP.
+ * All the tensors should be 4-dim and the transpose indices of the
+ * output tensor be (1, 2).
+ * If the tensors do not meet the above conditions, the performance
+ * of bmm_impl may drop when it uses the DNNL Matmul primitive
+ * as its backend.
+ */
+at::Tensor dil_mha_matmul_trans(
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2) {
+  RECORD_FUNCTION("dil_mha_bmm", c10::ArrayRef<c10::IValue>({}));
+
+  std::vector<int64_t> output_size = {
+      tensor1.size(0), tensor1.size(2), tensor1.size(1), tensor2.size(-1)};
+
+  auto out = at::empty(output_size, tensor1.options()).transpose(1, 2);
+  out = bmm_impl(tensor1, tensor2, out, ideep::attr_t(), {}, 1.f)
+            .transpose_(1, 2);
+
+  return out;
 }
 
 template <typename T>

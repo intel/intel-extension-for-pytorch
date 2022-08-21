@@ -3191,17 +3191,15 @@ class Tester(TestCase):
                 kind_not_in_graph="ipex::matmul_div")
 
     def test_transposed_matmuldiv(self):
-        M = torch.randn(32, 13, 27, 27)
+        x1 = [torch.randn(53, 23, 27, 25),
+              torch.randn(53, 27, 23, 25).transpose(1, 2),
+              torch.randn(53, 23, 25, 27).transpose(2, 3),
+              torch.randn(53, 25, 23, 27).transpose(2, 3).transpose(1, 3)]
 
-        x1 = [torch.randn(32, 13, 27, 25),
-              torch.randn(32, 27, 13, 25).transpose(1, 2),
-              torch.randn(32, 13, 25, 27).transpose(2, 3),
-              torch.randn(32, 25, 13, 27).transpose(2, 3).transpose(1, 3)]
-
-        y1 = [torch.randn(32, 13, 25, 27),
-              torch.randn(32, 25, 13, 27).transpose(1, 2),
-              torch.randn(32, 13, 27, 25).transpose(2, 3),
-              torch.randn(32, 27, 13, 25).transpose(2, 3).transpose(1, 3)]
+        y1 = [torch.randn(53, 23, 25, 27),
+              torch.randn(53, 25, 23, 27).transpose(1, 2),
+              torch.randn(53, 23, 27, 25).transpose(2, 3),
+              torch.randn(53, 27, 23, 25).transpose(2, 3).transpose(1, 3)]
 
         model = TransposedMatmulDiv().eval()
         model_fp32 = ipex.optimize(model, dtype=torch.float32, level="O1")
@@ -3209,19 +3207,19 @@ class Tester(TestCase):
         for i in range(len(x1)):
             for j in range(len(y1)):
                 with torch.no_grad():
-                    traced_mod = torch.jit.trace(model, (M, x1[i], y1[j]))
-                    fused_mod = traced_mod.graph_for(M, x1[i], y1[j])
-                    out = traced_mod(M, x1[i], y1[j])
-                    expected = torch.baddbmm(M, x1[i], y1[j])
-                    self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fused_mod.nodes()))
-                    self.assertEqual(out, expected, prec=1e-6)
-                with torch.cpu.amp.autocast(), torch.no_grad():
-                    traced_mod = torch.jit.trace(model, (M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16()))
-                    fused_mod = traced_mod.graph_for(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
-                    out = traced_mod(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
-                    expected = torch.baddbmm(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
+                    traced_mod = torch.jit.trace(model, (x1[i], y1[j]))
+                    fused_mod = traced_mod.graph_for(x1[i], y1[j])
+                    out = traced_mod(x1[i], y1[j])
+                    expected = model(x1[i], y1[j])
                     self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fused_mod.nodes()))
                     self.assertEqual(out, expected, prec=1e-4)
+                with torch.cpu.amp.autocast(), torch.no_grad():
+                    traced_mod = torch.jit.trace(model, (x1[i].bfloat16(), y1[j].bfloat16()))
+                    fused_mod = traced_mod.graph_for(x1[i].bfloat16(), y1[j].bfloat16())
+                    out = traced_mod(x1[i].bfloat16(), y1[j].bfloat16())
+                    expected = model(x1[i].bfloat16(), y1[j].bfloat16())
+                    self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fused_mod.nodes()))
+                    self.assertEqual(out, expected, prec=1e-1)
 
     def test_bmm_add(self):
         M = torch.randn(60, 30, 50)
@@ -3252,37 +3250,6 @@ class Tester(TestCase):
                     out = traced_mod(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
                     expected = torch.baddbmm(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
                     self.assertTrue(any(n.kind() == "ipex::bmm_add" for n in fused_mod.nodes()))
-                    self.assertEqual(out, expected, prec=1e-1)
-
-    def test_transposed_matmuldiv(self):
-        x1 = [torch.randn(53, 23, 27, 25),
-              torch.randn(53, 27, 23, 25).transpose(1, 2),
-              torch.randn(53, 23, 25, 27).transpose(2, 3),
-              torch.randn(53, 25, 23, 27).transpose(2, 3).transpose(1, 3)]
-
-        y1 = [torch.randn(53, 23, 25, 27),
-              torch.randn(53, 25, 23, 27).transpose(1, 2),
-              torch.randn(53, 23, 27, 25).transpose(2, 3),
-              torch.randn(53, 27, 23, 25).transpose(2, 3).transpose(1, 3)]
-
-        model = TransposedMatmulDiv().eval()
-        model_fp32 = ipex.optimize(model, dtype=torch.float32, level="O1")
-        model_bf16 = ipex.optimize(model, dtype=torch.bfloat16, level="O1")
-        for i in range(len(x1)):
-            for j in range(len(y1)):
-                with torch.no_grad():
-                    traced_mod = torch.jit.trace(model, (x1[i], y1[j]))
-                    fused_mod = traced_mod.graph_for(x1[i], y1[j])
-                    out = traced_mod(x1[i], y1[j])
-                    expected = model(x1[i], y1[j])
-                    self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fused_mod.nodes()))
-                    self.assertEqual(out, expected, prec=1e-4)
-                with torch.cpu.amp.autocast(), torch.no_grad():
-                    traced_mod = torch.jit.trace(model, (x1[i].bfloat16(), y1[j].bfloat16()))
-                    fused_mod = traced_mod.graph_for(x1[i].bfloat16(), y1[j].bfloat16())
-                    out = traced_mod(x1[i].bfloat16(), y1[j].bfloat16())
-                    expected = model(x1[i].bfloat16(), y1[j].bfloat16())
-                    self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fused_mod.nodes()))
                     self.assertEqual(out, expected, prec=1e-1)
 
     def test_einsum_add(self):

@@ -878,6 +878,34 @@ torch::jit::RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
+        "ipex::matmul(Tensor batch1, Tensor batch2) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = dil_matmul(
+                (std::move(peek(stack, 0, 2))).toTensor(),
+                (std::move(peek(stack, 1, 2))).toTensor());
+            drop(stack, 2);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::matmul_outtrans(Tensor batch1, Tensor batch2) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = dil_mha_matmul_trans(
+                (std::move(peek(stack, 0, 2))).toTensor(),
+                (std::move(peek(stack, 1, 2))).toTensor());
+            drop(stack, 2);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
         "ipex::mha_scores_calc(Tensor q, Tensor k, Tensor rel_qk, Scalar "
         "alpha, "
         "Scalar dim_per_head, int softmax_dim, ScalarType ? dtype) -> Tensor",
