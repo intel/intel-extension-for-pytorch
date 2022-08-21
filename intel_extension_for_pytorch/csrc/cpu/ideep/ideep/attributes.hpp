@@ -279,6 +279,11 @@ struct attr_t : public dnnl::primitive_attr {
     return false;
   }
 
+  bool has_post_op() const {
+    auto po = get_post_ops();
+    return po.len() > 0;
+  }
+
   std::tuple<kind, float, float, float, algorithm> get_params(int index) const {
     auto po = get_post_ops();
     IDEEP_ENFORCE(index < po.len(), "post_ops index is out of range");

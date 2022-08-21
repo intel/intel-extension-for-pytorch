@@ -11,9 +11,97 @@
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
 #include "csrc/utils/ipex_op_profile.h"
+#include "mkl.h"
 
 namespace torch_ipex {
 namespace cpu {
+
+/**
+ * MKL FP32 BMM kernel
+ *
+ * Restrictions on the Transpose-free MKL BMM kernel:
+ * 1. Minimum stride of the input and output tensors should be 1.
+ * 2. The input tensors should have the minimum stride (1) at the
+ *    last index (-1) or the second last index (-2).
+ * 3. The last stride of the output tensor should be 1.
+ * 4. The first stride of the input and output tensors should be
+ *    the largest, which means the first dimension should be the highest.
+ * 5. The dimension number of the input and output tensors should be the
+ *    same and larger than 2.
+ * If any tensor does not meet one of the above the conditions, make sure
+ * to apply contiguous() before sending it into this BMM kernel.
+ **/
+void mkl_fp32_bmm_impl(
+    const at::Tensor& batch1,
+    const at::Tensor& batch2,
+    at::Tensor& out,
+    const double& output_scale) {
+#define GRP_COUNT 1
+
+  auto batch_dim = batch1.dim();
+
+  MKL_INT m[GRP_COUNT] = {batch1.size(-2)};
+  MKL_INT k[GRP_COUNT] = {batch1.size(-1)};
+  MKL_INT n[GRP_COUNT] = {batch2.size(-1)};
+
+  MKL_INT lda[GRP_COUNT] = {
+      batch1.stride(-1) == 1 ? batch1.stride(-2) : batch1.stride(-1)};
+  MKL_INT ldb[GRP_COUNT] = {
+      batch2.stride(-1) == 1 ? batch2.stride(-2) : batch2.stride(-1)};
+  MKL_INT ldc[GRP_COUNT] = {out.stride(-2)};
+
+  CBLAS_TRANSPOSE transA[GRP_COUNT] = {
+      batch1.stride(-1) == 1 ? CblasNoTrans : CblasTrans};
+  CBLAS_TRANSPOSE transB[GRP_COUNT] = {
+      batch2.stride(-1) == 1 ? CblasNoTrans : CblasTrans};
+
+  float alpha[GRP_COUNT] = {output_scale};
+  float beta[GRP_COUNT] = {0.0};
+
+  int64_t array_size = batch1.numel() / (batch1.size(-2) * batch1.size(-1));
+  const MKL_INT size_per_grp[GRP_COUNT] = {array_size};
+  float *a_array[array_size], *b_array[array_size], *c_array[array_size];
+
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+#pragma omp parallel for simd schedule( \
+    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#else
+#pragma omp parallel for schedule( \
+    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#endif
+#endif
+  for (int64_t i = 0; i < array_size; ++i) {
+    a_array[i] = batch1.data_ptr<float>();
+    b_array[i] = batch2.data_ptr<float>();
+    c_array[i] = out.data_ptr<float>();
+    int64_t count = 1;
+    for (int64_t j = batch_dim - 3; j >= 0; --j) {
+      a_array[i] += ((int64_t)(i / count) % batch1.size(j)) * batch1.stride(j);
+      b_array[i] += ((int64_t)(i / count) % batch2.size(j)) * batch2.stride(j);
+      c_array[i] += ((int64_t)(i / count) % out.size(j)) * out.stride(j);
+      count *= batch1.size(j);
+    }
+  }
+
+  cblas_sgemm_batch(
+      CblasRowMajor,
+      transA,
+      transB,
+      m,
+      n,
+      k,
+      alpha,
+      (const float**)a_array,
+      lda,
+      (const float**)b_array,
+      ldb,
+      beta,
+      c_array,
+      ldc,
+      GRP_COUNT,
+      size_per_grp);
+}
 
 /**
  * bmm oneDNN kernel
@@ -28,6 +116,13 @@ namespace cpu {
  * 3-dim - abc, acb; 4-dim - abcd, acbd, adbc, abdc.
  * If the input tensor has one of the above layouts, the contiguous should NOT
  * be applied to avoid unnecessary transpose (copy).
+ * The MKL BMM kernel has better FP32 performance than that of the DNNL MATMUL
+ * primitive, and it allows the input tensors can be a part of the other bigger
+ * tensor. Thus the QKV split is NOT required for the FP32 MHA matmul.
+ *
+ * Since the MKL BMM kernel cannot fuse any post-OP, for the cases 1. FP32 BMM
+ * with any DNNL-defined post-OP, 2. BF16 BMM, the DNNL MATMUL primitive is
+ * applied. For FP32 BMM with mul/div, the MKL BMM kernel is applied.
  **/
 at::Tensor bmm_impl(
     const at::Tensor& tensor1,
@@ -39,32 +134,31 @@ at::Tensor bmm_impl(
   // The following conditions are strict to exclude some extreme cases when the
   // tensors have the undefined stride values. For the sake of reliability of
   // transpose-free Matmul kernel, contiguous will be applied to these tensors.
-  auto check_tensor_layout = [](at::Tensor tensor) {
+  auto check_tensor_dim_stride = [](at::Tensor tensor) {
     // Check if the Tensor is 3-dim or 4-dim
     if (tensor.dim() != 3 && tensor.dim() != 4)
       return false;
+    // Check the strides of the tensor are not out of the tensor's ranges.
+    if (tensor.stride(0) * tensor.size(0) != tensor.numel())
+      return false;
+    return true;
+  };
+  auto check_tensor_layout = [](at::Tensor tensor) {
     // Check if 'a' is the first dim
     for (int64_t i = 1; i < tensor.dim(); ++i) {
       if (tensor.stride(0) < tensor.stride(i))
         return false;
     }
-    // Check if the tensor has one of the above memory tags:
-    // The strides of the tensor should not be out of the tensor's ranges.
-    // 4-dim: 'b' should not be the last dim.
-    if (tensor.stride(0) * tensor.size(0) != tensor.numel() ||
-        (tensor.dim() == 4 && tensor.stride(1) == 1))
+    // Check the minimum stride is at the last or second last index
+    // and its value is 1.
+    if (!(tensor.stride(-1) == 1 || tensor.stride(-2) == 1))
       return false;
     return true;
   };
-  auto tensor1_ = check_tensor_layout(tensor1) ? tensor1 : tensor1.contiguous();
-  auto tensor2_ = check_tensor_layout(tensor2) ? tensor2 : tensor2.contiguous();
-
-  const int64_t dim = tensor1.dim();
-  const ideep::tensor mkldnn_input = itensor_view_from_dense(tensor1_);
-  const ideep::tensor mkldnn_tensor2 = itensor_view_from_dense(tensor2_);
 
   auto output = out;
   if (!out.defined()) {
+    const int64_t dim = tensor1.dim();
     std::vector<int64_t> output_size(dim);
     for (auto i = 0; i < dim - 1; i++) {
       output_size[i] = tensor1.size(i);
@@ -72,20 +166,48 @@ at::Tensor bmm_impl(
     output_size[dim - 1] = tensor2.size(dim - 1);
     output = at::empty(output_size, tensor1.options());
   }
-  ideep::tensor mkldnn_output = itensor_view_from_dense(output);
-  ideep::matmul_forward::compute(
-      mkldnn_input,
-      mkldnn_tensor2,
-      mkldnn_output,
-      dst_coeff,
-      1.0,
-      ideep::scale_t(),
-      ideep::scale_t(),
-      ideep::scale_t(),
-      attr,
-      postop_tensors);
+
+  if (tensor1.dtype() == at::kBFloat16 || attr.has_post_op()) {
+    auto tensor1_ =
+        (check_tensor_dim_stride(tensor1) && check_tensor_layout(tensor1))
+        ? tensor1
+        : tensor1.contiguous();
+    auto tensor2_ =
+        (check_tensor_dim_stride(tensor2) && check_tensor_layout(tensor2))
+        ? tensor2
+        : tensor2.contiguous();
+
+    const ideep::tensor mkldnn_input = itensor_view_from_dense(tensor1_);
+    const ideep::tensor mkldnn_tensor2 = itensor_view_from_dense(tensor2_);
+    ideep::tensor mkldnn_output = itensor_view_from_dense(output);
+
+    ideep::matmul_forward::compute(
+        mkldnn_input,
+        mkldnn_tensor2,
+        mkldnn_output,
+        dst_coeff,
+        1.0,
+        ideep::scale_t(),
+        ideep::scale_t(),
+        ideep::scale_t(),
+        attr,
+        postop_tensors);
+  } else {
+    auto tensor1_ =
+        check_tensor_layout(tensor1) ? tensor1 : tensor1.contiguous();
+    auto tensor2_ =
+        check_tensor_layout(tensor2) ? tensor2 : tensor2.contiguous();
+
+    mkl_fp32_bmm_impl(tensor1_, tensor2_, output, dst_coeff);
+  }
 
   return output;
+}
+
+at::Tensor dil_matmul(const at::Tensor& tensor1, const at::Tensor& tensor2) {
+  IPEX_RECORD_FUNCTION("dil_matmul", c10::ArrayRef<c10::IValue>({}));
+
+  return bmm_impl(tensor1, tensor2, at::Tensor(), ideep::attr_t(), {}, 1.f);
 }
 
 /**
