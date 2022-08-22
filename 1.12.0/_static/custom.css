@@ -11,3 +11,11 @@
 .rst-content tt.literal, .rst-content code.literal {
     color: #000000;
 }
+
+/* set color of version navigator to yellow */
+div.version a {
+    color: hsla(0,0%,100%,.3);
+}
+div.version p {
+    color: #FFFF00;
+}
