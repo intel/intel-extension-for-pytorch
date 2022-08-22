@@ -21,6 +21,8 @@ static thread_local DeviceId cur_dev_index = 0;
 
 struct DPCPPDevicePool {
   std::vector<std::unique_ptr<sycl::device>> devices;
+  // Record all device ids for each card
+  std::vector<std::vector<int>> deviceids_card;
 #if defined(USE_MULTI_CONTEXT)
   std::vector<std::unique_ptr<sycl::context>> contexts;
 #endif
@@ -52,13 +54,16 @@ static void initGlobalDevicePoolState() {
     constexpr sycl::info::partition_affinity_domain next_partitionable =
         sycl::info::partition_affinity_domain::next_partitionable;
     for (const auto& root_device : root_devices) {
+      std::vector<int> deviceids_eachcard = {};
       try {
         auto sub_devices =
             root_device.create_sub_devices<partition_by_affinity>(
                 next_partitionable);
         for (auto& s_dev : sub_devices) {
           gDevPool.devices.push_back(std::make_unique<sycl::device>(s_dev));
+          deviceids_eachcard.push_back(gDevPool.devices.size() - 1);
         }
+        gDevPool.deviceids_card.push_back(deviceids_eachcard);
       } catch (sycl::exception& e) {
         // FIXME: should only check feature_not_supported here.
         // But for now we got invalid here if partition is not supported.
@@ -75,7 +80,10 @@ static void initGlobalDevicePoolState() {
     }
   } else {
     for (const auto& root_device : root_devices) {
+      std::vector<int> deviceids_eachcard = {};
       gDevPool.devices.push_back(std::make_unique<sycl::device>(root_device));
+      deviceids_eachcard.push_back(gDevPool.devices.size() - 1);
+      gDevPool.deviceids_card.push_back(deviceids_eachcard);
     }
   }
 
@@ -266,6 +274,30 @@ DeviceProp* dpcppGetDeviceProperties(DeviceId device) {
   AT_ASSERT(device_id >= 0 && device_id < num_gpus);
   std::call_once(device_prop_flags[device_id], initDeviceProperty, device_id);
   return &device_properties[device_id];
+}
+
+std::vector<int>& dpcppGetDeviceIdListForCard(int card_id) {
+  initDevicePoolCallOnce();
+  std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
+
+  int num_cards = gDevPool.deviceids_card.size();
+  if (card_id == -1) {
+    int maxnum_devices = 0;
+    for (int i = 0; i < num_cards; i++) {
+      auto num_devices = gDevPool.deviceids_card[i].size();
+      if (maxnum_devices < num_devices) {
+        maxnum_devices = num_devices;
+        card_id = i;
+      }
+    }
+  }
+  TORCH_CHECK(
+      card_id >= 0 && card_id < num_cards,
+      "card_id ",
+      card_id,
+      " out of range");
+  std::vector<int>& deviceidlist_card = gDevPool.deviceids_card[card_id];
+  return deviceidlist_card;
 }
 
 } // namespace dpcpp

@@ -43,5 +43,8 @@ DeviceProp* getDeviceProperties(DeviceIndex device) {
   return dpcppGetDeviceProperties(device);
 }
 
+std::vector<int>& deviceIdListForCard(int card_id) {
+  return dpcppGetDeviceIdListForCard(card_id);
+}
 } // namespace dpcpp
 } // namespace xpu

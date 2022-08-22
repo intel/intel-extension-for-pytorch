@@ -1,6 +1,7 @@
 import torch
 from .. import _C
 from enum import Enum
+import intel_extension_for_pytorch # noqa
 
 
 def to_channels_last_1d(t):
@@ -312,3 +313,11 @@ def get_backend():
 def set_backend(backend):
     st = Backend.set_value(_C._set_backend, backend)
     assert bool(st), "WARNING: Failed to set XPU backend!"
+
+def getDeviceIdListForCard(card_id=-1) -> list:
+    r"""Returns the device list of card_id.
+    By default, return device list of the card which contains max number of devices."""
+    if torch.xpu.is_available():
+        return intel_extension_for_pytorch._C._getDeviceIdListForCard(card_id)
+    else:
+        return []

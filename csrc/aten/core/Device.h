@@ -23,5 +23,6 @@ IPEX_API DeviceProp* getCurrentDeviceProperties();
 
 IPEX_API DeviceProp* getDeviceProperties(DeviceIndex device);
 
+IPEX_API std::vector<int>& deviceIdListForCard(int card_id);
 } // namespace dpcpp
 } // namespace xpu

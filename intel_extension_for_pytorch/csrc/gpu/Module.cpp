@@ -9,6 +9,7 @@
 #include <core/Device.h>
 #include <core/Generator.h>
 #include <intrinsic/intrinsic.h>
+#include <pybind11/stl.h>
 #include <runtime/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/Settings.h>
@@ -66,6 +67,16 @@ PyObject* THPModule_getDevice_wrap(PyObject* self, PyObject* noargs) {
 PyObject* THPModule_getDeviceCount_wrap(PyObject* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
   return PyLong_FromLong(xpu::dpcpp::device_count());
+  END_HANDLE_TH_ERRORS
+}
+
+PyObject* THPModule_getDeviceIdListForCard_wrap(PyObject* self, PyObject* arg) {
+  HANDLE_TH_ERRORS
+  THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to get card id");
+  int card_id = THPUtils_unpackInt(arg);
+  auto deviceid_card = xpu::dpcpp::deviceIdListForCard(card_id);
+  py::list deviceid_card_pylist = py::cast(deviceid_card);
+  return deviceid_card_pylist.release().ptr();
   END_HANDLE_TH_ERRORS
 }
 
@@ -347,6 +358,10 @@ static struct PyMethodDef _THPModule_methods[] = {
     {"_getDeviceCount",
      (PyCFunction)THPModule_getDeviceCount_wrap,
      METH_NOARGS,
+     nullptr},
+    {"_getDeviceIdListForCard",
+     (PyCFunction)THPModule_getDeviceIdListForCard_wrap,
+     METH_O,
      nullptr},
     {"_xpu_isInBadFork",
      (PyCFunction)THPModule_isInBadFork,

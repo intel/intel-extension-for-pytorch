@@ -26,5 +26,6 @@ DeviceProp* dpcppGetDeviceProperties(DeviceId device_id = -1);
 
 sycl::context dpcppGetDeviceContext(DeviceId device_id = -1);
 
+std::vector<int>& dpcppGetDeviceIdListForCard(int card_id = -1);
 } // namespace dpcpp
 } // namespace xpu

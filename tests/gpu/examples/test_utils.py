@@ -1,7 +1,7 @@
 import torch
 import intel_extension_for_pytorch # noqa
 from torch.testing._internal.common_utils import TestCase
-
+from intel_extension_for_pytorch.xpu.utils import getDeviceIdListForCard, using_tile_as_device
 import pytest
 
 
@@ -54,3 +54,17 @@ class TestVerbose(TestCase):
         for backend in backend_list:
             torch.xpu.set_backend(backend)
             assert torch.xpu.get_backend() == backend, 'Fail to set XPU backend: ' + backend
+
+class TestDevicdeListForCard(TestCase):
+    def test_devicelist_empty(self):
+        if torch.xpu.device_count() > 0:
+            assert getDeviceIdListForCard(), 'Device list should not be empty'
+
+    def test_devicelist_size(self):
+        assert len(getDeviceIdListForCard()) <= torch.xpu.device_count(), \
+            'The size of device list should not be larger than device count'
+
+    def test_implicit_mode(self):
+        if not using_tile_as_device():
+            assert len(getDeviceIdListForCard()) == 1, \
+                'The size of device list should be always 1 with implicit mode'
