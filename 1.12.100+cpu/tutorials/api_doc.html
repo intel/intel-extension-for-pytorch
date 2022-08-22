@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Documentation &mdash; intel_extension_for_pytorch 1.12.100 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Performance Tuning Guide" href="performance_tuning.html" />
+    <link rel="prev" title="Performance" href="performance.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../versions.html">1.12.100+cpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general">General</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-ipex.quantization">Quantization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-ipex.cpu.runtime">CPU Runtime</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>API Documentation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/api_doc.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-documentation">
+<h1>API Documentation<a class="headerlink" href="#api-documentation" title="Permalink to this headline"></a></h1>
+<section id="general">
+<h2>General<a class="headerlink" href="#general" title="Permalink to this headline"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.optimize">
+<span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">optimize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'O1'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_bn_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights_prepack</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replace_dropout_with_identity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimize_lstm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">split_master_weight_for_bf16</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fuse_update_step</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auto_kernel_selection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_input</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.optimize" title="Permalink to this definition"></a></dt>
+<dd><p>Apply optimizations at Python frontend to the given model (nn.Module), as
+well as the given optimizer (optional). If the optimizer is given,
+optimizations will be applied for training. Otherwise, optimization will be
+applied for inference. Optimizations include <code class="docutils literal notranslate"><span class="pre">conv+bn</span></code> folding (for
+inference only), weight prepacking and so on.</p>
+<p>Weight prepacking is a technique to accelerate performance of oneDNN
+operators. In order to achieve better vectorization and cache reuse, onednn
+uses a specific memory layout called <code class="docutils literal notranslate"><span class="pre">blocked</span> <span class="pre">layout</span></code>. Although the
+calculation itself with <code class="docutils literal notranslate"><span class="pre">blocked</span> <span class="pre">layout</span></code> is fast enough, from memory usage
+perspective it has drawbacks. Running with the <code class="docutils literal notranslate"><span class="pre">blocked</span> <span class="pre">layout</span></code>, oneDNN
+splits one or several dimensions of data into blocks with fixed size each
+time the operator is executed. More details information about oneDNN data
+mermory format is available at <a class="reference external" href="https://oneapi-src.github.io/oneDNN/dev_guide_understanding_memory_formats.html">oneDNN manual</a>.
+To reduce this overhead, data will be converted to predefined block shapes
+prior to the execution of oneDNN operator execution. In runtime, if the data
+shape matches oneDNN operator execution requirements, oneDNN won’t perform
+memory layout conversion but directly go to calculation. Through this
+methodology, called <code class="docutils literal notranslate"><span class="pre">weight</span> <span class="pre">prepacking</span></code>, it is possible to avoid runtime
+weight data format convertion and thus increase performance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – User model to apply optimizations on.</p></li>
+<li><p><strong>dtype</strong> (<em>torch.dtype</em>) – Only works for <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code>.
+Model parameters will be casted to <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code> if dtype is set to
+<code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code>. The default value is None, meaning do nothing.
+Note: Data type conversion is only applied to <code class="docutils literal notranslate"><span class="pre">nn.Conv2d</span></code>, <code class="docutils literal notranslate"><span class="pre">nn.Linear</span></code>
+and <code class="docutils literal notranslate"><span class="pre">nn.ConvTranspose2d</span></code> for both training and inference cases. For
+inference mode, additional data type conversion is applied to the weights
+of <code class="docutils literal notranslate"><span class="pre">nn.Embedding</span></code> and <code class="docutils literal notranslate"><span class="pre">nn.LSTM</span></code>.</p></li>
+<li><p><strong>optimizer</strong> (<em>torch.optim.Optimizer</em>) – User optimizer to apply optimizations
+on, such as SGD. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>, meaning inference case.</p></li>
+<li><p><strong>level</strong> (<em>string</em>) – <code class="docutils literal notranslate"><span class="pre">&quot;O0&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;O1&quot;</span></code>. No optimizations are applied with
+<code class="docutils literal notranslate"><span class="pre">&quot;O0&quot;</span></code>. The optimizer function just returns the original model and
+optimizer. With <code class="docutils literal notranslate"><span class="pre">&quot;O1&quot;</span></code>, the following optimizations are applied:
+conv+bn folding, weights prepack, dropout removal (inferenc model),
+master weight split and fused optimizer update step (training model).
+The optimization options can be further overridden by setting the
+following options explicitly. The default value is <code class="docutils literal notranslate"><span class="pre">&quot;O1&quot;</span></code>.</p></li>
+<li><p><strong>inplace</strong> (<em>bool</em>) – Whether to perform inplace optimization. Default value is
+<code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+<li><p><strong>conv_bn_folding</strong> (<em>bool</em>) – Whether to perform <code class="docutils literal notranslate"><span class="pre">conv_bn</span></code> folding. It only
+works for inference model. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly
+setting this knob overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>weights_prepack</strong> (<em>bool</em>) – Whether to perform weight prepack for convolution
+and linear to avoid oneDNN weights reorder. The default value is
+<code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites the configuration
+set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>replace_dropout_with_identity</strong> (<em>bool</em>) – Whether to replace <code class="docutils literal notranslate"><span class="pre">nn.Dropout</span></code>
+with <code class="docutils literal notranslate"><span class="pre">nn.Identity</span></code>. If replaced, the <code class="docutils literal notranslate"><span class="pre">aten::dropout</span></code> won’t be
+included in the JIT graph. This may provide more fusion opportunites
+on the graph. This only works for inference model. The default value
+is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites the configuration
+set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>optimize_lstm</strong> (<em>bool</em>) – Whether to replace <code class="docutils literal notranslate"><span class="pre">nn.LSTM</span></code> with <code class="docutils literal notranslate"><span class="pre">IPEX</span> <span class="pre">LSTM</span></code>
+which takes advantage of oneDNN kernels to get better performance.
+The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob
+overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>split_master_weight_for_bf16</strong> (<em>bool</em>) – Whether to split master weights
+update for BF16 training. This saves memory comparing to master
+weight update solution. Split master weights update methodology
+doesn’t support all optimizers. The default value is None. The
+default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites
+the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>fuse_update_step</strong> (<em>bool</em>) – Whether to use fused params update for training
+which have better performance. It doesn’t support all optimizers.
+The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob
+overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>sample_input</strong> (<em>tuple</em><em> or </em><em>torch.Tensor</em>) – Whether to feed sample input data to ipex.optimize. The shape of
+input data will impact the block format of packed weight. If not feed a sample
+input, Intel® Extension for PyTorch* will pack the weight per some predefined heuristics.
+If feed a sample input with real input shape, Intel® Extension for PyTorch* can get
+best block format.</p></li>
+<li><p><strong>auto_kernel_selection</strong> (<em>bool</em>) – Different backends may have
+different performances with different dtypes/shapes. Default value
+is False. Intel® Extension for PyTorch* will try to optimize the
+kernel selection for better performance if this knob is set to
+<code class="docutils literal notranslate"><span class="pre">True</span></code>. There might be regressions at current stage. The default
+value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites the
+configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Model and optimizer (if given) modified according to the <code class="docutils literal notranslate"><span class="pre">level</span></code> knob
+or other user settings. <code class="docutils literal notranslate"><span class="pre">conv+bn</span></code> folding may take place and
+<code class="docutils literal notranslate"><span class="pre">dropout</span></code> may be replaced by <code class="docutils literal notranslate"><span class="pre">identity</span></code>. In inference scenarios,
+convolutuon, linear and lstm will be replaced with the optimized
+counterparts in Intel® Extension for PyTorch* (weight prepack for
+convolution and linear) for good performance. In bfloat16 scenarios,
+parameters of convolution and linear will be casted to bfloat16 dtype.</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Please invoke <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function AFTER loading weights to model via
+<code class="docutils literal notranslate"><span class="pre">model.load_state_dict(torch.load(PATH))</span></code>.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Please invoke <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function BEFORE invoking DDP in distributed
+training scenario.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function deepcopys the original model. If DDP is invoked
+before <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function, DDP is applied on the origin model, rather
+than the one returned from <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function. In this case, some
+operators in DDP, like allreduce, will not be invoked and thus may cause
+unpredictable accuracy loss.</p>
+</div>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 inference case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">PATH</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running evaluation step.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 training case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimizer</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span><span class="p">,</span> <span class="n">optimized_optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running training step.</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.enable_onednn_fusion">
+<span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">enable_onednn_fusion</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">enabled</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.enable_onednn_fusion" title="Permalink to this definition"></a></dt>
+<dd><p>Enables or disables oneDNN fusion functionality. If enabled, oneDNN
+operators will be fused in runtime, when intel_extension_for_pytorch
+is imported.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>enabled</strong> (<em>bool</em>) – Whether to enable oneDNN fusion functionality or not.
+Default value is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to enable the oneDNN fusion</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex</span><span class="o">.</span><span class="n">enable_onednn_fusion</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to disable the oneDNN fusion</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex</span><span class="o">.</span><span class="n">enable_onednn_fusion</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.verbose">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">verbose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.verbose" title="Permalink to this definition"></a></dt>
+<dd><p>On-demand oneDNN verbosing functionality</p>
+<p>To make it easier to debug performance issues, oneDNN can dump verbose
+messages containing information like kernel size, input data size and
+execution duration while executing the kernel. The verbosing functionality
+can be invoked via an environment variable named <cite>DNNL_VERBOSE</cite>. However,
+this methodology dumps messages in all steps. Those are a large amount of
+verbose messages. Moreover, for investigating the performance issues,
+generally taking verbose messages for one single iteration is enough.</p>
+<p>This on-demand verbosing functionality makes it possible to control scope
+for verbose message dumping. In the following example, verbose messages
+will be dumped out for the second inference only.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">ipex</span><span class="o">.</span><span class="n">verbose</span><span class="p">(</span><span class="n">ipex</span><span class="o">.</span><span class="n">VERBOSE_ON</span><span class="p">):</span>
+    <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>level</strong> – <p>Verbose level</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">VERBOSE_OFF</span></code>: Disable verbosing</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VERBOSE_ON</span></code>:  Enable verbosing</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VERBOSE_ON_CREATION</span></code>: Enable verbosing, including oneDNN kernel creation</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-ipex.quantization">
+<span id="quantization"></span><h2>Quantization<a class="headerlink" href="#module-ipex.quantization" title="Permalink to this headline"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.quantization.prepare">
+<span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">prepare</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">configure</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">example_inputs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.prepare" title="Permalink to this definition"></a></dt>
+<dd><p>Prepare an FP32 torch.nn.Module model to do calibration or to convert to quantized model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – The FP32 model to be prepared.</p></li>
+<li><p><strong>configure</strong> (<em>torch.quantization.qconfig.QConfig</em>) – The observer settings about activation and weight.</p></li>
+<li><p><strong>example_inputs</strong> (<em>tuple</em><em> or </em><em>torch.Tensor</em>) – A tuple of example inputs that
+will be passed to the function while running to init quantization state.</p></li>
+<li><p><strong>inplace</strong> – (bool): It will change the given model in-place if True. The default value is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>torch.nn.Module</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.quantization.convert">
+<span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">convert</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.convert" title="Permalink to this definition"></a></dt>
+<dd><p>Convert an FP32 prepared model to a model which will automatically insert fake quant
+before a quantizable module or operator.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – The FP32 model to be convert.</p></li>
+<li><p><strong>inplace</strong> – (bool): It will change the given model in-place if True. The default value is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>torch.torch.nn.Module</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-ipex.cpu.runtime">
+<span id="cpu-runtime"></span><h2>CPU Runtime<a class="headerlink" href="#module-ipex.cpu.runtime" title="Permalink to this headline"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.is_runtime_ext_enabled">
+<span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">is_runtime_ext_enabled</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.is_runtime_ext_enabled" title="Permalink to this definition"></a></dt>
+<dd><p>Helper function to check whether runtime extension is enabled or not.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>None</strong> (<em>None</em>) – None</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Whether the runtime exetension is enabled or not. If the</dt><dd><p>Intel OpenMP Library is preloaded, this API will return True.
+Otherwise, it will return False.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.CPUPool">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">CPUPool</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">core_ids</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_id</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.CPUPool" title="Permalink to this definition"></a></dt>
+<dd><p>An abstraction of a pool of CPU cores used for intra-op parallelism.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>core_ids</strong> (<em>list</em>) – A list of CPU cores’ ids used for intra-op parallelism.</p></li>
+<li><p><strong>node_id</strong> (<em>int</em>) – A numa node id with all CPU cores on the numa node.
+<code class="docutils literal notranslate"><span class="pre">node_id</span></code> doesn’t work if <code class="docutils literal notranslate"><span class="pre">core_ids</span></code> is set.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Generated
+ipex.cpu.runtime.CPUPool object.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.CPUPool">ipex.cpu.runtime.CPUPool</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.pin">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">pin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.cpupool.CPUPool"><span class="pre">ipex.cpu.runtime.cpupool.CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.pin" title="Permalink to this definition"></a></dt>
+<dd><p>Apply the given CPU pool to the master thread that runs the scoped code
+region or the function/method def.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>cpu_pool</strong> (<a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.CPUPool"><em>ipex.cpu.runtime.CPUPool</em></a>) – ipex.cpu.runtime.CPUPool object, contains
+all CPU cores used by the designated operations.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Generated
+ipex.cpu.runtime.pin object which can be used
+as a <cite>with</cite> context or a function decorator.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.pin" title="ipex.cpu.runtime.pin">ipex.cpu.runtime.pin</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.MultiStreamModuleHint">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">MultiStreamModuleHint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.MultiStreamModuleHint" title="Permalink to this definition"></a></dt>
+<dd><p>MultiStreamModuleHint is a hint to MultiStreamModule about how to split the inputs
+or concat the output. Each argument should be None, with type of int or a container
+which containes int or None such as: (0, None, …) or [0, None, …]. If the argument
+is None, it means this argument will not be split or concat. If the argument is with
+type int, its value means along which dim this argument will be split or concat.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>*args</strong> – Variable length argument list.</p></li>
+<li><p><strong>**kwargs</strong> – Arbitrary keyword arguments.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Generated
+ipex.cpu.runtime.MultiStreamModuleHint object.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.MultiStreamModuleHint" title="ipex.cpu.runtime.MultiStreamModuleHint">ipex.cpu.runtime.MultiStreamModuleHint</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.MultiStreamModule">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">MultiStreamModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">model</span></em>, <em class="sig-param"><span class="pre">num_streams:</span> <span class="pre">Union[int</span></em>, <em class="sig-param"><span class="pre">str]</span> <span class="pre">=</span> <span class="pre">'AUTO'</span></em>, <em class="sig-param"><span class="pre">cpu_pool:</span> <span class="pre">ipex.cpu.runtime.cpupool.CPUPool</span> <span class="pre">=</span> <span class="pre">&lt;ipex.cpu.runtime.cpupool.CPUPool</span> <span class="pre">object&gt;</span></em>, <em class="sig-param"><span class="pre">concat_output:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True</span></em>, <em class="sig-param"><span class="pre">input_split_hint:</span> <span class="pre">ipex.cpu.runtime.multi_stream.MultiStreamModuleHint</span> <span class="pre">=</span> <span class="pre">&lt;ipex.cpu.runtime.multi_stream.MultiStreamModuleHint</span> <span class="pre">object&gt;</span></em>, <em class="sig-param"><span class="pre">output_concat_hint:</span> <span class="pre">ipex.cpu.runtime.multi_stream.MultiStreamModuleHint</span> <span class="pre">=</span> <span class="pre">&lt;ipex.cpu.runtime.multi_stream.MultiStreamModuleHint</span> <span class="pre">object&gt;</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.MultiStreamModule" title="Permalink to this definition"></a></dt>
+<dd><p>MultiStreamModule supports inference with multi-stream throughput mode.</p>
+<p>If the number of cores inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code> is divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>,
+the cores will be allocated equally to each stream. If the number of cores
+inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code> is not divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> with remainder N,
+one extra core will be allocated to the first N streams. We suggest to set
+the <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> as divisor of core number inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code>.</p>
+<p>If the inputs’ batchsize is larger than and divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>,
+the batchsize will be allocated equally to each stream. If batchsize is not
+divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> with remainder N, one extra piece will be
+allocated to the first N streams. If the inputs’ batchsize is less than
+<code class="docutils literal notranslate"><span class="pre">num_streams</span></code>, only the first batchsize’s streams are used with mini batch
+as one. We suggest to set inputs’ batchsize larger than and divisible by
+<code class="docutils literal notranslate"><span class="pre">num_streams</span></code>. If you don’t want to tune the num of streams and leave it
+as “AUTO”, we suggest to set inputs’ batchsize larger than and divisible by
+number of cores.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.jit.ScriptModule</em><em> or </em><em>torch.nn.Module</em>) – The input model.</p></li>
+<li><p><strong>num_streams</strong> (<em>Union</em><em>[</em><em>int</em><em>, </em><em>str</em><em>]</em>) – Number of instances (int) or “AUTO” (str). “AUTO” means the stream number
+will be selected automatically. Although “AUTO” usually provides a
+reasonable performance, it may still not be optimal for some cases which
+means manual tuning for number of streams is needed for this case.</p></li>
+<li><p><strong>cpu_pool</strong> (<a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.CPUPool"><em>ipex.cpu.runtime.CPUPool</em></a>) – An
+ipex.cpu.runtime.CPUPool object, contains
+all CPU cores used to run multi-stream inference.</p></li>
+<li><p><strong>concat_output</strong> (<em>bool</em>) – A flag indicates whether the output of each
+stream will be concatenated or not. The default value is True. Note:
+if the output of each stream can’t be concatenated, set this flag to
+false to get the raw output (a list of each stream’s output).</p></li>
+<li><p><strong>input_split_hint</strong> (<a class="reference internal" href="#ipex.cpu.runtime.MultiStreamModuleHint" title="ipex.cpu.runtime.MultiStreamModuleHint"><em>MultiStreamModuleHint</em></a>) – Hint to MultiStreamModule about
+how to split the inputs.</p></li>
+<li><p><strong>output_concat_hint</strong> (<a class="reference internal" href="#ipex.cpu.runtime.MultiStreamModuleHint" title="ipex.cpu.runtime.MultiStreamModuleHint"><em>MultiStreamModuleHint</em></a>) – Hint to MultiStreamModule about
+how to concat the outputs.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Generated
+ipex.cpu.runtime.MultiStreamModule object.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.MultiStreamModule" title="ipex.cpu.runtime.MultiStreamModule">ipex.cpu.runtime.MultiStreamModule</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.Task">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">Task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.cpupool.CPUPool"><span class="pre">ipex.cpu.runtime.cpupool.CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.Task" title="Permalink to this definition"></a></dt>
+<dd><p>An abstraction of computation based on PyTorch module and is scheduled
+asynchronously.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.jit.ScriptModule</em><em> or </em><em>torch.nn.Module</em>) – The input module.</p></li>
+<li><p><strong>cpu_pool</strong> (<a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.CPUPool"><em>ipex.cpu.runtime.CPUPool</em></a>) – An
+ipex.cpu.runtime.CPUPool object, contains
+all CPU cores used to run Task asynchronously.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Generated
+ipex.cpu.runtime.Task object.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.Task" title="ipex.cpu.runtime.Task">ipex.cpu.runtime.Task</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.get_core_list_of_node_id">
+<span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">get_core_list_of_node_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_id</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.get_core_list_of_node_id" title="Permalink to this definition"></a></dt>
+<dd><p>Helper function to get the CPU cores’ ids of the input numa node.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>node_id</strong> (<em>int</em>) – Input numa node id.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>List of CPU cores’ ids on this numa node.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="performance.html" class="btn btn-neutral float-left" title="Performance" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="performance_tuning.html" class="btn btn-neutral float-right" title="Performance Tuning Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

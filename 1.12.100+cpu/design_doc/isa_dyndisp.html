@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intel® Extension for PyTorch* CPU ISA Dynamic Dispatch Design Doc &mdash; intel_extension_for_pytorch 1.12.100 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../versions.html">1.12.100+cpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Intel® Extension for PyTorch* CPU ISA Dynamic Dispatch Design Doc</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/design_doc/isa_dyndisp.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="intel-extension-for-pytorch-cpu-isa-dynamic-dispatch-design-doc">
+<h1>Intel® Extension for PyTorch* CPU ISA Dynamic Dispatch Design Doc<a class="headerlink" href="#intel-extension-for-pytorch-cpu-isa-dynamic-dispatch-design-doc" title="Permalink to this headline"></a></h1>
+<p>This document explains the dynamic kernel dispatch mechanism for Intel® Extension for PyTorch* (IPEX) based on CPU ISA. It is an extension to the similar mechanism in PyTorch.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline"></a></h2>
+<p>IPEX dyndisp is forked from <strong>PyTorch:</strong> <code class="docutils literal notranslate"><span class="pre">ATen/native/DispatchStub.h</span></code> and <code class="docutils literal notranslate"><span class="pre">ATen/native/DispatchStub.cpp</span></code>. IPEX adds additional CPU ISA level support, such as <code class="docutils literal notranslate"><span class="pre">AVX512_VNNI</span></code>, <code class="docutils literal notranslate"><span class="pre">AVX512_BF16</span></code> and <code class="docutils literal notranslate"><span class="pre">AMX</span></code>.</p>
+<p>PyTorch &amp; IPEX CPU ISA support statement:
+| | DEFAULT | AVX2 | AVX512 | AVX512_VNNI | AVX512_BF16 | AMX |
+| —- | —- | —- | —- | —- | —- | —- |
+| PyTorch | ✔ | ✔ | ✔ | ✘ | ✘ | ✘ |
+| IPEX | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ |</p>
+<p>* Current IPEX DEFAULT level implemented as same as AVX2 level.</p>
+<section id="cpu-isa-build-compiler-requirement">
+<h3>CPU ISA build compiler requirement<a class="headerlink" href="#cpu-isa-build-compiler-requirement" title="Permalink to this headline"></a></h3>
+<p>| ISA Level | GCC requirement |
+| —- | —- |
+| AVX2 | Any |
+| AVX512 | GCC 9.2+ |
+| AVX512_VNNI | GCC 9.2+ |
+| AVX512_BF16 | GCC 10.3+ |
+| AMX | GCC 11.2+ |</p>
+<p>* Check with <code class="docutils literal notranslate"><span class="pre">cmake/Modules/FindAVX.cmake</span></code> for detailed compiler checks.</p>
+</section>
+</section>
+<section id="dynamic-dispatch-design">
+<h2>Dynamic Dispatch Design<a class="headerlink" href="#dynamic-dispatch-design" title="Permalink to this headline"></a></h2>
+<p>Dynamic dispatch copies the kernel implementation source files to multiple folders for each ISA level. It then builds each file using its ISA specific parameters. Each generated object file will contain its function body (<strong>Kernel Implementation</strong>).</p>
+<p>Kernel Implementation uses an anonymous namespace so that different CPU versions won’t conflict.</p>
+<p><strong>Kernel Stub</strong> is a “virtual function” with polymorphic kernel implementations pertaining to ISA levels.</p>
+<p>At the runtime, <strong>Dispatch Stub implementation</strong> will check CPUIDs and OS status to determins which ISA level pointer best matches the function body.</p>
+<section id="code-folder-struct">
+<h3>Code Folder Struct<a class="headerlink" href="#code-folder-struct" title="Permalink to this headline"></a></h3>
+<section id="kernel-implementation-intel-extension-for-pytorch-csrc-aten-cpu-kernels-xyzkrnl-cpp">
+<h4><strong>Kernel implementation:</strong> <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch/csrc/aten/cpu/kernels/xyzKrnl.cpp</span></code><a class="headerlink" href="#kernel-implementation-intel-extension-for-pytorch-csrc-aten-cpu-kernels-xyzkrnl-cpp" title="Permalink to this headline"></a></h4>
+</section>
+<section id="kernel-stub-intel-extension-for-pytorch-csrc-aten-cpu-xyz-cpp-and-intel-extension-for-pytorch-csrc-aten-cpu-xyz-h">
+<h4><strong>Kernel Stub:</strong> <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch/csrc/aten/cpu/xyz.cpp</span></code> and <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch/csrc/aten/cpu/xyz.h</span></code><a class="headerlink" href="#kernel-stub-intel-extension-for-pytorch-csrc-aten-cpu-xyz-cpp-and-intel-extension-for-pytorch-csrc-aten-cpu-xyz-h" title="Permalink to this headline"></a></h4>
+</section>
+<section id="dispatch-stub-implementation-intel-extension-for-pytorch-csrc-dyndisp-dispatchstub-cpp-and-intel-extension-for-pytorch-csrc-dyndisp-dispatchstub-h">
+<h4><strong>Dispatch Stub implementation:</strong> <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.cpp</span></code> and <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h</span></code><a class="headerlink" href="#dispatch-stub-implementation-intel-extension-for-pytorch-csrc-dyndisp-dispatchstub-cpp-and-intel-extension-for-pytorch-csrc-dyndisp-dispatchstub-h" title="Permalink to this headline"></a></h4>
+</section>
+</section>
+<section id="codegen-process">
+<h3>CodeGen Process<a class="headerlink" href="#codegen-process" title="Permalink to this headline"></a></h3>
+<p>IPEX build system will generate code for each ISA level with specifiy complier parameters. The CodeGen script is located at <code class="docutils literal notranslate"><span class="pre">cmake/Codegen.cmake</span></code>.</p>
+<p>The CodeGen will copy each cpp files from <strong>Kernel implementation</strong>, and then add ISA level as new file suffix.</p>
+<blockquote>
+<div><p><strong>Sample:</strong></p>
+<hr class="docutils" />
+<p><strong>Origin file:</strong></p>
+<p><code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp</span></code></p>
+<p><strong>Generate files:</strong></p>
+<p>DEFAULT: <code class="docutils literal notranslate"><span class="pre">build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.DEFAULT.cpp</span> <span class="pre">-O3</span> <span class="pre">-D__AVX__</span> <span class="pre">-DCPU_CAPABILITY_AVX2</span> <span class="pre">-mavx2</span> <span class="pre">-mfma</span> <span class="pre">-mno-avx256-split-unaligned-load</span> <span class="pre">-mno-avx256-split-unaligned-store</span> <span class="pre">-DCPU_CAPABILITY=DEFAULT</span> <span class="pre">-DCPU_CAPABILITY_DEFAULT</span></code></p>
+<p>AVX2: <code class="docutils literal notranslate"><span class="pre">build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX2.cpp</span> <span class="pre">-O3</span> <span class="pre">-D__AVX__</span> <span class="pre">-mavx2</span> <span class="pre">-mfma</span> <span class="pre">-mno-avx256-split-unaligned-load</span> <span class="pre">-mno-avx256-split-unaligned-store</span> <span class="pre">-DCPU_CAPABILITY=AVX2</span> <span class="pre">-DCPU_CAPABILITY_AVX2</span></code></p>
+<p>AVX512: <code class="docutils literal notranslate"><span class="pre">build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512.cpp</span> <span class="pre">-O3</span> <span class="pre">-D__AVX512F__</span> <span class="pre">-mavx512f</span> <span class="pre">-mavx512bw</span> <span class="pre">-mavx512vl</span> <span class="pre">-mavx512dq</span> <span class="pre">-mfma</span> <span class="pre">-DCPU_CAPABILITY=AVX512</span> <span class="pre">-DCPU_CAPABILITY_AVX512</span></code></p>
+<p>AVX512_VNNI: <code class="docutils literal notranslate"><span class="pre">build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512_VNNI.cpp</span> <span class="pre">-O3</span> <span class="pre">-D__AVX512F__</span> <span class="pre">-DCPU_CAPABILITY_AVX512</span> <span class="pre">-mavx512f</span> <span class="pre">-mavx512bw</span> <span class="pre">-mavx512vl</span> <span class="pre">-mavx512dq</span> <span class="pre">-mavx512vnni</span> <span class="pre">-mfma</span> <span class="pre">-DCPU_CAPABILITY=AVX512_VNNI</span> <span class="pre">-DCPU_CAPABILITY_AVX512_VNNI</span></code></p>
+<p>AVX512_BF16: <code class="docutils literal notranslate"><span class="pre">build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512_BF16.cpp</span> <span class="pre">-O3</span> <span class="pre">-D__AVX512F__</span> <span class="pre">-DCPU_CAPABILITY_AVX512</span> <span class="pre">-DCPU_CAPABILITY_AVX512_VNNI</span> <span class="pre">-mavx512f</span> <span class="pre">-mavx512bw</span> <span class="pre">-mavx512vl</span> <span class="pre">-mavx512dq</span> <span class="pre">-mavx512vnni</span> <span class="pre">-mavx512bf16</span> <span class="pre">-mfma</span> <span class="pre">-DCPU_CAPABILITY=AVX512_BF16</span> <span class="pre">-DCPU_CAPABILITY_AVX512_BF16</span></code></p>
+<p>AMX: <code class="docutils literal notranslate"><span class="pre">build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.AMX.cpp</span> <span class="pre">-O3</span>&#160; <span class="pre">-D__AVX512F__</span> <span class="pre">-DCPU_CAPABILITY_AVX512</span> <span class="pre">-DCPU_CAPABILITY_AVX512_VNNI</span> <span class="pre">-DCPU_CAPABILITY_AVX512_BF16</span> <span class="pre">-mavx512f</span> <span class="pre">-mavx512bw</span> <span class="pre">-mavx512vl</span> <span class="pre">-mavx512dq</span> <span class="pre">-mavx512vnni</span> <span class="pre">-mavx512bf16</span> <span class="pre">-mfma</span> <span class="pre">-mamx-tile</span> <span class="pre">-mamx-int8</span> <span class="pre">-mamx-bf16</span> <span class="pre">-DCPU_CAPABILITY=AMX</span> <span class="pre">-DCPU_CAPABILITY_AMX</span></code></p>
+</div></blockquote>
+<hr class="docutils" />
+<blockquote>
+<div><p><strong>Note:</strong></p>
+<ol class="simple">
+<li><p>DEFAULT level kernels is not fully implemented in IPEX. In order to align to PyTorch, we build default use AVX2 parameters in stead of that. So, IPEX minimal required executing machine support AVX2.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-D__AVX__</span></code> and <code class="docutils literal notranslate"><span class="pre">-D__AVX512F__</span></code> is defined for depends library <a class="reference external" href="https://sleef.org/">sleef</a> .</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-DCPU_CAPABILITY_AVX512</span></code> and <code class="docutils literal notranslate"><span class="pre">-DCPU_CAPABILITY_AVX2</span></code> are must to be defined for <strong>PyTorch:</strong> <code class="docutils literal notranslate"><span class="pre">aten/src/ATen/cpu/vec</span></code>, it determins vec register width.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-DCPU_CAPABILITY=[ISA_NAME]</span></code> is must to be defined for <strong>PyTorch:</strong> <code class="docutils literal notranslate"><span class="pre">aten/src/ATen/cpu/vec</span></code>, it is used as inline namespace name.</p></li>
+<li><p>Higher ISA level is compatible to lower ISA levels, so it needs to contains level ISA feature definitions. Such as AVX512_BF16 need contains <code class="docutils literal notranslate"><span class="pre">-DCPU_CAPABILITY_AVX512</span></code> <code class="docutils literal notranslate"><span class="pre">-DCPU_CAPABILITY_AVX512_VNNI</span></code>. But AVX512 don’t contains AVX2 definitions, due to there are different vec register width.</p></li>
+</ol>
+</div></blockquote>
+</section>
+</section>
+<section id="add-custom-kernel">
+<h2>Add Custom Kernel<a class="headerlink" href="#add-custom-kernel" title="Permalink to this headline"></a></h2>
+<p>If you want to add a new custom kernel, and the kernel uses CPU ISA instructions, refer to these tips:</p>
+<ol class="simple">
+<li><p>Add CPU ISA related kernel implementation to the folder:  <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch/csrc/aten/cpu/kernels/NewKernelKrnl.cpp</span></code></p></li>
+<li><p>Add kernel stub to the folder: <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch/csrc/aten/cpu/NewKernel.cpp</span></code></p></li>
+<li><p>Include header file: <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h</span></code>, and reference to the comment in the header file.</p></li>
+</ol>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// Implements instruction set specific function dispatch.</span>
+<span class="c1">//</span>
+<span class="c1">// Kernels that may make use of specialized instruction sets (e.g. AVX2) are</span>
+<span class="c1">// compiled multiple times with different compiler flags (e.g. -mavx2). A</span>
+<span class="c1">// DispatchStub contains a table of function pointers for a kernel. At runtime,</span>
+<span class="c1">// the fastest available kernel is chosen based on the features reported by</span>
+<span class="c1">// cpuinfo.</span>
+<span class="c1">//</span>
+<span class="c1">// Example:</span>
+<span class="c1">//</span>
+<span class="c1">// In csrc/aten/cpu/MyKernel.h:</span>
+<span class="c1">//   using fn_type = void(*)(const Tensor&amp; x);</span>
+<span class="c1">//   DECLARE_DISPATCH(fn_type, stub);</span>
+<span class="c1">//</span>
+<span class="c1">// In csrc/aten/cpu/MyKernel.cpp</span>
+<span class="c1">//   DEFINE_DISPATCH(stub);</span>
+<span class="c1">//</span>
+<span class="c1">// In csrc/aten/cpu/kernels/MyKernel.cpp:</span>
+<span class="c1">//   namespace {</span>
+<span class="c1">//     // use anonymous namespace so that different cpu versions won&#39;t conflict</span>
+<span class="c1">//     void kernel(const Tensor&amp; x) { ... }</span>
+<span class="c1">//   }</span>
+<span class="c1">//   REGISTER_DISPATCH(stub, &amp;kernel);</span>
+<span class="c1">//</span>
+<span class="c1">// To call:</span>
+<span class="c1">//   stub(kCPU, tensor);</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>Write the kernel follow the guide. It contains: declare function type, register stub, call stub, etc.</p></li>
+</ol>
+<blockquote>
+<div><p><strong>Note:</strong></p>
+<ol class="simple">
+<li><p>Some kernels only call <strong>oneDNN</strong> or <strong>iDeep</strong> implementation, or other backend implementation, which is not needed to add kernel implementations. (Refer: <code class="docutils literal notranslate"><span class="pre">BatchNorm.cpp</span></code>)</p></li>
+<li><p>Vec related header file must be included in kernel implementation files, but can not be included in kernel stub. Kernel stub is common code for all ISA level, and can’t pass ISA related compiler parameters.</p></li>
+<li><p>For more intrinsics, check the <a class="reference external" href="https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html">Intel® Intrinsics Guide</a>.</p></li>
+</ol>
+</div></blockquote>
+<section id="isa-intrinics-specific-kernel-example">
+<h3>ISA intrinics specific kernel example:<a class="headerlink" href="#isa-intrinics-specific-kernel-example" title="Permalink to this headline"></a></h3>
+<p>This is a FP32 convert to BF16 function example, and it is implemented for <code class="docutils literal notranslate"><span class="pre">AVX512_BF16</span></code>, <code class="docutils literal notranslate"><span class="pre">AVX512</span></code> and <code class="docutils literal notranslate"><span class="pre">DEFAULT</span></code> ISA levels.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">//csrc/aten/cpu/CvtFp32ToBf16.h</span>
+
+<span class="cp">#pragma once</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h&quot;</span><span class="cp"></span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_ipex</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">cpu</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">cvt_fp32_to_bf16</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">BFloat16</span><span class="o">*</span><span class="w"> </span><span class="n">dst</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">float</span><span class="o">*</span><span class="w"> </span><span class="n">src</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">len</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">cvt_fp32_to_bf16_kernel_impl</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">BFloat16</span><span class="o">*</span><span class="w"> </span><span class="n">dst</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">float</span><span class="o">*</span><span class="w"> </span><span class="n">src</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">len</span><span class="p">);</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"></span>
+
+<span class="k">using</span><span class="w"> </span><span class="n">cvt_fp32_to_bf16_kernel_fn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="p">)(</span><span class="n">at</span><span class="o">::</span><span class="n">BFloat16</span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">float</span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">);</span><span class="w"></span>
+<span class="n">DECLARE_DISPATCH</span><span class="p">(</span><span class="n">cvt_fp32_to_bf16_kernel_fn</span><span class="p">,</span><span class="w"> </span><span class="n">cvt_fp32_to_bf16_kernel_stub</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace cpu</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch_ipex</span>
+</pre></div>
+</div>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">//csrc/aten/cpu/CvtFp32ToBf16.cpp</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;CvtFp32ToBf16.h&quot;</span><span class="cp"></span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_ipex</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">cpu</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="n">DEFINE_DISPATCH</span><span class="p">(</span><span class="n">cvt_fp32_to_bf16_kernel_stub</span><span class="p">);</span><span class="w"></span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">cvt_fp32_to_bf16</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">BFloat16</span><span class="o">*</span><span class="w"> </span><span class="n">dst</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">float</span><span class="o">*</span><span class="w"> </span><span class="n">src</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">len</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">cvt_fp32_to_bf16_kernel_stub</span><span class="p">(</span><span class="n">kCPU</span><span class="p">,</span><span class="w"> </span><span class="n">dst</span><span class="p">,</span><span class="w"> </span><span class="n">src</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace cpu</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch_ipex</span>
+</pre></div>
+</div>
+<p>Macro <code class="docutils literal notranslate"><span class="pre">CPU_CAPABILITY_AVX512</span></code> and <code class="docutils literal notranslate"><span class="pre">CPU_CAPABILITY_AVX512_BF16</span></code> are defined by compiler check, it is means that current compiler havs capability to generate defined ISA level code.</p>
+<p>Because of <code class="docutils literal notranslate"><span class="pre">AVX512_BF16</span></code> is higher level than <code class="docutils literal notranslate"><span class="pre">AVX512</span></code>, and it compatible to <code class="docutils literal notranslate"><span class="pre">AVX512</span></code>. <code class="docutils literal notranslate"><span class="pre">CPU_CAPABILITY_AVX512_BF16</span></code> can be contained in <code class="docutils literal notranslate"><span class="pre">CPU_CAPABILITY_AVX512</span></code> region.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">//csrc/aten/cpu/kernels/CvtFp32ToBf16Krnl.cpp</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;ATen/cpu/vec/vec.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;csrc/aten/cpu/CvtFp32ToBf16.h&quot;</span><span class="cp"></span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_ipex</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">cpu</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="cp">#if defined(CPU_CAPABILITY_AVX512)</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;ATen/cpu/vec/vec512/vec512.h&gt;</span><span class="cp"></span>
+<span class="cp">#else</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;ATen/cpu/vec/vec256/vec256.h&gt;</span><span class="cp"></span>
+<span class="cp">#endif</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">at</span><span class="o">::</span><span class="nn">vec</span><span class="p">;</span><span class="w"></span>
+
+<span class="cp">#if defined(CPU_CAPABILITY_AVX512)</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;immintrin.h&gt;</span><span class="cp"></span>
+
+<span class="kr">inline</span><span class="w"> </span><span class="n">__m256i</span><span class="w"> </span><span class="nf">_cvt_fp32_to_bf16</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">__m512</span><span class="w"> </span><span class="n">src</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="cp">#if (defined CPU_CAPABILITY_AVX512_BF16) </span><span class="c1">// AVX512_BF16 ISA implementation.</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="k">reinterpret_cast</span><span class="o">&lt;</span><span class="n">__m256i</span><span class="o">&gt;</span><span class="p">(</span><span class="n">_mm512_cvtneps_pbh</span><span class="p">(</span><span class="n">src</span><span class="p">));</span><span class="w"></span>
+<span class="cp">#else  </span><span class="c1">// AVX512 ISA implementation.</span>
+<span class="w">  </span><span class="n">__m512i</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm512_castps_si512</span><span class="p">(</span><span class="n">src</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="n">__m512i</span><span class="w"> </span><span class="n">nan</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm512_set1_epi32</span><span class="p">(</span><span class="mh">0xffff</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">mask_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm512_cmp_ps_mask</span><span class="p">(</span><span class="n">src</span><span class="p">,</span><span class="w"> </span><span class="n">src</span><span class="p">,</span><span class="w"> </span><span class="n">_CMP_ORD_Q</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="n">__m512i</span><span class="w"> </span><span class="n">ones</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm512_set1_epi32</span><span class="p">(</span><span class="mh">0x1</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="n">__m512i</span><span class="w"> </span><span class="n">vec_bias</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm512_set1_epi32</span><span class="p">(</span><span class="mh">0x7fff</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="c1">// uint32_t lsb = (input &gt;&gt; 16) &amp; 1;</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">t_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm512_and_si512</span><span class="p">(</span><span class="n">_mm512_srli_epi32</span><span class="p">(</span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">),</span><span class="w"> </span><span class="n">ones</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="c1">// uint32_t rounding_bias = 0x7fff + lsb;</span>
+<span class="w">  </span><span class="n">t_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm512_add_epi32</span><span class="p">(</span><span class="n">t_value</span><span class="p">,</span><span class="w"> </span><span class="n">vec_bias</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="c1">// input += rounding_bias;</span>
+<span class="w">  </span><span class="n">t_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm512_add_epi32</span><span class="p">(</span><span class="n">t_value</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="c1">// input = input &gt;&gt; 16;</span>
+<span class="w">  </span><span class="n">t_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm512_srli_epi32</span><span class="p">(</span><span class="n">t_value</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="c1">// Check NaN before converting back to bf16</span>
+<span class="w">  </span><span class="n">t_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm512_mask_blend_epi32</span><span class="p">(</span><span class="n">mask_value</span><span class="p">,</span><span class="w"> </span><span class="n">nan</span><span class="p">,</span><span class="w"> </span><span class="n">t_value</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">_mm512_cvtusepi32_epi16</span><span class="p">(</span><span class="n">t_value</span><span class="p">);</span><span class="w"></span>
+<span class="cp">#endif</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">cvt_fp32_to_bf16_kernel_impl</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="n">at</span><span class="o">::</span><span class="n">BFloat16</span><span class="o">*</span><span class="w"> </span><span class="n">dst</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">float</span><span class="o">*</span><span class="w"> </span><span class="n">src</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">len</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">len</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">15</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">16</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">f32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm512_loadu_ps</span><span class="p">(</span><span class="n">src</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">i</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">_mm256_storeu_si256</span><span class="p">((</span><span class="n">__m256i</span><span class="o">*</span><span class="p">)(</span><span class="n">dst</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">i</span><span class="p">),</span><span class="w"> </span><span class="n">_cvt_fp32_to_bf16</span><span class="p">(</span><span class="n">f32</span><span class="p">));</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">len</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="p">(</span><span class="n">len</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">i</span><span class="p">))</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">f32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm512_maskz_loadu_ps</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span><span class="w"> </span><span class="n">src</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">i</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">_mm256_mask_storeu_epi16</span><span class="p">(</span><span class="n">dst</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">mask</span><span class="p">,</span><span class="w"> </span><span class="n">_cvt_fp32_to_bf16</span><span class="p">(</span><span class="n">f32</span><span class="p">));</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cp">#else </span><span class="c1">// DEFAULT ISA implementation.</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">cvt_fp32_to_bf16_kernel_impl</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="n">at</span><span class="o">::</span><span class="n">BFloat16</span><span class="o">*</span><span class="w"> </span><span class="n">dst</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">float</span><span class="o">*</span><span class="w"> </span><span class="n">src</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">len</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">len</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="o">*</span><span class="p">(</span><span class="n">dst</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">j</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="p">(</span><span class="n">src</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">j</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cp">#endif</span>
+
+<span class="p">}</span><span class="w"> </span><span class="c1">// anonymous namespace</span>
+
+<span class="n">REGISTER_DISPATCH</span><span class="p">(</span><span class="n">cvt_fp32_to_bf16_kernel_stub</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cvt_fp32_to_bf16_kernel_impl</span><span class="p">);</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace cpu</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch_ipex</span>
+</pre></div>
+</div>
+</section>
+<section id="vec-specific-kernel-example">
+<h3>Vec specific kernel example:<a class="headerlink" href="#vec-specific-kernel-example" title="Permalink to this headline"></a></h3>
+<p>This example shows how to get the data type size and its Vec size. In different ISA, Vec has a different register width and a different Vec size.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">//csrc/aten/cpu/GetVecLength.h</span>
+<span class="cp">#pragma once</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h&quot;</span><span class="cp"></span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_ipex</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">cpu</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="n">std</span><span class="o">::</span><span class="n">tuple</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">get_cpp_typesize_and_vecsize</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="w"> </span><span class="n">dtype</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="n">std</span><span class="o">::</span><span class="n">tuple</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">get_cpp_typesize_and_vecsize_kernel_impl</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="w"> </span><span class="n">dtype</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="k">using</span><span class="w"> </span><span class="n">get_cpp_typesize_and_vecsize_kernel_fn</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">tuple</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="p">)(</span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="p">);</span><span class="w"></span>
+<span class="n">DECLARE_DISPATCH</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="n">get_cpp_typesize_and_vecsize_kernel_fn</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="n">get_cpp_typesize_and_vecsize_kernel_stub</span><span class="p">);</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace cpu</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch_ipex</span>
+</pre></div>
+</div>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">//csrc/aten/cpu/GetVecLength.cpp</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;GetVecLength.h&quot;</span><span class="cp"></span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_ipex</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">cpu</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="n">DEFINE_DISPATCH</span><span class="p">(</span><span class="n">get_cpp_typesize_and_vecsize_kernel_stub</span><span class="p">);</span><span class="w"></span>
+
+<span class="c1">// get cpp typesize and vectorsize by at::ScalarType</span>
+<span class="n">std</span><span class="o">::</span><span class="n">tuple</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">get_cpp_typesize_and_vecsize</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="w"> </span><span class="n">dtype</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">get_cpp_typesize_and_vecsize_kernel_stub</span><span class="p">(</span><span class="n">kCPU</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace cpu</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch_ipex</span>
+</pre></div>
+</div>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">//csrc/aten/cpu/kernels/GetVecLengthKrnl.cpp</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;ATen/cpu/vec/vec.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;csrc/aten/cpu/GetVecLength.h&quot;</span><span class="cp"></span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_ipex</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">cpu</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="n">std</span><span class="o">::</span><span class="n">tuple</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">get_cpp_typesize_and_vecsize_kernel_impl</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="w"> </span><span class="n">dtype</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="o">::</span><span class="nl">Double</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_tuple</span><span class="p">(</span><span class="w"></span>
+<span class="w">          </span><span class="k">sizeof</span><span class="p">(</span><span class="kt">double</span><span class="p">),</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">vec</span><span class="o">::</span><span class="n">Vectorized</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;::</span><span class="n">size</span><span class="p">());</span><span class="w"></span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="o">::</span><span class="nl">Float</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_tuple</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="kt">float</span><span class="p">),</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">vec</span><span class="o">::</span><span class="n">Vectorized</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;::</span><span class="n">size</span><span class="p">());</span><span class="w"></span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="o">::</span><span class="nl">ComplexDouble</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_tuple</span><span class="p">(</span><span class="w"></span>
+<span class="w">          </span><span class="k">sizeof</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">complex</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">),</span><span class="w"></span>
+<span class="w">          </span><span class="n">at</span><span class="o">::</span><span class="n">vec</span><span class="o">::</span><span class="n">Vectorized</span><span class="o">&lt;</span><span class="n">c10</span><span class="o">::</span><span class="n">complex</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;&gt;::</span><span class="n">size</span><span class="p">());</span><span class="w"></span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="o">::</span><span class="nl">ComplexFloat</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_tuple</span><span class="p">(</span><span class="w"></span>
+<span class="w">          </span><span class="k">sizeof</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">complex</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">),</span><span class="w"></span>
+<span class="w">          </span><span class="n">at</span><span class="o">::</span><span class="n">vec</span><span class="o">::</span><span class="n">Vectorized</span><span class="o">&lt;</span><span class="n">c10</span><span class="o">::</span><span class="n">complex</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;&gt;::</span><span class="n">size</span><span class="p">());</span><span class="w"></span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="o">::</span><span class="nl">BFloat16</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_tuple</span><span class="p">(</span><span class="w"></span>
+<span class="w">          </span><span class="k">sizeof</span><span class="p">(</span><span class="k">decltype</span><span class="p">(</span><span class="w"></span>
+<span class="w">              </span><span class="n">c10</span><span class="o">::</span><span class="n">impl</span><span class="o">::</span><span class="n">ScalarTypeToCPPType</span><span class="o">&lt;</span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="o">::</span><span class="n">BFloat16</span><span class="o">&gt;::</span><span class="n">t</span><span class="p">)),</span><span class="w"></span>
+<span class="w">          </span><span class="n">at</span><span class="o">::</span><span class="n">vec</span><span class="o">::</span><span class="n">Vectorized</span><span class="o">&lt;</span><span class="k">decltype</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">impl</span><span class="o">::</span><span class="n">ScalarTypeToCPPType</span><span class="o">&lt;</span><span class="w"></span>
+<span class="w">                                       </span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="o">::</span><span class="n">BFloat16</span><span class="o">&gt;::</span><span class="n">t</span><span class="p">)</span><span class="o">&gt;::</span><span class="n">size</span><span class="p">());</span><span class="w"></span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="o">::</span><span class="nl">Half</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_tuple</span><span class="p">(</span><span class="w"></span>
+<span class="w">          </span><span class="k">sizeof</span><span class="p">(</span><span class="k">decltype</span><span class="p">(</span><span class="w"></span>
+<span class="w">              </span><span class="n">c10</span><span class="o">::</span><span class="n">impl</span><span class="o">::</span><span class="n">ScalarTypeToCPPType</span><span class="o">&lt;</span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="o">::</span><span class="n">Half</span><span class="o">&gt;::</span><span class="n">t</span><span class="p">)),</span><span class="w"></span>
+<span class="w">          </span><span class="n">at</span><span class="o">::</span><span class="n">vec</span><span class="o">::</span><span class="n">Vectorized</span><span class="o">&lt;</span><span class="k">decltype</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">impl</span><span class="o">::</span><span class="n">ScalarTypeToCPPType</span><span class="o">&lt;</span><span class="w"></span>
+<span class="w">                                       </span><span class="n">at</span><span class="o">::</span><span class="n">ScalarType</span><span class="o">::</span><span class="n">Half</span><span class="o">&gt;::</span><span class="n">t</span><span class="p">)</span><span class="o">&gt;::</span><span class="n">size</span><span class="p">());</span><span class="w"></span>
+<span class="w">    </span><span class="k">default</span><span class="o">:</span><span class="w"></span>
+<span class="w">      </span><span class="n">TORCH_CHECK</span><span class="p">(</span><span class="w"></span>
+<span class="w">          </span><span class="nb">false</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s">&quot;Currently only floating and complex ScalarType are supported.&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"> </span><span class="c1">// anonymous namespace</span>
+
+<span class="n">REGISTER_DISPATCH</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="n">get_cpp_typesize_and_vecsize_kernel_stub</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="o">&amp;</span><span class="n">get_cpp_typesize_and_vecsize_kernel_impl</span><span class="p">);</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace cpu</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch_ipex</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="private-debug-apis">
+<h2>Private Debug APIs<a class="headerlink" href="#private-debug-apis" title="Permalink to this headline"></a></h2>
+<p>Here are three ISA-related private APIs that can help debugging::</p>
+<ol class="simple">
+<li><p>Query current ISA level.</p></li>
+<li><p>Query max CPU supported ISA level.</p></li>
+<li><p>Query max binary supported ISA level.</p></li>
+</ol>
+<blockquote>
+<div><p><strong>Note:</strong></p>
+<ol class="simple">
+<li><p>Max CPU supported ISA level only depends on CPU features.</p></li>
+<li><p>Max binary supported ISA level only depends on built complier version.</p></li>
+<li><p>Current ISA level, it is the smaller of <code class="docutils literal notranslate"><span class="pre">max</span> <span class="pre">CPU</span> <span class="pre">ISA</span> <span class="pre">level</span></code> and <code class="docutils literal notranslate"><span class="pre">max</span> <span class="pre">binary</span> <span class="pre">ISA</span> <span class="pre">level</span></code>.</p></li>
+</ol>
+</div></blockquote>
+<section id="example">
+<h3>Example:<a class="headerlink" href="#example" title="Permalink to this headline"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python
+Python <span class="m">3</span>.9.7 <span class="o">(</span>default, Sep <span class="m">16</span> <span class="m">2021</span>, <span class="m">13</span>:09:58<span class="o">)</span>
+<span class="o">[</span>GCC <span class="m">7</span>.5.0<span class="o">]</span> :: Anaconda, Inc. on linux
+Type <span class="s2">&quot;help&quot;</span>, <span class="s2">&quot;copyright&quot;</span>, <span class="s2">&quot;credits&quot;</span> or <span class="s2">&quot;license&quot;</span> <span class="k">for</span> more information.
+&gt;&gt;&gt; import intel_extension_for_pytorch._C as core
+&gt;&gt;&gt; core._get_current_isa_level<span class="o">()</span>
+<span class="s1">&#39;AMX&#39;</span>
+&gt;&gt;&gt; core._get_highest_cpu_support_isa_level<span class="o">()</span>
+<span class="s1">&#39;AMX&#39;</span>
+&gt;&gt;&gt; core._get_highest_binary_support_isa_level<span class="o">()</span>
+<span class="s1">&#39;AMX&#39;</span>
+&gt;&gt;&gt; quit<span class="o">()</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="select-isa-level-manually">
+<h2>Select ISA level manually.<a class="headerlink" href="#select-isa-level-manually" title="Permalink to this headline"></a></h2>
+<p>By default, IPEX dispatches to the kernels with the maximum ISA level supported by the underlying CPU hardware. This ISA level can be overridden by the environment variable <code class="docutils literal notranslate"><span class="pre">ATEN_CPU_CAPABILITY</span></code> (same environment variable as PyTorch). The available values are {<code class="docutils literal notranslate"><span class="pre">avx2</span></code>, <code class="docutils literal notranslate"><span class="pre">avx512</span></code>, <code class="docutils literal notranslate"><span class="pre">avx512_vnni</span></code>, <code class="docutils literal notranslate"><span class="pre">avx512_bf16</span></code>, <code class="docutils literal notranslate"><span class="pre">amx</span></code>}. The effective ISA level would be the minimal level between <code class="docutils literal notranslate"><span class="pre">ATEN_CPU_CAPABILITY</span></code> and the maximum level supported by the hardware.</p>
+<section id="id1">
+<h3>Example:<a class="headerlink" href="#id1" title="Permalink to this headline"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ python -c <span class="s1">&#39;import intel_extension_for_pytorch._C as core;print(core._get_current_isa_level())&#39;</span>
+AMX
+$ <span class="nv">ATEN_CPU_CAPABILITY</span><span class="o">=</span>avx2 python -c <span class="s1">&#39;import intel_extension_for_pytorch._C as core;print(core._get_current_isa_level())&#39;</span>
+AVX2
+</pre></div>
+</div>
+<blockquote>
+<div><p><strong>Note:</strong></p>
+<p><code class="docutils literal notranslate"><span class="pre">core._get_current_isa_level()</span></code> is an IPEX internal function used for checking the current effective ISA level. It is used for debugging purpose only and subject to change.</p>
+</div></blockquote>
+</section>
+</section>
+<section id="cpu-feature-check">
+<h2>CPU feature check<a class="headerlink" href="#cpu-feature-check" title="Permalink to this headline"></a></h2>
+<p>An addtional CPU feature check tool in the subfolder: <code class="docutils literal notranslate"><span class="pre">tests/cpu/isa</span></code></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ cmake .
+-- The C compiler identification is GNU <span class="m">11</span>.2.1
+-- The CXX compiler identification is GNU <span class="m">11</span>.2.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - <span class="k">done</span>
+-- Check <span class="k">for</span> working C compiler: /opt/rh/gcc-toolset-11/root/usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - <span class="k">done</span>
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - <span class="k">done</span>
+-- Check <span class="k">for</span> working CXX compiler: /opt/rh/gcc-toolset-11/root/usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - <span class="k">done</span>
+-- Configuring <span class="k">done</span>
+-- Generating <span class="k">done</span>
+-- Build files have been written to: tests/cpu/isa
+$ make
+<span class="o">[</span> <span class="m">33</span>%<span class="o">]</span> Building CXX object CMakeFiles/cpu_features.dir/intel_extension_for_pytorch/csrc/cpu/isa/cpu_feature.cpp.o
+<span class="o">[</span> <span class="m">66</span>%<span class="o">]</span> Building CXX object CMakeFiles/cpu_features.dir/intel_extension_for_pytorch/csrc/cpu/isa/cpu_feature_main.cpp.o
+<span class="o">[</span><span class="m">100</span>%<span class="o">]</span> Linking CXX executable cpu_features
+<span class="o">[</span><span class="m">100</span>%<span class="o">]</span> Built target cpu_features
+$ ./cpu_features
+XCR0: 00000000000602e7
+os --&gt; avx: <span class="nb">true</span>
+os --&gt; avx2: <span class="nb">true</span>
+os --&gt; avx512: <span class="nb">true</span>
+os --&gt; amx: <span class="nb">true</span>
+mmx:                    <span class="nb">true</span>
+sse:                    <span class="nb">true</span>
+sse2:                   <span class="nb">true</span>
+sse3:                   <span class="nb">true</span>
+ssse3:                  <span class="nb">true</span>
+sse4_1:                 <span class="nb">true</span>
+sse4_2:                 <span class="nb">true</span>
+aes_ni:                 <span class="nb">true</span>
+sha:                    <span class="nb">true</span>
+xsave:                  <span class="nb">true</span>
+fma:                    <span class="nb">true</span>
+f16c:                   <span class="nb">true</span>
+avx:                    <span class="nb">true</span>
+avx2:                   <span class="nb">true</span>
+avx_vnni:                       <span class="nb">true</span>
+avx512_f:                       <span class="nb">true</span>
+avx512_cd:                      <span class="nb">true</span>
+avx512_pf:                      <span class="nb">false</span>
+avx512_er:                      <span class="nb">false</span>
+avx512_vl:                      <span class="nb">true</span>
+avx512_bw:                      <span class="nb">true</span>
+avx512_dq:                      <span class="nb">true</span>
+avx512_ifma:                    <span class="nb">true</span>
+avx512_vbmi:                    <span class="nb">true</span>
+avx512_vpopcntdq:                       <span class="nb">true</span>
+avx512_4fmaps:                  <span class="nb">false</span>
+avx512_4vnniw:                  <span class="nb">false</span>
+avx512_vbmi2:                   <span class="nb">true</span>
+avx512_vpclmul:                 <span class="nb">true</span>
+avx512_vnni:                    <span class="nb">true</span>
+avx512_bitalg:                  <span class="nb">true</span>
+avx512_fp16:                    <span class="nb">true</span>
+avx512_bf16:                    <span class="nb">true</span>
+avx512_vp2intersect:                    <span class="nb">true</span>
+amx_bf16:                       <span class="nb">true</span>
+amx_tile:                       <span class="nb">true</span>
+amx_int8:                       <span class="nb">true</span>
+prefetchw:                      <span class="nb">true</span>
+prefetchwt1:                    <span class="nb">false</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
