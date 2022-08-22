@@ -163,20 +163,20 @@ class TestTorchMethod(TestCase):
 
 ## RUN the Whole Test Suite
 
-* run the python script under `tests/gpu/pytorch` like:
+* run the python script under `tests/gpu/experimental` like:
 
 ```
-python tests/gpu/pytorch/run_tests.py [--options opts]
+python tests/gpu/experimental/run_tests.py [--options opts]
 ```
 
-* the default log file is under `tests/gpu/pytorch/logs/raw_logs`.
+* the default log file is under `tests/gpu/experimental/logs/raw_logs`.
 
 ## Get the usage of options
 
 * run the python script with `--help` like:
 
 ```
-python tests/gpu/pytorch/run_tests.py --help
+python tests/gpu/experimental/run_tests.py --help
 ```
 
 * you may see decriptions of options like:
@@ -215,8 +215,8 @@ optional arguments:
 * you can run the whole tests with time threshold, multi-epoches and auto skip core dumped or hang cases like:
 
 ```
-python tests_gpu_pytorch/run_tests.py --clean
-python tests/gpu/pytorch/run_tests.py -c 3 -t 3600 --autoskip --quiet
+python tests/gpu/experimental/run_tests.py --clean
+python tests/gpu/experimental/run_tests.py -c 3 -t 3600 --autoskip --quiet
 ```
 
 ## SKIP ONE Specific Test
@@ -227,20 +227,20 @@ python tests/gpu/pytorch/run_tests.py -c 3 -t 3600 --autoskip --quiet
 
 ## USE the UT Analyzer to get analysis data
 
-* run python script `ut_analyzer.py` under `tests/gpu/pytorch/common` like:
+* run python script `ut_analyzer.py` under `tests/gpu/experimental/common` like:
 
 ```
-python tests/gpu/pytorch/common/ut_analyzer.py [--options opts]
+python tests/gpu/experimental/common/ut_analyzer.py [--options opts]
 ```
 
-* this analyzer will output a summary of result like pass rate, fail rate, etc. And also it will dump out detailed log list for each classified field under `tests/gpu/pytorch/logs/anls_logs` as well.
+* this analyzer will output a summary of result like pass rate, fail rate, etc. And also it will dump out detailed log list for each classified field under `tests/gpu/experimental/logs/anls_logs` as well.
 
 ## Get the usage of options
 
 * run the python script with `--help` like:
 
 ```
-python tests/gpu/pytorch/common/ut_analyzer.py --help
+python tests/gpu/experimental/common/ut_analyzer.py --help
 ```
 
 * you may see decriptions of options like:
