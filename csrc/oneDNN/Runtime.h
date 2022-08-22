@@ -118,7 +118,8 @@ struct GpuStreamManager {
 
  private:
 #ifdef USE_PERSIST_STREAM
-  // For each device, we have 1 default queue + 32 (QueuePerPool) reserved queues.
+  // For each device, we have 1 default queue + 32 (QueuePerPool) reserved
+  // queues.
   std::vector<std::array<std::shared_ptr<dnnl::stream>, QueuePerPool + 1>>
       stream_pool;
 #endif
