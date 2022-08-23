@@ -360,7 +360,7 @@ def record_input_shape_for_prepack(module, sample_input):
         self.input_shape = input[0].shape
 
     def register_hook_function(module):
-        if type(module) in [torch.nn.Linear, torch.nn.Conv2d, torch.nn.ConvTranspose2d]:
+        if type(module) in [torch.nn.Linear, torch.nn.Conv1d, torch.nn.Conv2d, torch.nn.ConvTranspose2d]:
             module.register_forward_pre_hook(hook_function)
 
     def register_hook_function_rec(module):

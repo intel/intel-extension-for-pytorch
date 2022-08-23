@@ -51,11 +51,11 @@ class TestPrepackCases(TestCase):
         elif dim == 3:
             channels_last = torch.channels_last_3d
         if dim == 1:
-            options = itertools.product([True, False], [1, 2], [1, 4], [torch.contiguous_format])
+            options = itertools.product([True, False], [1, 2], [1, 4], [True, False], [torch.contiguous_format])
         else:
-            options = itertools.product([True, False], [1, 2], [1, 4], [torch.contiguous_format, channels_last])
+            options = itertools.product([True, False], [1, 2], [1, 4], [True, False], [torch.contiguous_format, channels_last])
 
-        for bias, dilation, groups, memory_format in options:
+        for bias, dilation, groups, feed_sample_input, memory_format in options:
             N = torch.randint(3, 10, (1,)).item()
             M = torch.randint(1, 3, (1,)).item() * groups
             C = torch.randint(1, 3, (1,)).item() * groups
@@ -73,7 +73,10 @@ class TestPrepackCases(TestCase):
                 groups=groups).float().eval()
             model = model.to(memory_format=memory_format)
             x = x.to(memory_format=memory_format)
-            ipex_model = ipex.optimize(model, dtype=torch.float32, level='O1')
+            if feed_sample_input:
+                ipex_model = ipex.optimize(model, dtype=torch.float32, level='O1', sample_input=x)
+            else:
+                ipex_model = ipex.optimize(model, dtype=torch.float32, level='O1')
             y_ipex = ipex_model(x)
             y = model(x)
             self.assertEqual(y, y_ipex)
