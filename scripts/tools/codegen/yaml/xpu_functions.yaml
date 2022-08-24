@@ -249,6 +249,7 @@ supported:
   - hardshrink
   - hardshrink.out
   - hardshrink_backward
+  - hardshrink_backward.grad_input
   - hardswish
   - hardswish.out
   - hardswish_

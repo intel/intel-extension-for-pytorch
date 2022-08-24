@@ -671,17 +671,17 @@ Tensor hardshrink(const Tensor& self, const Scalar& lambd) {
   return hardshrink_out(self, lambd, result);
 }
 
-Tensor hardshrink_backward(
+Tensor& hardshrink_backward_out(
     const Tensor& grad,
     const Tensor& self,
-    const Scalar& lambd) {
-  auto result = at::empty_like(grad);
-  auto iter = TensorIterator::binary_op(result, grad, self);
+    const Scalar& lambd,
+    Tensor& grad_input) {
+  auto iter = TensorIterator::binary_op(grad_input, grad, self);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       iter.dtype(),
-      "hardshrink_backward",
+      "hardshrink_backward_out",
       [&]() {
         auto _lambd = lambd.to<scalar_t>();
         dpcpp_kernel_for_tensor_iter(
@@ -689,7 +689,15 @@ Tensor hardshrink_backward(
               return (x >= -_lambd && x <= _lambd) ? scalar_t(0) : grad_output;
             });
       });
-  return result;
+  return grad_input;
+}
+
+Tensor hardshrink_backward(
+    const Tensor& grad,
+    const Tensor& self,
+    const Scalar& lambd) {
+  auto result = at::empty_like(grad);
+  return hardshrink_backward_out(grad, self, lambd, result);
 }
 
 Tensor& hardswish_out(const Tensor& self, Tensor& result) {
