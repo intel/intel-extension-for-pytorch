@@ -186,9 +186,11 @@ int64_t mkl_getri_scratchpad(
     int64_t lda,
     int64_t stride_a,
     int64_t stride_ipiv,
+    int64_t ldainv,
+    int64_t stride_ainv,
     int64_t batch_size) {
   return oneapi::mkl::lapack::getri_batch_scratchpad_size<scalar_t>(
-      queue, n, lda, stride_a, stride_ipiv, batch_size);
+      queue, n, lda, stride_a, stride_ipiv, ldainv, stride_ainv, batch_size);
 }
 
 template <>
@@ -198,9 +200,11 @@ int64_t mkl_getri_scratchpad<c10::complex<double>>(
     int64_t lda,
     int64_t stride_a,
     int64_t stride_ipiv,
+    int64_t ldainv,
+    int64_t stride_ainv,
     int64_t batch_size) {
   return oneapi::mkl::lapack::getri_batch_scratchpad_size<std::complex<double>>(
-      queue, n, lda, stride_a, stride_ipiv, batch_size);
+      queue, n, lda, stride_a, stride_ipiv, ldainv, stride_ainv, batch_size);
 }
 
 template <>
@@ -210,9 +214,11 @@ int64_t mkl_getri_scratchpad<c10::complex<float>>(
     int64_t lda,
     int64_t stride_a,
     int64_t stride_ipiv,
+    int64_t ldainv,
+    int64_t stride_ainv,
     int64_t batch_size) {
   return oneapi::mkl::lapack::getri_batch_scratchpad_size<std::complex<float>>(
-      queue, n, lda, stride_a, stride_ipiv, batch_size);
+      queue, n, lda, stride_a, stride_ipiv, ldainv, stride_ainv, batch_size);
 }
 
 template <typename scalar_t>
@@ -422,6 +428,9 @@ void mkl_getri(
     int64_t stride_a,
     int64_t* ipiv,
     int64_t stride_ipiv,
+    scalar_t* ainv,
+    int64_t ldainv,
+    int64_t stride_ainv,
     int64_t batch_size,
     scalar_t* scratchpad,
     int64_t scratchpad_size) {
@@ -435,6 +444,9 @@ void mkl_getri(
       stride_a,
       ipiv,
       stride_ipiv,
+      ainv,
+      ldainv,
+      stride_ainv,
       batch_size,
       scratchpad,
       scratchpad_size);
@@ -449,6 +461,9 @@ void mkl_getri<c10::complex<double>>(
     int64_t stride_a,
     int64_t* ipiv,
     int64_t stride_ipiv,
+    c10::complex<double>* ainv,
+    int64_t ldainv,
+    int64_t stride_ainv,
     int64_t batch_size,
     c10::complex<double>* scratchpad,
     int64_t scratchpad_size) {
@@ -462,6 +477,9 @@ void mkl_getri<c10::complex<double>>(
       stride_a,
       ipiv,
       stride_ipiv,
+      reinterpret_cast<std::complex<double>*>(ainv),
+      ldainv,
+      stride_ainv,
       batch_size,
       reinterpret_cast<std::complex<double>*>(scratchpad),
       scratchpad_size);
@@ -476,6 +494,9 @@ void mkl_getri<c10::complex<float>>(
     int64_t stride_a,
     int64_t* ipiv,
     int64_t stride_ipiv,
+    c10::complex<float>* ainv,
+    int64_t ldainv,
+    int64_t stride_ainv,
     int64_t batch_size,
     c10::complex<float>* scratchpad,
     int64_t scratchpad_size) {
@@ -489,6 +510,9 @@ void mkl_getri<c10::complex<float>>(
       stride_a,
       ipiv,
       stride_ipiv,
+      reinterpret_cast<std::complex<float>*>(ainv),
+      ldainv,
+      stride_ainv,
       batch_size,
       reinterpret_cast<std::complex<float>*>(scratchpad),
       scratchpad_size);
@@ -854,7 +878,9 @@ static void apply_lu_solve_dpcpp_(
 }
 
 template <typename scalar_t>
-static void apply_inverse_dpcpp_(Tensor& self_, std::vector<int64_t>& infos_) {
+static Tensor apply_inverse_dpcpp_(
+    Tensor& self_,
+    std::vector<int64_t>& infos_) {
 #ifdef USE_ONEMKL
   auto req_size = self_.sizes().vec();
   req_size.pop_back();
@@ -869,11 +895,13 @@ static void apply_inverse_dpcpp_(Tensor& self_, std::vector<int64_t>& infos_) {
   int64_t stride_a = native::matrixStride(self_);
   int64_t stride_ipiv = pivots_.size(-1);
 
+  Tensor output = at::empty_like(self_);
   scalar_t* a = (scalar_t*)(self_.data_ptr());
   int64_t* ipiv = (int64_t*)(pivots_.data_ptr());
+  scalar_t* ainv = (scalar_t*)(output.data_ptr());
 
   int64_t scratchpadsize = mkl_getri_scratchpad<scalar_t>(
-      dpcpp_queue, n, lda, stride_a, stride_ipiv, batch_size);
+      dpcpp_queue, n, lda, stride_a, stride_ipiv, lda, stride_a, batch_size);
   Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
   try {
     mkl_getri<scalar_t>(
@@ -884,12 +912,16 @@ static void apply_inverse_dpcpp_(Tensor& self_, std::vector<int64_t>& infos_) {
         stride_a,
         ipiv,
         stride_ipiv,
+        ainv,
+        lda,
+        stride_a,
         batch_size,
         (scalar_t*)(scratchpad_at.data_ptr()),
         scratchpadsize);
   } catch (oneapi::mkl::lapack::batch_error be) {
     error_handle(infos_, be);
   }
+  return output;
 #else
   AT_ERROR("lu: oneMKL library not found in compilation");
 #endif
@@ -2080,16 +2112,17 @@ std::tuple<Tensor&, Tensor&> solve_out(
 Tensor _inverse_helper(const Tensor& self) {
   std::vector<int64_t> infos(native::batchCount(self), 0);
   auto self_working_copy = native::cloneBatchedColumnMajor(self);
+  Tensor output;
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
       self.scalar_type(), "inverse_dpcpp", [&] {
-        impl::apply_inverse_dpcpp_<scalar_t>(self_working_copy, infos);
+        output = impl::apply_inverse_dpcpp_<scalar_t>(self_working_copy, infos);
       });
   if (self.dim() > 2) {
     native::batchCheckErrors(infos, "inverse_dpcpp");
   } else {
     native::singleCheckErrors(infos[0], "inverse_dpcpp");
   }
-  return self_working_copy;
+  return output;
 }
 
 Tensor inverse(const Tensor& self) {
