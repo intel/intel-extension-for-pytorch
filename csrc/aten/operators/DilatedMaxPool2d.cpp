@@ -4,6 +4,7 @@
 
 #include <oneDNN/oneDNN.h>
 #include "comm/ATDispatch.h"
+#include "comm/ParamUtils.h"
 #include "comm/RegistrationDeclarations.h"
 
 #include <tuple>
@@ -15,6 +16,33 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
+
+std::vector<int64_t> pool_output_sizes(
+    IntArrayRef input_size,
+    IntArrayRef kernel_size,
+    IntArrayRef stride,
+    IntArrayRef padding_l,
+    IntArrayRef padding_r,
+    IntArrayRef dilation,
+    bool ceil_mode) {
+  std::vector<int64_t> output_size(input_size.size());
+
+  output_size[0] = input_size[0];
+  output_size[1] = input_size[1];
+
+  for (size_t i = 2; i < input_size.size(); ++i) {
+    output_size[i] = pooling_output_shape_pad_lr<int64_t>(
+        input_size[i],
+        kernel_size[i - 2],
+        padding_l[i - 2],
+        padding_r[i - 2],
+        stride[i - 2],
+        dilation[i - 2],
+        ceil_mode);
+  }
+
+  return output_size;
+}
 
 void max_pool2d_with_indices_out_template(
     Tensor& output,
@@ -70,10 +98,56 @@ void max_pool2d_with_indices_out_template(
   const auto inputHeight = input.size(-2);
   const auto inputWidth = input.size(-1);
 
-  const auto outputHeight = pooling_output_shape<int64_t>(
-      inputHeight, kH, padH, dH, dilationH, ceil_mode);
-  const auto outputWidth = pooling_output_shape<int64_t>(
-      inputWidth, kW, padW, dW, dilationW, ceil_mode);
+  const int64_t dims = 2;
+  auto kernel_size_vec =
+      expand_param_if_needed(kernel_size, "kernel_size", dims);
+  auto stride_vec = expand_param_if_needed(stride, "stride", dims);
+  auto padding_vec = expand_param_if_needed(padding, "padding", dims);
+
+  auto padding_vec_l = padding_vec;
+  auto padding_vec_r = padding_vec;
+  auto dilation_vec = expand_param_if_needed(dilation, "dilation", dims);
+
+  std::vector<int64_t> output_sizes;
+  int64_t outputHeight, outputWidth;
+
+  if (ceil_mode) {
+    const std::vector<int64_t> output_sizes_ceil = pool_output_sizes(
+        input.sizes(),
+        kernel_size_vec,
+        stride_vec,
+        padding_vec_l,
+        padding_vec_r,
+        dilation_vec,
+        true);
+
+    bool all_equal = false;
+    while (!all_equal) {
+      output_sizes = pool_output_sizes(
+          input.sizes(),
+          kernel_size_vec,
+          stride_vec,
+          padding_vec_l,
+          padding_vec_r,
+          dilation_vec,
+          false);
+
+      all_equal = true;
+      for (size_t i = 2; i < input.sizes().size(); ++i) {
+        if (output_sizes[i] < output_sizes_ceil[i]) {
+          padding_vec_r[i - 2]++;
+          all_equal = false;
+        }
+      }
+    }
+    outputHeight = output_sizes[2];
+    outputWidth = output_sizes[3];
+  } else {
+    outputHeight = pooling_output_shape<int64_t>(
+        inputHeight, kH, padH, dH, dilationH, ceil_mode);
+    outputWidth = pooling_output_shape<int64_t>(
+        inputWidth, kW, padW, dW, dilationW, ceil_mode);
+  }
 
   /* PyTorch support two cases of MaxPool2d:
      1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
@@ -133,15 +207,10 @@ void max_pool2d_with_indices_out_template(
       0,
       outputHeight,
       outputWidth,
-      0,
-      kH,
-      kW,
-      0,
-      dH,
-      dW,
-      0,
-      padH,
-      padW);
+      kernel_size_vec,
+      stride_vec,
+      padding_vec_l,
+      padding_vec_r);
 }
 
 Tensor& max_pool2d_with_indices_backward_out_template(
@@ -198,10 +267,57 @@ Tensor& max_pool2d_with_indices_backward_out_template(
   const auto nInputPlane = input.size(-3);
   const auto inputHeight = input.size(-2);
   const auto inputWidth = input.size(-1);
-  const auto outputWidth = pooling_output_shape<int64_t>(
-      inputWidth, kW, padW, dW, dilationW, ceil_mode);
-  const auto outputHeight = pooling_output_shape<int64_t>(
-      inputHeight, kH, padH, dH, dilationH, ceil_mode);
+
+  const int64_t dims = 2;
+  auto kernel_size_vec =
+      expand_param_if_needed(kernel_size, "kernel_size", dims);
+  auto stride_vec = expand_param_if_needed(stride, "stride", dims);
+  auto padding_vec = expand_param_if_needed(padding, "padding", dims);
+
+  auto padding_vec_l = padding_vec;
+  auto padding_vec_r = padding_vec;
+  auto dilation_vec = expand_param_if_needed(dilation, "dilation", dims);
+
+  std::vector<int64_t> output_sizes;
+  int64_t outputHeight, outputWidth;
+
+  if (ceil_mode) {
+    const std::vector<int64_t> output_sizes_ceil = pool_output_sizes(
+        input.sizes(),
+        kernel_size_vec,
+        stride_vec,
+        padding_vec_l,
+        padding_vec_r,
+        dilation_vec,
+        true);
+
+    bool all_equal = false;
+    while (!all_equal) {
+      output_sizes = pool_output_sizes(
+          input.sizes(),
+          kernel_size_vec,
+          stride_vec,
+          padding_vec_l,
+          padding_vec_r,
+          dilation_vec,
+          false);
+
+      all_equal = true;
+      for (size_t i = 2; i < input.sizes().size(); ++i) {
+        if (output_sizes[i] < output_sizes_ceil[i]) {
+          padding_vec_l[i - 2]++;
+          all_equal = false;
+        }
+      }
+    }
+    outputHeight = output_sizes[2];
+    outputWidth = output_sizes[3];
+  } else {
+    outputHeight = pooling_output_shape<int64_t>(
+        inputHeight, kH, padH, dH, dilationH, ceil_mode);
+    outputWidth = pooling_output_shape<int64_t>(
+        inputWidth, kW, padW, dW, dilationW, ceil_mode);
+  }
 
   auto memory_format = input.suggest_memory_format();
   max_pool2d_backward_shape_check(
@@ -244,8 +360,8 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       dH,
       dW,
       0,
-      padH,
-      padW);
+      padding_vec_l[0],
+      padding_vec_l[1]);
 
   return gradInput;
 }

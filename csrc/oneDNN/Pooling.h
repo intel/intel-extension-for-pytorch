@@ -43,15 +43,10 @@ static at::Tensor pooling(
     int64_t dstDepth,
     int64_t dstHeight,
     int64_t dstWidth,
-    int kD,
-    int kH,
-    int kW,
-    int dD,
-    int dH,
-    int dW,
-    int padD,
-    int padH,
-    int padW) {
+    std::vector<int64_t>& kernel_vec,
+    std::vector<int64_t>& stride_vec,
+    std::vector<int64_t>& padding_l_vec,
+    std::vector<int64_t>& padding_r_vec) {
   at::Device curDevice = at::Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -69,7 +64,8 @@ static at::Tensor pooling(
   memory::dims dst_tz;
   memory::dims kernel;
   memory::dims stride;
-  memory::dims padding;
+  memory::dims padding_l;
+  memory::dims padding_r;
   memory::format_tag format_any = memory::format_tag::any;
 
   auto ndim = src.ndimension();
@@ -102,9 +98,6 @@ static at::Tensor pooling(
                                        : memory::format_tag::nchw;
     src_tz = {nbatch, nInputPlane, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstHeight, dstWidth};
-    kernel = {kH, kW};
-    stride = {dH, dW};
-    padding = {padH, padW};
   } else if (ndim == 5 || (ndim == 4 && srcDepth != 0)) {
     /*
       This path is used for AvgPool3d/AdaptiveAvgPool3d.
@@ -127,10 +120,11 @@ static at::Tensor pooling(
                                        : memory::format_tag::ncdhw;
     src_tz = {nbatch, nInputPlane, srcDepth, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstDepth, dstHeight, dstWidth};
-    kernel = {kD, kH, kW};
-    stride = {dD, dH, dW};
-    padding = {padD, padH, padW};
   }
+  stride = {stride_vec.cbegin(), stride_vec.cend()};
+  kernel = {kernel_vec.cbegin(), kernel_vec.cend()};
+  padding_l = {padding_l_vec.cbegin(), padding_l_vec.cend()};
+  padding_r = {padding_r_vec.cbegin(), padding_r_vec.cend()};
 
   auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
   auto src_md = src_ctx.is_plain() ? memory::desc({src_tz}, data_t, format)
@@ -150,8 +144,8 @@ static at::Tensor pooling(
       dst_md_any,
       stride,
       kernel,
-      padding,
-      padding);
+      padding_l,
+      padding_r);
 
   auto pooling_fwd_pd =
       pooling_forward::primitive_desc(pooling_fwd_desc, engine);
@@ -205,15 +199,10 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
     int64_t dstDepth,
     int64_t dstHeight,
     int64_t dstWidth,
-    int kD,
-    int kH,
-    int kW,
-    int dD,
-    int dH,
-    int dW,
-    int padD,
-    int padH,
-    int padW) {
+    std::vector<int64_t> kernel_vec,
+    std::vector<int64_t> stride_vec,
+    std::vector<int64_t> padding_l_vec,
+    std::vector<int64_t> padding_r_vec) {
   at::Device curDevice = at::Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -230,7 +219,8 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   memory::dims dst_tz;
   memory::dims kernel;
   memory::dims stride;
-  memory::dims padding;
+  memory::dims padding_l;
+  memory::dims padding_r;
 
   auto ndim = src.ndimension();
   // FIXME:
@@ -262,9 +252,6 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
                                        : memory::format_tag::nchw;
     src_tz = {nbatch, nInputPlane, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstHeight, dstWidth};
-    kernel = {kH, kW};
-    stride = {dH, dW};
-    padding = {padH, padW};
   } else if (ndim == 5 || (ndim == 4 && srcDepth != 0)) {
     /*
       This path is used for MaxPool3d/AdaptiveMaxPool3d.
@@ -287,10 +274,11 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
                                        : memory::format_tag::ncdhw;
     src_tz = {nbatch, nInputPlane, srcDepth, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstDepth, dstHeight, dstWidth};
-    kernel = {kD, kH, kW};
-    stride = {dD, dH, dW};
-    padding = {padD, padH, padW};
   }
+  kernel = {kernel_vec.cbegin(), kernel_vec.cend()};
+  stride = {stride_vec.cbegin(), stride_vec.cend()};
+  padding_l = {padding_l_vec.cbegin(), padding_l_vec.cend()};
+  padding_r = {padding_r_vec.cbegin(), padding_r_vec.cend()};
 
   auto format_any = memory::format_tag::any;
   auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
@@ -313,8 +301,8 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
       dst_md_any,
       stride,
       kernel,
-      padding,
-      padding);
+      padding_l,
+      padding_r);
 
   auto pooling_fwd_pd =
       pooling_forward::primitive_desc(pooling_fwd_desc, engine);

@@ -54,14 +54,17 @@ void adaptive_avg_pool2d_out_template(
       std::floor((float)inputHeight / outputHeight);
   int dW = std::floor((float)2 * inputWidth / outputWidth) -
       std::floor((float)inputWidth / outputWidth);
+  std::vector<int64_t> stride_vec = {dH, dW};
 
   int kH = std::ceil((float)2 * inputHeight / outputHeight) -
       std::floor((float)inputHeight / outputHeight);
   int kW = std::ceil((float)2 * inputWidth / outputWidth) -
       std::floor((float)inputWidth / outputWidth);
+  std::vector<int64_t> kernel_size_vec = {kH, kW};
 
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
+  std::vector<int64_t> padding_vec = {padH, padW};
 
   /* PyTorch support two cases of AdaptiveAvgPool2d:
      1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
@@ -92,15 +95,10 @@ void adaptive_avg_pool2d_out_template(
       0,
       outputHeight,
       outputWidth,
-      0,
-      kH,
-      kW,
-      0,
-      dH,
-      dW,
-      0,
-      padH,
-      padW);
+      kernel_size_vec,
+      stride_vec,
+      padding_vec,
+      padding_vec);
 }
 
 void adaptive_avg_pool2d_backward_out_template(

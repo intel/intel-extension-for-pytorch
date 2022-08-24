@@ -109,6 +109,9 @@ void avg_pool2d_out_template(
     output.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
   }
 
+  std::vector<int64_t> kernel_size_vec = {kH, kW};
+  std::vector<int64_t> stride_vec = {dH, dW};
+  std::vector<int64_t> padding_vec = {padH, padW};
   if (count_include_pad) {
     ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_include_padding>(
         output,
@@ -121,15 +124,10 @@ void avg_pool2d_out_template(
         0,
         outputHeight,
         outputWidth,
-        0,
-        kH,
-        kW,
-        0,
-        dH,
-        dW,
-        0,
-        padH,
-        padW);
+        kernel_size_vec,
+        stride_vec,
+        padding_vec,
+        padding_vec);
   } else {
     ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
         output,
@@ -142,15 +140,10 @@ void avg_pool2d_out_template(
         0,
         outputHeight,
         outputWidth,
-        0,
-        kH,
-        kW,
-        0,
-        dH,
-        dW,
-        0,
-        padH,
-        padW);
+        kernel_size_vec,
+        stride_vec,
+        padding_vec,
+        padding_vec);
   }
 }
 

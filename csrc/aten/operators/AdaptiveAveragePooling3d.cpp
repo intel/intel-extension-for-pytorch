@@ -90,6 +90,10 @@ void adaptive_avg_pool3d_out_template(
         {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
   }
 
+  std::vector<int64_t> kernel_size_vec = {kD, kH, kW};
+  std::vector<int64_t> stride_vec = {dD, dH, dW};
+  std::vector<int64_t> padding_vec = {padD, padH, padW};
+
   ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
       output,
       input_,
@@ -101,15 +105,10 @@ void adaptive_avg_pool3d_out_template(
       outputDepth,
       outputHeight,
       outputWidth,
-      kD,
-      kH,
-      kW,
-      dD,
-      dH,
-      dW,
-      padD,
-      padH,
-      padW);
+      kernel_size_vec,
+      stride_vec,
+      padding_vec,
+      padding_vec);
 }
 
 Tensor& adaptive_avg_pool3d_backward_out_template(

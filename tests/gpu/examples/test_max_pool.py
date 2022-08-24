@@ -222,3 +222,34 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(output_cpu[0], output_xpu[0].to(cpu_device))
         self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
+
+    def test_max_pool_4D_ceil_mode(self, dtype=torch.float):
+        x = torch.randn([1, 3, 40, 40])
+        grad = torch.randn([1, 3, 20, 20])
+        m = nn.MaxPool2d(kernel_size=3, stride=2, return_indices=True, ceil_mode=True)
+
+        # cpu 
+        input_cpu = x.clone()
+        input_cpu.requires_grad_(True)
+        grad_cpu = grad.clone()
+        output_cpu = m(input_cpu)[0]
+        # 4D contiguous input
+        # mkldnn
+        input_dnn = x.clone()
+        input_dnn = input_dnn.to_mkldnn()
+        input_dnn.requires_grad_(True)
+        output_dnn = torch.mkldnn_max_pool2d(input_dnn, (3, 3), (2, 2), ceil_mode=True)
+        # print("cpu output_size:", output_cpu[0].size())
+        # output_cpu[0].backward(grad_cpu)
+
+        # XPU
+        input_xpu = x.clone().to(dpcpp_device)
+        input_xpu.requires_grad_(True)
+        grad_xpu = grad.clone().to(dpcpp_device)
+        output_xpu = m(input_xpu)[0]
+        print(output_xpu.size())
+        # output_xpu[0].backward(grad_xpu)
+
+        self.assertEqual(output_dnn.to_dense(), output_xpu.to(cpu_device))
+        self.assertEqual(output_cpu, output_xpu.to(cpu_device))
+        # self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
