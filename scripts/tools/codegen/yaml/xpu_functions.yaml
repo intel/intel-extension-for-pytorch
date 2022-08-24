@@ -401,6 +401,7 @@ supported:
   - ne.Tensor
   - ne.Tensor_out
   - neg.out
+  - nextafter.out
   - nll_loss2d_backward
   - nll_loss2d_backward.grad_input
   - nll_loss2d_forward

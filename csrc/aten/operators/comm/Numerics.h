@@ -38,6 +38,55 @@ static inline T sgni(T z) {
   }
 }
 
+static inline c10::BFloat16 nextafteri(c10::BFloat16 from, c10::BFloat16 to) {
+  // Reference:
+  // https://git.musl-libc.org/cgit/musl/tree/src/math/nextafter.c
+  using int_repr_t = uint16_t;
+  using float_t = c10::BFloat16;
+  constexpr uint8_t bits = 16;
+  union {
+    float_t f;
+    int_repr_t i;
+  } ufrom = {from}, uto = {to};
+
+  // get a mask to get the sign bit i.e. MSB
+  int_repr_t sign_mask = int_repr_t{1} << (bits - 1);
+
+  // short-circuit: if either is NaN, return NaN
+  if (from != from || to != to) {
+    return from + to;
+  }
+
+  // short-circuit: if they are exactly the same.
+  if (ufrom.i == uto.i) {
+    return from;
+  }
+
+  // mask the sign-bit to zero i.e. positive
+  // equivalent to abs(x)
+  int_repr_t abs_from = ufrom.i & ~sign_mask;
+  int_repr_t abs_to = uto.i & ~sign_mask;
+  if (abs_from == 0) {
+    // if both are zero but with different sign,
+    // preserve the sign of `to`.
+    if (abs_to == 0) {
+      return to;
+    }
+    // smallest subnormal with sign of `to`.
+    ufrom.i = (uto.i & sign_mask) | int_repr_t{1};
+    return ufrom.f;
+  }
+
+  // if abs(from) > abs(to) or sign(from) != sign(to)
+  if (abs_from > abs_to || ((ufrom.i ^ uto.i) & sign_mask)) {
+    ufrom.i--;
+  } else {
+    ufrom.i++;
+  }
+
+  return ufrom.f;
+}
+
 template <>
 struct Numerics<uint8_t> {
   static inline uint8_t lower_bound() {
@@ -752,6 +801,9 @@ struct Numerics<at::BFloat16> {
   static inline at::BFloat16 hypot(at::BFloat16 a, at::BFloat16 b) {
     return dpl::hypot(float(a), float(b));
   }
+  static inline at::BFloat16 nextafter(at::BFloat16 a, at::BFloat16 b) {
+    return nextafteri(a, b);
+  }
   static inline at::BFloat16 cinv(at::BFloat16 a) {
     return 1.0f / a;
   }
@@ -939,6 +991,9 @@ struct Numerics<float> {
   }
   static inline float hypot(float a, float b) {
     return dpl::hypot(a, b);
+  }
+  static inline float nextafter(float a, float b) {
+    return dpl::nextafter(a, b);
   }
   static inline float min(float a, float b) {
     if (a != a) {
@@ -1130,6 +1185,9 @@ struct Numerics<double> {
   }
   static inline double hypot(double a, double b) {
     return dpl::hypot(a, b);
+  }
+  static inline double nextafter(double a, double b) {
+    return dpl::nextafter(a, b);
   }
   static inline double min(double a, double b) {
     if (a != a) {
