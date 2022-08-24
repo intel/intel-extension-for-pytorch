@@ -35,6 +35,8 @@ supported:
   - _inverse_helper
   - _linalg_qr_helper
   - _local_scalar_dense
+  - _logcumsumexp
+  - _logcumsumexp.out
   - _log_softmax
   - _log_softmax_backward_data
   - _lu_with_info

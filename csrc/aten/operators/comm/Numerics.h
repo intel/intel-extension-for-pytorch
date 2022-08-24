@@ -589,7 +589,7 @@ struct Numerics<at::Half> {
   static inline at::Half cinv(at::Half a) {
     return 1.0f / a;
   }
-  static inline float min(at::Half a, at::Half b) {
+  static inline at::Half min(at::Half a, at::Half b) {
     if (a != a) {
       return a;
     } else if (b != b) {
@@ -768,7 +768,7 @@ struct Numerics<at::BFloat16> {
   static inline at::BFloat16 round(float a) {
     return sycl::round(float(a));
   }
-  static inline float min(at::BFloat16 a, at::BFloat16 b) {
+  static inline at::BFloat16 min(at::BFloat16 a, at::BFloat16 b) {
     if (a != a) {
       return a;
     } else if (b != b) {
@@ -777,7 +777,7 @@ struct Numerics<at::BFloat16> {
       return sycl::fmin(float(a), float(b));
     }
   }
-  static inline float max(at::BFloat16 a, at::BFloat16 b) {
+  static inline at::BFloat16 max(at::BFloat16 a, at::BFloat16 b) {
     if (a != a) {
       return a;
     } else if (b != b) {
