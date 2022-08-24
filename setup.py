@@ -236,8 +236,10 @@ class DPCPPBuild(BuildExtension, object):
         if not os.path.isfile(cmake._cmake_cache_file) or RERUN_CMAKE:
             build_type = 'Release'
 
+            build_separate_ops = 'OFF'
             if _check_env_flag('DEBUG'):
                 build_type = 'Debug'
+                build_separate_ops = 'ON'
 
             def convert_cmake_dirs(paths):
                 def converttostr(input_seq, seperator):
@@ -272,6 +274,7 @@ class DPCPPBuild(BuildExtension, object):
                 'PYTHON_EXECUTABLE': sys.executable,
                 'PYTHON_INCLUDE_DIR': distutils.sysconfig.get_python_inc(),
                 'PYTHON_PLATFORM_INFO': platform.platform(),
+                'BUILD_SEPARATE_OPS': build_separate_ops,
                 'LIB_NAME': ext.name,
             }
 
