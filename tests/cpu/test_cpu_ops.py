@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import random
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
+import itertools
 
 try:
     import torchvision
@@ -776,14 +777,84 @@ class CPUOPsTester(TestCase):
         self.assertEqual(y2, y, prec=0.01)
 
     def test_cat(self):
-        x = x = torch.randn(2, 3)
-        y = torch.cat((x, x, x), 0)
+        for datatype in [torch.float32, torch.double, torch.bfloat16]:
+            for dim, size in itertools.product([0, 1], [[2, 1], [2, 2], [5, 10]]):
+                x = torch.randn(size, dtype=datatype)
+                y = torch.cat([x, x], dim)
+                self.assertTrue(y.dtype == datatype)
 
-        # test bfloat16
-        x2 = x.clone().detach().bfloat16()
-        y2 = torch.cat((x2, x2, x2), 0)
-        self.assertTrue(y2.dtype == torch.bfloat16)
-        self.assertEqual(y2, y, prec=0.01)
+            # long input tensor list
+            x1 = torch.randn((2, 2), dtype=datatype)
+            input1 = []
+            for i in range(100):
+                input1.append(x1)
+            y1 = torch.cat(input1, 0)
+            self.assertTrue(y1.size() == torch.Size([200, 2]))
+            self.assertTrue(y1.dtype == datatype)
+
+            # input tensors have different shapes and strides
+            x2 = torch.randn((400, 2), dtype=datatype)
+            input2 = []
+            for i in range(10):
+                input2.append(x1)
+            for i in range(100):
+                input2.append(x2)
+            y2 = torch.cat(input2, 0)
+            self.assertTrue(y2.size() == torch.Size([40020, 2]))
+            self.assertTrue(y2.dtype == datatype)
+
+            x3 = torch.randn((4000, 2), dtype=datatype)
+            input3 = []
+            for i in range(10):
+                input3.append(x1)
+            for i in range(10):
+                input3.append(x3)
+            y3 = torch.cat(input3, 0)
+            self.assertTrue(y3.size() == torch.Size([40020, 2]))
+            self.assertTrue(y3.dtype == datatype)
+
+            x4 = torch.randn((4, 2), dtype=datatype)
+            input4 = []
+            for i in range(10):
+                input4.append(x1)
+            for i in range(10):
+                input4.append(x4)
+            y4 = torch.cat(input4, 0)
+            self.assertTrue(y4.size() == torch.Size([60, 2]))
+            self.assertTrue(y4.dtype == datatype)
+
+            # "out" arg is used but  un-defined
+            y5 = torch.cat([x4, x4], 0, out=torch.empty(0, dtype=datatype))
+            self.assertEqual(y5, torch.cat([x4, x4], 0))
+            self.assertTrue(y5.dtype == datatype)
+
+            # out is defined with wrong shape
+            ref = torch.cat([x4, x4], 0)
+            out = torch.zeros(1)
+            out_ptr = out.data_ptr()
+            torch.cat([x4, x4], 0, out=out)
+            self.assertEqual(ref, out)
+            self.assertTrue(ref.dtype == datatype)
+            self.assertTrue(out_ptr != out.data_ptr())
+
+            # out is defined with correct shape
+            ref = torch.cat([x4, x4], 0)
+            out = torch.zeros_like(ref)
+            out_ptr = out.data_ptr()
+            torch.cat([x4, x4], 0, out=out)
+            self.assertEqual(ref, out)
+            self.assertTrue(ref.dtype == datatype)
+            self.assertTrue(out_ptr == out.data_ptr())
+
+            y6 = torch.cat([x4, x4], 0, out=torch.empty(0, dtype=torch.float32))
+            self.assertEqual(y6, torch.cat([x4, x4], 0))
+            self.assertTrue(y6.dtype == torch.float32)
+
+            # one of input tensors is empty
+            x7 = torch.empty(0, dtype=datatype)
+            y7 = torch.cat([x4, x4, x7], 0)
+            self.assertTrue(y7.size() == torch.Size([8, 2]))
+            self.assertTrue(y7.dtype == datatype)
 
 if __name__ == '__main__':
     test = unittest.main()
