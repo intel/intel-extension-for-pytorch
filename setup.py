@@ -23,8 +23,10 @@
 #     the C/C++ compiler to use
 #
 #   MKLROOT
-#     specify MKL library path. By default, the MKL library installed with pip/conda
-#     is used. Make sure this directory contains include and lib directories.
+#     specify MKL library path.
+#     ONLY NEEDED if you have a specific MKL version you want to link against.
+#     Make sure this directory contains include and lib directories.
+#     By default, the MKL library installed with pip/conda is used.
 #
 # Environment variables for feature toggles:
 #
@@ -133,11 +135,12 @@ if len(sys.argv) > 1:
 mkl_install_dir = os.getenv('MKLROOT', '')
 if mode != 'clean':
     if mkl_install_dir:
-        mkl_header = os.path.join(mkl_install_dir, 'include', 'mkl_version.h')
-        if not os.path.exists(mkl_header):
+        mkl_header = glob.glob(f'{mkl_install_dir}/include/**/mkl_version.h', recursive = True)
+        if len(mkl_header) == 0:
             raise RuntimeError(f'{mkl_install_dir} doesn\'t seem to be a valid MKL library directory.\n{" ":14}mkl_version.h not found.')
             mkl_install_dir = ''
         else:
+            mkl_header = mkl_header[0]
             mkl_major = 0
             mkl_minor = 0
             mkl_patch = 0
@@ -156,8 +159,8 @@ if mode != 'clean':
             if pkg_ver.parse(mkl_version) < pkg_ver.parse('2021.0.0'):
                 raise RuntimeError(f'MKL version({mkl_version}) is not supported. Please use MKL later than 2021.0.0.')
                 mkl_install_dir = ''
-            mkl_library = os.path.join(mkl_install_dir, 'lib', 'intel64', 'libmkl_core.a')
-            if not os.path.exists(mkl_library):
+            mkl_library = glob.glob(f'{mkl_install_dir}/lib/**/libmkl_core.a', recursive = True)
+            if len(mkl_library) == 0:
                 raise RuntimeError(f'libmkl_core.a not found in {mkl_install_dir}/lib/intel64.')
                 mkl_install_dir = ''
     if not mkl_install_dir:
