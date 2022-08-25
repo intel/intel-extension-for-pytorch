@@ -849,6 +849,15 @@ class MatmulDivInplace(nn.Module):
         else:
             return mm_res.div_(torch.ones(mm_res_shape,dtype=x.dtype)+1)
 
+class TransposedMatmulDiv(nn.Module):
+    def __init__(self):
+        super(TransposedMatmulDiv, self).__init__()
+
+    def forward(self, batch1, batch2):
+        bmm_res = torch.matmul(batch1, batch2)
+        res = bmm_res * 0.3
+        return res
+
 class BmmAdd(nn.Module):
     def __init__(self):
         super(BmmAdd, self).__init__()
@@ -1308,16 +1317,19 @@ class Tester(TestCase):
                 self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
 
                 # test norm dim is not last dim, expect RuntimeError
-                # here in the case, norm dim is mid dim with seq_len size, not the last dim
+                # here in the a/b error input case, norm dim is mid dim but last dim is seq_len
                 # which is expected as unsupported RuntimeError
                 try:
-                    model_except_error = AddLayerNorm(seq_len)
-                    torch.jit.trace(model_except_error,(a, b))
+                    model_except_error = AddLayerNorm(dim)
+                    model_except_error = torch.jit.trace(model_except_error,(a, b))
+                    a_error = torch.randn(bs, dim, seq_len)
+                    b_error = torch.randn(bs, dim, seq_len)
+                    model_except_error(a_error, b_error)
                     #it is not excepted if no RuntimeError exception is found
                     #so end with assert
                     self.assertTrue(False)
                 except RuntimeError as e:
-                    expected_error = f"Given normalized_shape=[{seq_len}], expected input with shape [*, {seq_len}]"
+                    expected_error = f"Given normalized_shape=[{dim}], expected input with shape [*, {dim}]"
                     self.assertTrue(expected_error in str(e))
                     logging.info("expected RuntimeError is found")
                 finally:
@@ -3178,16 +3190,67 @@ class Tester(TestCase):
                 kind_in_graph=None,
                 kind_not_in_graph="ipex::matmul_div")
 
+    def test_transposed_matmuldiv(self):
+        x1 = [torch.randn(53, 23, 27, 25),
+              torch.randn(53, 27, 23, 25).transpose(1, 2),
+              torch.randn(53, 23, 25, 27).transpose(2, 3),
+              torch.randn(53, 25, 23, 27).transpose(2, 3).transpose(1, 3)]
+
+        y1 = [torch.randn(53, 23, 25, 27),
+              torch.randn(53, 25, 23, 27).transpose(1, 2),
+              torch.randn(53, 23, 27, 25).transpose(2, 3),
+              torch.randn(53, 27, 23, 25).transpose(2, 3).transpose(1, 3)]
+
+        model = TransposedMatmulDiv().eval()
+        model_fp32 = ipex.optimize(model, dtype=torch.float32, level="O1")
+        model_bf16 = ipex.optimize(model, dtype=torch.bfloat16, level="O1")
+        for i in range(len(x1)):
+            for j in range(len(y1)):
+                with torch.no_grad():
+                    traced_mod = torch.jit.trace(model, (x1[i], y1[j]))
+                    fused_mod = traced_mod.graph_for(x1[i], y1[j])
+                    out = traced_mod(x1[i], y1[j])
+                    expected = model(x1[i], y1[j])
+                    self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fused_mod.nodes()))
+                    self.assertEqual(out, expected, prec=1e-4)
+                with torch.cpu.amp.autocast(), torch.no_grad():
+                    traced_mod = torch.jit.trace(model, (x1[i].bfloat16(), y1[j].bfloat16()))
+                    fused_mod = traced_mod.graph_for(x1[i].bfloat16(), y1[j].bfloat16())
+                    out = traced_mod(x1[i].bfloat16(), y1[j].bfloat16())
+                    expected = model(x1[i].bfloat16(), y1[j].bfloat16())
+                    self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fused_mod.nodes()))
+                    self.assertEqual(out, expected, prec=1e-1)
+
     def test_bmm_add(self):
-        M = torch.randn(10, 3, 5)
-        batch1 = torch.randn(10, 3, 4)
-        batch2 = torch.randn(10, 4, 5)
-        mod = BmmAdd()
-        traced_mod = torch.jit.trace(mod, (M, batch1, batch2))
-        fused_mod = traced_mod.graph_for(M, batch1, batch2)
-        out = traced_mod(M, batch1, batch2)
-        expected = torch.baddbmm(M, batch1, batch2)
-        self.assertTrue(torch.allclose(out, expected))
+        M = torch.randn(60, 30, 50)
+
+        x1 = [torch.randn(60, 30, 40),
+              torch.randn(60, 40, 30).transpose(1, 2),
+              torch.randn(30, 60, 40).transpose(0, 1)]
+
+        y1 = [torch.randn(60, 40, 50),
+              torch.randn(60, 50, 40).transpose(1, 2),
+              torch.randn(50, 40, 60).transpose(0, 2)]
+
+        model = BmmAdd().eval()
+        model_fp32 = ipex.optimize(model, dtype=torch.float32, level="O1")
+        model_bf16 = ipex.optimize(model, dtype=torch.bfloat16, level="O1")
+        for i in range(len(x1)):
+            for j in range(len(y1)):
+                with torch.no_grad():
+                    traced_mod = torch.jit.trace(model, (M, x1[i], y1[j]))
+                    fused_mod = traced_mod.graph_for(M, x1[i], y1[j])
+                    out = traced_mod(M, x1[i], y1[j])
+                    expected = torch.baddbmm(M, x1[i], y1[j])
+                    self.assertTrue(any(n.kind() == "ipex::bmm_add" for n in fused_mod.nodes()))
+                    self.assertEqual(out, expected, prec=1e-4)
+                with torch.cpu.amp.autocast(), torch.no_grad():
+                    traced_mod = torch.jit.trace(model, (M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16()))
+                    fused_mod = traced_mod.graph_for(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
+                    out = traced_mod(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
+                    expected = torch.baddbmm(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
+                    self.assertTrue(any(n.kind() == "ipex::bmm_add" for n in fused_mod.nodes()))
+                    self.assertEqual(out, expected, prec=1e-1)
 
     def test_einsum_add(self):
         def _test_fp32(model_test, input1, input2, bias=None, kind_in_graph='ipex::einsum_binary', prec=1e-3):
@@ -3452,6 +3515,26 @@ class Tester(TestCase):
             torch.rand(10, 10, 4, 4, dtype=torch.bfloat16),
             kind_in_graph="ipex::batch_norm",
             prec=5e-3)
+
+    def test_max_pool2d_int8(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super(Model, self).__init__()
+                self.pool = torch.nn.MaxPool2d(3, stride=2)
+
+            def forward(self, x):
+                x = torch.quantize_per_tensor(x, 0.1, 10, torch.quint8)
+                return self.pool(x)
+
+        model = Model().eval()
+        x = torch.randn(1, 3, 24, 24)
+        with torch.no_grad():
+            ref_out = model(x)
+            traced_model = torch.jit.trace(model, x)
+            traced_out = traced_model(x)
+            self.assertEqual(ref_out, traced_out)
+            trace_graph = traced_model.graph_for(x)
+            self.assertTrue(any(n.kind() == "aten::max_pool2d" for n in trace_graph.nodes()))
 
     def test_restore_inplace(self):
         class M(nn.Module):

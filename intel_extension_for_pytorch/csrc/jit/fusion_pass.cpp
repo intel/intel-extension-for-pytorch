@@ -162,7 +162,7 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
 
   // Fuse operators as shuffle
   graph_rewrite::FuseShuffle(graph);
-  graph_rewrite::FuseMatmulDiv(graph);
+  graph_rewrite::FuseMatmulDivOrMul(graph);
   // replace aten softmax with ipex softmax
   graph_rewrite::replaceAtenSoftmaxWithIpexSoftmax(graph);
 
@@ -170,6 +170,20 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // after TensorExprs fix the performance issue(IPB-808).
   graph_rewrite::replaceAtenBatchNormWithIpexBatchNorm(graph);
   // TODO: Some post processing?? ECS/EDC/Peephole???
+
+  // This path contains two functions:
+  // 1. Fuse BF16 Mha for BERT and ViT
+  // 2. Replace the Matmul OP with MKL or DNNL Matmul kernels to enable
+  // transpose-free FP32 BMM.
+  // The BF16 Mha fusions depends on the FuseMHAScoreCalc and
+  // FuseMatmulDivOrMul since it uses the fused OPs from the two pathes.
+  // TODO: We will enable transpose-free BF16 BMM to benefit for most
+  // of the MHA patterns. Then the Matmul OP from the FuseMHAScoreCalc
+  // path will be removed in the future for simplicity.
+  // This path should be executed after all the other Matmul-related
+  // fusion are completed to prevent mismatching "aten::matmul".
+  graph_rewrite::FusedTransFreeMha(graph);
+
   ConstantPropagation(graph);
   GRAPH_DUMP("Before PrePackingOpsFolder", graph);
   // folding prepacking ops.

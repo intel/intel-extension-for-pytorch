@@ -46,11 +46,6 @@ add_executable(${TEST_NAME} ${IPEX_CPP_TEST_SOURCES})
 target_link_libraries(${TEST_NAME} PUBLIC gtest_main)
 target_link_libraries(${TEST_NAME} PUBLIC gtest)
 
-# Link MKL
-target_link_libraries(${TEST_NAME} PUBLIC ${MKL_INSTALL_DIR}/lib/libmkl_intel_lp64.a)
-target_link_libraries(${TEST_NAME} PUBLIC ${MKL_INSTALL_DIR}/lib/libmkl_gnu_thread.a)
-target_link_libraries(${TEST_NAME} PUBLIC ${MKL_INSTALL_DIR}/lib/libmkl_core.a)
-
 # Link Pytorch
 target_link_libraries(${TEST_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
 target_link_libraries(${TEST_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)

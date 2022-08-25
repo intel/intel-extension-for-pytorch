@@ -970,10 +970,28 @@ class CPUOPsTester(TestCase):
             self.assertTrue(y4.size() == torch.Size([60, 2]))
             self.assertTrue(y4.dtype == datatype)
 
-            # out is defined
+            # "out" arg is used but  un-defined
             y5 = torch.cat([x4, x4], 0, out=torch.empty(0, dtype=datatype))
             self.assertEqual(y5, torch.cat([x4, x4], 0))
             self.assertTrue(y5.dtype == datatype)
+
+            # out is defined with wrong shape
+            ref = torch.cat([x4, x4], 0)
+            out = torch.zeros(1)
+            out_ptr = out.data_ptr()
+            torch.cat([x4, x4], 0, out=out)
+            self.assertEqual(ref, out)
+            self.assertTrue(ref.dtype == datatype)
+            self.assertTrue(out_ptr != out.data_ptr())
+
+            # out is defined with correct shape
+            ref = torch.cat([x4, x4], 0)
+            out = torch.zeros_like(ref)
+            out_ptr = out.data_ptr()
+            torch.cat([x4, x4], 0, out=out)
+            self.assertEqual(ref, out)
+            self.assertTrue(ref.dtype == datatype)
+            self.assertTrue(out_ptr == out.data_ptr())
 
             y6 = torch.cat([x4, x4], 0, out=torch.empty(0, dtype=torch.float32))
             self.assertEqual(y6, torch.cat([x4, x4], 0))

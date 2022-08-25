@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, get_eltwise_fn
 from torch.testing._internal.common_utils import TEST_SCIPY
+from torch.quantization.quantize_fx import prepare_fx, convert_fx
 
 import intel_extension_for_pytorch as ipex
 from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserver, QConfig
@@ -1519,6 +1520,27 @@ class TestFusionPattern(JitLlgaTestCase):
         graph = traced.graph_for(x)
         self.checkAttr(graph, "aten::dequantize", "qtype")
 
+    def test_fx_converted_model(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = nn.Linear(15, 20)
+
+            def forward(self, x):
+                x = self.linear(x)
+                return x
+        
+        x = x = torch.randn(2, 15)
+        m = M()
+        m.eval()
+        
+        qconfig_dict = {'': static_qconfig[0]}
+        
+        m = prepare_fx(m, qconfig_dict, x)
+        m = convert_fx(m)
+        graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+    
 class TestShapeFallback(JitLlgaTestCase):
     @unittest.skipIf(True, 'Size peephole optimization not enabled yet')
     def test_view_permute(self):

@@ -29,3 +29,4 @@ from . import autocast
 
 from .utils.verbose import verbose
 from .frontend import optimize, enable_onednn_fusion, set_fp32_math_mode, get_fp32_math_mode, FP32MathMode
+from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl

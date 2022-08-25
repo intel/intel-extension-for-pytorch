@@ -5,6 +5,7 @@ import copy
 import logging
 
 from intel_extension_for_pytorch import optim, frontend
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import _using_dnnl
 
 logger = logging.getLogger(__name__)
 
@@ -267,15 +268,15 @@ def _should_prepack(module, auto_kernel_selection):
     # If hook is on `weight` or `bias`, will not prepack.
     if module._forward_pre_hooks is not None:
         for _, hook in module._forward_pre_hooks.items():
-            if hook.name == 'weight' or hook.name == 'bias':
+            if hasattr(hook, 'name') and (hook.name == 'weight' or hook.name == 'bias'):
                 return False
     if module._forward_hooks is not None:
         for _, hook in module._forward_hooks.items():
-            if hook.name == 'weight' or hook.name == 'bias':
+            if hasattr(hook, 'name') and (hook.name == 'weight' or hook.name == 'bias'):
                 return False
     if module._backward_hooks is not None:
         for _, hook in module._backward_hooks.items():
-            if hook.name == 'weight' or hook.name == 'bias':
+            if hasattr(hook, 'name') and (hook.name == 'weight' or hook.name == 'bias'):
                 return False
     # When the auto_kernel_selection is on, dtype is float, IPEX will use the prepack MKL backend
     # for FP32 Linear in the inference mode.
@@ -302,7 +303,7 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
             if weight not in params_attr:
                 params_attr[weight] = {}
             if type(m) is torch.nn.Linear:
-                if m.weight.dtype == torch.float32 and optimizer is None and frontend.get_fp32_math_mode(device="cpu") == frontend.FP32MathMode.FP32:
+                if m.weight.dtype == torch.float32 and optimizer is None and frontend.get_fp32_math_mode(device="cpu") == frontend.FP32MathMode.FP32 and not _using_dnnl():
                     new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = False)
                 else:
                     new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = True)
@@ -359,7 +360,7 @@ def record_input_shape_for_prepack(module, sample_input):
         self.input_shape = input[0].shape
 
     def register_hook_function(module):
-        if type(module) in [torch.nn.Linear, torch.nn.Conv2d, torch.nn.ConvTranspose2d]:
+        if type(module) in [torch.nn.Linear, torch.nn.Conv1d, torch.nn.Conv2d, torch.nn.ConvTranspose2d]:
             module.register_forward_pre_hook(hook_function)
 
     def register_hook_function_rec(module):
@@ -368,7 +369,6 @@ def record_input_shape_for_prepack(module, sample_input):
             register_hook_function_rec(child)
 
     origin_state_dict = copy.deepcopy(module.state_dict())
-    hook_function.name = "input_shape"
     register_hook_function_rec(module)
     module(*sample_input)
     module.load_state_dict(origin_state_dict)

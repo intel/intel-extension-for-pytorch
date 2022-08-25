@@ -31,6 +31,16 @@ bool isEltwiseOp(Node* n) {
   }
 }
 
+bool isSupportedAsInputToDequant(torch::jit::Node* n) {
+  if (n->kind() == prim::Constant ||
+      n->kind() == Symbol::aten("quantize_per_tensor") ||
+      n->kind() == Symbol::aten("quantize_per_channel")) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 } // namespace utils
 } // namespace onednn
 } // namespace fuser

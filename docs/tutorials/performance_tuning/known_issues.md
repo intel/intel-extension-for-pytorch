@@ -1,6 +1,8 @@
 Known Issues
 ============
 
+- Supporting of EmbeddingBag with INT8 when bag size > 1 is working in progress.
+
 - Compiling with gcc 11 might result in `illegal instruction` error.
 
 - `RuntimeError: Overflow when unpacking long` when a tensor's min max value exceeds int range while performing int8 calibration. Please customize QConfig to use min-max calibration method.

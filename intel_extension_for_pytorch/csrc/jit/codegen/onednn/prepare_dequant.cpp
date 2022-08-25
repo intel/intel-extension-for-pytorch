@@ -1,5 +1,6 @@
 #include "prepare_dequant.h"
 #include "operator.h"
+#include "utils.h"
 
 namespace torch_ipex {
 namespace jit {
@@ -151,12 +152,9 @@ void DequantInformationSave(Node* node) {
     return;
   }
   Node* input_node = node->input(0)->node();
-  TORCH_CHECK(
-      input_node->kind() == prim::Constant ||
-          input_node->kind() == Symbol::aten("quantize_per_tensor") ||
-          input_node->kind() == Symbol::aten("quantize_per_channel"),
-      "Unsupported input node kind to dequant ",
-      input_node->kind().toQualString());
+  if (!utils::isSupportedAsInputToDequant(input_node)) {
+    return;
+  }
   addInformationForDequant(node, input_node);
 }
 

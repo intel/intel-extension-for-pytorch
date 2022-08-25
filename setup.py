@@ -22,6 +22,12 @@
 #   CC
 #     the C/C++ compiler to use
 #
+#   MKLROOT
+#     specify MKL library path.
+#     ONLY NEEDED if you have a specific MKL version you want to link against.
+#     Make sure this directory contains include and lib directories.
+#     By default, the MKL library installed with pip/conda is used.
+#
 # Environment variables for feature toggles:
 #
 #   AVX2=1
@@ -53,7 +59,6 @@ from setuptools.command.egg_info import egg_info
 
 from subprocess import check_call, check_output
 from setuptools import setup, distutils
-from packaging.version import Version
 from sysconfig import get_paths
 
 import distutils.ccompiler
@@ -71,6 +76,13 @@ import warnings
 import urllib.request
 import re
 
+try:
+    from packaging import version as pkg_ver
+except Exception:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'packaging'])
+    from packaging import version as pkg_ver
+
+
 #TORCH_VERSION = '1.13.0'
 #TORCH_VERSION = os.getenv('TORCH_VERSION', TORCH_VERSION)
 
@@ -81,16 +93,13 @@ package_name = "intel_extension_for_pytorch"
 
 # build mode
 pytorch_install_dir = ''
-mkl_install_dir = ''
 USE_CXX11_ABI = 0
 mode = ''
 if len(sys.argv) > 1:
     if sys.argv[1] in ['build_clib', 'bdist_cppsdk']:
         mode = 'cppsdk'
         if len(sys.argv) != 3:
-            print('Please set path of libtorch directory if "build_clib" or "bdist_cppsdk" is applied.')
-            print('Usage: python setup.py [build_clib|bdist_cppsdk] <libtorch_path>')
-            exit(1)
+            raise RuntimeError('Please set path of libtorch directory if "build_clib" or "bdist_cppsdk" is applied.\nUsage: python setup.py [build_clib|bdist_cppsdk] <libtorch_path>')
         pytorch_install_dir = sys.argv[2]
         if pytorch_install_dir.startswith('.'):
             pytorch_install_dir = os.path.join(os.getcwd(), pytorch_install_dir)
@@ -122,14 +131,46 @@ if len(sys.argv) > 1:
         USE_CXX11_ABI = torch._C._GLIBCXX_USE_CXX11_ABI
 
 
+# configure for MKL
+mkl_install_dir = os.getenv('MKLROOT', '')
+if mode != 'clean':
+    if mkl_install_dir:
+        mkl_header = glob.glob(f'{mkl_install_dir}/include/**/mkl_version.h', recursive = True)
+        if len(mkl_header) == 0:
+            raise RuntimeError(f'{mkl_install_dir} doesn\'t seem to be a valid MKL library directory.\n{" ":14}mkl_version.h not found.')
+            mkl_install_dir = ''
+        else:
+            mkl_header = mkl_header[0]
+            mkl_major = 0
+            mkl_minor = 0
+            mkl_patch = 0
+            with open(mkl_header) as fp:
+                for line in fp:
+                    matches = re.match('#define __INTEL_MKL__ +(\d+)', line.strip())
+                    if matches:
+                        mkl_major = int(matches.groups()[0])
+                    matches = re.match('#define __INTEL_MKL_MINOR__ +(\d+)', line.strip())
+                    if matches:
+                        mkl_minor = int(matches.groups()[0])
+                    matches = re.match('#define __INTEL_MKL_UPDATE__ +(\d+)', line.strip())
+                    if matches:
+                        mkl_patch = int(matches.groups()[0])
+            mkl_version = f'{mkl_major}.{mkl_minor}.{mkl_patch}'
+            if pkg_ver.parse(mkl_version) < pkg_ver.parse('2021.0.0'):
+                raise RuntimeError(f'MKL version({mkl_version}) is not supported. Please use MKL later than 2021.0.0.')
+                mkl_install_dir = ''
+            mkl_library = glob.glob(f'{mkl_install_dir}/lib/**/libmkl_core.a', recursive = True)
+            if len(mkl_library) == 0:
+                raise RuntimeError(f'libmkl_core.a not found in {mkl_install_dir}/lib/intel64.')
+                mkl_install_dir = ''
+    if not mkl_install_dir:
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'mkl-include>=2021.0.0'])
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-deps', 'mkl-static>=2021.0.0'])
+        mkl_install_dir = os.path.abspath(os.path.join(os.path.dirname(sys.executable), ".."))
+
+
 # global supporting functions
 def _install_requirements():
-    try:
-        from packaging import version as pkg_ver
-    except Exception:
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'packaging'])
-        from packaging import version as pkg_ver
-
     installed_raw = {pkg for pkg in pkg_resources.working_set}
     installed = {}
     for i in installed_raw:
@@ -165,7 +206,6 @@ def _install_requirements():
         if restart:
             os.execv(sys.executable, ['python'] + sys.argv)
             exit(1)
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-deps', 'mkl-static'])
 
 
 def _build_installation_dependency():
@@ -222,7 +262,7 @@ def get_cmake_command():
     def _get_version(cmd):
         for line in check_output([cmd, '--version']).decode('utf-8').split('\n'):
             if 'version' in line:
-                return Version(line.strip().split(' ')[2])
+                return pkg_ver.parse(line.strip().split(' ')[2])
         raise RuntimeError('no version found')
     "Returns cmake command."
     cmake_command = 'cmake'
@@ -230,10 +270,10 @@ def get_cmake_command():
         return cmake_command
     cmake3 = which('cmake3')
     cmake = which('cmake')
-    if cmake3 is not None and _get_version(cmake3) >= Version("3.13.0"):
+    if cmake3 is not None and _get_version(cmake3) >= pkg_ver.parse("3.13.0"):
         cmake_command = 'cmake3'
         return cmake_command
-    elif cmake is not None and _get_version(cmake) >= Version("3.13.0"):
+    elif cmake is not None and _get_version(cmake) >= pkg_ver.parse("3.13.0"):
         return cmake_command
     else:
         raise RuntimeError('no cmake or cmake3 with version >= 3.13.0 found')
@@ -533,7 +573,6 @@ elif mode == 'python':
     _install_requirements()
 
     # Find the oneMKL library path
-    mkl_install_dir = os.path.abspath(os.path.join(os.path.dirname(sys.executable), ".."))
     mkl_lib_path = mkl_install_dir + "/lib/"
     mkl_include_path = mkl_install_dir + "/include/"
 
@@ -653,6 +692,12 @@ this_directory = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
+entry_points = {
+    'console_scripts': [
+        'ipexrun = intel_extension_for_pytorch.cpu.launch:main',
+    ]
+}
+
 setup(
     name='intel_extension_for_pytorch',
     version=ipex_build_version,
@@ -674,4 +719,5 @@ setup(
     zip_safe=False,
     ext_modules=ext_modules,
     cmdclass=cmdclass,
+    entry_points=entry_points,
     )

@@ -1,6 +1,10 @@
 Releases
 =============
 
+## 1.12.100
+
+This is a patch release to fix the AVX2 issue that blocks running on non-AVX512 platforms.
+
 ## 1.12.0
 
 We are excited to bring you the release of Intel® Extension for PyTorch\* 1.12.0-cpu, by tightly following PyTorch [1.12](https://github.com/pytorch/pytorch/releases/tag/v1.12.0) release. In this release, we matured the automatic int8 quantization and made it a stable feature. We stabilized runtime extension and brought about a MultiStreamModule feature to further boost throughput in offline inference scenario. We also brought about various enhancements in operation and graph which are positive for performance of broad set of workloads.

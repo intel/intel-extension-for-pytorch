@@ -14,7 +14,7 @@ The configurations are mainly around the following perspectives.
 
 The *launch* script is provided as a module of *intel_extension_for_pytorch*. You can take advantage of it with the following command:
 ```
-python -m intel_extension_for_pytorch.cpu.launch [knobs] <your_pytorch_script> [args]
+ipexrun [knobs] <your_pytorch_script> [args]
 ```
 
 Available option settings (knobs) are listed below:
@@ -86,7 +86,7 @@ __Note:__ GIF files below illustrate CPU usage ONLY. Do NOT infer performance nu
 #### I. Use all physical cores
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --log_path ./logs resnet50.py
+ipexrun --log_path ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched physical core number of threads on all physical cores.
@@ -119,7 +119,7 @@ $ cat logs/run_20210712212258_instances.log
 #### II. Use all cores including logical cores
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --use_logical_core --log_path ./logs resnet50.py
+ipexrun --use_logical_core --log_path ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on all cores, including logical cores.
@@ -152,7 +152,7 @@ $ cat logs/run_20210712223308_instances.log
 #### III. Use physical cores on 1 node
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --node_id 1 --log_path ./logs resnet50.py
+ipexrun --node_id 1 --log_path ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on all other cores on the same numa node.
@@ -185,7 +185,7 @@ $ cat logs/run_20210712214504_instances.log
 #### IV. Use your designated number of cores
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --ninstances 1 --ncore_per_instance 10 --log_path ./logs resnet50.py
+ipexrun --ninstances 1 --ncore_per_instance 10 --log_path ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on other 9 physical cores.
@@ -219,7 +219,7 @@ $ cat logs/run_20210712220928_instances.log
 #### V. Throughput mode
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --throughput_mode --log_path ./logs resnet50.py
+ipexrun --throughput_mode --log_path ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 2 main worker threads were launched on 2 numa nodes respectively, then they launched threads on other physical cores.
@@ -253,7 +253,7 @@ $ cat logs/run_20210712221150_instances.log
 #### VI. Latency mode
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --latency_mode --log_path ./logs resnet50.py
+ipexrun --latency_mode --log_path ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 4 cores are used for each instance.
@@ -306,7 +306,7 @@ $ cat logs/run_20210712221415_instances.log
 #### VII. Your designated number of instances
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --ninstances 4 --log_path ./logs resnet50.py
+ipexrun --ninstances 4 --log_path ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 4 main worker thread were launched, then they launched threads on all other physical cores.
@@ -345,7 +345,7 @@ $ cat logs/run_20210712221305_instances.log
 Launcher by default runs all `ninstances` for multi-instance inference/training as shown above. You can specify `instance_idx` to independently run that instance only among `ninstances`
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --ninstances 4 --instance_idx 0 --log_path ./logs resnet50.py
+ipexrun --ninstances 4 --instance_idx 0 --log_path ./logs resnet50.py
 ```
 
 you can confirm usage in log file:
@@ -360,7 +360,7 @@ you can confirm usage in log file:
 ```
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --ninstances 4 --instance_idx 1 --log_path ./logs resnet50.py
+ipexrun --ninstances 4 --instance_idx 1 --log_path ./logs resnet50.py
 ```
 
 you can confirm usage in log file:
@@ -383,7 +383,7 @@ Memory allocator influences performance sometime. If users do not designate desi
 __Note:__ You can set your favorite value to *MALLOC_CONF* before running the *launch* script if you do not want to use its default setting.
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --enable_jemalloc --log_path ./logs resnet50.py
+ipexrun --enable_jemalloc --log_path ./logs resnet50.py
 ```
 
 you can confirm usage in log file:
@@ -403,7 +403,7 @@ you can confirm usage in log file:
 #### TCMalloc
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --enable_tcmalloc --log_path ./logs resnet50.py
+ipexrun --enable_tcmalloc --log_path ./logs resnet50.py
 ```
 
 you can confirm usage in log file:
@@ -422,7 +422,7 @@ you can confirm usage in log file:
 #### Default memory allocator
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --use_default_allocator --log_path ./logs resnet50.py
+ipexrun --use_default_allocator --log_path ./logs resnet50.py
 ```
 
 you can confirm usage in log file:
@@ -448,7 +448,7 @@ Generally, Intel OpenMP library brings better performance. Thus, in the *launch*
 It is, however, not always that Intel OpenMP library brings better performance comparing to GNU OpenMP library. In this case, you can use knob ```--disable_iomp``` to switch active OpenMP library to the GNU one.
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --disable_iomp --log_path ./logs resnet50.py
+ipexrun --disable_iomp --log_path ./logs resnet50.py
 ```
 
 you can confirm usage in log file:
