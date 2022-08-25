@@ -237,6 +237,20 @@ static constexpr auto dpcpp_dev_native_vec_width_double =
 static constexpr auto dpcpp_dev_native_vec_width_half =
     sycl::info::device::native_vector_width_half;
 
+// intel extensions
+static constexpr auto dpcpp_dev_ext_intel_gpu_eu_simd_width =
+    sycl::info::device::ext_intel_gpu_eu_simd_width;
+static constexpr auto dpcpp_dev_ext_intel_gpu_hw_threads_per_eu =
+    sycl::info::device::ext_intel_gpu_hw_threads_per_eu;
+
+// aspects for extensions
+static constexpr auto dpcpp_dev_aspect_gpu_eu_simd_width =
+    sycl::aspect::ext_intel_gpu_eu_simd_width;
+static constexpr auto dpcpp_dev_aspect_hw_threads_per_eu =
+    sycl::aspect::ext_intel_gpu_hw_threads_per_eu;
+static constexpr auto dpcpp_dev_aspect_fp64 = sycl::aspect::fp64;
+static constexpr auto dpcpp_dev_aspect_atomic64 = sycl::aspect::atomic64;
+
 // dpcpp event info
 static constexpr auto dpcpp_event_exec_stat =
     sycl::info::event::command_execution_status;

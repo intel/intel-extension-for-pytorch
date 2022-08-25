@@ -67,6 +67,39 @@ static inline int64_t dpcppMaxComputeUnitSize(
   return dev_prop->max_compute_units;
 }
 
+static inline int64_t dpcppGpuEuSimdWidth(
+    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  return dev_prop->gpu_eu_simd_width;
+}
+
+static inline int64_t dpcppGpuHWThreadsPerEU(
+    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  return dev_prop->gpu_hw_threads_per_eu;
+}
+
+static inline bool dpcppSupportAtomic64(
+    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  return dev_prop->support_atomic64;
+}
+
+static inline bool dpcppSupportFP64(
+    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  return dev_prop->support_fp64;
+}
+
+static inline int64_t dpcppMaxWorkItemsPerTile(
+    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  int64_t eu_num = dev_prop->max_compute_units;
+  int64_t simd_width = dpcppMaxSubGroupSize(dev_id);
+  int64_t hw_threads = dev_prop->gpu_hw_threads_per_eu;
+  return eu_num * simd_width * hw_threads;
+}
+
 static inline int64_t dpcppMaxDSSNum(
     DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
   // TODO: We need to got this info from DPC++ Runtime

@@ -254,6 +254,17 @@ static void initDeviceProperty(DeviceId device_id) {
   device_prop.native_vec_width_half =
       device.get_info<dpcpp_dev_native_vec_width_half>();
 
+  // intel extensions
+  device_prop.gpu_eu_simd_width = device.has(dpcpp_dev_aspect_gpu_eu_simd_width)
+      ? device.get_info<dpcpp_dev_ext_intel_gpu_eu_simd_width>()
+      : 8;
+  device_prop.gpu_hw_threads_per_eu =
+      device.has(dpcpp_dev_aspect_hw_threads_per_eu)
+      ? device.get_info<dpcpp_dev_ext_intel_gpu_hw_threads_per_eu>()
+      : 8;
+  device_prop.support_atomic64 = device.has(dpcpp_dev_aspect_atomic64);
+  device_prop.support_fp64 = device.has(dpcpp_dev_aspect_fp64);
+
   device_properties[device_id] = device_prop;
 }
 

@@ -49,13 +49,10 @@ void fractional_max_pool2d_out_frame(
   auto& queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
-  int64_t max_sg_size = SYCL_MAX_SUB_GROUP_SIZE;
   int outputSize = numBatch * numPlane * outputSizeH * outputSizeW;
   int work_group_size = outputSize > max_wg_size ? max_wg_size : outputSize;
-  auto eu_num = dpcppGetCurrentDeviceProperties()->max_compute_units;
   // One full device launch could launch en_num * SMID32 * HD threads as below
-  const auto target_global_size =
-      eu_num * max_sg_size /* SIMD32 */ * 8 /* HD threads */;
+  const auto target_global_size = dpcppMaxWorkItemsPerTile(dev_id);
   // Each work group size is work_group_size, one full device launch is
   // target_global_size, so we can calculate max work group num as below
   const int max_work_group_num = target_global_size / work_group_size;
