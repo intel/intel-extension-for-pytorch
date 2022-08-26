@@ -928,6 +928,14 @@ at::Tensor trans_addmm(
   return at::AtenIpexTypeXPU::trans_addmm(bias, input, weight, beta, alpha);
 }
 
+at::Tensor linear_gelu(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias) {
+  const OptionalDeviceGuard device_guard(device_of(input));
+  return at::AtenIpexTypeXPU::linear_gelu(input, weight, bias);
+}
+
 at::Tensor trans_addmm_relu(
     const at::Tensor& weight,
     const at::Tensor& bias,

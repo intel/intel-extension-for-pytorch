@@ -119,6 +119,16 @@ class PermuteContiguous(torch.nn.Module):
         x = torch.permute(x, [0, 2, 3, 1])
         return x.contiguous()
 
+class LinearGELU(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearGELU, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.gelu = nn.GELU()
+
+    def forward(self, x):
+        x = self.gelu(self.linear(x))
+        return x
+
 
 class LinearReLU(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -495,6 +505,23 @@ class TestNNMethod(TestCase):
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_gelu(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearGELU(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            # print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device), atol=1e-3, rtol=1.3e-6)
         del modelJit
 
     def test_linear_sigmoid(self, dtype=torch.float):

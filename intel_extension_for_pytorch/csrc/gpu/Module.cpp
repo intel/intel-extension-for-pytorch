@@ -480,6 +480,14 @@ at::Scalar scalar_slow(PyObject* object) {
 
 void init_module(pybind11::module& m) {
   m.def(
+      "linear_gelu",
+      [](const at::Tensor& input,
+         const at::Tensor& weight,
+         const at::Tensor& bias) {
+        return at::AtenIpexTypeXPU::linear_gelu(input, weight, bias);
+      },
+      "fused linear with gelu opt. on Intel device");
+  m.def(
       "linear_relu",
       [](const at::Tensor& input,
          const at::Tensor& weight,

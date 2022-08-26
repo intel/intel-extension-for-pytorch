@@ -189,6 +189,11 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
     bool keepdim,
     bool take_sqrt);
 
+at::Tensor linear_gelu(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias);
+
 at::Tensor trans_addmm_relu(
     const at::Tensor& input,
     const at::Tensor& weight,

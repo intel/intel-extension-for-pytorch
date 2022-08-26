@@ -610,6 +610,19 @@ RegisterOperators op(
             },
             aliasAnalysisFromSchema()),
         Operator(
+            "xpu::linear_gelu(Tensor input, Tensor weight, Tensor? bias=None) -> Tensor",
+            [](const Node* node) -> Operation {
+              return [](Stack& stack) {
+                auto result = torch::jit::xpu::linear_gelu(
+                    (std::move(peek(stack, 0, 3))).toTensor(),
+                    (std::move(peek(stack, 1, 3))).toTensor(),
+                    toOptionalTensor(std::move(peek(stack, 2, 3))));
+                drop(stack, 3);
+                pack(stack, std::move(result));
+              };
+            },
+            aliasAnalysisFromSchema()),
+        Operator(
             "xpu::t_addmm_relu(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha) -> Tensor",
             [](const Node* node) -> Operation {
               return [](Stack& stack) {

@@ -456,6 +456,10 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_sym,
       Symbol::fromQualString("quantized::add")},
      xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_add_sym},
+    // BERT: linear with bias + gelu
+    {{aten::linear, aten::gelu}, xpu::linear_gelu_sym},
+    {{aten::linear, Symbol::fromQualString("aten::gelu_")},
+     xpu::linear_gelu_sym},
     // DLRM: linear with bias + relu/sigmoid
     {{aten::t, aten::addmm}, xpu::t_addmm_sym},
     {{xpu::t_addmm_sym, aten::relu}, xpu::t_addmm_relu_sym},

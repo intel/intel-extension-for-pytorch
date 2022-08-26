@@ -62,6 +62,7 @@ static auto q_conv2d_dequantize_softplus_tanh_mul_quantize_add_sym =
 static auto t_addmm_sym = Symbol::fromQualString("xpu::t_addmm");
 static auto t_addmm_dropout_sym =
     Symbol::fromQualString("xpu::t_addmm_dropout");
+static auto linear_gelu_sym = Symbol::fromQualString("xpu::linear_gelu");
 static auto t_addmm_relu_sym = Symbol::fromQualString("xpu::t_addmm_relu");
 static auto t_addmm_sigmoid_sym =
     Symbol::fromQualString("xpu::t_addmm_sigmoid");
