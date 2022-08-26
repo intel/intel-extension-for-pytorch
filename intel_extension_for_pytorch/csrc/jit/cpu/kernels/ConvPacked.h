@@ -16,6 +16,15 @@ namespace convolution {
       const at::Tensor& input,                          \
       const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
 
+static void check_shape_forward(
+    const at::IntArrayRef& input_sizes,
+    const at::IntArrayRef& weight_sizes,
+    const c10::optional<at::Tensor>& bias,
+    const at::IntArrayRef& padding,
+    const at::IntArrayRef& stride,
+    const at::IntArrayRef& dilation,
+    const int64_t groups);
+
 c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
