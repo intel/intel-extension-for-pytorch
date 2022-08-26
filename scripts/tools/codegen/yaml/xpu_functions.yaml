@@ -684,6 +684,10 @@ supported:
   - _foreach_zero_
   - _thnn_fused_gru_cell
   - _thnn_fused_gru_cell_backward
+  - logaddexp
+  - logaddexp.out
+  - logaddexp2
+  - logaddexp2.out
 autograd:
   - cdist
   - lstm.input
