@@ -2,6 +2,7 @@
 #include <core/detail/TensorInfo.h>
 #include <utils/DPCPP.h>
 #include "BatchKernel.h"
+#include "comm/Numerics.h"
 #include "comm/TensorOptions.h"
 
 using namespace xpu::dpcpp::detail;
@@ -18,7 +19,8 @@ template <class LSConfig, class T, class BinaryFunction>
 DPCPP_DEVICE T group_x_scan_by_uds_for_loop_scan(
     sycl::nd_item<2> item,
     const T pre_max_carr,
-    int64_t base_off,
+    int64_t base_off_batch,
+    int64_t base_off_problem,
     dpcpp_local_ptr<T> slm,
     LSConfig cfg) {
   using InputInfo = typename LSConfig::InputInfoType;
@@ -38,31 +40,33 @@ DPCPP_DEVICE T group_x_scan_by_uds_for_loop_scan(
   const auto rx = item.get_local_range(1);
   const auto ry = item.get_local_range(0);
 
-  uint32_t ix0 = base_off + lix;
-  uint32_t ix1 = base_off + rx + lix;
+  uint32_t ix0 = base_off_problem + lix;
+  uint32_t ix1 = base_off_problem + rx + lix;
+  uint32_t glb0 = base_off_batch * cfg.problem_ + ix0;
+  uint32_t glb1 = base_off_batch * cfg.problem_ + ix1;
 
-  glb_ldr_logical_off_0 = ix0 + id.glb_batch * cfg.problem_;
+  glb_ldr_logical_off_0 = glb0;
   glb_ldr_off_0 = IndexToOffset<typename InputInfo::scalar_t, int64_t>::get(
       glb_ldr_logical_off_0,
       cfg.input_,
       IndexToOffset<typename InputInfo::scalar_t, int64_t>::
           NON_STRICT_CONTIGUOUS);
 
-  glb_ldr_logical_off_1 = ix1 + id.glb_batch * cfg.problem_;
+  glb_ldr_logical_off_1 = glb1;
   glb_ldr_off_1 = IndexToOffset<typename InputInfo::scalar_t, int64_t>::get(
       glb_ldr_logical_off_1,
       cfg.input_,
       IndexToOffset<typename InputInfo::scalar_t, int64_t>::
           NON_STRICT_CONTIGUOUS);
 
-  glb_str_logical_off_0 = ix0 + id.glb_batch * cfg.problem_;
+  glb_str_logical_off_0 = glb0;
   glb_str_off_0 = IndexToOffset<typename OutputInfo::scalar_t, int64_t>::get(
       glb_str_logical_off_0,
       cfg.output_,
       IndexToOffset<typename OutputInfo::scalar_t, int64_t>::
           NON_STRICT_CONTIGUOUS);
 
-  glb_str_logical_off_1 = ix1 + id.glb_batch * cfg.problem_;
+  glb_str_logical_off_1 = glb1;
   glb_str_off_1 = IndexToOffset<typename OutputInfo::scalar_t, int64_t>::get(
       glb_str_logical_off_1,
       cfg.output_,
@@ -73,7 +77,7 @@ DPCPP_DEVICE T group_x_scan_by_uds_for_loop_scan(
   // Read data from global memory to shared local memory
   // Each work item load 2 elements from global device memory to shared local
   // memory
-  if (id.glb_batch < cfg.batch_) {
+  if (base_off_batch < cfg.batch_) {
     if (ix0 < cfg.problem_) {
       slm[liy * rx * 2 + lix] = cfg.input_.data[glb_ldr_off_0];
     } else {
@@ -97,7 +101,7 @@ DPCPP_DEVICE T group_x_scan_by_uds_for_loop_scan(
 
   // Parallel reduction (Up-sweep)
   for (uint32_t s = rx, d = 1; s >= 1; s >>= 1, d <<= 1) {
-    if (id.glb_batch < cfg.batch_ && lix < s) {
+    if (base_off_batch < cfg.batch_ && lix < s) {
       uint32_t offset = liy * rx * 2 + (2 * lix + 1) * d - 1;
       slm[offset + d] = cfg.func_(slm[offset], slm[offset + d]);
     }
@@ -108,7 +112,7 @@ DPCPP_DEVICE T group_x_scan_by_uds_for_loop_scan(
 
   // Down-sweep
   for (uint32_t s = 2, d = rx / 2; d >= 1; s <<= 1, d >>= 1) {
-    if (id.glb_batch < cfg.batch_ && lix < s - 1) {
+    if (base_off_batch < cfg.batch_ && lix < s - 1) {
       uint32_t offset = liy * rx * 2 + 2 * (lix + 1) * d - 1;
       slm[offset + d] = cfg.func_(slm[offset], slm[offset + d]);
     }
@@ -118,7 +122,7 @@ DPCPP_DEVICE T group_x_scan_by_uds_for_loop_scan(
   }
 
   // Write back from shared local memory to global memory
-  if (id.glb_batch < cfg.batch_) {
+  if (base_off_batch < cfg.batch_) {
     if (ix0 < cfg.problem_) {
       cfg.output_.data[glb_str_off_0] = slm[liy * rx * 2 + lix];
     }
@@ -277,20 +281,25 @@ class LoopScanConfig {
         wg_range_x_(0),
         wg_range_y_(0) {
     int64_t wg_size = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
+    auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
     wg_range_x_ = 32;
     while (problem_ <= wg_range_x_ >> 1) {
       wg_range_x_ = wg_range_x_ >> 1;
     }
     wg_range_y_ = wg_size / wg_range_x_;
-
+    const auto target_global_size = dpcppMaxWorkItemsPerTile(dev_id);
+    ;
+    const int max_work_group_num = target_global_size / wg_size;
+    const int wg_number =
+        std::min(max_work_group_num, CeilDiv((int)batch_, wg_range_y_));
     glb_range_x_ = wg_range_x_;
-    glb_range_y_ =
-        wg_range_y_ * (int)((batch_ + wg_range_y_ - 1) / wg_range_y_);
+    glb_range_y_ = wg_range_y_ * wg_number;
 
     // For up down sweep algorithm, each work-item handle two elements.
     // This means that one work group would handle 2 times work group size
     // elements.
-    loops_ = (problem_ + (wg_range_x_ * 2) - 1) / (wg_range_x_ * 2);
+    loops_batch = (batch_ + glb_range_y_ - 1) / glb_range_y_;
+    loops_problem = (problem_ + (wg_range_x_ * 2) - 1) / (wg_range_x_ * 2);
   }
 
   static LoopScanConfig<InputInfo, OutputInfo, T, BinaryFunction> make_config(
@@ -337,7 +346,8 @@ class LoopScanConfig {
   int64_t problem_;
   int64_t stride_;
   T init_;
-  int loops_;
+  int loops_batch;
+  int loops_problem;
   ScanType type_;
   BinaryFunction func_;
   int glb_range_x_;
@@ -355,17 +365,26 @@ class loop_scan_kernel {
       sycl::nd_item<2> item,
       dpcpp_local_acc_t<T> slm,
       dpcpp_local_acc_t<T> max_carr) const {
-    const int loops = cfg.loops_;
+    const int loops_batch = cfg.loops_batch;
+    const int loops_problem = cfg.loops_problem;
     const auto group_size_x = cfg.wg_range_x_;
     const auto liy = item.get_local_id(0);
-    max_carr[liy] = cfg.init_;
 
-    for (int i = 0; i < loops; ++i) {
-      // calculate base addr offset for each loop
-      int64_t base_off = i * group_size_x * 2;
-      max_carr[liy] =
-          group_x_scan_by_uds_for_loop_scan<LSConfig, T, BinaryFunction>(
-              item, max_carr[liy], base_off, slm, cfg);
+    for (int k = 0; k < loops_batch; ++k) {
+      max_carr[liy] = cfg.init_;
+      int64_t base_off_batch = k * cfg.glb_range_y_ + item.get_global_id(0);
+      for (int i = 0; i < loops_problem; ++i) {
+        // calculate base addr offset for each loop
+        int64_t base_off_problem = i * group_size_x * 2;
+        max_carr[liy] =
+            group_x_scan_by_uds_for_loop_scan<LSConfig, T, BinaryFunction>(
+                item,
+                max_carr[liy],
+                base_off_batch,
+                base_off_problem,
+                slm,
+                cfg);
+      }
     }
   }
 
