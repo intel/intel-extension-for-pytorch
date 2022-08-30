@@ -1,8 +1,8 @@
 #include "Matmul.h"
 #include <ATen/ATen.h>
 #include <ATen/native/Resize.h>
+#include <torch/all.h>
 #include <torch/csrc/autograd/functions/utils.h>
-#include <torch/extension.h>
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
 #include "csrc/utils/fpmath_mode.h"
@@ -272,7 +272,10 @@ at::Tensor matmul_impl(
     c10::optional<at::Tensor> out_opt,
     const at::Tensor& tensor1,
     const at::Tensor& tensor2) {
-  bool useOneDNN =
+  auto has_out = out_opt.has_value();
+  at::Tensor out = out_opt.value_or(at::Tensor());
+  bool useOneDNN = tensor1.device().is_cpu() && tensor2.device().is_cpu() &&
+      (!out.defined() || out.device().is_cpu()) &&
       (torch_ipex::getFP32MathModeCpu() == torch_ipex::FP32MathMode::BF32) &&
       (tensor1.scalar_type() == at::ScalarType::Float) &&
       (tensor2.scalar_type() == at::ScalarType::Float) &&
@@ -280,8 +283,6 @@ at::Tensor matmul_impl(
   at::NoNamesGuard guard;
   auto dim_tensor1 = tensor1.dim();
   auto dim_tensor2 = tensor2.dim();
-  auto has_out = out_opt.has_value();
-  at::Tensor out = out_opt.value_or(at::Tensor());
 
   if (dim_tensor1 == 1 && dim_tensor2 == 1) {
     return has_out ? at::native::dot_out(tensor1, tensor2, out)
@@ -464,7 +465,7 @@ at::Tensor& matmul_out_cpu(
 
 namespace {
 
-IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
+IPEX_TORCH_LIBRARY_IMPL(aten, CompositeImplicitAutograd, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::matmul"),
       TORCH_FN((&torch_ipex::cpu::matmul_cpu)));

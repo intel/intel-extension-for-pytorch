@@ -1,6 +1,6 @@
 #include <ATen/Tensor.h>
 #include <intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h>
-#include <torch/extension.h>
+#include <torch/all.h>
 
 namespace torch_ipex {
 

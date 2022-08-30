@@ -4,7 +4,7 @@
 #include <c10/core/CPUAllocator.h>
 #include <csrc/dyndisp/DispatchStub.h>
 #include <omp.h>
-#include <torch/extension.h>
+#include <torch/all.h>
 
 namespace torch_ipex {
 namespace cpu {

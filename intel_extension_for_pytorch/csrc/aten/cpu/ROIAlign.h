@@ -2,7 +2,7 @@
 
 #include <ATen/ATen.h>
 #include <csrc/dyndisp/DispatchStub.h>
-#include <torch/extension.h>
+#include <torch/all.h>
 
 namespace torch_ipex {
 namespace cpu {

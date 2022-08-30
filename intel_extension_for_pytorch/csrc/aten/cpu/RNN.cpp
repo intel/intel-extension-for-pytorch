@@ -8,7 +8,7 @@
 #include <ATen/quantized/QTensorImpl.h>
 #include <ATen/record_function.h>
 #include <c10/util/Exception.h>
-#include <torch/extension.h>
+#include <torch/all.h>
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"

@@ -1,7 +1,7 @@
 #include "optimizer.h"
 
+#include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
-#include <torch/extension.h>
 
 namespace torch_ipex {
 namespace cpu {

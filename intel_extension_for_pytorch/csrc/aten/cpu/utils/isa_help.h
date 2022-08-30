@@ -1,7 +1,7 @@
 #pragma once
 
 #include <ATen/Tensor.h>
-#include <torch/extension.h>
+#include <torch/all.h>
 #include <string>
 #include "intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h"
 

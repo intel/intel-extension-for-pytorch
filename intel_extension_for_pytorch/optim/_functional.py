@@ -275,14 +275,12 @@ def _single_tensor_sgd(params: List[Tensor],
                       maximize: bool,
                       has_sparse_grad: bool,
                       fused: bool):
-    if maximize:
-        lr = -lr
-
     for i, param in enumerate(params):
-        if not grads[i].is_sparse:
+        grad = grads[i] if not maximize else -grads[i]
+        if not grad.is_sparse:
             momentum_buffer_list[i] = torch.ops.torch_ipex.sgd_fused_step(
                 param,
-                grads[i],
+                grad,
                 momentum_buffer_list[i],
                 params2[i],
                 momentum,
@@ -294,19 +292,19 @@ def _single_tensor_sgd(params: List[Tensor],
 
         if (
             param.dtype == torch.bfloat16 and
-            grads[i].is_sparse and
-            grads[i].dtype == torch.bfloat16 and
+            grad.is_sparse and
+            grad.dtype == torch.bfloat16 and
             weight_decay == 0 and
             momentum == 0
         ):
             # packed_add can support sparse tensor
-            torch.ops.torch_ipex.packed_add(param, params2[i], grads[i], alpha=-lr)
+            torch.ops.torch_ipex.packed_add(param, params2[i], grad, alpha=-lr)
         else:
             # no special optimize for other non fused case, fall back to naive implementation
-            grads[i] = grads[i].to(param.dtype)
+            grad = grad.to(param.dtype)
             momentum_buffer_list[i] = _sgd_non_fused_micro_step(
                 param,
-                grads[i],
+                grad,
                 momentum_buffer_list[i],
                 momentum,
                 lr,

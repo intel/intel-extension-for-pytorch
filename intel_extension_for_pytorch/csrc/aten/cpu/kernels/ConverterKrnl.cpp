@@ -1,8 +1,8 @@
 #include <csrc/aten/cpu/Converter.h>
 #include "csrc/cpu/vec/vec.h"
 
+#include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
-#include <torch/extension.h>
 
 #define BF16_2_FP32(dst, src, len) cvt_bf16_to_fp32(dst, src, len)
 #define FP32_2_BF16(dst, src, len) cvt_fp32_to_bf16(dst, src, len)

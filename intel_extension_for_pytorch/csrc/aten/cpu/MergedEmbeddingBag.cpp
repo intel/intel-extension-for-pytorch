@@ -1,7 +1,7 @@
 #include "MergedEmbeddingBag.h"
 #include <ATen/AccumulateType.h>
 #include <ATen/Tensor.h>
-#include <torch/extension.h>
+#include <torch/all.h>
 #include "csrc/autocast/autocast_mode.h"
 
 namespace torch_ipex {

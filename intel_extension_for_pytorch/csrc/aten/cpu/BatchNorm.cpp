@@ -1,4 +1,4 @@
-#include <torch/extension.h>
+#include <torch/all.h>
 
 #include "BatchNorm.h"
 #include "csrc/autocast/autocast_mode.h"

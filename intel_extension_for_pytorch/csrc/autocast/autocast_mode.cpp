@@ -165,7 +165,8 @@ MAKE_REGISTER_FUNC(
         const Tensor&,
         const c10::optional<Tensor>&,
         bool,
-        bool),
+        bool,
+        c10::optional<int64_t>),
     user_defined_dtype)
 
 // fp32 cast policy a.k.a BlackList

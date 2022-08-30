@@ -94,7 +94,7 @@ class AutocastCPUTestLists(object):
                                               torch.randn((2304), device=dev, dtype=torch.float32),
                                               torch.randn((768, 768), device=dev, dtype=torch.float32),
                                               torch.randn((768), device=dev, dtype=torch.float32),
-                                              None, False, True)),
+                                              None, False, True, 1)),
             ("_native_multi_head_attention", (torch.randn((1, 2, 768), device=dev, dtype=torch.float32),
                                               torch.randn((1, 2, 768), device=dev, dtype=torch.float32),
                                               torch.randn((1, 2, 768), device=dev, dtype=torch.float32),
@@ -102,7 +102,7 @@ class AutocastCPUTestLists(object):
                                               torch.randn((2304), device=dev, dtype=torch.float32),
                                               torch.randn((768, 768), device=dev, dtype=torch.float32),
                                               torch.randn((768), device=dev, dtype=torch.float32),
-                                              torch.Tensor([[False, True]]), False, True)),
+                                              torch.Tensor([[False, True]]), False, True, 1)),
         ]
         self.torch_fp32 = [
         ]

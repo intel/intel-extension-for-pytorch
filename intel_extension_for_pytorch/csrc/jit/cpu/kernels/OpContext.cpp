@@ -1,5 +1,5 @@
 #include "OpContext.h"
-#include <torch/extension.h>
+#include <torch/all.h>
 #include "ConvPacked.h"
 #include "ConvTransposePacked.h"
 #include "LinearMKLPacked.h"

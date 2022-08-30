@@ -1,6 +1,6 @@
 #include "Converter.h"
 #include <ATen/Parallel.h>
-#include <torch/extension.h>
+#include <torch/all.h>
 
 namespace torch_ipex {
 namespace cpu {

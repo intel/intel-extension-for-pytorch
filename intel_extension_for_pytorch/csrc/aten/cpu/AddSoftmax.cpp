@@ -1,5 +1,5 @@
 #include "AddSoftmax.h"
-#include <torch/extension.h>
+#include <torch/all.h>
 
 namespace torch_ipex {
 namespace cpu {
