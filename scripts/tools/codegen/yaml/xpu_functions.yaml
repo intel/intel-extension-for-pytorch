@@ -689,6 +689,12 @@ supported:
   - logaddexp.out
   - logaddexp2
   - logaddexp2.out
+  - gcd
+  - gcd.out
+  - gcd_
+  - lcm
+  - lcm.out
+  - lcm_
 autograd:
   - cdist
   - lstm.input
