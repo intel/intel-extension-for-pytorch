@@ -9,6 +9,8 @@ Installation Guide
 |Operating System|CentOS 7, RHEL 8, Rocky Linux 8.5, Ubuntu newer than 18.04|
 |Python|See prebuilt wheel files availability matrix below|
 
+* Intel® Extension for PyTorch\* is functional on systems with AVX2 instruction set support (such as Intel® Core™ Processor Family and Intel® Xeon® Processor formerly Broadwell). However, it is highly recommended to run on systems with AVX-512 and above instructions support for optimal performance (such as Intel® Xeon® Scalable Processors).
+
 ## Install PyTorch
 
 Make sure PyTorch is installed so that the extension will work properly. For each PyTorch release, we have a corresponding release of the extension. Here are the PyTorch versions that we support and the mapping relationship:
