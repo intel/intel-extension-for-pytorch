@@ -333,8 +333,12 @@ void fractional_max_pool2d_out_template(
     indices_ = indices_.reshape({1, numPlanes, outputH, outputW});
     input_ = input_.reshape({1, input.size(0), input.size(1), input.size(2)});
   }
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "fractional_max_pool2d_out_frame", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      input.scalar_type(),
+      "fractional_max_pool2d_out_frame",
+      [&] {
         fractional_max_pool2d_out_frame<scalar_t>(
             output_.data_ptr<scalar_t>(),
             indices_.data_ptr<int64_t>(),
