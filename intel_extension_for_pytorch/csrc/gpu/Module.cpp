@@ -129,6 +129,11 @@ static PyObject* THPModule_initExtension(PyObject* self, PyObject* noargs) {
     }
   };
 
+  // Here is thread safety. Set run_yet TRUE before device_count() to avoid
+  // circular calls.
+  // Put set_run_yet_variable_to_true() here instead of in C++ API's lazy_init()
+  // to avoid circular calls when directly call Python API's _lazy_init().
+  set_run_yet_variable_to_true();
   auto num_gpus = xpu::dpcpp::device_count();
   auto default_dpcpp_generators =
       PyTuple_New(static_cast<Py_ssize_t>(num_gpus));

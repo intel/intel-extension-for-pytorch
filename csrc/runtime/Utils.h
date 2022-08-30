@@ -19,6 +19,8 @@ void lazy_init();
 
 void set_run_yet_variable_to_false();
 
+void set_run_yet_variable_to_true();
+
 static inline bool dpcppIsAvailable() {
   int count;
   dpcppGetDeviceCount(&count);
