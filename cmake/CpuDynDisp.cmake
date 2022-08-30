@@ -207,9 +207,12 @@ if (NOT MKL_LIBRARY)
 endif()
 get_filename_component(MKL_LIBRARY_DIR ${MKL_LIBRARY} DIRECTORY)
 message(STATUS "Using MKL in ${MKL_LIBRARY_DIR}")
-target_link_libraries(${PLUGIN_NAME} PUBLIC ${MKL_LIBRARY_DIR}/libmkl_intel_lp64.a)
-target_link_libraries(${PLUGIN_NAME} PUBLIC ${MKL_LIBRARY_DIR}/libmkl_gnu_thread.a)
-target_link_libraries(${PLUGIN_NAME} PUBLIC ${MKL_LIBRARY_DIR}/libmkl_core.a)
+target_link_libraries(${PLUGIN_NAME} PUBLIC
+  -Wl,--start-group
+  ${MKL_LIBRARY_DIR}/libmkl_intel_lp64.a
+  ${MKL_LIBRARY_DIR}/libmkl_gnu_thread.a
+  ${MKL_LIBRARY_DIR}/libmkl_core.a
+  -Wl,--end-group)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
