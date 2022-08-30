@@ -829,11 +829,11 @@ at::Tensor dequant_pixelshuffle_quant(
 }
 
 at::Tensor q_conv2d_sum_relu(
-    at::Tensor& accumu,
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double conv_scale,
     int64_t conv_zpoint,
+    at::Tensor& accumu,
     double sum_scale,
     int64_t sum_zpoint) {
   RECORD_FUNCTION(

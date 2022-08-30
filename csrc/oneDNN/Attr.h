@@ -113,27 +113,30 @@ class Attr {
   algorithm kind_with_swish = algorithm::eltwise_swish;
 
   // append sum post op
-  void append_post_sum(
+  Attr& append_post_sum(
       float sum_scale,
       float sum_q_scale = 1.f,
       int64_t zp = 0) {
     ops_params_.push_back(
         PostOpParam(/*scale_sum*/ sum_scale * sum_q_scale, kind_t::sum));
+    return *this;
   }
 
   // append eltwise post op
-  void append_post_eltwise(
+  Attr& append_post_eltwise(
       float scale,
       float alpha,
       float beta,
       algorithm algo) {
     ops_params_.push_back(
         PostOpParam(scale, alpha, beta, algo, kind_t::eltwise));
+    return *this;
   }
 
   // append prelu post op
-  void append_post_prelu(int mask) {
+  Attr& append_post_prelu(int mask) {
     ops_params_.push_back(PostOpParam(mask, kind_t::prelu));
+    return *this;
   }
 
   // This function only work for int8

@@ -1,9 +1,119 @@
 #include <quantized/QUtil.h>
 #include <torch/csrc/jit/runtime/custom_operator.h>
 #include <torch/csrc/jit/runtime/operator.h>
+#include <vector>
+#include "ATen/core/ivalue.h"
+#include "ATen/native/quantized/cpu/conv_packed_params.h"
 #include "accelerated_ops.h"
+#include "c10/core/Scalar.h"
+#include "c10/core/ScalarType.h"
+#include "c10/util/Exception.h"
+#include "c10/util/Optional.h"
+#include "c10/util/intrusive_ptr.h"
 #include "dpcpp_ops.h"
-//#include "graph_ext.h"
+
+namespace {
+// using namespace torch;
+using namespace at::native;
+using namespace torch::jit;
+struct TensorLValue;
+struct TensorNeedPlain;
+template <typename T>
+struct IvalueConvert {
+  T operator()(c10::IValue&) {}
+};
+
+#define DEFINE_CONVERTER(T, mf)           \
+  template <>                             \
+  struct IvalueConvert<T> {               \
+    T operator()(c10::IValue& i_value) {  \
+      return i_value.mf;                  \
+    }                                     \
+    T operator()(c10::IValue&& i_value) { \
+      return i_value.mf;                  \
+    }                                     \
+  };
+
+#define DEFINE_CUSTOMTYPE_CONVERT(T)                          \
+  template <>                                                 \
+  struct IvalueConvert<T> {                                   \
+    c10::intrusive_ptr<T> operator()(c10::IValue& i_value) {  \
+      return i_value.toCustomClass<T>();                      \
+    }                                                         \
+    c10::intrusive_ptr<T> operator()(c10::IValue&& i_value) { \
+      return i_value.toCustomClass<T>();                      \
+    }                                                         \
+  };
+
+DEFINE_CONVERTER(at::Tensor, toTensor())
+DEFINE_CONVERTER(std::vector<int64_t>, toIntVector())
+DEFINE_CONVERTER(at::Scalar, toScalar())
+DEFINE_CONVERTER(at::ScalarType, toScalarType())
+DEFINE_CONVERTER(at::MemoryFormat, toMemoryFormat())
+DEFINE_CONVERTER(at::QScheme, toQScheme())
+DEFINE_CONVERTER(c10::Device, toDevice())
+DEFINE_CONVERTER(c10::intrusive_ptr<ivalue::Object>, toObject())
+DEFINE_CONVERTER(c10::Stream, toStream())
+DEFINE_CONVERTER(c10::Layout, toLayout())
+DEFINE_CONVERTER(int, toInt())
+DEFINE_CONVERTER(float, toDouble())
+DEFINE_CONVERTER(double, toDouble())
+DEFINE_CONVERTER(bool, toBool())
+DEFINE_CONVERTER(c10::complex<double>, toComplexDouble())
+DEFINE_CONVERTER(at::Dimname, toDimname())
+DEFINE_CUSTOMTYPE_CONVERT(ConvPackedParamsBase<2>)
+
+template <>
+struct IvalueConvert<c10::optional<at::Tensor>> {
+  at::Tensor operator()(IValue& i_value) {
+    return i_value.isNone() ? at::Tensor() : i_value.toTensor();
+  }
+  at::Tensor operator()(IValue&& i_value) {
+    return i_value.isNone() ? at::Tensor() : i_value.toTensor();
+  }
+};
+
+template <>
+struct IvalueConvert<TensorLValue> {
+  at::Tensor& operator()(c10::IValue& i_value) {
+    val_ = i_value.toTensor();
+    return val_;
+  }
+  at::Tensor& operator()(c10::IValue&& i_value) {
+    val_ = i_value.toTensor();
+    return val_;
+  }
+
+  at::Tensor val_;
+};
+
+template <typename... Args>
+constexpr int typeCounter() {
+  return sizeof...(Args);
+}
+
+template <int n, typename Func, typename... Args, size_t... N>
+torch::jit::Operation generateJitOperation(
+    Func func,
+    std::index_sequence<N...> seq) {
+  return [=](Stack& stack) {
+    auto result = func(IvalueConvert<Args>()(std::move(peek(stack, N, n)))...);
+    drop(stack, n);
+    pack(stack, std::move(result));
+  };
+}
+
+#define IPEX_JIT_OP_REGISTER(schema, func, ...)                      \
+  Operator(                                                          \
+      schema,                                                        \
+      [](const Node* node) -> Operation {                            \
+        constexpr int n = typeCounter<__VA_ARGS__>();                \
+        return generateJitOperation<n, decltype(func), __VA_ARGS__>( \
+            func, std::make_index_sequence<n>());                    \
+      },                                                             \
+      aliasAnalysisFromSchema())
+
+} // namespace
 
 namespace torch {
 namespace jit {
@@ -41,59 +151,38 @@ RegisterOperators op(
         //      },
         //      aliasAnalysisFromSchema()
         //      ),
-        Operator(
+        IPEX_JIT_OP_REGISTER(
             "xpu::pad_conv2d(Tensor input, int[] pad_nd, Scalar value, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
-            [](const Node* node) -> Operation {
-              return [](Stack& stack) {
-                auto result = torch::jit::xpu::pad_conv2d(
-                    (std::move(peek(stack, 0, 9))).toTensor(),
-                    (std::move(peek(stack, 1, 9))).toIntVector(),
-                    (std::move(peek(stack, 2, 9))).toScalar(),
-                    (std::move(peek(stack, 3, 9))).toTensor(),
-                    toOptionalTensor(std::move(peek(stack, 4, 9))),
-                    (std::move(peek(stack, 5, 9))).toIntVector(),
-                    (std::move(peek(stack, 6, 9))).toIntVector(),
-                    (std::move(peek(stack, 7, 9))).toIntVector(),
-                    (std::move(peek(stack, 8, 9))).toInt());
-                drop(stack, 9);
-                pack(stack, std::move(result));
-              };
-            },
-            aliasAnalysisFromSchema()),
-        Operator(
+            torch::jit::xpu::pad_conv2d,
+            Tensor,
+            std::vector<int64_t>,
+            Scalar,
+            Tensor,
+            c10::optional<Tensor>,
+            std::vector<int64_t>,
+            std::vector<int64_t>,
+            std::vector<int64_t>,
+            int),
+        IPEX_JIT_OP_REGISTER(
             "xpu::conv2d_relu(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
-            [](const Node* node) -> Operation {
-              return [](Stack& stack) {
-                auto result = torch::jit::xpu::conv2d_relu(
-                    (std::move(peek(stack, 0, 7))).toTensor(),
-                    (std::move(peek(stack, 1, 7))).toTensor(),
-                    toOptionalTensor(std::move(peek(stack, 2, 7))),
-                    (std::move(peek(stack, 3, 7))).toIntVector(),
-                    (std::move(peek(stack, 4, 7))).toIntVector(),
-                    (std::move(peek(stack, 5, 7))).toIntVector(),
-                    (std::move(peek(stack, 6, 7))).toInt());
-                drop(stack, 7);
-                pack(stack, std::move(result));
-              };
-            },
-            aliasAnalysisFromSchema()),
-        Operator(
+            torch::jit::xpu::conv2d_relu,
+            Tensor,
+            Tensor,
+            c10::optional<Tensor>,
+            std::vector<int64_t>,
+            std::vector<int64_t>,
+            std::vector<int64_t>,
+            int),
+        IPEX_JIT_OP_REGISTER(
             "xpu::conv2d_sigmoid(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
-            [](const Node* node) -> Operation {
-              return [](Stack& stack) {
-                auto result = torch::jit::xpu::conv2d_sigmoid(
-                    (std::move(peek(stack, 0, 7))).toTensor(),
-                    (std::move(peek(stack, 1, 7))).toTensor(),
-                    toOptionalTensor(std::move(peek(stack, 2, 7))),
-                    (std::move(peek(stack, 3, 7))).toIntVector(),
-                    (std::move(peek(stack, 4, 7))).toIntVector(),
-                    (std::move(peek(stack, 5, 7))).toIntVector(),
-                    (std::move(peek(stack, 6, 7))).toInt());
-                drop(stack, 7);
-                pack(stack, std::move(result));
-              };
-            },
-            aliasAnalysisFromSchema()),
+            torch::jit::xpu::conv2d_sigmoid,
+            Tensor,
+            Tensor,
+            c10::optional<Tensor>,
+            std::vector<int64_t>,
+            std::vector<int64_t>,
+            std::vector<int64_t>,
+            int),
         Operator(
             "xpu::batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps, bool dummy) -> Tensor",
             [](const Node* node) -> Operation {
@@ -409,56 +498,31 @@ RegisterOperators op(
               };
             },
             aliasAnalysisFromSchema()),
-        Operator(
+        IPEX_JIT_OP_REGISTER(
             "xpu::q_conv2d_sum_relu(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float conv_scale, int conv_zpoint, Tensor(a!) accumu, *, float sum_scale, int sum_zpoint) -> Tensor(a!)",
-            [](const Node* node) -> Operation {
-              return [](Stack& stack) {
-                auto output = (std::move(peek(stack, 4, 7))).toTensor();
-                auto result = torch::jit::xpu::q_conv2d_sum_relu(
-                    output,
-                    (std::move(peek(stack, 0, 7))).toTensor(),
-                    (std::move(peek(stack, 1, 7)))
-                        .toCustomClass<ConvPackedParamsBase<2>>(),
-                    (std::move(peek(stack, 2, 7))).toDouble(),
-                    (std::move(peek(stack, 3, 7))).toInt(),
-                    (std::move(peek(stack, 5, 7))).toDouble(),
-                    (std::move(peek(stack, 6, 7))).toInt());
-                drop(stack, 7);
-                pack(stack, std::move(result));
-              };
-            },
-            aliasAnalysisFromSchema()),
-        Operator(
+            torch::jit::xpu::q_conv2d_sum_relu,
+            Tensor,
+            ConvPackedParamsBase<2>,
+            double,
+            int,
+            TensorLValue,
+            double,
+            int),
+        IPEX_JIT_OP_REGISTER(
             "xpu::q_conv2d_leaky_relu(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float output_scale, int output_zpoint, Scalar negative_slope) -> Tensor(a!)",
-            [](const Node* node) -> Operation {
-              return [](Stack& stack) {
-                auto result = torch::jit::xpu::q_conv2d_leaky_relu(
-                    (std::move(peek(stack, 0, 5))).toTensor(),
-                    (std::move(peek(stack, 1, 5)))
-                        .toCustomClass<ConvPackedParamsBase<2>>(),
-                    (std::move(peek(stack, 2, 5))).toDouble(),
-                    (std::move(peek(stack, 3, 5))).toInt(),
-                    (std::move(peek(stack, 4, 5))).toScalar());
-                drop(stack, 5);
-                pack(stack, std::move(result));
-              };
-            },
-            aliasAnalysisFromSchema()),
-        Operator(
+            torch::jit::xpu::q_conv2d_leaky_relu,
+            Tensor,
+            ConvPackedParamsBase<2>,
+            double,
+            int,
+            Scalar),
+        IPEX_JIT_OP_REGISTER(
             "xpu::q_conv2d_sigmoid(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float output_scale, int output_zpoint) -> Tensor(a!)",
-            [](const Node* node) -> Operation {
-              return [](Stack& stack) {
-                auto result = torch::jit::xpu::q_conv2d_sigmoid(
-                    (std::move(peek(stack, 0, 4))).toTensor(),
-                    (std::move(peek(stack, 1, 4)))
-                        .toCustomClass<ConvPackedParamsBase<2>>(),
-                    (std::move(peek(stack, 2, 4))).toDouble(),
-                    (std::move(peek(stack, 3, 4))).toInt());
-                drop(stack, 4);
-                pack(stack, std::move(result));
-              };
-            },
-            aliasAnalysisFromSchema()),
+            torch::jit::xpu::q_conv2d_sigmoid,
+            Tensor,
+            ConvPackedParamsBase<2>,
+            double,
+            int),
         Operator(
             "xpu::q_conv2d_dequantize(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float conv_scale, int conv_zpoint) -> Tensor",
             [](const Node* node) -> Operation {
@@ -519,63 +583,40 @@ RegisterOperators op(
               };
             },
             aliasAnalysisFromSchema()),
-        Operator(
+        IPEX_JIT_OP_REGISTER(
             "xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float conv_scale, int conv_zpoint, Scalar beta, Scalar threshold, float q_scale, int q_zpoint, ScalarType dtype) -> Tensor",
-            [](const Node* node) -> Operation {
-              return [](Stack& stack) {
-                auto result = torch::jit::xpu::
-                    q_conv2d_dequantize_softplus_tanh_mul_quantize(
-                        (std::move(peek(stack, 0, 9))).toTensor(),
-                        (std::move(peek(stack, 1, 9)))
-                            .toCustomClass<ConvPackedParamsBase<2>>(),
-                        (std::move(peek(stack, 2, 9))).toDouble(),
-                        (std::move(peek(stack, 3, 9))).toInt(),
-                        (std::move(peek(stack, 4, 9))).toScalar(),
-                        (std::move(peek(stack, 5, 9))).toScalar(),
-                        (std::move(peek(stack, 6, 9))).toDouble(),
-                        (std::move(peek(stack, 7, 9))).toInt(),
-                        (std::move(peek(stack, 8, 9))).toScalarType());
-                drop(stack, 9);
-                pack(stack, std::move(result));
-              };
-            },
-            aliasAnalysisFromSchema()),
-        Operator(
+            torch::jit::xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize,
+            Tensor,
+            ConvPackedParamsBase<2>,
+            double,
+            int,
+            Scalar,
+            Scalar,
+            double,
+            int,
+            ScalarType),
+        IPEX_JIT_OP_REGISTER(
             "xpu::permute_contiguous(Tensor self, int[] dims, MemoryFormat memory_format=contiguous_format) -> Tensor(a)",
-            [](const Node* node) -> Operation {
-              return [](Stack& stack) {
-                auto result = torch::jit::xpu::permute_contiguous(
-                    (std::move(peek(stack, 0, 3))).toTensor(),
-                    (std::move(peek(stack, 1, 3))).toIntVector(),
-                    (std::move(peek(stack, 2, 3))).toMemoryFormat());
-                drop(stack, 3), pack(stack, std::move(result));
-              };
-            },
-            aliasAnalysisFromSchema()),
-        Operator(
+            torch::jit::xpu::permute_contiguous,
+            Tensor,
+            std::vector<int64_t>,
+            MemoryFormat),
+        IPEX_JIT_OP_REGISTER(
             "xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_add(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float conv_scale, int conv_zpoint, Scalar beta, Scalar threshold, float q_scale, int q_zpoint, ScalarType dtype, Tensor qb, double add_scale, int64_t add_zero_point) -> Tensor",
-            [](const Node* node) -> Operation {
-              return [](Stack& stack) {
-                auto result = torch::jit::xpu::
-                    q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
-                        (std::move(peek(stack, 0, 12))).toTensor(),
-                        (std::move(peek(stack, 1, 12)))
-                            .toCustomClass<ConvPackedParamsBase<2>>(),
-                        (std::move(peek(stack, 2, 12))).toDouble(),
-                        (std::move(peek(stack, 3, 12))).toInt(),
-                        (std::move(peek(stack, 4, 12))).toScalar(),
-                        (std::move(peek(stack, 5, 12))).toScalar(),
-                        (std::move(peek(stack, 6, 12))).toDouble(),
-                        (std::move(peek(stack, 7, 12))).toInt(),
-                        (std::move(peek(stack, 8, 12))).toScalarType(),
-                        (std::move(peek(stack, 9, 12))).toTensor(),
-                        (std::move(peek(stack, 10, 12))).toDouble(),
-                        (std::move(peek(stack, 11, 12))).toInt());
-                drop(stack, 12);
-                pack(stack, std::move(result));
-              };
-            },
-            aliasAnalysisFromSchema()),
+            torch::jit::xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_add,
+            Tensor,
+            ConvPackedParamsBase<2>,
+            double,
+            int,
+            Scalar,
+            Scalar,
+            double,
+            int,
+            ScalarType,
+            Tensor,
+            double,
+            int),
+
         Operator(
             "xpu::t_addmm(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha) -> Tensor",
             [](const Node* node) -> Operation {
