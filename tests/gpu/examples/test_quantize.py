@@ -18,6 +18,17 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(dst_cpu, dst_gpu)
 
+        src_cpu = torch.randn(1, 3, 2, 2)
+        src_gpu = src_cpu.clone().to('xpu')
+        scale_cpu = torch.tensor(0.1)
+        scale_gpu = scale_cpu.clone().to('xpu')
+        zero_point_cpu = torch.tensor(0)
+        zero_point_gpu = zero_point_cpu.clone().to('xpu')
+        dst_cpu = torch.quantize_per_tensor(src_cpu, scale_cpu, zero_point_cpu, dtype=data_type)
+        dst_gpu = torch.quantize_per_tensor(src_gpu, scale_gpu, zero_point_gpu, dtype=data_type)
+
+        self.assertEqual(dst_cpu, dst_gpu)
+
     def test_quantize_tensor_channels_last(self, dtype=torch.float):
         src_cpu = torch.randn(1, 3, 2, 2)
         src_gpu = src_cpu.to("xpu")

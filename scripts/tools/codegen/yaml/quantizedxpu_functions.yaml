@@ -31,6 +31,7 @@ supported:
   - q_zero_point
   - qscheme
   - quantize_per_tensor
+  - quantize_per_tensor.tensor_qparams
   - quantized_max_pool2d
   - record_stream
   - resize_
