@@ -36,5 +36,15 @@ Tensor& i0_out(const Tensor& self, Tensor& out) {
   return out;
 }
 
+Tensor& special_erfcx_out(const Tensor& self, at::Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.common_dtype(), "erfcx", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t a) -> scalar_t { return calc_erfcx(a); });
+      });
+  return out;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

@@ -511,6 +511,7 @@ supported:
   - sort.stable
   - sort.values
   - sort.values_stable
+  - special_erfcx.out
   - sqrt.out
   - std.correction
   - std_mean.correction
