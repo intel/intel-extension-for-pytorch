@@ -1,10 +1,11 @@
 #pragma once
+#include <c10/macros/Macros.h>
+#include <stdio.h>
 #include "ATen/ATen.h"
 #include "BatchKernel.h"
 #include "Loops.h"
 #include "comm/Atomics.h"
 #include "core/detail/TensorInfo.h"
-
 using namespace at::AtenIpexTypeXPU;
 using namespace xpu::dpcpp::detail;
 
@@ -625,6 +626,7 @@ void dpcpp_index_kernel_impl(
               index,
               -sizes[i],
               sizes[i]);
+          __assert_fail("Assert at ", __FILE__, __LINE__, __FUNCTION__);
         }
       }
       f(out_ptr, in_ptr, offset);
