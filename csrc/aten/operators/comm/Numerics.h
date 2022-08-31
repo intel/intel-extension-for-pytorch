@@ -2,6 +2,8 @@
 
 #include <ATen/ATen.h>
 
+#include <c10/macros/Macros.h>
+#include <c10/util/BFloat16.h>
 #include <c10/util/Half.h>
 #include <c10/util/complex.h>
 #include <utils/DPCPP.h>
@@ -87,6 +89,11 @@ static inline c10::BFloat16 nextafteri(c10::BFloat16 from, c10::BFloat16 to) {
   return ufrom.f;
 }
 
+template <typename T>
+C10_HOST_DEVICE inline constexpr T pi_i() {
+  return static_cast<T>(3.14159265358979323846L);
+}
+
 template <>
 struct Numerics<uint8_t> {
   static inline uint8_t lower_bound() {
@@ -94,6 +101,9 @@ struct Numerics<uint8_t> {
   }
   static inline uint8_t upper_bound() {
     return std::numeric_limits<uint8_t>::max();
+  }
+  static inline constexpr uint8_t pi() {
+    return pi_i<uint8_t>();
   }
 
   static inline bool lt(uint8_t a, uint8_t b) {
@@ -158,6 +168,9 @@ struct Numerics<bool> {
   static inline bool upper_bound() {
     return std::numeric_limits<bool>::max();
   }
+  static inline constexpr bool pi() {
+    return pi_i<bool>();
+  }
 
   static inline bool lt(bool a, bool b) {
     return a < b;
@@ -207,6 +220,9 @@ struct Numerics<int8_t> {
   }
   static inline int8_t upper_bound() {
     return std::numeric_limits<int8_t>::max();
+  }
+  static inline constexpr int8_t pi() {
+    return pi_i<int8_t>();
   }
 
   static inline bool lt(int8_t a, int8_t b) {
@@ -270,6 +286,9 @@ struct Numerics<int16_t> {
   }
   static inline int16_t upper_bound() {
     return std::numeric_limits<int16_t>::max();
+  }
+  static inline constexpr int16_t pi() {
+    return pi_i<int16_t>();
   }
 
   static inline bool lt(int16_t a, int16_t b) {
@@ -337,6 +356,9 @@ struct Numerics<int32_t> {
   static inline int32_t upper_bound() {
     return std::numeric_limits<int32_t>::max();
   }
+  static inline constexpr int32_t pi() {
+    return pi_i<int32_t>();
+  }
 
   static inline bool lt(int32_t a, int32_t b) {
     return a < b;
@@ -403,6 +425,9 @@ struct Numerics<int64_t> {
   static inline int64_t upper_bound() {
     return std::numeric_limits<int64_t>::max();
   }
+  static inline constexpr int64_t pi() {
+    return pi_i<int64_t>();
+  }
 
   static inline bool lt(int64_t a, int64_t b) {
     return a < b;
@@ -468,6 +493,9 @@ struct Numerics<at::Half> {
   }
   static inline at::Half upper_bound() {
     return at::Half(0x7C00, at::Half::from_bits());
+  }
+  static inline constexpr at::Half pi() {
+    return at::Half(0x4248, at::Half::from_bits());
   }
 
   static inline bool lt(at::Half a, at::Half b) {
@@ -659,6 +687,12 @@ struct Numerics<at::BFloat16> {
   }
   static inline at::BFloat16 upper_bound() {
     return at::BFloat16(0x7F80, at::BFloat16::from_bits());
+  }
+  static inline constexpr at::BFloat16 pi() {
+    // According to
+    // https://en.wikipedia.org/wiki/Bfloat16_floating-point_format#Special_values
+    // pi is encoded as 4049
+    return at::BFloat16(0x4049, at::BFloat16::from_bits());
   }
 
   static inline bool lt(at::BFloat16 a, at::BFloat16 b) {
@@ -855,6 +889,9 @@ struct Numerics<float> {
   static inline float upper_bound() {
     return std::numeric_limits<float>::infinity();
   }
+  static inline constexpr float pi() {
+    return pi_i<float>();
+  }
 
   static inline bool lt(float a, float b) {
     return sycl::isless(a, b);
@@ -1049,6 +1086,9 @@ struct Numerics<double> {
   }
   static inline double upper_bound() {
     return std::numeric_limits<double>::infinity();
+  }
+  static inline constexpr double pi() {
+    return pi_i<double>();
   }
 
   static inline bool lt(double a, double b) {
@@ -1372,6 +1412,10 @@ struct Numerics<c10::complex<float>> {
   static inline bool ne(c10::complex<float> a, c10::complex<float> b) {
     return a != b;
   }
+
+  static inline constexpr c10::complex<float> pi() {
+    return c10::complex<float>(pi_i<float>(), 0);
+  }
 };
 
 template <>
@@ -1509,6 +1553,10 @@ struct Numerics<c10::complex<double>> {
 
   static inline bool ne(c10::complex<double> a, c10::complex<double> b) {
     return a != b;
+  }
+
+  static inline constexpr c10::complex<double> pi() {
+    return c10::complex<double>(pi_i<double>(), 0);
   }
 };
 

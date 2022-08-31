@@ -34,7 +34,7 @@ void cauchy_kernel(
               median +
               sigma *
                   at::tan(
-                      static_cast<accscalar_t>(M_PI) *
+                      Numerics<accscalar_t>::pi() *
                       (rand - static_cast<accscalar_t>(0.5))));
         };
         AtenIpexTypeXPU::distribution_nullary_kernel<scalar_t, accscalar_t>(

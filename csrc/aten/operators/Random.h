@@ -88,7 +88,7 @@ class RandomState final {
         static_cast<dist_acctype<T>>(-2.0) *
         Numerics<dist_acctype<T>>::log(static_cast<dist_acctype<T>>(1.0) - u2));
     const dist_acctype<T> theta = static_cast<dist_acctype<T>>(2.0) *
-        static_cast<dist_acctype<T>>(M_PI) * u1;
+        Numerics<dist_acctype<T>>::pi() * u1;
     ret = r * Numerics<dist_acctype<T>>::cos(theta);
     return static_cast<T>(ret);
   }

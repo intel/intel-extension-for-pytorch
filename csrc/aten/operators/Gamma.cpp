@@ -134,7 +134,9 @@ Tensor mvlgamma(const Tensor& self, int64_t p) {
   Tensor args = at::arange_out(range, -p / 2. + 0.5, 0.5, 0.5);
   args = args.add(self.unsqueeze(-1));
 
-  return args.lgamma_().sum(-1).add_(p * (p - 1) * std::log(M_PI) / 4.);
+  return args.lgamma_().sum(-1).add_(
+      p * (p - 1) * std::log(Numerics<double>::pi()) / 4.);
+
 #else
   AT_ERROR("lgamma: oneMKL library not found in compilation");
 #endif
@@ -147,8 +149,8 @@ Tensor& mvlgamma_(Tensor& self, int64_t p) {
   Tensor args = at::arange_out(range, -p / 2. + 0.5, 0.5, 0.5);
   args = args.add(self.unsqueeze(-1));
 
-  return self.copy_(
-      args.lgamma_().sum(-1).add_(p * (p - 1) * std::log(M_PI) / 4.));
+  return self.copy_(args.lgamma_().sum(-1).add_(
+      p * (p - 1) * std::log(Numerics<double>::pi()) / 4.));
 #else
   AT_ERROR("lgamma: oneMKL library not found in compilation");
 #endif
