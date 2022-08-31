@@ -3,6 +3,10 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. meta::
+   :description: This website introduces Intel® Extension for PyTorch*
+   :keywords: Intel optimization, PyTorch, Intel® Extension for PyTorch*
+
 Welcome to Intel® Extension for PyTorch* Documentation
 ######################################################
 
