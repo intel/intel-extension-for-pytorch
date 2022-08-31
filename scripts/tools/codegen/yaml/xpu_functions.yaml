@@ -441,7 +441,6 @@ supported:
   - put_
   - quantize_per_channel
   - quantize_per_tensor
-  - quantize_per_tensor.tensor_qparams
   - random_
   - random_.from
   - random_.to

@@ -185,20 +185,6 @@ Tensor quantize_per_tensor(
   return quantizer->quantize(self);
 }
 
-Tensor quantize_per_tensor(
-    const Tensor& self,
-    const Tensor& scale,
-    const Tensor& zero_point,
-    ScalarType dtype) {
-  if (self.is_quantized()) {
-    return self;
-  }
-
-  auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
-      scale.item().toDouble(), zero_point.item().toLong(), dtype);
-  return quantizer->quantize(self);
-}
-
 Tensor quantize_per_channel(
     const Tensor& self,
     const Tensor& scales,
@@ -344,19 +330,6 @@ Tensor quantize_per_tensor(
     return self;
   }
   auto quantizer = dpcpp_make_per_tensor_affine_quantizer(scale, 0, dtype);
-  return quantizer->quantize(self);
-}
-
-Tensor quantize_per_tensor(
-    const Tensor& self,
-    const Tensor& scale,
-    const Tensor& zero_point,
-    ScalarType dtype) {
-  if (self.is_quantized()) {
-    return self;
-  }
-  auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
-      scale.item().toDouble(), zero_point.item().toLong(), dtype);
   return quantizer->quantize(self);
 }
 
