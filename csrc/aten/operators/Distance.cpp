@@ -5,6 +5,7 @@
 #include <core/Stream.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
+#include "BatchKernel.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
@@ -270,43 +271,32 @@ static void pdist_backward_kernel_impl(
     const double n2,
     const double n2_squared_minus_1) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-
-  // TODO: this is not optimized if the m is smaller than 256. The work item is
-  // wasted (m-256).
-  int64_t m_round = ((m + wgroup_size - 1) / (wgroup_size));
-  sycl::range<2> global_range(
-      dist.numel() /**wgroup_size*/, m_round * wgroup_size);
-  sycl::range<2> local_range(/*wgroup_size*/ 1, wgroup_size);
-  sycl::nd_range<2> work_load(global_range, local_range);
+  static constexpr int val_per_wi = 8;
+  BatchKernelConfig cfg = {dist.numel(), m / val_per_wi, 1, dist.numel(), true};
+  sycl::nd_range<2> work_load(cfg.global_size(), cfg.group_size());
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto out_data = buffer.data_ptr<scalar_t>();
-    auto in_data = self.data_ptr<scalar_t>();
-    auto grad_data = grad.data_ptr<scalar_t>();
-    auto dist_data = dist.data_ptr<scalar_t>();
+    auto out_ptr = buffer.data_ptr<scalar_t>();
+    auto in_ptr = self.data_ptr<scalar_t>();
+    auto grad_ptr = grad.data_ptr<scalar_t>();
+    auto dist_ptr = dist.data_ptr<scalar_t>();
 
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
-      auto out_ptr = out_data;
-      auto in_ptr = in_data;
-      auto grad_ptr = grad_data;
-      auto dist_ptr = dist_data;
-
-      const int k = item_id.get_global_id(0);
-      const int init = item_id.get_group(1) * item_id.get_local_range(1) +
-          item_id.get_local_id(1);
-      const int stride = item_id.get_local_range(1);
+      auto desc = cfg.get_item_desc(item_id);
+      const int k = desc.glb_batch;
+      const int stride = desc.chunk_num * desc.chunk_size;
+      const int init = desc.chunk * desc.chunk_size + desc.chunk_off;
 
       if (k >= combs) {
         return;
       }
 
+      // select row i, j depending on k
       int64_t i = static_cast<int64_t>(
           (n2 - device_sqrt<double>(n2_squared_minus_1 - 2 * k)));
       int64_t j = k - n * i + i * (i + 1) / 2 + i + 1;
-      int64_t ib = j - 1;
-      int64_t jb = i;
+      int64_t ib = j - i - 1;
+      int64_t jb = n - 2 - i;
 
       const scalar_t grad_k = grad_ptr[k * gs];
       const scalar_t dist_k = dist_ptr[k];
@@ -317,15 +307,12 @@ static void pdist_backward_kernel_impl(
       const scalar_t* self_j = in_ptr + j * m + init;
       scalar_t* buff_i = out_ptr + (ib * n + i) * m + init;
       scalar_t* buff_j = out_ptr + (jb * n + j) * m + init;
+
       for (; self_i < end; self_i += stride,
                            self_j += stride,
                            buff_i += stride,
                            buff_j += stride) {
-        const scalar_t res = F::backward(
-            static_cast<scalar_t>(*self_i) - static_cast<scalar_t>(*self_j),
-            grad_k,
-            dist_k,
-            p);
+        const scalar_t res = F::backward(*self_i - *self_j, grad_k, dist_k, p);
         *buff_i = res;
         *buff_j = -res;
       }
