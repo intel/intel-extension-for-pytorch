@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
 #include <core/Memory.h>
+#include <core/MemoryFormat.h>
 #include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
@@ -31,7 +32,7 @@ inline int64_t get_intervals(
 }
 
 template <typename scalar_t>
-void fractional_max_pool3d_out_frame(
+void fractional_max_pool3d_out_frame_cf(
     scalar_t* output,
     int64_t* indices,
     scalar_t* input,
@@ -49,9 +50,22 @@ void fractional_max_pool3d_out_frame(
     int poolSizeW) {
   using accscalar_t = acc_type<scalar_t>;
   auto& queue = dpcppGetCurrentQueue();
-  int outputPlaneSize = outputSizeT * outputSizeH * outputSizeW;
-  int work_group_size = outputPlaneSize > 128 ? 128 : outputPlaneSize;
-  int work_group_num = (outputPlaneSize + 127) / 128;
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
+  int outputPlaneSize = outputSizeH * outputSizeW * outputSizeT;
+  // input stride for NCTHW data
+  int64_t iT_stride = inputSizeH * inputSizeW;
+  int64_t iplane_stride = inputSizeT * iT_stride;
+  int64_t ibatch_stride = numPlane * iplane_stride;
+  // output stride for NCTHW data
+  int64_t oT_stride = outputSizeH * outputSizeW;
+  int64_t oplane_stride = outputSizeT * oT_stride;
+  int64_t obatch_stride = numPlane * oplane_stride;
+
+  int work_group_size =
+      outputPlaneSize > max_wg_size ? max_wg_size : outputPlaneSize;
+  int work_group_num =
+      (outputPlaneSize + work_group_size - 1) / work_group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto input_data = input;
@@ -64,9 +78,9 @@ void fractional_max_pool3d_out_frame(
       auto indices_ptr = indices_data;
       auto samples_ptr = samples_data;
 
-      int ourOutputPoint = item.get_global_id()[0];
+      int ourOutputPoint = item.get_global_id()[2];
+      int batch = item.get_group()[0];
       int plane = item.get_group()[1];
-      int batch = item.get_group()[2];
 
       if (ourOutputPoint < outputPlaneSize) {
         int64_t outputT = ourOutputPoint / (outputSizeH * outputSizeW);
@@ -103,54 +117,146 @@ void fractional_max_pool3d_out_frame(
 
         for (int64_t t = poolT; t < poolT + poolSizeT; ++t) {
           for (int64_t h = poolH; h < poolH + poolSizeH; ++h) {
-            if (poolSizeW < 2 || poolSizeW > 7) {
-              for (int64_t w = poolW; w < poolW + poolSizeW; ++w) {
-                scalar_t val = input_ptr
-                    [batch * numPlane * inputSizeT * inputSizeH * inputSizeW +
-                     plane * inputSizeT * inputSizeH * inputSizeW +
-                     t * inputSizeH * inputSizeW + h * inputSizeW +
-                     w] /*[batch][plane][t][h][w]*/;
-                if (val > maxVal) {
-                  maxIndex = t * inputSizeH * inputSizeW + h * inputSizeW + w;
-                  maxVal = val;
-                }
-              }
-            } else {
-              for (int64_t i = 0; i < poolSizeW; ++i) {
-                int64_t w = i + poolW;
-                scalar_t val = input_ptr
-                    [batch * numPlane * inputSizeT * inputSizeH * inputSizeW +
-                     plane * inputSizeT * inputSizeH * inputSizeW +
-                     t * inputSizeH * inputSizeW + h * inputSizeW +
-                     w] /*[batch][plane][t][h][w]*/;
-                if (val > maxVal) {
-                  maxIndex = t * inputSizeH * inputSizeW + h * inputSizeW + w;
-                  maxVal = val;
-                }
+            for (int64_t w = poolW; w < poolW + poolSizeW; ++w) {
+              int64_t load_offset = batch * ibatch_stride +
+                  plane * iplane_stride + t * iT_stride + h * inputSizeW + w;
+              scalar_t val = input_ptr[load_offset] /*[batch][plane][t][h][w]*/;
+              if (val > maxVal) {
+                maxIndex = t * inputSizeH * inputSizeW + h * inputSizeW + w;
+                maxVal = val;
               }
             }
           }
         }
 
-        indices_ptr
-            [batch * numPlane * outputSizeT * outputSizeH * outputSizeW +
-             plane * outputSizeT * outputSizeH * outputSizeW +
-             outputT * outputSizeH * outputSizeW + outputH * outputSizeW +
-             outputW] /*[batch][plane][outputT][outputH][outputW]*/
+        int64_t store_offset = batch * obatch_stride + plane * oplane_stride +
+            outputT * oT_stride + outputH * outputSizeW + outputW;
+        indices_ptr[store_offset] /*[batch][plane][outputT][outputH][outputW]*/
             = maxIndex;
-        output_ptr
-            [batch * numPlane * outputSizeT * outputSizeH * outputSizeW +
-             plane * outputSizeT * outputSizeH * outputSizeW +
-             outputT * outputSizeH * outputSizeW + outputH * outputSizeW +
-             outputW] /*[batch][plane][outputT][outputH][outputW]*/
+        output_ptr[store_offset] /*[batch][plane][outputT][outputH][outputW]*/
             = maxVal;
       }
     };
     cgh.parallel_for(
         sycl::nd_range<3>(
             sycl::range<3>(
-                work_group_size * work_group_num, numPlane, numBatch),
-            sycl::range<3>(work_group_size, 1, 1)),
+                numBatch, numPlane, work_group_size * work_group_num),
+            sycl::range<3>(1, 1, work_group_size)),
+        kfn);
+  };
+  DPCPP_Q_SUBMIT(queue, cgf);
+}
+
+template <typename scalar_t>
+void fractional_max_pool3d_out_frame_cl(
+    scalar_t* output,
+    int64_t* indices,
+    scalar_t* input,
+    scalar_t* samples,
+    int numBatch,
+    int numPlane,
+    int inputSizeT,
+    int inputSizeH,
+    int inputSizeW,
+    int outputSizeT,
+    int outputSizeH,
+    int outputSizeW,
+    int poolSizeT,
+    int poolSizeH,
+    int poolSizeW) {
+  using accscalar_t = acc_type<scalar_t>;
+  auto& queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
+  int outputSize = outputSizeH * outputSizeW * numPlane;
+  // input stride for NTHWC data
+  int64_t iH_stride = inputSizeW * numPlane;
+  int64_t iT_stride = inputSizeH * iH_stride;
+  // iBatch_stride = inputSizeT * inputSizeH * inputSizeW * numPlane
+  int64_t iBatch_stride = inputSizeT * iT_stride;
+
+  // output stride for NTHWC data
+  int64_t oH_stride = outputSizeW * numPlane;
+  int64_t oT_stride = outputSizeH * oH_stride;
+  // oBatch_stride = outputSizeT * outputSizeH * outputSizeW * numPlane
+  int64_t oBatch_stride = outputSizeT * oT_stride;
+
+  int work_group_size = outputSize > max_wg_size ? max_wg_size : outputSize;
+  int work_group_num = (outputSize + work_group_size - 1) / work_group_size;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto input_data = input;
+    auto output_data = output;
+    auto indices_data = indices;
+    auto samples_data = samples;
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
+      auto input_ptr = input_data;
+      auto output_ptr = output_data;
+      auto indices_ptr = indices_data;
+      auto samples_ptr = samples_data;
+
+      int outputIndex = item.get_global_id()[2];
+
+      if (outputIndex < outputSize) {
+        int batch = item.get_group()[0];
+        int outputT = item.get_group()[1];
+        int outputH = outputIndex / numPlane / outputSizeW % outputSizeH;
+        int outputW = outputIndex / numPlane % outputSizeW;
+        int plane = outputIndex % numPlane;
+        int64_t poolT = get_intervals<scalar_t, accscalar_t>(
+            static_cast<accscalar_t>(
+                samples_ptr
+                    [batch * numPlane * 3 + plane * 3] /*[batch][plane][0]*/),
+            outputT,
+            inputSizeT,
+            outputSizeT,
+            poolSizeT);
+        int64_t poolH = get_intervals<scalar_t, accscalar_t>(
+            static_cast<accscalar_t>(samples_ptr
+                                         [batch * numPlane * 3 + plane * 3 +
+                                          1] /*[batch][plane][1]*/),
+            outputH,
+            inputSizeH,
+            outputSizeH,
+            poolSizeH);
+        int64_t poolW = get_intervals<scalar_t, accscalar_t>(
+            static_cast<accscalar_t>(samples_ptr
+                                         [batch * numPlane * 3 + plane * 3 +
+                                          2] /*[batch][plane][2]*/),
+            outputW,
+            inputSizeW,
+            outputSizeW,
+            poolSizeW);
+
+        scalar_t maxVal = std::numeric_limits<scalar_t>::lowest();
+        int64_t maxIndex = -1;
+
+        for (int64_t t = poolT; t < poolT + poolSizeT; ++t) {
+          for (int64_t h = poolH; h < poolH + poolSizeH; ++h) {
+            for (int64_t w = poolW; w < poolW + poolSizeW; ++w) {
+              int64_t load_offset = batch * iBatch_stride + t * iT_stride +
+                  h * iH_stride + w * numPlane + plane;
+              scalar_t val = input_ptr[load_offset] /*[batch][plane][t][h][w]*/;
+              if (val > maxVal) {
+                maxIndex = t * inputSizeH * inputSizeW + h * inputSizeW + w;
+                maxVal = val;
+              }
+            }
+          }
+        }
+        int64_t store_offset = batch * oBatch_stride + outputT * oT_stride +
+            outputH * oH_stride + outputW * numPlane + plane;
+        indices_ptr[store_offset] /*[batch][plane][outputT][outputH][outputW]*/
+            = maxIndex;
+        output_ptr[store_offset] /*[batch][plane][outputT][outputH][outputW]*/
+            = maxVal;
+      }
+    };
+    cgh.parallel_for(
+        sycl::nd_range<3>(
+            sycl::range<3>(
+                numBatch, outputSizeT, work_group_size * work_group_num),
+            sycl::range<3>(1, 1, work_group_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -297,6 +403,8 @@ void fractional_max_pool3d_out_template(
       inputW,
       ")");
 
+  auto smf = (4 == ndims) ? at::MemoryFormat::Contiguous
+                          : input.suggest_memory_format();
   if (ndims == 4) {
     /* resize output */
     output.resize_({numPlanes, outputT, outputH, outputW});
@@ -304,38 +412,59 @@ void fractional_max_pool3d_out_template(
     indices.resize_({numPlanes, outputT, outputH, outputW});
   } else {
     /* resize output */
-    output.resize_({numBatch, numPlanes, outputT, outputH, outputW});
+    output.resize_({numBatch, numPlanes, outputT, outputH, outputW}, smf);
     /* indices will contain the locations for each output point */
-    indices.resize_({numBatch, numPlanes, outputT, outputH, outputW});
+    indices.resize_({numBatch, numPlanes, outputT, outputH, outputW}, smf);
   }
 
   auto output_ = output;
   auto indices_ = indices;
-  auto input_ = input.contiguous();
+  auto input_ = input.contiguous(smf);
   if (ndims == 4) {
     output_ = output_.reshape({1, numPlanes, outputT, outputH, outputW});
     indices_ = indices_.reshape({1, numPlanes, outputT, outputH, outputW});
     input_ = input_.reshape({1, numPlanes, inputT, inputH, inputW});
   }
-
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "fractional_max_pool3d_out_frame", [&] {
-        fractional_max_pool3d_out_frame<scalar_t>(
-            output_.data_ptr<scalar_t>(),
-            indices_.data_ptr<int64_t>(),
-            input_.data_ptr<scalar_t>(),
-            randomSamples.data_ptr<scalar_t>(),
-            input_.size(0),
-            input_.size(1),
-            inputT,
-            inputH,
-            inputW,
-            outputT,
-            outputH,
-            outputW,
-            poolSizeT,
-            poolSizeH,
-            poolSizeW);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      input.scalar_type(),
+      "fractional_max_pool3d_out_frame",
+      [&] {
+        if (is_smf_channels_last(input))
+          fractional_max_pool3d_out_frame_cl<scalar_t>(
+              output_.data_ptr<scalar_t>(),
+              indices_.data_ptr<int64_t>(),
+              input_.data_ptr<scalar_t>(),
+              randomSamples.data_ptr<scalar_t>(),
+              input_.size(0),
+              input_.size(1),
+              inputT,
+              inputH,
+              inputW,
+              outputT,
+              outputH,
+              outputW,
+              poolSizeT,
+              poolSizeH,
+              poolSizeW);
+        else
+          fractional_max_pool3d_out_frame_cf<scalar_t>(
+              output_.data_ptr<scalar_t>(),
+              indices_.data_ptr<int64_t>(),
+              input_.data_ptr<scalar_t>(),
+              randomSamples.data_ptr<scalar_t>(),
+              input_.size(0),
+              input_.size(1),
+              inputT,
+              inputH,
+              inputW,
+              outputT,
+              outputH,
+              outputW,
+              poolSizeT,
+              poolSizeH,
+              poolSizeW);
       });
 }
 
