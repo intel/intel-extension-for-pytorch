@@ -4,7 +4,7 @@ Intel® Extension for PyTorch\* extends [PyTorch\*](https://github.com/pytorch/p
 
 Intel® Extension for PyTorch\* is loaded as a Python module for Python programs or linked as a C++ library for C++ programs. Users can enable it dynamically in script by importing intel_extension_for_pytorch. It covers optimizations for both imperative mode and graph mode. Optimized operators and kernels are registered to XPU backend through PyTorch dispatching mechanism. These operators and kernels are accelerated from native vectorization feature and matrix calculation feature of Intel hardware. In graph mode, further operator fusions are supported to reduce operator/kernel invocation overheads, and thus increase performance.
 
-The latest release version for GPU solution of Intel® Extension for PyTorch\* is 1.10.0+gpu.
+The latest release version for GPU solution of Intel® Extension for PyTorch\* is 1.10.100+gpu.
 
 # Table of Contents
 - [Intel® Extension for PyTorch* GPU](#intel-extension-for-pytorch-gpu)
@@ -25,33 +25,35 @@ The latest release version for GPU solution of Intel® Extension for PyTorch\* i
 - [Launch Option List](#launch-option-list)
 - [Feature Introduction](#feature-introduction)
   - [AOT compilation](#aot-compilation)
+  - [Auto Mixed Precision (AMP)](#auto-mixed-precision-amp)
   - [Coding Style Alignment](#coding-style-alignment)
+  - [Distributed Training with DistributedDataParallel (DDP)](#distributed-training-with-distributeddataparallel-ddp)
+  - [Distributed Training with Horovod](#distributed-training-with-horovod)
   - [Fusion pattern support](#fusion-pattern-support)
   - [ITT support](#itt-support)
   - [Master weights support](#master-weights-support)
-  - [Multi-tile training with Horovod](#multi-tile-training-with-horovod)
   - [oneDNN specific layouts](#onednn-specific-layouts)
   - [Operator Coverage](#operator-coverage)
   - [Profile tool](#profile-tool)
   - [Sparse tensor support](#sparse-tensor-support)
+  - [TF32 math mode](#tf32-math-mode)
   - [torch.inference_mode](#torchinference_mode)
   - [User mode scratchpad](#user-mode-scratchpad)
 - [Caveat](#caveat)
   - [1. Build order of PyTorch and extension](#1-build-order-of-pytorch-and-extension)
   - [2. symbol undefined caused by _GLIBCXX_USE_CXX11_ABI](#2-symbol-undefined-caused-by-_glibcxx_use_cxx11_abi)
-  - [3. Adorym hangs on ATS-P B0](#3-adorym-hangs-on-ats-p-b0)
-  - [4. Molan issues](#4-molan-issues)
-  - [5. UT failures](#5-ut-failures)
+  - [3. Distributed Training Issues](#3-distributed-training-issues)
+  - [4. UT failures](#4-ut-failures)
 
 ## Pre-requirements
 
 | **GPU HW** | **OS** | **GPU User Mode Driver** | Python |
 | ------ | ------ | ------ | ------ |
-| **ATS-P B0** | Ubuntu-20.04.3 |  agama-ci-prerelease-516 | 3.x |
-| **ATS-P B0** | OpenSUSE Leap 15sp3| agama-ci-prerelease-516 | 3.x |
-| **PVC-XT B4** | Ubuntu-20.04.3 |  agama-ci-prerelease-516 | 3.x |
-| **PVC-XT B4** | OpenSUSE Leap 15sp3| agama-ci-prerelease-516 | 3.x |
-| **ATS-M M1** | Ubuntu-20.04.3 | agama-ci-prerelease-516 | 3.x |
+| **PVC-XT B4** | Ubuntu-20.04.3 |  agama-ci-prerelease-522 | 3.x |
+| **PVC-XT B4** | OpenSUSE Leap 15sp3| agama-ci-prerelease-522 | 3.x |
+| **ATS-P B0** | Ubuntu-20.04.3 |  agama-ci-prerelease-522 | 3.x |
+| **ATS-P B0** | OpenSUSE Leap 15sp3| agama-ci-prerelease-522 | 3.x |
+| **ATS-M M1** | Ubuntu-20.04.3 | agama-ci-devel-419.2 | 3.x |
 
 ### **Dependencies**
 
@@ -67,6 +69,7 @@ Code organization
     ├── cmake                       // cmake files for build process and dependencies
     ├── csrc                        // IPEX native source code
     │   ├── aten                    // XPU aten implementations
+    |   |   ├── amp                 // Auto mixed precision implementations 
     │   │   ├── core                // [Export] aten integration layer
     │   │   │   └── detail          // Mutable implementations
     │   │   ├── operators           // aten operator implementations
@@ -90,6 +93,7 @@ Code organization
     ├── tests                       // IPEX test suites
     │   └── gpu                     // IPEX gpu test suites
     │       ├── examples            // IPEX gpu examples and unit tests
+    │       ├── experimental        // Test suites ported from PyTorch 1.10   
     │       ├── pytorch             // Test suites ported from PyTorch proper
     │       └── regression          // unit tests for regression issues
     ├── third_party                 // third party modules
@@ -100,7 +104,11 @@ Code organization
 
 ## **Compiler Version and Setting**
 
-- Intel DPC++ Compiler Version: **Intel(R) oneAPI Base Toolkit 2022.2.0 RC2**
+| **GPU HW** | **oneMKL Version** |
+| ------ | ------ |
+| **PVC-XT B4** | 20220630_ms284 |
+| **ATS-P B0** | 20220630_ms284 |
+| **ATS-M M1** | XMAIN-REL_0730 |
 
 - Environment Variables Setting for DPC++:
 
@@ -113,22 +121,28 @@ please update ${PATH_To_Your_Compiler} to where you install DPC++ compiler with 
 
 ## **oneMKL Version and Setting**
 
-- oneMKL Version: **Intel(R) oneAPI Base Toolkit 2022.2.0 RC2**
+| **GPU HW** | **oneMKL Version** |
+| ------ | ------ |
+| **PVC-XT B4** | 20220708_ms284 |
+| **ATS-P B0** | 20220708_ms284 |
+| **ATS-M M1** | 2022u2_20220804 |
  
 - Environment Variables Setting for oneMKL:
 
 ```bash
-export MKL_DPCPP_ROOT=${PATH_To_Your_oneAPI_basekit}/intel/oneapi/mkl/latest
+export MKL_DPCPP_ROOT=${PATH_To_Your_oneMKL}/__release_lnx/mkl
 ```
 
 **Note:**
-please update ${PATH_To_Your_oneAPI_basekit} to where you install oneAPI basekit with absolute path.
+please update ${PATH_To_Your_oneMKL} to where you install oneAPI basekit with absolute path.
 If you are using different version of oneMKL, the MKL path might be different.
 
 ### MKL related issues:
-Story MKLD-13445 is not completed in **Intel(R) oneAPI Base Toolkit 2022.2.0 RC2**, which makes different versions of MKL library in one system might conflict with each other. For now, we recommend to build PyTorch with mkl from conda channel and build Intel® Extension for PyTorch* with oneMKL library from oneAPI Base toolkit, which is the typical usage scenario validated regularly. You may meet build error or runtime errors listed below in other usage scenarios:
+
+Story MKLD-13445 is not completed in verified oneMKL versions listed above, which makes different versions of MKL library in one system might conflict with each other. For now, we recommend to build PyTorch with mkl from conda channel and build Intel® Extension for PyTorch* with the verified oneMKL library, which is the typical usage scenario validated regularly. You may meet build error or runtime errors listed below in other usage scenarios:
 
 #### Can't find oneMKL library when build Intel® Extension for PyTorch* without oneMKL <br>
+
 Error info: <br>
 
 ```bash
@@ -143,10 +157,11 @@ When PyTorch is built with oneMKL library while Intel® Extension for PyTorch* i
 
 ```bash
 export USE_ONEMKL=OFF
-export MKL_DPCPP_ROOT=${PATH_To_Your_oneAPI_basekit}/intel/oneapi/mkl/latest
+export MKL_DPCPP_ROOT=${PATH_To_Your_oneMKL}/__release_lnx/mkl
 ```
 
 #### undefined symbol: mkl_lapack_dspevd. Intel MKL FATAL ERROR: cannot load libmkl_vml_avx512.so.2 or libmkl_vml_def.so.2 <br>
+
 This issue may raise when Intel® Extension for PyTorch* is built with oneMKL library while PyTorch is not build with any MKL library. oneMKL kernel may run into CPU occasionally which causes this issue. Please install MKL library from conda as following:
 
 ```bash
@@ -157,6 +172,7 @@ conda install mkl-include
 then clean build PyTorch to solve this issue.
 
 #### OSError: libmkl_intel_lp64.so.1: cannot open shared object file: No such file or directory <br>
+
 Wrong MKL library is used when multiple MKL libraries exist in system. To solve this issue, preload oneMKL by:
 
 ```bash
@@ -184,6 +200,7 @@ git submodule update --init --recursive
 ```
 
 ### **Validation of Compiler Installation**
+
 Follow instrcutions in <PATH_To_frameworks.ai.pytorch.ipex-gpu>/tests/gpu/device_enum.cpp to check the compiler and device. It is optional.
 
 ## Build and Install PyTorch
@@ -259,6 +276,7 @@ with torch.inference_mode():
 ```
 
 ### Supported torchvision
+
 Intel® Extension for PyTorch\* GPU supports torchvision 0.8.2 for now. The supported torchvision version will be uplifted to align with PyTorch version we supported eventually, for example, torchvision 0.11 will be supported in future release. Currently, for models rely on torchvision, users may follow below steps to install required torchvision package:
 
 ```bash
@@ -270,6 +288,7 @@ Intel® Extension for PyTorch\* GPU supports torchvision 0.8.2 for now. The supp
 Please skip the first two steps if Private Pytorch is already installed (follow steps in [Build and Install PyTorch](#build-and-install-pytorch) or through binary) and Intel® Extension for PyTorch\* GPU is already installed (follow steps in [Build and Install Intel® Extension for PyTorch* GPU](#build-and-install-intel-extension-for-pytorch-gpu) or through binary).
 
 ## Build Option List
+
 The following build options are supported in Intel® Extension for PyTorch* GPU.
 
 | **Build Option** | **Default<br> Value** | **Description** |
@@ -293,12 +312,15 @@ The following build options are supported in Intel® Extension for PyTorch* GPU.
 | BUILD_INTERNAL_DEBUG | OFF | Use internal debug code path if set to ON. |
 
 ## Launch Option List
+
 The following lauch options are supported in Intel® Extension for PyTorch* GPU.
 
 | **Launch Option** | **Default<br> Value** | **Description** |
 | ------ | ------ | ------ |
-| IPEX_SHOW_OPTION | 0 | Show all available launch option values. |
+| IPEX_SHOW_OPTION | 0 | Set to 1 to show all available launch option values. |
 | IPEX_VERBOSE | 0 | Verbose level in integer. Provide verbose output for Intel® Extension for PyTorch* GPU customized kernel. |
+| IPEX_FP32_MATH_MODE | FP32 | FP32 math mode. Set to TF32 for using TF32 math mode,  BF32 for using BF32 math mode.|
+| IPEX_SIMPLE_TRACE | 0 | If set to 1, enable simple trace for all operators. |
 | IPEX_TILE_AS_DEVICE | 1 | Device partition. If set to 0, tile partition will be disabled and map device to physical device. |
 | IPEX_XPU_SYNC_MODE | 0 | Kernel Execution mode. If set to 1, use synchronized execution mode and perform blocking wait for the completion of submitted kernel. |
 | IPEX_XPU_ONEDNN_LAYOUT | 0 | [EXPERIMENTAL] Enable oneDNN specific layouts. If set to 1, Intel® Extension for PyTorch* GPU tries to use blocked layouts querying from oneDNN.  |
@@ -320,13 +342,14 @@ IPEX_VERBOSE=1 python ResNet50.py
 3. Set multiple options when running model
 
 ```bash
-IPEX_VERBOSE=1 IPEX_LAYOUT_OPT=1 python ResNet50.py
+IPEX_VERBOSE=1 IPEX_XPU_ONEDNN_LAYOUT=1 python ResNet50.py
 ```
 
 ## Feature Introduction
 
 ### AOT compilation:
-AOT compilation is supported on ATS-P, ATS-M or PVC with below config:
+
+AOT compilation is supported on ATS-P, ATS-M or PVC with below config using agama-ci-prerelease-522:
 | Supported HW | Setting |
 | ------ | ------ |
 | ATS-P B0 |  USE_AOT_DEVLIST='xehp-sdv'  |
@@ -336,12 +359,74 @@ AOT compilation is supported on ATS-P, ATS-M or PVC with below config:
 | ATS-M M1 + PVC XT B4 | USE_AOT_DEVLIST='dg2-g10-c0,pvc-xt-c0' |
 | ATS-M M1 + PVC XT B4 + ATS-P B0 | USE_AOT_DEVLIST='dg2-g10-c0,pvc-xt-c0,xehp-sdv' |
 
-Multi-target AOT compilation are supported with application side workaround. We still need product solution of CMPLRLLVM-25864 to support large object file (>2GB).
+Multi-target AOT compilation is supported with application side workaround. We still need product solution of CMPLRLLVM-25864 to support large object file (>2GB).
+
+On agama-ci-devel-419.2, set USE_AOT_DEVLIST='12.55.8' to enable single-target AOT compilation on ATS-M M1. Multi-target AOT is not verified on that driver.
+
+### Auto Mixed Precision (AMP):
+
+This release supports the fundamental functionality of AMP, and enables automatic mixed precision in ResNet50-v1.5 inference and training workloads. We will support more workloads and make this feature mature in future release.
+
+#### Inference Model Example using AMP (float16)
+
+```bash
+with torch.inference_mode():
+  with torch.xpu.amp.autocast(dtype=torch.half):
+    output = model(input)
+```
+
+#### Inference Model Example using AMP (bfloat16)
+
+```bash
+with torch.inference_mode():
+  with torch.xpu.amp.autocast(dtype=torch.bfloat16):
+    output = model(input)
+```
+
+#### Training Model Example using AMP (bfloat16)
+
+```bash
+for images, label in train_loader():
+  with torch.xpu.amp.autocast(dtype=torch.bfloat16):
+    loss = criterion(model(images), label)
+  loss.backward()
+  optimizer.step()
+```
 
 ### Coding Style Alignment:
+
 This release uses clang-format and flake8 to enhance the code in Intel® Extension for PyTorch* GPU and make sure the coding style align with PyTorch proper.
 
+### Distributed Training with DistributedDataParallel (DDP):
+
+ResNet50, BERT, CosmicTagger training are verified with DDP on PVC B4. For supporting this scenario, oneCCL Bindings for Pytorch* based on oneCCL 2021.8-eng02 version shall be built and used. 
+
+```bash
+git clone -b torch-ccl-xpu-1.10-rc2 https://github.com/intel-innersource/frameworks.ai.pytorch.torch-ccl.git
+git submodule update --init --recursive
+COMPUTE_BACKEND=dpcpp python setup.py install
+```
+Example of running multi-tile ResNet50 training with DDP:
+
+```bash
+cd frameworks.ai.pytorch.gpu-models/ResNet50
+source `python -c "from oneccl_bindings_for_pytorch import cwd;print(cwd)"`/env/setvars.sh
+mpiexec -n 2 python main.py -a resnet50 -e -b 1024 --pretrained --jit --xpu 0 $dataset
+```
+
+### Distributed Training with Horovod:
+
+ResNet50, CosmicTagger, PointNet-ATLAS are verified with Horovod on PVC B4. Following launch options need be set during the validation: <br>
+
+```bash
+source $ONEAPI_INSTALL_DIR/mpi/latest/env/vars.sh -i_mpi_library_kind=release_mt
+source $ONEAPI_INSTALL_DIR/ccl/latest/env/vars.sh --ccl-configuration=cpu_gpu_dpcpp
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib
+export CCL_STAGING_BUFFER=regular
+```
+
 ### Fusion pattern support:
+
 All fusions patterns are only available in PyTorch JIT mode.
 
 | Supported Fusion | Supported Precision |
@@ -357,8 +442,15 @@ All fusions patterns are only available in PyTorch JIT mode.
 | Linear + Div(scalar) | FP32/FP16/BF16 |
 | Mul + Add | FP32/FP16/BF16 |
 | Add + ReLU | INT8 |
+| Permute + Contiguous | FP32/FP16/BF16/INT8 |
+| Conv2D + Leaky_relu | INT8 |
+| Conv2D + Leaky_relu_ | INT8 |
+| Conv2D + Sigmoid | INT8 |
+| Conv2D + Dequantize | INT8 |
+| Conv2D + Dequantize + Softplus + Tanh + Mul + Quantize + Add | INT8 |
 
 ### ITT support:
+
 ITT is Intel® VTune™ Profiler's Instrumentation and Tracing Technology. To enable this feature, <br>
 build Intel® Extension for PyTorch* GPU with USE_ITT=ON and update model as below:
 
@@ -373,6 +465,7 @@ with torch.xpu.emit_itt():
 Then start VTune for profiling kernels. Make sure ```INTELONEAPIROOT``` is set for VTune.
 
 ### Master weights support:
+
 Master weights is enabled for assuring accuracy by using FP32 weights in BF16 training gradient update. To use this feature, model shall be updated as following: 
 
 ```bash
@@ -390,36 +483,12 @@ optimizer.step()
 1) optimizer shall be updated to use a new API such as ```SGDMasterWeight``` which contains master weights support
 2) model shall be converted to bfloat16 after optimizer is initiated. Otherwise, optimizer can't get FP32 weights since it is already converted to BF16.
 
-### Multi-tile training with Horovod:
-Multi-tile ResNet50 training is verified with Horovod on 2-tile ATS-P B0 and PVC A0. Following launch options need be set during the validation: <br>
-
-```bash
-source $ONEAPI_INSTALL_DIR/mpi/latest/env/vars.sh -i_mpi_library_kind=release_mt
-source $ONEAPI_INSTALL_DIR/ccl/latest/env/vars.sh --ccl-configuration=cpu_gpu_dpcpp
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib
-export CCL_STAGING_BUFFER=regular
-```
-
-### Multi-tile training with DistributedDataParallel:
-Multi-tile ResNet50 training is verified with DistributedDataParallel (DDP) on 2-tile ATS-P B0 and PVC A0. For supporting this scenario, oneCCL Bindings for Pytorch* based on oneCCL 2021.6 version shall be built and used. 
-
-```bash
-git clone -b chengjun/xpu_torch_ccl_1.10 https://github.com/intel-innersource/frameworks.ai.pytorch.torch-ccl.git
-git submodule update --init --recursive
-COMPUTE_BACKEND=dpcpp_level_zero python setup.py install
-```
-Example of running multi-tile ResNet50 training with DDP:
-
-```bash
-cd frameworks.ai.pytorch.gpu-models/ResNet50
-source `python -c "import torch_ccl;print(torch_ccl.cwd)"`/env/setvars.sh
-mpiexec -n 2 python main.py -a resnet50 -e -b 1024 --pretrained --jit --xpu 0 $dataset
-```
-
 ### oneDNN specific layouts:
-For models running with IPEX_LAYOUT_OPT=1, Intel® Extension for PyTorch* GPU will use blocked layouts querying from oneDNN. However, not all the models can gain performance improvement through this feature.
+
+For models running with IPEX_XPU_ONEDNN_LAYOUT=1, Intel® Extension for PyTorch* GPU will use blocked layouts querying from oneDNN. However, not all the models can gain performance improvement through this feature.
 
 ### Operator Coverage:
+
 | **Operator Type** | **Implemented**| **Completion ratio** |
 | ------ | ------ | ------ |
 | PyTorch NN functions | 176 | 100.00%　|
@@ -431,6 +500,7 @@ For models running with IPEX_LAYOUT_OPT=1, Intel® Extension for PyTorch* GPU wi
 Note that we count 61 NN backwards op to make the total op number accurate and increased from 686 to 747.
 
 ### Profile tool:
+
 torch.autograd.profiler_legacy supports profiling kernel time spent on "xpu" device. Pesudo example looks like:
 
 ```bash
@@ -498,6 +568,7 @@ print(prof.table(sort_by="id", row_limit=100000))
 ```
 
 #### Profiling Results
+
 The output from BERT training model looks like (omitting some columns and rows):
 
 ```bash
@@ -520,21 +591,31 @@ The output from BERT training model looks like (omitting some columns and rows):
 Note the difference between Self XPU time and XPU total time - operators can call other operators, Self XPU time excludes time spent in children operator calls, while XPU total time includes it. You can choose to sort by the self xpu time by passing sort_by="self_xpu_time_total" into the table call.
 
 ### Sparse tensor support:
+
 This release supports sparse backend and several sparse related operators, including dense_dim, sparse_dim, to_sparse, sparse_mask, values, indices, coalesce and embeddingbag. It adds additional support for performing embeddingbag on sparse tensor in DLRM training.
 
+### TF32 math mode:
+
+This release supports TF32 math mode and provides launch option 'IPEX_FP32_MATH_MODE' to configure. The default math mode is FP32. Use 'IPEX_FP32_MATH_MODE=TF32' to change the math mode to TF32.
+
 ### torch.inference_mode():
-The inference_mode is recommended by PyTorch official to get better performance by disabling view tracking and version counter bumps. For Intel® Extension for PyTorch* GPU, we also strongly recommend it, especially if IPEX_LAYOUT_OPT=1 is set to enable oneDNN private layout, inference_mode is able to significantly enhance performance by removing redundant layout conversions.
+
+The inference_mode is recommended by PyTorch official to get better performance by disabling view tracking and version counter bumps. For Intel® Extension for PyTorch* GPU, we also strongly recommend it, especially if IPEX_XPU_ONEDNN_LAYOUT=1 is set to enable oneDNN private layout, inference_mode is able to significantly enhance performance by removing redundant layout conversions.
 
 ### User mode scratchpad:
+
 oneDNN defines two scratchpad modes: library and user. User mode means framework will manage the scratchpad allocation by querying and providing the scratchpad memory to oneDNN primitives. User mode scratchpad is default enabled for all oneDNN primitives in this release. 
 
 To switch to library mode scratchpad, please set USE_SCRATCHPAD_MODE=OFF and rebuild. Please expect negative impact to performance when changing the mode.
 
 ## Caveat
+
 ### 1. Build order of PyTorch and extension:
+
 Please build Intel® Extension for PyTorch* GPU after pytorch is built and installed, otherwise you will get an error “ModuleNotFoundError: No module named 'torch'”.
 
 ### 2. symbol undefined caused by _GLIBCXX_USE_CXX11_ABI:
+
 #### Error info: <br>
 
 ```bash
@@ -547,30 +628,28 @@ This issue appears when Intel® Extension for PyTorch* is compiled with \_GLIBCX
 <br>
 
 #### Background：
+
 1. DPC++ has no plan to support \_GLIBCXX_USE_CXX11_ABI=0 (CMPLRLLVM-34202), Intel® Extension for PyTorch* is always compiled with \_GLIBCXX_USE_CXX11_ABI=1. <br>
 2. PyTorch detects the setting of \_GLIBCXX_USE_CXX11_ABI by checking user config and compiler capability. If compiler in use does not support \_GLIBCXX_USE_CXX11_ABI=1, PyTorch is compiled with \_GLIBCXX_USE_CXX11_ABI=0. PyTorch publishes official binary package with \_GLIBCXX_USE_CXX11_ABI=0. <br>
 
 #### Solution：
+
 User shall update PyTorch CMAKE file to set \_GLIBCXX_USE_CXX11_ABI=1 and compile PyTorch with particular compiler which supports \_GLIBCXX_USE_CXX11_ABI=1. We recommend to use gcc version 9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04) on ubuntu 20.04 which is validated by us. <br>
 
 This issue won't exist with future version of PyTorch as community agrees to provide \_GLIBCXX_USE_CXX11_ABI=1 binary for versions after PyTorch 1.10. 
 
-### 3. Adorym hangs on ATS-P B0:
-Adroym can function on PVC A0 but still hangs on ATS-P B0 (XDEPS-3800). The root cause is under investigation.
-   
-### 4. Molan issues:
-#### 1) Molan BF16 NAN issue
-Molan BF16 NAN issue reported in 0.3.0gpu release (PYTORCHDGQ-660) was fixed by uplifting oneDNN (MFDNN-7786) in this release, however NAN issue still randomly occurs (PYTORCHDGQ-1486). We will confirm whether latest commit from oneDNN master can fix this random issue.
-    
-#### 2) Molan FP32 accuracy issue on PVC A0
-Molan FP32 accuracy issue (XDEPS-4207) was identified as IGC regression and fixed in agama-ci-prerelease-449.
-    
-#### 3) Molan FP32 random runtime error on ATS-P B0
-Molan FP32 random runtime error issue (XDEPS-4208) can't be reproduced on agama-ci-prerelease-449. The root cause is under investigation.
-    
-### 5. UT failures:
-#### 1) test_max_unpooling3d_channels_last.py HANG
-test_max_unpooling3d_channels_last.py hang issue (XDEPS-4206) was identified as PVC A0 only issue and can be workaround by export EnableRecoverablePageFaults=1. This issue does not exist on PVC B stepping machines.
-    
-#### 2) test_nll_loss.py assertion error
-test_nll_loss.py assertion error (XDEPS-4178) was identified as driver issue in agama-ci-prerelease-402. The root cause is under investigation.
+### 3. Distributed Training Issues:
+
+#### ResNet50 training with Horovod
+
+Explicit scaling of ResNet50 training with Horovod hang on 2-cards PVC B4 (XDEPS-4646). This was identified as driver issue. 
+
+#### BERT training with DDP
+
+Explicit scaling of BERT training with DDP hang on 2-cards PVC B4 (PYTORCHDGQ-1768). This issue disappeared when roll back driver from agama-ci-prerelease-522 to agama-ci-prerelease-438. The root cause is still under investigation.
+
+### 4. UT failures:
+
+#### test_groupnorm_channels_last.py AssertionError
+
+test_groupnorm_channels_last.py AssertionError (MFDNN-8290) was identified as HW bug related to alignment for 2D messages and was fixed in oneDNN master. We will uplift oneDNN in IPEX master to get such fix.
