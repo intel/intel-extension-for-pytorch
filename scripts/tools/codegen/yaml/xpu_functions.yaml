@@ -233,7 +233,9 @@ supported:
   - ge.Tensor
   - ge.Tensor_out
   - gelu
+  - gelu.out
   - gelu_backward
+  - gelu_backward.grad_input
   - geometric_
   - geqrf
   - geqrf.a

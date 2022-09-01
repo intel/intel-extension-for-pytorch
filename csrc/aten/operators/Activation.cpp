@@ -766,16 +766,17 @@ Tensor hardswish_backward(const Tensor& grad_output, const Tensor& self) {
   return result;
 }
 
-Tensor gelu(const Tensor& self) {
+Tensor& gelu_out(const Tensor& self, Tensor& result) {
   if (xpu::oneDNN::is_onednn_layout(self) &&
       xpu::oneDNN::eltwise_forward_valid(self)) {
-    Tensor result;
     xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
         result, self, 0.0f, 0.0f);
     return result;
   } else {
     auto _self = to_plain_if_needed(self);
-    auto result = at::empty_like(_self);
+    if (!result.defined()) {
+      result = at::empty_like(_self);
+    }
     auto iter = TensorIterator::unary_op(result, _self);
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::BFloat16,
@@ -791,18 +792,27 @@ Tensor gelu(const Tensor& self) {
   }
 }
 
-Tensor gelu_backward(const Tensor& grad, const Tensor& self) {
+Tensor gelu(const Tensor& self) {
+  Tensor result;
+  return gelu_out(self, result);
+}
+
+Tensor& gelu_backward_out(
+    const Tensor& grad,
+    const Tensor& self,
+    Tensor& grad_input) {
   if (IPEX_ANY(xpu::oneDNN::is_onednn_layout, grad, self) &&
       IPEX_ALL(xpu::oneDNN::eltwise_backward_valid, grad, self)) {
-    Tensor dX;
     xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_gelu_erf>(
-        dX, self, grad, 0.0f, 0.0f);
-    return dX;
+        grad_input, self, grad, 0.0f, 0.0f);
+    return grad_input;
   } else {
     auto _self = to_plain_if_needed(self);
     auto _grad = to_plain_if_needed(grad);
-    auto dX = at::empty_like(_self);
-    auto iter = TensorIterator::binary_op(dX, _grad, _self);
+    if (!grad_input.defined()) {
+      grad_input = at::empty_like(_self);
+    }
+    auto iter = TensorIterator::binary_op(grad_input, _grad, _self);
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::BFloat16,
         at::ScalarType::Half,
@@ -814,8 +824,13 @@ Tensor gelu_backward(const Tensor& grad, const Tensor& self) {
                 return impl::gelu_erf_backward<scalar_t>(grad, self);
               });
         });
-    return dX;
+    return grad_input;
   }
+}
+
+Tensor gelu_backward(const Tensor& grad, const Tensor& self) {
+  Tensor result;
+  return gelu_backward_out(grad, self, result);
 }
 
 Tensor& silu_out(const Tensor& self, Tensor& output) {
