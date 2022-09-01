@@ -495,6 +495,7 @@ supported:
   - signbit.out
   - sign.out
   - sin.out
+  - sinc.out
   - sinh.out
   - smooth_l1_loss
   - smooth_l1_loss.out
