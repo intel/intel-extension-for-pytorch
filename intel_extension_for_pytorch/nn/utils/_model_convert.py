@@ -19,7 +19,7 @@ class _LSTM(torch.nn.LSTM):
         # xxx: isinstance check needs to be in conditional for TorchScript to compile
         if isinstance(orig_input, PackedSequence):
             # fallback to PyTorch LSTM since PackedSequence unsupported in oneDNN
-            return super(LSTM, self).forward(input, hx)
+            return super(_LSTM, self).forward(input, hx)
         else:
             batch_sizes = None
             max_batch_size = input.size(0) if self.batch_first else input.size(1)

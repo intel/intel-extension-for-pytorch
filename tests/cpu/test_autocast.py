@@ -490,7 +490,7 @@ class TestLSTM(TorchTestCase):
         hidden_1 = hid_1.clone().requires_grad_(False)
         embeds = torch.nn.utils.rnn.pack_padded_sequence(sentences, sent_lens, batch_first=True, enforce_sorted=False)
 
-        model = nn.LSTM(embedding_dim, hidden_dim, num_layers=num_layers, bidirectional=bidirectional, batch_first=True)
+        model = M(embedding_dim, hidden_dim, num_layers=num_layers, bidirectional=bidirectional, batch_first=True, bias=True, dropout=0.2)
 
         model_ipex = copy.deepcopy(model)
         ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model_ipex)
