@@ -6,8 +6,11 @@
 #include <c10/util/complex.h>
 #include <c10/util/math_compat.h>
 #include <oneapi/dpl/cmath>
+#include <oneapi/dpl/complex>
 #include <oneapi/dpl/type_traits>
+#include <oneapi/dpl/utility>
 #include "AccumulateType.h"
+#include "General.h"
 #include "Numerics.h"
 
 namespace at {
@@ -303,6 +306,51 @@ static inline C10_HOST_DEVICE scalar_t calc_i0(scalar_t _x) {
   return (
       sycl::exp(x) * chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len) /
       sycl::sqrt(x));
+}
+
+/*
+ * This function is derived from the implementation of the i0e function in the
+ * Cephes Math Library. See note [3-Clause BSD License for the Cephes Math
+ * Library].
+ *
+ * Computes an approximation of the exponentially scaled zeroth order modified
+ * Bessel function of the first kind. The approximation is actually two
+ * (sub)approximations, both using a Chebyshev polynomial expansion. One
+ * approximates the function over [0, 8], and the other over (8, infinity). This
+ * function takes the absolute value of all inputs to convert them into the
+ * domain of the approximation.
+ */
+template <typename scalar_t>
+static inline C10_HOST_DEVICE scalar_t calc_i0e(scalar_t _x) {
+  scalar_t x = sycl::abs(_x);
+
+  if (x <= scalar_t{8.0}) {
+    auto coeff_pair = chebyshev_coefficients_i0e_A<scalar_t>();
+#ifdef SYCL_DEVICE_ONLY
+    auto A = dpl::get<0>(coeff_pair);
+    auto len = dpl::get<1>(coeff_pair);
+#else
+    auto A = std::get<0>(coeff_pair);
+    auto len = std::get<1>(coeff_pair);
+#endif
+    scalar_t y = (x / scalar_t{2.0}) - scalar_t{2.0};
+    return chbevl(y, A, len);
+  }
+
+  auto coeff_pair = chebyshev_coefficients_i0e_B<scalar_t>();
+#ifdef SYCL_DEVICE_ONLY
+  auto B = dpl::get<0>(coeff_pair);
+  auto len = dpl::get<1>(coeff_pair);
+#else
+  auto B = std::get<0>(coeff_pair);
+  auto len = std::get<1>(coeff_pair);
+#endif
+  return chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len) / sycl::sqrt(x);
+}
+
+// Upcast bfloat16 input to float for numerical accuracy purposes
+static inline c10::BFloat16 calc_i0e(c10::BFloat16 a) {
+  return calc_i0e(static_cast<float>(a));
 }
 
 template <typename T>
