@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <c10/macros/Macros.h>
 #include "comm/AccumulateType.h"
 
 #include <core/Memory.h>
@@ -60,6 +61,54 @@ Tensor _s_where(
 
 Tensor isnan(const Tensor& self) {
   return self != self;
+}
+
+template <typename scalar_t>
+void _assert_async_kernel(scalar_t* input) {
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto cgf = DPCPP_Q_CGF(cgf) {
+    cgf.single_task([=]() { SYCL_KERNEL_ASSERT(input[0] != 0); });
+  };
+
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+template <>
+void _assert_async_kernel(c10::complex<float>* input) {
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto cgf = DPCPP_Q_CGF(cgf) {
+    cgf.single_task([=]() {
+      SYCL_KERNEL_ASSERT(input[0] != static_cast<c10::complex<float>>(0, 0));
+    });
+  };
+
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+template <>
+void _assert_async_kernel(c10::complex<double>* input) {
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto cgf = DPCPP_Q_CGF(cgf) {
+    cgf.single_task([=]() {
+      SYCL_KERNEL_ASSERT(input[0] != static_cast<c10::complex<double>>(0, 0));
+    });
+  };
+
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+void _assert_async(const Tensor& self) {
+  auto n = self.numel();
+  TORCH_CHECK(n != 0, "Boolean value of Tensor with no values is ambiguous");
+  TORCH_CHECK(
+      n < 2, "Boolean value of Tensor with more than one value is ambiguous");
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "_assert_async",
+      [&]() { _assert_async_kernel<scalar_t>(self.data_ptr<scalar_t>()); });
 }
 
 Tensor& isneginf_out(const Tensor& self, Tensor& out) {
