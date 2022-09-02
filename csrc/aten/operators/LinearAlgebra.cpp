@@ -2,9 +2,12 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/LinearAlgebraUtils.h>
 
+#include <core/detail/OffsetCalculator.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
 #include <utils/oneMKLUtils.h>
+#include <oneapi/dpl/utility>
+#include "Loops.h"
 #include "Resize.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
@@ -699,6 +702,210 @@ std::tuple<Tensor, Tensor> slogdet(const Tensor& self) {
 std::tuple<Tensor, Tensor, Tensor> _det_lu_based_helper(const Tensor& self) {
   // fallback to at::native::_det_lu_based_helper
   return at::native::_det_lu_based_helper(self);
+}
+
+constexpr int n_elems_per_work_item = UNROLLED_ELEM_PER_WORK_ITEM;
+
+template <int n_elems_per_work_item, typename func_t>
+void _elementwise_kernel(int total_n_elems, func_t f) {
+  int total_work_items =
+      (total_n_elems + n_elems_per_work_item - 1) / n_elems_per_work_item;
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    cgh.parallel_for(
+        sycl::range<1>(total_work_items), [=](sycl::item<1> itemId) {
+          int idx = itemId.get_linear_id();
+#pragma unroll
+          for (int i = 0; i < n_elems_per_work_item; ++i) {
+            if (idx < total_n_elems) {
+              f(idx);
+              idx += total_work_items;
+            }
+          }
+        });
+  };
+
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+template <int n_elems_per_work_item, typename func_t>
+static void _launch_kernel(int total_n_elems, func_t f) {
+  TORCH_INTERNAL_ASSERT(
+      total_n_elems >= 0 &&
+      total_n_elems <= std::numeric_limits<int32_t>::max());
+  _elementwise_kernel<n_elems_per_work_item, func_t>(total_n_elems, f);
+}
+
+void _unpack_pivots_internal_kernel_dpcpp(
+    TensorIterator& iter,
+    int64_t dim_size) {
+  if (iter.numel() == 0) {
+    return;
+  }
+
+  if (!iter.can_use_32bit_indexing()) {
+    for (auto& sub_iter : iter.with_32bit_indexing()) {
+      _unpack_pivots_internal_kernel_dpcpp(sub_iter, dim_size);
+    }
+    return;
+  }
+
+  auto offset_calculator = make_offset_calculator<2>(iter);
+
+  char* unpacked_pivots_ptr = reinterpret_cast<char*>(iter.data_ptr(0));
+  const char* const __restrict__ pivots_ptr =
+      reinterpret_cast<const char*>(iter.data_ptr(1));
+
+  auto loop = [=] C10_DEVICE(int i) {
+    auto offsets = offset_calculator.get(i);
+
+    auto* unpacked_pivots_data =
+        reinterpret_cast<int32_t*>(unpacked_pivots_ptr + offsets[0]);
+    const auto* const __restrict__ pivots_data =
+        reinterpret_cast<const int32_t*>(pivots_ptr + offsets[1]);
+
+    // QUESTION: can we mix 64bit offsets with 32bit Iterator indexing?
+    for (int64_t i = 0; i < dim_size; ++i) {
+      oneapi::dpl::swap(
+          unpacked_pivots_data[i], unpacked_pivots_data[pivots_data[i]]);
+    }
+  };
+
+  _launch_kernel<n_elems_per_work_item>(iter.numel(), loop);
+}
+
+void unpack_pivots_kernel_dpcpp(TensorIterator& iter, int64_t dim_size) {
+  _unpack_pivots_internal_kernel_dpcpp(iter, dim_size);
+}
+
+std::tuple<Tensor, Tensor, Tensor> lu_unpack(
+    const Tensor& LU_data,
+    const Tensor& LU_pivots,
+    bool unpack_data,
+    bool unpack_pivots) {
+  TORCH_CHECK(
+      LU_pivots.is_contiguous() && (LU_pivots.scalar_type() == at::kInt),
+      "lu_unpack: LU_pivots is expected to be a contiguous tensor of torch.int32 dtype."
+      "Note: this function is intended to be used with the output produced by torch{.linalg}.lu");
+
+  // trivial case
+  if (!unpack_data && !unpack_pivots) {
+    return std::make_tuple(Tensor(), Tensor(), Tensor());
+  }
+
+  Tensor L, U;
+  // In the generalized LU factorization, the following shape relations hold:
+  // A.shape[-2:] == (m, n),
+  // P.shape[-2:] == (m, m),
+  // U.shape[-2:] == (m, k),
+  // L.shape[-2:] == (k, n),
+  // where k = min(m, n)
+  int64_t m = LU_data.size(-2);
+  int64_t n = LU_data.size(-1);
+  int64_t k = std::min(m, n);
+
+  if (unpack_data) {
+    U = LU_data.triu();
+    if (m != k) {
+      U = U.narrow(-2, 0, k);
+    }
+
+    L = LU_data.tril();
+    if (k != n) {
+      L = L.narrow(-1, 0, k);
+    }
+    L.diagonal(/*offset=*/0, /*dim1=*/-2, /*dim2=*/-1).fill_(1);
+  }
+
+  if (!unpack_pivots) {
+    return std::make_tuple(Tensor(), L, U);
+  }
+
+  auto unpacked_pivots_sizes = LU_pivots.sizes().vec();
+  unpacked_pivots_sizes[LU_pivots.dim() - 1] = m;
+  auto unpacked_pivots = at::empty(
+      unpacked_pivots_sizes,
+      LU_pivots.options().memory_format(at::MemoryFormat::Contiguous));
+
+  // Fill `unpacked_pivots` with identity permutation
+  auto id_perm = at::arange(m, LU_pivots.options());
+  unpacked_pivots.copy_(id_perm);
+
+  // WARNING: we assume that unchanged LAPACK pivots are provided.
+  // Since LAPACK relies on the FORTRAN's 1-based indexing,
+  // we subtract 1 to convert the pivots to the C-style 0-based indexing.
+  // This behaviour could change in the future.
+  auto LU_pivots_zero_idx = LU_pivots - 1;
+
+  auto iter = TensorIteratorConfig()
+                  .set_check_mem_overlap(false)
+                  .check_all_same_dtype(false)
+                  .resize_outputs(false)
+                  .declare_static_shape(
+                      LU_pivots.sizes(), /*squash_dim=*/LU_pivots.dim() - 1)
+                  .add_output(unpacked_pivots)
+                  .add_input(LU_pivots_zero_idx)
+                  .build();
+  // }
+
+  unpack_pivots_kernel_dpcpp(iter, LU_pivots.size(-1));
+
+  // The permutation matrix is converted to LU_data.dtype
+  // because `matmul` does not work with integer matrices.
+  unpacked_pivots_sizes.push_back(m);
+  auto permutation_matrix = at::zeros(
+      unpacked_pivots_sizes,
+      LU_data.options().memory_format(at::MemoryFormat::Contiguous));
+
+  // now that we know the final permutation,
+  // scatter 1s at proper locations.
+  permutation_matrix.scatter_(
+      -2,
+      unpacked_pivots.unsqueeze(-2).to(at::kLong),
+      at::ones({1}, permutation_matrix.options())
+          .expand(permutation_matrix.sizes()));
+
+  return std::make_tuple(permutation_matrix, L, U);
+}
+
+using TupleTensorRefs3 = std::tuple<Tensor&, Tensor&, Tensor&>;
+
+TupleTensorRefs3 lu_unpack_out(
+    const Tensor& LU_data,
+    const Tensor& LU_pivots,
+    bool unpack_data,
+    bool unpack_pivots,
+    Tensor& P,
+    Tensor& L,
+    Tensor& U) {
+  Tensor P_tmp, L_tmp, U_tmp;
+  std::tie(P_tmp, L_tmp, U_tmp) =
+      at::lu_unpack(LU_data, LU_pivots, unpack_data, unpack_pivots);
+
+  if (unpack_pivots) {
+    checkSameDevice("lu_unpack", P, LU_data, "P");
+    // Note that lu_unpack returns P such that P.dtype == LU_data.dtype,
+    // because otherwise we cannot use P in matric products (no int -> float
+    // promotion)
+    checkLinalgCompatibleDtype("lu_unpack", P, LU_data, "L");
+
+    at::native::resize_output(P, P_tmp.sizes());
+    P.copy_(P_tmp);
+  }
+
+  if (unpack_data) {
+    checkSameDevice("lu_unpack", L, LU_data, "L");
+    checkSameDevice("lu_unpack", U, LU_data, "U");
+    checkLinalgCompatibleDtype("lu_unpack", L, LU_data, "L");
+    checkLinalgCompatibleDtype("lu_unpack", U, LU_data, "U");
+
+    at::native::resize_output(L, L_tmp.sizes());
+    at::native::resize_output(U, U_tmp.sizes());
+    L.copy_(L_tmp);
+    U.copy_(U_tmp);
+  }
+
+  return TupleTensorRefs3(P, L, U);
 }
 
 } // namespace AtenIpexTypeXPU

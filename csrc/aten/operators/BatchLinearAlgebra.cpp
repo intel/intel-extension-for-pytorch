@@ -1778,15 +1778,16 @@ std::tuple<Tensor, Tensor, Tensor> _lu_with_info(
     const Tensor& self,
     bool pivot,
     bool check_errors) {
-  TORCH_CHECK(pivot, "lu without pivoting is not implemented on the DPCPP");
   TORCH_CHECK(
       self.dim() >= 2,
       "expected tensor with 2 or more dimensions, got size: ",
       self.sizes(),
       " instead");
-  native::squareCheckInputs(self);
+  auto m = self.size(-2);
+  auto n = self.size(-1);
   auto req_size = self.sizes().vec();
   req_size.pop_back();
+  req_size.back() = std::min(m, n);
   auto pivots_tensor = at::empty(req_size, self.options().dtype(kLong));
   req_size.pop_back();
   auto infos_tensor =

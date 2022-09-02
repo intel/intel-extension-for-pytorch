@@ -332,6 +332,8 @@ supported:
   - lt.Tensor_out
   - lu_solve
   - lu_solve.out
+  - lu_unpack
+  - lu_unpack.out
   - masked_fill_.Scalar
   - masked_fill_.Tensor
   - masked_scatter_
