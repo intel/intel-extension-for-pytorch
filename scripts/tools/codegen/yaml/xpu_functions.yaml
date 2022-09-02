@@ -36,6 +36,7 @@ supported:
   - _index_put_impl_ 
   - _inverse_helper
   - _linalg_qr_helper
+  - _linalg_inv_out_helper_
   - _local_scalar_dense
   - _logcumsumexp
   - _logcumsumexp.out

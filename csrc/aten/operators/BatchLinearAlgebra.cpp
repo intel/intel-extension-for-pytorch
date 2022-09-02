@@ -877,15 +877,23 @@ static void apply_lu_solve_dpcpp_(
 #endif
 }
 
+/*
+Note: A workaround to align with MKL API to store infos_lu
+and infos_getri in vector. For future efficiency concern,
+the MKL API needs to accept tensor data_ptr as input and store
+the error infos inplace.
+*/
 template <typename scalar_t>
-static Tensor apply_inverse_dpcpp_(
+static void apply_inverse_dpcpp_(
     Tensor& self_,
-    std::vector<int64_t>& infos_) {
+    Tensor& self_inv_,
+    std::vector<int64_t>& infos_lu,
+    std::vector<int64_t>& infos_getri) {
 #ifdef USE_ONEMKL
   auto req_size = self_.sizes().vec();
   req_size.pop_back();
   Tensor pivots_ = at::empty(req_size, self_.options().dtype(kLong));
-  impl::apply_lu_dpcpp_<scalar_t>(self_, pivots_, infos_);
+  impl::apply_lu_dpcpp_<scalar_t>(self_, pivots_, infos_lu);
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t batch_size = native::batchCount(self_);
@@ -895,10 +903,9 @@ static Tensor apply_inverse_dpcpp_(
   int64_t stride_a = native::matrixStride(self_);
   int64_t stride_ipiv = pivots_.size(-1);
 
-  Tensor output = at::empty_like(self_);
   scalar_t* a = (scalar_t*)(self_.data_ptr());
   int64_t* ipiv = (int64_t*)(pivots_.data_ptr());
-  scalar_t* ainv = (scalar_t*)(output.data_ptr());
+  scalar_t* ainv = (scalar_t*)(self_inv_.data_ptr());
 
   int64_t scratchpadsize = mkl_getri_scratchpad<scalar_t>(
       dpcpp_queue, n, lda, stride_a, stride_ipiv, lda, stride_a, batch_size);
@@ -919,9 +926,8 @@ static Tensor apply_inverse_dpcpp_(
         (scalar_t*)(scratchpad_at.data_ptr()),
         scratchpadsize);
   } catch (oneapi::mkl::lapack::batch_error be) {
-    error_handle(infos_, be);
+    error_handle(infos_getri, be);
   }
-  return output;
 #else
   AT_ERROR("lu: oneMKL library not found in compilation");
 #endif
@@ -2113,19 +2119,27 @@ std::tuple<Tensor&, Tensor&> solve_out(
 }
 
 Tensor _inverse_helper(const Tensor& self) {
-  std::vector<int64_t> infos(native::batchCount(self), 0);
+  std::vector<int64_t> infos_lu_vec(native::batchCount(self), 0);
+  std::vector<int64_t> infos_getri_vec(native::batchCount(self), 0);
+
   auto self_working_copy = native::cloneBatchedColumnMajor(self);
-  Tensor output;
+  auto self_inv_working_copy = native::cloneBatchedColumnMajor(self);
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
       self.scalar_type(), "inverse_dpcpp", [&] {
-        output = impl::apply_inverse_dpcpp_<scalar_t>(self_working_copy, infos);
+        impl::apply_inverse_dpcpp_<scalar_t>(
+            self_working_copy,
+            self_inv_working_copy,
+            infos_lu_vec,
+            infos_getri_vec);
       });
   if (self.dim() > 2) {
-    native::batchCheckErrors(infos, "inverse_dpcpp");
+    native::batchCheckErrors(infos_lu_vec, "inverse_dpcpp");
+    native::batchCheckErrors(infos_getri_vec, "inverse_dpcpp");
   } else {
-    native::singleCheckErrors(infos[0], "inverse_dpcpp");
+    native::singleCheckErrors(infos_lu_vec[0], "inverse_dpcpp");
+    native::singleCheckErrors(infos_getri_vec[0], "inverse_dpcpp");
   }
-  return output;
+  return self_inv_working_copy;
 }
 
 Tensor inverse(const Tensor& self) {
@@ -2143,6 +2157,56 @@ Tensor& inverse_out(Tensor& out, const Tensor& self) {
   }
   out.copy_(at::AtenIpexTypeXPU::inverse(self));
   return out;
+}
+
+// A type dispatching helper function for 'apply_inverse_dpcpp_'.
+Tensor& _linalg_inv_out_helper_(
+    Tensor& result,
+    Tensor& infos_lu,
+    Tensor& infos_getri) {
+  /*
+  [Note:] Current mkl API `getrf_batch` and `getri_batch` does not accept
+  info_arrays as input to store the error infos, instead, the errors are throwed
+  out as exceptions. As a workaround, we store the errors in `vector<int64_t>
+  infos`, and convert the vectors to tensors.
+
+  'infos_lu' is for holding LU errors, and 'infos_getri' is for holding getri
+  errors
+
+  The `infos_lu` and `infos_getri` are following:
+
+  = 0: successful exit
+  < 0: if INFO = -i, the i-th argument had an illegal value or another error
+  occured, such as memory allocation failed.
+  > 0: if INFO = i, U(i,i) is exactly zero.
+      The factorization has been completed, but the factor U is exactly
+      singular, and division by zero will occur if it is used to solve a
+      system of equation.
+  */
+
+  std::vector<int64_t> infos_lu_vec(native::batchCount(result), 0);
+  std::vector<int64_t> infos_getri_vec(native::batchCount(result), 0);
+  auto self_inv_working_copy = native::cloneBatchedColumnMajor(result);
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      result.scalar_type(), "linalg_inv_out_dpcpp", [&] {
+        impl::apply_inverse_dpcpp_<scalar_t>(
+            self_inv_working_copy, result, infos_lu_vec, infos_getri_vec);
+      });
+  // Needs to handle the copy for scalar tensor separately.
+  // Because the copy from 1D tensor to 0D scalar mismatch.
+  auto expected_info_shape =
+      IntArrayRef(result.sizes().cbegin(), result.sizes().cend() - 2);
+
+  infos_lu.copy_(at::from_blob(
+      (int32_t*)(infos_lu_vec.data()),
+      expected_info_shape,
+      c10::toValueType(infos_lu.scalar_type())));
+  infos_getri.copy_(at::from_blob(
+      (int32_t*)(infos_getri_vec.data()),
+      expected_info_shape,
+      c10::toValueType(infos_getri.scalar_type())));
+
+  return result;
 }
 
 std::tuple<Tensor, Tensor> _linalg_qr_helper(
