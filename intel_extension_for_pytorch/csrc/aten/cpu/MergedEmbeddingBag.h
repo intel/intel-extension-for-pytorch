@@ -1,7 +1,7 @@
 #include <ATen/AccumulateType.h>
 #include <ATen/Tensor.h>
 #include <csrc/dyndisp/DispatchStub.h>
-#include <torch/extension.h>
+#include <torch/all.h>
 #include "utils/csr2csc.h"
 
 namespace torch_ipex {

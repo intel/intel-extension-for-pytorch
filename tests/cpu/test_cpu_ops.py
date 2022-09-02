@@ -634,7 +634,6 @@ class CPUOPsTester(TestCase):
         helper(self, nn.AvgPool2d((3, 2), stride=(2, 1), count_include_pad=False), torch.randn(20, 16, 50, 32))
         helper(self, nn.AvgPool2d((3, 2), stride=(2, 1), count_include_pad=True, divisor_override=100), torch.randn(20, 16, 50, 32))
         helper(self, nn.AvgPool2d((3, 2), stride=(2, 1), count_include_pad=True, divisor_override=100), torch.randn(10, 8, 25, 16))
-        helper(self, nn.AvgPool2d((2, 2), stride=(1, 4), ceil_mode=True, padding=(-2, -2)), torch.randn(3, 16, 16, 8))
 
     # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_adaptive_max_pool2d(self):

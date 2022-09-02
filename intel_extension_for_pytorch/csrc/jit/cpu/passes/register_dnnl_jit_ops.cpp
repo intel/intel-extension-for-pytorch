@@ -45,28 +45,29 @@ at::Tensor toOptionalTensor(const IValue& v) {
   "int groups, bool input_is_channels_last, "     \
   "int[] input_sizes"
 
-#define CreateConvUnaryPostOpPrepack(FUSED_OP)                             \
-  Operator(                                                                \
-      "ipex_prepack::convolution_" #FUSED_OP "_prepack(" CONV_PREPACK_ARGS \
-      ") "                                                                 \
-      "-> __torch__.torch.classes.ipex_prepack.ConvolutionOpContext",      \
-      [](const Node* node) -> Operation {                                  \
-        return [](Stack* stack) {                                          \
-          auto result = IpexConvolutionOpContext::create_context(          \
-              std::move((std::move(peek(stack, 0, 8))).toTensor()),        \
-              std::move(toOptionalTensor(std::move(peek(stack, 1, 8)))),   \
-              std::move((std::move(peek(stack, 2, 8))).toIntVector()),     \
-              std::move((std::move(peek(stack, 3, 8))).toIntVector()),     \
-              std::move((std::move(peek(stack, 4, 8))).toIntVector()),     \
-              (std::move(peek(stack, 5, 8))).toInt(),                      \
-              (std::move(peek(stack, 6, 8))).toBool(),                     \
-              std::move((std::move(peek(stack, 7, 8))).toIntVector()),     \
-              ideep::attr_t::fuse_##FUSED_OP());                           \
-          drop(stack, 8);                                                  \
-          torch::jit::pack(stack, std::move(result));                      \
-          return 0;                                                        \
-        };                                                                 \
-      },                                                                   \
+#define CreateConvUnaryPostOpPrepack(FUSED_OP)                              \
+  Operator(                                                                 \
+      "ipex_prepack::convolution_" #FUSED_OP "_prepack(" CONV_PREPACK_ARGS  \
+      ") "                                                                  \
+      "-> __torch__.torch.classes.ipex_prepack.ConvolutionOpContext",       \
+      [](const Node* node) -> Operation {                                   \
+        return [](Stack* stack) {                                           \
+          auto result = IpexConvolutionOpContext::create_context(           \
+              std::move((std::move(peek(stack, 0, 8))).toTensor()),         \
+              std::move(                                                    \
+                  (std::move(peek(stack, 1, 8))).toOptional<at::Tensor>()), \
+              std::move((std::move(peek(stack, 2, 8))).toIntVector()),      \
+              std::move((std::move(peek(stack, 3, 8))).toIntVector()),      \
+              std::move((std::move(peek(stack, 4, 8))).toIntVector()),      \
+              (std::move(peek(stack, 5, 8))).toInt(),                       \
+              (std::move(peek(stack, 6, 8))).toBool(),                      \
+              std::move((std::move(peek(stack, 7, 8))).toIntVector()),      \
+              ideep::attr_t::fuse_##FUSED_OP());                            \
+          drop(stack, 8);                                                   \
+          torch::jit::pack(stack, std::move(result));                       \
+          return 0;                                                         \
+        };                                                                  \
+      },                                                                    \
       aliasAnalysisFromSchema())
 
 #define CreateConvUnaryPostOpRun(FUSED_OP)                         \
@@ -100,7 +101,8 @@ at::Tensor toOptionalTensor(const IValue& v) {
           auto scale = alpha1.has_value() ? alpha1.value().to<float>() : 1.0; \
           auto result = IpexConvolutionOpContext::create_context(             \
               std::move((std::move(peek(stack, 0, 9))).toTensor()),           \
-              std::move(toOptionalTensor(std::move(peek(stack, 1, 9)))),      \
+              std::move(                                                      \
+                  (std::move(peek(stack, 1, 9))).toOptional<at::Tensor>()),   \
               std::move((std::move(peek(stack, 2, 9))).toIntVector()),        \
               std::move((std::move(peek(stack, 3, 9))).toIntVector()),        \
               std::move((std::move(peek(stack, 4, 9))).toIntVector()),        \
@@ -223,7 +225,8 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 9, 10))).toScalar().to<float>();
             auto result = IpexConvolutionOpContext::create_context(
                 std::move((std::move(peek(stack, 0, 10))).toTensor()),
-                std::move(toOptionalTensor(std::move(peek(stack, 1, 10)))),
+                std::move(
+                    (std::move(peek(stack, 1, 10))).toOptional<at::Tensor>()),
                 std::move((std::move(peek(stack, 2, 10))).toIntVector()),
                 std::move((std::move(peek(stack, 3, 10))).toIntVector()),
                 std::move((std::move(peek(stack, 4, 10))).toIntVector()),
@@ -252,7 +255,8 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 10, 11))).toScalar().to<float>();
             auto result = IpexConvolutionOpContext::create_context(
                 std::move((std::move(peek(stack, 0, 11))).toTensor()),
-                std::move(toOptionalTensor(std::move(peek(stack, 1, 11)))),
+                std::move(
+                    (std::move(peek(stack, 1, 11))).toOptional<at::Tensor>()),
                 std::move((std::move(peek(stack, 2, 11))).toIntVector()),
                 std::move((std::move(peek(stack, 3, 11))).toIntVector()),
                 std::move((std::move(peek(stack, 4, 11))).toIntVector()),
@@ -277,7 +281,8 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 8, 9))).toScalar().to<float>();
             auto result = IpexConvolutionOpContext::create_context(
                 std::move((std::move(peek(stack, 0, 9))).toTensor()),
-                std::move(toOptionalTensor(std::move(peek(stack, 1, 9)))),
+                std::move(
+                    (std::move(peek(stack, 1, 9))).toOptional<at::Tensor>()),
                 std::move((std::move(peek(stack, 2, 9))).toIntVector()),
                 std::move((std::move(peek(stack, 3, 9))).toIntVector()),
                 std::move((std::move(peek(stack, 4, 9))).toIntVector()),
@@ -301,7 +306,8 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 8, 9))).toScalar().to<float>();
             auto result = IpexConvolutionOpContext::create_context(
                 std::move((std::move(peek(stack, 0, 9))).toTensor()),
-                std::move(toOptionalTensor(std::move(peek(stack, 1, 9)))),
+                std::move(
+                    (std::move(peek(stack, 1, 9))).toOptional<at::Tensor>()),
                 std::move((std::move(peek(stack, 2, 9))).toIntVector()),
                 std::move((std::move(peek(stack, 3, 9))).toIntVector()),
                 std::move((std::move(peek(stack, 4, 9))).toIntVector()),
@@ -330,7 +336,8 @@ torch::jit::RegisterOperators op({
             }
             auto result = IpexConvolutionOpContext::create_context(
                 std::move((std::move(peek(stack, 0, 9))).toTensor()),
-                std::move(toOptionalTensor(std::move(peek(stack, 1, 9)))),
+                std::move(
+                    (std::move(peek(stack, 1, 9))).toOptional<at::Tensor>()),
                 std::move((std::move(peek(stack, 2, 9))).toIntVector()),
                 std::move((std::move(peek(stack, 3, 9))).toIntVector()),
                 std::move((std::move(peek(stack, 4, 9))).toIntVector()),

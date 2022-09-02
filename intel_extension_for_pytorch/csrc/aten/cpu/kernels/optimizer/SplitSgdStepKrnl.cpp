@@ -1,8 +1,8 @@
 #include <csrc/aten/cpu/optimizer/optimizer.h>
 #include "csrc/cpu/vec/vec.h"
 
+#include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
-#include <torch/extension.h>
 
 namespace torch_ipex {
 namespace cpu {

@@ -1,5 +1,5 @@
 #include "LayerNorm.h"
-#include <torch/extension.h>
+#include <torch/all.h>
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/utils/library.h"
 

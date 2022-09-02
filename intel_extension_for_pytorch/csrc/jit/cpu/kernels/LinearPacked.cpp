@@ -191,6 +191,9 @@ at::Tensor run(
     const ContextLinear& context,
     const at::Tensor& input,
     const ideep::attr_t& attr) {
+  TORCH_CHECK(
+      input.size(input.dim() - 1) == context.weight_packed_.get_dims()[1],
+      "Check the shapes of mat1 and mat2, they cannot be multiplied!");
   auto input_ = input.contiguous();
   c10::MaybeOwned<at::Tensor> bias_maybe_owned =
       at::borrow_from_optional_tensor(context.bias_);
@@ -203,6 +206,9 @@ at::Tensor& run(
     const at::Tensor& input,
     at::Tensor& accumu,
     const ideep::attr_t& attr) {
+  TORCH_CHECK(
+      input.size(input.dim() - 1) == context.weight_packed_.get_dims()[1],
+      "Check the shapes of mat1 and mat2, they cannot be multiplied!");
   auto input_ = input.contiguous();
   c10::MaybeOwned<at::Tensor> bias_maybe_owned =
       at::borrow_from_optional_tensor(context.bias_);

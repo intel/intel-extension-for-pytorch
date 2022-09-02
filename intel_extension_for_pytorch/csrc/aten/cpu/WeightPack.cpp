@@ -1,4 +1,4 @@
-#include <torch/extension.h>
+#include <torch/all.h>
 
 #include "WeightPack.h"
 #include "csrc/utils/rw_lock.h"

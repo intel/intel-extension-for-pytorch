@@ -9,7 +9,7 @@ namespace cpu {
 
 at::Tensor mean_dim_impl(
     const at::Tensor& input,
-    c10::IntArrayRef dim,
+    c10::OptionalIntArrayRef dim_opt,
     bool keepdim,
     c10::optional<at::ScalarType> dtype);
 

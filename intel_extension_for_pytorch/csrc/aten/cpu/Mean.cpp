@@ -14,18 +14,21 @@ namespace cpu {
 
 at::Tensor mean_dim_impl(
     const at::Tensor& input,
-    c10::IntArrayRef dim,
+    c10::OptionalIntArrayRef dim_opt,
     bool keepdim,
     c10::optional<c10::ScalarType> dtype) {
   int64_t dim_prod = 1;
-  if (dim.size() == 0 || input.ndimension() == 0) {
-    dim_prod = input.numel();
-  } else {
-    for (auto d : dim) {
-      dim_prod *= input.size(d);
+  if (dim_opt.has_value()) {
+    auto dim = dim_opt.value();
+    if (dim.size() == 0 || input.ndimension() == 0) {
+      dim_prod = input.numel();
+    } else {
+      for (auto d : dim) {
+        dim_prod *= input.size(d);
+      }
     }
   }
-  return at::sum(input, dim, keepdim, dtype).div_(dim_prod);
+  return at::sum(input, dim_opt, keepdim, dtype).div_(dim_prod);
 }
 
 IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {

@@ -1,7 +1,7 @@
 #include <ATen/AccumulateType.h>
 #include <ATen/Tensor.h>
 #include <csrc/aten/cpu/MergedEmbeddingBag.h>
-#include <torch/extension.h>
+#include <torch/all.h>
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/vec/vec.h"
 

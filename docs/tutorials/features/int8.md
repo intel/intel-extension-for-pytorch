@@ -3,7 +3,7 @@ Intel® Extension for PyTorch\* optimizations for quantization
 
 The quantization functionality in Intel® Extension for PyTorch\* currently only supports post-training quantization. This tutorial introduces how the quantization works in the Intel® Extension for PyTorch\* side.
 
-We fully utilize Pytorch quantization components as much as possible, such as PyTorch [Observer method](https://pytorch.org/docs/1.11/quantization-support.html#torch-quantization-observer). To make a PyTorch user be able to easily use the quantization API, API for quantization in Intel® Extension for PyTorch\* is very similar to those in PyTorch. Intel® Extension for PyTorch\* quantization supports a default recipe to automatically decide which operators should be quanized or not. This brings a satisfying performance and accuracy tradeoff.
+We fully utilize Pytorch quantization components as much as possible, such as PyTorch [Observer method](https://pytorch.org/docs/1.11/quantization-support.html#torch-quantization-observer). To make a PyTorch user be able to easily use the quantization API, API for quantization in Intel® Extension for PyTorch\* is very similar to those in PyTorch. Intel® Extension for PyTorch\* quantization supports a default recipe to automatically decide which operators should be quantized or not. This brings a satisfying performance and accuracy tradeoff.
 
 ## Static Quantization
 

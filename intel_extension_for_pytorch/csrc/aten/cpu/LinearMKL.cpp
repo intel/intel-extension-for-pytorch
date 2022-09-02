@@ -1,4 +1,4 @@
-#include <torch/extension.h>
+#include <torch/all.h>
 
 #include <torch/csrc/autograd/function.h>
 #include "LinearMKL.h"

@@ -54,6 +54,9 @@ class TestOptimizers(TestCase):
         M = TestModule(has_sparse_grad=True)
         options = itertools.product([True, False], [True, False], [torch.float, torch.bfloat16], [0.1, 0], [True, False], [True, False])
         for set_to_none, split_master_weight_for_bf16, dtype, dampening, foreach, maximize in options:
+            if foreach:
+                # stock pytorch will fail while foreach and has_sparse_grad
+                continue
             sgd = torch.optim.SGD(
                 M.parameters(), lr=0.001,
                 dampening=dampening, foreach=foreach, maximize=maximize)

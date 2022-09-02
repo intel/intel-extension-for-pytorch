@@ -20,6 +20,88 @@ namespace conv_transpose {
     return op_context->run(input, ideep::attr_t::fuse_##FUSED_OP());  \
   }
 
+// follow check rules from
+// https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/Convolution.cpp
+static void check_shape_forward(
+    const at::IntArrayRef& input_sizes,
+    const at::IntArrayRef& weight_sizes,
+    const c10::optional<at::Tensor>& bias,
+    const at::IntArrayRef& padding,
+    const at::IntArrayRef& stride,
+    const at::IntArrayRef& dilation,
+    const int64_t groups) {
+#define MKLDNN_CONV_ARG_CHECK(IT, OP) \
+  std::any_of(IT.begin(), IT.end(), [](auto x) { return x OP 0; })
+  auto is_padding_neg = MKLDNN_CONV_ARG_CHECK(padding, <);
+  auto is_stride_nonpos = MKLDNN_CONV_ARG_CHECK(stride, <=);
+  auto is_dilation_nonpos = MKLDNN_CONV_ARG_CHECK(dilation, <=);
+#undef MKLDNN_CONV_ARG_CHECK
+  TORCH_CHECK(!is_padding_neg, "negative padding is not supported");
+  TORCH_CHECK(!is_stride_nonpos, "non-positive stride is not supported");
+  TORCH_CHECK(!is_dilation_nonpos, "non-positive dilation is not supported");
+  TORCH_CHECK(groups > 0, "non-positive groups is not supported");
+
+  int64_t k = input_sizes.size();
+  int64_t weight_dim = weight_sizes.size();
+
+  if (k != 0) {
+    TORCH_CHECK(
+        weight_dim == k,
+        "Expected ",
+        weight_dim,
+        "-dimensional input for ",
+        weight_dim,
+        "-dimensional weight ",
+        weight_sizes,
+        ", but got ",
+        k,
+        "-dimensional input of size ",
+        input_sizes,
+        " instead");
+    TORCH_CHECK(
+        input_sizes[1] == weight_sizes[0],
+        "Given transposed=True, weight of size ",
+        weight_sizes,
+        ", expected input",
+        input_sizes,
+        " to have ",
+        weight_sizes[0],
+        " channels, but got ",
+        input_sizes[1],
+        " channels instead");
+  }
+  TORCH_CHECK(
+      weight_sizes[0] >= groups,
+      "Given groups=",
+      groups,
+      ", expected weight to be at least ",
+      groups,
+      " at dimension 0, but got weight of size ",
+      weight_sizes,
+      " instead");
+  TORCH_CHECK(
+      weight_sizes[0] % groups == 0,
+      "Given groups=",
+      groups,
+      ", expected weight to be divisible by ",
+      groups,
+      " at dimension 0, but got weight of size [",
+      weight_sizes,
+      "] instead");
+  TORCH_CHECK(
+      !bias.has_value() ||
+          (bias.value().ndimension() == 1 &&
+           bias.value().size(0) == weight_sizes[1] * groups),
+      "Given transposed=True, weight of size ",
+      weight_sizes,
+      ", expected bias to be 1-dimensional with ",
+      weight_sizes[1] * groups,
+      " elements",
+      ", but got bias of size ",
+      bias.value().sizes(),
+      " instead");
+}
+
 c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
@@ -181,6 +263,15 @@ ContextConvTranspose create(
   const auto dilation_expanded =
       expand_param_if_needed(dilation, "dilation", dim);
 
+  check_shape_forward(
+      input_size,
+      weight.sizes(),
+      bias,
+      padding_expanded,
+      stride_expanded,
+      dilation_expanded,
+      groups);
+
   bool weight_is_channels_last_ = weight_is_channels_last;
 
   weight_is_channels_last_ =
@@ -253,6 +344,15 @@ at::Tensor run(
   }
   auto input_ = input.contiguous(memory_format);
 
+  check_shape_forward(
+      input_.sizes(),
+      context.origin_weight_dims_,
+      context.bias_,
+      context.padding_,
+      context.stride_,
+      context.dilation_,
+      context.groups_);
+
   return conv_transpose_kernel_impl(
       input_,
       context.weight_packed_,
@@ -288,6 +388,15 @@ at::Tensor& run(
   auto input_ = input.contiguous(memory_format);
   // always align accumu format with inputs' format.
   accumu = accumu.contiguous(memory_format);
+
+  check_shape_forward(
+      input_.sizes(),
+      context.origin_weight_dims_,
+      context.bias_,
+      context.padding_,
+      context.stride_,
+      context.dilation_,
+      context.groups_);
 
   conv_transpose_out_kernel_impl(
       input_,

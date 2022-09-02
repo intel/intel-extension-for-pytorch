@@ -25,7 +25,7 @@ void AddLayerNormKernelImpl(
     int64_t N,
     T eps,
     at::Tensor& Y) {
-  DCHECK_EQ(a.numel(), M * N);
+  DCHECK(a.numel() == M * N);
   DCHECK(!gamma.defined() || gamma.numel() == N);
   DCHECK(!beta.defined() || beta.numel() == N);
   const T* a_data = a.data_ptr<T>();
