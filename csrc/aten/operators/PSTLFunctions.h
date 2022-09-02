@@ -607,8 +607,11 @@ inline void leaf_sort(
   auto end = std::min(start + n, sorted_sz);
   for (size_t i = start; i < end; ++i) {
     for (size_t j = start + 1; j < start + end - i; ++j) {
+      // for stable sort, the condition should be:
+      // if comp_t(key[j], key[j-1]), swap two elements;
+      // so when key[j]==key[j-1], no swap.
       at::AtenIpexTypeXPU::impl::compare_and_swap(
-          key[j - 1], val[j - 1], key[j], val[j], false, comp_t);
+          key[j], val[j], key[j - 1], val[j - 1], true, comp_t);
     }
   }
 }
