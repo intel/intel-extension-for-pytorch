@@ -318,5 +318,113 @@ Tensor& renorm_out(
       out, self, norm.contiguous().view(sizes_));
 }
 
+static Tensor& linalg_vector_norm_impl(
+    const Tensor& self,
+    const Scalar& scalar_ord,
+    optional<IntArrayRef> opt_dim,
+    bool keepdim,
+    optional<ScalarType> opt_dtype,
+    Tensor& result) {
+  // Casting a large integer to a double will introduce some error, but for
+  // practical purposes, it won't matter since a large order will usually
+  // give an infinite result
+  auto ord = scalar_ord.toDouble();
+
+  TORCH_CHECK(
+      self.layout() == Layout::Strided,
+      "linalg.vector_norm only supports strided layout, but got: ",
+      self.layout());
+
+  if (opt_dtype.has_value() && isComplexType(self.scalar_type())) {
+    TORCH_CHECK(
+        isComplexType(opt_dtype.value()),
+        "linalg.vector_norm expected complex 'dtype', since input is complex, ",
+        "but got ",
+        opt_dtype.value());
+  }
+
+  ScalarType in_dtype = opt_dtype.value_or(self.scalar_type());
+  TORCH_CHECK(
+      at::isFloatingType(in_dtype) || at::isComplexType(in_dtype),
+      "linalg.vector_norm only supports floating point and complex dtypes, but got: ",
+      toString(in_dtype));
+
+  IntArrayRef dim = opt_dim.value_or(IntArrayRef{});
+
+  if (self.numel() == 0) {
+    // TODO: The question about how to handle negative orders when the input
+    // is empty has not been settled yet. For now, we raise an error. Issue:
+    // https://github.com/pytorch/pytorch/issues/52783
+    TORCH_CHECK(
+        ord >= 0,
+        "linalg.vector_norm of negative order cannot be performed on an empty tensor");
+
+    // For NumPy compatibility, we can only perform order infinity reduction
+    // (max/min) on a tensor with zero elements if the dimensions to reduce are
+    // nonzero. Otherwise, throw an error.
+    if (ord == INFINITY) {
+      bool has_identity = true;
+
+      if (dim.size() == 0) {
+        has_identity = false;
+      } else {
+        for (int64_t dim_num : dim) {
+          if (self.size(dim_num) == 0) {
+            has_identity = false;
+            break;
+          }
+        }
+      }
+      TORCH_CHECK(
+          has_identity,
+          "linalg.vector_norm cannot compute the infinity norm on an empty ",
+          "dimension because the operation does not have an identity");
+    }
+  }
+  Tensor self_;
+  self_ = self;
+  ScalarType out_dtype = opt_dtype.value_or(toValueType(self.scalar_type()));
+  TORCH_CHECK(
+      !result.defined() || out_dtype == result.scalar_type(),
+      "linalg.vector_norm expected out tensor dtype ",
+      out_dtype,
+      " but got: ",
+      result.scalar_type());
+  // omit in_dtype in the following call, to avoid make_reduction explicitly
+  // casting input to out_dtype
+  auto iter = at::isComplexType(self.scalar_type())
+      ? meta::make_reduction(
+            "vector_norm", result, self_, dim, keepdim, in_dtype, out_dtype)
+      : meta::make_reduction(
+            "vector_norm", result, self_, dim, keepdim, out_dtype);
+
+  norm_kernel(iter, ord, dim);
+  return result;
+}
+
+Tensor linalg_vector_norm(
+    const Tensor& self,
+    const Scalar& ord,
+    optional<IntArrayRef> opt_dim,
+    bool keepdim,
+    optional<ScalarType> opt_dtype) {
+  ScalarType out_dtype = opt_dtype.value_or(toValueType(self.scalar_type()));
+  Tensor result = create_reduction_result(
+      self, opt_dim.value_or(IntArrayRef{}), keepdim, out_dtype);
+  return linalg_vector_norm_impl(
+      self, ord, opt_dim, keepdim, opt_dtype, result);
+}
+
+Tensor& linalg_vector_norm_out(
+    const Tensor& self,
+    const Scalar& ord,
+    optional<IntArrayRef> opt_dim,
+    bool keepdim,
+    optional<ScalarType> opt_dtype,
+    Tensor& result) {
+  return linalg_vector_norm_impl(
+      self, ord, opt_dim, keepdim, opt_dtype, result);
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
