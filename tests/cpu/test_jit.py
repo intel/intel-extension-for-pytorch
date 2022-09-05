@@ -979,6 +979,30 @@ class ConcatBnRelu(torch.nn.Module):
         x = self.bn(x)
         return self.relu(x)
 
+class ConcatBnReluV2(torch.nn.Module):
+    def __init__(self, dim, cat_dim, in_channels, **kwargs):
+        super(ConcatBnReluV2, self).__init__()
+        self.bn = bn_module[dim](in_channels)
+        self.relu = torch.nn.ReLU(inplace=True)
+        self.cat_dim = cat_dim
+    def forward(self, x1, x2, x3):
+        x = torch.cat((x1, x2, x3), dim = self.cat_dim)
+        x = self.bn(x)
+        return self.relu(x)
+
+class ConcatBnReluV3(torch.nn.Module):
+    def __init__(self, dim, cat_dim, in_channels, **kwargs):
+        super(ConcatBnReluV3, self).__init__()
+        self.bn = bn_module[dim](in_channels)
+        self.relu = torch.nn.ReLU(inplace=True)
+        self.cat_dim = cat_dim
+    def forward(self, x1, x2, x3):
+        x = torch.cat((x1, x2, x3), dim = self.cat_dim)
+        x = self.bn(x)
+        y = self.relu(x)
+        x += 2
+        return y + x
+
 class ModMultLinear(nn.Module):
     def __init__(self, w1_dim, w2_dim):
          super(ModMultLinear, self).__init__()
@@ -1402,32 +1426,41 @@ class Tester(TestCase):
             a = [a1, a2, a3]
 
             in_channels = sum(channels)
-            model = ConcatBnRelu(dim, 1, in_channels).eval()
+            model1 = ConcatBnRelu(dim, 1, in_channels).eval()
+            model2 = ConcatBnReluV2(dim, 1, in_channels).eval()
+            model3 = ConcatBnReluV3(dim, 1, in_channels).eval()
 
-            if use_channels_last:
-                suggest_memory_format = torch.channels_last if dim == 2 else torch.channels_last_3d
-                for i in range(3):
-                    a[i] = a[i].to(memory_format=suggest_memory_format)
-                model = model.to(memory_format=suggest_memory_format)
-
-            model = ipex.optimize(model, dtype=dtype, level=level)
-
-            with torch.cpu.amp.autocast(enabled=True if dtype == torch.bfloat16 else False), torch.no_grad():
-                result = model(a[0], a[1], a[2])
-                trace_model = torch.jit.trace(model, (a[0], a[1], a[2])).eval()
-                trace_model = torch.jit.freeze(trace_model)
-
-                tresult = trace_model(a[0], a[1], a[2])
-                trace_graph = trace_model.graph_for(a[0], a[1], a[2])
-
-                self.assertEqual(result, tresult)
-                self.assertEqual(tresult.dtype, dtype)
+            for model in [model1, model2]:
                 if use_channels_last:
-                    self.assertTrue(tresult.is_contiguous(memory_format=suggest_memory_format))
-                if use_channels_last and a1.size(1) % 16 == 0 and a2.size(1) % 16 == 0 and a3.size(1) % 16 == 0 :
-                    self.assertTrue(any(n.kind() == "ipex::concat_bn_relu" for n in trace_graph.nodes()))
-                else:
-                    self.assertTrue(all(n.kind() != "ipex::concat_bn_relu" for n in trace_graph.nodes()))
+                    suggest_memory_format = torch.channels_last if dim == 2 else torch.channels_last_3d
+                    for i in range(3):
+                        a[i] = a[i].to(memory_format=suggest_memory_format)
+                    model = model.to(memory_format=suggest_memory_format)
+
+                model = ipex.optimize(model, dtype=dtype, level=level)
+
+                with torch.cpu.amp.autocast(enabled=True if dtype == torch.bfloat16 else False), torch.no_grad():
+                    result = model(a[0], a[1], a[2])
+                    trace_model = torch.jit.trace(model, (a[0], a[1], a[2])).eval()
+                    trace_model = torch.jit.freeze(trace_model)
+
+                    tresult = trace_model(a[0], a[1], a[2])
+                    trace_graph = trace_model.graph_for(a[0], a[1], a[2])
+
+                    self.assertEqual(result, tresult)
+                    self.assertEqual(tresult.dtype, dtype)
+                    if use_channels_last:
+                        self.assertTrue(tresult.is_contiguous(memory_format=suggest_memory_format))
+                    if use_channels_last and a1.size(1) % 16 == 0 and a2.size(1) % 16 == 0 and a3.size(1) % 16 == 0:
+                        self.assertTrue(any(n.kind() == "ipex::concat_bn_relu" for n in trace_graph.nodes()))
+                    else:
+                        self.assertTrue(all(n.kind() != "ipex::concat_bn_relu" for n in trace_graph.nodes()))
+
+            model = ipex.optimize(model3, dtype=dtype, level = level)
+            trace_model = torch.jit.trace(model, (a[0], a[1], a[2])).eval()
+            trace_model = torch.jit.freeze(trace_model)
+            trace_graph = trace_model.graph_for(a[0], a[1], a[2])
+            self.assertTrue(any(n.kind() != "ipex::concat_bn_relu" for n in trace_graph.nodes()))
 
     def test_mha_scores_calculation(self):
         def _check_match_mha(trace_model, mat1, mat2, bias, node = "ipex::mha_scores_calc"):
@@ -3569,13 +3602,17 @@ class Tester(TestCase):
                 x = torch.randn(1, 3, 16, 16)
 
 #test restore inplace
-                traced = torch.jit.trace(m, x)
-                trace_graph = traced.graph_for(x)
-                self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph.nodes()))
+# Since TE is with priority and it has not supported inplace op yet, we make inplace optimization after TE.
+# Some in place ops replaced by replaceInplaceOpsWithOutplaceOps will be optimized by TE and won't resume by ApplyInplaceOptimization.
+# Thus we need to disable TE here.
+                with self._texpr_enable(False):
+                    traced = torch.jit.trace(m, x)
+                    trace_graph = traced.graph_for(x)
+                    self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph.nodes()))
 
-                y = m(x)
-                traced_y = traced(x)
-                self.assertEqual(y, traced_y)
+                    y = m(x)
+                    traced_y = traced(x)
+                    self.assertEqual(y, traced_y)
 
 
     def test_enable_inplace(self):

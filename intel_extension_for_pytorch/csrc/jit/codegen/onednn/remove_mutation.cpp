@@ -3,6 +3,24 @@
 
 namespace torch_ipex {
 namespace jit {
+
+bool maybeAliveAfterNode(
+    torch::jit::AliasDb* aliasdb,
+    torch::jit::Node* node,
+    torch::jit::Value* v,
+    torch::jit::Value* x) {
+  torch::jit::Node* next_node = node->next();
+  while (next_node != nullptr &&
+         next_node->kind() != torch::jit::prim::Return) {
+    for (torch::jit::Value* i : next_node->inputs()) {
+      if (aliasdb->mayContainAlias(i, v) && i != x) {
+        return true;
+      }
+    }
+    next_node = next_node->next();
+  }
+  return false;
+}
 namespace fuser {
 namespace onednn {
 
@@ -10,27 +28,6 @@ using namespace torch::jit;
 
 bool IPEXRemoveMutation::removeTensorMutation() {
   return removeTensorMutation(graph_->block());
-}
-
-/** This function tries to check if the mutated value v except its alias x is
- * still alive after node.
- *
- * @param node: The node of an inplace op
- * @param v: The first input of the node
- * @param x: An alias of v, its use is excluded from the check
- *
- **/
-bool IPEXRemoveMutation::maybeAliveAfterNode(Node* node, Value* v, Value* x) {
-  Node* next_node = node->next();
-  while (next_node != nullptr && next_node->kind() != prim::Return) {
-    for (Value* i : next_node->inputs()) {
-      if (getAliasDb()->mayContainAlias(i, v) && i != x) {
-        return true;
-      }
-    }
-    next_node = next_node->next();
-  }
-  return false;
 }
 
 // This function is copied from
@@ -101,7 +98,7 @@ bool IPEXRemoveMutation::removeTensorMutation(Block* block) {
 
     Value* mutated_value = node->inputs().at(0);
     Value* output = node->output();
-    if (maybeAliveAfterNode(node, mutated_value, output)) {
+    if (maybeAliveAfterNode(getAliasDb(), node, mutated_value, output)) {
       continue;
     }
 
