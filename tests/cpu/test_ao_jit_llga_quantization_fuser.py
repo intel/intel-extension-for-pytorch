@@ -1540,7 +1540,37 @@ class TestFusionPattern(JitLlgaTestCase):
         m = convert_fx(m)
         graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
-    
+
+    def test_ffn_residual(self):
+        class FFN_Residual(nn.Module):
+            def __init__(self, hidden_size, intermediate_size):
+                super(FFN_Residual, self).__init__()
+                self.linear1 = nn.Linear(hidden_size, intermediate_size)
+                self.linear2 = nn.Linear(intermediate_size, hidden_size)
+                self.LayerNorm1 = nn.LayerNorm(hidden_size)
+                self.LayerNorm2 = nn.LayerNorm(hidden_size)
+                self.intermediate_act_fn = nn.functional.gelu
+
+            def forward(self, x):
+                x1 = self.LayerNorm1(x)
+                x2 = self.linear1(x1)
+                x3 = self.intermediate_act_fn(x2)
+                x4 = self.linear2(x3)
+                x5 = self.LayerNorm2(x4 + x)
+                return x5
+        
+        patterns = [
+            ["aten::dequantize", "aten::linear", "aten::gelu", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::linear", "aten::add"],
+        ]
+        m =  FFN_Residual(1024, 4096).eval()
+        x = torch.rand(128, 1024)
+        graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+        self.assertFused(graph, ['aten::linear', 'aten::gelu'])
+        self.assertFused(graph, ['aten::linear', 'aten::add'])
+        self.checkPatterns(graph, patterns)
+
 class TestShapeFallback(JitLlgaTestCase):
     @unittest.skipIf(True, 'Size peephole optimization not enabled yet')
     def test_view_permute(self):
