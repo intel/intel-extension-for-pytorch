@@ -460,6 +460,8 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{aten::linear, aten::gelu}, xpu::linear_gelu_sym},
     {{aten::linear, Symbol::fromQualString("aten::gelu_")},
      xpu::linear_gelu_sym},
+    // BERT: linear with bias + add
+    {{aten::linear, aten::add}, xpu::linear_add_sym},
     // DLRM: linear with bias + relu/sigmoid
     {{aten::t, aten::addmm}, xpu::t_addmm_sym},
     {{xpu::t_addmm_sym, aten::relu}, xpu::t_addmm_relu_sym},

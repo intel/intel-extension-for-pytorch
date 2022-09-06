@@ -936,6 +936,16 @@ at::Tensor linear_gelu(
   return at::AtenIpexTypeXPU::linear_gelu(input, weight, bias);
 }
 
+at::Tensor linear_add(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    const at::Tensor& accumu,
+    at::Scalar alpha) {
+  const OptionalDeviceGuard device_guard(device_of(input));
+  return at::AtenIpexTypeXPU::linear_add(input, weight, bias, accumu, alpha);
+}
+
 at::Tensor trans_addmm_relu(
     const at::Tensor& weight,
     const at::Tensor& bias,

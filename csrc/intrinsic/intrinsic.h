@@ -194,6 +194,13 @@ at::Tensor linear_gelu(
     const at::Tensor& weight,
     const at::Tensor& bias);
 
+at::Tensor linear_add(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    const at::Tensor& accumu,
+    at::Scalar alpha);
+
 at::Tensor trans_addmm_relu(
     const at::Tensor& input,
     const at::Tensor& weight,

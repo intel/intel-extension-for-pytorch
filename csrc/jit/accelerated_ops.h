@@ -63,6 +63,7 @@ static auto t_addmm_sym = Symbol::fromQualString("xpu::t_addmm");
 static auto t_addmm_dropout_sym =
     Symbol::fromQualString("xpu::t_addmm_dropout");
 static auto linear_gelu_sym = Symbol::fromQualString("xpu::linear_gelu");
+static auto linear_add_sym = Symbol::fromQualString("xpu::linear_add");
 static auto t_addmm_relu_sym = Symbol::fromQualString("xpu::t_addmm_relu");
 static auto t_addmm_sigmoid_sym =
     Symbol::fromQualString("xpu::t_addmm_sigmoid");

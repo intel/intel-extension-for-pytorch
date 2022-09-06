@@ -129,6 +129,16 @@ class LinearGELU(torch.nn.Module):
         x = self.gelu(self.linear(x))
         return x
 
+class LinearAdd(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearAdd, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x1 = torch.ones(x.shape).to(x.device) 
+        x = self.linear(x)
+        y = x + x1
+        return y
 
 class LinearReLU(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -519,6 +529,23 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             # print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device), atol=1e-3, rtol=1.3e-6)
+        del modelJit
+
+    def test_linear_add(self, dtype=torch.float):
+        x = torch.randn([1, 384, 1024], device=cpu_device)
+        model = LinearAdd(1024, 1024)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device), atol=1e-3, rtol=1.3e-6)
