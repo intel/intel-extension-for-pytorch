@@ -634,7 +634,7 @@ elif mode == 'python':
             return '-Wl,-rpath,$ORIGIN/' + path
 
     def pyi_module():
-        main_libraries = ['mkl_intel_lp64','mkl_gnu_thread','mkl_core','intel-ext-pt-cpu']
+        main_libraries = ['intel-ext-pt-cpu']
         main_sources = [os.path.join(package_name, "csrc", "python", "init_python_bindings.cpp"),
                         os.path.join(package_name, "csrc", "python", "TaskModule.cpp")]
 
@@ -647,7 +647,6 @@ elif mode == 'python':
 
         library_dirs = [
             "lib",
-            os.path.join(mkl_lib_path),
             os.path.join(pytorch_install_dir, "lib")]
 
         extra_compile_args = [
