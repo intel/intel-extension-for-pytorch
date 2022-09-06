@@ -135,7 +135,7 @@ inline dest_t no_double_fetch_and_cast(
     NO_DOUBLE_FORALL_SCALAR_TYPES_WITH_COMPLEX_EXCEPT_COMPLEX_HALF(
         NO_DOUBLE_FETCH_AND_CAST_CASE)
     default:
-      CUDA_KERNEL_ASSERT(false);
+      SYCL_KERNEL_ASSERT(false);
   }
   return dest_t(0); // just to avoid compiler warning
 }
@@ -154,20 +154,20 @@ inline void no_double_cast_and_store(
         NO_DOUBLE_CAST_AND_STORE_CASE)
     default:;
   }
-  CUDA_KERNEL_ASSERT(false);
+  SYCL_KERNEL_ASSERT(false);
 }
 
 #define NO_DOUBLE_DEFINE_UNCASTABLE(T, scalartype_)           \
   template <>                                                 \
   inline T no_double_fetch_and_cast<T>(                       \
       const ScalarType src_type, const void* ptr) {           \
-    CUDA_KERNEL_ASSERT(ScalarType::scalartype_ == src_type);  \
+    SYCL_KERNEL_ASSERT(ScalarType::scalartype_ == src_type);  \
     return *(const T*)ptr;                                    \
   }                                                           \
   template <>                                                 \
   inline void no_double_cast_and_store<T>(                    \
       const ScalarType dest_type, void* ptr, T value) {       \
-    CUDA_KERNEL_ASSERT(ScalarType::scalartype_ == dest_type); \
+    SYCL_KERNEL_ASSERT(ScalarType::scalartype_ == dest_type); \
     *(T*)ptr = value;                                         \
   }
 

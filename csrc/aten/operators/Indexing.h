@@ -529,15 +529,12 @@ void dpcpp_small_index_kernel_impl(
         for (size_t i = 0; i < num_indices; i++) {
           int64_t index =
               *(int64_t*)(index_ptrs[i] + local_index * indice_size_bytes);
-          // if (index >= -sizes[i] && index < sizes[i]) {
+          SYCL_KERNEL_ASSERT(
+              index >= -sizes[i] && index < sizes[i] && "index out of bounds");
           if (index < 0) {
             index += sizes[i];
           }
           offset += index * strides[i];
-          //} else {
-          //  DPCPP_K_PRINT("index %ld out of bounds, expected [%ld, %ld)\n",
-          //  index, -sizes[i], sizes[i]);
-          //}
         }
         local_offset[local_index] = offset;
       }
@@ -615,19 +612,12 @@ void dpcpp_index_kernel_impl(
       //#pragma unroll
       for (size_t i = 0; i < num_indices; i++) {
         int64_t index = *(int64_t*)(index_ptrs[i] + offsets[2]);
-        if (index >= -sizes[i] && index < sizes[i]) {
-          if (index < 0) {
-            index += sizes[i];
-          }
-          offset += index * strides[i];
-        } else {
-          DPCPP_K_PRINT(
-              "index %ld out of bounds, expected [%ld, %ld)\n",
-              index,
-              -sizes[i],
-              sizes[i]);
-          __assert_fail("Assert at ", __FILE__, __LINE__, __FUNCTION__);
+        SYCL_KERNEL_ASSERT(
+            index >= -sizes[i] && index < sizes[i] && "index out of bounds");
+        if (index < 0) {
+          index += sizes[i];
         }
+        offset += index * strides[i];
       }
       f(out_ptr, in_ptr, offset);
     };
