@@ -29,11 +29,6 @@
   classname(const classname&) = delete;         \
   classname& operator=(const classname&) = delete
 
-enum DPCPP_STATUS {
-  DPCPP_SUCCESS = 0,
-  DPCPP_FAILURE = 1,
-};
-
 // Host side print utils
 template <typename T>
 void ipex_host_print(T& t) {

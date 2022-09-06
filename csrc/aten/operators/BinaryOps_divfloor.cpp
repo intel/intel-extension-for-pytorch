@@ -47,7 +47,7 @@ static void div_floor_kernel_dpcpp(TensorIterator& iter) {
         [&]() {
           dpcpp_kernel_with_scalars(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                if (C10_UNLIKELY(b == 0)) {
+                if (DPCPP_UNLIKELY(b == 0)) {
                   // Divide by zero: return standard IEEE result
                   return a / b;
                 }

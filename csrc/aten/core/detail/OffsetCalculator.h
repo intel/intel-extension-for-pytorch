@@ -74,7 +74,7 @@ struct TrivialOffsetCalculator {
   // The offsets are in # of elements, not in bytes.
   using offset_type = xpu::dpcpp::Array<index_t, std::max<int>(NARGS, 1)>;
 
-  C10_HOST_DEVICE offset_type get(index_t linear_idx) const {
+  DPCPP_BOTH offset_type get(index_t linear_idx) const {
     offset_type offsets;
 #pragma unroll
     for (int arg = 0; arg < NARGS; arg++) {

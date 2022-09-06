@@ -13,7 +13,7 @@ namespace AtenIpexTypeXPU {
 
 template <typename scalar_t>
 struct LessOrNan {
-  C10_DEVICE bool operator()(
+  DPCPP_DEVICE bool operator()(
       scalar_t a,
       scalar_t b,
       int64_t idx_a,
@@ -31,7 +31,7 @@ struct LessOrNan {
 
 template <typename scalar_t>
 struct GreaterOrNan {
-  C10_DEVICE bool operator()(
+  DPCPP_DEVICE bool operator()(
       scalar_t a,
       scalar_t b,
       int64_t idx_a,
@@ -53,24 +53,24 @@ struct MinMaxReductionOps {
   using index_t = int64_t;
   using arg_t = std::pair<scalar_t, index_t>;
 
-  static C10_DEVICE arg_t project(arg_t arg) {
+  static DPCPP_DEVICE arg_t project(arg_t arg) {
     return arg;
   }
 
-  static C10_DEVICE arg_t reduce(arg_t arg, scalar_t val, int64_t idx) {
+  static DPCPP_DEVICE arg_t reduce(arg_t arg, scalar_t val, int64_t idx) {
     return comp_t{}(arg.first, val, arg.second, idx) ? arg : arg_t(val, idx);
   }
 
-  static C10_DEVICE arg_t combine(arg_t a, arg_t b) {
+  static DPCPP_DEVICE arg_t combine(arg_t a, arg_t b) {
     return comp_t{}(a.first, b.first, a.second, b.second) ? a : b;
   }
 
-  static C10_DEVICE arg_t translate_idx(arg_t a, int64_t base_idx) {
+  static DPCPP_DEVICE arg_t translate_idx(arg_t a, int64_t base_idx) {
     return {a.first, a.second + base_idx};
   }
 
 #if 0
-  static C10_DEVICE arg_t warp_shfl_down(arg_t arg, int offset) {
+  static DPCPP_DEVICE arg_t warp_shfl_down(arg_t arg, int offset) {
     return arg_t(
         WARP_SHFL_DOWN(arg.first, offset), WARP_SHFL_DOWN(arg.second, offset));
   }

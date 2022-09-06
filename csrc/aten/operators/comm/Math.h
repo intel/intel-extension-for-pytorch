@@ -17,7 +17,7 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 template <typename scalar_t>
-C10_HOST_DEVICE static inline scalar_t zeta(scalar_t _x, scalar_t _q) {
+DPCPP_BOTH static inline scalar_t zeta(scalar_t _x, scalar_t _q) {
   using acc_t = acc_type<scalar_t>;
   const acc_t MACHEP = acc_t{1.11022302462515654042E-16};
   constexpr acc_t zero = acc_t{0.0};
@@ -96,7 +96,7 @@ C10_HOST_DEVICE static inline scalar_t zeta(scalar_t _x, scalar_t _q) {
 }
 
 template <typename scalar_t>
-static inline C10_HOST_DEVICE scalar_t calc_digamma(scalar_t in) {
+static inline DPCPP_BOTH scalar_t calc_digamma(scalar_t in) {
   // [C++ Standard Reference: Gamma Function]
   // https://en.cppreference.com/w/cpp/numeric/math/tgamma
   using accscalar_t = acc_type<scalar_t>;
@@ -162,7 +162,7 @@ static inline C10_HOST_DEVICE scalar_t calc_digamma(scalar_t in) {
 }
 
 template <typename scalar_t>
-static inline C10_HOST_DEVICE scalar_t calc_trigamma(scalar_t in) {
+static inline DPCPP_BOTH scalar_t calc_trigamma(scalar_t in) {
   using accscalar_t = acc_type<scalar_t>;
   const accscalar_t PI = 3.14159265358979323846;
   accscalar_t x = static_cast<accscalar_t>(in);
@@ -187,7 +187,7 @@ static inline C10_HOST_DEVICE scalar_t calc_trigamma(scalar_t in) {
 }
 
 template <typename scalar_t>
-static inline C10_HOST_DEVICE scalar_t calc_gcd(scalar_t a_in, scalar_t b_in) {
+static inline DPCPP_BOTH scalar_t calc_gcd(scalar_t a_in, scalar_t b_in) {
   scalar_t a = sycl::abs(a_in);
   scalar_t b = sycl::abs(b_in);
   while (a != 0) {
@@ -203,7 +203,7 @@ static inline C10_HOST_DEVICE scalar_t calc_gcd(scalar_t a_in, scalar_t b_in) {
  * implementation located in "ATen/native/Math.h".
  */
 template <typename scalar_t>
-static inline C10_HOST_DEVICE scalar_t
+static inline DPCPP_BOTH scalar_t
 chbevl(scalar_t _x, const scalar_t array[], size_t len) {
   static_assert(
       !std::is_same<scalar_t, Half>() && !std::is_same<scalar_t, BFloat16>(),
@@ -230,8 +230,7 @@ chbevl(scalar_t _x, const scalar_t array[], size_t len) {
  * implementation located in "ATen/native/Math.h".
  */
 template <typename T>
-C10_HOST_DEVICE inline std::tuple<const T*, size_t>
-chebyshev_coefficients_i0e_A() {
+DPCPP_BOTH inline std::tuple<const T*, size_t> chebyshev_coefficients_i0e_A() {
   /* Chebyshev coefficients for exp(-x) I0(x)
    * in the interval [0,8].
    *
@@ -258,8 +257,7 @@ chebyshev_coefficients_i0e_A() {
 }
 
 template <typename T>
-C10_HOST_DEVICE inline std::tuple<const T*, size_t>
-chebyshev_coefficients_i0e_B() {
+DPCPP_BOTH inline std::tuple<const T*, size_t> chebyshev_coefficients_i0e_B() {
   /* Chebyshev coefficients for exp(-x) sqrt(x) I0(x)
    * in the inverted interval [8,infinity].
    *
@@ -284,7 +282,7 @@ chebyshev_coefficients_i0e_B() {
 }
 
 template <typename scalar_t>
-static inline C10_HOST_DEVICE scalar_t calc_i0(scalar_t _x) {
+static inline DPCPP_BOTH scalar_t calc_i0(scalar_t _x) {
   static_assert(
       !std::is_same<scalar_t, Half>() && !std::is_same<scalar_t, BFloat16>(),
       "don't instantiate with low precision type");
@@ -321,7 +319,7 @@ static inline C10_HOST_DEVICE scalar_t calc_i0(scalar_t _x) {
  * domain of the approximation.
  */
 template <typename scalar_t>
-static inline C10_HOST_DEVICE scalar_t calc_i0e(scalar_t _x) {
+static inline DPCPP_BOTH scalar_t calc_i0e(scalar_t _x) {
   scalar_t x = sycl::abs(_x);
 
   if (x <= scalar_t{8.0}) {
@@ -354,7 +352,7 @@ static inline c10::BFloat16 calc_i0e(c10::BFloat16 a) {
 }
 
 template <typename T>
-C10_HOST_DEVICE inline typename std::enable_if<
+DPCPP_BOTH inline typename std::enable_if<
     std::is_same<double, T>::value,
     std::tuple<const T*, size_t>>::type
 chebyshev_coefficients_i1e_A() {
@@ -384,7 +382,7 @@ chebyshev_coefficients_i1e_A() {
 }
 
 template <typename T>
-C10_HOST_DEVICE inline typename std::
+DPCPP_BOTH inline typename std::
     enable_if<std::is_same<float, T>::value, std::tuple<const T*, size_t>>::type
     chebyshev_coefficients_i1e_A() {
   /* Chebyshev coefficients for exp(-x) I1(x)
@@ -414,7 +412,7 @@ C10_HOST_DEVICE inline typename std::
 };
 
 template <typename T>
-C10_HOST_DEVICE inline typename std::enable_if<
+DPCPP_BOTH inline typename std::enable_if<
     std::is_same<double, T>::value,
     std::tuple<const T*, size_t>>::type
 chebyshev_coefficients_i1e_B() {
@@ -442,7 +440,7 @@ chebyshev_coefficients_i1e_B() {
 }
 
 template <typename T>
-C10_HOST_DEVICE inline typename std::
+DPCPP_BOTH inline typename std::
     enable_if<std::is_same<float, T>::value, std::tuple<const T*, size_t>>::type
     chebyshev_coefficients_i1e_B() {
   /* Chebyshev coefficients for exp(-x) sqrt(x) I1(x)
@@ -463,7 +461,7 @@ C10_HOST_DEVICE inline typename std::
 };
 
 template <typename scalar_t>
-static inline C10_HOST_DEVICE scalar_t calc_i1(scalar_t _x) {
+static inline DPCPP_BOTH scalar_t calc_i1(scalar_t _x) {
   const auto x = sycl::abs(_x);
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i1e_A<scalar_t>();
@@ -484,7 +482,7 @@ static inline C10_HOST_DEVICE scalar_t calc_i1(scalar_t _x) {
 }
 
 template <typename scalar_t>
-static inline C10_HOST_DEVICE scalar_t calc_i1e(scalar_t _x) {
+static inline DPCPP_BOTH scalar_t calc_i1e(scalar_t _x) {
   const auto x = sycl::abs(_x);
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i1e_A<scalar_t>();
@@ -504,7 +502,7 @@ static inline C10_HOST_DEVICE scalar_t calc_i1e(scalar_t _x) {
 }
 
 template <typename scalar_t>
-static inline C10_HOST_DEVICE scalar_t calc_polygamma(scalar_t x, int n) {
+static inline DPCPP_BOTH scalar_t calc_polygamma(scalar_t x, int n) {
   // already blocked if n <= 1
   const auto one = scalar_t{1};
   return ((n % 2) ? one : -one) *
@@ -513,7 +511,7 @@ static inline C10_HOST_DEVICE scalar_t calc_polygamma(scalar_t x, int n) {
 }
 
 template <typename T>
-static inline C10_HOST_DEVICE T erfcx_y100(T y100) {
+static inline DPCPP_BOTH T erfcx_y100(T y100) {
   switch (static_cast<int>(y100)) {
     case 0: {
       T t = 2 * y100 - 1;
@@ -1922,7 +1920,7 @@ static inline C10_HOST_DEVICE T erfcx_y100(T y100) {
 }
 
 template <typename scalar_t>
-static inline C10_HOST_DEVICE scalar_t calc_erfcx(scalar_t x) {
+static inline DPCPP_BOTH scalar_t calc_erfcx(scalar_t x) {
   if (at::_isnan(x)) {
     return x;
   }

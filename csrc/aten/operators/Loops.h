@@ -349,7 +349,7 @@ static inline void launch_legacy_kernel(int64_t N, const func_t& f) {
 template <typename traits, typename func_t, typename index_t, size_t... INDEX>
 typename traits::result_type invoke_impl(
     const func_t& f,
-    char* const C10_RESTRICT data[],
+    char* const DPCPP_RESTRICT data[],
     const index_t strides[],
     int i,
     std::index_sequence<INDEX...>) {
@@ -366,7 +366,7 @@ template <
     typename traits = function_traits<func_t>>
 typename traits::result_type invoke(
     const func_t& f,
-    char* const C10_RESTRICT data[],
+    char* const DPCPP_RESTRICT data[],
     const index_t strides[],
     int i) {
   using Indices = std::make_index_sequence<traits::arity>;
@@ -381,7 +381,7 @@ template <
     size_t... I>
 typename traits::result_type invoke_with_cast_impl(
     const func_t& f,
-    char* const C10_RESTRICT data[],
+    char* const DPCPP_RESTRICT data[],
     const index_t strides[],
     const ScalarType dtypes[],
     int i,
@@ -405,7 +405,7 @@ template <
     typename traits = function_traits<func_t>>
 typename traits::result_type invoke_with_cast(
     const func_t& f,
-    char* const C10_RESTRICT data[],
+    char* const DPCPP_RESTRICT data[],
     const index_t strides[],
     const ScalarType dtypes[],
     int i) {

@@ -9,7 +9,7 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
-C10_ALWAYS_INLINE std::pair<int64_t, int64_t> _check_layer_norm_inputs(
+inline std::pair<int64_t, int64_t> _check_layer_norm_inputs(
     const Tensor& input,
     IntArrayRef normalized_shape,
     const Tensor& weight /* optional */,

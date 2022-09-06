@@ -11,6 +11,11 @@
 #include <c10/macros/Macros.h>
 #include <c10/util/Exception.h>
 
+enum DPCPP_STATUS {
+  DPCPP_SUCCESS = 0,
+  DPCPP_FAILURE = 1,
+};
+
 // Kernel inside print utils
 #if defined(__SYCL_DEVICE_ONLY__)
 #define DPCPP_CONSTANT __attribute__((opencl_constant))
@@ -26,6 +31,16 @@
     DPCPP_KER_STRING(fmt_var, fmt_str);       \
     DPCPP_KER_PRINTF(fmt_var, ##__VA_ARGS__); \
   }
+
+#define DPCPP_RESTRICT __restrict
+
+#if defined(__GNUC__) || defined(__ICL) || defined(__clang__)
+#define DPCPP_LIKELY(expr) (__builtin_expect(static_cast<bool>(expr), 1))
+#define DPCPP_UNLIKELY(expr) (__builtin_expect(static_cast<bool>(expr), 0))
+#else
+#define DPCPP_LIKELY(expr) (expr)
+#define DPCPP_UNLIKELY(expr) (expr)
+#endif
 
 // Kernel function implementation
 #define DPCPP_Q_KFN(...) [=](__VA_ARGS__)

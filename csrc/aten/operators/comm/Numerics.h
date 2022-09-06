@@ -90,7 +90,7 @@ static inline c10::BFloat16 nextafteri(c10::BFloat16 from, c10::BFloat16 to) {
 }
 
 template <typename T>
-C10_HOST_DEVICE inline constexpr T pi_i() {
+DPCPP_BOTH inline constexpr T pi_i() {
   return static_cast<T>(3.14159265358979323846L);
 }
 

@@ -756,7 +756,7 @@ void _unpack_pivots_internal_kernel_dpcpp(
   const char* const __restrict__ pivots_ptr =
       reinterpret_cast<const char*>(iter.data_ptr(1));
 
-  auto loop = [=] C10_DEVICE(int i) {
+  auto loop = [=] DPCPP_DEVICE(int i) {
     auto offsets = offset_calculator.get(i);
 
     auto* unpacked_pivots_data =
