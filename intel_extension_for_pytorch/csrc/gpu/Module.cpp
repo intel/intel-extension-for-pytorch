@@ -70,6 +70,12 @@ PyObject* THPModule_getDeviceCount_wrap(PyObject* self, PyObject* noargs) {
   END_HANDLE_TH_ERRORS
 }
 
+PyObject* THPModule_prefetchDeviceCount_wrap(PyObject* self, PyObject* noargs) {
+  HANDLE_TH_ERRORS
+  return PyLong_FromLong(xpu::dpcpp::prefetch_device_count());
+  END_HANDLE_TH_ERRORS
+}
+
 PyObject* THPModule_getDeviceIdListForCard_wrap(PyObject* self, PyObject* arg) {
   HANDLE_TH_ERRORS
   THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to get card id");
@@ -362,6 +368,10 @@ static struct PyMethodDef _THPModule_methods[] = {
     {"_getDevice", (PyCFunction)THPModule_getDevice_wrap, METH_NOARGS, nullptr},
     {"_getDeviceCount",
      (PyCFunction)THPModule_getDeviceCount_wrap,
+     METH_NOARGS,
+     nullptr},
+    {"_prefetchDeviceCount",
+     (PyCFunction)THPModule_prefetchDeviceCount_wrap,
      METH_NOARGS,
      nullptr},
     {"_getDeviceIdListForCard",

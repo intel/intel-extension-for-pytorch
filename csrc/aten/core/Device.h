@@ -11,6 +11,8 @@ using namespace at;
 namespace xpu {
 namespace dpcpp {
 
+IPEX_API DeviceIndex prefetch_device_count() noexcept;
+
 IPEX_API DeviceIndex device_count() noexcept;
 
 IPEX_API DeviceIndex current_device();

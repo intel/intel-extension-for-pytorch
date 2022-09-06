@@ -10,6 +10,8 @@ namespace dpcpp {
 
 using DeviceId = at::DeviceIndex;
 
+int dpcppPrefetchDeviceCount() noexcept;
+
 int dpcppGetDeviceCount(int* deviceCount);
 
 int dpcppGetDevice(DeviceId* pDI);

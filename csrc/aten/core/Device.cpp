@@ -7,6 +7,11 @@ using namespace at;
 namespace xpu {
 namespace dpcpp {
 
+DeviceIndex prefetch_device_count() noexcept {
+  int count = dpcppPrefetchDeviceCount();
+  return static_cast<DeviceIndex>(count);
+}
+
 DeviceIndex device_count() noexcept {
   int count;
   lazy_init();

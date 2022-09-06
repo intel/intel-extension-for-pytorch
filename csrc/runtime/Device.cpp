@@ -29,12 +29,13 @@ struct DPCPPDevicePool {
   std::mutex devices_mutex;
 } gDevPool;
 
-// It should be call only once. (std::call_once)
-static void initGlobalDevicePoolState() {
-  auto plaform_list = sycl::platform::get_platforms();
+static void enumDevices(
+    std::vector<std::unique_ptr<sycl::device>>& devices,
+    std::vector<std::vector<int>>& deviceids_card) {
   std::vector<sycl::device> root_devices;
+  auto platform_list = sycl::platform::get_platforms();
   // Enumerated root devices(GPU cards) from GPU Platform firstly.
-  for (const auto& platform : plaform_list) {
+  for (const auto& platform : platform_list) {
     if (platform.get_backend() != sycl::backend::ext_oneapi_level_zero)
       continue;
     auto device_list = platform.get_devices();
@@ -60,10 +61,10 @@ static void initGlobalDevicePoolState() {
             root_device.create_sub_devices<partition_by_affinity>(
                 next_partitionable);
         for (auto& s_dev : sub_devices) {
-          gDevPool.devices.push_back(std::make_unique<sycl::device>(s_dev));
+          devices.push_back(std::make_unique<sycl::device>(s_dev));
           deviceids_eachcard.push_back(gDevPool.devices.size() - 1);
         }
-        gDevPool.deviceids_card.push_back(deviceids_eachcard);
+        deviceids_card.push_back(deviceids_eachcard);
       } catch (sycl::exception& e) {
         // FIXME: should only check feature_not_supported here.
         // But for now we got invalid here if partition is not supported.
@@ -75,17 +76,22 @@ static void initGlobalDevicePoolState() {
         TORCH_WARN(
             "Tile partition is UNSUPPORTED : ",
             root_device.get_info<dpcpp_dev_name>());
-        gDevPool.devices.push_back(std::make_unique<sycl::device>(root_device));
+        devices.push_back(std::make_unique<sycl::device>(root_device));
       }
     }
   } else {
     for (const auto& root_device : root_devices) {
       std::vector<int> deviceids_eachcard = {};
-      gDevPool.devices.push_back(std::make_unique<sycl::device>(root_device));
+      devices.push_back(std::make_unique<sycl::device>(root_device));
       deviceids_eachcard.push_back(gDevPool.devices.size() - 1);
-      gDevPool.deviceids_card.push_back(deviceids_eachcard);
+      deviceids_card.push_back(deviceids_eachcard);
     }
   }
+}
+
+// It should be call only once. (std::call_once)
+static void initGlobalDevicePoolState() {
+  enumDevices(gDevPool.devices, gDevPool.deviceids_card);
 
   auto device_count = gDevPool.devices.size();
   if (device_count <= 0) {
@@ -309,6 +315,16 @@ std::vector<int>& dpcppGetDeviceIdListForCard(int card_id) {
       " out of range");
   std::vector<int>& deviceidlist_card = gDevPool.deviceids_card[card_id];
   return deviceidlist_card;
+}
+
+// This function can be used to prefetch device count and no execption. It is
+// used in device_count() and is_available() such that both two functions can be
+// called before forking process.
+int dpcppPrefetchDeviceCount() noexcept {
+  std::vector<std::unique_ptr<sycl::device>> devices;
+  std::vector<std::vector<int>> deviceids_card;
+  enumDevices(devices, deviceids_card);
+  return devices.size();
 }
 
 } // namespace dpcpp

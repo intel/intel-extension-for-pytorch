@@ -134,21 +134,25 @@ def _lazy_call(callable, **kwargs):
             _queued_calls.append((callable, traceback.format_stack()))
 
 
-def is_available() -> bool:
-    r"""Returns a bool indicating if XPU is currently available."""
-    if not hasattr(intel_extension_for_pytorch._C, '_getDeviceCount'):
-        return False
-    # This function never throws and returns 0 if driver is missing or can't
-    # be initialized
-    return intel_extension_for_pytorch._C._getDeviceCount() > 0
-
-
+# This API call _prefetchDeviceCount() if _lazy_init() has not been called such that
+# this API can be used before forking proces.
 def device_count() -> int:
     r"""Returns the number of XPUs device available."""
-    if is_available():
-        return intel_extension_for_pytorch._C._getDeviceCount()
+    if hasattr(intel_extension_for_pytorch._C, '_getDeviceCount'):
+        if _initialized:
+            return intel_extension_for_pytorch._C._getDeviceCount()
+        else:
+            return intel_extension_for_pytorch._C._prefetchDeviceCount()
     else:
         return 0
+
+
+# This API can be used before forking process if _lazy_init() has not been called.
+def is_available() -> bool:
+    r"""Returns a bool indicating if XPU is currently available."""
+    # This function device_count() never throws and returns 0 if driver is missing
+    # or can't be initialized
+    return device_count() > 0
 
 
 class device(object):
