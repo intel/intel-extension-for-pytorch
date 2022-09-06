@@ -27,8 +27,8 @@ void lazy_init() {
   if (!run_yet) {
     // We set run_yet true in THPModule_initExtension(), which is invoked by
     // Python API's _lazy_init(), to avoid circular calls.
-    auto module =
-        THPObjectPtr(PyImport_ImportModule("intel_extension_for_pytorch.xpu"));
+    auto module = THPObjectPtr(
+        PyImport_ImportModule("intel_extension_for_pytorch.xpu.lazy_init"));
     if (!module)
       throw python_error();
     auto res =

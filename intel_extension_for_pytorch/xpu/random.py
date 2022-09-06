@@ -1,7 +1,7 @@
 import torch
 from typing import cast, Iterable, List, Union
 from torch import Tensor
-from . import _lazy_init, _lazy_call
+from .lazy_init import _lazy_init, _lazy_call
 
 __all__ = ['get_rng_state', 'get_rng_state_all',
            'set_rng_state', 'set_rng_state_all',
