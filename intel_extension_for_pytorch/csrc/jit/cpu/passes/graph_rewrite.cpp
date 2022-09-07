@@ -915,7 +915,7 @@ void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
     if (!dtype_option) {
       return false;
     }
-    if (dtype_option.value() != c10::ScalarType::BFloat16 ||
+    if (dtype_option.value() != c10::ScalarType::BFloat16 &&
         dtype_option.value() != c10::ScalarType::Float) {
       return false;
     }
