@@ -22,11 +22,18 @@ void replaceFrozenIPEXLinearWithAtenLinear(
       replaceFrozenIPEXLinearWithAtenLinear(
           block, get_data_handle_nodes, use_mkl_sgemm);
     }
-    if (n->kind() == Symbol::fromQualString("torch_ipex::ipex_linear") ||
-        n->kind() == Symbol::fromQualString("torch_ipex::ipex_MKLSGEMM")) {
+
+    bool is_ipex_linear =
+        n->kind() == Symbol::fromQualString("torch_ipex::ipex_linear");
+    bool is_mkl_sgemm =
+        n->kind() == Symbol::fromQualString("torch_ipex::ipex_MKLSGEMM");
+    if (is_ipex_linear || is_mkl_sgemm) {
+      // mkl sgemm does not support grad mode
+      bool mkl_sgemm_and_grad_mode =
+          is_mkl_sgemm && c10::GradMode::is_enabled();
       TORCH_CHECK(
-          !(c10::GradMode::is_enabled()),
-          "Detect the Grad Mode! Please make sure torch.no_grad() is set priori to JIT trace");
+          !mkl_sgemm_and_grad_mode,
+          "Currently the auto_kernel_selection does not support the grad mode! Please add torch.no_grad() before the inference runtime.");
       if (!(constant_as<at::Tensor>(n->namedInput("weight")).has_value())) {
         continue;
       }

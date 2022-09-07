@@ -7,9 +7,9 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(mkl_sgemm_repackB_stub);
 DEFINE_DISPATCH(mkl_sgemm_packB_stub);
 DEFINE_DISPATCH(mkl_sgemm_kernel_stub);
+DEFINE_DISPATCH(mkl_prepack_sgemm_kernel_stub);
 
 /**
  * FP32 Linear inplace version with MKL SGEMM kernel.
@@ -21,15 +21,6 @@ DEFINE_DISPATCH(mkl_sgemm_kernel_stub);
  *@param output Output tensor provided by user.
  */
 
-void mkl_sgemm_repack_weight(
-    const int64_t M,
-    const int64_t N,
-    const int64_t K,
-    const at::Tensor& ori_weight,
-    at::Tensor& mkl_weight) {
-  mkl_sgemm_repackB_stub(kCPU, M, N, K, ori_weight, mkl_weight);
-}
-
 at::Tensor mkl_sgemm_pack_weight(
     const int64_t M,
     const int64_t N,
@@ -40,14 +31,36 @@ at::Tensor mkl_sgemm_pack_weight(
 
 void mkl_sgemm_kernel_output(
     const at::Tensor& self,
+    const at::Tensor& ori_weight,
+    const at::Tensor& bias,
+    at::Tensor& output) {
+  mkl_sgemm_kernel_stub(kCPU, self, ori_weight, bias, output);
+}
+
+at::Tensor mkl_sgemm_kernel(
+    const at::Tensor& self,
+    const at::Tensor& ori_weight,
+    const at::Tensor& bias) {
+  auto input_size = self.sizes();
+  std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
+  output_size.push_back(ori_weight.size(0));
+  auto output = at::empty(output_size, self.options());
+  output.set_requires_grad(self.requires_grad());
+  mkl_sgemm_kernel_output(self, ori_weight, bias, output);
+  return output;
+}
+
+void mkl_prepack_sgemm_kernel_output(
+    const at::Tensor& self,
     const at::Tensor& mkl_weight,
     const at::Tensor& bias,
     const int64_t out_features,
     at::Tensor& output) {
-  mkl_sgemm_kernel_stub(kCPU, self, mkl_weight, bias, out_features, output);
+  mkl_prepack_sgemm_kernel_stub(
+      kCPU, self, mkl_weight, bias, out_features, output);
 }
 
-at::Tensor mkl_sgemm_kernel(
+at::Tensor mkl_prepack_sgemm_kernel(
     const at::Tensor& self,
     const at::Tensor& mkl_weight,
     const at::Tensor& bias,
@@ -57,7 +70,7 @@ at::Tensor mkl_sgemm_kernel(
   output_size.push_back(out_features);
   auto output = at::empty(output_size, self.options());
   output.set_requires_grad(self.requires_grad());
-  mkl_sgemm_kernel_output(self, mkl_weight, bias, out_features, output);
+  mkl_prepack_sgemm_kernel_output(self, mkl_weight, bias, out_features, output);
   return output;
 }
 
