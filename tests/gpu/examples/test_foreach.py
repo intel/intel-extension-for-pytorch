@@ -1,140 +1,249 @@
-from numbers import Number
-import random
-import re
+import torch
+from torch.testing._internal.common_utils import (TestCase)
 
-from torch.testing._internal.common_utils import run_tests, TEST_WITH_SLOW, TestCase
-from torch.testing._internal.common_device_type import \
-    (instantiate_device_type_tests, dtypes, skipMeta, ops)
-from torch.testing._internal.common_methods_invocations import \
-    (foreach_unary_op_db)
-from torch.testing._internal.common_dtype import (
-    get_all_dtypes, get_all_complex_dtypes,
-)
+import intel_extension_for_pytorch # noqa
 
-N_values = [20, 23] if not TEST_WITH_SLOW else [23, 30, 300]
-Scalars = (
-    random.randint(1, 10),
-    1.0 - random.random(),
-    True,
-    complex(1.0 - random.random(), 1.0 - random.random()),
-)
+cpu_device = torch.device("cpu")
+dpcpp_device = torch.device("xpu")
 
 
-def getScalarLists(N):
-    return (
-        ("int", [random.randint(0, 9) + 1 for _ in range(N)]),
-        ("float", [1.0 - random.random() for _ in range(N)]),
-        ("complex", [complex(1.0 - random.random(), 1.0 - random.random()) for _ in range(N)]),
-        ("bool", [True for _ in range(N)]),
-        ("mixed", [1, 2.0, 3.0 + 4.5j] + [3.0 for _ in range(N - 3)]),
-        ("mixed", [True, 1, 2.0, 3.0 + 4.5j] + [3.0 for _ in range(N - 4)]),
-    )
 
-
-_BOOL_SUB_ERR_MSG = "Subtraction, the `-` operator"
-
-
-class RegularFuncWrapper:
-
+class ForeachTest:
     def __init__(self, func):
         self.func = func
 
-    def __call__(self, inputs, values=None, **kwargs):
-        if values is not None:
-            assert len(inputs) == 3
-            if isinstance(values, Number):
-                values = [values for _ in range(len(inputs[0]))]
-            return [self.func(*i, value=values[idx], **kwargs) for idx, i in enumerate(zip(*inputs))]
-        if len(inputs) == 2 and isinstance(inputs[1], Number):
-            # binary op with tensorlist and scalar.
-            inputs[1] = [inputs[1] for _ in range(len(inputs[0]))]
-        return [self.func(*i, **kwargs) for i in zip(*inputs)]
+    def __call__(self, input, device):
+        input_for_func = []
+        for i in input:
+            input_for_func.append(i.clone().to(device))
+        return self.func(input_for_func)
 
+class TestTorchMethod(TestCase):
+    # @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
+    def test_foreach_abs(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
 
-class ForeachFuncWrapper:
+        test = ForeachTest(torch._foreach_abs)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
 
-    def __init__(self, func, n_expected_xpuLaunchKernels):
-        self.func = func
-        self.n_expected_xpuLaunchKernels = n_expected_xpuLaunchKernels
-        # Some foreach functions don't have in-place implementations.
-        self._is_inplace = False if func is None else func.__name__.endswith('_')
+    def test_foreach_sigmoid(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
 
-    def __call__(self, inputs, is_xpu, is_fastpath, **kwargs):
-        actual = None
-        actual = self.func(*inputs, **kwargs)
-        # note(mkozuki): inplace foreach functions are void functions.
-        return inputs[0] if self._is_inplace else actual
+        test = ForeachTest(torch._foreach_sigmoid)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
 
+    def test_foreach_round(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
 
-class TestForeach(TestCase):
-    @property
-    def is_xpu(self):
-        return self.device_type == 'xpu'
+        test = ForeachTest(torch._foreach_round)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
 
-    # note(mkozuki): It might be the case that the expected number of `xpuLaunchKernel`s
-    # is greater than 1 once foreach functions internally separate their input `TensorList`s by
-    # devices & dtypes into vectors of tensors.
-    def _get_funcs(self, op, n_expected_xpuLaunchKernels):
-        return (
-            ForeachFuncWrapper(op.method_variant, n_expected_xpuLaunchKernels),
-            RegularFuncWrapper(op.ref),
-            ForeachFuncWrapper(op.inplace_variant, n_expected_xpuLaunchKernels),
-            RegularFuncWrapper(op.ref_inplace),
-        )
+    def test_foreach_frac(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
 
-    def _regular_unary_test(self, dtype, op, ref, inputs, is_fastpath):
-        if is_fastpath:
-            self.assertEqual(ref(inputs), op(inputs, self.is_xpu, is_fastpath))
-            return
-        try:
-            actual = op(inputs, self.is_xpu, is_fastpath)
-        except RuntimeError as e:
-            with self.assertRaisesRegex(type(e), re.escape(str(e))):
-                ref(inputs)
-        else:
-            expected = ref(inputs)
-            self.assertEqual(actual, expected)
+        test = ForeachTest(torch._foreach_frac)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
 
-    # note(mkozuki): why `try-except` for both fastpath?
-    # - inputs for fastpath can be integer tensors.
-    #    - this is becase opinfo dtypes are configured for outpulace implementation
-    # - for integer inputs, trigonometric functions and exponential function returns float outputs,
-    #   which causes "result type Float can't be case to the desired type" error.
-    # Thus, `try-except` is used even if `is_fastpath` is `True`.
-    def _inplace_unary_test(self, dtype, inplace, inplace_ref, inputs, is_fastpath):
-        copied_inputs = [[t.clone().detach() for t in tensors] for tensors in inputs]
-        try:
-            inplace(inputs, self.is_xpu, is_fastpath)
-        except RuntimeError as e:
-            with self.assertRaisesRegex(type(e), re.escape(str(e))):
-                inplace_ref(copied_inputs)
-        else:
-            inplace_ref(copied_inputs),
-            self.assertEqual(copied_inputs, inputs)
+    def test_foreach_reciprocal(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
 
-    def _test_unary(self, device, dtype, opinfo, N, is_fastpath):
-        op, ref, inplace_op, inplace_ref = self._get_funcs(opinfo, 1)
-        inputs = opinfo.sample_inputs(device, dtype, N, noncontiguous=not is_fastpath),
-        # note(mkozuki): Complex inputs for `_foreach_abs` go through slowpath.
-        if opinfo.name == "_foreach_abs" and dtype in get_all_complex_dtypes():
-            is_fastpath = False
-        self._regular_unary_test(dtype, op, ref, inputs, is_fastpath)
-        self._inplace_unary_test(dtype, inplace_op, inplace_ref, inputs, is_fastpath)
+        test = ForeachTest(torch._foreach_reciprocal)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
 
-    @skipMeta
-    @ops(foreach_unary_op_db)
-    def test_unary_fastpath(self, device, dtype, op):
-        for N in N_values:
-            self._test_unary(device, dtype, op, N, is_fastpath=True)
+    def test_foreach_erfc(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
 
-    @dtypes(*get_all_dtypes())
-    @ops(foreach_unary_op_db)
-    def test_unary_slowpath(self, device, dtype, op):
-        for N in N_values:
-            self._test_unary(device, dtype, op, N, is_fastpath=False)
+        test = ForeachTest(torch._foreach_erfc)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
 
+    def test_foreach_expm1(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
 
-instantiate_device_type_tests(TestForeach, globals())
+        test = ForeachTest(torch._foreach_expm1)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
 
-if __name__ == '__main__':
-    run_tests()
+    def test_foreach_lgamma(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_lgamma)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_traunc(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_trunc)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_floor(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_floor)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_ceil(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_ceil)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_acos(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_acos)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_asin(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_asin)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_atan(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_atan)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_cosh(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_cosh)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_tan(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_tan)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_sin(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_sin)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_sinh(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_sinh)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_exp(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_exp)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_tanh(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_tanh)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_log(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_log)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_log10(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_log10)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_log2(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_log2)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_cos(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_cos)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_sqrt(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_sqrt)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_log1p(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_log1p)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_erf(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_erf)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def test_foreach_neg(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_neg)
+        cpu = test(x1, 'cpu')
+        xpu = test(x1, 'xpu')
+        self.result_compare(cpu, xpu)
+
+    def result_compare(self, x1, x2):
+        for i in range(len(x1)):
+            self.assertEqual(x1[i].cpu(), x2[i].cpu())
