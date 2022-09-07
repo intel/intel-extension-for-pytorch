@@ -63,9 +63,14 @@ at::Tensor run(ContextLinearMKL& context, const at::Tensor& input) {
       at::borrow_from_optional_tensor(context.bias_);
   const at::Tensor& bias = *bias_maybe_owned;
   int64_t input_batch = (int64_t)(input_.numel() / K);
+
+  // Since MKL prepack API only accepts fixed M/N/K, a repack is required
+  // when M changes. To avoid frequently repacking the weights,
+  // it will fall back to the MKL cblas_sgemm kernel when M-dim is
+  // dynamically changed.
   if (input_batch != context.sgemm_sizes_[0])
-    repack_for(context, input_batch);
-  return mkl_sgemm_kernel(
+    return mkl_sgemm_kernel(input_, context.ori_weight_, bias);
+  return mkl_prepack_sgemm_kernel(
       input_, context.mkl_weight_, bias, context.sgemm_sizes_[2]);
 }
 
@@ -83,8 +88,8 @@ at::Tensor& run(
   const at::Tensor& bias = *bias_maybe_owned;
   int64_t input_batch = (int64_t)(input_.numel() / K);
   if (input_batch != context.sgemm_sizes_[0])
-    repack_for(context, input_batch);
-  mkl_sgemm_kernel_output(
+    mkl_sgemm_kernel_output(input_, context.ori_weight_, bias, accumu);
+  mkl_prepack_sgemm_kernel_output(
       input_, context.mkl_weight_, bias, context.sgemm_sizes_[2], accumu);
   return accumu;
 }
@@ -94,19 +99,6 @@ at::Tensor pack(ContextLinearMKL& context, const at::Tensor& tensor) {
   auto in_features = context.sgemm_sizes_[1];
   auto out_features = context.sgemm_sizes_[2];
   return mkl_sgemm_pack_weight(batch_size, out_features, in_features, tensor);
-}
-
-void repack_for(ContextLinearMKL& context, int64_t batch_size) {
-  auto in_features = context.sgemm_sizes_[1];
-  auto out_features = context.sgemm_sizes_[2];
-
-  context.sgemm_sizes_[0] = batch_size;
-  mkl_sgemm_repack_weight(
-      batch_size,
-      out_features,
-      in_features,
-      context.ori_weight_,
-      context.mkl_weight_);
 }
 
 } // namespace mkl_sgemm
