@@ -64,6 +64,19 @@ def is_available() -> bool:
     return device_count() > 0
 
 
+# This API can be used before forking process if _lazy_init() has not been called.
+def getDeviceIdListForCard(card_id=-1) -> list:
+    r"""Returns the device list of card_id.
+    By default, return device list of the card which contains max number of devices."""
+    if hasattr(intel_extension_for_pytorch._C, '_getDeviceIdListForCard'):
+        if is_initialized():
+            return intel_extension_for_pytorch._C._getDeviceIdListForCard(card_id)
+        else:
+            return intel_extension_for_pytorch._C._prefetchDeviceIdListForCard(card_id)
+    else:
+        return []
+
+
 class device(object):
     r"""Context-manager that changes the selected device.
 

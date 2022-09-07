@@ -62,7 +62,7 @@ static void enumDevices(
                 next_partitionable);
         for (auto& s_dev : sub_devices) {
           devices.push_back(std::make_unique<sycl::device>(s_dev));
-          deviceids_eachcard.push_back(gDevPool.devices.size() - 1);
+          deviceids_eachcard.push_back(devices.size() - 1);
         }
         deviceids_card.push_back(deviceids_eachcard);
       } catch (sycl::exception& e) {
@@ -83,7 +83,7 @@ static void enumDevices(
     for (const auto& root_device : root_devices) {
       std::vector<int> deviceids_eachcard = {};
       devices.push_back(std::make_unique<sycl::device>(root_device));
-      deviceids_eachcard.push_back(gDevPool.devices.size() - 1);
+      deviceids_eachcard.push_back(devices.size() - 1);
       deviceids_card.push_back(deviceids_eachcard);
     }
   }
@@ -293,28 +293,33 @@ DeviceProp* dpcppGetDeviceProperties(DeviceId device) {
   return &device_properties[device_id];
 }
 
+// By default, get the first card id that contains max number of devices.
+static int getMaxTilesCardId(std::vector<std::vector<int>>& deviceids_card) {
+  int card_id = -1;
+  int maxnum_devices = 0;
+  int num_cards = deviceids_card.size();
+  for (int i = 0; i < num_cards; i++) {
+    auto num_devices = deviceids_card[i].size();
+    if (maxnum_devices < num_devices) {
+      maxnum_devices = num_devices;
+      card_id = i;
+    }
+  }
+  return card_id;
+}
+
 std::vector<int>& dpcppGetDeviceIdListForCard(int card_id) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
-
-  int num_cards = gDevPool.deviceids_card.size();
   if (card_id == -1) {
-    int maxnum_devices = 0;
-    for (int i = 0; i < num_cards; i++) {
-      auto num_devices = gDevPool.deviceids_card[i].size();
-      if (maxnum_devices < num_devices) {
-        maxnum_devices = num_devices;
-        card_id = i;
-      }
-    }
+    card_id = getMaxTilesCardId(gDevPool.deviceids_card);
   }
   TORCH_CHECK(
-      card_id >= 0 && card_id < num_cards,
+      card_id >= 0 && card_id < gDevPool.deviceids_card.size(),
       "card_id ",
       card_id,
       " out of range");
-  std::vector<int>& deviceidlist_card = gDevPool.deviceids_card[card_id];
-  return deviceidlist_card;
+  return gDevPool.deviceids_card[card_id];
 }
 
 // This function can be used to prefetch device count and no execption. It is
@@ -325,6 +330,24 @@ int dpcppPrefetchDeviceCount() noexcept {
   std::vector<std::vector<int>> deviceids_card;
   enumDevices(devices, deviceids_card);
   return devices.size();
+}
+
+// This function can be used to prefetch device list for each card. It is used
+// in getDeviceIdListForCard() such that this function can be called before
+// forking process.
+std::vector<int> dpcppPrefetchDeviceIdListForCard(int card_id) {
+  std::vector<std::unique_ptr<sycl::device>> devices;
+  std::vector<std::vector<int>> deviceids_card;
+  enumDevices(devices, deviceids_card);
+  if (card_id == -1) {
+    card_id = getMaxTilesCardId(deviceids_card);
+  }
+  TORCH_CHECK(
+      card_id >= 0 && card_id < deviceids_card.size(),
+      "card_id ",
+      card_id,
+      " out of range");
+  return deviceids_card[card_id];
 }
 
 } // namespace dpcpp

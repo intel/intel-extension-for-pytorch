@@ -48,8 +48,14 @@ DeviceProp* getDeviceProperties(DeviceIndex device) {
   return dpcppGetDeviceProperties(device);
 }
 
-std::vector<int>& deviceIdListForCard(int card_id) {
+std::vector<int> prefetchDeviceIdListForCard(int card_id) {
+  return dpcppPrefetchDeviceIdListForCard(card_id);
+}
+
+std::vector<int>& getDeviceIdListForCard(int card_id) {
+  lazy_init();
   return dpcppGetDeviceIdListForCard(card_id);
 }
+
 } // namespace dpcpp
 } // namespace xpu

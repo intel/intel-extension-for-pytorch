@@ -80,7 +80,19 @@ PyObject* THPModule_getDeviceIdListForCard_wrap(PyObject* self, PyObject* arg) {
   HANDLE_TH_ERRORS
   THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to get card id");
   int card_id = THPUtils_unpackInt(arg);
-  auto deviceid_card = xpu::dpcpp::deviceIdListForCard(card_id);
+  auto deviceid_card = xpu::dpcpp::getDeviceIdListForCard(card_id);
+  py::list deviceid_card_pylist = py::cast(deviceid_card);
+  return deviceid_card_pylist.release().ptr();
+  END_HANDLE_TH_ERRORS
+}
+
+PyObject* THPModule_prefetchDeviceIdListForCard_wrap(
+    PyObject* self,
+    PyObject* arg) {
+  HANDLE_TH_ERRORS
+  THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to get card id");
+  int card_id = THPUtils_unpackInt(arg);
+  auto deviceid_card = xpu::dpcpp::prefetchDeviceIdListForCard(card_id);
   py::list deviceid_card_pylist = py::cast(deviceid_card);
   return deviceid_card_pylist.release().ptr();
   END_HANDLE_TH_ERRORS
@@ -376,6 +388,10 @@ static struct PyMethodDef _THPModule_methods[] = {
      nullptr},
     {"_getDeviceIdListForCard",
      (PyCFunction)THPModule_getDeviceIdListForCard_wrap,
+     METH_O,
+     nullptr},
+    {"_prefetchDeviceIdListForCard",
+     (PyCFunction)THPModule_prefetchDeviceIdListForCard_wrap,
      METH_O,
      nullptr},
     {"_xpu_isInBadFork",

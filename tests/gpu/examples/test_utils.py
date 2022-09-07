@@ -1,7 +1,8 @@
 import torch
 import intel_extension_for_pytorch # noqa
 from torch.testing._internal.common_utils import TestCase
-from intel_extension_for_pytorch.xpu.utils import getDeviceIdListForCard, using_tile_as_device
+from intel_extension_for_pytorch.xpu.utils import using_tile_as_device
+from intel_extension_for_pytorch.xpu import getDeviceIdListForCard
 import pytest
 
 
