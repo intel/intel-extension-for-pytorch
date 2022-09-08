@@ -79,6 +79,28 @@ Tensor& special_i1e_out(const Tensor& self, Tensor& out) {
   return out;
 }
 
+Tensor& special_entr_out(const Tensor& self, at::Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      ScalarType::Half,
+      ScalarType::BFloat16,
+      iter.common_dtype(),
+      "entr",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t x) -> scalar_t {
+          if (at::_isnan(x)) {
+            return x;
+          } else if (x > 0) {
+            return -x * Numerics<scalar_t>::log(x);
+          } else if (x == 0) {
+            return 0;
+          }
+          return Numerics<scalar_t>::lower_bound();
+        });
+      });
+  return out;
+}
+
 Tensor& special_erfcx_out(const Tensor& self, at::Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
   IPEX_DISPATCH_FLOATING_TYPES_AND(

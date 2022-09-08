@@ -519,6 +519,7 @@ supported:
   - sort.stable
   - sort.values
   - sort.values_stable
+  - special_entr.out
   - special_erfcx.out
   - special_i0e.out
   - special_i1.out
