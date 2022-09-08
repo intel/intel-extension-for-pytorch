@@ -77,9 +77,8 @@ template <>
 void _assert_async_kernel(c10::complex<float>* input) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgf) {
-    cgf.single_task([=]() {
-      SYCL_KERNEL_ASSERT(input[0] != static_cast<c10::complex<float>>(0, 0));
-    });
+    cgf.single_task(
+        [=]() { SYCL_KERNEL_ASSERT(input[0] != c10::complex<float>(0, 0)); });
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -89,9 +88,8 @@ template <>
 void _assert_async_kernel(c10::complex<double>* input) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgf) {
-    cgf.single_task([=]() {
-      SYCL_KERNEL_ASSERT(input[0] != static_cast<c10::complex<double>>(0, 0));
-    });
+    cgf.single_task(
+        [=]() { SYCL_KERNEL_ASSERT(input[0] != c10::complex<double>(0, 0)); });
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
