@@ -629,6 +629,169 @@ std::vector<at::Tensor> interaction_backward_kernel_impl(
   }
 }
 
+#if defined(CPU_CAPABILITY_AMX)
+/**
+ *  A fast path if feature_nums == 27 and feature_size == 128 while AMX is
+ * enabled (require gcc >=11.2) This function: (1) Assume feature num = 27 and
+ * padding it to 32 to align memory unit. (2) Assume feature size = 128, using
+ * "<< 7" insteadt of "/128" for performance consideration
+ *  TODO: generalize this function to work on feature_nums != 27 and
+ * feature_size != 128
+ */
+void interaction_int8_128_27_amx(
+    const at::Tensor& output,
+    const std::vector<int8_t*> input_data,
+    float* out_in_scales,
+    const float dense_scale) {
+  const uint8_t _S = 26;
+  const uint8_t _S1 = 27;
+  const uint8_t _M = 28;
+  const uint8_t TILE_M = 14;
+  const uint8_t TILE_N = TILE_M;
+  const uint8_t TILE_K = 64;
+  const uint8_t TILE_BROWS = 16;
+  const uint8_t _K = 128;
+  const uint8_t LOG2_K = 7;
+  // setup size and create output
+  const int32_t flat_nums = _S1 * _S / 2;
+  const size_t ROW = _K + flat_nums; // 128 + 27 * 26/2
+  TORCH_INTERNAL_ASSERT(input_data.size() == _S1);
+  TORCH_INTERNAL_ASSERT(output.size(1) == ROW);
+  tileconfig_t tc = {0};
+  tc.palette_id = 1;
+  // tc.startRow = 0;
+  //  Configure C tiles
+  for (int t = 0; t < 4; ++t) {
+    tc.rows[t] = (uint8_t)TILE_M;
+    tc.colb[t] = (uint16_t)(TILE_N * sizeof(int32_t));
+  }
+  // Configure A tiles
+  for (int t = 4; t < 6; ++t) {
+    tc.rows[t] = (uint8_t)TILE_M;
+    tc.colb[t] = (uint16_t)(TILE_K * sizeof(int8_t));
+  }
+  // Configure B tile. B effectively has 64 rows and 16 columns.
+  for (int t = 6; t < 8; ++t) {
+    tc.rows[t] = (uint8_t)TILE_BROWS;
+    tc.colb[t] = (uint16_t)(TILE_N * 4 * sizeof(int8_t));
+  }
+
+  int8_t* res = static_cast<int8_t*>(output.data_ptr());
+  bool do_dense_scale = (std::abs(dense_scale - 1.0) > 0.0005);
+  auto batch_size = output.size(0);
+  at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
+    int32_t Cmem[_M][_M] __attribute__((aligned(64)));
+    int32_t flat_buf[351] __attribute__((aligned(64)));
+    int8_t Amem[_M][_K] __attribute__((aligned(64)));
+    int8_t Bmem[_K / 4][_M][4] __attribute__((aligned(64)));
+    _tile_loadconfig((const void*)&tc);
+    int8_t* local_input_data[_S1];
+    int64_t bs_offset = start << LOG2_K;
+    for (int i = 0; i < _S1; i++) {
+      local_input_data[i] = input_data[i] + bs_offset;
+    }
+
+    int8_t* output0_ptr = res + start * ROW;
+    for (int i = start; i < end; ++i) {
+      if (do_dense_scale) {
+        scale_and_move_ker_128(output0_ptr, local_input_data[0], dense_scale);
+      } else {
+        move_ker(output0_ptr, local_input_data[0], _K);
+      }
+      load_s8x128_store_aligned_ker(Amem[0], local_input_data[0]);
+      int8_t *p0, *p1;
+      int j = 1;
+      for (; j < (_S1 - 1); j += 2) {
+        p0 = local_input_data[j];
+        p1 = local_input_data[j + 1];
+        load_double_s8x128_store_aligned_ker(Amem[j], p0, Amem[j + 1], p1);
+      }
+
+#pragma unroll
+      for (int k = 0; k < 32; k++) {
+        int32_t ak = (k << 2);
+        int n;
+#pragma unroll
+        for (n = 0; n < _M - 7; n += 8) {
+          (*(int32_t*)Bmem[k][n]) = (*(int32_t*)(&Amem[n][ak]));
+          (*(int32_t*)Bmem[k][n + 1]) = (*(int32_t*)(&Amem[n + 1][ak]));
+          (*(int32_t*)Bmem[k][n + 2]) = (*(int32_t*)(&Amem[n + 2][ak]));
+          (*(int32_t*)Bmem[k][n + 3]) = (*(int32_t*)(&Amem[n + 3][ak]));
+          (*(int32_t*)Bmem[k][n + 4]) = (*(int32_t*)(&Amem[n + 4][ak]));
+          (*(int32_t*)Bmem[k][n + 5]) = (*(int32_t*)(&Amem[n + 5][ak]));
+          (*(int32_t*)Bmem[k][n + 6]) = (*(int32_t*)(&Amem[n + 6][ak]));
+          (*(int32_t*)Bmem[k][n + 7]) = (*(int32_t*)(&Amem[n + 7][ak]));
+        }
+#pragma unroll
+        for (; n < _M; n++) {
+          (*(int32_t*)Bmem[k][n]) = (*(int32_t*)(&Amem[n][ak]));
+        }
+      }
+
+      _tile_zero(0);
+      _tile_zero(2);
+      _tile_zero(3);
+
+      _tile_loadd(6, Bmem[0][0], _M * 4 * sizeof(int8_t));
+
+      _tile_loadd(4, &Amem[0][0], _K * sizeof(int8_t));
+      _tile_dpbssd(0, 4, 6);
+
+      _tile_loadd(5, &Amem[TILE_M][0], _K * sizeof(int8_t));
+      _tile_dpbssd(2, 5, 6);
+
+      _tile_loadd(7, Bmem[0][TILE_N], _M * 4 * sizeof(int8_t));
+      _tile_dpbssd(3, 5, 7);
+
+      _tile_loadd(6, Bmem[TILE_BROWS][0], _M * 4 * sizeof(int8_t));
+
+      _tile_loadd(4, &Amem[0][TILE_K], _K * sizeof(int8_t));
+      _tile_dpbssd(0, 4, 6);
+      _tile_stored(0, &Cmem[0][0], _M * sizeof(int32_t));
+
+      _tile_loadd(5, &Amem[TILE_M][TILE_K], _K * sizeof(int8_t));
+      _tile_dpbssd(2, 5, 6);
+      _tile_stored(2, &Cmem[TILE_M][0], _M * sizeof(int32_t));
+
+      _tile_loadd(7, Bmem[TILE_BROWS][TILE_N], _M * 4 * sizeof(int8_t));
+      _tile_dpbssd(3, 5, 7);
+      _tile_stored(3, &Cmem[TILE_M][TILE_N], _M * sizeof(int32_t));
+
+      flat_buf[0] = Cmem[1][0];
+      flat_buf[1] = Cmem[2][0];
+      flat_buf[2] = Cmem[2][1];
+      int32_t offset = 3;
+#pragma unroll
+      for (int i = 3; i < _S1; i++) {
+        move_ker((int32_t*)(&flat_buf[offset]), Cmem[i], i);
+        offset += i;
+      }
+
+      int8_t* outp = output0_ptr + _K;
+      int off;
+#pragma unroll
+      for (off = 0; off < flat_nums - 63; off += 64) {
+        scale_int32_and_store_int8_16x4(
+            (outp + off), (flat_buf + off), (out_in_scales + off));
+      }
+      __m512 scale_m512 = _mm512_load_ps((const void*)(out_in_scales + off));
+      scale_int32_and_store_int8_16((outp + off), (flat_buf + off), scale_m512);
+      off += 16;
+      scale_m512 = _mm512_load_ps((const void*)(out_in_scales + off));
+      scale_int32_and_store_int8_maskz_16(
+          (outp + off), (flat_buf + off), scale_m512, 0x7fff);
+
+      for (int i = 0; i < _S1; i++) {
+        local_input_data[i] += _K;
+      }
+      output0_ptr += ROW;
+    }
+  });
+  return;
+}
+
+#endif
+
 #if defined(CPU_CAPABILITY_AVX512)
 static inline void _interaction_s8s8_scale_s32s8_128(
     int8_t* out,
@@ -734,6 +897,15 @@ at::Tensor dil_qinteraction_kernel_impl(
   }
 
   float dense_scale = in_scales[0] / output_scale;
+
+#if defined(CPU_CAPABILITY_AMX)
+  if (feature_nums == 27 && feature_size == 128) {
+    // A fast path if feature_nums == 27 and feature_size == 128 while AMX is
+    // enabled (require gcc >=11.2)
+    interaction_int8_128_27_amx(output, input_data, out_in_scales, dense_scale);
+    return output;
+  }
+#endif
 
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
     __m512i cat_buf[aligned_off] __attribute__((aligned(64)));

@@ -777,6 +777,128 @@ static inline __attribute__((always_inline)) int8_t _dot_s8s8_scale_s32s8(
   return (int8_t)c;
 }
 
+/**
+ * load 128 * 8  from "in" and store to "out", the start of "out" should align
+ * with memory unit
+ */
+static inline __attribute__((always_inline)) void load_s8x128_store_aligned_ker(
+    int8_t* __restrict__ out,
+    const int8_t* __restrict__ in) {
+  auto in0 = _mm512_loadu_si512(in);
+  auto in1 = _mm512_loadu_si512(in + 64);
+  _mm512_store_si512(out, in0);
+  _mm512_store_si512(out + 64, in1);
+}
+
+/**
+ *  load 128 * 8  from "in0" and store to "out0", from "in1" to "out1"
+ * the start of "out0" and "out1" should align with memory unit
+ */
+static inline __attribute__((always_inline)) void
+load_double_s8x128_store_aligned_ker(
+    int8_t* __restrict__ out0,
+    const int8_t* __restrict__ in0,
+    int8_t* __restrict__ out1,
+    const int8_t* __restrict__ in1) {
+  auto in0_0 = _mm512_loadu_si512(in0);
+  auto in0_1 = _mm512_loadu_si512(in0 + 64);
+  auto in1_0 = _mm512_loadu_si512(in1);
+  auto in1_1 = _mm512_loadu_si512(in1 + 64);
+  _mm512_store_si512(out0, in0_0);
+  _mm512_store_si512(out0 + 64, in0_1);
+  _mm512_store_si512(out1, in1_0);
+  _mm512_store_si512(out1 + 64, in1_1);
+}
+
+/**
+ * perform quantization on 64 numbers (16 per vec * 4 vecs)
+ * load int32_t from "in" and cvt to float (round to nearest)
+ * multiply scale from (scales_ptr) and cvt to int32_t (round to nearest)
+ * cvt int32_t to int8_t with Saturate8 and store int8_t to "out"
+ */
+static inline void scale_int32_and_store_int8_16x4(
+    int8_t* __restrict__ out,
+    const int32_t* __restrict__ __attribute__((aligned(64))) in,
+    const float* __restrict__ __attribute__((aligned(64))) scales_ptr) {
+  auto in0_32i = _mm512_load_si512((const void*)in);
+  auto in1_32i = _mm512_load_si512((const void*)(in + 16));
+  auto in2_32i = _mm512_load_si512((const void*)(in + 32));
+  auto in3_32i = _mm512_load_si512((const void*)(in + 48));
+  __m512 scale0 = _mm512_load_ps(scales_ptr);
+  __m512 scale1 = _mm512_load_ps(scales_ptr + 16);
+  __m512 scale2 = _mm512_load_ps(scales_ptr + 32);
+  __m512 scale3 = _mm512_load_ps(scales_ptr + 48);
+  auto in0_f = _mm512_cvt_roundepi32_ps(
+      in0_32i, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+  auto in1_f = _mm512_cvt_roundepi32_ps(
+      in1_32i, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+  auto in2_f = _mm512_cvt_roundepi32_ps(
+      in2_32i, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+  auto in3_f = _mm512_cvt_roundepi32_ps(
+      in3_32i, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+  in0_f = _mm512_mul_round_ps(
+      in0_f, scale0, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+  in1_f = _mm512_mul_round_ps(
+      in1_f, scale1, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+  in2_f = _mm512_mul_round_ps(
+      in2_f, scale2, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+  in3_f = _mm512_mul_round_ps(
+      in3_f, scale3, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+  auto out1_16 = _mm512_cvtsepi32_epi8(_mm512_cvt_roundps_epi32(
+      in0_f, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC)));
+  auto out2_16 = _mm512_cvtsepi32_epi8(_mm512_cvt_roundps_epi32(
+      in1_f, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC)));
+  auto out3_16 = _mm512_cvtsepi32_epi8(_mm512_cvt_roundps_epi32(
+      in2_f, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC)));
+  auto out4_16 = _mm512_cvtsepi32_epi8(_mm512_cvt_roundps_epi32(
+      in3_f, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC)));
+  _mm_storeu_si128((__m128i*)out, out1_16);
+  _mm_storeu_si128((__m128i*)(out + 16), out2_16);
+  _mm_storeu_si128((__m128i*)(out + 32), out3_16);
+  _mm_storeu_si128((__m128i*)(out + 48), out4_16);
+}
+
+/**
+ * perform quantization on 16 numbers (16 per vec * 1 vecs)
+ * load int32_t from "in" and cvt to float (round to nearest)
+ * multiply scale from (scales_ptr) and cvt to int32_t (round to nearest)
+ * cvt int32_t to int8_t with Saturate8 and store int8_t to "out"
+ */
+static inline void scale_int32_and_store_int8_16(
+    int8_t* __restrict__ out,
+    const int32_t* __restrict__ __attribute__((aligned(64))) in,
+    __m512 scale) {
+  auto in0_32i = _mm512_load_si512(in);
+  auto in0_32f = _mm512_cvt_roundepi32_ps(
+      in0_32i, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+  in0_32f = _mm512_mul_round_ps(
+      in0_32f, scale, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+  auto out_16 = _mm512_cvtsepi32_epi8(_mm512_cvt_roundps_epi32(
+      in0_32f, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC)));
+  _mm_storeu_si128((__m128i*)out, out_16);
+}
+
+/**
+ * perform quantization on less than 16 numbers with mask
+ * load int32_t from "in" and cvt to float (round to nearest)
+ * multiply scale from (scales_ptr) and cvt to int32_t (round to nearest)
+ * cvt int32_t to int8_t with Saturate8 and store int8_t to "out"
+ */
+static inline void scale_int32_and_store_int8_maskz_16(
+    int8_t* __restrict__ out,
+    const int32_t* __restrict__ __attribute__((aligned(64))) in,
+    __m512 scale,
+    __mmask16 mask) {
+  auto in0_32i = _mm512_maskz_load_epi32(mask, in);
+  auto in0_32f = _mm512_cvt_roundepi32_ps(
+      in0_32i, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+  in0_32f = _mm512_mul_round_ps(
+      in0_32f, scale, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+  auto out_i8 = _mm512_cvtsepi32_epi8(_mm512_cvt_roundps_epi32(
+      in0_32f, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC)));
+  _mm_mask_storeu_epi8((void*)out, mask, out_i8);
+}
+
 } // namespace kernel
 } // namespace cpu
 } // namespace torch_ipex
