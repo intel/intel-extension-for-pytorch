@@ -100,7 +100,8 @@ at::Tensor softplus_tanh(
     const Scalar& beta,
     const Scalar& threshold) {
   const OptionalDeviceGuard device_guard(device_of(self));
-  return at::AtenIpexTypeXPU::softplus_tanh(self, beta, threshold);
+  auto _self = to_plain_if_needed(self);
+  return at::AtenIpexTypeXPU::softplus_tanh(_self, beta, threshold);
 }
 
 at::Tensor softplus_tanh_mul(
@@ -109,8 +110,9 @@ at::Tensor softplus_tanh_mul(
     const Scalar& threshold,
     const Tensor& mul_input) {
   const OptionalDeviceGuard device_guard(device_of(self));
-  return at::AtenIpexTypeXPU::softplus_tanh_mul(
-      self, beta, threshold, mul_input);
+  auto _self = to_plain_if_needed(self);
+  auto _mul = to_plain_if_needed(mul_input);
+  return at::AtenIpexTypeXPU::softplus_tanh_mul(_self, beta, threshold, _mul);
 }
 
 at::Tensor permute_contiguous(
