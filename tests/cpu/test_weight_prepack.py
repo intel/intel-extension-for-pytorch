@@ -100,8 +100,13 @@ class TestPrepackCases(TestCase):
     def _test_convolution_training_base(self, dim, dtype, rtol=None, atol=None):
         input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
         channels_last = torch.channels_last if dim ==2 else torch.channels_last_3d
-        options = itertools.product([True, False], [1, 2], [1, 4],
-                [torch.contiguous_format, channels_last], [True, False])
+        # Currently, there is no channels_last_1d format for 1d input in IPEX.
+        # After adding a python API named `to_channels_last_1d` which is to convert 1d input to channels last,
+        # we will make some changes to fully support channels_last_1d.
+        if dim == 1:
+            options = itertools.product([True, False], [1, 2], [1, 4], [torch.contiguous_format], [True, False])
+        else:
+            options = itertools.product([True, False], [1, 2], [1, 4], [torch.contiguous_format, channels_last], [True, False])
 
         for bias, dilation, groups, memory_format, feed_sample_input in options:
             N = torch.randint(3, 10, (1,)).item()
@@ -182,6 +187,12 @@ class TestPrepackCases(TestCase):
                 if var_name == 'state':
                     self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state1[var_name], rtol=rtol, atol=atol)
                     self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state2[var_name], rtol=rtol, atol=atol)
+
+    def test_conv1d_training(self):
+        self._test_convolution_training_base(dim=1, dtype=torch.float)
+        if core.onednn_has_bf16_support():
+            self._test_convolution_training_base(dim=1, dtype=torch.bfloat16, rtol=1e-2, atol=1e-03)
+        # TODO: add inference case.
 
     def test_conv2d_training(self):
         self._test_convolution_training_base(dim=2, dtype=torch.float)

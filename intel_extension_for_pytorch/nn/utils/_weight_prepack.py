@@ -294,6 +294,9 @@ def _should_prepack(module, auto_kernel_selection):
             return False
         if module.padding[2] - module.output_padding[2] + module.stride[2] <= 0:
             return False
+    # Conv1d backward is not implemented, will not prepack.
+    if isinstance(module, torch.nn.Conv1d) and module.training:
+        return False
     return True
 
 def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selection):
