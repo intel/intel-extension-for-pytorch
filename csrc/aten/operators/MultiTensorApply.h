@@ -30,12 +30,12 @@ void load_store(T* dst, T* src, int dst_offset, int src_offset) {
 template <int n>
 struct TLMetaForAddress {
   void* addresses[n];
-  int numel_to_tensor;
+  uint32_t numel_to_tensor;
 };
 
 struct TLMetaForWG {
-  unsigned char wg_to_tensor;
-  int wg_to_chunk;
+  uint32_t wg_to_tensor;
+  uint32_t wg_to_chunk;
 };
 
 template <typename T, typename Y, typename U, typename... ArgTypes>

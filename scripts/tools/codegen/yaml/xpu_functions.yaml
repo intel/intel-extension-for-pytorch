@@ -698,6 +698,12 @@ supported:
   - _foreach_neg
   - _foreach_neg_
   - _foreach_zero_
+  - _foreach_maximum.List
+  - _foreach_minimum.List
+  - _foreach_addcdiv.Scalar
+  - _foreach_addcdiv_.Scalar
+  - _foreach_addcmul.Scalar
+  - _foreach_addcmul_.Scalar
   - _thnn_fused_gru_cell
   - _thnn_fused_gru_cell_backward
   - logaddexp

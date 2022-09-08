@@ -316,7 +316,6 @@ void _foreach_zero_(TensorList tensors) {
   if (!at::native::can_use_fast_route(tensors)) {
     return at::native::foreach_tensor_zero_slow_(tensors);
   }
-
   std::vector<std::vector<at::Tensor>> tensor_lists;
   tensor_lists.emplace_back(tensors.vec());
 
