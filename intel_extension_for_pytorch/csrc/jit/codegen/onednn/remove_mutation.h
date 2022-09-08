@@ -5,6 +5,20 @@
 
 namespace torch_ipex {
 namespace jit {
+/** This function tries to check if the mutated value v except its alias x is
+ * still alive after node.
+ *
+ * @param aliasdb: The aliasdb of the graph owned by node
+ * @param node: The node of an inplace op
+ * @param v: The first input of the node
+ * @param x: An alias of v, its use is excluded from the check
+ *
+ **/
+bool maybeAliveAfterNode(
+    torch::jit::AliasDb* aliasdb,
+    torch::jit::Node* node,
+    torch::jit::Value* v,
+    torch::jit::Value* x = nullptr);
 namespace fuser {
 namespace onednn {
 
@@ -13,10 +27,6 @@ struct IPEXRemoveMutation {
       : graph_(std::move(graph)) {}
 
   bool removeTensorMutation();
-  bool maybeAliveAfterNode(
-      torch::jit::Node* node,
-      torch::jit::Value* v,
-      torch::jit::Value* x = nullptr);
 
  private:
   std::shared_ptr<torch::jit::Graph> graph_;

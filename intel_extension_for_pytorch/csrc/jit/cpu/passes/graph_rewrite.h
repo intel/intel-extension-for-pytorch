@@ -21,6 +21,8 @@ void fuseBmmAdd(std::shared_ptr<torch::jit::Graph>& graph);
 void replaceOpsWithAtenInplaceOps(std::shared_ptr<torch::jit::Graph>& graph);
 void replaceAtenOpsWithIpexInplaceOps(
     std::shared_ptr<torch::jit::Graph>& graph);
+void replaceInplaceOpsWithOutplaceOps(
+    std::shared_ptr<torch::jit::Graph>& graph);
 void replaceAtenSoftmaxWithIpexSoftmax(
     std::shared_ptr<torch::jit::Graph>& graph);
 void replaceAtenBatchNormWithIpexBatchNorm(

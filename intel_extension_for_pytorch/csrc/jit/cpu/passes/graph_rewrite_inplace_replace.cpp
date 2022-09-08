@@ -1,4 +1,5 @@
 #include "graph_rewrite_inplace_replace.h"
+#include "intel_extension_for_pytorch/csrc/jit/codegen/onednn/remove_mutation.h"
 
 namespace torch_ipex {
 namespace jit {
@@ -172,23 +173,20 @@ void replaceAtenOpsWithIpexInplaceOps(std::shared_ptr<Graph>& graph) {
 
 // based on the aten inplace op list:
 // {PyTorch Repo}:torch/csrc/jit/passes/restore_mutation.h#L14-L31
-std::string AtenInplaceOps_with_no_args[] = {
-    "aten::silu",
-    "aten::sigmoid",
-    "aten::tanh",
-    "aten::hardsigmoid",
-    "aten::hardswish",
-    "aten::relu6",
-    "aten::relu",
-    "aten::selu"};
-
-std::string AtenInplaceOps_with_one_args[] = {"aten::celu", "aten::leaky_relu"};
-
-std::string AtenInplaceOps_with_two_args[] = {"aten::hardtanh"};
-
-std::string AtenInplaceOps_with_three_args[] = {"aten::elu"};
-
-std::string AtenInplaceOps_with_four_args[] = {"aten::rrelu"};
+std::unordered_map<std::string, int> aten_ops_args_mapping = {
+    {"aten::silu", 0},
+    {"aten::sigmoid", 0},
+    {"aten::tanh", 0},
+    {"aten::hardsigmoid", 0},
+    {"aten::hardswish", 0},
+    {"aten::relu6", 0},
+    {"aten::relu", 0},
+    {"aten::selu", 0},
+    {"aten::celu", 1},
+    {"aten::leaky_relu", 1},
+    {"aten::hardtanh", 2},
+    {"aten::elu", 3},
+    {"aten::rrelu", 4}};
 
 void replaceOpsWithAtenInplaceOps(std::shared_ptr<Graph>& graph) {
   std::string input_no_args = R"(
@@ -245,51 +243,108 @@ void replaceOpsWithAtenInplaceOps(std::shared_ptr<Graph>& graph) {
       };
 
   SubgraphRewriter rewriter_aten_inplace;
-  for (int i = 0; i < 8; i++) {
-    std::string match_pattern = input_no_args + set_result +
-        AtenInplaceOps_with_no_args[i] + ops_no_args + set_return;
-    std::string inplace_pattern = input_no_args + set_result +
-        AtenInplaceOps_with_no_args[i] + R"(_)" + ops_no_args + set_return;
+  for (auto it = aten_ops_args_mapping.begin();
+       it != aten_ops_args_mapping.end();
+       it++) {
+    std::string name = it->first;
+    int args_num = it->second;
+    std::string match_pattern = "";
+    std::string inplace_pattern = "";
+    if (args_num == 0) {
+      match_pattern =
+          input_no_args + set_result + name + ops_no_args + set_return;
+      inplace_pattern =
+          input_no_args + set_result + name + R"(_)" + ops_no_args + set_return;
+    } else if (args_num == 1) {
+      match_pattern = input_with_one_args + set_result + name +
+          ops_with_one_args + set_return;
+      inplace_pattern = input_with_one_args + set_result + name + R"(_)" +
+          ops_with_one_args + set_return;
+    } else if (args_num == 2) {
+      match_pattern = input_with_two_args + set_result + name +
+          ops_with_two_args + set_return;
+      inplace_pattern = input_with_two_args + set_result + name + R"(_)" +
+          ops_with_two_args + set_return;
+    } else if (args_num == 3) {
+      match_pattern = input_with_three_args + set_result + name +
+          ops_with_three_args + set_return;
+      inplace_pattern = input_with_three_args + set_result + name + R"(_)" +
+          ops_with_three_args + set_return;
+    } else if (args_num == 4) {
+      match_pattern = input_with_four_args + set_result + name +
+          ops_with_four_args + set_return;
+      inplace_pattern = input_with_four_args + set_result + name + R"(_)" +
+          ops_with_four_args + set_return;
+    }
     rewriter_aten_inplace.RegisterRewritePattern(
         match_pattern, inplace_pattern);
   }
-  for (int i = 0; i < 2; i++) {
-    std::string match_pattern = input_with_one_args + set_result +
-        AtenInplaceOps_with_one_args[i] + ops_with_one_args + set_return;
-    std::string inplace_pattern = input_with_one_args + set_result +
-        AtenInplaceOps_with_one_args[i] + R"(_)" + ops_with_one_args +
-        set_return;
-    rewriter_aten_inplace.RegisterRewritePattern(
-        match_pattern, inplace_pattern);
-  }
-  for (int i = 0; i < 1; i++) {
-    std::string match_pattern = input_with_two_args + set_result +
-        AtenInplaceOps_with_two_args[i] + ops_with_two_args + set_return;
-    std::string inplace_pattern = input_with_two_args + set_result +
-        AtenInplaceOps_with_two_args[i] + R"(_)" + ops_with_two_args +
-        set_return;
-    rewriter_aten_inplace.RegisterRewritePattern(
-        match_pattern, inplace_pattern);
-  }
-  for (int i = 0; i < 1; i++) {
-    std::string match_pattern = input_with_three_args + set_result +
-        AtenInplaceOps_with_three_args[i] + ops_with_three_args + set_return;
-    std::string inplace_pattern = input_with_three_args + set_result +
-        AtenInplaceOps_with_three_args[i] + R"(_)" + ops_with_three_args +
-        set_return;
-    rewriter_aten_inplace.RegisterRewritePattern(
-        match_pattern, inplace_pattern);
-  }
-  for (int i = 0; i < 1; i++) {
-    std::string match_pattern = input_with_four_args + set_result +
-        AtenInplaceOps_with_four_args[i] + ops_with_four_args + set_return;
-    std::string inplace_pattern = input_with_four_args + set_result +
-        AtenInplaceOps_with_four_args[i] + R"(_)" + ops_with_four_args +
-        set_return;
-    rewriter_aten_inplace.RegisterRewritePattern(
-        match_pattern, inplace_pattern);
-  }
+
   rewriter_aten_inplace.runOnGraph(graph, filter_inplace);
+}
+
+void replaceInplaceOpsWithOutplaceOps(std::shared_ptr<Graph>& graph, Block* b) {
+  for (auto i = b->nodes().begin(); i != b->nodes().end();) {
+    Node* n = *i;
+    i++;
+    for (Block* block : n->blocks()) {
+      replaceInplaceOpsWithOutplaceOps(graph, block);
+    }
+    bool is_support = false;
+    for (auto it = aten_ops_args_mapping.begin();
+         it != aten_ops_args_mapping.end();
+         it++) {
+      if (std::string(n->kind().toQualString()).compare(it->first + "_") == 0) {
+        is_support = true;
+        break;
+      }
+    }
+    if (!is_support) {
+      continue;
+    }
+    Value* mutated_value = n->inputs().at(0);
+    Value* output = n->outputs().at(0);
+
+    // always get the latest aliasdb
+    std::unique_ptr<AliasDb> aliasdb = std::make_unique<AliasDb>(graph);
+    if (maybeAliveAfterNode(aliasdb.get(), n, mutated_value, output)) {
+      continue;
+    }
+
+    // Do the same check as replaceOpsWithAtenInplaceOps to make sure the
+    // replacement resumes after fusion fails.
+    auto inputDtype = mutated_value->type()->expect<TensorType>()->scalarType();
+    auto outputDtype = output->type()->expect<TensorType>()->scalarType();
+    auto schema_name = n->schema().name();
+    auto new_schema = schema_name.substr(0, schema_name.size() - 1);
+    bool check_dtype = activation_type_promotion_mapping.at(
+        Symbol::fromQualString(new_schema));
+    if (check_dtype &&
+        (!inputDtype || !outputDtype ||
+         inputDtype.value() != outputDtype.value())) {
+      continue;
+    }
+    if (n->input(0)->uses().size() > 1) {
+      continue;
+    }
+    if (hasSideEffectOrAlias(mutated_value, aliasdb.get())) {
+      continue;
+    }
+
+    Node* new_node = graph->create(Symbol::fromQualString(new_schema), 1);
+    new_node->copyMetadata(n);
+    new_node->insertBefore(n);
+    for (Value* input : n->inputs()) {
+      new_node->addInput(input);
+    }
+    new_node->output()->setType(n->output()->type());
+    n->output()->replaceAllUsesWith(new_node->output());
+    n->destroy();
+  }
+}
+
+void replaceInplaceOpsWithOutplaceOps(std::shared_ptr<Graph>& graph) {
+  replaceInplaceOpsWithOutplaceOps(graph, graph->block());
 }
 
 } // namespace graph_rewrite
