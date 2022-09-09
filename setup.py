@@ -121,8 +121,6 @@ def get_submodule_commit(base_dir, submodule_dir):
         ['git', 'submodule', 'status', submodule_dir], cwd=base_dir).decode('ascii').strip().split()[0]
 
 
-
-
 def get_build_version(ipex_git_sha):
     versions = {}
     version_file = 'version.txt'

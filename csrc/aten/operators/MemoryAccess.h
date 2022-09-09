@@ -6,7 +6,9 @@
 #include <c10/macros/Macros.h>
 #include <c10/util/Exception.h>
 #include <c10/util/TypeCast.h>
+#include <core/Array.h>
 #include <cstdint>
+#include <oneapi/dpl/tuple>
 #include <type_traits>
 
 namespace at {
@@ -101,8 +103,8 @@ template <int current>
 struct multi_outputs_store_helper {
   template <int ntensors, int num_outputs, typename... Args>
   static void apply(
-      at::detail::Array<char*, ntensors> data,
-      at::detail::Array<uint32_t, num_outputs> offsets,
+      xpu::dpcpp::Array<char*, ntensors> data,
+      xpu::dpcpp::Array<uint32_t, num_outputs> offsets,
       std::tuple<Args...> ret) {
     using T = typename std::tuple_element<current, std::tuple<Args...>>::type;
     T* to = reinterpret_cast<T*>(data[current]) + offsets[current];
@@ -186,8 +188,8 @@ struct LoadWithoutCast {
 
 template <int N, bool no_double_cast = false>
 struct LoadWithCast {
-  using array_t = at::detail::Array<at::ScalarType, std::max<int>(N, 1)>;
-  using size_array_t = at::detail::Array<uint32_t, std::max<int>(N, 1)>;
+  using array_t = xpu::dpcpp::Array<at::ScalarType, std::max<int>(N, 1)>;
+  using size_array_t = xpu::dpcpp::Array<uint32_t, std::max<int>(N, 1)>;
 
   array_t dtypes;
   size_array_t element_sizes;
@@ -476,13 +478,86 @@ struct vectorized {
   }
 };
 
+template <
+    int ITEM_WORK_SIZE,
+    typename data_t,
+    typename inp_calc_t,
+    typename out_calc_t,
+    int num_outputs>
+struct multi_outputs_unroll {
+  data_t data;
+  int remaining;
+  inp_calc_t input_offset_calculator;
+  out_calc_t output_offset_calculator;
+  LoadWithoutCast loader;
+  StoreWithoutCast storer;
+  int thread_idx;
+  int group_idx;
+  int group_items;
+  int group_work_size;
+
+  multi_outputs_unroll(
+      data_t data,
+      int remaining,
+      inp_calc_t ic,
+      out_calc_t oc,
+      int thread_idx,
+      int group_idx,
+      int group_items)
+      : data(data),
+        remaining(remaining),
+        input_offset_calculator(ic),
+        output_offset_calculator(oc),
+        thread_idx(thread_idx),
+        group_idx(group_idx),
+        group_items(group_items),
+        group_work_size(ITEM_WORK_SIZE * group_items) {}
+
+  inline bool check_inbounds(int thread_work_elem) const {
+    return (thread_idx + thread_work_elem * group_items < remaining);
+  }
+
+  template <typename args_t>
+  inline void load(args_t* args) {
+    constexpr int arity = std::tuple_size<args_t>::value;
+    int thread_idx_ = thread_idx;
+#pragma unroll
+    for (int i = 0; i < ITEM_WORK_SIZE; i++) {
+      if (thread_idx_ >= remaining) {
+        return;
+      }
+      int linear_idx = thread_idx_ + group_work_size * group_idx;
+      auto offset = input_offset_calculator.get(linear_idx);
+      detail::static_unroll<detail::unroll_load_helper, arity>::with_args(
+          *this, args, offset, loader, i, num_outputs);
+      thread_idx_ += group_items;
+    }
+  }
+
+  template <typename return_t>
+  inline void store(return_t* from) {
+    int thread_idx_ = thread_idx;
+#pragma unroll
+    for (int i = 0; i < ITEM_WORK_SIZE; i++) {
+      if (thread_idx_ >= this->remaining) {
+        return;
+      }
+      int linear_idx = thread_idx_ + group_work_size * group_idx;
+      auto offsets = this->output_offset_calculator.get(linear_idx);
+      detail::static_unroll<detail::multi_outputs_store_helper, num_outputs>::
+          with_args(this->data, offsets, from[i]);
+      thread_idx_ += group_items;
+    }
+  }
+};
+
 } // namespace policies
 
 static inline int preferred_vector_width(DeviceId dev_id, int elem_sz) {
   size_t ret;
   switch (elem_sz) {
     case 1:
-      static_assert(sizeof(char) == 1, "the char size is not 2 bytes");
+      static_assert(sizeof(char) == 1, "the char size is not 1 bytes");
       ret = xpu::dpcpp::dpcppPrefVectorWidth<char>(dev_id);
       break;
     case 2:

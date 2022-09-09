@@ -9,6 +9,7 @@
 
 #include <core/Memory.h>
 #include <runtime/Utils.h>
+#include <oneapi/dpl/tuple>
 #include "MemoryAccess.h"
 #include "comm/Load.h"
 
@@ -449,7 +450,7 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
   TORCH_INTERNAL_ASSERT(iter.ninputs() >= traits::arity);
   TORCH_INTERNAL_ASSERT(iter.noutputs() == 1);
 
-  at::detail::Array<char*, ntensors> data;
+  xpu::dpcpp::Array<char*, ntensors> data;
   for (int i = 0; i < ntensors; i++) {
     data[i] = (char*)iter.data_ptr(i);
   }
@@ -488,7 +489,7 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
       });
     }
   } else {
-    at::detail::Array<ScalarType, traits::arity> dtypes;
+    xpu::dpcpp::Array<ScalarType, traits::arity> dtypes;
     for (int i = 0; i < traits::arity; i++) {
       dtypes[i] = iter.tensor(i + 1).scalar_type();
     }
@@ -545,6 +546,104 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
   }
 }
 
+template <
+    int ITEM_WORK_SIZE,
+    int num_outputs,
+    typename func_t,
+    typename array_t,
+    typename inp_calc_t,
+    typename out_calc_t>
+static inline void unrolled_elementwise_kernel_for_multi_outputs(
+    sycl::nd_item<1>& item_id,
+    int numel,
+    func_t f,
+    array_t data,
+    inp_calc_t ic,
+    out_calc_t oc) {
+  int group_items = item_id.get_local_range(0);
+  int thread_idx = item_id.get_local_id(0);
+  int group_idx = item_id.get_group(0);
+  int remaining = numel - ITEM_WORK_SIZE * group_items * group_idx;
+  auto policy = at::native::Memory::policies::multi_outputs_unroll<
+      ITEM_WORK_SIZE,
+      array_t,
+      inp_calc_t,
+      out_calc_t,
+      num_outputs>(data, remaining, ic, oc, thread_idx, group_idx, group_items);
+  elementwise_kernel_helper<ITEM_WORK_SIZE>(f, policy);
+}
+
+template <
+    int ITEM_WORK_SIZE,
+    int num_outputs,
+    typename func_t,
+    typename array_t,
+    typename inp_calc_t,
+    typename out_calc_t>
+static inline void launch_unrolled_kernel_for_multi_outputs(
+    int64_t N,
+    const func_t& f,
+    array_t data,
+    inp_calc_t ic,
+    out_calc_t oc) {
+  TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  int group_items = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
+  int group_work_size = ITEM_WORK_SIZE * group_items;
+  int num_groups = (N + group_work_size - 1) / group_work_size;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
+      unrolled_elementwise_kernel_for_multi_outputs<
+          ITEM_WORK_SIZE,
+          num_outputs>(item_id, N, f, data, ic, oc);
+    };
+
+    cgh.parallel_for(
+        sycl::nd_range<1>(
+            sycl::range<1>(num_groups * group_items),
+            sycl::range<1>(group_items)),
+        kfn);
+  };
+
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+template <typename func_t>
+void dpcpp_loops_multiple_outputs_kernel(
+    TensorIteratorBase& iter,
+    const func_t& f) {
+  using traits = function_traits<func_t>;
+  using output_t = typename traits::result_type;
+  constexpr int num_outputs = dpl::tuple_size<output_t>::value;
+  constexpr int num_inputs = traits::arity;
+  constexpr int ntensors = num_outputs + num_inputs;
+
+  TORCH_INTERNAL_ASSERT(iter.can_use_32bit_indexing());
+  TORCH_INTERNAL_ASSERT(iter.ntensors() == ntensors);
+
+  xpu::dpcpp::Array<char*, ntensors> data;
+  for (int i = 0; i < ntensors; i++) {
+    data[i] = (char*)iter.data_ptr(i);
+  }
+
+  int64_t numel = iter.numel();
+
+  if (iter.is_contiguous()) {
+    auto input_calc = TrivialOffsetCalculator<num_inputs>();
+    auto output_calc = TrivialOffsetCalculator<num_outputs>();
+    launch_unrolled_kernel_for_multi_outputs<
+        UNROLLED_ELEM_PER_WORK_ITEM,
+        num_outputs>(numel, f, data, input_calc, output_calc);
+  } else {
+    auto input_calc = make_input_offset_calculator<num_inputs>(iter);
+    auto output_calc = make_output_offset_calculator<num_outputs>(iter);
+    launch_unrolled_kernel_for_multi_outputs<
+        UNROLLED_ELEM_PER_WORK_ITEM,
+        num_outputs>(numel, f, data, input_calc, output_calc);
+  }
+}
+
 template <typename func_t, bool signed_strides = false>
 void dpcpp_kernel_for_tensor_iter(TensorIteratorBase& iter, const func_t& f) {
   for (int arg = 0; arg < iter.ntensors(); arg++) {
@@ -596,6 +695,28 @@ void dpcpp_fast_mode_kernel_for_tensor_iter(
   }
 
   dpcpp_loops_kernel<func_t, signed_strides, true>(iter, f);
+}
+
+template <typename func_t>
+void dpcpp_kernel_multiple_outputs_for_tensor_iter(
+    TensorIteratorBase& iter,
+    const func_t& f) {
+  for (int arg = 0; arg < iter.ntensors(); arg++) {
+    TORCH_INTERNAL_ASSERT(iter.device(arg).is_xpu());
+  }
+
+  if (iter.numel() == 0) {
+    return;
+  }
+
+  if (!iter.can_use_32bit_indexing()) {
+    for (auto& sub_iter : iter.with_32bit_indexing()) {
+      dpcpp_kernel_multiple_outputs_for_tensor_iter(sub_iter, f);
+    }
+    return;
+  }
+
+  dpcpp_loops_multiple_outputs_kernel<func_t>(iter, f);
 }
 
 template <typename arg1_t, typename arg2_t, typename return_t, typename func_t>

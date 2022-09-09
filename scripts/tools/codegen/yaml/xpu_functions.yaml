@@ -25,6 +25,11 @@ supported:
   - _embedding_bag_dense_backward
   - _empty_affine_quantized
   - _empty_per_channel_affine_quantized
+  - _fake_quantize_learnable_per_channel_affine
+  - _fake_quantize_learnable_per_tensor_affine
+  - _fake_quantize_learnable_per_channel_affine_backward 
+  - _fake_quantize_learnable_per_tensor_affine_backward
+  - _fake_quantize_per_tensor_affine_cachemask_tensor_qparams
   - _fft_c2r
   - _fft_r2c
   - _fft_c2c
@@ -209,6 +214,8 @@ supported:
   - exponential_
   - eye.m_out
   - eye.out
+  - fake_quantize_per_channel_affine_cachemask
+  - fake_quantize_per_tensor_affine_cachemask
   - fill_.Scalar
   - fill_.Tensor
   - flip
