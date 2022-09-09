@@ -747,7 +747,7 @@ Tensor& max_unpooling3d_backward_template(
         "max_unpooling3d_cl_backward_kernel",
         ([&] {
           max_unpooling3d_cl_backward_kernel(
-              grad_output.numel(),
+              self.numel(),
               grad_output.data_ptr<scalar_t>(),
               inputSlices,
               inputTime,
