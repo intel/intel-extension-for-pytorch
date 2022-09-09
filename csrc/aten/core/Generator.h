@@ -20,7 +20,7 @@ struct IPEX_API DPCPPGeneratorImpl : public GeneratorImpl {
   uint64_t current_seed() const override;
   uint64_t seed() override;
   void set_philox_offset_per_thread(uint64_t offset);
-  uint64_t philox_offset_per_thread();
+  uint64_t philox_offset_per_thread() const;
   std::pair<uint64_t, uint64_t> philox_engine_inputs(uint64_t increment);
   static DeviceType device_type();
   void set_state(const c10::TensorImpl& new_state) override;

@@ -71,15 +71,18 @@ uint64_t DPCPPGeneratorImpl::seed() {
 }
 
 void DPCPPGeneratorImpl::set_philox_offset_per_thread(uint64_t offset) {
+  TORCH_CHECK(offset % 4 == 0, "offset must be a multiple of 4");
   philox_offset_per_thread_ = offset;
 }
 
-uint64_t DPCPPGeneratorImpl::philox_offset_per_thread() {
+uint64_t DPCPPGeneratorImpl::philox_offset_per_thread() const {
   return philox_offset_per_thread_;
 }
 
 std::pair<uint64_t, uint64_t> DPCPPGeneratorImpl::philox_engine_inputs(
     uint64_t increment) {
+  increment = ((increment + 3) / 4) * 4;
+  TORCH_INTERNAL_ASSERT(this->philox_offset_per_thread_ % 4 == 0);
   uint64_t offset = this->philox_offset_per_thread_;
   this->philox_offset_per_thread_ += increment;
   return std::make_pair(this->seed_, offset);

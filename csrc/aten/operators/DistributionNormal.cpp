@@ -7,8 +7,8 @@
 #include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
 
-#include "Distributions.h"
-#include "Random.h"
+#include "DistributionTemplates.h"
+#include "RandomEngine.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -95,13 +95,9 @@ void normal_dpcpp(
           auto ret = static_cast<scalar_t>(rand * std + mean);
           return ret;
         };
-        AtenIpexTypeXPU::distribution_nullary_kernel<scalar_t, accscalar_t>(
-            iter,
-            gen,
-            [](RandomState<Philox4_32_10>* state) {
-              return state->normal<scalar_t>();
-            },
-            normal_func);
+        AtenIpexTypeXPU::
+            normal_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
+                iter, gen, normal_func);
       });
 }
 

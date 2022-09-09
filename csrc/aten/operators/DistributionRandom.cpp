@@ -9,8 +9,8 @@
 #include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
 
-#include "Distributions.h"
-#include "Random.h"
+#include "DistributionTemplates.h"
+#include "RandomEngine.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -30,23 +30,33 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
             auto random_func = [](uint64_t rand) {
               return transformation::uniform_int<scalar_t>(rand);
             };
-            distribution_nullary_kernel<scalar_t, uint64_t>(
+            distribution_nullary_kernel<
+                scalar_t,
+                uint64_t,
+                PHILOX_ENGINE_CALLS / 2>(
                 iter,
                 gen,
-                [](RandomState<Philox4_32_10>* state) {
-                  return state->random<uint64_t>();
+                [](randStatePhilox4_32_10_t* state) {
+                  rand_vec2<uint64_t> ret;
+                  auto rand_val = rand4(state);
+                  ret.x =
+                      (static_cast<uint64_t>(rand_val.x) << 32) | rand_val.y;
+                  ret.y =
+                      (static_cast<uint64_t>(rand_val.z) << 32) | rand_val.w;
+                  return ret;
                 },
                 random_func);
           } else {
             auto random_func = [](uint32_t rand) {
               return transformation::uniform_int<scalar_t>(rand);
             };
-            distribution_nullary_kernel<scalar_t, uint32_t>(
+            distribution_nullary_kernel<
+                scalar_t,
+                uint32_t,
+                PHILOX_ENGINE_CALLS>(
                 iter,
                 gen,
-                [](RandomState<Philox4_32_10>* state) {
-                  return state->random<uint32_t>();
-                },
+                [](randStatePhilox4_32_10_t* state) { return rand4(state); },
                 random_func);
           }
         });
@@ -56,12 +66,10 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
     auto random_func = [](uint32_t rand) {
       return transformation::uniform_int<scalar_t>(rand);
     };
-    distribution_nullary_kernel<scalar_t, uint32_t>(
+    distribution_nullary_kernel<scalar_t, uint32_t, PHILOX_ENGINE_CALLS>(
         iter,
         gen,
-        [](RandomState<Philox4_32_10>* state) {
-          return state->random<uint32_t>();
-        },
+        [](randStatePhilox4_32_10_t* state) { return rand4(state); },
         random_func);
   } else if (isIntegralType(iter.dtype(), /*includeBool=*/false)) {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "random_kernel_int", [&] {
@@ -69,23 +77,28 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
         auto random_func = [](uint64_t rand) {
           return transformation::uniform_int<scalar_t>(rand);
         };
-        distribution_nullary_kernel<scalar_t, uint64_t>(
+        distribution_nullary_kernel<
+            scalar_t,
+            uint64_t,
+            PHILOX_ENGINE_CALLS / 2>(
             iter,
             gen,
-            [](RandomState<Philox4_32_10>* state) {
-              return state->random<uint64_t>();
+            [](randStatePhilox4_32_10_t* state) {
+              rand_vec2<uint64_t> ret;
+              auto rand_val = rand4(state);
+              ret.x = (static_cast<uint64_t>(rand_val.x) << 32) | rand_val.y;
+              ret.y = (static_cast<uint64_t>(rand_val.z) << 32) | rand_val.w;
+              return ret;
             },
             random_func);
       } else {
         auto random_func = [](uint32_t rand) {
           return transformation::uniform_int<scalar_t>(rand);
         };
-        distribution_nullary_kernel<scalar_t, uint32_t>(
+        distribution_nullary_kernel<scalar_t, uint32_t, PHILOX_ENGINE_CALLS>(
             iter,
             gen,
-            [](RandomState<Philox4_32_10>* state) {
-              return state->random<uint32_t>();
-            },
+            [](randStatePhilox4_32_10_t* state) { return rand4(state); },
             random_func);
       }
     });
@@ -121,11 +134,18 @@ void random_from_to_kernel(
             return transformation::uniform_int_from_to<scalar_t>(
                 rand, range, base);
           };
-          distribution_nullary_kernel<scalar_t, uint64_t>(
+          distribution_nullary_kernel<
+              scalar_t,
+              uint64_t,
+              PHILOX_ENGINE_CALLS / 2>(
               iter,
               gen,
-              [](RandomState<Philox4_32_10>* state) {
-                return state->random<uint64_t>();
+              [](randStatePhilox4_32_10_t* state) {
+                rand_vec2<uint64_t> ret;
+                auto rand_val = rand4(state);
+                ret.x = (static_cast<uint64_t>(rand_val.x) << 32) | rand_val.y;
+                ret.y = (static_cast<uint64_t>(rand_val.z) << 32) | rand_val.w;
+                return ret;
               },
               random_func);
         } else {
@@ -133,12 +153,10 @@ void random_from_to_kernel(
             return transformation::uniform_int_from_to<scalar_t>(
                 rand, range, base);
           };
-          distribution_nullary_kernel<scalar_t, uint32_t>(
+          distribution_nullary_kernel<scalar_t, uint32_t, PHILOX_ENGINE_CALLS>(
               iter,
               gen,
-              [](RandomState<Philox4_32_10>* state) {
-                return state->random<uint32_t>();
-              },
+              [](randStatePhilox4_32_10_t* state) { return rand4(state); },
               random_func);
         }
       });
@@ -165,11 +183,18 @@ void random_full_64_bits_range_kernel(
           auto random_func = [](uint64_t rand) {
             return transformation::uniform_int_full_range<scalar_t>(rand);
           };
-          distribution_nullary_kernel<scalar_t, uint64_t>(
+          distribution_nullary_kernel<
+              scalar_t,
+              uint64_t,
+              PHILOX_ENGINE_CALLS / 2>(
               iter,
               gen,
-              [](RandomState<Philox4_32_10>* state) {
-                return state->random<uint64_t>();
+              [](randStatePhilox4_32_10_t* state) {
+                rand_vec2<uint64_t> ret;
+                auto rand_val = rand4(state);
+                ret.x = (static_cast<uint64_t>(rand_val.x) << 32) | rand_val.y;
+                ret.y = (static_cast<uint64_t>(rand_val.z) << 32) | rand_val.w;
+                return ret;
               },
               random_func);
         } else {

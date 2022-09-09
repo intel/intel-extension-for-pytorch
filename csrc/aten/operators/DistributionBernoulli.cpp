@@ -2,21 +2,15 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <core/Generator.h>
-#include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
 
-#include "Distributions.h"
-#include "Random.h"
+#include "DistributionTemplates.h"
+#include "RandomEngine.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
-
-Tensor& uniform_(
-    Tensor& self,
-    double from,
-    double to,
-    c10::optional<Generator> generator);
 
 Tensor& bernoulli_(
     Tensor& self,
@@ -52,48 +46,25 @@ Tensor& bernoulli_(
   return self;
 }
 
-void bernoulli_scalar_dpcpp(
-    TensorIterator& iter,
-    double p_,
-    c10::optional<Generator> gen_) {
+Tensor& bernoulli_(Tensor& self, double p_, c10::optional<Generator> gen_) {
+  auto iter = TensorIterator::nullary_op(self);
   auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
       gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
-      at::ScalarType::Bool,
       at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
       iter.dtype(),
-      "bernoulli_scalar_dpcpp",
+      "bernoulli_",
       [&] {
         using accscalar_t = DiscreteDistributionType<scalar_t>::type;
         auto p = static_cast<accscalar_t>(p_);
-        // define lambda for bernoulli transformation
         auto bernoulli_func = [p](accscalar_t rand) {
           return static_cast<scalar_t>(rand < static_cast<accscalar_t>(p));
         };
-        if (std::is_same<scalar_t, double>::value) {
-          AtenIpexTypeXPU::distribution_nullary_kernel<scalar_t, accscalar_t>(
-              iter,
-              gen,
-              [](RandomState<Philox4_32_10>* state) {
-                return state->uniform<double>();
-              },
-              bernoulli_func);
-        } else {
-          AtenIpexTypeXPU::distribution_nullary_kernel<scalar_t, accscalar_t>(
-              iter,
-              gen,
-              [](RandomState<Philox4_32_10>* state) {
-                return state->uniform<float>();
-              },
-              bernoulli_func);
-        }
+        uniform_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
+            iter, gen, bernoulli_func);
       });
-}
-
-Tensor& bernoulli_(Tensor& self, double p, c10::optional<Generator> gen_) {
-  auto iter = TensorIterator::nullary_op(self);
-  bernoulli_scalar_dpcpp(iter, p, gen_);
   return self;
 }
 

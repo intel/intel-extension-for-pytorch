@@ -6,8 +6,8 @@
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
 
-#include "Distributions.h"
-#include "Random.h"
+#include "DistributionTemplates.h"
+#include "RandomEngine.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -31,13 +31,8 @@ void geometric_scalar_dpcpp(
           return static_cast<scalar_t>(Numerics<accscalar_t>::ceil(
               at::log(rand) / at::log(static_cast<accscalar_t>(1.0) - p)));
         };
-        AtenIpexTypeXPU::distribution_nullary_kernel<scalar_t, accscalar_t>(
-            iter,
-            gen,
-            [](RandomState<Philox4_32_10>* state) {
-              return state->uniform<scalar_t>();
-            },
-            geometric_func);
+        uniform_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
+            iter, gen, geometric_func);
       });
 }
 

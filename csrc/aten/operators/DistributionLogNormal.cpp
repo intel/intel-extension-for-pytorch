@@ -5,22 +5,24 @@
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
-#include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
 
-#include "Distributions.h"
-#include "Random.h"
+#include "DistributionTemplates.h"
+#include "RandomEngine.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
 
-void log_normal_dpcpp(
-    TensorIterator& iter,
+Tensor& log_normal_(
+    Tensor& self,
     double mean_,
     double std_,
     c10::optional<Generator> gen_) {
+  TORCH_CHECK(
+      std_ > 0.0, "log_normal_ expects std > 0.0, but found std=", std_);
+  auto iter = TensorIterator::nullary_op(self);
   auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
       gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -37,53 +39,10 @@ void log_normal_dpcpp(
           return static_cast<scalar_t>(
               Numerics<accscalar_t>::exp(rand * std + mean));
         };
-        AtenIpexTypeXPU::distribution_nullary_kernel<scalar_t, accscalar_t>(
-            iter,
-            gen,
-            [](RandomState<Philox4_32_10>* state) {
-              return state->normal<scalar_t>();
-            },
-            log_normal_func);
+        normal_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
+            iter, gen, log_normal_func);
       });
-}
 
-Tensor& log_normal_(
-    Tensor& self,
-    double mean_,
-    double std_,
-    c10::optional<Generator> gen_) {
-  TORCH_CHECK(
-      std_ > 0.0, "log_normal_ expects std > 0.0, but found std=", std_);
-#ifdef USE_ONEMKL
-  if (self.is_contiguous() &&
-      (self.scalar_type() == kFloat || self.scalar_type() == kDouble)) {
-    auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
-        gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
-
-    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "log_normal_", [&] {
-      auto mean = static_cast<scalar_t>(mean_);
-      auto std = static_cast<scalar_t>(std_);
-      scalar_t displ = static_cast<scalar_t>(0.0);
-      scalar_t scale = static_cast<scalar_t>(1.0);
-      auto& dpcpp_queue = dpcppGetCurrentQueue();
-      oneapi::mkl::rng::philox4x32x10 engine(dpcpp_queue, gen->current_seed());
-      oneapi::mkl::rng::
-          lognormal<scalar_t, oneapi::mkl::rng::lognormal_method::box_muller2>
-              distribution(mean, std, displ, scale);
-      DPCPP_ONEMKL_SUBMIT(
-          dpcpp_queue,
-          oneapi::mkl::rng::generate,
-          distribution,
-          engine,
-          self.numel(),
-          (scalar_t*)(self.data_ptr()));
-    });
-  } else
-#endif
-  {
-    auto iter = TensorIterator::nullary_op(self);
-    log_normal_dpcpp(iter, mean_, std_, gen_);
-  }
   return self;
 }
 

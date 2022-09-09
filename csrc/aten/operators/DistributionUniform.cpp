@@ -6,8 +6,8 @@
 #include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
 
-#include "Distributions.h"
-#include "Random.h"
+#include "DistributionTemplates.h"
+#include "RandomEngine.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -29,17 +29,14 @@ void uniform_kernel(
         auto to = static_cast<scalar_t>(to_);
         using accscalar_t = acc_type<scalar_t>;
         auto range = static_cast<accscalar_t>(to - from);
-        // define lambda to reverse bounds, multiply 'range' and add 'from_'
         auto uniform_func = [range, from](accscalar_t rand) {
-          return static_cast<scalar_t>(rand * range + from);
+          auto reverse_bound_rand = rand == static_cast<accscalar_t>(1.0)
+              ? static_cast<accscalar_t>(0.0)
+              : rand;
+          return static_cast<scalar_t>(reverse_bound_rand * range + from);
         };
-        AtenIpexTypeXPU::distribution_nullary_kernel<scalar_t, accscalar_t>(
-            iter,
-            gen,
-            [](RandomState<Philox4_32_10>* state) {
-              return state->uniform<scalar_t>();
-            },
-            uniform_func);
+        uniform_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
+            iter, gen, uniform_func);
       });
 }
 
