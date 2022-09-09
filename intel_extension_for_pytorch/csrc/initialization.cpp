@@ -5,9 +5,9 @@
 #include <torch/torch.h>
 #include <regex>
 #include <string>
-#include "intel_extension_for_pytorch/csrc/jit/auto_opt_config.h"
-#include "intel_extension_for_pytorch/csrc/jit/fusion_pass.h"
-#include "intel_extension_for_pytorch/csrc/version.h"
+#include "auto_opt_config.h"
+#include "fusion_pass.h"
+#include "version.h"
 
 namespace torch_ipex {
 

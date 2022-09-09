@@ -10,10 +10,7 @@ set(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "" FORCE)
 set(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
 set(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
-set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc")
-
 #find_package(TorchCCL REQUIRED)
-list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 # Define build type
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -35,8 +32,8 @@ if(DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
   set(DNNL_GRAPH_BUILD_COMPILER_BACKEND ON CACHE BOOL "" FORCE)
   set(DNNL_GRAPH_LLVM_CONFIG "llvm-config-13" CACHE STRING "" FORCE)
 endif()
-add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/llga)
-# add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
+add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/llga cpu_third_party/llga)
+# add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/mkl-dnn cpu_third_party/mkl-dnn)
 
 IF("${IPEX_DISP_OP}" STREQUAL "1")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIPEX_DISP_OP")
@@ -126,17 +123,19 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-Bsymbolic-functions")
 # include mkl-dnn before PyTorch
 # Otherwise, path_to_pytorch/torch/include/dnnl.hpp will be used as the header
 
-include_directories(${PROJECT_SOURCE_DIR})
-include_directories(${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch)
-include_directories(${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/)
-include_directories(${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/utils)
+include_directories(${IPEX_PROJECT_TOP_DIR})
+include_directories(${IPEX_CPU_CPP_ROOT})
+include_directories(${IPEX_CPU_CPP_ROOT}/aten)
+include_directories(${IPEX_CPU_CPP_ROOT}/utils)
 
-include_directories(${DPCPP_THIRD_PARTY_ROOT}/llga/include)
-include_directories(${PROJECT_SOURCE_DIR}/build/third_party/llga/third_party/oneDNN/include)
-include_directories(${DPCPP_THIRD_PARTY_ROOT}/llga/third_party/oneDNN/include)
+include_directories(${IPEX_JIT_CPP_ROOT})
+include_directories(${IPEX_COMMON_CPP_ROOT})
+
+include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/llga/include)
+include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/llga/third_party/oneDNN/include)
 # TODO: once llga is merged into oneDNN, use oneDNN directly as the third_party instead of using that inside llga
 # include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
-# include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
+# include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
 
 # Set installed MKL install dir
 include_directories(${MKL_INSTALL_DIR}/include)
@@ -159,46 +158,51 @@ endif()
 # sources
 set(DPCPP_ISA_SRCS)
 set(DPCPP_ISA_SRCS_ORIGIN)
-include(cmake/Codegen.cmake)
+include(${IPEX_PROJECT_TOP_DIR}/cmake/Codegen.cmake)
 
-set(DPCPP_SRCS)
-set(DPCPP_COMMON_SRCS)
-set(DPCPP_UTILS_SRCS)
+set(IPEX_CPU_CPP_SRCS)
+set(IPEX_CPU_CPP_UTILS_SRCS)
 set(DPCPP_QUANTIZATION_SRCS)
-set(DPCPP_JIT_SRCS)
-set(DPCPP_CPU_SRCS)
-set(DPCPP_AUTOCAST_SRCS)
-set(DPCPP_ATEN_SRCS)
-set(DPCPP_DYNDISP_SRCS)
+set(IPEX_CPU_CPP_AUTOCAST_SRCS)
+set(IPEX_CPU_CPP_ATEN_SRCS)
+set(IPEX_CPU_CPP_DYNDISP_SRCS)
+set(IPEX_CPU_CPP_ISA_SRCS)
+set(IPEX_CPU_CPP_IDEEP_SRCS)
+
+set(IPEX_JIT_CPP_SRCS)
+set(DPCPP_COMMON_SRCS)
 
 # foreach(file_path ${DPCPP_ISA_SRCS})
 #   message(${file_path})
 # endforeach()
 
-add_subdirectory(${DPCPP_ROOT})
-add_subdirectory(${DPCPP_ROOT}/utils)
-add_subdirectory(${DPCPP_ROOT}/jit)
-add_subdirectory(${DPCPP_ROOT}/cpu)
-add_subdirectory(${DPCPP_ROOT}/dyndisp)
-add_subdirectory(${DPCPP_ROOT}/autocast)
-add_subdirectory(${DPCPP_ROOT}/aten)
+add_subdirectory(${IPEX_CPU_CPP_ROOT}/aten)
+add_subdirectory(${IPEX_CPU_CPP_ROOT}/autocast)
+add_subdirectory(${IPEX_CPU_CPP_ROOT}/dyndisp)
+add_subdirectory(${IPEX_CPU_CPP_ROOT}/ideep)
+add_subdirectory(${IPEX_CPU_CPP_ROOT}/isa)
+add_subdirectory(${IPEX_CPU_CPP_ROOT}/utils)
+
+
+add_subdirectory(${IPEX_JIT_CPP_ROOT} jit_cpu)
+add_subdirectory(${IPEX_COMMON_CPP_ROOT} common_cpu)
 
 # Compile code with pybind11
-set(DPCPP_SRCS ${DPCPP_DYNDISP_SRCS} ${DPCPP_ISA_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_UTILS_SRCS} ${DPCPP_QUANTIZATION_SRCS} ${DPCPP_JIT_SRCS}
-    ${DPCPP_CPU_SRCS} ${DPCPP_AUTOCAST_SRCS} ${DPCPP_ATEN_SRCS})
+set(IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_DYNDISP_SRCS} ${DPCPP_ISA_SRCS} ${DPCPP_COMMON_SRCS} ${IPEX_CPU_CPP_UTILS_SRCS} ${DPCPP_QUANTIZATION_SRCS} ${IPEX_JIT_CPP_SRCS}
+    ${IPEX_CPU_CPP_ISA_SRCS} ${IPEX_CPU_CPP_IDEEP_SRCS} ${IPEX_CPU_CPP_AUTOCAST_SRCS} ${IPEX_CPU_CPP_ATEN_SRCS})
 
-list(REMOVE_ITEM DPCPP_SRCS ${DPCPP_ISA_SRCS_ORIGIN})
+list(REMOVE_ITEM IPEX_CPU_CPP_SRCS ${DPCPP_ISA_SRCS_ORIGIN})
 
-add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
+add_library(${PLUGIN_NAME_CPU} SHARED ${IPEX_CPU_CPP_SRCS})
 
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
-add_dependencies(${PLUGIN_NAME} dnnl_graph)
+add_dependencies(${PLUGIN_NAME_CPU} dnnl_graph)
 # If Graph Compiler is built, then it should link to its LLVM dependencies,
 # and not the LLVM symbols exposed by PyTorch.
-target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl_graph)
+target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC dnnl_graph)
 if (DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
   get_target_property(DNNL_GRAPHCOMPILER_LLVM_LIB dnnl_graphcompiler_llvm_lib INTERFACE_LINK_LIBRARIES)
-  target_link_libraries(${PLUGIN_NAME} PUBLIC graphcompiler ${DNNL_GRAPHCOMPILER_LLVM_LIB})
+  target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC graphcompiler ${DNNL_GRAPHCOMPILER_LLVM_LIB})
 endif()
 
 find_library(MKL_LIBRARY libmkl_core.a PATHS "${MKL_INSTALL_DIR}/lib" "${MKL_INSTALL_DIR}/lib/intel64")
@@ -207,25 +211,25 @@ if (NOT MKL_LIBRARY)
 endif()
 get_filename_component(MKL_LIBRARY_DIR ${MKL_LIBRARY} DIRECTORY)
 message(STATUS "Using MKL in ${MKL_LIBRARY_DIR}")
-target_link_libraries(${PLUGIN_NAME} PUBLIC
+target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC
   -Wl,--start-group
   ${MKL_LIBRARY_DIR}/libmkl_intel_lp64.a
   ${MKL_LIBRARY_DIR}/libmkl_gnu_thread.a
   ${MKL_LIBRARY_DIR}/libmkl_core.a
   -Wl,--end-group)
-target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
-target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
+target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
+target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
 set(ATEN_THREADING "OMP" CACHE STRING "ATen parallel backend")
 message(STATUS "Using ATen parallel backend: ${ATEN_THREADING}")
 if ("${ATEN_THREADING}" STREQUAL "OMP")
-  target_compile_definitions(${PLUGIN_NAME} PUBLIC "-DAT_PARALLEL_OPENMP=1")
+  target_compile_definitions(${PLUGIN_NAME_CPU} PUBLIC "-DAT_PARALLEL_OPENMP=1")
 elseif ("${ATEN_THREADING}" STREQUAL "NATIVE")
-  target_compile_definitions(${PLUGIN_NAME} PUBLIC "-DAT_PARALLEL_NATIVE=1")
+  target_compile_definitions(${PLUGIN_NAME_CPU} PUBLIC "-DAT_PARALLEL_NATIVE=1")
 elseif ("${ATEN_THREADING}" STREQUAL "TBB")
-  target_compile_definitions(${PLUGIN_NAME} PUBLIC "-DAT_PARALLEL_NATIVE_TBB=1")
+  target_compile_definitions(${PLUGIN_NAME_CPU} PUBLIC "-DAT_PARALLEL_NATIVE_TBB=1")
 else()
   message(FATAL_ERROR "Unknown ATen parallel backend: ${ATEN_THREADING}")
 endif()
 
-target_compile_options(${PLUGIN_NAME} PRIVATE "-DC10_BUILD_MAIN_LIB")
+target_compile_options(${PLUGIN_NAME_CPU} PRIVATE "-DC10_BUILD_MAIN_LIB")
