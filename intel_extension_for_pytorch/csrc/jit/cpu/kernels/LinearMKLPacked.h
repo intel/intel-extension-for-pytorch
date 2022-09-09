@@ -32,8 +32,6 @@ at::Tensor& run(
 
 at::Tensor pack(ContextLinearMKL& context, const at::Tensor& tensor);
 
-void repack_for(ContextLinearMKL& context, int64_t batch_size);
-
 } // namespace mkl_sgemm
 } // namespace detail
 } // namespace cpu

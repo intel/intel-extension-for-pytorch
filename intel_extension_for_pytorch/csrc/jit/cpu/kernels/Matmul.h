@@ -25,6 +25,12 @@ static auto bmm_add = Symbol::fromQualString("ipex::bmm_add");
 namespace torch_ipex {
 namespace cpu {
 
+void mkl_fp32_bmm_impl(
+    const at::Tensor& batch1,
+    const at::Tensor& batch2,
+    at::Tensor& out,
+    const double& output_scale);
+
 at::Tensor bmm_impl(
     const at::Tensor& tensor1,
     const at::Tensor& tensor2,
@@ -32,6 +38,8 @@ at::Tensor bmm_impl(
     const ideep::attr_t& attr,
     const std::vector<ideep::tensor>& postop_tensors,
     const float dst_coeff);
+
+at::Tensor dil_matmul(const at::Tensor& left, const at::Tensor& right);
 
 at::Tensor dil_matmul_div(
     const at::Tensor& left,

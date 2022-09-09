@@ -219,11 +219,17 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::replaceAtenBatchNormWithIpexBatchNorm(graph);
   // TODO: Some post processing?? ECS/EDC/Peephole???
 
-  // Fuse BF16 Mha for BERT and ViT
-  // This path depends on the FuseMHAScoreCalc and FuseMatmulDivOrMul
-  // because it uses the fused OPs from the above two pathes.
-  // TODO: We will merge the transpose-free MHA fusion into FuseMHAScoreCalc
-  // in the future for simplicity.
+  // This path contains two functions:
+  // 1. Fuse BF16 Mha for BERT and ViT
+  // 2. Replace the Matmul OP with MKL or DNNL Matmul kernels to enable
+  // transpose-free FP32 BMM.
+  // The BF16 Mha fusions depends on the FuseMHAScoreCalc and
+  // FuseMatmulDivOrMul since it uses the fused OPs from the two pathes.
+  // TODO: We will enable transpose-free BF16 BMM to benefit for most
+  // of the MHA patterns. Then the Matmul OP from the FuseMHAScoreCalc
+  // path will be removed in the future for simplicity.
+  // This path should be executed after all the other Matmul-related
+  // fusion are completed to prevent mismatching "aten::matmul".
   graph_rewrite::FusedTransFreeMha(graph);
 
   ConstantPropagation(graph);
