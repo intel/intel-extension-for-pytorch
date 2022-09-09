@@ -723,6 +723,22 @@ supported:
   - lcm
   - lcm.out
   - lcm_
+  - _foreach_sub.Scalar
+  - _foreach_sub_.Scalar
+  - _foreach_add.Scalar
+  - _foreach_add_.Scalar
+  - _foreach_mul.Scalar
+  - _foreach_mul_.Scalar
+  - _foreach_div.Scalar
+  - _foreach_div_.Scalar
+  - _foreach_add.List
+  - _foreach_add_.List
+  - _foreach_sub.List
+  - _foreach_sub_.List
+  - _foreach_mul.List
+  - _foreach_mul_.List
+  - _foreach_div.List
+  - _foreach_div_.List
 autograd:
   - cdist
   - lstm.input

@@ -470,6 +470,15 @@ class TestTorchMethod(TestCase):
         self.assertEqual(torch.fmod(y_cpu1, y_cpu2), torch.fmod(
             y_dpcpp1, y_dpcpp2).to(cpu_device))
 
+    def test_add_complex(self, dtype=torch.complex64):
+        real = torch.tensor([1, 2], dtype=torch.float32)
+        imag = torch.tensor([3, 4], dtype=torch.float32)
+        z = torch.complex(real, imag)
+        z_xpu = z.to("xpu")
+        cpu = torch.add(z, z)
+        xpu = torch.add(z_xpu, z_xpu)
+        self.assertEqual(cpu, xpu.cpu())
+
     def test_add_with_alpha_block_format(self, dtype=torch.float):
         x1 = torch.randn(1, 2, 3, 3)
         x1_xpu = x1.to("xpu")

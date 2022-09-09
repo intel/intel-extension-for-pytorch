@@ -44,7 +44,8 @@ inline void alpha_check(const TensorIterator& iter, Scalar alpha) {
       !alpha.isBoolean() || iter.dtype() == ScalarType::Bool,
       "Boolean alpha only supported for Boolean results.");
   TORCH_CHECK(
-      isFloatingType(iter.dtype()) || alpha.isIntegral(true),
+      isFloatingType(iter.dtype()) || isComplexType(iter.dtype()) ||
+          alpha.isIntegral(true),
       "For integral input tensors, argument alpha must not be a floating "
       "point number.");
 }
@@ -71,7 +72,8 @@ Tensor& add_out(
     const Tensor& _other,
     const Scalar& alpha,
     Tensor& result) {
-  if (1.0 == alpha.to<float>() && xpu::oneDNN::binary_valid(_self, _other) &&
+  if ((!alpha.isComplex()) && 1.0 == alpha.to<float>() &&
+      xpu::oneDNN::binary_valid(_self, _other) &&
       IPEX_ANY(xpu::oneDNN::is_onednn_layout, _self, _other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
@@ -97,7 +99,8 @@ Tensor& add_out(
 
 Tensor add(const Tensor& _self, const Tensor& _other, const Scalar& alpha) {
   Tensor result;
-  if (1.0 == alpha.to<float>() && xpu::oneDNN::binary_valid(_self, _other) &&
+  if ((!alpha.isComplex()) && 1.0 == alpha.to<float>() &&
+      xpu::oneDNN::binary_valid(_self, _other) &&
       IPEX_ANY(xpu::oneDNN::is_onednn_layout, _self, _other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
