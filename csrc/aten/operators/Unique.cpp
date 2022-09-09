@@ -108,7 +108,8 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto index_options = self.options().dtype(kLong);
-  Tensor output = self.clone().reshape(-1);
+  auto self_c = self.contiguous();
+  Tensor output = self_c.clone().reshape(-1);
   int64_t num_inp = output.numel();
   Tensor sorted_indices = at::empty({num_inp}, index_options);
   Tensor inverse_indices = at::empty({num_inp}, index_options);
@@ -120,7 +121,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
   if (num_inp > 0) {
     if (!consecutive) {
       xpu::pstl::sort<scalar_t, int64_t>(
-          self.data_ptr<scalar_t>(),
+          self_c.data_ptr<scalar_t>(),
           output.data_ptr<scalar_t>(),
           sorted_indices.data_ptr<int64_t>(),
           num_inp,
