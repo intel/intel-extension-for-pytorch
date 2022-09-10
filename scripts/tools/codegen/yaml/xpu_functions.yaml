@@ -531,6 +531,7 @@ supported:
   - special_i0e.out
   - special_i1.out
   - special_i1e.out
+  - special_ndtri.out
   - sqrt.out
   - std.correction
   - std_mean.correction

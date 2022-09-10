@@ -36,6 +36,19 @@ Tensor& i0_out(const Tensor& self, Tensor& out) {
   return out;
 }
 
+Tensor& special_ndtri_out(const Tensor& self, Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "special_ndtri_out",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t a) -> scalar_t { return calc_ndtri(a); });
+      });
+  return out;
+}
+
 Tensor& special_i0e_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(

@@ -37,7 +37,7 @@ class TestTorchMethod(TestCase):
             t = torch.tensor([min, max, eps, tiny], dtype=dtype, device=device)
             check_equal(t, torch.special.erfcx, special.erfcx)
 
-    def test_entr(self, dtype=torch.float):
+    def test_ndtri_entr(self, dtype=torch.float):
         dtypes = [torch.float32, torch.float64, torch.bfloat16]
         device = "xpu"
         for dtype in dtypes:
@@ -55,15 +55,18 @@ class TestTorchMethod(TestCase):
                 self.assertEqual(actual, expected)
 
             t = torch.tensor([], device=device, dtype=dtype)
+            check_equal(t, torch.special.ndtri, special.ndtri)
             check_equal(t, torch.special.entr, special.entr)
 
             range = (-1e7, 1e7)
 
             t = torch.linspace(*range, int(1e4), device=device, dtype=dtype)
+            check_equal(t, torch.special.ndtri, special.ndtri)
             check_equal(t, torch.special.entr, special.entr)
 
             # NaN, inf, -inf are tested in reference_numerics tests.
             info = torch.finfo(dtype)
             min, max, eps, tiny = info.min, info.max, info.eps, info.tiny
             t = torch.tensor([min, max, eps, tiny], dtype=dtype, device=device)
+            check_equal(t, torch.special.ndtri, special.ndtri)
             check_equal(t, torch.special.entr, special.entr)
