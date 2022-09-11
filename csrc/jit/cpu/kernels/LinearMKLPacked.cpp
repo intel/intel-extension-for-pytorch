@@ -87,10 +87,12 @@ at::Tensor& run(
       at::borrow_from_optional_tensor(context.bias_);
   const at::Tensor& bias = *bias_maybe_owned;
   int64_t input_batch = (int64_t)(input_.numel() / K);
-  if (input_batch != context.sgemm_sizes_[0])
+  if (input_batch != context.sgemm_sizes_[0]) {
     mkl_sgemm_kernel_output(input_, context.ori_weight_, bias, accumu);
-  mkl_prepack_sgemm_kernel_output(
-      input_, context.mkl_weight_, bias, context.sgemm_sizes_[2], accumu);
+  } else {
+    mkl_prepack_sgemm_kernel_output(
+        input_, context.mkl_weight_, bias, context.sgemm_sizes_[2], accumu);
+  }
   return accumu;
 }
 

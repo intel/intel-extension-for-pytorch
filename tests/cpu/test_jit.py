@@ -2781,8 +2781,8 @@ class Tester(TestCase):
                     prec=prec)        
 
     def test_linear_fp32_with_dynamic_input(self):
-        x1 = torch.rand(128, 64)
-        x2 = torch.rand(80, 64)
+        x1 = torch.rand(512, 64)
+        x2 = torch.rand(15, 64)
 
         model = LinearRelu(64, 241, bias=True).eval()
         model1 = ipex.optimize(model, dtype=torch.float32, level="O1", auto_kernel_selection=True)
