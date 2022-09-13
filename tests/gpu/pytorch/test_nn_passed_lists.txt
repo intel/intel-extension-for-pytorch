@@ -51,8 +51,6 @@ test_nn.py::TestNN::test_CosineEmbeddingLoss_dpcpp_half
 test_nn.py::TestNN::test_CosineEmbeddingLoss_margin_dpcpp_half
 test_nn.py::TestNN::test_CosineEmbeddingLoss_margin_sum_reduction_dpcpp_half
 test_nn.py::TestNN::test_CosineEmbeddingLoss_sum_reduction_dpcpp_half
-test_nn.py::TestNN::test_CrossEntropyLoss_dpcpp_half
-test_nn.py::TestNN::test_CrossEntropyLoss_weights_dpcpp_half
 test_nn.py::TestNN::test_HingeEmbeddingLoss_dpcpp_half
 test_nn.py::TestNN::test_HingeEmbeddingLoss_margin_dpcpp_half
 test_nn.py::TestNN::test_HingeEmbeddingLoss_margin_sum_reduction_dpcpp_half
