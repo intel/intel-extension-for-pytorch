@@ -1,8 +1,8 @@
 ## Included by CMakeLists
-if(CPU_BUILD_OPTIONS_cmake_included)
+if(COMMON_LIB_BUILD_OPTIONS_cmake_included)
     return()
 endif()
-set(CPU_BUILD_OPTIONS_cmake_included true)
+set(COMMON_LIB_BUILD_OPTIONS_cmake_included true)
 
 # check and set CMAKE_CXX_STANDARD
 string(FIND "${CMAKE_CXX_FLAGS}" "-std=c++" env_cxx_standard)

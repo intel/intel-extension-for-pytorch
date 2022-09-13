@@ -56,3 +56,4 @@ target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/lib
 
 # Link IPEX
 target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/libintel-ext-pt-cpu.so)
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/libintel-ext-pt-python.so)

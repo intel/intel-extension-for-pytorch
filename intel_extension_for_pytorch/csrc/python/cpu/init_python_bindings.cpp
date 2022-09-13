@@ -212,7 +212,3 @@ void InitIpexBindings(py::module m) {
 }
 
 } // namespace torch_ipex
-
-PYBIND11_MODULE(_C, m) {
-  torch_ipex::InitIpexBindings(m);
-}

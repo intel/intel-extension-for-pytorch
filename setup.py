@@ -387,6 +387,14 @@ def get_ipex_cpu_dir():
 def get_ipex_cpu_build_dir():
     return os.path.join(get_build_type_dir(), 'csrc', 'cpu')
 
+def get_ipex_common_lib_dir():
+    project_root_dir = os.path.dirname(__file__)
+    cpu_root_dir = os.path.join(project_root_dir, 'intel_extension_for_pytorch', 'csrc')
+    return os.path.abspath(cpu_root_dir)
+
+def get_ipex_common_lib_build_dir():
+    return os.path.join(get_build_type_dir(), 'intel_extension_for_pytorch', 'csrc')
+
 # initialize variables for compilation
 IS_WINDOWS = (platform.system() == 'Windows')
 IS_DARWIN = (platform.system() == 'Darwin')
@@ -450,15 +458,11 @@ class IPEXCPPLibBuild(build_clib, object):
         if platform.system() == "Windows":
             raise RuntimeError("Intel Extension for PyTorch only supports Linux now.")
 
-        build_dir = get_build_dir()
         project_dir = get_project_dir()
         ipex_cpu_dir = get_ipex_cpu_dir()
         build_type_dir = get_build_type_dir()
         output_lib_path = get_package_lib_dir()
         ipex_cpu_build_dir = get_ipex_cpu_build_dir()
-
-        if not os.path.exists(build_dir):
-            Path(build_dir).mkdir(parents=True, exist_ok=True)
 
         if not os.path.exists(build_type_dir):
             Path(build_type_dir).mkdir(parents=True, exist_ok=True)
@@ -495,6 +499,7 @@ class IPEXCPPLibBuild(build_clib, object):
 
 
         build_args = ['-j', str(multiprocessing.cpu_count())]
+        # build_args += ['VERBOSE=1']
 
         env = os.environ.copy()
         if _check_env_flag("USE_SYCL"):
@@ -502,11 +507,27 @@ class IPEXCPPLibBuild(build_clib, object):
 
         check_call([self.cmake, ipex_cpu_dir] + cmake_args, cwd=ipex_cpu_build_dir, env=env)
 
-        # build_args += ['VERBOSE=1']
         if use_ninja:
             check_call(['ninja'] + build_args, cwd=ipex_cpu_build_dir, env=env)
         else:
             check_call(['make'] + build_args, cwd=ipex_cpu_build_dir, env=env)
+
+        # common lib
+        ipex_common_lib_dir = get_ipex_common_lib_dir()
+        ipex_common_lib_build_dir = get_ipex_common_lib_build_dir()
+
+        if not os.path.exists(ipex_common_lib_dir):
+            Path(ipex_common_lib_dir).mkdir(parents=True, exist_ok=True)
+
+        if not os.path.exists(ipex_common_lib_build_dir):
+            Path(ipex_common_lib_build_dir).mkdir(parents=True, exist_ok=True)
+
+        check_call([self.cmake, ipex_common_lib_dir] + cmake_args, cwd=ipex_common_lib_build_dir, env=env)
+
+        if use_ninja:
+            check_call(['ninja'] + build_args, cwd=ipex_common_lib_build_dir, env=env)
+        else:
+            check_call(['make'] + build_args, cwd=ipex_common_lib_build_dir, env=env)
 
         # Build the CPP UT
         cpp_test_dir = get_cpp_test_dir()
@@ -520,7 +541,6 @@ class IPEXCPPLibBuild(build_clib, object):
             check_call(['ninja'] + build_args, cwd=cpp_test_build_dir, env=env)
         else:
             check_call(['make'] + build_args, cwd=cpp_test_build_dir, env=env)
-
 
 cmdclass = {
     'build_clib': IPEXCPPLibBuild,
@@ -561,7 +581,7 @@ if mode == 'cppsdk':
             dist_dir = 'dist'
             if not os.path.exists(dist_dir):
                 os.makedirs(dist_dir)
-            shutil.copyfile(os.path.join('tools', 'intel-ext-pt-cpu.run.in'), os.path.join(dist_dir, run_file_name))
+            shutil.copyfile(os.path.join('tools', 'intel-ext-pt-cpu.run.in'), os.path.join(dist_dir, run_file_name)) # TODO: check if we need rename 'intel-ext-pt-cpu.run.in' after merge CPU and GPU.
             subprocess.check_call(['sed', '-i', 's/<IPEX_VERSION>/{}/'.format(TORCH_IPEX_VERSION), os.path.join(dist_dir, run_file_name)])
             subprocess.check_call(['tar', 'czf', '-', '-C', tmp_dir, '.'],
                 stdout=open(os.path.join(dist_dir, run_file_name), 'a'))
@@ -640,9 +660,11 @@ elif mode == 'python':
             return '-Wl,-rpath,$ORIGIN/' + path
 
     def pyi_module():
-        main_libraries = ['intel-ext-pt-cpu']
-        main_sources = [os.path.join(package_name, "csrc", "cpu", "python", "init_python_bindings.cpp"),
-                        os.path.join(package_name, "csrc", "cpu", "python", "TaskModule.cpp")]
+        main_libraries = ['intel-ext-pt-python']
+        main_sources = [
+            os.path.join(package_name, "csrc", "python", "_C.cpp"),
+            os.path.join(package_name, "csrc", "python", "cpu", "init_python_bindings.cpp"),
+            os.path.join(package_name, "csrc", "python", "cpu", "TaskModule.cpp")]
 
         include_dirs = [
             os.path.realpath("."),
@@ -712,7 +734,6 @@ setup(
     url='https://github.com/intel/intel-extension-for-pytorch',
     author='Intel/PyTorch Dev Team',
     install_requires=_build_installation_dependency(),
-    libraries=[('intel-ext-pt-cpu', {'sources': list()})],
     packages=[
         'intel_extension_for_pytorch'],
     package_data={

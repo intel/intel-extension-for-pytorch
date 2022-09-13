@@ -19,26 +19,6 @@ set(CMAKE_INSTALL_RPATH "${RPATH_VALUE}/lib/:${RPATH_VALUE}/")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${IPEX_INSTALL_LIBDIR})
 
-# check and set CMAKE_CXX_STANDARD
-string(FIND "${CMAKE_CXX_FLAGS}" "-std=c++" env_cxx_standard)
-if(env_cxx_standard GREATER -1)
-  message(
-      WARNING "C++ standard version definition detected in environment variable."
-      "PyTorch requires -std=c++14. Please remove -std=c++ settings in your environment.")
-endif()
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-set(_CXX11_ABI_FLAG 0)
-if(DEFINED GLIBCXX_USE_CXX11_ABI)
-  if(${GLIBCXX_USE_CXX11_ABI} EQUAL 1)
-    set(CXX_STANDARD_REQUIRED ON)
-    set(_CXX11_ABI_FLAG 1)
-  endif()
-endif()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=${_CXX11_ABI_FLAG}")
-
 list(APPEND CMAKE_MODULE_PATH ${IPEX_PROJECT_TOP_DIR}/cmake/Modules)
 
 set(IPEX_CPU_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/cpu")
@@ -123,7 +103,6 @@ set(IPEX_CPU_CPP_ISA_SRCS)
 set(IPEX_CPU_CPP_IDEEP_SRCS)
 
 set(IPEX_JIT_CPP_SRCS)
-set(IPEX_COMMON_CPP_SRCS)
 
 # foreach(file_path ${IPEX_CPU_CPP_ISA_SRCS_GEN})
 #   message(${file_path})
@@ -137,10 +116,9 @@ add_subdirectory(${IPEX_CPU_CPP_ROOT}/isa)
 add_subdirectory(${IPEX_CPU_CPP_ROOT}/utils)
 
 add_subdirectory(${IPEX_JIT_CPP_ROOT} jit_cpu)
-add_subdirectory(${IPEX_COMMON_CPP_ROOT} common_cpu)
 
 # Compile code with pybind11
-set(IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_DYNDISP_SRCS} ${IPEX_CPU_CPP_ISA_SRCS_GEN} ${IPEX_COMMON_CPP_SRCS} ${IPEX_CPU_CPP_UTILS_SRCS} ${IPEX_CPU_CPP_QUANTIZATION_SRCS} ${IPEX_JIT_CPP_SRCS}
+set(IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_DYNDISP_SRCS} ${IPEX_CPU_CPP_ISA_SRCS_GEN} ${IPEX_CPU_CPP_UTILS_SRCS} ${IPEX_CPU_CPP_QUANTIZATION_SRCS} ${IPEX_JIT_CPP_SRCS}
     ${IPEX_CPU_CPP_ISA_SRCS} ${IPEX_CPU_CPP_IDEEP_SRCS} ${IPEX_CPU_CPP_AUTOCAST_SRCS} ${IPEX_CPU_CPP_ATEN_SRCS})
 
 list(REMOVE_ITEM IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_ISA_SRCS_ORIGIN})
