@@ -499,6 +499,8 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
      xpu::_convolution_relu__sym},
     {{Symbol::fromQualString("aten::_convolution"), aten::add_},
      xpu::_convolution_sum_sym},
+    {{Symbol::fromQualString("aten::_convolution"), aten::add},
+     xpu::_convolution_sum_sym},
     {{xpu::_convolution_sum_sym, Symbol::fromQualString("aten::relu_")},
      xpu::_convolution_sum_relu_sym},
     {{Symbol::fromQualString("aten::_convolution"),
