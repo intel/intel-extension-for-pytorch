@@ -534,6 +534,7 @@ supported:
   - special_i1e.out
   - special_ndtri.out
   - special_xlog1py.out
+  - special_zeta.out
   - sqrt.out
   - std.correction
   - std_mean.correction

@@ -99,7 +99,7 @@ Tensor& special_i1e_out(const Tensor& self, Tensor& out) {
   return out;
 }
 
-Tensor& special_entr_out(const Tensor& self, at::Tensor& out) {
+Tensor& special_entr_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       ScalarType::Half,
@@ -121,7 +121,7 @@ Tensor& special_entr_out(const Tensor& self, at::Tensor& out) {
   return out;
 }
 
-Tensor& special_erfcx_out(const Tensor& self, at::Tensor& out) {
+Tensor& special_erfcx_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.common_dtype(), "erfcx", [&]() {
@@ -171,6 +171,17 @@ Tensor& special_xlog1py_out(
             return 0;
           }
           return x * Numerics<scalar_t>::log1p(y);
+        });
+      });
+  return out;
+}
+
+Tensor& special_zeta_out(const Tensor& self, const Tensor& other, Tensor& out) {
+  auto iter = TensorIterator::binary_float_op(out, self, other);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.common_dtype(), "zeta", [&]() {
+        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t q) -> scalar_t {
+          return zeta<scalar_t>(x, q);
         });
       });
   return out;
