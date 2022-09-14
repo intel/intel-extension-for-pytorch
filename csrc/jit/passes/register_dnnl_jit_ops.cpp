@@ -20,7 +20,7 @@
 #include "cpu/kernels/RNN.h"
 #include "cpu/kernels/Shuffle.h"
 #include "cpu/kernels/Softmax.h"
-
+#include "ideep/IDeepConversions.h"
 namespace torch_ipex {
 namespace jit {
 
@@ -109,7 +109,8 @@ at::Tensor toOptionalTensor(const IValue& v) {
               (std::move(peek(stack, 5, 9))).toInt(),                         \
               (std::move(peek(stack, 6, 9))).toBool(),                        \
               std::move((std::move(peek(stack, 7, 9))).toIntVector()),        \
-              ideep::attr_t::ATTR(scale));                                    \
+              ideep::attr_t::ATTR(scale).set_fpmath_mode(                     \
+                  torch_ipex::fpmath_mode));                                  \
           drop(stack, 9);                                                     \
           torch::jit::pack(stack, std::move(result));                         \
           return 0;                                                           \
@@ -233,8 +234,8 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 5, 10))).toInt(),
                 (std::move(peek(stack, 6, 10))).toBool(),
                 std::move((std::move(peek(stack, 7, 10))).toIntVector()),
-                ideep::attr_t::fuse_clamp(
-                    lower_bound_value, upper_bound_value));
+                ideep::attr_t::fuse_clamp(lower_bound_value, upper_bound_value)
+                    .set_fpmath_mode(torch_ipex::fpmath_mode));
             drop(stack, 10);
             torch::jit::pack(stack, std::move(result));
             return 0;
@@ -264,7 +265,8 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 6, 11))).toBool(),
                 std::move((std::move(peek(stack, 7, 11))).toIntVector()),
                 ideep::attr_t::fuse_elu(
-                    scale_value, alpha_value, input_scale_value));
+                    scale_value, alpha_value, input_scale_value)
+                    .set_fpmath_mode(torch_ipex::fpmath_mode));
             drop(stack, 11);
             torch::jit::pack(stack, std::move(result));
             return 0;
@@ -289,7 +291,8 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 5, 9))).toInt(),
                 (std::move(peek(stack, 6, 9))).toBool(),
                 std::move((std::move(peek(stack, 7, 9))).toIntVector()),
-                ideep::attr_t::fuse_relu(1.0, alpha_value));
+                ideep::attr_t::fuse_relu(1.0, alpha_value)
+                    .set_fpmath_mode(torch_ipex::fpmath_mode));
             drop(stack, 9);
             torch::jit::pack(stack, std::move(result));
             return 0;
@@ -314,7 +317,8 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 5, 9))).toInt(),
                 (std::move(peek(stack, 6, 9))).toBool(),
                 std::move((std::move(peek(stack, 7, 9))).toIntVector()),
-                ideep::attr_t::fuse_pow(1.0, exponent_value));
+                ideep::attr_t::fuse_pow(1.0, exponent_value)
+                    .set_fpmath_mode(torch_ipex::fpmath_mode));
             drop(stack, 9);
             torch::jit::pack(stack, std::move(result));
             return 0;
@@ -344,7 +348,8 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 5, 9))).toInt(),
                 (std::move(peek(stack, 6, 9))).toBool(),
                 std::move((std::move(peek(stack, 7, 9))).toIntVector()),
-                ideep::attr_t::fuse_gelu(1.f, 0.f, 0.f, gelu_type));
+                ideep::attr_t::fuse_gelu(1.f, 0.f, 0.f, gelu_type)
+                    .set_fpmath_mode(torch_ipex::fpmath_mode));
             drop(stack, 9);
             torch::jit::pack(stack, std::move(result));
             return 0;

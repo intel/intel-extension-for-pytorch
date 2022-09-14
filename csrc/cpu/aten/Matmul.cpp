@@ -1,10 +1,10 @@
 #include "Matmul.h"
 #include <ATen/ATen.h>
 #include <ATen/native/Resize.h>
+#include <ideep.hpp>
 #include <torch/all.h>
 #include <torch/csrc/autograd/functions/utils.h>
 #include "ideep/IDeepConversions.h"
-#include "ideep/ideep.hpp"
 #include "utils/fpmath_mode.h"
 #include "utils/library.h"
 namespace torch {
@@ -199,7 +199,7 @@ at::Tensor matmul_onednn(const at::Tensor& self, const at::Tensor& mat2) {
       ideep::scale_t(),
       ideep::scale_t(),
       ideep::scale_t(),
-      ideep::attr_t());
+      ideep::attr_t(torch_ipex::fpmath_mode));
 
   handle_grad(self, mat2, output);
   return output;
@@ -244,7 +244,7 @@ at::Tensor& matmul_onednn(
       ideep::scale_t(),
       ideep::scale_t(),
       ideep::scale_t(),
-      ideep::attr_t());
+      ideep::attr_t(torch_ipex::fpmath_mode));
   return out;
 }
 

@@ -1,6 +1,6 @@
+#include <ideep.hpp>
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
-#include "ideep/ideep.hpp"
 #include "utils.h"
 
 #include <ATen/code_template.h>

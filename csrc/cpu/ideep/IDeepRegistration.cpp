@@ -2,7 +2,7 @@
 #include <ATen/Config.h>
 
 // needs to be included only once in library.
-#include "ideep_pin_singletons.hpp"
+#include <ideep_pin_singletons.hpp>
 
 using namespace ideep;
 

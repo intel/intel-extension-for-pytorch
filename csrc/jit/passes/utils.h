@@ -3,7 +3,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 
-#include "ideep/ideep.hpp"
+#include <ideep.hpp>
 
 namespace torch_ipex {
 namespace jit {

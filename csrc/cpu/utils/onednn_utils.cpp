@@ -1,6 +1,6 @@
 #include "onednn_utils.h"
 
-#include "ideep/ideep.hpp"
+#include <ideep.hpp>
 
 namespace torch_ipex {
 namespace utils {

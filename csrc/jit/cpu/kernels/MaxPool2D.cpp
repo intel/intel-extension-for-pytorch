@@ -9,10 +9,10 @@
 
 #include <limits>
 
+#include <ideep.hpp>
 #include "aten/ParamUtils.h"
 #include "aten/utils/utils.h"
 #include "ideep/IDeepConversions.h"
-#include "ideep/ideep.hpp"
 
 namespace torch_ipex {
 namespace cpu {

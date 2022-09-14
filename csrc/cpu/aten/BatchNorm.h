@@ -4,7 +4,7 @@
 #include <ATen/Tensor.h>
 #include <torch/csrc/autograd/custom_function.h>
 
-#include "ideep/ideep.hpp"
+#include <ideep.hpp>
 
 namespace torch_ipex {
 namespace cpu {

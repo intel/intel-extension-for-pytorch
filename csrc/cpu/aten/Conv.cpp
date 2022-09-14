@@ -156,7 +156,7 @@ at::Tensor convolution_forward_impl(
 
   return reinterpret_cast<IpexConvolutionOpContext*>(
              op_context.data_ptr<int64_t>()[0])
-      ->run(input, ideep::attr_t());
+      ->run(input, ideep::attr_t(torch_ipex::fpmath_mode));
 }
 
 at::Tensor convolution_backward_input(
@@ -203,7 +203,8 @@ at::Tensor convolution_backward_input(
       dilation.vec(),
       padding.vec(),
       padding.vec(),
-      groups);
+      groups,
+      ideep::attr_t(torch_ipex::fpmath_mode));
 
   if (is_channels_last_contiguous) {
     return grad_input;
@@ -259,7 +260,8 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
         dilation.vec(),
         padding.vec(),
         padding.vec(),
-        groups);
+        groups,
+        ideep::attr_t(torch_ipex::fpmath_mode));
   } else {
     ideep::convolution_backward_weights::compute(
         mkldnn_input,
@@ -270,7 +272,8 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
         dilation.vec(),
         padding.vec(),
         padding.vec(),
-        groups);
+        groups,
+        ideep::attr_t(torch_ipex::fpmath_mode));
   }
   return std::make_tuple(grad_weight, grad_bias);
 }

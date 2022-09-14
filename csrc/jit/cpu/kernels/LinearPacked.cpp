@@ -1,22 +1,25 @@
 #include "LinearPacked.h"
+#include <ideep.hpp>
 #include "aten/Linear.h"
 #include "aten/WeightPack.h"
 #include "ideep/IDeepConversions.h"
-#include "ideep/ideep.hpp"
 
 namespace torch_ipex {
 namespace cpu {
 namespace detail {
 namespace linear {
 
-#define DEFINE_LINEAR_UNARY_ELTWISE_RUN(FUSED_OP)                    \
-  at::Tensor linear_##FUSED_OP##_run(                                \
-      const at::Tensor& input,                                       \
-      const c10::intrusive_ptr<LinearOpContext>& op_context) {       \
-    RECORD_FUNCTION(                                                 \
-        "ipex_prepack::linear_" #FUSED_OP "_run",                    \
-        c10::ArrayRef<c10::IValue>({}));                             \
-    return op_context->run(input, ideep::attr_t::fuse_##FUSED_OP()); \
+#define DEFINE_LINEAR_UNARY_ELTWISE_RUN(FUSED_OP)              \
+  at::Tensor linear_##FUSED_OP##_run(                          \
+      const at::Tensor& input,                                 \
+      const c10::intrusive_ptr<LinearOpContext>& op_context) { \
+    RECORD_FUNCTION(                                           \
+        "ipex_prepack::linear_" #FUSED_OP "_run",              \
+        c10::ArrayRef<c10::IValue>({}));                       \
+    return op_context->run(                                    \
+        input,                                                 \
+        ideep::attr_t::fuse_##FUSED_OP().set_fpmath_mode(      \
+            torch_ipex::fpmath_mode));                         \
   }
 
 c10::intrusive_ptr<LinearOpContext> createLinearPrePackOpContext(
@@ -36,7 +39,7 @@ at::Tensor linear_run(
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
   RECORD_FUNCTION("ipex_prepack::linear_run", c10::ArrayRef<c10::IValue>({}));
 
-  return op_context->run(input, ideep::attr_t());
+  return op_context->run(input, ideep::attr_t(torch_ipex::fpmath_mode));
 }
 
 DEFINE_LINEAR_UNARY_ELTWISE_RUN(relu);
@@ -60,7 +63,10 @@ at::Tensor linear_leaky_relu_run(
   RECORD_FUNCTION(
       "ipex_prepack::linear_leaky_relu_run", c10::ArrayRef<c10::IValue>({}));
   auto alpha_value = alpha.to<float>();
-  return op_context->run(input, ideep::attr_t::fuse_relu(1.0, alpha_value));
+  return op_context->run(
+      input,
+      ideep::attr_t::fuse_relu(1.0, alpha_value)
+          .set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 at::Tensor linear_hardtanh_run(
@@ -73,7 +79,9 @@ at::Tensor linear_hardtanh_run(
   auto lower_bound_value = lower_bound.to<float>();
   auto upper_bound_value = upper_bound.to<float>();
   return op_context->run(
-      input, ideep::attr_t::fuse_clamp(lower_bound_value, upper_bound_value));
+      input,
+      ideep::attr_t::fuse_clamp(lower_bound_value, upper_bound_value)
+          .set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 at::Tensor linear_elu_run(
@@ -89,7 +97,8 @@ at::Tensor linear_elu_run(
   auto input_scale_value = input_scale.to<float>();
   return op_context->run(
       input,
-      ideep::attr_t::fuse_elu(scale_value, alpha_value, input_scale_value));
+      ideep::attr_t::fuse_elu(scale_value, alpha_value, input_scale_value)
+          .set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 at::Tensor linear_pow_run(
@@ -100,7 +109,9 @@ at::Tensor linear_pow_run(
       "ipex_prepack::linear_pow_run", c10::ArrayRef<c10::IValue>({}));
   auto exponent_value = exponent.to<float>();
   return op_context->run(
-      input, ideep::attr_t::fuse_pow(1.0, 1.0, exponent_value));
+      input,
+      ideep::attr_t::fuse_pow(1.0, 1.0, exponent_value)
+          .set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 at::Tensor linear_gelu_run(
@@ -123,7 +134,9 @@ at::Tensor linear_gelu_run(
         false, "ipex::linear_gelu_run only support tanh approximate now");
   }
   return op_context->run(
-      input, ideep::attr_t::fuse_gelu(1.0, 0.f, 0.f, gelu_type));
+      input,
+      ideep::attr_t::fuse_gelu(1.0, 0.f, 0.f, gelu_type)
+          .set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 at::Tensor linear_add_run(
@@ -135,7 +148,10 @@ at::Tensor linear_add_run(
       "ipex_prepack::linear_add_run", c10::ArrayRef<c10::IValue>({}));
 
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
-  return op_context->run(input, accumu, ideep::attr_t::fuse_sum(scale));
+  return op_context->run(
+      input,
+      accumu,
+      ideep::attr_t::fuse_sum(scale).set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 at::Tensor linear_add_relu_run(
@@ -147,7 +163,10 @@ at::Tensor linear_add_relu_run(
       "ipex_prepack::linear_add_relu_run", c10::ArrayRef<c10::IValue>({}));
 
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
-  return op_context->run(input, accumu, ideep::attr_t::residual(scale));
+  return op_context->run(
+      input,
+      accumu,
+      ideep::attr_t::residual(scale).set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 ContextLinear create(

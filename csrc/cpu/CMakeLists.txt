@@ -70,6 +70,8 @@ include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/llga/third_party/oneDNN/inc
 # include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
 # include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
 
+include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/include)
+
 # Set installed MKL install dir
 include_directories(${MKL_INSTALL_DIR}/include)
 

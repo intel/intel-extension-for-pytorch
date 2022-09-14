@@ -1,5 +1,5 @@
 #include <ATen/code_template.h>
-#include "ideep/ideep.hpp"
+#include <ideep.hpp>
 #include "passes/utils.h"
 
 #include "graph_rewrite.h"

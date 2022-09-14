@@ -4,11 +4,11 @@
 #include <ATen/Tensor.h>
 #include <torch/custom_class.h>
 
+#include <ideep.hpp>
 #include "ContextConvTranspose.h"
 #include "ContextConvolution.h"
 #include "ContextLinear.h"
 #include "ContextLinearMKL.h"
-#include "ideep/ideep.hpp"
 
 namespace torch_ipex {
 namespace cpu {

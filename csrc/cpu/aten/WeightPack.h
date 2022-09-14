@@ -4,9 +4,9 @@
 
 #include <ATen/Tensor.h>
 
+#include <ideep.hpp>
 #include "aten/RNN.h"
 #include "ideep/IDeepConversions.h"
-#include "ideep/ideep.hpp"
 
 namespace torch_ipex {
 namespace cpu {

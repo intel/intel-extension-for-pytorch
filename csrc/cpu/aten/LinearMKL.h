@@ -3,9 +3,9 @@
 #include <ATen/ATen.h>
 #include <ATen/Tensor.h>
 #include <dyndisp/DispatchStub.h>
+#include <ideep.hpp>
 #include <vector>
 #include "cpu/kernels/OpContext.h"
-#include "ideep/ideep.hpp"
 #include "mkl.h"
 
 namespace torch_ipex {

@@ -8,8 +8,8 @@
 
 #include <limits>
 
+#include <ideep.hpp>
 #include "ideep/IDeepConversions.h"
-#include "ideep/ideep.hpp"
 #include "mkl.h"
 
 namespace torch_ipex {
@@ -261,7 +261,13 @@ at::Tensor dil_matmul_div(
   auto dim_tensor2 = tensor2.dim();
   if (dim_tensor1 == dim_tensor2 && dim_tensor1 >= 3) {
     float scale = 1.0f / div_input.to<float>();
-    return bmm_impl(tensor1, tensor2, out, ideep::attr_t(), {}, scale);
+    return bmm_impl(
+        tensor1,
+        tensor2,
+        out,
+        ideep::attr_t(torch_ipex::fpmath_mode),
+        {},
+        scale);
   } else {
     return dil_matmul_div(
         tensor1, tensor2, out, at::native::wrapped_scalar_tensor(div_input));
@@ -284,6 +290,7 @@ at::Tensor dil_bmm_add(
 
     auto op_attr = ideep::attr_t::fuse_binary(
         dnnl::algorithm::binary_add, onednn_input.get_desc());
+    op_attr.set_fpmath_mode(torch_ipex::fpmath_mode);
     return bmm_impl(
         batch1, batch2, at::Tensor(), op_attr, {onednn_input}, 1.0f);
   } else {

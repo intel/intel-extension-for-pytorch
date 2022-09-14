@@ -8,8 +8,8 @@
 
 #include <limits>
 
+#include <ideep.hpp>
 #include "ideep/IDeepConversions.h"
-#include "ideep/ideep.hpp"
 
 namespace torch_ipex {
 namespace cpu {

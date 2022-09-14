@@ -5,7 +5,7 @@
 #include <c10/core/Scalar.h>
 #include <torch/csrc/jit/runtime/custom_operator.h>
 
-#include "ideep/ideep.hpp"
+#include <ideep.hpp>
 
 namespace torch {
 namespace jit {

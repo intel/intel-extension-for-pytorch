@@ -344,7 +344,17 @@ std::vector<at::Tensor> lstm_kernel(
   if (train) {
     at::Tensor workspace = at::Tensor();
     auto pd = ideep::lstm_forward_training::prepare(
-        x, hx, cx, w1_, w2_, b, y, hy, cy, reverse);
+        x,
+        hx,
+        cx,
+        w1_,
+        w2_,
+        b,
+        y,
+        hy,
+        cy,
+        reverse,
+        ideep::attr_t(torch_ipex::fpmath_mode));
     workspace = torch_ipex::cpu::empty_aten_tensor_from_desc(
         pd.workspace_desc(), input.options().dtype(at::kByte));
     ideep::tensor mkldnn_workspace;
@@ -373,7 +383,8 @@ std::vector<at::Tensor> lstm_kernel(
         scale,
         zp,
         weights_scale_mask,
-        weight_scales);
+        weight_scales,
+        ideep::attr_t(torch_ipex::fpmath_mode));
     result.reserve(3);
     result.push_back(output);
     result.push_back(hy_);
@@ -835,7 +846,17 @@ std::vector<at::Tensor> ipex_lstm_layer_backward(
   }
 
   auto forward_hint = ideep::lstm_forward_training::prepare(
-      x, hx, cx, w1, w2, b, y, hy, cy, reverse);
+      x,
+      hx,
+      cx,
+      w1,
+      w2,
+      b,
+      y,
+      hy,
+      cy,
+      reverse,
+      ideep::attr_t(torch_ipex::fpmath_mode));
   ideep::tensor mkldnn_workspace;
   mkldnn_workspace.init(
       forward_hint.workspace_desc(), workspace.template data_ptr<uint8_t>());
@@ -860,7 +881,8 @@ std::vector<at::Tensor> ipex_lstm_layer_backward(
       diff_w1,
       diff_w2,
       diff_b,
-      reverse);
+      reverse,
+      ideep::attr_t(torch_ipex::fpmath_mode));
   return {diff_x_, diff_w1_, diff_w2_, diff_b_, diff_b_, diff_hx_, diff_cx_};
 }
 

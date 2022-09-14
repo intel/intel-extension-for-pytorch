@@ -4,9 +4,12 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 
-#include "ideep.hpp"
+#include <ideep.hpp>
+
+#include <oneapi/dnnl/dnnl_types.h>
 
 namespace torch_ipex {
+extern dnnl_fpmath_mode_t fpmath_mode;
 namespace cpu {
 
 // Mapping ScalarType to ideep tensor data_type

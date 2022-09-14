@@ -10,7 +10,7 @@
 
 #include <limits>
 
-#include "ideep/ideep.hpp"
+#include <ideep.hpp>
 
 namespace torch_ipex {
 namespace cpu {

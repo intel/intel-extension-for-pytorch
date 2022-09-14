@@ -1,8 +1,11 @@
 #include "fpmath_mode.h"
+#include <ideep.hpp>
 #include <exception>
 #include <iostream>
-#include "ideep/ideep.hpp"
-namespace ideep {
+#include "csrc/cpu/ideep/IDeepConversions.h"
+
+namespace torch_ipex {
+
 dnnl_fpmath_mode_t fpmath_mode = []() {
   dnnl_fpmath_mode_t mode = dnnl_fpmath_mode_strict;
   static char* val = getenv("IPEX_FP32_MATH_MODE");
@@ -16,8 +19,6 @@ dnnl_fpmath_mode_t fpmath_mode = []() {
   }
   return mode;
 }();
-}
-namespace torch_ipex {
 
 void setFP32MathModeCpu(FP32MathMode m) {
   dnnl_fpmath_mode_t mode;
@@ -26,11 +27,11 @@ void setFP32MathModeCpu(FP32MathMode m) {
   } else if (m == FP32MathMode::BF32) {
     mode = dnnl_fpmath_mode_bf16;
   }
-  ideep::utils::set_fpmath_mode(mode);
+  torch_ipex::fpmath_mode = mode;
 }
 
 FP32MathMode getFP32MathModeCpu() {
-  dnnl_fpmath_mode_t mode = ideep::utils::get_fpmath_mode();
+  dnnl_fpmath_mode_t mode = torch_ipex::fpmath_mode;
   switch (mode) {
     case dnnl_fpmath_mode_bf16:
       return FP32MathMode::BF32;

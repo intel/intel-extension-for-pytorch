@@ -1,8 +1,8 @@
+#include <ideep.hpp>
 #include "aten/WeightPack.h"
 #include "cpu/kernels/OpContext.h"
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
-#include "ideep/ideep.hpp"
 #include "passes/utils.h"
 
 #include <ATen/code_template.h>

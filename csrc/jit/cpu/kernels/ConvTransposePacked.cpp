@@ -1,9 +1,9 @@
 #include "ConvTransposePacked.h"
+#include <ideep.hpp>
 #include "aten/ConvTranspose.h"
 #include "aten/ParamUtils.h"
 #include "aten/WeightPack.h"
 #include "ideep/IDeepConversions.h"
-#include "ideep/ideep.hpp"
 
 namespace torch_ipex {
 namespace cpu {
@@ -297,6 +297,11 @@ ContextConvTranspose create(
       ideep::algorithm::deconvolution_direct,
       dtype,
       input_size.vec());
+  if (groups > 1) {
+    expected_desc = expected_desc.transpose(1, 2);
+  } else {
+    expected_desc = expected_desc.transpose(0, 1);
+  }
   auto weight_dtype = w.get_data_type();
   expected_desc = expected_desc.to_type(weight_dtype);
   auto at_weight = empty_aten_tensor_from_desc(expected_desc, weight.options());
@@ -504,6 +509,11 @@ void repack_for(
       ideep::algorithm::deconvolution_direct,
       dtype,
       input_size);
+  if (context.groups_ > 1) {
+    packed_desc = packed_desc.transpose(1, 2);
+  } else {
+    packed_desc = packed_desc.transpose(0, 1);
+  }
   auto new_at_weight =
       empty_aten_tensor_from_desc(packed_desc, context.at_weight_.options());
   if (ideep::data_type::f32 == dtype) {

@@ -1,26 +1,29 @@
 #include "ConvPacked.h"
 #include <dnnl.hpp>
+#include <ideep.hpp>
+#include <ideep/utils.hpp>
 #include "aten/Conv.h"
 #include "aten/ParamUtils.h"
 #include "aten/WeightPack.h"
 #include "aten/utils/utils.h"
 #include "ideep/IDeepConversions.h"
-#include "ideep/ideep.hpp"
-#include "ideep/ideep/utils.hpp"
 
 namespace torch_ipex {
 namespace cpu {
 namespace detail {
 namespace convolution {
 
-#define DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(FUSED_OP)               \
-  at::Tensor convolution_##FUSED_OP##_run(                           \
-      const at::Tensor& input,                                       \
-      const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {  \
-    RECORD_FUNCTION(                                                 \
-        "ipex_prepack::convolution_" #FUSED_OP "_run",               \
-        c10::ArrayRef<c10::IValue>({}));                             \
-    return op_context->run(input, ideep::attr_t::fuse_##FUSED_OP()); \
+#define DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(FUSED_OP)              \
+  at::Tensor convolution_##FUSED_OP##_run(                          \
+      const at::Tensor& input,                                      \
+      const c10::intrusive_ptr<ConvolutionOpContext>& op_context) { \
+    RECORD_FUNCTION(                                                \
+        "ipex_prepack::convolution_" #FUSED_OP "_run",              \
+        c10::ArrayRef<c10::IValue>({}));                            \
+    return op_context->run(                                         \
+        input,                                                      \
+        ideep::attr_t::fuse_##FUSED_OP().set_fpmath_mode(           \
+            torch_ipex::fpmath_mode));                              \
   }
 
 // follow check rules from
@@ -165,7 +168,7 @@ c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
       groups,
       weight_is_channels_last,
       std::move(input_size),
-      ideep::attr_t());
+      ideep::attr_t(torch_ipex::fpmath_mode));
 }
 
 at::Tensor convolution_run(
@@ -173,7 +176,7 @@ at::Tensor convolution_run(
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
   RECORD_FUNCTION(
       "ipex_prepack::convolution_run", c10::ArrayRef<c10::IValue>({}));
-  return op_context->run(input, ideep::attr_t());
+  return op_context->run(input, ideep::attr_t(torch_ipex::fpmath_mode));
 }
 
 DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(relu);
@@ -198,7 +201,10 @@ at::Tensor convolution_leaky_relu_run(
       "ipex_prepack::convolution_leaky_relu_run",
       c10::ArrayRef<c10::IValue>({}));
   auto alpha_value = alpha.to<float>();
-  return op_context->run(input, ideep::attr_t::fuse_relu(1.0, alpha_value));
+  return op_context->run(
+      input,
+      ideep::attr_t::fuse_relu(1.0, alpha_value)
+          .set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 at::Tensor convolution_hardtanh_run(
@@ -211,7 +217,9 @@ at::Tensor convolution_hardtanh_run(
   auto lower_bound_value = lower_bound.to<float>();
   auto upper_bound_value = upper_bound.to<float>();
   return op_context->run(
-      input, ideep::attr_t::fuse_clamp(lower_bound_value, upper_bound_value));
+      input,
+      ideep::attr_t::fuse_clamp(lower_bound_value, upper_bound_value)
+          .set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 at::Tensor convolution_elu_run(
@@ -227,7 +235,8 @@ at::Tensor convolution_elu_run(
   auto input_scale_value = input_scale.to<float>();
   return op_context->run(
       input,
-      ideep::attr_t::fuse_elu(scale_value, alpha_value, input_scale_value));
+      ideep::attr_t::fuse_elu(scale_value, alpha_value, input_scale_value)
+          .set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 at::Tensor convolution_pow_run(
@@ -238,7 +247,9 @@ at::Tensor convolution_pow_run(
       "ipex_prepack::convolution_pow_run", c10::ArrayRef<c10::IValue>({}));
   auto exponent_value = exponent.to<float>();
   return op_context->run(
-      input, ideep::attr_t::fuse_pow(1.0, 1.0, exponent_value));
+      input,
+      ideep::attr_t::fuse_pow(1.0, 1.0, exponent_value)
+          .set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 at::Tensor convolution_gelu_run(
@@ -261,7 +272,9 @@ at::Tensor convolution_gelu_run(
         false, "ipex::linear_gelu_run only support tanh approximate now");
   }
   return op_context->run(
-      input, ideep::attr_t::fuse_gelu(1.0, 0.f, 0.f, gelu_type));
+      input,
+      ideep::attr_t::fuse_gelu(1.0, 0.f, 0.f, gelu_type)
+          .set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 at::Tensor convolution_add_run(
@@ -272,7 +285,10 @@ at::Tensor convolution_add_run(
   RECORD_FUNCTION(
       "ipex_prepack::convolution_add_run", c10::ArrayRef<c10::IValue>({}));
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
-  return op_context->run(input, accumu, ideep::attr_t::fuse_sum(scale));
+  return op_context->run(
+      input,
+      accumu,
+      ideep::attr_t::fuse_sum(scale).set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 at::Tensor convolution_add_relu_run(
@@ -283,7 +299,10 @@ at::Tensor convolution_add_relu_run(
   RECORD_FUNCTION(
       "ipex_prepack::convolution_add_relu_run", c10::ArrayRef<c10::IValue>({}));
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
-  return op_context->run(input, accumu, ideep::attr_t::residual(scale));
+  return op_context->run(
+      input,
+      accumu,
+      ideep::attr_t::residual(scale).set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 at::Tensor& convolution_bottleneck_run(
@@ -613,7 +632,9 @@ at::Tensor run(
       context.groups_);
 
   if (input_.sizes().vec() == context.conv_params_.pd.src_desc().dims() &&
-      attr == context.conv_params_.op_attr &&
+      attr.has_same_postop_as(context.conv_params_.op_attr) &&
+      attr.get_output_scales() ==
+          context.conv_params_.op_attr.get_output_scales() &&
       omp_get_max_threads() == context.conv_params_.pd_use_threads) {
     auto output_sizes = context.conv_params_.pd.dst_desc().dims();
     auto output = at::empty(

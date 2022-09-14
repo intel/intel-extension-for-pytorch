@@ -9,9 +9,9 @@
 
 #include <limits>
 
+#include <ideep.hpp>
 #include "Matmul.h"
 #include "ideep/IDeepConversions.h"
-#include "ideep/ideep.hpp"
 
 namespace torch_ipex {
 namespace cpu {
@@ -341,6 +341,7 @@ static Tensor sumproduct_pair(
     ideep::tensor onednn_input = itensor_view_from_dense(_input);
     auto op_attr = ideep::attr_t::fuse_binary(
         dnnl::algorithm::binary_add, onednn_input.get_desc());
+    op_attr.set_fpmath_mode(torch_ipex::fpmath_mode);
     result = bmm_impl(left, right, at::Tensor(), op_attr, {onednn_input}, 1.0f);
   } else {
     result = at::matmul(left, right);

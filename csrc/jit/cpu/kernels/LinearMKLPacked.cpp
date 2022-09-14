@@ -1,8 +1,8 @@
 #include "LinearMKLPacked.h"
+#include <ideep.hpp>
 #include "aten/LinearMKL.h"
 #include "aten/WeightPack.h"
 #include "ideep/IDeepConversions.h"
-#include "ideep/ideep.hpp"
 
 namespace torch_ipex {
 namespace cpu {

@@ -113,7 +113,11 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward_kernel(
 
     // bw_d
     ideep::inner_product_backward_data::compute(
-        grady, packed_weight, input_reshaped.sizes().vec(), gradx);
+        grady,
+        packed_weight,
+        input_reshaped.sizes().vec(),
+        gradx,
+        ideep::attr_t(torch_ipex::fpmath_mode));
     grad_input = input_contiguous.dim() > 2
         ? grad_input_reshaped.reshape(input_contiguous.sizes().vec())
         : grad_input_reshaped;
@@ -128,10 +132,19 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward_kernel(
       grad_bias = at::empty({packed_weight.get_dim(0)}, weight.options());
       ideep::tensor gradb = itensor_view_from_dense(grad_bias);
       ideep::inner_product_backward_weights::compute(
-          x, grady, gradw, gradb, diff_weight_type);
+          x,
+          grady,
+          gradw,
+          gradb,
+          diff_weight_type,
+          ideep::attr_t(torch_ipex::fpmath_mode));
     } else {
       ideep::inner_product_backward_weights::compute(
-          x, grady, gradw, diff_weight_type);
+          x,
+          grady,
+          gradw,
+          diff_weight_type,
+          ideep::attr_t(torch_ipex::fpmath_mode));
     }
   }
   return std::make_tuple(grad_input, grad_weight, grad_bias);
@@ -144,7 +157,7 @@ at::Tensor linear_forward(
     const at::Tensor& op_context) {
   return reinterpret_cast<IpexLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
-      ->run(input, ideep::attr_t());
+      ->run(input, ideep::attr_t(torch_ipex::fpmath_mode));
 }
 
 at::Tensor linear_eltwise_forward(
@@ -160,7 +173,7 @@ at::Tensor linear_eltwise_forward(
     attr = ideep::attr_t::fuse_sigmoid();
   return reinterpret_cast<IpexLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
-      ->run(input, attr);
+      ->run(input, attr.set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward(
