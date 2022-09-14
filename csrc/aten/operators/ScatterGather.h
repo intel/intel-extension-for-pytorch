@@ -14,6 +14,84 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+enum class SCATTER_GATHER_OP : uint8_t { REDUCE_ADD, REDUCE_MULTIPLY };
+
+SCATTER_GATHER_OP get_operator_enum(const c10::string_view reduce) {
+  if (reduce == "add") {
+    return SCATTER_GATHER_OP::REDUCE_ADD;
+  } else if (reduce == "multiply") {
+    return SCATTER_GATHER_OP::REDUCE_MULTIPLY;
+  } else {
+    TORCH_CHECK(false, "reduce argument must be either add or multiply.");
+  }
+}
+
+template <typename T, typename ReduceStub, typename FillStub>
+void scatter_impl(
+    const Tensor& self,
+    int64_t dim,
+    const Tensor& index,
+    const T& src,
+    const Tensor& out,
+    ReduceStub& reduce_stub,
+    FillStub& fill_stub,
+    const c10::optional<c10::string_view> reduce = nullopt) {
+  if (index.numel() == 0)
+    return;
+  dim = at::maybe_wrap_dim(dim, self.dim());
+  auto mut_out = const_cast<Tensor&>(out);
+
+  if (!self.is_same(mut_out)) {
+    mut_out.copy_(self);
+  }
+
+  if (reduce.has_value()) {
+    auto op = get_operator_enum(reduce.value());
+    reduce_stub(mut_out, dim, index, src, op);
+  } else {
+    fill_stub(mut_out, dim, index, src);
+  }
+}
+
+class ReduceMultiply {
+ public:
+  template <typename scalar_t>
+  constexpr void operator()(scalar_t* self_data, const scalar_t* src_data)
+      const {
+    atomicMul((dpcpp_global_ptr_pt<scalar_t>)self_data, *src_data);
+  }
+};
+static ReduceMultiply reduce_multiply;
+
+class ReduceAdd {
+ public:
+  template <typename scalar_t>
+  constexpr void operator()(scalar_t* self_data, const scalar_t* src_data)
+      const {
+    atomicAdd((dpcpp_global_ptr_pt<scalar_t>)self_data, *src_data);
+  }
+};
+static ReduceAdd reduce_add;
+
+class TensorAssign {
+ public:
+  template <typename scalar_t>
+  constexpr void operator()(scalar_t* self_data, const scalar_t* src_data)
+      const {
+    *self_data = *src_data;
+  }
+};
+static TensorAssign tensor_assign;
+
+// The kernels are implemented on an opaque,
+// self-aligned type of the correct size,
+// to avoid redundant kernels for different types
+// of the same size.
+template <int N>
+struct alignas(N) OpaqueType {
+  char data[N];
+};
+
 // Compute the offsets into the given tensors for a linear index. For the 't2'
 // tensor, dimension 'dim' is skipped. The tensors are assumed to have the same
 // size (with the exception of 't2' in dimension 'dim').

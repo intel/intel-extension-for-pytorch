@@ -496,6 +496,9 @@ supported:
   - scatter.src
   - scatter_.src
   - scatter.value_out
+  - scatter.reduce_out
+  - scatter.src_out
+  - scatter.value_reduce_out
   - scatter_add.out  # newly added
   - set_
   - set_.source_Storage
