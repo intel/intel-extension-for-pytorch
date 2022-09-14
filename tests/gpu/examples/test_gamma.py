@@ -43,6 +43,26 @@ class TestTorchMethod(TestCase):
         print(x_dpcpp.to(cpu_device))
         self.assertEqual(x, x_dpcpp.to(cpu_device))
 
+    def test_lgamma_out(self, dtype=torch.float):
+        a = np.array([[0.5, 1, 1.5],
+                      [2.5, 3, 3.5]])
+        data = torch.from_numpy(a)
+        x = data.clone().detach()
+        c_result = torch.zeros_like(x)
+        x_dpcpp = x.to(dpcpp_device)
+        x_result = torch.zeros_like(x_dpcpp)
+
+        y = torch.lgamma(x, out=c_result)
+        y_dpcpp = torch.lgamma(x_dpcpp, out=x_result)
+
+        print("x: ")
+        print(x)
+        print("y: ")
+        print(y)
+        print("y_dpcpp: ")
+        print(y_dpcpp.to(cpu_device))
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+
     @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_mvlgamma(self, dtype=torch.float):
         a = np.array([[1.6835, 1.8474, 1.1929],

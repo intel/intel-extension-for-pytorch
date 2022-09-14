@@ -319,6 +319,7 @@ supported:
   - lerp_.Tensor
   - lgamma
   - lgamma_
+  - lgamma.out
   - linspace.out
   - log.out
   - log10.out

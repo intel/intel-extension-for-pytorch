@@ -590,6 +590,9 @@ struct Numerics<at::Half> {
   static inline at::Half atan(at::Half a) {
     return dpl::atan(float(a));
   }
+  static inline at::Half lgamma(at::Half a) {
+    return dpl::lgamma(float(a));
+  }
   static inline at::Half tanh(float a) {
     return dpl::tanh(float(a));
   }
@@ -799,6 +802,9 @@ struct Numerics<at::BFloat16> {
   static inline at::BFloat16 erfc(float a) {
     return dpl::erfc(float(a));
   }
+  static inline at::BFloat16 lgamma(at::BFloat16 a) {
+    return dpl::lgamma(float(a));
+  }
   static inline at::BFloat16 round(float a) {
     return sycl::round(float(a));
   }
@@ -998,6 +1004,9 @@ struct Numerics<float> {
   static inline float erfc(float a) {
     return dpl::erfc(a);
   }
+  static inline float lgamma(float a) {
+    return dpl::lgamma(a);
+  }
   static inline float round(float a) {
     return sycl::round(a);
   }
@@ -1194,6 +1203,9 @@ struct Numerics<double> {
   }
   static inline double erfc(double a) {
     return dpl::erfc(a);
+  }
+  static inline double lgamma(double a) {
+    return dpl::lgamma(a);
   }
   static inline double round(double a) {
     return sycl::round(a);

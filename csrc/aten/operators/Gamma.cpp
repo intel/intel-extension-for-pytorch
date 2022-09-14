@@ -116,6 +116,17 @@ Tensor& lgamma_(Tensor& self) {
 #endif
 }
 
+Tensor& lgamma_out(const Tensor& self, Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      kHalf, kBFloat16, iter.common_dtype(), "lgamma", [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+          return Numerics<scalar_t>::lgamma(a);
+        });
+      });
+  return out;
+}
+
 static inline void mvlgamma_check(const Tensor& self, int64_t p) {
   TORCH_CHECK(
       at::isFloatingType(self.scalar_type()),
