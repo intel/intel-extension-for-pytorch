@@ -1,18 +1,25 @@
 #include <ATen/ATen.h>
+#include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
-#include "comm/AccumulateType.h"
-
 #include <core/Generator.h>
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
 #include "comm/Math.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
 #include "Random.h"
+
+#include <ATen/Context.h>
+
+#include <utils/DPCPP.h>
+#include "comm/Numerics.h"
+#include "comm/Pointwise.h"
+#include "comm/ScalarOps.h"
 
 using namespace xpu::dpcpp;
 
@@ -120,6 +127,51 @@ Tensor& special_erfcx_out(const Tensor& self, at::Tensor& out) {
       at::ScalarType::BFloat16, iter.common_dtype(), "erfcx", [&]() {
         dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t a) -> scalar_t { return calc_erfcx(a); });
+      });
+  return out;
+}
+
+Tensor& xlogy_out(const Tensor& self, const Tensor& other, at::Tensor& out) {
+  auto iter = TensorIterator::binary_float_op(out, self, other);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "xlogy",
+      [&]() {
+        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t y) -> scalar_t {
+          if (at::_isnan(y)) {
+            return NAN;
+          }
+          if (x == 0) {
+            return 0;
+          }
+          return x * Numerics<scalar_t>::log(y);
+        });
+      });
+  return out;
+}
+
+Tensor& special_xlog1py_out(
+    const Tensor& self,
+    const Tensor& other,
+    at::Tensor& out) {
+  auto iter = TensorIterator::binary_float_op(out, self, other);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "xlog1py",
+      [&]() {
+        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t y) -> scalar_t {
+          if (at::_isnan(y)) {
+            return NAN;
+          }
+          if (x == 0) {
+            return 0;
+          }
+          return x * Numerics<scalar_t>::log1p(y);
+        });
       });
   return out;
 }

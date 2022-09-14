@@ -532,6 +532,7 @@ supported:
   - special_i1.out
   - special_i1e.out
   - special_ndtri.out
+  - special_xlog1py.out
   - sqrt.out
   - std.correction
   - std_mean.correction
@@ -617,6 +618,7 @@ supported:
   - view
   - view_as_real   # newly added
   - view_as_complex
+  - xlogy.OutTensor
   - zero_
   - channel_shuffle
   - linalg_slogdet
