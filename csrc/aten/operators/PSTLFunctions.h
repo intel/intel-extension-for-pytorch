@@ -997,12 +997,12 @@ void sort(
 
   if (desc.valid()) {
     if (!desc.need_temp()) {
-      segmented_group_radix_sort_kernel<KeyType, int64_t, uint16_t, true>(
+      segmented_group_radix_sort_kernel<KeyType, ValueType, uint16_t, true>(
           desc,
           in_key,
-          (KeyType*)out_key,
+          out_key,
           nullptr,
-          (int64_t*)out_val,
+          out_val,
           [=](offset_t slice) -> offset_t { return slice * sort_sz; });
     } else {
       auto key_options = map_options<KeyType>();
@@ -1010,15 +1010,15 @@ void sort(
       Tensor tmp_key = at::empty({sort_sz}, key_options);
       Tensor tmp_val = at::empty({sort_sz}, val_options);
 
-      segmented_group_radix_sort_kernel<KeyType, int64_t, uint16_t, true>(
+      segmented_group_radix_sort_kernel<KeyType, ValueType, uint16_t, true>(
           desc,
           in_key,
-          (KeyType*)out_key,
+          out_key,
           nullptr,
-          (int64_t*)out_val,
+          out_val,
           [=](offset_t slice) -> offset_t { return slice * sort_sz; },
           (KeyType*)tmp_key.data_ptr(),
-          (int64_t*)tmp_val.data_ptr());
+          (ValueType*)tmp_val.data_ptr());
     }
   } else {
     if (descending) {
