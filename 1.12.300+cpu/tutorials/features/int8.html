@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intel® Extension for PyTorch* optimizations for quantization &mdash; intel_extension_for_pytorch 1.12.300+cpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Releases" href="../releases.html" />
+    <link rel="prev" title="Runtime Extension" href="runtime_extension.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../versions.html">1.12.300+cpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ease-of-use-python-api">Ease-of-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#isa-dynamic-dispatching">ISA Dynamic Dispatching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-optimization">Graph Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#operator-optimization">Operator Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#runtime-extension">Runtime Extension</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#int8-quantization">INT8 Quantization</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Intel® Extension for PyTorch* optimizations for quantization</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#static-quantization">Static Quantization</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#define-qconfig">Define qconfig</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#prepare-model-and-do-calibration">Prepare Model and Do Calibration</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#convert-to-static-quantized-model-and-deploy">Convert to Static Quantized Model and Deploy</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#dynamic-quantization">Dynamic Quantization</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#id1">Define QConfig</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#prepare-model">Prepare Model</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#convert-to-dynamic-quantized-model-and-deploy">Convert to Dynamic Quantized Model and Deploy</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../features.html">Features</a> &raquo;</li>
+      <li>Intel® Extension for PyTorch* optimizations for quantization</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/int8.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="intel-extension-for-pytorch-optimizations-for-quantization">
+<h1>Intel® Extension for PyTorch* optimizations for quantization<a class="headerlink" href="#intel-extension-for-pytorch-optimizations-for-quantization" title="Permalink to this heading"></a></h1>
+<p>The quantization functionality in Intel® Extension for PyTorch* currently only supports post-training quantization. This tutorial introduces how the quantization works in the Intel® Extension for PyTorch* side.</p>
+<p>We fully utilize Pytorch quantization components as much as possible, such as PyTorch <a class="reference external" href="https://pytorch.org/docs/1.11/quantization-support.html#torch-quantization-observer">Observer method</a>. To make a PyTorch user be able to easily use the quantization API, API for quantization in Intel® Extension for PyTorch* is very similar to those in PyTorch. Intel® Extension for PyTorch* quantization supports a default recipe to automatically decide which operators should be quantized or not. This brings a satisfying performance and accuracy tradeoff.</p>
+<section id="static-quantization">
+<h2>Static Quantization<a class="headerlink" href="#static-quantization" title="Permalink to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">from</span> <span class="nn">intel_extension_for_pytorch.quantization</span> <span class="kn">import</span> <span class="n">prepare</span><span class="p">,</span> <span class="n">convert</span>
+</pre></div>
+</div>
+<section id="define-qconfig">
+<h3>Define qconfig<a class="headerlink" href="#define-qconfig" title="Permalink to this heading"></a></h3>
+<p>Using the default qconfig(recommended):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">qconfig</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">default_static_qconfig</span>
+<span class="c1"># equal to</span>
+<span class="c1"># QConfig(activation=HistogramObserver.with_args(reduce_range=False),</span>
+<span class="c1">#         weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric)) </span>
+</pre></div>
+</div>
+<p>or define your own qconfig as:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">torch.ao.quantization</span> <span class="kn">import</span> <span class="n">MinMaxObserver</span><span class="p">,</span> <span class="n">PerChannelMinMaxObserver</span><span class="p">,</span> <span class="n">QConfig</span>
+<span class="n">qconfig</span> <span class="o">=</span> <span class="n">QConfig</span><span class="p">(</span><span class="n">activation</span><span class="o">=</span><span class="n">MinMaxObserver</span><span class="o">.</span><span class="n">with_args</span><span class="p">(</span><span class="n">qscheme</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">per_tensor_affine</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">quint8</span><span class="p">),</span>
+                  <span class="n">weight</span><span class="o">=</span><span class="n">PerChannelMinMaxObserver</span><span class="o">.</span><span class="n">with_args</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">qint8</span><span class="p">,</span> <span class="n">qscheme</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">per_channel_symmetric</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Note: we fully use PyTorch <a class="reference external" href="https://pytorch.org/docs/stable/quantization-support.html#torch-quantization-observer">observer methonds</a>, so you can use a different PyTorch obsever methond to define the <a class="reference external" href="https://pytorch.org/docs/1.11/generated/torch.quantization.qconfig.QConfig.html">QConfig</a>. For weight observer, we only support <strong>torch.qint8</strong> dtype now.</p>
+<p><strong>Suggestion</strong>:</p>
+<ol class="simple">
+<li><p>For activation observer, if using <strong>qscheme</strong> as <strong>torch.per_tensor_affine</strong>, <strong>torch.quint8</strong> is preferred. If using <strong>qscheme</strong> as <strong>torch.per_tensor_symmetric</strong>, <strong>torch.qint8</strong> is preferred. For weight observer, setting <strong>qscheme</strong> to <strong>torch.per_channel_symmetric</strong> can get a better accuracy.</p></li>
+<li><p>If your CPU device doesn’t support VNNI, seting the observer’s <strong>reduce_range</strong> to <strong>True</strong> can get a better accuracy, such as skylake.</p></li>
+</ol>
+</section>
+<section id="prepare-model-and-do-calibration">
+<h3>Prepare Model and Do Calibration<a class="headerlink" href="#prepare-model-and-do-calibration" title="Permalink to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># prepare model, do conv+bn folding, and init model quant_state.</span>
+<span class="n">user_model</span> <span class="o">=</span> <span class="o">...</span>
+<span class="n">user_model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">example_inputs</span> <span class="o">=</span> <span class="o">..</span>
+<span class="n">prepared_model</span> <span class="o">=</span> <span class="n">prepare</span><span class="p">(</span><span class="n">user_model</span><span class="p">,</span> <span class="n">qconfig</span><span class="p">,</span> <span class="n">example_inputs</span><span class="o">=</span><span class="n">example_inputs</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">calibration_data_set</span><span class="p">:</span>
+    <span class="n">prepared_model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="c1"># Optional, if you want to tuning(performance or accuracy), you can save the qparams as json file which</span>
+<span class="c1"># including the quantization state, such as scales, zero points and inference dtype.</span>
+<span class="c1"># And then you can achange the json file&#39;s settings, loading the changed json file</span>
+<span class="c1"># to model which will override the model&#39;s original quantization&#39;s settings.  </span>
+<span class="c1">#  </span>
+<span class="c1"># prepared_model.save_qconf_summary(qconf_summary = &quot;configure.json&quot;)</span>
+<span class="c1"># prepared_model.load_qconf_summary(qconf_summary = &quot;configure.json&quot;)</span>
+</pre></div>
+</div>
+</section>
+<section id="convert-to-static-quantized-model-and-deploy">
+<h3>Convert to Static Quantized Model and Deploy<a class="headerlink" href="#convert-to-static-quantized-model-and-deploy" title="Permalink to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># make sure the example_inputs&#39;s size is same as the real input&#39;s size </span>
+<span class="n">convert_model</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">prepared_model</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">convert_model</span><span class="p">,</span> <span class="n">example_input</span><span class="p">)</span>
+    <span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">traced_model</span><span class="p">)</span>
+<span class="c1"># for inference </span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">traced_model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="c1"># or save the model to deploy</span>
+
+<span class="c1"># traced_model.save(&quot;quantized_model.pt&quot;)</span>
+<span class="c1"># quantized_model = torch.jit.load(&quot;quantized_model.pt&quot;)</span>
+<span class="c1"># quantized_model = torch.jit.freeze(quantized_model.eval())</span>
+<span class="c1"># ...</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="dynamic-quantization">
+<h2>Dynamic Quantization<a class="headerlink" href="#dynamic-quantization" title="Permalink to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">from</span> <span class="nn">intel_extension_for_pytorch.quantization</span> <span class="kn">import</span> <span class="n">prepare</span><span class="p">,</span> <span class="n">convert</span>
+</pre></div>
+</div>
+<section id="id1">
+<h3>Define QConfig<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h3>
+<p>Using the default qconfig(recommended):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">dynamic_qconfig</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">default_dynamic_qconfig</span>
+<span class="c1"># equal to </span>
+<span class="c1"># QConfig(activation=PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),</span>
+<span class="c1">#         weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))</span>
+</pre></div>
+</div>
+<p>or define your own qconfig as:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">torch.ao.quantization</span> <span class="kn">import</span> <span class="n">MinMaxObserver</span><span class="p">,</span> <span class="n">PlaceholderObserver</span><span class="p">,</span> <span class="n">QConfig</span>
+<span class="n">dynamic_qconfig</span> <span class="o">=</span> <span class="n">QConfig</span><span class="p">(</span><span class="n">activation</span> <span class="o">=</span> <span class="n">PlaceholderObserver</span><span class="o">.</span><span class="n">with_args</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">compute_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">quint8</span><span class="p">),</span>
+                          <span class="n">weight</span> <span class="o">=</span> <span class="n">MinMaxObserver</span><span class="o">.</span><span class="n">with_args</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">qint8</span><span class="p">,</span> <span class="n">qscheme</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">per_tensor_symmetric</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Note: For weight observer, it only supports dtype <strong>torch.qint8</strong>, and the qscheme can only be <strong>torch.per_tensor_symmetric</strong> or <strong>torch.per_channel_symmetric</strong>. For activation observer, it only supports dtype <strong>torch.float</strong>, and the <strong>compute_dtype</strong> can be <strong>torch.quint8</strong> or <strong>torch.qint8</strong>.</p>
+<p><strong>Suggestion</strong>:</p>
+<ol class="simple">
+<li><p>For weight observer, setting <strong>qscheme</strong> to <strong>torch.per_channel_symmetric</strong> can get a better accuracy.</p></li>
+<li><p>If your CPU device doesn’t support VNNI, seeting the observer’s <strong>reduce_range</strong> to <strong>True</strong> can get a better accuracy, such as skylake.</p></li>
+</ol>
+</section>
+<section id="prepare-model">
+<h3>Prepare Model<a class="headerlink" href="#prepare-model" title="Permalink to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">prepared_model</span> <span class="o">=</span> <span class="n">prepare</span><span class="p">(</span><span class="n">user_model</span><span class="p">,</span> <span class="n">dynamic_qconfig</span><span class="p">,</span> <span class="n">example_inputs</span><span class="o">=</span><span class="n">example_inputs</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="convert-to-dynamic-quantized-model-and-deploy">
+<h2>Convert to Dynamic Quantized Model and Deploy<a class="headerlink" href="#convert-to-dynamic-quantized-model-and-deploy" title="Permalink to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># make sure the example_inputs&#39;s size is same as the real input&#39;s size</span>
+<span class="n">convert_model</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">prepared_model</span><span class="p">)</span>
+<span class="c1"># Optional: convert the model to traced model</span>
+<span class="c1">#with torch.no_grad():</span>
+<span class="c1">#    traced_model = torch.jit.trace(convert_model, example_input)</span>
+<span class="c1">#    traced_model = torch.jit.freeze(traced_model)</span>
+
+<span class="c1"># or save the model to deploy</span>
+<span class="c1"># traced_model.save(&quot;quantized_model.pt&quot;)</span>
+<span class="c1"># quantized_model = torch.jit.load(&quot;quantized_model.pt&quot;)</span>
+<span class="c1"># quantized_model = torch.jit.freeze(quantized_model.eval())</span>
+<span class="c1"># ...</span>
+<span class="c1"># for inference </span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">convert_model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Note: we only support the following ops to do dynamic quantization:</p>
+<ul class="simple">
+<li><p>torch.nn.Linear</p></li>
+<li><p>torch.nn.LSTM</p></li>
+<li><p>torch.nn.GRU</p></li>
+<li><p>torch.nn.LSTMCell</p></li>
+<li><p>torch.nn.RNNCell</p></li>
+<li><p>torch.nn.GRUCell</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="runtime_extension.html" class="btn btn-neutral float-left" title="Runtime Extension" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../releases.html" class="btn btn-neutral float-right" title="Releases" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
