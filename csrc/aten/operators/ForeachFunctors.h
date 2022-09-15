@@ -440,5 +440,41 @@ struct BinaryOpListAlphaFunctor {
   }
 };
 
+template <typename T, int depth, int r_args_depth, int res_arg_index>
+struct BinaryOpScalarListFunctor {
+  using opmath_t = at::opmath_type<T>;
+  template <typename TLA, typename TLW, typename Op>
+  void operator()(
+      int chunk_size,
+      TLA tlAddress,
+      TLW tlWGMeta,
+      sycl::nd_item<1> item_id,
+      Op op) const {
+    auto item_idx = item_id.get_local_id(0);
+    auto item_range = item_id.get_local_range(0);
+    auto group_idx = item_id.get_group(0);
+    int tensor_loc = tlWGMeta[group_idx].wg_to_tensor;
+    int chunk_idx = tlWGMeta[group_idx].wg_to_chunk;
+    int64_t n = tlAddress[tensor_loc].numel_to_tensor;
+    opmath_t scalar = tlAddress[tensor_loc].scalar_vals;
+
+    T* args[depth];
+    bool all_aligned =
+        init_args<depth>(args, tlAddress, chunk_idx, chunk_size, tensor_loc);
+    n -= chunk_idx * chunk_size;
+    T r_args[r_args_depth][kILP];
+    binary_op_scalar<r_args_depth, res_arg_index>(
+        r_args,
+        args,
+        scalar,
+        n,
+        chunk_size,
+        all_aligned,
+        op,
+        item_range,
+        item_idx);
+  }
+};
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

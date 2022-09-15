@@ -747,6 +747,14 @@ supported:
   - _foreach_mul_.List
   - _foreach_div.List
   - _foreach_div_.List
+  - _foreach_add.ScalarList
+  - _foreach_add_.ScalarList
+  - _foreach_sub.ScalarList
+  - _foreach_sub_.ScalarList
+  - _foreach_div.ScalarList
+  - _foreach_div_.ScalarList
+  - _foreach_mul.ScalarList
+  - _foreach_mul_.ScalarList
 autograd:
   - cdist
   - lstm.input
