@@ -728,11 +728,11 @@ entry_points = {
 setup(
     name='intel_extension_for_pytorch',
     version=ipex_build_version,
-    description='Intel Extension for PyTorch',
+    description='Intel® Extension for PyTorch*',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/intel/intel-extension-for-pytorch',
-    author='Intel/PyTorch Dev Team',
+    author='Intel Corp.',
     install_requires=_build_installation_dependency(),
     packages=[
         'intel_extension_for_pytorch'],
