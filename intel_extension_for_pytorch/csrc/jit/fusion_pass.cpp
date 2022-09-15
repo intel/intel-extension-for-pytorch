@@ -51,6 +51,10 @@ void ApplyInplaceOptimization(std::shared_ptr<Graph>& graph) {
   graph_rewrite::replaceOpsWithAtenInplaceOps(graph);
 }
 
+void ReplaceInplaceOpsWitOutplaceOps(std::shared_ptr<Graph>& graph) {
+  graph_rewrite::replaceInplaceOpsWithOutplaceOps(graph);
+}
+
 void RemoveBailOutNodesAndSpecializeTypes(Block* b) {
   for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
     if (it->kind() == prim::BailOut) {
@@ -299,7 +303,16 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
     RemoveRedundantAliases(graph);
     fuser::onednn::fuseGraph(graph);
   }
-  GRAPH_DUMP("After LLGA fusion pass. Before IPEXFusionPass", graph);
+  GRAPH_DUMP(
+      "After LLGA fusion pass. Before ReplaceInplaceOpsWitOutplaceOps", graph);
+
+  // Replace inplace ops with outplace ops so that we do not need to enumerate
+  // all inplace and outplace fusion patterns. This replacement is the inverse
+  // of ApplyInplaceOptimization. All the replaced ops failed to be fused will
+  // be reverted by ApplyInplaceOptimization.
+  ReplaceInplaceOpsWitOutplaceOps(graph);
+  GRAPH_DUMP(
+      "After ReplaceInplaceOpsWitOutplaceOps. Before IPEXFusionPass", graph);
 
   // IPEX fusion pass for fp32 and bf16
   IPEXFusionPass(graph);

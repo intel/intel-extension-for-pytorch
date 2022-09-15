@@ -1,6 +1,17 @@
 Releases
 =============
 
+## 1.12.300
+
+### Highlights
+
+- Optimize BF16 MHA fusion to avoid transpose overhead to boost BERT-\* BF16 performance [#992](https://github.com/intel/intel-extension-for-pytorch/commit/7076524601f42a9b60402019af21b32782c2c203)
+- Remove 64bytes alignment constraint for FP32 and BF16 AddLayerNorm fusion [#992](https://github.com/intel/intel-extension-for-pytorch/commit/7076524601f42a9b60402019af21b32782c2c203)
+- Fix INT8 RetinaNet accuracy issue [#1032](https://github.com/intel/intel-extension-for-pytorch/commit/e0c719be8246041f8b7bc5feca9cf9c2f599210a)
+- Fix `Cat.out` issue that does not update the `out` tensor (#1053) [#1074](https://github.com/intel/intel-extension-for-pytorch/commit/4381f9126bbb65aab2daf034299c3bf3d307e6e2)
+
+**Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v1.12.100...v1.12.300
+
 ## 1.12.100
 
 This is a patch release to fix the AVX2 issue that blocks running on non-AVX512 platforms.
