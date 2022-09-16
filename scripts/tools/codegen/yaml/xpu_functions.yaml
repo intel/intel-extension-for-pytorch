@@ -561,6 +561,8 @@ supported:
   - threshold_
   - threshold_backward
   - threshold_backward.grad_input
+  - to_sparse
+  - to_sparse.sparse_dim
   - topk.values
   - trace
   - triangular_solve

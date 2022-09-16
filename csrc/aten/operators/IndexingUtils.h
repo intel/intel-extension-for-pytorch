@@ -128,19 +128,6 @@ transposeToFrontAndInvPerm(Tensor self, TensorList indices) {
       self.permute(dims), std::move(transposedIndices), std::move(invPerm));
 }
 
-struct AdvancedIndex {
-  AdvancedIndex(const Tensor& src, TensorList indices);
-
-  Tensor src;
-  std::vector<Tensor> indices;
-  DimVector indexed_sizes;
-  DimVector indexed_strides;
-  DimVector non_indexed_sizes;
-  DimVector non_indexed_strides;
-  int64_t dims_before;
-  int64_t dims_after;
-};
-
 static bool all_strides_match(TensorList tensors) {
   TORCH_CHECK(tensors.size() >= 1, "all strides match");
   auto strides = tensors[0].strides();
@@ -197,52 +184,63 @@ static Tensor reshape_indexer(
   return index.reshape(shape);
 }
 
-AdvancedIndex::AdvancedIndex(const Tensor& src, TensorList indices_list) {
-  int64_t element_size_bytes = src.element_size();
-  int64_t dims_before = 0, dims_after = 0, dims_indexed = 0;
-  IntArrayRef replacement_shape;
-  for (size_t dim = 0; dim < indices_list.size(); dim++) {
-    if (!indices_list[dim].defined()) {
-      if (dims_indexed == 0) {
-        dims_before++;
+struct AdvancedIndex {
+  AdvancedIndex(const Tensor& src, TensorList indices_list) {
+    int64_t element_size_bytes = src.element_size();
+    int64_t dims_before = 0, dims_after = 0, dims_indexed = 0;
+    IntArrayRef replacement_shape;
+    for (size_t dim = 0; dim < indices_list.size(); dim++) {
+      if (!indices_list[dim].defined()) {
+        if (dims_indexed == 0) {
+          dims_before++;
+        } else {
+          dims_after++;
+        }
+        non_indexed_sizes.push_back(src.size(dim));
+        non_indexed_strides.push_back(src.stride(dim) * element_size_bytes);
       } else {
-        dims_after++;
+        dims_indexed++;
+        replacement_shape = indices_list[dim].sizes();
+        indexed_sizes.push_back(src.size(dim));
+        indexed_strides.push_back(src.stride(dim) * element_size_bytes);
       }
-      non_indexed_sizes.push_back(src.size(dim));
-      non_indexed_strides.push_back(src.stride(dim) * element_size_bytes);
-    } else {
-      dims_indexed++;
-      replacement_shape = indices_list[dim].sizes();
-      indexed_sizes.push_back(src.size(dim));
-      indexed_strides.push_back(src.stride(dim) * element_size_bytes);
     }
-  }
 
-  if (std::find(indexed_sizes.begin(), indexed_sizes.end(), 0) !=
-          indexed_sizes.end() &&
-      std::find(replacement_shape.begin(), replacement_shape.end(), 0) ==
-          replacement_shape.end()) {
-    TORCH_CHECK(0, "index is out of bounds for dimension with size 0");
-  }
-
-  this->dims_before = dims_before;
-  this->dims_after = dims_after;
-  this->src = restride_src(src, dims_before, dims_indexed, replacement_shape);
-
-  for (auto& index : indices_list) {
-    if (index.defined()) {
-      indices.push_back(reshape_indexer(index, dims_before, dims_after));
+    if (std::find(indexed_sizes.begin(), indexed_sizes.end(), 0) !=
+            indexed_sizes.end() &&
+        std::find(replacement_shape.begin(), replacement_shape.end(), 0) ==
+            replacement_shape.end()) {
+      TORCH_CHECK(0, "index is out of bounds for dimension with size 0");
     }
-  }
 
-  if (indices.size() >= 2) {
-    if (!all_strides_match(indices)) {
-      for (size_t i = 0; i < indices.size(); i++) {
-        indices[i] = indices[i].contiguous();
+    this->dims_before = dims_before;
+    this->dims_after = dims_after;
+    this->src = restride_src(src, dims_before, dims_indexed, replacement_shape);
+
+    for (auto& index : indices_list) {
+      if (index.defined()) {
+        indices.push_back(reshape_indexer(index, dims_before, dims_after));
+      }
+    }
+
+    if (indices.size() >= 2) {
+      if (!all_strides_match(indices)) {
+        for (size_t i = 0; i < indices.size(); i++) {
+          indices[i] = indices[i].contiguous();
+        }
       }
     }
   }
-}
+
+  Tensor src;
+  std::vector<Tensor> indices;
+  DimVector indexed_sizes;
+  DimVector indexed_strides;
+  DimVector non_indexed_sizes;
+  DimVector non_indexed_strides;
+  int64_t dims_before;
+  int64_t dims_after;
+};
 
 static AdvancedIndex make_info(
     Tensor self,
@@ -316,6 +314,26 @@ static TensorIterator make_index_iterator(const AdvancedIndex& info) {
     config.add_input(index);
   }
   return config.build();
+}
+
+inline torch::List<c10::optional<Tensor>> toListOfOptionalTensors(
+    ArrayRef<Tensor> list) {
+  torch::List<c10::optional<Tensor>> result;
+  result.reserve(list.size());
+  for (const Tensor& a : list) {
+    result.push_back(a);
+  }
+  return result;
+}
+
+inline torch::List<c10::optional<Tensor>> toListOfOptionalTensors(
+    ArrayRef<IValue> list) {
+  torch::List<c10::optional<Tensor>> result;
+  result.reserve(list.size());
+  for (const IValue& a : list) {
+    result.push_back(a.toTensor());
+  }
+  return result;
 }
 
 } // namespace AtenIpexTypeXPU

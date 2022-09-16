@@ -32,3 +32,12 @@ class TestTorchMethod(TestCase):
         self.assertEqual(value_cpu, value_xpu)
         # assertEqual needs to_dense op support
         # self.assertEqual(coalesce_cpu, coalesce_xpu)
+
+        sizes = [(10, 10), (10, 1), (4, 5, 6)]
+        for size in sizes:
+            x = torch.rand(size)
+            y = torch.zeros(size)
+            src_cpu = torch.where(x > 0.8, x, y)
+            src_xpu = src_cpu.clone().to('xpu')
+            self.assertEqual(src_cpu.to_sparse(), src_xpu.to_sparse().to('cpu'))
+            self.assertEqual(src_cpu.to_sparse().sparse_dim(), src_xpu.to_sparse().sparse_dim())

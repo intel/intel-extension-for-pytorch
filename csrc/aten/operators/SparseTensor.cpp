@@ -5,6 +5,7 @@
 #include <runtime/Utils.h>
 
 #include "BitonicMergeSort.h"
+#include "IndexingUtils.h"
 #include "PSTLFunctions.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
@@ -14,6 +15,89 @@ using namespace xpu::dpcpp;
 using namespace at::sparse;
 
 namespace at {
+namespace AtenIpexTypeXPU {
+
+SparseTensor new_sparse(
+    c10::optional<ScalarType> dtype,
+    c10::optional<Layout> layout,
+    c10::optional<Device> device,
+    c10::optional<bool> pin_memory) {
+  AT_ASSERT(layout.has_value() && *layout == kSparse);
+  AT_ASSERT(device_or_default(device).is_xpu());
+  DispatchKey dispatch_key;
+  dispatch_key = DispatchKey::SparseXPU;
+  return detail::make_tensor<SparseTensorImpl>(
+      DispatchKeySet(dispatch_key),
+      scalarTypeToTypeMeta(dtype_or_default(dtype)));
+}
+
+SparseTensor new_with_dims_sparse(
+    int64_t sparse_dim,
+    int64_t dense_dim,
+    ArrayRef<int64_t> size,
+    c10::optional<ScalarType> dtype,
+    c10::optional<Layout> layout,
+    c10::optional<Device> device,
+    c10::optional<bool> pin_memory) {
+  SparseTensor self = new_sparse(dtype, layout, device, pin_memory);
+  get_sparse_impl(self)->resize_and_clear_(sparse_dim, dense_dim, size);
+  return self;
+}
+
+SparseTensor to_sparse(const Tensor& self, int64_t sparse_dim) {
+  int64_t dims = self.dim();
+  // TODO: it seems like sparse_dim == 0 could be supported even if self.dim() >
+  // 0, but this would take some work and doesn't seem particularly useful.
+  TORCH_CHECK(
+      sparse_dim > 0 || self.dim() == 0,
+      "sparse_dim must be >0 if dimensionality > 0");
+  TORCH_CHECK(
+      sparse_dim <= dims,
+      "sparse_dim must be less than or equal to self.dim()");
+  at::TensorOptions sparse_options = self.options().layout(kSparse);
+  std::vector<int64_t> sizes = self.sizes().vec();
+
+  Tensor nz = self.nonzero().transpose(0, 1);
+  if (nz.size(1) == 0) {
+    return new_with_dims_sparse(
+        sparse_dim,
+        dims - sparse_dim,
+        sizes,
+        optTypeMetaToScalarType(sparse_options.dtype_opt()),
+        sparse_options.layout_opt(),
+        sparse_options.device_opt(),
+        sparse_options.pinned_memory_opt());
+  }
+
+  Tensor indices;
+  if (sparse_dim == dims) {
+    indices = nz.clone();
+  } else {
+    Tensor i = nz.narrow(0, 0, sparse_dim);
+    std::tie(indices, std::ignore, std::ignore) = unique_dim(i, 1);
+    indices = indices.contiguous();
+  }
+
+  Tensor values;
+  if (self.dim() > 0) {
+    auto ix = toListOfOptionalTensors(indices.chunk(indices.size(0), 0));
+    values = self.index(ix).squeeze(0).clone(at::MemoryFormat::Preserve);
+  } else {
+    AT_ASSERT(nz.sizes().equals({0, 1}));
+    // In this cases, indices is a clone of nz, which is a tensor of shape (0,
+    // 1). Given sparse tensor invariants, values should be shape (1,)
+    values = self.unsqueeze(0).clone(at::MemoryFormat::Preserve);
+  }
+
+  Tensor sparse = at::sparse_coo_tensor(indices, values, sizes, sparse_options);
+  return sparse._coalesced_(true);
+}
+
+SparseTensor to_sparse(const Tensor& self) {
+  return to_sparse(self, self.dim());
+}
+
+} // namespace AtenIpexTypeXPU
 namespace AtenIpexTypeSparseXPU {
 namespace impl {
 
