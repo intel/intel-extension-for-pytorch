@@ -248,6 +248,9 @@ supported:
   - geometric_
   - geqrf
   - geqrf.a
+  - logit
+  - logit_
+  - logit.out 
   - glu
   - glu.out
   - glu_backward

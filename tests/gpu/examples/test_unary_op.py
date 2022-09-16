@@ -63,6 +63,7 @@ OP_TEST_FOR_FLOATING = [
     torch.log10,
     torch.log1p,
     torch.log2,
+    torch.logit,
     torch.rsqrt,
     torch.sqrt,
     torch.erfinv,
