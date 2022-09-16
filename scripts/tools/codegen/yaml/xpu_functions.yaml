@@ -281,6 +281,8 @@ supported:
   - huber_loss_backward.out
   - hypot.out
   - i0.out
+  - igamma.out
+  - igammac.out
   - im2col
   - im2col.out
   - im2col_backward

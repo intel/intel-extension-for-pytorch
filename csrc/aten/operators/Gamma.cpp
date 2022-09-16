@@ -33,6 +33,26 @@ void digamma_kernel_xpu(TensorIterator& iter) {
       });
 }
 
+void igamma_kernel_xpu(TensorIterator& iter) {
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.common_dtype(), "igamma_xpu", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [=](scalar_t a, scalar_t b) -> scalar_t {
+              return calc_igamma(a, b);
+            });
+      });
+}
+
+void igammac_kernel_xpu(TensorIterator& iter) {
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.common_dtype(), "igammac_xpu", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [=](scalar_t a, scalar_t b) -> scalar_t {
+              return calc_igammac(a, b);
+            });
+      });
+}
+
 void trigamma_kernel_xpu(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -185,6 +205,18 @@ Tensor& digamma_(Tensor& self) {
 Tensor& digamma_out(Tensor& out, const Tensor& self) {
   auto iter = TensorIterator::unary_float_op(out, self);
   impl::digamma_kernel_xpu(iter);
+  return out;
+}
+
+Tensor& igamma_out(const Tensor& self, const Tensor& other, Tensor& out) {
+  auto iter = TensorIterator::binary_float_op(out, self, other);
+  impl::igamma_kernel_xpu(iter);
+  return out;
+}
+
+Tensor& igammac_out(const Tensor& self, const Tensor& other, Tensor& out) {
+  auto iter = TensorIterator::binary_float_op(out, self, other);
+  impl::igammac_kernel_xpu(iter);
   return out;
 }
 
