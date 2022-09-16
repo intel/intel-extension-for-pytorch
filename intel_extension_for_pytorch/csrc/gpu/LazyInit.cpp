@@ -1,12 +1,10 @@
-#include <runtime/Utils.h>
-
-#include <core/Device.h>
-#include <core/Generator.h>
 #include <torch/csrc/python_headers.h>
 #include <mutex>
 
+#include <core/LazyInit.h>
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/utils/object_ptr.h>
+
 namespace xpu {
 namespace dpcpp {
 
@@ -40,6 +38,8 @@ void lazy_init() {
     }
   }
 }
+
+REGISTER_LAZY_INIT(&lazy_init)
 
 void set_run_yet_variable_to_false() {
   run_yet = false;
