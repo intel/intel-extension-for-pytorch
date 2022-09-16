@@ -143,14 +143,18 @@ auto vit_mha_fusion_filter =
 auto transfree_bmm_filter =
     [](const Match& match,
        const std::unordered_map<std::string, Value*>& vmap) {
+      Node* node = match.anchor;
       const auto& match_vmap = match.values_map;
 
-      auto batch1 = graph_rewrite_helper::getValue("batch1", match_vmap, vmap)
-                        ->type()
-                        ->cast<TensorType>();
-      auto batch2 = graph_rewrite_helper::getValue("batch2", match_vmap, vmap)
-                        ->type()
-                        ->cast<TensorType>();
+      auto batch1 = node->input(0)->type()->cast<TensorType>();
+
+      auto batch2 = node->input(1)->type()->cast<TensorType>();
+
+      if (!batch1->dim().has_value() || !batch2->dim().has_value() ||
+          !batch1->scalarType().has_value() ||
+          !batch2->scalarType().has_value()) {
+        return false;
+      }
 
       if (batch1->dim() != batch2->dim() || batch1->dim().value() < 3 ||
           batch1->sizes()[batch1->dim().value() - 1].value() !=
@@ -172,10 +176,12 @@ auto transfree_bmm_filter =
 auto bmm_outtrans_filter_v1 =
     [](const Match& match,
        const std::unordered_map<std::string, Value*>& vmap) {
+      Node* node = match.anchor;
       const auto& match_vmap = match.values_map;
-      auto permute_sizes =
-          toIValue(graph_rewrite_helper::getValue("permute", match_vmap, vmap))
-              ->toIntVector();
+      if (!toIValue(node->input(1)).has_value()) {
+        return false;
+      }
+      auto permute_sizes = toIValue(node->input(1))->toIntVector();
       std::vector<int64_t> permute_ref = {0, 2, 1, 3};
       if (permute_sizes != permute_ref) {
         return false;
@@ -186,16 +192,15 @@ auto bmm_outtrans_filter_v1 =
 auto bmm_outtrans_filter_v2 =
     [](const Match& match,
        const std::unordered_map<std::string, Value*>& vmap) {
+      Node* node = match.anchor;
       const auto& match_vmap = match.values_map;
-      auto bmm1 = graph_rewrite_helper::getValue("bmm1", match_vmap, vmap)
-                      ->type()
-                      ->cast<TensorType>();
-      auto trans_a =
-          toIValue(graph_rewrite_helper::getValue("trans_a", match_vmap, vmap))
-              .value();
-      auto trans_b =
-          toIValue(graph_rewrite_helper::getValue("trans_b", match_vmap, vmap))
-              .value();
+      auto bmm1 = node->input(0)->node()->input(0)->type()->cast<TensorType>();
+      if (!toIValue(node->input(1)).has_value() ||
+          !toIValue(node->input(2)).has_value() || !bmm1->dim().has_value()) {
+        return false;
+      }
+      auto trans_a = toIValue(node->input(1)).value();
+      auto trans_b = toIValue(node->input(2)).value();
       if (bmm1->dim().value() != 4 || !(trans_a == 1 && trans_b == 2)) {
         return false;
       }
