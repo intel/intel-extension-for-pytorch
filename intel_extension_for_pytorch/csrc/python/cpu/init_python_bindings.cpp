@@ -34,8 +34,8 @@
 
 #include "TaskModule.h"
 #include "csrc/cpu/aten/EmbeddingBag.h"
-#include "intel_extension_for_pytorch/csrc/cpu/runtime/CPUPool.h"
-#include "intel_extension_for_pytorch/csrc/cpu/runtime/TaskExecutor.h"
+#include "csrc/cpu/runtime/CPUPool.h"
+#include "csrc/cpu/runtime/TaskExecutor.h"
 
 namespace torch_ipex {
 namespace {

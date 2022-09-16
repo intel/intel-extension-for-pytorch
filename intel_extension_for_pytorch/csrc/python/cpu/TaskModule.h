@@ -12,7 +12,7 @@
 #include <torch/csrc/jit/api/module.h>
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/csrc/utils/pybind.h>
-#include "cpu/runtime/TaskExecutor.h"
+#include "csrc/cpu/runtime/TaskExecutor.h"
 
 namespace torch_ipex {
 namespace runtime {

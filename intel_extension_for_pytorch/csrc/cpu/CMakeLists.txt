@@ -1,4 +1,4 @@
-FILE(GLOB _CPU_SRCS runtime/*.cpp)
+FILE(GLOB _CPU_SRCS)
 LIST(APPEND IPEX_COMMON_CPU_SRCS ${_CPU_SRCS})
 
 # Pass to parent
