@@ -39,7 +39,7 @@ void lazy_init() {
   }
 }
 
-REGISTER_LAZY_INIT(&lazy_init)
+IPEX_REGISTER_LAZY_INIT(&lazy_init)
 
 void set_run_yet_variable_to_false() {
   run_yet = false;

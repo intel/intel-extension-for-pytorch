@@ -3,25 +3,21 @@
 namespace xpu {
 namespace dpcpp {
 
-using FnPtr = void (*)();
-void setLazyInit(FnPtr fn);
+using InitFnPtr = void (*)();
+
+void do_lazy_init();
+
+void set_lazy_init_fn(InitFnPtr fn);
 
 struct LazyInitRegister {
-  explicit LazyInitRegister(FnPtr fn) {
-    setLazyInit(fn);
+  explicit LazyInitRegister(InitFnPtr fn) {
+    set_lazy_init_fn(fn);
   }
 };
 
-#define REGISTER_LAZY_INIT(fn)               \
+#define IPEX_REGISTER_LAZY_INIT(fn)          \
   namespace {                                \
   static LazyInitRegister g_lazy_init_d(fn); \
-  }
-
-// Don't call back fn when fn is nullptr. It makes sure backend library
-// libintel-ext-pt-gpu.so can be used independently.
-#define LAZY_INIT_CALLBACK(fn) \
-  if (fn) {                    \
-    (*fn)();                   \
   }
 
 } // namespace dpcpp

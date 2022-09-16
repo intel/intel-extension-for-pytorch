@@ -10,7 +10,6 @@
 #include <core/Generator.h>
 #include <intrinsic/intrinsic.h>
 #include <pybind11/stl.h>
-#include <runtime/Memory.h>
 #include <utils/Settings.h>
 #include "Event.h"
 #include "LazyInit.h"
