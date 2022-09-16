@@ -257,8 +257,8 @@ static inline void get_wgroup_size_spatial(
 
   // set the GroupSize smaller to ensure larger group number
   // smaller GroupSize is friendly to the tail case
-  GroupSize = SIMD32;
-  GroupSize = std::min(GroupSize, int(inner_size));
+  GroupSize = int((inner_size + vec_size - 1) / vec_size);
+  GroupSize = std::min(GroupSize, SIMD32);
   auto local_group_num = (inner_size + GroupSize - 1) / GroupSize;
 
   // enlarge the GroupRow to occupy all the computation resource
@@ -534,7 +534,6 @@ void spatial_softmax_forward(
       (inner_size + local_size * vec_size - 1) / (local_size * vec_size);
   sycl::range<3> global_range{outer_size, block_row, group_num * local_size};
   sycl::range<3> local_range{1, block_row, local_size};
-
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto local_data = dpcpp_local_acc_t<accscalar_t, dpcpp_rw_mode, 3>(
         sycl::range<3>{block_row, local_size, vec_size}, cgh);
@@ -549,16 +548,23 @@ void spatial_softmax_forward(
           auto out_ptr = out_data + group_offset;
 
           // get max value
-          accscalar_t max_value[vec_size] = {
-              std::numeric_limits<accscalar_t>::lowest()};
-          for (int i = local_row_id; i < dim_size; i += block_row) {
-            auto offset = i * inner_size + global_col * vec_size;
-            vec_t value =
+          accscalar_t max_value[vec_size];
+          auto offset = local_row_id * inner_size + global_col * vec_size;
+          vec_t value =
+              *(reinterpret_cast<vec_t*>(in_data + group_offset + offset));
+#pragma unroll(vec_size)
+          for (int j = 0; j < vec_size; ++j) {
+            max_value[j] = accscalar_t(value[j]);
+          }
+          for (int i = local_row_id + block_row; i < dim_size; i += block_row) {
+            offset = i * inner_size + global_col * vec_size;
+            value =
                 *(reinterpret_cast<vec_t*>(in_data + group_offset + offset));
 #pragma unroll(vec_size)
-            for (int j = 0; j < vec_size; ++j)
+            for (int j = 0; j < vec_size; ++j) {
               max_value[j] = Numerics<accscalar_t>::max(
                   max_value[j], accscalar_t(value[j]));
+            }
           }
           if (block_row > 1) {
             group_reduce_spatial<vec_size, accscalar_t>(
@@ -577,15 +583,22 @@ void spatial_softmax_forward(
           }
 
           // get sum value
-          accscalar_t sum_value[vec_size] = {accscalar_t(0)};
-          for (int i = local_row_id; i < dim_size; i += block_row) {
-            auto offset = i * inner_size + global_col * vec_size;
-            vec_t value =
+          accscalar_t sum_value[vec_size];
+          offset = local_row_id * inner_size + global_col * vec_size;
+          value = *(reinterpret_cast<vec_t*>(in_data + group_offset + offset));
+#pragma unroll(vec_size)
+          for (int j = 0; j < vec_size; ++j) {
+            sum_value[j] = Numerics<accscalar_t>::exp(value[j] - max_value[j]);
+          }
+          for (int i = local_row_id + block_row; i < dim_size; i += block_row) {
+            offset = i * inner_size + global_col * vec_size;
+            value =
                 *(reinterpret_cast<vec_t*>(in_data + group_offset + offset));
 #pragma unroll(vec_size)
-            for (int j = 0; j < vec_size; ++j)
+            for (int j = 0; j < vec_size; ++j) {
               sum_value[j] +=
                   Numerics<accscalar_t>::exp(value[j] - max_value[j]);
+            }
           }
           if (block_row > 1) {
             group_reduce_spatial<vec_size, accscalar_t>(
@@ -887,7 +900,11 @@ void spatial_softmax_backward_kernel(
           auto gradout_ptr = gradOutput + group_offset;
 
           // get sum value
-          accscalar_t sum_value[vec_size] = {accscalar_t(0)};
+          accscalar_t sum_value[vec_size];
+#pragma unroll(vec_size)
+          for (int j = 0; j < vec_size; ++j)
+            sum_value[j] = accscalar_t(0);
+
           for (int i = local_row_id; i < dim_size; i += block_row) {
             auto offset = i * inner_size + global_col * vec_size;
             vec_t gradout_val =

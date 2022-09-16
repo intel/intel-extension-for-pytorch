@@ -13,18 +13,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
-    def test_softmax(self, dtype=torch.float):
-
-        x_cpu = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]],
-                             requires_grad=True, device=cpu_device)
-        y_cpu_output = torch.tensor(
-            [[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device=cpu_device)
-
-        x_dpcpp = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]],
-                               requires_grad=True, device=dpcpp_device)
-        y_dpcpp_output = torch.tensor(
-            [[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device=dpcpp_device)
-
+    def softmax_basic(self, x_cpu, y_cpu_output, x_dpcpp, y_dpcpp_output):
         print("x:", x_cpu)
         print("x_dpcpp:", x_dpcpp.cpu())
         self.assertEqual(x_cpu, x_dpcpp.cpu())
@@ -56,6 +45,28 @@ class TestNNMethod(TestCase):
         print("softmax x_dpcpp_grad = ", x_dpcpp.grad.cpu())
         self.assertEqual(y, y_dpcpp.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
+    def test_softmax(self, dtype=torch.float):
+        x_cpu = torch.tensor([[[1.5357e+00, -2.4013e+01, -9.2085e+01],
+                               [6.2914e-01, 6.7819e+01, -9.3087e+01],
+                               [2.2412e+00, -1.0471e+02, -1.3249e+02]]])
+
+        y_cpu_output = torch.randn(x_cpu.shape)
+        x_dpcpp = x_cpu.clone().to("xpu")
+        y_dpcpp_output = y_cpu_output.clone().to("xpu")
+
+        x_cpu.requires_grad_()
+        x_dpcpp.requires_grad_()
+        self.softmax_basic(x_cpu, y_cpu_output, x_dpcpp, y_dpcpp_output)
+
+        x_cpu = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]])
+        y_cpu_output = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]])
+        x_dpcpp = x_cpu.clone().to("xpu")
+        y_dpcpp_output = y_cpu_output.clone().to("xpu")
+
+        x_cpu.requires_grad_()
+        x_dpcpp.requires_grad_()
+        self.softmax_basic(x_cpu, y_cpu_output, x_dpcpp, y_dpcpp_output)
 
         shape = [[8], [7, 8], [7, 8, 512], [16, 7, 8, 512], [16, 7, 8, 512, 35]]
         for i in range(len(shape)):
