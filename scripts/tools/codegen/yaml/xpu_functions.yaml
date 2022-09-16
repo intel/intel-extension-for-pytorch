@@ -177,6 +177,7 @@ supported:
   - copysign.out
   - cos.out
   - cosh.out
+  - count_nonzero.dim_IntList
   - cross
   - cross.out
   - dequantize.self

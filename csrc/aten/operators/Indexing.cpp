@@ -873,6 +873,10 @@ Tensor nonzero(const at::Tensor& self) {
   return at::AtenIpexTypeXPU::nonzero_out(out, self);
 }
 
+Tensor count_nonzero(const Tensor& self, IntArrayRef dims) {
+  return (self != 0).sum(dims);
+}
+
 Tensor& index_add_(
     Tensor& self,
     int64_t dim,
