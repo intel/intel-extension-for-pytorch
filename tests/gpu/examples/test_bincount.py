@@ -2,6 +2,7 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch # noqa
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -23,6 +24,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(torch.bincount(x_cpu),
                          torch.bincount(x_dpcpp).to(cpu_device))
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_histc(self, dtype=torch.float):
         x_cpu = torch.randint(0, 8, (5,), dtype=torch.double)
         x_dpcpp = x_cpu.to(dpcpp_device)

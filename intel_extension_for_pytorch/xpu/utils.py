@@ -58,6 +58,11 @@ def has_channels_last_1d():
     return _C._is_channels_last_1d_enabled()
 
 
+def has_fp64_dtype(device: int = -1) -> bool:
+    r"""Returns a bool indicating if the current XPU device supports dtype float64"""
+    return _C._get_device_properties(device).support_fp64
+
+
 class EnumBase(Enum):
     @classmethod
     def convert(cls, value):

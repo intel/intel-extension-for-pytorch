@@ -1,8 +1,8 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
-
+import intel_extension_for_pytorch  # noqa
+import pytest
 
 
 class TestTorchMethod(TestCase):
@@ -18,6 +18,7 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(y, y_xpu.cpu())
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_sgn_double(self, dtype=torch.double):
         x = torch.randn([1, 4], dtype=dtype)
         y = x.sgn()
@@ -42,6 +43,7 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(y, y_xpu.cpu())
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_sgn_complex_double(self, dtype=torch.complex128):
         x = torch.randn([1, 4], dtype=dtype)
         y = x.sgn()

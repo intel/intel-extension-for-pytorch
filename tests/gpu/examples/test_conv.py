@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -62,6 +62,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_conv2d_double(self, dtype=torch.double):
         x_cpu = torch.randn([1, 64, 256, 256], dtype=dtype, device=cpu_device, requires_grad=True)
         grad_cpu = torch.full([1, 64, 256, 256], 1e-3, dtype=dtype, device=cpu_device, requires_grad=True)

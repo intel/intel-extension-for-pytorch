@@ -1,7 +1,8 @@
+import numpy as np
 import torch
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 from torch.testing._internal.common_utils import TestCase
-from intel_extension_for_pytorch.xpu.utils import using_tile_as_device
+from intel_extension_for_pytorch.xpu.utils import using_tile_as_device, has_fp64_dtype
 from intel_extension_for_pytorch.xpu import getDeviceIdListForCard
 import pytest
 
@@ -56,6 +57,7 @@ class TestVerbose(TestCase):
             torch.xpu.set_backend(backend)
             assert torch.xpu.get_backend() == backend, 'Fail to set XPU backend: ' + backend
 
+
 class TestDevicdeListForCard(TestCase):
     def test_devicelist_empty(self):
         if torch.xpu.device_count() > 0:
@@ -69,3 +71,10 @@ class TestDevicdeListForCard(TestCase):
         if not using_tile_as_device():
             assert len(getDeviceIdListForCard()) == 1, \
                 'The size of device list should be always 1 with implicit mode'
+
+
+class TestHasDtypes(TestCase):
+    def test_has_fp64_dtype(self):
+        assert (has_fp64_dtype() ==
+                (torch.tensor(1, device="xpu", dtype=torch.double)**2).cpu().numpy() == np.array(1)), \
+            "This Device Not Support FP64"
