@@ -1,7 +1,13 @@
 Intel® Pytorch Extension Third Party Programs File
  
-This file is the "third-party-programs.txt" file specified in the associated Intel end user license
-agreement for the Intel software you are licensing.
+This file contains the list of third party software ("third party programs")
+contained in the Intel software and their required notices and/or license
+terms. This third party software, even if included with the distribution of
+the Intel software, may be governed by separate license terms, including
+without limitation, third party license terms, other Intel software license
+terms, and open source software license terms. These separate license terms
+govern your use of the third party programs as set forth in in the
+"THIRD-PARTY-PROGRAMS" file.
 
 Third party programs and their corresponding required notices and/or license terms are listed
 below.
