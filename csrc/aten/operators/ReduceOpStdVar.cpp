@@ -43,7 +43,8 @@ template <
     typename combine_t,
     typename res_t>
 struct WelfordOps {
-  bool unbiased;
+  index_t correction;
+  ;
   bool take_sqrt;
 
  public:
@@ -78,10 +79,9 @@ struct WelfordOps {
   }
   inline DPCPP_DEVICE res_t project(acc_t acc) const {
     auto mean = acc.mean;
-    combine_t divisor = unbiased ? (acc.nf - 1) : acc.nf;
-    auto ret = (divisor > 0)
-        ? (take_sqrt ? dpl::sqrt(acc.m2 / divisor) : (acc.m2 / divisor))
-        : NAN;
+    combine_t divisor = acc.nf > correction ? acc.nf - correction : 0;
+    const auto var = acc.m2 / divisor;
+    auto ret = take_sqrt ? dpl::sqrt(var) : var;
 
     std::pair<scalar_t, scalar_t> results{(scalar_t)ret, (scalar_t)mean};
     return results;
@@ -93,12 +93,15 @@ struct WelfordOps {
   static inline acc_t translate_idx(acc_t acc, int64_t /*idx*/) {
     return acc;
   }
-  WelfordOps(bool unbiased, bool take_sqrt)
-      : unbiased(unbiased), take_sqrt(take_sqrt) {}
+  WelfordOps(index_t correction, bool take_sqrt)
+      : correction(correction), take_sqrt(take_sqrt) {}
 };
 
 template <typename scalar_t>
-void std_var_kernel_impl(TensorIterator& iter, bool unbiased, bool take_sqrt) {
+void std_var_kernel_impl(
+    TensorIterator& iter,
+    int64_t correction_opt,
+    bool take_sqrt) {
   dpcpp_reduce_kernel<scalar_t, scalar_t, 2>(
       iter,
       WelfordOps<
@@ -106,14 +109,14 @@ void std_var_kernel_impl(TensorIterator& iter, bool unbiased, bool take_sqrt) {
           scalar_t,
           int32_t,
           float,
-          std::pair<scalar_t, scalar_t>>{unbiased, take_sqrt},
+          std::pair<scalar_t, scalar_t>>{correction_opt, take_sqrt},
       WelfordData<scalar_t, int32_t, float>{});
 }
 
 template <>
 void std_var_kernel_impl<at::Half>(
     TensorIterator& iter,
-    bool unbiased,
+    int64_t correction_opt,
     bool take_sqrt) {
   dpcpp_reduce_kernel<at::Half, at::Half, 2>(
       iter,
@@ -122,27 +125,29 @@ void std_var_kernel_impl<at::Half>(
           float,
           int32_t,
           float,
-          std::pair<at::Half, at::Half>>{unbiased, take_sqrt},
+          std::pair<at::Half, at::Half>>{correction_opt, take_sqrt},
       WelfordData<float, int32_t, float>{});
 }
 
 static void std_var_kernel(
     TensorIterator& iter,
-    bool unbiased,
+    int64_t correction_opt,
     bool take_sqrt) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
       "std",
-      [&]() { std_var_kernel_impl<scalar_t>(iter, unbiased, take_sqrt); });
+      [&]() {
+        std_var_kernel_impl<scalar_t>(iter, correction_opt, take_sqrt);
+      });
 }
 
 Tensor& std_var_out(
     Tensor& result,
     const Tensor& self,
     IntArrayRef dim,
-    bool unbiased,
+    int64_t correction_opt,
     bool keepdim,
     bool take_sqrt) {
   TORCH_CHECK(
@@ -158,7 +163,7 @@ Tensor& std_var_out(
     if (iter.numel() == 0) {
       real_out.fill_(NAN);
     } else {
-      std_var_kernel(iter, unbiased, false);
+      std_var_kernel(iter, correction_opt, false);
     }
     Tensor imag_in = at::imag(self).to(dtype);
     Tensor imag_out = at::empty({0}, self.options().dtype(dtype));
@@ -166,7 +171,7 @@ Tensor& std_var_out(
     if (iter.numel() == 0) {
       imag_out.fill_(NAN);
     } else {
-      std_var_kernel(iter, unbiased, false);
+      std_var_kernel(iter, correction_opt, false);
     }
     at::add_out(result, real_out, imag_out);
     take_sqrt ? at::sqrt_out(result, result) : result;
@@ -176,7 +181,7 @@ Tensor& std_var_out(
     if (iter.numel() == 0) {
       result.fill_(NAN);
     } else {
-      std_var_kernel(iter, unbiased, take_sqrt);
+      std_var_kernel(iter, correction_opt, take_sqrt);
     }
   }
   return result;
@@ -188,7 +193,7 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
     Tensor& result2,
     const Tensor& self,
     IntArrayRef dim,
-    bool unbiased,
+    int64_t correction_opt,
     bool keepdim,
     bool take_sqrt) {
   AT_ASSERT(result1.defined() && result2.defined());
@@ -215,7 +220,7 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
       real_out_var.fill_(NAN);
       real_out_mean.fill_(NAN);
     } else {
-      std_var_kernel(iter, unbiased, false);
+      std_var_kernel(iter, correction_opt, false);
     }
     Tensor imag_in = at::imag(self).to(dtype);
     Tensor imag_out_var = at::empty({0}, self.options().dtype(dtype));
@@ -226,7 +231,7 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
       imag_out_var.fill_(NAN);
       imag_out_mean.fill_(NAN);
     } else {
-      std_var_kernel(iter, unbiased, false);
+      std_var_kernel(iter, correction_opt, false);
     }
     at::add_out(result1, real_out_var, imag_out_var);
     take_sqrt ? at::sqrt_out(result1, result1) : result1;
@@ -242,7 +247,7 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
       result1.fill_(NAN);
       result2.fill_(NAN);
     } else {
-      std_var_kernel(iter, unbiased, take_sqrt);
+      std_var_kernel(iter, correction_opt, take_sqrt);
     }
   }
   return std::tuple<Tensor&, Tensor&>(result1, result2);

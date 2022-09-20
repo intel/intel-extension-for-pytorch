@@ -364,6 +364,15 @@ void silu_backward_kernel(
   });
 }
 
+template <typename scalar_t>
+inline scalar_t mish_forward(scalar_t self) {
+  using T_ACC = acc_type<scalar_t>;
+  const T_ACC x_acc = static_cast<T_ACC>(self);
+  return (scalar_t)(
+      x_acc *
+      Numerics<T_ACC>::tanh(
+          Numerics<T_ACC>::log1p(Numerics<T_ACC>::exp(x_acc))));
+}
 } // namespace impl
 
 Tensor relu(const Tensor& self) {
@@ -849,6 +858,31 @@ Tensor& silu_backward_out(
         impl::silu_backward_kernel<scalar_t>(grad_input, grad_output, output);
       });
   return grad_input;
+}
+
+at::Tensor& mish_out(const at::Tensor& self, at::Tensor& out) {
+  if (xpu::oneDNN::is_onednn_layout(self) &&
+      xpu::oneDNN::eltwise_forward_valid(self)) {
+    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_mish>(out, self, 0.0f, 0.0f);
+    return out;
+  } else {
+    auto _self = to_plain_if_needed(self);
+    if (!out.defined()) {
+      out = at::empty_like(_self);
+    }
+    auto iter = TensorIterator::unary_op(out, _self);
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        iter.dtype(),
+        "mish",
+        [&]() {
+          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t self) -> scalar_t {
+            return impl::mish_forward<scalar_t>(self);
+          });
+        });
+    return out;
+  }
 }
 
 } // namespace AtenIpexTypeXPU

@@ -25,3 +25,18 @@ class TestTorchMethod(TestCase):
         self.assertEqual(src, src_dpcpp.to(cpu_device))
         self.assertEqual(torch.var(src), torch.var(src_dpcpp).to(cpu_device))
         self.assertEqual(torch.var(src, 1), torch.var(src_dpcpp, 1).to(cpu_device))
+
+    def test_var_correction(self, dtype=torch.float):
+        src = torch.randn((3, 4,), dtype=dtype, device=cpu_device)
+        cpu = torch.empty(4, device=cpu_device)
+        torch.var(src, 0, unbiased=True, out=cpu)
+        cpu_corr = torch.empty(4, device=cpu_device)
+        torch.var(src, 0, correction=3, out=cpu_corr)
+
+        src_dpcpp = src.to("xpu")
+        xpu = torch.empty(4, device=dpcpp_device)
+        torch.var(src_dpcpp, 0, unbiased=True, out=xpu)
+        self.assertEqual(cpu, xpu.to("cpu"))
+        xpu_corr = torch.empty(4, device=dpcpp_device)
+        torch.var(src_dpcpp, 0, correction=3, out=xpu_corr)
+        self.assertEqual(cpu_corr, xpu_corr.to("cpu"))

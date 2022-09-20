@@ -763,6 +763,9 @@ supported:
   - _foreach_div_.ScalarList
   - _foreach_mul.ScalarList
   - _foreach_mul_.ScalarList
+  - mish.out
+  - polar.out
+  - var.correction_out
 autograd:
   - cdist
   - lstm.input

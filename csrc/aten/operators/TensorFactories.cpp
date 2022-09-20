@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/InitialTensorOptions.h>
+#include <ATen/NamedTensorUtils.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/ReduceOpsUtils.h>
 #include <ATen/native/TensorFactories.h>
@@ -11,6 +12,7 @@
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
 #include "BitonicMergeSort.h"
+#include "Loops.h"
 #include "PSTLFunctions.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
@@ -512,13 +514,25 @@ Tensor var(
 Tensor _var(const Tensor& self, bool unbiased) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::std_var_out(
-      result, self, IntArrayRef{}, unbiased, false, false);
+      result, self, IntArrayRef{}, int64_t{unbiased ? 1 : 0}, false, false);
+}
+
+at::Tensor& var_out(
+    const at::Tensor& self,
+    c10::optional<at::IntArrayRef> _dim,
+    c10::optional<int64_t> _correction,
+    bool keepdim,
+    at::Tensor& out) {
+  auto correction = _correction.value_or(1);
+  auto dim = _dim.value_or(IntArrayRef{});
+  return at::AtenIpexTypeXPU::std_var_out(
+      out, self, dim, correction, keepdim, false);
 }
 
 Tensor _std(const Tensor& self, bool unbiased) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::std_var_out(
-      result, self, IntArrayRef{}, unbiased, false, true);
+      result, self, IntArrayRef{}, int64_t{unbiased ? 1 : 0}, false, true);
 }
 
 Tensor std(
@@ -578,7 +592,6 @@ Tensor view_as_real(const at::Tensor& self) {
 Tensor view_as_complex(const Tensor& self) {
   return at::native::view_as_complex(self);
 }
-
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {

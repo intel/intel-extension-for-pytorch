@@ -5,6 +5,8 @@ from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch # noqa
 import copy
 
+cpu_device = torch.device("cpu")
+dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
 
@@ -218,3 +220,23 @@ class TestNNMethod(TestCase):
         print("cpu prelu bwd", x_cpu.grad)
         print("dpcpp prelu bwd", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
+    def test_activation_mish(self, dtype=torch.float):
+        test_shape = [1, 4, 3, 3]
+        Mish = torch.nn.Mish()
+        Mish_dpcpp = copy.deepcopy(Mish).to("xpu")
+        x_cpu = torch.randn(test_shape)
+        x_dpcpp = x_cpu.to("xpu")
+        y_cpu = Mish(x_cpu)
+        y_dpcpp = Mish_dpcpp(x_dpcpp)
+        print("cpu mish ", y_cpu)
+        print("dpcpp mish ", y_dpcpp)
+        self.assertEqual(y_cpu, y_dpcpp.cpu())
+
+        Mish = torch.nn.Mish(inplace=True)
+        Mish_dpcpp = copy.deepcopy(Mish).to("xpu")
+        Mish(x_cpu)
+        Mish_dpcpp(x_dpcpp)
+        print("cpu mish inplace ", x_cpu)
+        print("dpcpp mish inplace", x_dpcpp)
+        self.assertEqual(x_cpu, x_dpcpp.cpu())

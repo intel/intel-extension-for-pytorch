@@ -4,6 +4,7 @@
 
 #include "Loops.h"
 #include "comm/ATDispatch.h"
+#include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
 namespace at {
@@ -38,6 +39,16 @@ void complex_check_dtype(
       result.scalar_type(),
       " for argument 'out'");
 }
+
+void polar_dpcpp(TensorIterator& iter) {
+  IPEX_DISPATCH_FLOATING_TYPES(iter.input_dtype(0), "polar", [&]() {
+    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(
+        iter, [=](scalar_t a, scalar_t b) -> c10::complex<scalar_t> {
+          return c10::complex<scalar_t>(
+              a * Numerics<scalar_t>::cos(b), a * Numerics<scalar_t>::sin(b));
+        });
+  });
+}
 } // namespace impl
 
 namespace AtenIpexTypeXPU {
@@ -58,6 +69,18 @@ Tensor& complex_out(const Tensor& real, const Tensor& imag, Tensor& result) {
   });
 
   return result;
+}
+
+Tensor& polar_out(const Tensor& abs, const Tensor& angle, Tensor& out) {
+  impl::complex_check_dtype(out, abs, angle);
+  auto iter = TensorIteratorConfig()
+                  .add_output(out)
+                  .add_input(abs)
+                  .add_input(angle)
+                  .check_all_same_dtype(false)
+                  .build();
+  impl::polar_dpcpp(iter);
+  return out;
 }
 
 } // namespace AtenIpexTypeXPU

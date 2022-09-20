@@ -175,7 +175,7 @@ at::Tensor& std_var_out(
     at::Tensor& result,
     const at::Tensor& self,
     at::IntArrayRef dim,
-    bool unbiased,
+    int64_t correction_opt,
     bool keepdim,
     bool take_sqrt);
 
@@ -185,7 +185,7 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
     Tensor& result2,
     const Tensor& self,
     IntArrayRef dim,
-    bool unbiased,
+    int64_t correction_opt,
     bool keepdim,
     bool take_sqrt);
 
