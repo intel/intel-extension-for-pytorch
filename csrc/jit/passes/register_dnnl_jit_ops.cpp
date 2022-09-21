@@ -62,7 +62,8 @@ at::Tensor toOptionalTensor(const IValue& v) {
               (std::move(peek(stack, 5, 8))).toInt(),                       \
               (std::move(peek(stack, 6, 8))).toBool(),                      \
               std::move((std::move(peek(stack, 7, 8))).toIntVector()),      \
-              ideep::attr_t::fuse_##FUSED_OP());                            \
+              ideep::attr_t::fuse_##FUSED_OP().set_fpmath_mode(             \
+                  torch_ipex::fpmath_mode));                                \
           drop(stack, 8);                                                   \
           torch::jit::pack(stack, std::move(result));                       \
           return 0;                                                         \
