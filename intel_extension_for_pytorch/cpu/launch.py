@@ -12,6 +12,7 @@ from argparse import RawTextHelpFormatter
 import logging
 import psutil
 from datetime import datetime
+import intel_extension_for_pytorch.cpu.auto_ipex as auto_ipex
 
 format_str = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 logging.basicConfig(level=logging.INFO, format=format_str)
@@ -455,6 +456,10 @@ class MultiInstanceLauncher(Launcher):
                                             args.enable_jemalloc,
                                             args.use_default_allocator)
         os.environ["LAUNCH_CMD"] = "#"
+
+        if args.auto_ipex:
+            args.program = auto_ipex.apply_monkey_patch(args.program, args.dtype, args.auto_ipex_verbose)
+
         for i in range(args.ninstances):
             cmd = []
             cur_process_cores = ""
@@ -521,10 +526,16 @@ class MultiInstanceLauncher(Launcher):
                 break
 
         os.environ["LAUNCH_CMD"] = os.environ["LAUNCH_CMD"][:-2]
-        for process in processes:
-            process.wait()
-            if process.returncode != 0:
-                raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd_s)
+        try:
+            for process in processes:
+                process.wait()
+                if process.returncode != 0:
+                    raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd_s)
+        finally:
+            if args.auto_ipex:
+                # Clean the temp file
+                if os.path.exists(args.program) and args.program.endswith("_auto_ipex"):
+                    os.remove(args.program)
 
 class DistributedTrainingLauncher(Launcher):
     r"""
@@ -744,7 +755,6 @@ def add_kmp_iomp_params(parser):
     group.add_argument("--disable_iomp", action='store_true', default=False,
                        help="By default, we use Intel OpenMP and libiomp5.so will be add to LD_PRELOAD")
 
-
 def parse_args():
     """
     Helper function parsing the command line options
@@ -790,6 +800,9 @@ def parse_args():
 
     add_distributed_training_params(parser)
     add_multi_instance_params(parser)
+
+    auto_ipex.add_auto_ipex_params(parser)
+
     # positional
     parser.add_argument("program", type=str,
                         help="The full path to the proram/script to be launched. "
