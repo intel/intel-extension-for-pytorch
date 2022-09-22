@@ -371,6 +371,24 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
       "bmm",
       Tensor(const Tensor&, const Tensor&),
       lower_precision_fp)
+  m.impl(
+      "_thnn_fused_gru_cell",
+      TORCH_FN((&WrapFunction<
+                CastPolicy::lower_precision_fp,
+                DeviceType::XPU,
+                std::tuple<Tensor, Tensor>(
+                    const Tensor&,
+                    const Tensor&,
+                    const Tensor&,
+                    const c10::optional<Tensor>&,
+                    const c10::optional<Tensor>&),
+                std::tuple<Tensor, Tensor>(
+                    const Tensor&,
+                    const Tensor&,
+                    const Tensor&,
+                    const c10::optional<Tensor>&,
+                    const c10::optional<Tensor>&),
+                &ADD_NS(_thnn_fused_gru_cell)>::type::call)));
 
   // fp32
   KERNEL_XPU(
