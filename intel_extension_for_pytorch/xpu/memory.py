@@ -3,7 +3,7 @@ from typing import Any, Dict, Union
 
 import intel_extension_for_pytorch
 from torch.types import Device
-from intel_extension_for_pytorch._utils import _get_device_index
+from torch._utils import _get_device_index
 
 
 def empty_cache() -> None:

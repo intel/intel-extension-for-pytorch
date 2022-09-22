@@ -19,7 +19,7 @@ from .utils import *
 from .random import *
 from .memory import *
 
-from intel_extension_for_pytorch._utils import _get_device_index  # , _dummy_type
+from torch._utils import _get_device_index
 import intel_extension_for_pytorch.optim as optim
 
 
@@ -29,12 +29,12 @@ _device_t = Union[_device, str, int]
 
 def is_initialized():
     r"""Returns whether XPU state has been initialized."""
-    return _initialized 
+    return _initialized
 
 
 def init():
     r"""Initialize the XPU's state. This is a Python API about lazy initialization
-    that avoids initializing XPU until the first time it is accessed. You may need 
+    that avoids initializing XPU until the first time it is accessed. You may need
     to call this function explicitly in very rare cases, since IPEX could call
     this initialization automatically when XPU functionality is on-demand.
 

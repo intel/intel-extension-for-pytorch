@@ -1,6 +1,5 @@
 import os
 import torch
-from ._utils import _get_device_index  # , _dummy_type
 from . import _C
 from ._version import (__version__, __ipex_git_sha__,
                        __torch_version__, __torch_git_sha__,
