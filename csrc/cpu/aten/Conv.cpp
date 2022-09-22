@@ -242,9 +242,15 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   if (grad_output.scalar_type() == at::ScalarType::Float) {
     mkldnn_grad_weight.init(
         packed_weight_desc, grad_weight.template data_ptr<float>());
-  } else {
+  } else if (grad_output.scalar_type() == at::ScalarType::BFloat16) {
     mkldnn_grad_weight.init(
         packed_weight_desc, grad_weight.template data_ptr<c10::BFloat16>());
+  } else {
+    TORCH_CHECK(
+        grad_output.scalar_type() == at::ScalarType::Half,
+        "Only support bfloat16, float16 and float for convolution_backward_weights");
+    mkldnn_grad_weight.init(
+        packed_weight_desc, grad_weight.template data_ptr<c10::Half>());
   }
 
   if (bias_defined) {

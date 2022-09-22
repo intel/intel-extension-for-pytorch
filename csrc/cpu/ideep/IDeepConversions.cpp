@@ -105,6 +105,8 @@ ideep::tensor::data_type get_mkldnn_dtype(at::ScalarType type) {
       return ideep::tensor::data_type::u8;
     case at::ScalarType::BFloat16:
       return ideep::tensor::data_type::bf16;
+    case at::ScalarType::Half:
+      return ideep::tensor::data_type::f16;
     default:
       TORCH_CHECK(false, "get_mkldnn_dtype: unsupported data type");
   }
@@ -128,7 +130,8 @@ ideep::tensor itensor_view_from_dense(const at::Tensor& tensor) {
       "itensor_view_from_dense expects dense tensor input");
   TORCH_CHECK(
       tensor.scalar_type() == at::ScalarType::Float ||
-          tensor.scalar_type() == at::ScalarType::BFloat16,
+          tensor.scalar_type() == at::ScalarType::BFloat16 ||
+          tensor.scalar_type() == at::ScalarType::Half,
       "itensor_view_from_dense expects float tensor input");
 
   return {
@@ -150,6 +153,7 @@ ideep::tensor itensor_view_from_dense(
   TORCH_CHECK(
       tensor.scalar_type() == at::ScalarType::Float ||
           tensor.scalar_type() == at::ScalarType::BFloat16 ||
+          tensor.scalar_type() == at::ScalarType::Half ||
           tensor.scalar_type() == at::ScalarType::QInt8 ||
           tensor.scalar_type() == at::ScalarType::QUInt8,
       "itensor_view_from_dense expects float, bfloat16 or int8 tensor input");
@@ -180,16 +184,18 @@ at::Tensor mkldnn_to_dense(
     c10::optional<at::ScalarType> dtype) {
   TORCH_CHECK(
       mkldnn_tensor.scalar_type() == at::ScalarType::Float ||
-          mkldnn_tensor.scalar_type() == at::ScalarType::BFloat16,
-      "mkldnn_to_dense expects float or bfloat16 tensor input");
+          mkldnn_tensor.scalar_type() == at::ScalarType::BFloat16 ||
+          mkldnn_tensor.scalar_type() == at::ScalarType::Half,
+      "mkldnn_to_dense expects float, bfloat16 or float16 tensor input");
   ideep::tensor& stensor = itensor_from_mkldnn(mkldnn_tensor);
   auto dims = stensor.get_dims();
   auto data_type =
       dtype.has_value() ? dtype.value() : mkldnn_tensor.scalar_type();
   TORCH_CHECK(
       data_type == at::ScalarType::Float ||
-          data_type == at::ScalarType::BFloat16,
-      "mkldnn tensor only can be converted to be a float or bfloat16 "
+          data_type == at::ScalarType::BFloat16 ||
+          data_type == at::ScalarType::Half,
+      "mkldnn tensor only can be converted to be a float, bfloat16 or float16 "
       "cpu tensor")
   // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
   at::Tensor cpu_tensor = at::empty(
@@ -197,13 +203,17 @@ at::Tensor mkldnn_to_dense(
       mkldnn_tensor.options().layout(c10::kStrided).dtype(data_type));
   if (stensor.is_empty())
     return cpu_tensor;
-  auto pub_tensor = data_type == at::ScalarType::Float
+  auto pub_tensor = data_type == at::ScalarType::BFloat16
       ? stensor.to_public(
-            cpu_tensor.template data_ptr<float>(),
-            ideep::tensor::data_type::f32)
-      : stensor.to_public(
             cpu_tensor.template data_ptr<c10::BFloat16>(),
-            ideep::tensor::data_type::bf16);
+            ideep::tensor::data_type::bf16)
+      : (data_type == at::ScalarType::Half
+             ? stensor.to_public(
+                   cpu_tensor.template data_ptr<c10::Half>(),
+                   ideep::tensor::data_type::f16)
+             : stensor.to_public(
+                   cpu_tensor.template data_ptr<float>(),
+                   ideep::tensor::data_type::f32));
   cpu_tensor.as_strided_(dims, pub_tensor.get_strides());
   return cpu_tensor;
 }
