@@ -2,7 +2,7 @@
 
 #include "csrc/cpu/aten/utils/isa_help.h"
 #include "csrc/jit/codegen/onednn/interface.h"
-#include "version.h"
+#include "csrc/utils/version.h"
 
 #include <c10/core/Device.h>
 #include <c10/core/Layout.h>

@@ -24,7 +24,7 @@ list(APPEND CMAKE_MODULE_PATH ${IPEX_PROJECT_TOP_DIR}/cmake/Modules)
 set(IPEX_CPU_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/cpu")
 set(IPEX_CPU_CPP_THIRD_PARTY_ROOT "${IPEX_PROJECT_TOP_DIR}/third_party")
 set(IPEX_JIT_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/jit")
-set(IPEX_COMMON_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/intel_extension_for_pytorch/csrc")
+set(IPEX_UTLIS_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/utils")
 
 set(DNNL_BUILD_TESTS FALSE CACHE BOOL "" FORCE)
 set(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "" FORCE)
@@ -62,7 +62,7 @@ include_directories(${IPEX_CPU_CPP_ROOT}/aten)
 include_directories(${IPEX_CPU_CPP_ROOT}/utils)
 
 include_directories(${IPEX_JIT_CPP_ROOT})
-include_directories(${IPEX_COMMON_CPP_ROOT})
+include_directories(${IPEX_UTLIS_CPP_ROOT})
 
 include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include)
 include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/third_party/oneDNN/include)
@@ -106,6 +106,7 @@ set(IPEX_CPU_CPP_IDEEP_SRCS)
 set(IPEX_CPU_CPP_RUNTIME_SRCS)
 
 set(IPEX_JIT_CPP_SRCS)
+set(IPEX_UTLIS_CPP_SRCS)
 
 # foreach(file_path ${IPEX_CPU_CPP_ISA_SRCS_GEN})
 #   message(${file_path})
@@ -120,10 +121,11 @@ add_subdirectory(${IPEX_CPU_CPP_ROOT}/runtime)
 add_subdirectory(${IPEX_CPU_CPP_ROOT}/utils)
 
 add_subdirectory(${IPEX_JIT_CPP_ROOT} jit_cpu)
+add_subdirectory(${IPEX_UTLIS_CPP_ROOT} csrc_utlis)
 
 # Compile code with pybind11
 set(IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_DYNDISP_SRCS} ${IPEX_CPU_CPP_ISA_SRCS_GEN} ${IPEX_CPU_CPP_UTILS_SRCS} ${IPEX_CPU_CPP_QUANTIZATION_SRCS} ${IPEX_JIT_CPP_SRCS}
-    ${IPEX_CPU_CPP_ISA_SRCS} ${IPEX_CPU_CPP_IDEEP_SRCS} ${IPEX_CPU_CPP_AUTOCAST_SRCS} ${IPEX_CPU_CPP_ATEN_SRCS} ${IPEX_CPU_CPP_RUNTIME_SRCS})
+    ${IPEX_CPU_CPP_ISA_SRCS} ${IPEX_CPU_CPP_IDEEP_SRCS} ${IPEX_CPU_CPP_AUTOCAST_SRCS} ${IPEX_CPU_CPP_ATEN_SRCS} ${IPEX_CPU_CPP_RUNTIME_SRCS} ${IPEX_UTLIS_CPP_SRCS})
 
 list(REMOVE_ITEM IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_ISA_SRCS_ORIGIN})
 
