@@ -8,6 +8,9 @@
 #include "comm/Atomics.h"
 #include "comm/Numerics.h"
 
+#include "Loops.h"
+#include "ReduceOpsUtils.h"
+
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
 
@@ -56,6 +59,16 @@ void scatter_impl(
 class ReduceMultiply {
  public:
   template <typename scalar_t>
+  constexpr C10_DEVICE void operator()(
+      scalar_t* self_data_start,
+      int64_t index,
+      int64_t numel,
+      const scalar_t* src_data) const {
+    atomicMul(
+        (dpcpp_global_ptr_pt<scalar_t>)(self_data_start + index), *src_data);
+  }
+
+  template <typename scalar_t>
   constexpr void operator()(scalar_t* self_data, const scalar_t* src_data)
       const {
     atomicMul((dpcpp_global_ptr_pt<scalar_t>)self_data, *src_data);
@@ -66,6 +79,16 @@ static ReduceMultiply reduce_multiply;
 class ReduceAdd {
  public:
   template <typename scalar_t>
+  constexpr C10_DEVICE void operator()(
+      scalar_t* self_data_start,
+      int64_t index,
+      int64_t numel,
+      const scalar_t* src_data) const {
+    atomicAdd(
+        (dpcpp_global_ptr_pt<scalar_t>)(self_data_start + index), *src_data);
+  }
+
+  template <typename scalar_t>
   constexpr void operator()(scalar_t* self_data, const scalar_t* src_data)
       const {
     atomicAdd((dpcpp_global_ptr_pt<scalar_t>)self_data, *src_data);
@@ -75,6 +98,16 @@ static ReduceAdd reduce_add;
 
 class TensorAssign {
  public:
+  template <typename scalar_t>
+  constexpr C10_DEVICE void operator()(
+      scalar_t* self_data_start,
+      int64_t index,
+      int64_t numel,
+      const scalar_t* src_data) const {
+    (void)numel; // suppress unused warning
+    *(self_data_start + index) = *src_data;
+  }
+
   template <typename scalar_t>
   constexpr void operator()(scalar_t* self_data, const scalar_t* src_data)
       const {
@@ -92,301 +125,475 @@ struct alignas(N) OpaqueType {
   char data[N];
 };
 
-// Compute the offsets into the given tensors for a linear index. For the 't2'
-// tensor, dimension 'dim' is skipped. The tensors are assumed to have the same
-// size (with the exception of 't2' in dimension 'dim').
-// This version uses a static number of dimensions.
-template <typename IndexType, typename Real, int Dims>
-struct IndexToScatterGatherOffsets {
-  static DPCPP_DEVICE void compute(
-      IndexType linearId,
-      const int dim,
-      const TensorInfo<int64_t, IndexType>& index,
-      IndexType* indexOffset,
-      const TensorInfo<Real, IndexType>& t1,
-      IndexType* t1Offset,
-      const TensorInfo<Real, IndexType>& t2,
-      IndexType* t2Offset) {
-    for (int d = Dims - 1; d >= 0; d--) {
-      IndexType curDimIndex = linearId % index.sizes[d];
-      *indexOffset += curDimIndex * index.strides[d];
-      *t1Offset += curDimIndex * t1.strides[d];
-      if (d != dim) {
-        *t2Offset += curDimIndex * t2.strides[d];
-      }
-      linearId /= index.sizes[d];
-    }
+template <typename func_t>
+static void _launch_scatter_gather_kernel(int64_t N, const func_t& f) {
+  TORCH_INTERNAL_ASSERT(N >= 0 && N <= std::numeric_limits<int32_t>::max());
+  if (N == 0) {
+    return;
   }
 
-  static DPCPP_DEVICE void compute(
-      IndexType linearId,
-      const int dim,
-      const TensorInfo<int64_t, IndexType>& index,
-      IndexType* indexOffset,
-      const TensorInfo<Real, IndexType>& t2,
-      IndexType* t2Offset) {
-    for (int d = Dims - 1; d >= 0; d--) {
-      IndexType curDimIndex = linearId % index.sizes[d];
-      *indexOffset += curDimIndex * index.strides[d];
-      if (d != dim) {
-        *t2Offset += curDimIndex * t2.strides[d];
+  auto& queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
+
+  int outputSize = N;
+  int work_group_size = outputSize > max_wg_size ? max_wg_size : outputSize;
+  const auto target_global_size = dpcppMaxWorkItemsPerTile();
+  // Each work group size is work_group_size, one full device launch is
+  // target_global_size, so we can calculate max work group num as below
+  const int max_work_group_num = target_global_size / work_group_size;
+  int work_group_num = outputSize / work_group_size < max_work_group_num
+      ? outputSize / work_group_size
+      : max_work_group_num;
+  int draft_work_group_num =
+      (outputSize + work_group_size - 1) / work_group_size;
+
+  int thread_work_size = draft_work_group_num / work_group_num + 1;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
+      int nv = work_group_size * thread_work_size;
+      auto wg_id = item.get_group_linear_id();
+      auto local_id = item.get_local_linear_id();
+      int idx = nv * wg_id + local_id;
+#pragma unroll
+      for (int i = 0; i < thread_work_size; ++i) {
+        if (idx < N) {
+          f(idx);
+          idx += work_group_size;
+        }
       }
-      linearId /= index.sizes[d];
+    };
+    cgh.parallel_for(
+        sycl::nd_range<1>(
+            sycl::range<1>(work_group_size * work_group_num),
+            sycl::range<1>(work_group_size)),
+        kfn);
+  };
+  DPCPP_Q_SUBMIT(queue, cgf);
+}
+
+template <typename scalar_t>
+struct _dpcpp_scatter_fill_internal_kernel {
+  template <typename func_t>
+  void operator()(
+      TensorIterator& iter,
+      scalar_t src_val,
+      int64_t index_size,
+      int64_t index_stride,
+      const func_t& f) {
+    if (!iter.can_use_32bit_indexing()) {
+      for (auto& sub_iter : iter.with_32bit_indexing()) {
+        _dpcpp_scatter_fill_internal_kernel<scalar_t>()(
+            sub_iter, src_val, index_size, index_stride, f);
+      }
+      return;
     }
+
+    char* self_ptr = (char*)iter.data_ptr(0);
+    char* index_ptr = (char*)iter.data_ptr(1);
+
+    auto offset_calc = make_offset_calculator<2>(iter);
+    auto loop = [=](int i) {
+      auto offsets = offset_calc.get(i);
+
+      int64_t idx_dim = *(int64_t*)(index_ptr + offsets[1]);
+
+      char* self_data = self_ptr + offsets[0];
+
+      f((scalar_t*)self_data + idx_dim * index_stride, (scalar_t*)&src_val);
+    };
+
+    _launch_scatter_gather_kernel(iter.numel(), loop);
+  }
+}; // struct _dpcpp_scatter_fill_internal_kernel
+
+template <bool is_scatter_like, typename scalar_t>
+struct _dpcpp_scatter_gather_internal_kernel {
+  template <typename func_t>
+  void operator()(
+      TensorIterator& iter,
+      int64_t index_size,
+      int64_t index_stride,
+      int64_t numel,
+      const func_t& f) {
+    if (!iter.can_use_32bit_indexing()) {
+      for (auto& sub_iter : iter.with_32bit_indexing()) {
+        _dpcpp_scatter_gather_internal_kernel<is_scatter_like, scalar_t>()(
+            sub_iter, index_size, index_stride, numel, f);
+      }
+      return;
+    }
+
+    char* self_ptr = (char*)iter.data_ptr(0);
+    char* src_ptr = (char*)iter.data_ptr(1);
+    char* index_ptr = (char*)iter.data_ptr(2);
+
+    auto offset_calc = make_offset_calculator<3>(iter);
+    auto loop = [=] C10_DEVICE(int i) {
+      auto offsets = offset_calc.get(i);
+
+      int64_t idx_dim = *(int64_t*)(index_ptr + offsets[2]);
+      SYCL_KERNEL_ASSERT(
+          idx_dim >= 0 && idx_dim < index_size && "index out of bounds");
+
+      f((scalar_t*)(self_ptr + offsets[0]),
+        is_scatter_like ? idx_dim * index_stride : 0,
+        numel,
+        (scalar_t*)(src_ptr + offsets[1]) +
+            (is_scatter_like ? 0 : idx_dim * index_stride));
+    };
+
+    _launch_scatter_gather_kernel(iter.numel(), loop);
+  }
+}; // struct _dpcpp_scatter_fill_internal_kernel
+
+template <bool cast_to_opaque = true>
+struct dpcpp_scatter_fill_base_kernel {
+  template <typename func_t>
+  void operator()(
+      const Tensor& self,
+      int64_t dim,
+      const Tensor& index,
+      Scalar src,
+      const std::string& method_name,
+      const func_t& f) {
+    at::assert_no_internal_overlap(self);
+    dim = (dim < 0) ? (self.ndimension() + dim) : dim;
+
+    auto index_sizes = ensure_nonempty_vec(index.sizes().vec());
+
+    // restride self such that
+    // self.shape = index.shape and
+    // self.stride[dim] = 0
+    auto self_restrided = restride_dim(self, dim, index_sizes);
+
+    auto iter = TensorIteratorConfig()
+                    .set_check_mem_overlap(false)
+                    .check_all_same_dtype(false)
+                    .resize_outputs(false)
+                    .add_output(self_restrided)
+                    .add_input(index)
+                    .build();
+
+    auto index_size = ensure_nonempty_size(self, dim);
+    auto index_stride = ensure_nonempty_stride(self, dim);
+
+    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+        at::ScalarType::Half,
+        at::ScalarType::Bool,
+        at::ScalarType::BFloat16,
+        iter.dtype(),
+        "dpcpp_scatter_fill_base_kernel_func",
+        [&] {
+          using dtype = typename std::conditional<
+              cast_to_opaque,
+              OpaqueType<sizeof(scalar_t)>,
+              scalar_t>::type;
+
+          auto src_scalar_val = src.to<scalar_t>();
+          auto src_val = *(dtype*)&src_scalar_val;
+
+          _dpcpp_scatter_fill_internal_kernel<dtype>()(
+              iter, src_val, index_size, index_stride, f);
+        });
+  }
+
+  void operator()(
+      const Tensor& self,
+      int64_t dim,
+      const Tensor& index,
+      Scalar src,
+      const std::string& method_name,
+      const ReduceMultiply& f) {
+    at::assert_no_internal_overlap(self);
+
+    auto index_sizes = ensure_nonempty_vec(index.sizes().vec());
+
+    // restride self such that
+    // self.shape = index.shape and
+    // self.stride[dim] = 0
+    auto self_restrided = restride_dim(self, dim, index_sizes);
+
+    auto iter = TensorIteratorConfig()
+                    .set_check_mem_overlap(false)
+                    .check_all_same_dtype(false)
+                    .resize_outputs(false)
+                    .add_output(self_restrided)
+                    .add_input(index)
+                    .build();
+
+    auto index_size = ensure_nonempty_size(self, dim);
+    auto index_stride = ensure_nonempty_stride(self, dim);
+
+    AT_DISPATCH_ALL_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        iter.dtype(),
+        "dpcpp_scatter_fill_base_kernel_reduce_multiply",
+        [&] {
+          using dtype = typename std::conditional<
+              cast_to_opaque,
+              OpaqueType<sizeof(scalar_t)>,
+              scalar_t>::type;
+
+          auto src_scalar_val = src.to<scalar_t>();
+          auto src_val = *(dtype*)&src_scalar_val;
+
+          _dpcpp_scatter_fill_internal_kernel<dtype>()(
+              iter, src_val, index_size, index_stride, f);
+        });
+  }
+}; // struct dpcpp_scatter_fill_base_kernel
+
+template <bool is_scatter_like = true, bool cast_to_opaque = true>
+struct dpcpp_scatter_gather_base_kernel {
+  void operator()(
+      const Tensor& self,
+      int64_t dim,
+      const Tensor& index,
+      const Tensor& src,
+      const std::string& method_name,
+      const ReduceAdd& f) {
+    at::assert_no_internal_overlap(self);
+
+    dim = (dim < 0) ? (src.ndimension() + dim) : dim;
+    auto index_sizes = ensure_nonempty_vec(index.sizes().vec());
+    auto self_strides = ensure_nonempty_vec(self.strides().vec());
+    auto src_strides = ensure_nonempty_vec(src.strides().vec());
+
+    // restride self and src such that
+    // self.shape = src.shape = index.shape
+    //
+    // restride stride[dim] such that
+    // if (is_scatter_like) self.stride[dim] = 0
+    // else src.stride[dim] = 0
+    auto self_restrided = is_scatter_like
+        ? restride_dim(self, dim, index_sizes)
+        : self.as_strided(index_sizes, self_strides);
+    auto src_restrided = is_scatter_like
+        ? src.as_strided(index_sizes, src_strides)
+        : restride_dim(src, dim, index_sizes);
+
+    auto iter = TensorIteratorConfig()
+                    .set_check_mem_overlap(false)
+                    .check_all_same_dtype(false)
+                    .resize_outputs(false)
+                    .add_output(self_restrided)
+                    .add_input(src_restrided)
+                    .add_input(index)
+                    .build();
+
+    auto self_dim_stride = ensure_nonempty_stride(self, dim);
+    auto self_dim_size = ensure_nonempty_size(self, dim);
+
+    auto src_dim_stride = ensure_nonempty_stride(src, dim);
+    auto src_dim_size = ensure_nonempty_size(src, dim);
+
+    auto index_size = is_scatter_like ? self_dim_size : src_dim_size;
+    auto index_stride = is_scatter_like ? self_dim_stride : src_dim_stride;
+
+    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+        at::ScalarType::Half,
+        at::ScalarType::Bool,
+        at::ScalarType::BFloat16,
+        iter.dtype(),
+        "dpcpp_scatter_gather_base_kernel_func",
+        [&] {
+          using dtype = typename std::conditional<
+              cast_to_opaque,
+              OpaqueType<sizeof(scalar_t)>,
+              scalar_t>::type;
+
+          _dpcpp_scatter_gather_internal_kernel<is_scatter_like, dtype>()(
+              iter, index_size, index_stride, self.numel(), f);
+        });
+  }
+
+  void operator()(
+      const Tensor& self,
+      int64_t dim,
+      const Tensor& index,
+      const Tensor& src,
+      const std::string& method_name,
+      const TensorAssign& f) {
+    at::assert_no_internal_overlap(self);
+
+    dim = (dim < 0) ? (src.ndimension() + dim) : dim;
+    auto index_sizes = ensure_nonempty_vec(index.sizes().vec());
+    auto self_strides = ensure_nonempty_vec(self.strides().vec());
+    auto src_strides = ensure_nonempty_vec(src.strides().vec());
+
+    // restride self and src such that
+    // self.shape = src.shape = index.shape
+    //
+    // restride stride[dim] such that
+    // if (is_scatter_like) self.stride[dim] = 0
+    // else src.stride[dim] = 0
+    auto self_restrided = is_scatter_like
+        ? restride_dim(self, dim, index_sizes)
+        : self.as_strided(index_sizes, self_strides);
+    auto src_restrided = is_scatter_like
+        ? src.as_strided(index_sizes, src_strides)
+        : restride_dim(src, dim, index_sizes);
+
+    auto iter = TensorIteratorConfig()
+                    .set_check_mem_overlap(false)
+                    .check_all_same_dtype(false)
+                    .resize_outputs(false)
+                    .add_output(self_restrided)
+                    .add_input(src_restrided)
+                    .add_input(index)
+                    .build();
+
+    auto self_dim_stride = ensure_nonempty_stride(self, dim);
+    auto self_dim_size = ensure_nonempty_size(self, dim);
+
+    auto src_dim_stride = ensure_nonempty_stride(src, dim);
+    auto src_dim_size = ensure_nonempty_size(src, dim);
+
+    auto index_size = is_scatter_like ? self_dim_size : src_dim_size;
+    auto index_stride = is_scatter_like ? self_dim_stride : src_dim_stride;
+
+    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+        at::ScalarType::Half,
+        at::ScalarType::Bool,
+        at::ScalarType::BFloat16,
+        iter.dtype(),
+        "dpcpp_scatter_gather_base_kernel_func",
+        [&] {
+          using dtype = typename std::conditional<
+              cast_to_opaque,
+              OpaqueType<sizeof(scalar_t)>,
+              scalar_t>::type;
+
+          _dpcpp_scatter_gather_internal_kernel<is_scatter_like, dtype>()(
+              iter, index_size, index_stride, self.numel(), f);
+        });
+  }
+
+  template <typename func_t>
+  void operator()(
+      const Tensor& self,
+      int64_t dim,
+      const Tensor& index,
+      const Tensor& src,
+      const std::string& method_name,
+      const func_t& f) {
+    at::assert_no_internal_overlap(self);
+
+    dim = (dim < 0) ? (src.ndimension() + dim) : dim;
+    auto index_sizes = ensure_nonempty_vec(index.sizes().vec());
+    auto self_strides = ensure_nonempty_vec(self.strides().vec());
+    auto src_strides = ensure_nonempty_vec(src.strides().vec());
+
+    // restride self and src such that
+    // self.shape = src.shape = index.shape
+    //
+    // restride stride[dim] such that
+    // if (is_scatter_like) self.stride[dim] = 0
+    // else src.stride[dim] = 0
+    auto self_restrided = is_scatter_like
+        ? restride_dim(self, dim, index_sizes)
+        : self.as_strided(index_sizes, self_strides);
+    auto src_restrided = is_scatter_like
+        ? src.as_strided(index_sizes, src_strides)
+        : restride_dim(src, dim, index_sizes);
+
+    auto iter = TensorIteratorConfig()
+                    .set_check_mem_overlap(false)
+                    .check_all_same_dtype(false)
+                    .resize_outputs(false)
+                    .add_output(self_restrided)
+                    .add_input(src_restrided)
+                    .add_input(index)
+                    .build();
+
+    auto self_dim_stride = ensure_nonempty_stride(self, dim);
+    auto self_dim_size = ensure_nonempty_size(self, dim);
+
+    auto src_dim_stride = ensure_nonempty_stride(src, dim);
+    auto src_dim_size = ensure_nonempty_size(src, dim);
+
+    auto index_size = is_scatter_like ? self_dim_size : src_dim_size;
+    auto index_stride = is_scatter_like ? self_dim_stride : src_dim_stride;
+
+    AT_DISPATCH_ALL_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        iter.dtype(),
+        "dpcpp_scatter_gather_base_kernel_func",
+        [&] {
+          using dtype = typename std::conditional<
+              cast_to_opaque,
+              OpaqueType<sizeof(scalar_t)>,
+              scalar_t>::type;
+
+          _dpcpp_scatter_gather_internal_kernel<is_scatter_like, dtype>()(
+              iter, index_size, index_stride, self.numel(), f);
+        });
+  }
+
+  void operator()(
+      const Tensor& self,
+      int64_t dim,
+      const Tensor& index,
+      const Tensor& src,
+      const std::string& method_name,
+      const ReduceMultiply& f) {
+    at::assert_no_internal_overlap(self);
+
+    auto index_sizes = ensure_nonempty_vec(index.sizes().vec());
+    auto self_strides = ensure_nonempty_vec(self.strides().vec());
+    auto src_strides = ensure_nonempty_vec(src.strides().vec());
+
+    // restride self and src such that
+    // self.shape = src.shape = index.shape
+    //
+    // restride stride[dim] such that
+    // if (is_scatter_like) self.stride[dim] = 0
+    // else src.stride[dim] = 0
+    auto self_restrided = is_scatter_like
+        ? restride_dim(self, dim, index_sizes)
+        : self.as_strided(index_sizes, self_strides);
+    auto src_restrided = is_scatter_like
+        ? src.as_strided(index_sizes, src_strides)
+        : restride_dim(src, dim, index_sizes);
+
+    auto iter = TensorIteratorConfig()
+                    .set_check_mem_overlap(false)
+                    .check_all_same_dtype(false)
+                    .resize_outputs(false)
+                    .add_output(self_restrided)
+                    .add_input(src_restrided)
+                    .add_input(index)
+                    .build();
+
+    auto self_dim_stride = ensure_nonempty_stride(self, dim);
+    auto self_dim_size = ensure_nonempty_size(self, dim);
+
+    auto src_dim_stride = ensure_nonempty_stride(src, dim);
+    auto src_dim_size = ensure_nonempty_size(src, dim);
+
+    auto index_size = is_scatter_like ? self_dim_size : src_dim_size;
+    auto index_stride = is_scatter_like ? self_dim_stride : src_dim_stride;
+
+    AT_DISPATCH_ALL_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        iter.dtype(),
+        "dpcpp_scatter_gather_base_kernel_reduce_multiply",
+        [&] {
+          using dtype = typename std::conditional<
+              cast_to_opaque,
+              OpaqueType<sizeof(scalar_t)>,
+              scalar_t>::type;
+
+          _dpcpp_scatter_gather_internal_kernel<is_scatter_like, dtype>()(
+              iter, index_size, index_stride, self.numel(), f);
+        });
   }
 };
-
-// Same as above but using a dynamic number of dimensions.
-template <typename IndexType, typename Real>
-struct IndexToScatterGatherOffsets<IndexType, Real, -1> {
-  static DPCPP_DEVICE void compute(
-      IndexType linearId,
-      const int dim,
-      const TensorInfo<int64_t, IndexType>& index,
-      IndexType* indexOffset,
-      const TensorInfo<Real, IndexType>& t1,
-      IndexType* t1Offset,
-      const TensorInfo<Real, IndexType>& t2,
-      IndexType* t2Offset) {
-    for (int d = index.dims - 1; d >= 0; d--) {
-      IndexType curDimIndex = linearId % index.sizes[d];
-      *indexOffset += curDimIndex * index.strides[d];
-      *t1Offset += curDimIndex * t1.strides[d];
-      if (d != dim) {
-        *t2Offset += curDimIndex * t2.strides[d];
-      }
-      linearId /= index.sizes[d];
-    }
-  }
-
-  static DPCPP_DEVICE void compute(
-      IndexType linearId,
-      const int dim,
-      const TensorInfo<int64_t, IndexType>& index,
-      IndexType* indexOffset,
-      const TensorInfo<Real, IndexType>& t2,
-      IndexType* t2Offset) {
-    for (int d = index.dims - 1; d >= 0; d--) {
-      IndexType curDimIndex = linearId % index.sizes[d];
-      *indexOffset += curDimIndex * index.strides[d];
-      if (d != dim) {
-        *t2Offset += curDimIndex * t2.strides[d];
-      }
-      linearId /= index.sizes[d];
-    }
-  }
-};
-
-template <typename IndexType, typename Real, int Dims>
-void THDPCPPTensor_gatherKernel(
-    TensorInfo<Real, IndexType> tensor,
-    TensorInfo<Real, IndexType> src,
-    TensorInfo<int64_t, IndexType> index,
-    const int dim,
-    const IndexType totalElements) {
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-
-  auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto tensor_data = tensor.data;
-    auto src_data = src.data;
-    auto index_data = index.data;
-
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      auto tensor_ptr = tensor_data;
-      auto src_ptr = src_data;
-      auto index_ptr = index_data;
-
-      auto linear_idx = item_id.get_id(0);
-
-      IndexType tensorOffset = 0;
-      IndexType srcOffset = 0;
-      IndexType indexOffset = 0;
-
-      IndexToScatterGatherOffsets<IndexType, Real, Dims>::compute(
-          linear_idx,
-          dim,
-          index,
-          &indexOffset,
-          tensor,
-          &tensorOffset,
-          src,
-          &srcOffset);
-
-      int64_t indexValue = index_ptr[indexOffset];
-      if (indexValue >= 0 &&
-          static_cast<IndexType>(indexValue) < src.sizes[dim]) {
-        srcOffset += indexValue * src.strides[dim];
-
-        tensor_ptr[tensorOffset] = src_ptr[srcOffset];
-      }
-      //      else
-      //        add warning
-    };
-
-    __cgh.parallel_for(sycl::range</*dim=*/1>(totalElements), kfn);
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-}
-
-template <typename IndexType, typename Real, int Dims>
-void THSyclTensor_scatterKernel(
-    TensorInfo<Real, IndexType> tensor,
-    TensorInfo<Real, IndexType> src,
-    TensorInfo<int64_t, IndexType> index,
-    const int dim,
-    const IndexType totalElements) {
-  auto& queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(dev_id);
-  auto num_groups = CeilDiv(totalElements, group_size);
-  auto total_items = num_groups * group_size;
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto out_data = tensor.data;
-    auto src_data = src.data;
-    auto index_data = index.data;
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto tensor_ptr = out_data;
-      auto src_ptr = src_data;
-      auto index_ptr = index_data;
-      for (IndexType linearIndex = (IndexType)item.get_global_id(0);
-           linearIndex < totalElements;
-           linearIndex += (IndexType)item.get_global_range()[0]) {
-        IndexType tensorOffset = 0;
-        IndexType srcOffset = 0;
-        IndexType indexOffset = 0;
-
-        IndexToScatterGatherOffsets<IndexType, Real, Dims>::compute(
-            linearIndex,
-            dim,
-            index,
-            &indexOffset,
-            src,
-            &srcOffset,
-            tensor,
-            &tensorOffset);
-
-        int64_t indexValue = index_ptr[indexOffset];
-        // assert(indexValue >= 0 && indexValue < src.sizes[dim]);
-        tensorOffset += indexValue * tensor.strides[dim];
-
-        tensor_ptr[tensorOffset] = src_ptr[srcOffset];
-      }
-    };
-
-    // kick off kernel
-    cgh.parallel_for(
-        sycl::nd_range<1>(
-            sycl::range<1>(total_items), sycl::range<1>(group_size)),
-        kfn);
-  };
-
-  DPCPP_Q_SUBMIT(queue, cgf);
-}
-
-template <typename IndexType, typename Real, int Dims>
-void THSyclTensor_scatterAddKernel(
-    TensorInfo<Real, IndexType> tensor,
-    TensorInfo<Real, IndexType> src,
-    TensorInfo<int64_t, IndexType> index,
-    const int dim,
-    const IndexType totalElements) {
-  auto& queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(dev_id);
-  auto num_groups = CeilDiv(totalElements, group_size);
-  auto total_items = num_groups * group_size;
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto out_data = tensor.data;
-    auto src_data = src.data;
-    auto index_data = index.data;
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto tensor_ptr = out_data;
-      auto src_ptr = src_data;
-      auto index_ptr = index_data;
-
-      for (IndexType linearIndex = (IndexType)item.get_global_id(0);
-           linearIndex < totalElements;
-           linearIndex += (IndexType)item.get_global_range()[0]) {
-        IndexType tensorOffset = 0;
-        IndexType srcOffset = 0;
-        IndexType indexOffset = 0;
-
-        IndexToScatterGatherOffsets<IndexType, Real, Dims>::compute(
-            linearIndex,
-            dim,
-            index,
-            &indexOffset,
-            src,
-            &srcOffset,
-            tensor,
-            &tensorOffset);
-
-        int64_t indexValue = index_ptr[indexOffset];
-        // assert(indexValue >= 0 && indexValue < src.sizes[dim]);
-        tensorOffset += indexValue * tensor.strides[dim];
-
-        atomicAdd(
-            (dpcpp_global_ptr_pt<Real>)&tensor_ptr[tensorOffset],
-            src_ptr[srcOffset]);
-      }
-    };
-
-    // kick off kernel
-    cgh.parallel_for(
-        sycl::nd_range<1>(
-            sycl::range<1>(total_items), sycl::range<1>(group_size)),
-        kfn);
-  };
-  DPCPP_Q_SUBMIT(queue, cgf);
-}
-
-template <typename IndexType, typename Real, int Dims>
-void THSyclTensor_scatterFillKernel(
-    TensorInfo<Real, IndexType> tensor,
-    TensorInfo<int64_t, IndexType> index,
-    Real value,
-    const int dim,
-    const IndexType totalElements) {
-  auto& queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(dev_id);
-  auto num_groups = CeilDiv(totalElements, group_size);
-  auto total_items = num_groups * group_size;
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto out_data = tensor.data;
-    auto index_data = index.data;
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto tensor_ptr = out_data;
-      auto index_ptr = index_data;
-      for (IndexType linearIndex = (IndexType)item.get_global_id(0);
-           linearIndex < totalElements;
-           linearIndex += (IndexType)item.get_global_range()[0]) {
-        IndexType tensorOffset = 0;
-        IndexType indexOffset = 0;
-
-        IndexToScatterGatherOffsets<IndexType, Real, Dims>::compute(
-            linearIndex, dim, index, &indexOffset, tensor, &tensorOffset);
-
-        int64_t indexValue = index_ptr[indexOffset];
-        // assert(indexValue >= 0 && indexValue < src.sizes[dim]);
-        tensorOffset += indexValue * tensor.strides[dim];
-
-        tensor_ptr[tensorOffset] = value;
-      }
-    };
-
-    // kick off kernel
-    cgh.parallel_for(
-        sycl::nd_range<1>(
-            sycl::range<1>(total_items), sycl::range<1>(group_size)),
-        kfn);
-  };
-
-  DPCPP_Q_SUBMIT(queue, cgf);
-}
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
