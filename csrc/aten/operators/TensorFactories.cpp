@@ -552,11 +552,11 @@ Tensor& std_out(
     c10::optional<IntArrayRef>(_dim),
     c10::optional<int64_t>(_correction),
     bool keepdim,
-    Tensor& result) {
+    Tensor& out) {
   auto correction = _correction.value_or(1);
   auto dim = _dim.value_or(IntArrayRef{});
   return at::AtenIpexTypeXPU::std_var_out(
-      result, self, dim, correction, keepdim, true);
+      out, self, dim, correction, keepdim, true);
 }
 
 std::tuple<Tensor, Tensor> var_mean(

@@ -546,6 +546,7 @@ supported:
   - special_zeta.out
   - sqrt.out
   - std.correction
+  - std.correction_out
   - std_mean.correction
   - sub.out
   - sum
