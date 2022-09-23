@@ -45,21 +45,27 @@ def _save_to_state_dict(self, destination, prefix, keep_vars):
     if hasattr(self, 'bias') and self.bias is not None:
         self.bias = temp_bias
 
-def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight_split):
+def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight_split, convert_dtype=torch.bfloat16):
 
     def cast_attr(m, attr, master_weight_split, params_attr, optimizer):
-        # cast weight/bias for BF16 dtype
+        # cast weight/bias for BF16 or FP16 dtype
         float_param = getattr(m, attr)
         params_attr[float_param] = {}
         if master_weight_split:
+            assert convert_dtype==torch.bfloat16, "master_weight_split is only support for bf16 now"
             top_half, bot_half = torch.ops.torch_ipex.split_float_bfloat16(float_param.data)
             setattr(m, attr + '_trail', bot_half)
             setattr(m, attr, nn.Parameter(top_half.detach(), requires_grad=float_param.requires_grad))
             params_attr[float_param]['trail'] = getattr(m, attr + '_trail')
         else:
             setattr(m, 'master_' + attr, float_param.data)
-            setattr(m, attr, nn.Parameter(float_param.detach().bfloat16(), requires_grad=float_param.requires_grad))
-            params_attr[float_param]['bf16_param'] = getattr(m, attr)
+            if convert_dtype == torch.bfloat16:
+                setattr(m, attr, nn.Parameter(float_param.detach().bfloat16(), requires_grad=float_param.requires_grad))
+                params_attr[float_param]['bf16_param'] = getattr(m, attr)
+            else:
+                assert convert_dtype==torch.float16, "Only bf16 and fp16 are supported"
+                setattr(m, attr, nn.Parameter(float_param.detach().half(), requires_grad=float_param.requires_grad))
+                params_attr[float_param]['fp16_param'] = getattr(m, attr)
         # update attr entry, always use params in optimzer as "key"
         # while master weight split, key is m.weight/bias, if not split, key is m.master_weight/master_bias
         attr_name = attr if master_weight_split else 'master_' + attr

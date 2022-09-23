@@ -121,10 +121,10 @@ class TestOptimizeCases(TestCase):
                 super(Conv, self).__init__()
                 self.conv = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
 
-        def forward(self, x):
-            return self.conv(x)
+            def forward(self, x):
+                return self.conv(x)
 
-        model = Conv().half()
+        model = Conv().double()
         with self.assertWarnsRegex(UserWarning,
                                    "WARNING: Can't convert model's parameters dtype"):
             optimized_model = ipex.optimize(model.eval(), dtype=torch.bfloat16)

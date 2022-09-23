@@ -91,7 +91,7 @@ def convert_module_data_type(module, dtype):
                 for name, param in module.named_parameters():
                     ori_data = getattr(getattr(module, name), "data")
                     ori_data_dtype = ori_data.dtype
-                    if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16:
+                    if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16 or ori_data_dtype == torch.half:
                         casted_data = ori_data.detach().clone().to(dtype)
                         setattr(getattr(module, name), "data", casted_data)
                     else:
@@ -100,7 +100,7 @@ def convert_module_data_type(module, dtype):
             else:
                 ori_data_dtype = module.weight.dtype
                 # Assume weight and bias have same dtype, only need check weight dtype here.
-                if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16:
+                if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16 or ori_data_dtype == torch.half:
                     weight_data = module.weight.detach().clone().to(dtype)
                     module.weight.data = weight_data
                     if hasattr(module, 'bias') and module.bias is not None:
@@ -112,4 +112,3 @@ def convert_module_data_type(module, dtype):
     for child in module.children():
         convert_module_data_type(child, dtype)
     return module
-

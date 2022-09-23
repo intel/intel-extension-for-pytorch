@@ -301,14 +301,17 @@ def _should_prepack(module, auto_kernel_selection):
 
 def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selection):
     def convert(m, optimizer, params_attr, auto_kernel_selection):
-        if _should_prepack(m, auto_kernel_selection) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16):
+        if _should_prepack(m, auto_kernel_selection) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16 or m.weight.dtype == torch.half):
             weight = m.master_weight if hasattr(m, "master_weight") else m.weight
             if weight not in params_attr:
                 params_attr[weight] = {}
             if type(m) is torch.nn.Linear:
-                if m.weight.dtype == torch.float32 and optimizer is None and frontend.get_fp32_math_mode(device="cpu") == frontend.FP32MathMode.FP32 and not _using_dnnl():
+                if m.weight.dtype == torch.half:
+                    new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = True)
+                elif m.weight.dtype == torch.float32 and optimizer is None and frontend.get_fp32_math_mode(device="cpu") == frontend.FP32MathMode.FP32 and not _using_dnnl():
                     new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = False)
                 else:
+                    assert m.weight.dtype in [torch.float32, torch.bfloat16], "Only float, bf16 and fp16 are supported"
                     new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = True)
             else:
                 new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m)
@@ -321,6 +324,8 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
                 params_attr[weight]['bf16_param'] = new_m.weight
             elif 'trail' in params_attr[weight]:
                 params_attr[weight]['trail'] = new_m.weight_trail
+            if 'fp16_param' in params_attr[weight]:
+                params_attr[weight]['fp16_param'] = new_m.weight
             # update entry from origin weight to packed weight, from origin bias to cloned bias
             new_weight = new_m.master_weight if hasattr(m, "master_weight") else new_m.weight
             params_attr[new_weight] = params_attr.pop(weight)
@@ -334,6 +339,8 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
                         params_attr[bias]['bf16_param'] = new_m.bias
                     elif 'trail' in params_attr[bias]:
                         params_attr[bias]['trail'] = new_m.bias_trail
+                    if 'fp16_param' in params_attr[bias]:
+                        params_attr[bias]['fp16_param'] = new_m.bias
                     if bias in params_attr:
                         params_attr[new_bias] = params_attr.pop(bias)
             # replace optimizer's param with prepacked param, also prepack its state.

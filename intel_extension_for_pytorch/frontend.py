@@ -264,6 +264,8 @@ def optimize(
             utils._model_convert.replace_dropout_with_identity(optimized_model)
         if dtype == torch.bfloat16:
             optimized_model = utils._model_convert.convert_module_data_type(optimized_model, torch.bfloat16)
+        if dtype == torch.half:
+            optimized_model = utils._model_convert.convert_module_data_type(optimized_model, torch.half)
 
     if opt_properties.optimize_lstm:
         utils._model_convert.replace_lstm_with_ipex_lstm(optimized_model)
@@ -287,10 +289,17 @@ def optimize(
     if dtype == torch.bfloat16 and model.training:
         optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
             optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16)
+    if dtype == torch.half and model.training:
+        optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
+            optimized_model, optimized_optimizer, params_attr, False, convert_dtype=torch.float16)
     if opt_properties.weights_prepack:
         if dtype == torch.bfloat16:
             assert core.onednn_has_bf16_support(), \
                     "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, " + \
+                    "please set dtype to torch.float or set weights_prepack to False."
+        if dtype == torch.half:
+            assert core.onednn_has_fp16_support(), \
+                    "FP16 weight prepack needs the cpu support avx512_core_fp16, " + \
                     "please set dtype to torch.float or set weights_prepack to False."
         optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
             optimized_model, optimized_optimizer, params_attr, opt_properties.auto_kernel_selection)

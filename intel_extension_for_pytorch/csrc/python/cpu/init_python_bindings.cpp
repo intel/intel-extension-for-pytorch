@@ -71,6 +71,9 @@ void InitIpexModuleBindings(py::module m) {
   m.def("onednn_has_bf16_support", []() {
     return torch_ipex::utils::onednn_has_bf16_type_support();
   });
+  m.def("onednn_has_fp16_support", []() {
+    return torch_ipex::utils::onednn_has_fp16_type_support();
+  });
 
   // ipex amp autocast
   m.def("get_autocast_dtype", []() {

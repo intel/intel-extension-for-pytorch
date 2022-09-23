@@ -13,5 +13,9 @@ bool onednn_has_bf16_type_support() {
   return ideep::has_bf16_type_support();
 }
 
+bool onednn_has_fp16_type_support() {
+  return ideep::has_fp16_type_support();
+}
+
 } // namespace utils
 } // namespace torch_ipex

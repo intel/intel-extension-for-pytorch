@@ -580,9 +580,14 @@ ContextConvolution create(
   ideep::tensor packed_weight;
   if (ideep::data_type::f32 == dtype) {
     packed_weight.init(expected_desc, at_weight.template data_ptr<float>());
-  } else {
+  } else if (ideep::data_type::bf16 == dtype) {
     packed_weight.init(
         expected_desc, at_weight.template data_ptr<c10::BFloat16>());
+  } else {
+    TORCH_CHECK(
+        ideep::data_type::f16 == dtype,
+        "Only support bfloat16, float16 and float for weight prepack of convolution");
+    packed_weight.init(expected_desc, at_weight.template data_ptr<c10::Half>());
   }
   packed_weight.feed_from(w);
 
@@ -791,9 +796,15 @@ at::Tensor pack(ContextConvolution& context, const at::Tensor& tensor) {
   if (ideep::data_type::f32 == dtype) {
     packed_tensor.init(
         expected_desc, packed_at_tensor.template data_ptr<float>());
-  } else {
+  } else if (ideep::data_type::bf16 == dtype) {
     packed_tensor.init(
         expected_desc, packed_at_tensor.template data_ptr<c10::BFloat16>());
+  } else {
+    TORCH_CHECK(
+        ideep::data_type::f16 == dtype,
+        "Only support bfloat16, float16 and float for weight prepack of convolution");
+    packed_tensor.init(
+        expected_desc, packed_at_tensor.template data_ptr<c10::Half>());
   }
   packed_tensor.feed_from(ideep_tensor);
   return packed_at_tensor;
@@ -805,9 +816,14 @@ at::Tensor unpack(ContextConvolution& context, const at::Tensor& tensor) {
   ideep::tensor blocked_tensor;
   if (ideep::data_type::f32 == dtype) {
     blocked_tensor.init(expected_desc, tensor.template data_ptr<float>());
-  } else {
+  } else if (ideep::data_type::bf16 == dtype) {
     blocked_tensor.init(
         expected_desc, tensor.template data_ptr<c10::BFloat16>());
+  } else {
+    TORCH_CHECK(
+        ideep::data_type::f16 == dtype,
+        "Only support bfloat16, float16 and float for weight prepack of convolution");
+    blocked_tensor.init(expected_desc, tensor.template data_ptr<c10::Half>());
   }
 
   at::Tensor result = at::empty(expected_desc.get_dims(), tensor.options());
@@ -822,8 +838,13 @@ at::Tensor unpack(ContextConvolution& context, const at::Tensor& tensor) {
   auto pub_tensor_desc = context.original_desc_.to_type(dtype);
   if (ideep::data_type::f32 == dtype) {
     pub_tensor.init(pub_tensor_desc, result.template data_ptr<float>());
-  } else {
+  } else if (ideep::data_type::bf16 == dtype) {
     pub_tensor.init(pub_tensor_desc, result.template data_ptr<c10::BFloat16>());
+  } else {
+    TORCH_CHECK(
+        ideep::data_type::f16 == dtype,
+        "Only support bfloat16, float16 and float for weight prepack of convolution");
+    pub_tensor.init(pub_tensor_desc, result.template data_ptr<c10::Half>());
   }
   pub_tensor.feed_from(blocked_tensor);
   return result;
