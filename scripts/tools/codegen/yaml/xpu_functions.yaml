@@ -560,6 +560,7 @@ supported:
   - tanh.out
   - tanh_backward
   - tanh_backward.grad_input
+  - tensordot.out
   - threshold
   - threshold.out
   - threshold_
