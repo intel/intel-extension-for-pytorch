@@ -288,6 +288,15 @@ ideep::tensor::desc get_conv_transpose_expected_weights_desc(
   }
 }
 
+/**
+ * Synchronize FP32 master weight back to BF16 weight.
+ * After updating FP32 master weights by grads,
+ * FP32 master weights should be written back to BF16 weights
+ * in the model.
+ *
+ *@param master_weight Master FP32 weight
+ *@param bf16_weight BF16 weight
+ */
 void sync_master_weight_to_bf16(
     const at::Tensor master_weight,
     at::Tensor& bf16_weight) {
@@ -303,6 +312,30 @@ void sync_master_weight_to_bf16(
   w_bf16.feed_from(w_master);
 }
 
+/**
+ * Synchronize FP32 master weight back to FP16 weight.
+ * After updating FP32 master weights by grads,
+ * FP32 master weights should be written back to FP16 weights
+ * in the model.
+ *
+ *@param master_weight Master FP32 weight
+ *@param fp16_weight FP16 weight
+ */
+void sync_master_weight_to_fp16(
+    const at::Tensor master_weight,
+    at::Tensor& fp16_weight) {
+  TORCH_CHECK(
+      master_weight.sizes() == fp16_weight.sizes(),
+      "expected master weight has same sizes with fp16 weight");
+  TORCH_CHECK(
+      master_weight.scalar_type() == at::kFloat &&
+          fp16_weight.scalar_type() == at::kHalf,
+      "expected master weght has same dims with fp16 weight");
+  auto w_master = itensor_view_from_dense(master_weight);
+  auto w_fp16 = itensor_view_from_dense(fp16_weight);
+  w_fp16.feed_from(w_master);
+}
+
 } // namespace cpu
 } // namespace torch_ipex
 
@@ -313,6 +346,13 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "sync_master_weight_to_bf16(Tensor master_weight, Tensor bf16_weight) "
       "-> ()",
       torch_ipex::cpu::sync_master_weight_to_bf16);
+}
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "sync_master_weight_to_fp16(Tensor master_weight, Tensor fp16_weight) "
+      "-> ()",
+      torch_ipex::cpu::sync_master_weight_to_fp16);
 }
 
 } // namespace

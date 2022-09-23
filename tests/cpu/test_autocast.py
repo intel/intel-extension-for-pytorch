@@ -3,6 +3,7 @@ import copy
 import torch
 import torch.nn as nn
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 from common_utils import TestCase
 from torch.testing._internal.common_utils import TestCase as TorchTestCase
 import time
@@ -44,7 +45,6 @@ class TestFunction(TestCase):
             torch.rand(1, 1, 32, 32)]
 
     def test_set_autocast_dtype(self):
-        import intel_extension_for_pytorch._C as core
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
             self.assertEqual(core.get_autocast_dtype(), torch.bfloat16)
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.float16):
@@ -59,6 +59,27 @@ class TestFunction(TestCase):
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
             out_autocast = _conv(_in_cpu)
         self.assertEqual(out_autocast.dtype, torch.bfloat16)
+
+    @unittest.skipIf(not core.onednn_has_fp16_support(), "ipex fp16 is not supported on this CPU device")
+    def test_gradscaler(self):
+        scaler = torch.cpu.amp.GradScaler()
+        niters = 100
+        criterion = torch.nn.L1Loss()
+        for i in range(self.models.__len__()):
+            model = self.models[i]
+            out = model(self.inputs[i])
+            target = torch.rand_like(out)
+            optimizer = torch.optim.SGD(model.parameters(), lr=0.05, momentum=0.95)
+            model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.half, auto_kernel_selection=True, weights_prepack=True)
+            optimizer.zero_grad()
+            for _ in range(niters):
+                optimizer.zero_grad()
+                with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
+                    output = model(self.inputs[i])
+                    loss = criterion(output, target)
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
 
     def test_nested_useage(self):
         rand_seed = int(get_rand_seed())
