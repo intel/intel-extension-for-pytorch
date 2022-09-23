@@ -2,6 +2,7 @@ import unittest
 import itertools
 import copy
 import os
+from intel_extension_for_pytorch.utils.channels_last_1d import to_channels_last_1d, is_contiguous_channels_last_1d
 
 try:
     import torchvision
@@ -29,14 +30,6 @@ def module_found(model, type):
     return False
 
 class TestPrepackCases(TestCase):
-    def _is_channels_last_nwc(self, input):
-        n = 0
-        c = 1
-        w = 2
-        dims = input.size()
-        strides = input.stride()
-        return strides[n] == dims[w] * dims[c] and strides[w] == dims[c] and strides[c] == 1
-
     def _test_convolution_inference_base(self, dim):
         class ConvNd(torch.nn.Module):
             def __init__(self, dim, in_channels, out_channels, kernel_size, stride, padding, dilation, bias, groups):
@@ -56,7 +49,7 @@ class TestPrepackCases(TestCase):
             options = itertools.product([True, False], [1, 2], [1, 4], [True, False], [torch.contiguous_format, channels_last])
 
         for bias, dilation, groups, feed_sample_input, memory_format in options:
-            N = torch.randint(3, 10, (1,)).item()
+            N = torch.randint(1, 10, (1,)).item()
             M = torch.randint(1, 3, (1,)).item() * groups
             C = torch.randint(1, 3, (1,)).item() * groups
             x_shape = (N, C) + input_shapes[dim]
@@ -73,6 +66,9 @@ class TestPrepackCases(TestCase):
                 groups=groups).float().eval()
             model = model.to(memory_format=memory_format)
             x = x.to(memory_format=memory_format)
+            if dim == 1:
+                x_nwc = to_channels_last_1d(copy.deepcopy(x))
+                model = to_channels_last_1d(model)
             if feed_sample_input:
                 ipex_model = ipex.optimize(model, dtype=torch.float32, level='O1', sample_input=x)
             else:
@@ -81,12 +77,10 @@ class TestPrepackCases(TestCase):
             y = model(x)
             self.assertEqual(y, y_ipex)
             if dim == 1:
-                self.assertTrue(self._is_channels_last_nwc(y_ipex))
-                x_nwc = torch.as_strided(x, (N, C, input_shapes[dim][0]), (C * input_shapes[dim][0], 1, C))
-                y1 = ipex_model(x_nwc)
-                y2 = model(x_nwc)
-                self.assertEqual(y1, y2)
-                self.assertTrue(self._is_channels_last_nwc(y1))
+                y_ipex_nwc = ipex_model(x_nwc)
+                self.assertEqual(y_ipex, y_ipex_nwc)
+                self.assertTrue(is_contiguous_channels_last_1d(y_ipex))
+                self.assertTrue(is_contiguous_channels_last_1d(y_ipex_nwc))
 
     def test_conv1d_inference(self):
         self._test_convolution_inference_base(dim=1)
@@ -96,6 +90,43 @@ class TestPrepackCases(TestCase):
 
     def test_conv3d_inference(self):
         self._test_convolution_inference_base(dim=3)
+
+    def test_channels_last_1d_forward(self):
+        class Conv1d(torch.nn.Module):
+            def __init__(self, in_channels, out_channels, kernel_size, stride, padding, bias):
+                super(Conv1d, self).__init__()
+                self.conv = torch.nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=bias)
+
+            def forward(self, x):
+                return self.conv(x)
+
+        input_shapes = [(2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4), (4, 1, 1), (1, 4, 4), (1, 4, 1), (1, 1, 4)]
+        for x_shape in input_shapes:
+            M = 5
+            C = x_shape[1]
+            x = torch.randn(x_shape, dtype=torch.float32)
+            model = Conv1d(
+                in_channels=C,
+                out_channels=M,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                bias=False).float().eval()
+
+            x_nwc = to_channels_last_1d(copy.deepcopy(x))
+            model = to_channels_last_1d(model)
+
+            ipex_model = ipex.optimize(model, dtype=torch.float32, level='O1')
+            y_ipex = ipex_model(x)
+            y = model(x)
+            self.assertEqual(y, y_ipex)
+
+            y_ipex_nwc = ipex_model(x_nwc)
+            y_nwc = model(x_nwc)
+            self.assertEqual(y_nwc, y_ipex_nwc)
+            self.assertEqual(y_ipex, y_ipex_nwc)
+            self.assertTrue(is_contiguous_channels_last_1d(y_ipex))
+            self.assertTrue(is_contiguous_channels_last_1d(y_ipex_nwc))
 
     def _test_convolution_training_base(self, dim, dtype, rtol=None, atol=None):
         input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
