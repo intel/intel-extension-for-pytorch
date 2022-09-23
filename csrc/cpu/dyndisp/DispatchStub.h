@@ -19,14 +19,14 @@ using namespace c10;
 //
 // Example:
 //
-// In csrc/aten/cpu/MyKernel.h:
+// In csrc/cpu/aten/MyKernel.h:
 //   using fn_type = void(*)(const Tensor& x);
 //   DECLARE_DISPATCH(fn_type, stub);
 //
-// In csrc/aten/cpu/MyKernel.cpp
+// In csrc/cpu/aten/MyKernel.cpp
 //   DEFINE_DISPATCH(stub);
 //
-// In csrc/aten/cpu/kernels/MyKernel.cpp:
+// In csrc/cpu/aten/kernels/MyKernel.cpp:
 //   namespace {
 //     // use anonymous namespace so that different cpu versions won't conflict
 //     void kernel(const Tensor& x) { ... }

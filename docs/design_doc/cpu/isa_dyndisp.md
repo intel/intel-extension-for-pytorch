@@ -39,12 +39,12 @@ Kernel Implementation uses an anonymous namespace so that different CPU versions
 At the runtime, **Dispatch Stub implementation** will check CPUIDs and OS status to determins which ISA level pointer best matches the function body.
 
 ### Code Folder Struct
->#### **Kernel implementation:** `intel_extension_for_pytorch/csrc/aten/cpu/kernels/xyzKrnl.cpp`
->#### **Kernel Stub:** `intel_extension_for_pytorch/csrc/aten/cpu/xyz.cpp` and `intel_extension_for_pytorch/csrc/aten/cpu/xyz.h`
->#### **Dispatch Stub implementation:** `intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.cpp` and `intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h`
+>#### **Kernel implementation:** `csrc/cpu/aten/kernels/xyzKrnl.cpp`
+>#### **Kernel Stub:** `csrc/cpu/aten/xyz.cpp` and `csrc/cpu/aten/xyz.h`
+>#### **Dispatch Stub implementation:** `csrc/cpu/dyndisp/DispatchStub.cpp` and `csrc/cpu/dyndisp/DispatchStub.h`
 
 ### CodeGen Process
-IPEX build system will generate code for each ISA level with specifiy complier parameters. The CodeGen script is located at `cmake/Codegen.cmake`.
+IPEX build system will generate code for each ISA level with specifiy complier parameters. The CodeGen script is located at `cmake/cpu/IsaCodegen.cmake`.
 
 The CodeGen will copy each cpp files from **Kernel implementation**, and then add ISA level as new file suffix.
 
@@ -54,21 +54,21 @@ The CodeGen will copy each cpp files from **Kernel implementation**, and then ad
 >
 > **Origin file:**
 >
-> `intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp`
+> `csrc/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp`
 >
 > **Generate files:**
 >
-> DEFAULT: `build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.DEFAULT.cpp -O3 -D__AVX__ -DCPU_CAPABILITY_AVX2 -mavx2 -mfma -mno-avx256-split-unaligned-load -mno-avx256-split-unaligned-store -DCPU_CAPABILITY=DEFAULT -DCPU_CAPABILITY_DEFAULT`
+> DEFAULT: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.DEFAULT.cpp -O3 -D__AVX__ -DCPU_CAPABILITY_AVX2 -mavx2 -mfma -mno-avx256-split-unaligned-load -mno-avx256-split-unaligned-store -DCPU_CAPABILITY=DEFAULT -DCPU_CAPABILITY_DEFAULT`
 >
-> AVX2: `build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX2.cpp -O3 -D__AVX__ -mavx2 -mfma -mno-avx256-split-unaligned-load -mno-avx256-split-unaligned-store -DCPU_CAPABILITY=AVX2 -DCPU_CAPABILITY_AVX2`
+> AVX2: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX2.cpp -O3 -D__AVX__ -mavx2 -mfma -mno-avx256-split-unaligned-load -mno-avx256-split-unaligned-store -DCPU_CAPABILITY=AVX2 -DCPU_CAPABILITY_AVX2`
 >
-> AVX512: `build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512.cpp -O3 -D__AVX512F__ -mavx512f -mavx512bw -mavx512vl -mavx512dq -mfma -DCPU_CAPABILITY=AVX512 -DCPU_CAPABILITY_AVX512`
+> AVX512: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512.cpp -O3 -D__AVX512F__ -mavx512f -mavx512bw -mavx512vl -mavx512dq -mfma -DCPU_CAPABILITY=AVX512 -DCPU_CAPABILITY_AVX512`
 >
-> AVX512_VNNI: `build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512_VNNI.cpp -O3 -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mfma -DCPU_CAPABILITY=AVX512_VNNI -DCPU_CAPABILITY_AVX512_VNNI`
+> AVX512_VNNI: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512_VNNI.cpp -O3 -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mfma -DCPU_CAPABILITY=AVX512_VNNI -DCPU_CAPABILITY_AVX512_VNNI`
 >
-> AVX512_BF16: `build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512_BF16.cpp -O3 -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma -DCPU_CAPABILITY=AVX512_BF16 -DCPU_CAPABILITY_AVX512_BF16`
+> AVX512_BF16: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512_BF16.cpp -O3 -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma -DCPU_CAPABILITY=AVX512_BF16 -DCPU_CAPABILITY_AVX512_BF16`
 >
-> AMX: `build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.AMX.cpp -O3  -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -DCPU_CAPABILITY_AVX512_BF16 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma -mamx-tile -mamx-int8 -mamx-bf16 -DCPU_CAPABILITY=AMX -DCPU_CAPABILITY_AMX`
+> AMX: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.AMX.cpp -O3  -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -DCPU_CAPABILITY_AVX512_BF16 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma -mamx-tile -mamx-int8 -mamx-bf16 -DCPU_CAPABILITY=AMX -DCPU_CAPABILITY_AMX`
 
 ---
 
@@ -83,9 +83,9 @@ The CodeGen will copy each cpp files from **Kernel implementation**, and then ad
 
 If you want to add a new custom kernel, and the kernel uses CPU ISA instructions, refer to these tips:
 
-1. Add CPU ISA related kernel implementation to the folder:  `intel_extension_for_pytorch/csrc/aten/cpu/kernels/NewKernelKrnl.cpp`
-2. Add kernel stub to the folder: `intel_extension_for_pytorch/csrc/aten/cpu/NewKernel.cpp`
-3. Include header file: `intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h`, and reference to the comment in the header file.
+1. Add CPU ISA related kernel implementation to the folder:  `csrc/cpu/aten/kernels/NewKernelKrnl.cpp`
+2. Add kernel stub to the folder: `csrc/cpu/aten/NewKernel.cpp`
+3. Include header file: `csrc/cpu/dyndisp/DispatchStub.h`, and reference to the comment in the header file.
 ```c++
 // Implements instruction set specific function dispatch.
 //
@@ -97,14 +97,14 @@ If you want to add a new custom kernel, and the kernel uses CPU ISA instructions
 //
 // Example:
 //
-// In csrc/aten/cpu/MyKernel.h:
+// In csrc/cpu/aten/MyKernel.h:
 //   using fn_type = void(*)(const Tensor& x);
 //   DECLARE_DISPATCH(fn_type, stub);
 //
-// In csrc/aten/cpu/MyKernel.cpp
+// In csrc/cpu/aten/MyKernel.cpp
 //   DEFINE_DISPATCH(stub);
 //
-// In csrc/aten/cpu/kernels/MyKernel.cpp:
+// In csrc/cpu/aten/kernels/MyKernel.cpp:
 //   namespace {
 //     // use anonymous namespace so that different cpu versions won't conflict
 //     void kernel(const Tensor& x) { ... }
@@ -127,11 +127,11 @@ If you want to add a new custom kernel, and the kernel uses CPU ISA instructions
 This is a FP32 convert to BF16 function example, and it is implemented for `AVX512_BF16`, `AVX512` and `DEFAULT` ISA levels.
 
 ```c++
-//csrc/aten/cpu/CvtFp32ToBf16.h
+//csrc/cpu/aten/CvtFp32ToBf16.h
 
 #pragma once
 
-#include "intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h"
+#include <dyndisp/DispatchStub.h>
 
 namespace torch_ipex {
 namespace cpu {
@@ -151,7 +151,7 @@ DECLARE_DISPATCH(cvt_fp32_to_bf16_kernel_fn, cvt_fp32_to_bf16_kernel_stub);
 
 ```
 ```c++
-//csrc/aten/cpu/CvtFp32ToBf16.cpp
+//csrc/cpu/aten/CvtFp32ToBf16.cpp
 
 #include "CvtFp32ToBf16.h"
 
@@ -172,7 +172,7 @@ Macro `CPU_CAPABILITY_AVX512` and `CPU_CAPABILITY_AVX512_BF16` are defined by co
 
 Because of `AVX512_BF16` is higher level than `AVX512`, and it compatible to `AVX512`. `CPU_CAPABILITY_AVX512_BF16` can be contained in `CPU_CAPABILITY_AVX512` region.
 ```c++
-//csrc/aten/cpu/kernels/CvtFp32ToBf16Krnl.cpp
+//csrc/cpu/aten/kernels/CvtFp32ToBf16Krnl.cpp
 
 #include <ATen/cpu/vec/vec.h>
 #include "csrc/aten/cpu/CvtFp32ToBf16.h"
@@ -257,10 +257,10 @@ REGISTER_DISPATCH(cvt_fp32_to_bf16_kernel_stub, &cvt_fp32_to_bf16_kernel_impl);
 This example shows how to get the data type size and its Vec size. In different ISA, Vec has a different register width and a different Vec size.
 
 ```c++
-//csrc/aten/cpu/GetVecLength.h
+//csrc/cpu/aten/GetVecLength.h
 #pragma once
 
-#include "intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h"
+#include <dyndisp/DispatchStub.h>
 
 namespace torch_ipex {
 namespace cpu {
@@ -285,7 +285,7 @@ DECLARE_DISPATCH(
 ```
 
 ```c++
-//csrc/aten/cpu/GetVecLength.cpp
+//csrc/cpu/aten/GetVecLength.cpp
 
 #include "GetVecLength.h"
 
@@ -305,10 +305,10 @@ std::tuple<int, int> get_cpp_typesize_and_vecsize(at::ScalarType dtype) {
 ```
 
 ```c++
-//csrc/aten/cpu/kernels/GetVecLengthKrnl.cpp
+//csrc/cpu/aten/kernels/GetVecLengthKrnl.cpp
 
 #include <ATen/cpu/vec/vec.h>
-#include "csrc/aten/cpu/GetVecLength.h"
+#include "csrc/cpu/aten/GetVecLength.h"
 
 namespace torch_ipex {
 namespace cpu {
