@@ -35,6 +35,7 @@ enum class DtypeCastPolicy : uint8_t {
                      // at::kFloat to the args, and redispatch to the type-aware
                      // overload.
   promote, // Run in the widest dtype among several args.
+  fallthrough, // Do not cast inputs.
 };
 
 at::ScalarType get_autocast_dtype();
@@ -104,8 +105,9 @@ inline at::ScalarType prioritize(
       return current; // ignores double tensors
     } else if (current == at::kFloat || next == at::kFloat) {
       return at::kFloat; // prioritizes float over bfloat16
-    } else if (current == at::kBFloat16 && next == at::kBFloat16) {
-      return at::kBFloat16;
+    } else if (
+        current == get_autocast_dtype() && next == get_autocast_dtype()) {
+      return get_autocast_dtype();
     } else {
       AT_ERROR("Unexpected floating ScalarType in at::autocast::prioritize");
       return current;
