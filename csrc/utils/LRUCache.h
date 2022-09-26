@@ -266,7 +266,10 @@ inline typename std::enable_if<std::is_integral<T>::value, void>::type to_bytes(
     T arg) {
   if (arg == 0)
     return;
-  auto len = sizeof(T) - (__builtin_clz(arg) / 8);
+  auto len = sizeof(T);
+  if constexpr (sizeof(T) >= 4) {
+    len = sizeof(T) - (__builtin_clz(arg) / 8);
+  }
   auto as_cstring = reinterpret_cast<char*>(&arg);
   bytes.append(as_cstring, len);
 }
