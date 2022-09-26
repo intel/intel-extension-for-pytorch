@@ -2,7 +2,9 @@
 #include <ATen/SparseTensorUtils.h>
 #include <core/Memory.h>
 #include <core/detail/ListUtils.h>
+#include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 
 #include "BitonicMergeSort.h"
 #include "IndexingUtils.h"
@@ -403,5 +405,6 @@ Tensor empty(
           pin_memory);
   return empty(size, options, optional_memory_format);
 }
+
 } // namespace AtenIpexTypeSparseXPU
 } // namespace at

@@ -19,3 +19,4 @@ supported:
   - _coalesce
   - add.Tensor
   - add_.Tensor
+  - add.out
