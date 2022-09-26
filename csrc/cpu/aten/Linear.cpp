@@ -33,7 +33,11 @@ void linear_kernel_output(
   auto self_reshaped =
       dim == 2 ? self_ : self_.reshape({-1, self.size(self.dim() - 1)});
   const ideep::tensor mkldnn_input = itensor_view_from_dense(self_reshaped);
-  auto output_size = output.sizes();
+  // output.sizes() will return a reference for output's size which will not
+  // hold the underlaying storage. It will be released if output are dead
+  // (output = output.reshape(output_size_reshaped)) output.sizes().vec() will
+  // trigger a copy and can hold the sizes vector.
+  auto output_size = output.sizes().vec();
   auto output_memory_format = output.suggest_memory_format();
   if (dim != 2) {
     std::vector<int64_t> output_size_reshaped = {
