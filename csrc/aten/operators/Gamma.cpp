@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/native/Resize.h>
 #include <ATen/native/TensorIterator.h>
 #include "comm/AccumulateType.h"
 
@@ -182,6 +183,22 @@ Tensor& mvlgamma_(Tensor& self, int64_t p) {
 
   return self.copy_(args.lgamma_().sum(-1).add_(
       p * (p - 1) * std::log(Numerics<double>::pi()) / 4.));
+#else
+  AT_ERROR("lgamma: oneMKL library not found in compilation");
+#endif
+}
+
+Tensor& mvlgamma_out(const Tensor& self, int64_t p, Tensor& out) {
+#ifdef USE_ONEMKL
+  auto output = self.mvlgamma(p);
+  TORCH_CHECK(
+      at::can_cast(output.scalar_type(), out.scalar_type()),
+      "mvlgamma: result type ",
+      self.scalar_type(),
+      " can't be cast to the desired output type ",
+      output.scalar_type());
+  at::native::resize_output(out, output.sizes());
+  return out.copy_(output);
 #else
   AT_ERROR("lgamma: oneMKL library not found in compilation");
 #endif

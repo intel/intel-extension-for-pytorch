@@ -95,6 +95,26 @@ class TestTorchMethod(TestCase):
         print(x_dpcpp.to(cpu_device))
         self.assertEqual(x, x_dpcpp.to(cpu_device))
 
+    def test_mvlgamma_out(self, dtype=torch.float):
+        a = np.array([[4.5, 2, 1.5],
+                      [2.5, 3, 3.5]])
+        data = torch.from_numpy(a)
+        x = data.clone().detach()
+        c_result = torch.zeros_like(x)
+        x_dpcpp = x.to(dpcpp_device)
+        x_result = torch.zeros_like(x_dpcpp)
+
+        y = torch.mvlgamma(x, 2, out=c_result)
+        y_dpcpp = torch.mvlgamma(x_dpcpp, 2, out=x_result)
+
+        print("x: ")
+        print(x)
+        print("y: ")
+        print(y)
+        print("y_dpcpp: ")
+        print(y_dpcpp.to(cpu_device))
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+
     def test_polygamma(self, dtype=torch.float):
         x_cpu = torch.tensor([1, 0.5])
         x_xpu = x_cpu.to('xpu')

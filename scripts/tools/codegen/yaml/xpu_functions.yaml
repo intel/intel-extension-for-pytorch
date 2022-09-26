@@ -410,6 +410,7 @@ supported:
   - mv
   - mvlgamma
   - mvlgamma_
+  - mvlgamma.out
   - nan_to_num.out
   - nanmedian
   - nanmedian.dim_values
