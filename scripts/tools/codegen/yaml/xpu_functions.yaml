@@ -765,6 +765,10 @@ supported:
   - _foreach_div_.ScalarList
   - _foreach_mul.ScalarList
   - _foreach_mul_.ScalarList
+  - _foreach_addcmul.ScalarList
+  - _foreach_addcmul_.ScalarList
+  - _foreach_addcdiv.ScalarList
+  - _foreach_addcdiv_.ScalarList
   - mish.out
   - polar.out
   - var.correction_out

@@ -19,7 +19,6 @@ class ForeachBinaryScalarListTest:
 
 
 class TestTorchMethod(TestCase):
-    # @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
     def test_foreach_add_scalarlist(self, dtype=torch.float):
         x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
         scalarlist = torch.randn(250)

@@ -239,6 +239,73 @@ struct PointWiseOpScalarFunctor {
     }
   }
 };
+
+template <typename T, int depth, int r_args_depth, int res_arg_index>
+struct PointWiseOpScalarListFunctor {
+  using opmath_t = at::opmath_type<T>;
+  template <typename Op, typename TLA, typename TLW>
+  void operator()(
+      const int chunk_size,
+      TLA tlAddress,
+      TLW tlWGMeta,
+      sycl::nd_item<1> item_id,
+      Op op) const {
+    auto item_idx = item_id.get_local_id(0);
+    auto item_range = item_id.get_local_range(0);
+    auto group_idx = item_id.get_group(0);
+    int tensor_loc = tlWGMeta[group_idx].wg_to_tensor;
+    int chunk_idx = tlWGMeta[group_idx].wg_to_chunk;
+    int64_t n = tlAddress[tensor_loc].numel_to_tensor;
+    opmath_t scalar = tlAddress[tensor_loc].scalar_vals;
+    T* args[depth];
+    bool all_aligned =
+        init_args<depth>(args, tlAddress, chunk_idx, chunk_size, tensor_loc);
+    n -= chunk_idx * chunk_size;
+    T r_args[r_args_depth][kILP];
+
+    if (n % kILP == 0 && chunk_size % kILP == 0 && all_aligned) {
+      for (int i_start = item_idx;
+           i_start * kILP < n && i_start * kILP < chunk_size;
+           i_start += item_range) {
+        load_store(r_args[0], args[0], 0, i_start);
+        load_store(r_args[1], args[1], 0, i_start);
+        load_store(r_args[2], args[2], 0, i_start);
+#pragma unroll
+        for (int ii = 0; ii < kILP; ii++) {
+          r_args[0][ii] = static_cast<T>(
+              static_cast<opmath_t>(r_args[0][ii]) +
+              scalar *
+                  op(static_cast<opmath_t>(r_args[1][ii]),
+                     static_cast<opmath_t>(r_args[2][ii])));
+        }
+        load_store(args[res_arg_index], r_args[0], i_start, 0);
+      }
+    } else {
+      for (int i_start = 0; i_start < n && i_start < chunk_size;
+           i_start += item_range * kILP) {
+        load_args<3>(
+            r_args, args, i_start, chunk_size, n, item_idx, item_range);
+#pragma unroll
+        for (int ii = 0; ii < kILP; ii++) {
+          r_args[0][ii] = static_cast<T>(
+              static_cast<opmath_t>(r_args[0][ii]) +
+              scalar *
+                  op(static_cast<opmath_t>(r_args[1][ii]),
+                     static_cast<opmath_t>(r_args[2][ii])));
+        }
+        store_args(
+            args[res_arg_index],
+            r_args[0],
+            i_start,
+            chunk_size,
+            n,
+            item_idx,
+            item_range);
+      }
+    }
+  }
+};
+
 template <typename T, int depth>
 struct PointwiseOpListFunctor {
   using opmath_t = at::opmath_type<T>;
