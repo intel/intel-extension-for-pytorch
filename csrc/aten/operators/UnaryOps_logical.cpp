@@ -54,7 +54,7 @@ Tensor& signbit_out(const Tensor& self, Tensor& result) {
   if (self.dtype() == at::kBool) {
     result.fill_(false);
   } else {
-    auto iter = TensorIterator::unary_force_boolean_op(result, self);
+    auto iter = TensorIterator::unary_op(result, self);
     impl::signbit_kernel(iter);
   }
   return result;
