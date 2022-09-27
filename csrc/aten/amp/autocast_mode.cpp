@@ -825,7 +825,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           c10::optional<c10::string_view>),
       fp32)
   // promote
-  KERNEL_XPU(ADD_NS(cat), "cat", Tensor(TensorList, int64_t), promote)
+  KERNEL_XPU(ADD_NS(cat), "cat", Tensor(const at::ITensorListRef&, int64_t), promote)
   KERNEL_XPU(ADD_NS(stack), "stack", Tensor(TensorList, int64_t), promote)
   KERNEL_XPU(
       ADD_NS(addcdiv),
