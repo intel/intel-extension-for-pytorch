@@ -87,20 +87,20 @@ If an op is unlisted, we assume it's numerically stable in `bfloat16` or `float1
 
 #### Ops that can autocast to `bfloat16`
 
-`conv1d`, `conv2d`, `conv3d`, `bmm`, `baddbmm`, `addmm`, `linear`, `matmul`, `_convolution`, `convolution` 
+`conv1d`, `conv2d`, `conv3d`, `_convolution`, `convolution`, `_convolution_nogroup`, `conv_tbc`, `conv_transpose1d`, `conv_transpose1d`, `conv_transpose3d`, `prelu`, `addmm`, `addmv`, `addr`, `linear`, `matmul`, `mm`, `mv`, `bmm`, `baddbmm`, `addbmm`, `chain_matmul`, `linalg_multi_dot`, `_thnn_fused_gru_cell`, `gru_cell`
 
 #### Ops that can autocast to `float16`
 
-`conv1d`, `conv2d`, `conv3d`, `bmm`, `baddbmm`, `addmm`, `linear`, `matmul`, `_convolution`, `convolution`
+`conv1d`, `conv2d`, `conv3d`, `_convolution`, `convolution`, `_convolution_nogroup`, `conv_tbc`, `conv_transpose1d`, `conv_transpose1d`, `conv_transpose3d`, `prelu`, `addmm`, `addmv`, `addr`, `linear`, `matmul`, `mm`, `mv`, `bmm`, `baddbmm`, `addbmm`, `chain_matmul`, `linalg_multi_dot`, `_thnn_fused_gru_cell`, `gru_cell`
 
 #### Ops that can autocast to `float32`
 
-`log_softmax`, `nll_loss`, `nll_loss_nd`, `cross_entropy_loss`, `fft_fft`, `fft_ifft`, `fft_fft2`, `fft_ifft2`, `fft_fftn`, `fft_ifftn`, `fft_rfft`, `fft_irfft`, `fft_rfft2`, `fft_irfft2`, `fft_rfftn`, `fft_irfftn`, `fft_hfft`, `fft_ihfft`
+`binary_cross_entropy`, `binary_cross_entropy_with_logits`, `log_softmax`, `nll_loss`, `nll_loss2d`, `nll_loss_nd`, `cross_entropy_loss`, `fft_fft`, `fft_ifft`, `fft_fft2`, `fft_ifft2`, `fft_fftn`, `fft_ifftn`, `fft_rfft`, `fft_irfft`, `fft_rfft2`, `fft_irfft2`, `fft_rfftn`, `fft_irfftn`, `fft_hfft`, `fft_ihfft`, `acos`, `asin`, `cosh`, `erfinv`, `exp`, `expm1`, `log`, `log10`, `log2`, `log1p`, `reciprocal`, `rsqrt`, `sinh`, `tan`, `pow`, `softplus`, `layer_norm`, `group_norm`, `frobenius_norm`, `nuclear_norm`, `cosine_similarity`, `poisson_nll_loss`, `cosine_embedding_loss`, `hinge_embedding_loss`, `kl_div`, `l1_loss`, `smooth_l1_loss `, `huber_loss`, `mse_loss`, `margin_ranking_loss`, `multilabel_margin_loss`, `soft_margin_loss`, `triplet_margin_loss`, `multi_margin_loss`, `dist`, `pdist`, `cdist`, `renorm`, `native_layer_norm`
 
 #### Ops that promote to the widest input type
 
 These ops don't require a particular dtype for stability, but take multiple inputs and require that the inputs' dtypes match.  If all of the inputs are `bfloat16`, the op runs in `bfloat16`.  If any of the inputs is `float32`, autocast casts all inputs to `float32` and runs the op in `float32`.
 
-`cat`, `stack`
+`cat`, `stack`, `addcdiv`, `addcmul`, `atan2`, `bilinear`, `cross`, `dot`, `grid_sampler`, `index_put`, `tensordot`, `scatter_add`
 
 Some ops not listed here (e.g., binary ops like `add`) natively promote inputs without autocasting's intervention.  If inputs are a mixture of `bfloat16` and `float32`, these ops run in `float32` and produce `float32` output, regardless of whether autocast is enabled.

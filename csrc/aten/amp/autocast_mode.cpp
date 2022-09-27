@@ -15,9 +15,9 @@ namespace autocast {
 // Policies correspond to op categories that need code-divergent handling.
 // Wrapper templates below are specialized based on a policy template parameter.
 enum class CastPolicy : uint8_t {
-  lower_precision_fp =
-      0, // Cast all inputs to lower_precision_fp before running the op.
-         // Currently, lower_precision_fp is bf16 for AutocastXPU, and is
+  lower_precision =
+      0, // Cast all inputs to lower_precision before running the op.
+         // Currently, lower_precision is bf16 / fp16 for AutocastXPU, and is
          // defined by user(default bf16) for AutocastXPU.
   fp32, // Cast all inputs to at::kFloat before running the op.
   fp32_set_opt_dtype, // Treats functions (like softmax) that
@@ -61,7 +61,7 @@ template <
     class ArgList>
 struct WrapFunction_ {};
 
-// CastPolicy::lower_precision_fp General_DeviceType
+// CastPolicy::lower_precision General_DeviceType
 template <
     DeviceType device_type,
     class Redispatch,
@@ -69,7 +69,7 @@ template <
     class Ret,
     class... Args>
 struct WrapFunction_<
-    CastPolicy::lower_precision_fp,
+    CastPolicy::lower_precision,
     device_type,
     Redispatch,
     F,
@@ -235,7 +235,7 @@ TORCH_LIBRARY_IMPL(_, AutocastXPU, m) {
 }
 
 TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
-  // lower_precision_fp cast policy
+  // lower_precision cast policy
   KERNEL_XPU(
       ADD_NS(_convolution),
       "_convolution.deprecated",
@@ -252,7 +252,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           bool,
           bool,
           bool),
-      lower_precision_fp)
+      lower_precision)
   KERNEL_XPU(
       ADD_NS(_convolution),
       "_convolution",
@@ -270,7 +270,20 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           bool,
           bool,
           bool),
-      lower_precision_fp)
+      lower_precision)
+  KERNEL_XPU(
+      ADD_NS(_convolution_nogroup),
+      "_convolution_nogroup",
+      Tensor(
+          const Tensor&,
+          const Tensor&,
+          const c10::optional<Tensor>&,
+          IntArrayRef,
+          IntArrayRef,
+          IntArrayRef,
+          bool,
+          IntArrayRef),
+      lower_precision)
   KERNEL_XPU(
       ADD_NS(conv1d),
       "conv1d",
@@ -282,7 +295,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           IntArrayRef,
           IntArrayRef,
           int64_t),
-      lower_precision_fp)
+      lower_precision)
   KERNEL_XPU(
       ADD_NS(conv2d),
       "conv2d",
@@ -294,7 +307,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           IntArrayRef,
           IntArrayRef,
           int64_t),
-      lower_precision_fp)
+      lower_precision)
   KERNEL_XPU(
       ADD_NS(conv3d),
       "conv3d",
@@ -306,7 +319,51 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           IntArrayRef,
           IntArrayRef,
           int64_t),
-      lower_precision_fp)
+      lower_precision)
+  KERNEL_XPU(
+      ADD_NS(conv_tbc),
+      "conv_tbc",
+      Tensor(const Tensor&, const Tensor&, const Tensor&, int64_t),
+      lower_precision)
+  KERNEL_XPU(
+      ADD_NS(conv_transpose1d),
+      "conv_transpose1d",
+      Tensor(
+          const Tensor&,
+          const Tensor&,
+          const c10::optional<Tensor>&,
+          IntArrayRef,
+          IntArrayRef,
+          IntArrayRef,
+          int64_t,
+          IntArrayRef),
+      lower_precision)
+  KERNEL_XPU(
+      ADD_NS(conv_transpose2d),
+      "conv_transpose2d.input",
+      Tensor(
+          const Tensor&,
+          const Tensor&,
+          const c10::optional<Tensor>&,
+          IntArrayRef,
+          IntArrayRef,
+          IntArrayRef,
+          int64_t,
+          IntArrayRef),
+      lower_precision)
+  KERNEL_XPU(
+      ADD_NS(conv_transpose3d),
+      "conv_transpose3d.input",
+      Tensor(
+          const Tensor&,
+          const Tensor&,
+          const c10::optional<Tensor>&,
+          IntArrayRef,
+          IntArrayRef,
+          IntArrayRef,
+          int64_t,
+          IntArrayRef),
+      lower_precision)
   KERNEL_XPU(
       ADD_NS(convolution),
       "convolution",
@@ -320,7 +377,12 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           bool,
           IntArrayRef,
           int64_t),
-      lower_precision_fp)
+      lower_precision)
+  KERNEL_XPU(
+      ADD_NS(prelu),
+      "prelu",
+      Tensor(const Tensor&, const Tensor&),
+      lower_precision)
   KERNEL_XPU(
       ADD_NS(addmm),
       "addmm",
@@ -330,22 +392,41 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           const Tensor&,
           const Scalar&,
           const Scalar&),
-      lower_precision_fp)
+      lower_precision)
+  KERNEL_XPU(
+      ADD_NS(addmv),
+      "addmv",
+      Tensor(
+          const Tensor&,
+          const Tensor&,
+          const Tensor&,
+          const Scalar&,
+          const Scalar&),
+      lower_precision)
+  KERNEL_XPU(
+      ADD_NS(addr),
+      "addr",
+      Tensor(
+          const Tensor&,
+          const Tensor&,
+          const Tensor&,
+          const Scalar&,
+          const Scalar&),
+      lower_precision)
   KERNEL_XPU(
       ADD_NS(matmul),
       "matmul",
       Tensor(const Tensor&, const Tensor&),
-      lower_precision_fp)
+      lower_precision)
   KERNEL_XPU(
-      ADD_NS(mm),
-      "mm",
-      Tensor(const Tensor&, const Tensor&),
-      lower_precision_fp)
+      ADD_NS(mm), "mm", Tensor(const Tensor&, const Tensor&), lower_precision)
+  KERNEL_XPU(
+      ADD_NS(mv), "mv", Tensor(const Tensor&, const Tensor&), lower_precision)
   KERNEL_XPU(
       ADD_NS(linear),
       "linear",
       Tensor(const Tensor&, const Tensor&, const c10::optional<Tensor>&),
-      lower_precision_fp)
+      lower_precision)
   KERNEL_XPU(
       ADD_NS(addbmm),
       "addbmm",
@@ -355,7 +436,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           const Tensor&,
           const Scalar&,
           const Scalar&),
-      lower_precision_fp)
+      lower_precision)
   KERNEL_XPU(
       ADD_NS(baddbmm),
       "baddbmm",
@@ -365,16 +446,22 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           const Tensor&,
           const Scalar&,
           const Scalar&),
-      lower_precision_fp)
+      lower_precision)
   KERNEL_XPU(
-      ADD_NS(bmm),
-      "bmm",
-      Tensor(const Tensor&, const Tensor&),
-      lower_precision_fp)
+      ADD_NS(bmm), "bmm", Tensor(const Tensor&, const Tensor&), lower_precision)
+  KERNEL_XPU(
+      ADD_NS(chain_matmul), "chain_matmul", Tensor(TensorList), lower_precision)
+  KERNEL_XPU(
+      ADD_NS(linalg_multi_dot),
+      "linalg_multi_dot",
+      Tensor(TensorList),
+      lower_precision)
+  // The macro doesn't like these (I think it chokes on commas inside <>) so
+  // write them manually
   m.impl(
       "_thnn_fused_gru_cell",
       TORCH_FN((&WrapFunction<
-                CastPolicy::lower_precision_fp,
+                CastPolicy::lower_precision,
                 DeviceType::XPU,
                 std::tuple<Tensor, Tensor>(
                     const Tensor&,
@@ -389,7 +476,26 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
                     const c10::optional<Tensor>&,
                     const c10::optional<Tensor>&),
                 &ADD_NS(_thnn_fused_gru_cell)>::type::call)));
-
+  m.impl(
+      "gru_cell",
+      TORCH_FN((&WrapFunction<
+                CastPolicy::lower_precision,
+                DeviceType::XPU,
+                Tensor(
+                    const Tensor&,
+                    const Tensor&,
+                    const Tensor&,
+                    const Tensor&,
+                    const c10::optional<Tensor>&,
+                    const c10::optional<Tensor>&),
+                Tensor(
+                    const Tensor&,
+                    const Tensor&,
+                    const Tensor&,
+                    const Tensor&,
+                    const c10::optional<Tensor>&,
+                    const c10::optional<Tensor>&),
+                &ADD_NS(gru_cell)>::type::call)));
   // fp32
   KERNEL_XPU(
       ADD_NS(binary_cross_entropy),
@@ -439,6 +545,16 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           int64_t),
       fp32)
   KERNEL_XPU(
+      ADD_NS(nll_loss2d),
+      "nll_loss2d",
+      Tensor(
+          const Tensor&,
+          const Tensor&,
+          const c10::optional<Tensor>&,
+          int64_t,
+          int64_t),
+      fp32)
+  KERNEL_XPU(
       ADD_NS(nll_loss_nd),
       "nll_loss_nd",
       Tensor(
@@ -447,6 +563,173 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           const c10::optional<Tensor>&,
           int64_t,
           int64_t),
+      fp32)
+  KERNEL_XPU(ADD_NS(acos), "acos", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(ADD_NS(asin), "asin", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(ADD_NS(cosh), "cosh", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(ADD_NS(erfinv), "erfinv", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(ADD_NS(exp), "exp", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(ADD_NS(expm1), "expm1", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(ADD_NS(log), "log", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(ADD_NS(log10), "log10", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(ADD_NS(log2), "log2", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(ADD_NS(log1p), "log1p", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(ADD_NS(reciprocal), "reciprocal", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(ADD_NS(rsqrt), "rsqrt", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(ADD_NS(sinh), "sinh", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(ADD_NS(tan), "tan", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(
+      ADD_NS(pow),
+      "pow.Tensor_Scalar",
+      Tensor(const Tensor&, const Scalar&),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(pow),
+      "pow.Tensor_Tensor",
+      Tensor(const Tensor&, const Tensor&),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(pow), "pow.Scalar", Tensor(const Scalar&, const Tensor&), fp32)
+  KERNEL_XPU(
+      ADD_NS(softplus),
+      "softplus",
+      Tensor(const Tensor&, const Scalar&, const Scalar&),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(layer_norm),
+      "layer_norm",
+      Tensor(
+          const Tensor&,
+          IntArrayRef,
+          const c10::optional<Tensor>&,
+          const c10::optional<Tensor>&,
+          double,
+          bool),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(group_norm),
+      "group_norm",
+      Tensor(
+          const Tensor&,
+          int64_t,
+          const c10::optional<Tensor>&,
+          const c10::optional<Tensor>&,
+          double,
+          bool),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(frobenius_norm), "frobenius_norm", Tensor(const Tensor&), fp32)
+  KERNEL_XPU(
+      ADD_NS(frobenius_norm),
+      "frobenius_norm.dim",
+      Tensor(const Tensor&, IntArrayRef, bool),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(nuclear_norm), "nuclear_norm", Tensor(const Tensor&, bool), fp32)
+  KERNEL_XPU(
+      ADD_NS(nuclear_norm),
+      "nuclear_norm.dim",
+      Tensor(const Tensor&, IntArrayRef, bool),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(cosine_similarity),
+      "cosine_similarity",
+      Tensor(const Tensor&, const Tensor&, int64_t, double),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(poisson_nll_loss),
+      "poisson_nll_loss",
+      Tensor(const Tensor&, const Tensor&, bool, bool, double, int64_t),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(cosine_embedding_loss),
+      "cosine_embedding_loss",
+      Tensor(const Tensor&, const Tensor&, const Tensor&, double, int64_t),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(hinge_embedding_loss),
+      "hinge_embedding_loss",
+      Tensor(const Tensor&, const Tensor&, double, int64_t),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(kl_div),
+      "kl_div",
+      Tensor(const Tensor&, const Tensor&, int64_t, bool),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(l1_loss),
+      "l1_loss",
+      Tensor(const Tensor&, const Tensor&, int64_t),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(smooth_l1_loss),
+      "smooth_l1_loss",
+      Tensor(const Tensor&, const Tensor&, int64_t, double),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(huber_loss),
+      "huber_loss",
+      Tensor(const Tensor&, const Tensor&, int64_t, double),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(mse_loss),
+      "mse_loss",
+      Tensor(const Tensor&, const Tensor&, int64_t),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(margin_ranking_loss),
+      "margin_ranking_loss",
+      Tensor(const Tensor&, const Tensor&, const Tensor&, double, int64_t),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(multilabel_margin_loss),
+      "multilabel_margin_loss",
+      Tensor(const Tensor&, const Tensor&, int64_t),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(soft_margin_loss),
+      "soft_margin_loss",
+      Tensor(const Tensor&, const Tensor&, int64_t),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(triplet_margin_loss),
+      "triplet_margin_loss",
+      Tensor(
+          const Tensor&,
+          const Tensor&,
+          const Tensor&,
+          double,
+          double,
+          double,
+          bool,
+          int64_t),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(multi_margin_loss),
+      "multi_margin_loss",
+      Tensor(
+          const Tensor&,
+          const Tensor&,
+          const Scalar&,
+          const Scalar&,
+          const c10::optional<Tensor>&,
+          int64_t),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(dist),
+      "dist",
+      Tensor(const Tensor&, const Tensor&, const Scalar&),
+      fp32)
+  KERNEL_XPU(ADD_NS(pdist), "pdist", Tensor(const Tensor&, double), fp32)
+  KERNEL_XPU(
+      ADD_NS(cdist),
+      "cdist",
+      Tensor(const Tensor&, const Tensor&, double, c10::optional<int64_t>),
+      fp32)
+  KERNEL_XPU(
+      ADD_NS(renorm),
+      "renorm",
+      Tensor(const Tensor&, const Scalar&, int64_t, const Scalar&),
       fp32)
   KERNEL_XPU(
       ADD_NS(fft_ifft),
@@ -565,10 +848,81 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           int64_t,
           c10::optional<c10::string_view>),
       fp32)
+  // The macro doesn't like these (I think it chokes on commas inside <>) so
+  // write them manually
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::native_layer_norm"),
+      TORCH_FN((&WrapFunction<
+                CastPolicy::fp32,
+                DeviceType::XPU,
+                std::tuple<Tensor, Tensor, Tensor>(
+                    const Tensor&,
+                    IntArrayRef,
+                    const c10::optional<Tensor>&,
+                    const c10::optional<Tensor>&,
+                    double),
+                std::tuple<Tensor, Tensor, Tensor>(
+                    const Tensor&,
+                    IntArrayRef,
+                    const c10::optional<Tensor>&,
+                    const c10::optional<Tensor>&,
+                    double),
+                &ADD_NS(native_layer_norm)>::type::call)));
 
   // promote
   KERNEL_XPU(ADD_NS(cat), "cat", Tensor(TensorList, int64_t), promote)
   KERNEL_XPU(ADD_NS(stack), "stack", Tensor(TensorList, int64_t), promote)
+  KERNEL_XPU(
+      ADD_NS(addcdiv),
+      "addcdiv",
+      Tensor(const Tensor&, const Tensor&, const Tensor&, const Scalar&),
+      promote)
+  KERNEL_XPU(
+      ADD_NS(addcmul),
+      "addcmul",
+      Tensor(const Tensor&, const Tensor&, const Tensor&, const Scalar&),
+      promote)
+  KERNEL_XPU(
+      ADD_NS(atan2), "atan2", Tensor(const Tensor&, const Tensor&), promote)
+  KERNEL_XPU(
+      ADD_NS(bilinear),
+      "bilinear",
+      Tensor(
+          const Tensor&,
+          const Tensor&,
+          const Tensor&,
+          const c10::optional<Tensor>&),
+      promote)
+  KERNEL_XPU(
+      ADD_NS(cross),
+      "cross",
+      Tensor(const Tensor&, const Tensor&, c10::optional<int64_t>),
+      promote)
+  KERNEL_XPU(ADD_NS(dot), "dot", Tensor(const Tensor&, const Tensor&), promote)
+  KERNEL_XPU(
+      ADD_NS(grid_sampler),
+      "grid_sampler",
+      Tensor(const Tensor&, const Tensor&, int64_t, int64_t, bool),
+      promote)
+  KERNEL_XPU(
+      ADD_NS(index_put),
+      "index_put",
+      Tensor(
+          const Tensor&,
+          const torch::List<c10::optional<Tensor>>&,
+          const Tensor&,
+          bool),
+      promote)
+  KERNEL_XPU(
+      ADD_NS(tensordot),
+      "tensordot",
+      Tensor(const Tensor&, const Tensor&, IntArrayRef, IntArrayRef),
+      promote)
+  KERNEL_XPU(
+      ADD_NS(scatter_add),
+      "scatter_add",
+      Tensor(const Tensor&, int64_t, const Tensor&, const Tensor&),
+      promote)
 }
 } // namespace autocast
 } // namespace at
