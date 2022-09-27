@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/WrapDimUtils.h>
 #include <ATen/core/DimVector.h>
 #include <ATen/native/SpectralOpsUtils.h>
 #include <core/detail/ListUtils.h>
