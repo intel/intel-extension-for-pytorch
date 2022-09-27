@@ -1,7 +1,7 @@
 #include <torch/csrc/python_headers.h>
 #include <mutex>
 
-#include <core/LazyInit.h>
+#include <core/PreInitHook.h>
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/utils/object_ptr.h>
 
@@ -39,7 +39,9 @@ void lazy_init() {
   }
 }
 
-IPEX_REGISTER_LAZY_INIT(&lazy_init)
+// Here, register lazy_init to pre_init_hook. It makes possible calling
+// lazy_init in back-end if necessary.
+IPEX_REGISTER_PRE_INIT_HOOK(&lazy_init)
 
 void set_run_yet_variable_to_false() {
   run_yet = false;
