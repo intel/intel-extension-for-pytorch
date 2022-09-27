@@ -112,10 +112,9 @@ class MultiStreamModule(nn.Module):
             self.num_streams = self.core_list.__len__()
             warnings.warn("The number of streams is larger than number of cores. The number of streams changes to {}.".format(self.num_streams))
 
-        if self.num_streams == 1:
-            # Sync execution path if num_stream is 1.
-            self.model = model
-        else:
+        self.model = model
+        if self.num_streams != 1:
+            self.is_first_iteration = True
             self.cores_per_instance = self.core_list.__len__() // self.num_streams
             num_stream_allocated_extra_core = self.core_list.__len__() % self.num_streams
             self.tasks = []
@@ -356,6 +355,11 @@ class MultiStreamModule(nn.Module):
         # Split the raw input to generate input for each stream
         self._get_input_for_each_stream(self.input_split_hint, *args, **kwargs)
 
+        # dry run in the first iteration to ensure that the model in graph mode completes graph generation.
+        if self.is_first_iteration:
+            self.model(*(self.args_streams_input[0]), **(self.kwargs_streams_input[0]))
+            self.is_first_iteration = False
+
         results_raw_future = []
         results_raw = []
         for stream_id in range(self.used_num_streams):
@@ -398,10 +402,9 @@ class _MultiStreamBenchmarkModule(nn.Module):
             self.num_streams = self.core_list.__len__()
             warnings.warn("The number of streams is larger than number of cores. The number of streams changes to {}.".format(self.num_streams))
 
-        if self.num_streams == 1:
-            # Sync execution path if num_stream is 1.
-            self.model = model
-        else:
+        self.model = model
+        if self.num_streams != 1:
+            self.is_first_iteration = True
             self.cores_per_instance = self.core_list.__len__() // self.num_streams
             num_stream_allocated_extra_core = self.core_list.__len__() % self.num_streams
             self.tasks = []
@@ -424,6 +427,11 @@ class _MultiStreamBenchmarkModule(nn.Module):
                 # If the main thread's core affinity has been changed, we should set it again.
                 core.pin_cpu_cores(self.cpu_pool.cpu_pool)
             return self.model(*args, **kwargs)
+
+        # dry run in the first iteration to ensure that the model in graph mode completes graph generation.
+        if self.is_first_iteration:
+            self.model(*args, **kwargs)
+            self.is_first_iteration = False
 
         results_raw_future = []
         results_raw = []

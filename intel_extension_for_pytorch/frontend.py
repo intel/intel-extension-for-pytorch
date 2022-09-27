@@ -9,6 +9,10 @@ from .optim._optimizer_utils import optimizer_fusion, IPEX_FUSED_OPTIMIZER_LIST
 import intel_extension_for_pytorch._C as core
 from enum import IntEnum
 
+from typing import List
+import functools
+import logging
+
 def _copy_model_and_optimizer(model, optimizer):
     new_model = copy.deepcopy(model)
     if optimizer is None:
@@ -40,6 +44,7 @@ class _Properties(object):
         self.split_master_weight_for_bf16 = None
         self.fuse_update_step = None
         self.auto_kernel_selection = None
+        self.graph_mode = None
 
 # O0 properties
 class _O0:
@@ -52,6 +57,7 @@ class _O0:
         properties.split_master_weight_for_bf16 = False
         properties.fuse_update_step = False
         properties.auto_kernel_selection = False
+        properties.graph_mode = False
         return properties
 
 
@@ -66,10 +72,91 @@ class _O1:
         properties.split_master_weight_for_bf16 = True
         properties.fuse_update_step = True
         properties.auto_kernel_selection = False
+        properties.graph_mode = False
         return properties
 
 opt_levels = {"O0": _O0(),
               "O1": _O1()}
+
+class RunMethods(IntEnum):
+    JIT = 1
+    TorchDynamo = 2
+    EagerInfer = 3
+    EagerTrain = 4
+
+class GraphCapture(object):
+
+    def __init__(self, model, train, dtype, weights_prepack, auto_kernel_selection):
+        self.model = copy.deepcopy(model)
+        self.train = train
+        self.dtype = dtype
+        self.weights_prepack = weights_prepack
+        self.auto_kernel_selection = auto_kernel_selection
+        self.method = None
+
+    def __call__(self, func):
+
+        def compiler(gm: torch.fx.GraphModule, example_inputs: List[torch.Tensor]):
+            traced_gm = torch.jit.trace(gm.eval(), example_inputs).eval()
+            traced_gm = torch.jit.freeze(traced_gm)
+            return traced_gm
+
+        @functools.wraps(func)
+        def forward(*input, **kwargs):
+            if torch.jit.is_tracing():
+                return func(*input, **kwargs)
+            if self.method:
+                if self.train:
+                    return func(*input, **kwargs)
+                else:
+                    return self.model(*input, **kwargs)
+            else:
+                if self.train:
+                    warnings.warn("graph capture does not support training yet.")
+                    self.method = RunMethods.EagerTrain
+                    return func(*input, **kwargs)
+                else:
+                    try:
+                        # Try JIT trace.
+                        # Tracing only records operations done when the given function is run on the given tensors.
+                        # Therefore, the returned ScriptModule will always run the same traced graph on any input.
+                        # This has some important implications when your module is expected to run different sets of operations,
+                        # depending on the input and/or the module state. In cases like these, tracing would not be appropriate,
+                        # and the tracer will try to emit warnings when doing something that may cause an incorrect trace to be produced.
+                        # Therefore, we catch these warnings and treat them as errors, and let TorchDynamo handle such models appropriately.
+                        with warnings.catch_warnings():
+                            warnings.filterwarnings('error')
+                            traced_model = torch.jit.trace(self.model.eval(), input).eval()
+                            traced_model = torch.jit.freeze(traced_model)
+                            output = traced_model(*input, **kwargs)
+                            self.model = traced_model
+                            self.method = RunMethods.JIT
+                            logging.debug("generate graph by JIT trace.")
+                            return output
+                    except:
+                        try:
+                            # JIT trace failed, try torchdynamo with JIT trace backend.
+                            import torchdynamo
+                            torchdynamo.reset()
+                            torchdynamo.config.dynamic_shapes = True
+                            dynamo_model = torchdynamo.optimize(compiler)(self.model)
+                            output = dynamo_model(*input, **kwargs)
+                            self.model = dynamo_model
+                            self.method = RunMethods.TorchDynamo
+                            logging.debug("generate graph by TorchDynamo.")
+                            return output
+                        except:
+                            warnings.warn("Both JIT and TorchDynamo failed, fallback to original model.")
+                            self.method = RunMethods.EagerInfer
+                            if self.weights_prepack:
+                                if self.dtype == torch.bfloat16:
+                                    assert core.onednn_has_bf16_support(), \
+                                            "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, " + \
+                                            "please set dtype to torch.float or set weights_prepack to False."
+                                self.model, _, _ = utils._weight_prepack.weight_prepack_with_ipex(self.model, None, {}, self.auto_kernel_selection)
+                            return self.model(*input, **kwargs)
+
+        return forward
 
 def optimize(
     model,
@@ -84,7 +171,8 @@ def optimize(
     split_master_weight_for_bf16=None,
     fuse_update_step=None,
     auto_kernel_selection=None,
-    sample_input=None
+    sample_input=None,
+    graph_mode=None
 ):
     r"""
     Apply optimizations at Python frontend to the given model (nn.Module), as
@@ -167,6 +255,8 @@ def optimize(
             ``True``. You might get better performance at the cost of extra memory usage.
             The default value is ``None``. Explicitly setting this knob overwrites the
             configuration set by ``level`` knob.
+        graph_mode: (bool) [experimental]: It will automatically apply a combination of methods
+            to generate graph or multiple subgraphs if True. The default value is ``False``.
 
     Returns:
         Model and optimizer (if given) modified according to the ``level`` knob
@@ -242,6 +332,8 @@ def optimize(
         opt_properties.fuse_update_step = fuse_update_step
     if auto_kernel_selection is not None:
         opt_properties.auto_kernel_selection = auto_kernel_selection
+    if graph_mode is not None:
+        opt_properties.graph_mode = graph_mode
 
     if inplace:
         optimized_model = model
@@ -292,7 +384,9 @@ def optimize(
     if dtype == torch.half and model.training:
         optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
             optimized_model, optimized_optimizer, params_attr, False, convert_dtype=torch.float16)
-    if opt_properties.weights_prepack:
+    # Since TorchDynamo cannot handle custom operations yet, for the case of inference graph mode,
+    # the weights prepacking here is temporarily cancelled, and it will be completed on the graph.
+    if opt_properties.weights_prepack and (opt_properties.graph_mode is not True or optimizer is not None):
         if dtype == torch.bfloat16:
             assert core.onednn_has_bf16_support(), \
                     "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, " + \
@@ -303,6 +397,12 @@ def optimize(
                     "please set dtype to torch.float or set weights_prepack to False."
         optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
             optimized_model, optimized_optimizer, params_attr, opt_properties.auto_kernel_selection)
+
+    if opt_properties.graph_mode:
+        _old_forward = optimized_model.forward
+        wrapper = GraphCapture(optimized_model, optimizer is not None, dtype, opt_properties.weights_prepack, opt_properties.auto_kernel_selection)
+        optimized_model.forward = wrapper(_old_forward)
+
     # TODO: model list, optimizer list.
     if optimizer is None:
         return optimized_model
