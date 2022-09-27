@@ -197,7 +197,7 @@ std::tuple<Tensor, Tensor> _aminmax(
     in = self.reshape({-1});
     keepdim = false;
   }
-  at::AtenIpexTypeXPU::aminmax_dim_out(min, max, in, dim.value_or(0), keepdim);
+  at::AtenIpexTypeXPU::aminmax_dim_out(in, dim.value_or(0), keepdim, min, max);
   return std::tuple<Tensor&, Tensor&>(min, max);
 }
 
