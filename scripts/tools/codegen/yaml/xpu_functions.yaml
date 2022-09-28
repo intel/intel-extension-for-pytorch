@@ -485,10 +485,15 @@ supported:
   - remainder.Scalar_Tensor
   - renorm.out
   - repeat_interleave.Tensor
+  - replication_pad1d.out
+  - replication_pad1d_backward.grad_input
   - replication_pad2d
   - replication_pad2d.out
   - replication_pad2d_backward
   - replication_pad2d_backward.grad_input
+  - replication_pad3d.out
+  - replication_pad3d_backward
+  - replication_pad3d_backward.grad_input
   - resize_
   - resize_as_
   - roll

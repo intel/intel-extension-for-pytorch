@@ -20,6 +20,89 @@ inline int imax(int a, int b) {
   return a > b ? a : b;
 }
 
+template <typename scalar_t, typename F>
+void parallel_replication_pad1d(
+    PackedTensorAccessor64<scalar_t, 3> input,
+    PackedTensorAccessor64<scalar_t, 3> output,
+    int64_t pad_left,
+    int64_t pad_right,
+    const F& f) {
+  auto& queue = dpcppGetCurrentQueue();
+  int64_t output_plane_size = output.size(2);
+  int work_group_size = output_plane_size > 256 ? 256 : output_plane_size;
+  int work_group_num = CeilDiv(output_plane_size, (int64_t)256);
+  int64_t nplane = output.size(1);
+  int64_t nbatch = output.size(0);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
+      auto output_id = item.get_global_id(0);
+      if (output_id > output_plane_size) {
+        return;
+      }
+      int64_t output_x = output_id % output.size(2);
+      int64_t i_start_x = imax(0, -pad_left);
+      int64_t o_start_x = imax(0, pad_left);
+      int64_t input_x =
+          imin(imax(pad_left, output_x), input.size(2) + pad_left - 1) -
+          o_start_x + i_start_x;
+
+      f(input, output, item.get_group(1), item.get_group(2), output_x, input_x);
+    };
+    cgh.parallel_for(
+        sycl::nd_range<3>(
+            sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
+            sycl::range<3>(work_group_size, 1, 1)),
+        kfn);
+  };
+  DPCPP_Q_SUBMIT(queue, cgf);
+}
+
+template <typename scalar_t>
+void replication_pad1d_forward_kernel(
+    PackedTensorAccessor64<scalar_t, 3> input,
+    PackedTensorAccessor64<scalar_t, 3> output,
+    int64_t pad_left,
+    int64_t pad_right) {
+  parallel_replication_pad1d(
+      input,
+      output,
+      pad_left,
+      pad_right,
+      [&](PackedTensorAccessor64<scalar_t, 3> input,
+          PackedTensorAccessor64<scalar_t, 3> output,
+          int64_t plane,
+          int64_t batch,
+          int64_t output_x,
+          int64_t intput_x) {
+        auto value_to_copy = input[batch][plane][intput_x];
+        output[batch][plane][output_x] = value_to_copy;
+      });
+}
+
+template <typename scalar_t>
+void replication_pad1d_backward_kernel(
+    PackedTensorAccessor64<scalar_t, 3> grad_input,
+    PackedTensorAccessor64<scalar_t, 3> grad_output,
+    int64_t pad_left,
+    int64_t pad_right) {
+  parallel_replication_pad1d(
+      grad_input,
+      grad_output,
+      pad_left,
+      pad_right,
+      [&](PackedTensorAccessor64<scalar_t, 3> grad_input,
+          PackedTensorAccessor64<scalar_t, 3> grad_output,
+          int64_t plane,
+          int64_t batch,
+          int64_t output_x,
+          int64_t intput_x) {
+        auto value_to_add = grad_output[batch][plane][output_x];
+        auto target =
+            (dpcpp_global_ptr_pt<scalar_t>)&grad_input[batch][plane][intput_x];
+        atomicAdd(target, value_to_add);
+      });
+}
+
 template <typename scalar_t>
 void replication_pad_forward_kernel2d(
     scalar_t* input,
@@ -330,7 +413,343 @@ void replication_pad2d_backward_out_template(
       });
 }
 
+template <typename scalar_t, typename F>
+void parallel_replication_pad3d(
+    PackedTensorAccessor64<scalar_t, 5> input,
+    PackedTensorAccessor64<scalar_t, 5> output,
+    int64_t pad_left,
+    int64_t pad_top,
+    int64_t pad_front,
+    const F& f) {
+  auto& queue = dpcppGetCurrentQueue();
+  int64_t output_plane_size = output.size(2) * output.size(3) * output.size(4);
+  int work_group_size = output_plane_size > 256 ? 256 : output_plane_size;
+  int work_group_num = CeilDiv(output_plane_size, (int64_t)256);
+  int64_t nplane = output.size(1);
+  int64_t nbatch = output.size(0);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
+      auto output_id = item.get_global_id(0);
+      if (output_id > output_plane_size) {
+        return;
+      }
+      int64_t output_x = output_id % output.size(4);
+      int64_t output_y = (output_id / output.size(4)) % output.size(3);
+      int64_t output_z = output_id / (output.size(3) * output.size(4));
+
+      int64_t i_start_x = imax(0, -pad_left);
+      int64_t i_start_y = imax(0, -pad_top);
+      int64_t i_start_z = imax(0, -pad_front);
+      int64_t o_start_x = imax(0, pad_left);
+      int64_t o_start_y = imax(0, pad_top);
+      int64_t o_start_z = imax(0, pad_front);
+
+      int64_t input_x =
+          imin(imax(pad_left, output_x), input.size(4) + pad_left - 1) -
+          o_start_x + i_start_x;
+      int64_t input_y =
+          imin(imax(pad_top, output_y), input.size(3) + pad_top - 1) -
+          o_start_y + i_start_y;
+      int64_t input_z =
+          imin(imax(pad_front, output_z), input.size(2) + pad_front - 1) -
+          o_start_z + i_start_z;
+
+      f(input,
+        output,
+        item.get_group(1),
+        item.get_group(2),
+        output_z,
+        output_y,
+        output_x,
+        input_z,
+        input_y,
+        input_x);
+    };
+    cgh.parallel_for(
+        sycl::nd_range<3>(
+            sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
+            sycl::range<3>(work_group_size, 1, 1)),
+        kfn);
+  };
+  DPCPP_Q_SUBMIT(queue, cgf);
+}
+
+template <typename scalar_t>
+void replication_pad3d_forward_kernel(
+    PackedTensorAccessor64<scalar_t, 5> input,
+    PackedTensorAccessor64<scalar_t, 5> output,
+    int64_t pad_left,
+    int64_t pad_top,
+    int64_t pad_front) {
+  parallel_replication_pad3d(
+      input,
+      output,
+      pad_left,
+      pad_top,
+      pad_front,
+      [&](PackedTensorAccessor64<scalar_t, 5> input,
+          PackedTensorAccessor64<scalar_t, 5> output,
+          int64_t plane,
+          int64_t batch,
+          int64_t output_z,
+          int64_t output_y,
+          int64_t output_x,
+          int64_t intput_z,
+          int64_t intput_y,
+          int64_t intput_x) {
+        auto value_to_copy = input[batch][plane][intput_z][intput_y][intput_x];
+        output[batch][plane][output_z][output_y][output_x] = value_to_copy;
+      });
+}
+
+template <typename scalar_t>
+void replication_pad3d_backward_kernel(
+    PackedTensorAccessor64<scalar_t, 5> grad_input,
+    PackedTensorAccessor64<scalar_t, 5> grad_output,
+    int64_t pad_left,
+    int64_t pad_top,
+    int64_t pad_front) {
+  parallel_replication_pad3d(
+      grad_input,
+      grad_output,
+      pad_left,
+      pad_top,
+      pad_front,
+      [&](PackedTensorAccessor64<scalar_t, 5> grad_input,
+          PackedTensorAccessor64<scalar_t, 5> grad_output,
+          int64_t plane,
+          int64_t batch,
+          int64_t output_z,
+          int64_t output_y,
+          int64_t output_x,
+          int64_t intput_z,
+          int64_t intput_y,
+          int64_t intput_x) {
+        auto value_to_add =
+            grad_output[batch][plane][output_z][output_y][output_x];
+        auto target =
+            (dpcpp_global_ptr_pt<scalar_t>)&grad_input[batch][plane][intput_z]
+                                                      [intput_y][intput_x];
+        atomicAdd(target, value_to_add);
+      });
+}
+
+static inline void shapeAndGradOutputCheck3d(
+    const Tensor& input,
+    const Tensor& grad_output,
+    int64_t pad_left,
+    int64_t pad_right,
+    int64_t pad_top,
+    int64_t pad_bottom,
+    int64_t pad_front,
+    int64_t pad_back) {
+  TORCH_CHECK(
+      xpu::dpcpp::detail::canUse32BitIndexMath(input),
+      "input tensor must fit into 32-bit index math");
+  int64_t num_input_dims = input.dim();
+
+  bool valid_dims =
+      input.size(1) != 0 && input.size(2) != 0 && input.size(3) != 0;
+  TORCH_CHECK(
+      (num_input_dims == 4 && valid_dims) ||
+          (num_input_dims == 5 && valid_dims && input.size(4) != 0),
+      "Expected 4D or 5D (batch mode) tensor with possibly 0 batch size and other non-zero dimensions for input, but got: ",
+      input.sizes());
+
+  int plane_dim = 0;
+  int dimd = 1;
+  int dimh = 2;
+  int dimw = 3;
+  if (num_input_dims == 5) {
+    plane_dim++;
+    dimd++;
+    dimh++;
+    dimw++;
+  }
+
+  int64_t num_planes = input.size(plane_dim);
+  int64_t idepth = input.size(dimd);
+  int64_t iheight = input.size(dimh);
+  int64_t iwidth = input.size(dimw);
+  int64_t odepth = idepth + pad_front + pad_back;
+  int64_t oheight = iheight + pad_top + pad_bottom;
+  int64_t owidth = iwidth + pad_left + pad_right;
+  TORCH_CHECK(
+      owidth >= 1 || oheight >= 1 || odepth >= 1,
+      "input (D: ",
+      idepth,
+      " H: ",
+      iheight,
+      ", W: ",
+      iwidth,
+      ") is too small."
+      " Calculated output D: ",
+      odepth,
+      " H: ",
+      oheight,
+      " W: ",
+      owidth);
+
+  TORCH_CHECK(
+      xpu::dpcpp::detail::canUse32BitIndexMath(grad_output),
+      "output gradient tensor must fit into 32-bit index math");
+
+  TORCH_CHECK(
+      num_planes == grad_output.size(plane_dim),
+      "grad_output width unexpected. Expected: ",
+      num_planes,
+      ", Got: ",
+      grad_output.size(plane_dim));
+  TORCH_CHECK(
+      owidth == grad_output.size(dimw),
+      "grad_output width unexpected. Expected: ",
+      owidth,
+      ", Got: ",
+      grad_output.size(dimw));
+  TORCH_CHECK(
+      oheight == grad_output.size(dimh),
+      "grad_output height unexpected. Expected: ",
+      oheight,
+      ", Got: ",
+      grad_output.size(dimh));
+  TORCH_CHECK(
+      odepth == grad_output.size(dimd),
+      "grad_output depth unexpected. Expected: ",
+      odepth,
+      ", Got: ",
+      grad_output.size(dimd));
+}
+
+void replication_pad3d_backward_out_dpcpp_template(
+    Tensor& grad_input,
+    const Tensor& grad_output,
+    const Tensor& input,
+    IntArrayRef padding) {
+  grad_input.resize_as_(input);
+  if (grad_input.numel() == 0) {
+    return;
+  }
+  grad_input.zero_();
+
+  TORCH_CHECK(padding.size() == 6, "padding Size is expected to be 6");
+  int pad_left = padding[0];
+  int pad_right = padding[1];
+  int pad_top = padding[2];
+  int pad_bottom = padding[3];
+  int pad_front = padding[4];
+  int pad_back = padding[5];
+  shapeAndGradOutputCheck3d(
+      input,
+      grad_output,
+      pad_left,
+      pad_right,
+      pad_top,
+      pad_bottom,
+      pad_front,
+      pad_back);
+  int num_input_dims = input.dim();
+
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+      kHalf,
+      kBFloat16,
+      input.scalar_type(),
+      "replication_pad3d_backward_dpcpp",
+      [&] {
+        auto grad_input_ = grad_input;
+        auto grad_output_ = grad_output;
+        if (num_input_dims == 4) {
+          grad_input_ = grad_input.unsqueeze(0);
+          grad_output_ = grad_output.unsqueeze(0);
+        }
+        auto grad_input_packed = grad_input_.packed_accessor64<scalar_t, 5>();
+        auto grad_output_packed = grad_output_.packed_accessor64<scalar_t, 5>();
+        replication_pad3d_backward_kernel<scalar_t>(
+            grad_input_packed,
+            grad_output_packed,
+            pad_left,
+            pad_top,
+            pad_front);
+      });
+}
+
 } // namespace impl
+
+Tensor& replication_pad1d_out(
+    const Tensor& input,
+    IntArrayRef padding,
+    Tensor& output) {
+  TORCH_CHECK(
+      xpu::dpcpp::detail::canUse32BitIndexMath(input),
+      "input tensor must fit into 32-bit index math");
+
+  if (output.numel() == 0) {
+    return output;
+  }
+
+  int64_t pad_left = padding[0];
+  int64_t pad_right = padding[1];
+  int64_t num_input_dims = input.dim();
+
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+      kHalf, kBFloat16, input.scalar_type(), "replication_pad1d_dpcpp", [&] {
+        auto input_ = input;
+        auto output_ = output;
+        if (num_input_dims == 2) {
+          input_ = input.unsqueeze(0);
+          output_ = output.unsqueeze(0);
+        }
+
+        auto input_packed = input_.packed_accessor64<scalar_t, 3>();
+        auto output_packed = output_.packed_accessor64<scalar_t, 3>();
+
+        impl::replication_pad1d_forward_kernel<scalar_t>(
+            input_packed, output_packed, pad_left, pad_right);
+      });
+
+  return output;
+}
+
+Tensor& replication_pad1d_backward_out(
+    const Tensor& grad_output,
+    const Tensor& input,
+    IntArrayRef padding,
+    Tensor& grad_input) {
+  TORCH_CHECK(
+      xpu::dpcpp::detail::canUse32BitIndexMath(input),
+      "input tensor must fit into 32-bit index math");
+  TORCH_CHECK(
+      xpu::dpcpp::detail::canUse32BitIndexMath(grad_output),
+      "output gradient tensor must fit into 32-bit index math");
+
+  if (grad_input.numel() == 0) {
+    return grad_input;
+  }
+  grad_input.zero_();
+
+  int pad_left = padding[0];
+  int pad_right = padding[1];
+  int num_input_dims = input.ndimension();
+
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+      kHalf,
+      kBFloat16,
+      input.scalar_type(),
+      "replication_pad1d_backward_dpcpp",
+      [&] {
+        auto grad_input_ = grad_input;
+        auto grad_output_ = grad_output;
+        if (num_input_dims == 2) {
+          grad_input_ = grad_input.unsqueeze(0);
+          grad_output_ = grad_output.unsqueeze(0);
+        }
+        auto grad_input_packed = grad_input_.packed_accessor64<scalar_t, 3>();
+        auto grad_output_packed = grad_output_.packed_accessor64<scalar_t, 3>();
+
+        impl::replication_pad1d_backward_kernel<scalar_t>(
+            grad_input_packed, grad_output_packed, pad_left, pad_right);
+      });
+  return grad_input;
+}
 
 Tensor& replication_pad2d_out(
     Tensor& output,
@@ -364,6 +783,57 @@ Tensor replication_pad2d_backward(
   impl::replication_pad2d_backward_out_template(
       gradInput, gradOutput, input, paddingSize);
   return gradInput;
+}
+
+Tensor& replication_pad3d_out(
+    const Tensor& input,
+    IntArrayRef padding,
+    Tensor& output) {
+  if (output.numel() == 0) {
+    return output;
+  }
+  int64_t pad_left = padding[0];
+  int64_t pad_top = padding[2];
+  int64_t pad_front = padding[4];
+
+  int64_t num_input_dims = input.dim();
+
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+      kHalf, kBFloat16, input.scalar_type(), "replication_pad3d_dpcpp", [&] {
+        auto input_ = input;
+        auto output_ = output;
+        if (num_input_dims == 4) {
+          input_ = input.unsqueeze(0);
+          output_ = output.unsqueeze(0);
+        }
+
+        auto input_packed = input_.packed_accessor64<scalar_t, 5>();
+        auto output_packed = output_.packed_accessor64<scalar_t, 5>();
+
+        impl::replication_pad3d_forward_kernel<scalar_t>(
+            input_packed, output_packed, pad_left, pad_top, pad_front);
+      });
+  return output;
+}
+
+Tensor& replication_pad3d_backward_out(
+    const Tensor& grad_output,
+    const Tensor& input,
+    IntArrayRef padding,
+    Tensor& grad_input) {
+  impl::replication_pad3d_backward_out_dpcpp_template(
+      grad_input, grad_output, input, padding);
+  return grad_input;
+}
+
+Tensor replication_pad3d_backward(
+    const Tensor& grad_output,
+    const Tensor& input,
+    IntArrayRef padding) {
+  auto grad_input = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  impl::replication_pad3d_backward_out_dpcpp_template(
+      grad_input, grad_output, input, padding);
+  return grad_input;
 }
 
 } // namespace AtenIpexTypeXPU
