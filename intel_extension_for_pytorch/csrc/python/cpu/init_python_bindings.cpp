@@ -25,6 +25,7 @@
 #include "csrc/cpu/utils/onednn_utils.h"
 #include "csrc/cpu/utils/rw_lock.h"
 #include "csrc/jit/auto_opt_config.h"
+#include "csrc/jit/cpu/tensorexpr/nnc_fuser_register.h"
 
 #include <c10/core/DeviceType.h>
 #include <torch/csrc/Exceptions.h>
@@ -51,6 +52,10 @@ py::object GetBinaryInfo() {
 }
 
 void InitIpexModuleBindings(py::module m) {
+  m.def("enable_custom_op_2_nnc_fuser", []() {
+    torch_ipex::jit::cpu::tensorexpr::registerCustomOp2NncFuser();
+  });
+
   m.def("_get_binary_info", []() { return GetBinaryInfo(); });
 
   m.def("_get_current_isa_level", []() {

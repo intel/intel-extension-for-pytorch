@@ -763,6 +763,76 @@ at::Tensor& run(
   return accumu;
 }
 
+void run_core_nhwc(
+    const ContextConvolution& context,
+    void* input,
+    void* output) {
+  auto mkldnn_input = ideep::tensor(
+      context.conv_params_.pd.src_desc(), input, ideep::engine::cpu_engine());
+  auto mkldnn_output = ideep::tensor(
+      context.conv_params_.pd.dst_desc(), output, ideep::engine::cpu_engine());
+
+  if (!context.bias_.is_empty()) {
+    ideep::convolution_forward::compute<false, false>(
+        context.conv_params_,
+        mkldnn_input,
+        context.weight_packed_,
+        context.bias_,
+        mkldnn_output);
+  } else {
+    ideep::convolution_forward::compute<false, false>(
+        context.conv_params_,
+        mkldnn_input,
+        context.weight_packed_,
+        mkldnn_output);
+  }
+}
+
+void run_core(
+    const ContextConvolution& context,
+    const at::Tensor& input,
+    at::Tensor& accumu) {
+  auto input_layout = input.suggest_memory_format();
+  bool use_channels_last = input_layout == at::MemoryFormat::ChannelsLast ||
+      input_layout == at::MemoryFormat::ChannelsLast3d ||
+      context.weight_is_channels_last_;
+
+  const ideep::tensor mkldnn_input = itensor_view_from_dense(input);
+  ideep::tensor mkldnn_output = itensor_view_from_dense(accumu);
+
+  if (use_channels_last) {
+    if (!context.bias_.is_empty()) {
+      ideep::convolution_forward::compute<false, false>(
+          context.conv_params_,
+          mkldnn_input,
+          context.weight_packed_,
+          context.bias_,
+          mkldnn_output);
+    } else {
+      ideep::convolution_forward::compute<false, false>(
+          context.conv_params_,
+          mkldnn_input,
+          context.weight_packed_,
+          mkldnn_output);
+    }
+  } else {
+    if (!context.bias_.is_empty()) {
+      ideep::convolution_forward::compute<true, false>(
+          context.conv_params_,
+          mkldnn_input,
+          context.weight_packed_,
+          context.bias_,
+          mkldnn_output);
+    } else {
+      ideep::convolution_forward::compute<true, false>(
+          context.conv_params_,
+          mkldnn_input,
+          context.weight_packed_,
+          mkldnn_output);
+    }
+  }
+}
+
 std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
     ContextConvolution& context,
     const at::Tensor& input,

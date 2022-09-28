@@ -318,7 +318,7 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 5, 9))).toInt(),
                 (std::move(peek(stack, 6, 9))).toBool(),
                 std::move((std::move(peek(stack, 7, 9))).toIntVector()),
-                ideep::attr_t::fuse_pow(1.0, exponent_value)
+                ideep::attr_t::fuse_pow(1.0, 1.0, exponent_value)
                     .set_fpmath_mode(torch_ipex::fpmath_mode));
             drop(stack, 9);
             torch::jit::pack(stack, std::move(result));

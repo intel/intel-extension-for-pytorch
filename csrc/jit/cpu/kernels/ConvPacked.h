@@ -128,6 +128,16 @@ at::Tensor& run(
     at::Tensor& accumu,
     const ideep::attr_t& attr);
 
+void run_core(
+    const ContextConvolution& context,
+    const at::Tensor& input,
+    at::Tensor& accumu);
+
+void run_core_nhwc(
+    const ContextConvolution& context,
+    void* input,
+    void* output);
+
 // Runing backward for conv by given grad_output, input and grad_masks.
 // Will using the mkldnn_weight/bias stored in the context
 std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
