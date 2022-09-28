@@ -479,6 +479,8 @@ supported:
   - reflection_pad2d.out
   - reflection_pad2d_backward
   - reflection_pad2d_backward.grad_input
+  - reflection_pad3d.out
+  - reflection_pad3d_backward.grad_input
   - relu
   - relu_
   - remainder.Tensor_out
