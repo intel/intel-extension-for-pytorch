@@ -7,7 +7,7 @@ import sys
 from typing import List, Optional, Tuple, Union
 import torch
 import intel_extension_for_pytorch
-from .lazy_init import _initialized, _lazy_init
+from .lazy_init import _lazy_init, _lazy_call
 from torch import device as _device
 
 from .streams import Stream, Event
@@ -29,6 +29,7 @@ _device_t = Union[_device, str, int]
 
 def is_initialized():
     r"""Returns whether XPU state has been initialized."""
+    from .lazy_init import _initialized
     return _initialized
 
 

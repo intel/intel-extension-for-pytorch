@@ -30,11 +30,25 @@ DeviceIndex prefetch_device_count() noexcept {
   return static_cast<DeviceIndex>(count);
 }
 
-DeviceIndex device_count() noexcept {
+DeviceIndex device_count_impl() {
   int count;
-  do_pre_init_hook();
   int err = dpcppGetDeviceCount(&count);
   return (err == DPCPP_SUCCESS) ? static_cast<DeviceIndex>(count) : 0;
+}
+
+DeviceIndex device_count() noexcept {
+  do_pre_init_hook();
+  // initialize number of devices only once
+  static DeviceIndex count = []() {
+    try {
+      return device_count_impl();
+    } catch (std::runtime_error& err) {
+      // such as "Failed to apply tile partition"
+      TORCH_WARN("XPU initialization: ", err.what());
+      return static_cast<DeviceIndex>(0);
+    }
+  }();
+  return count;
 }
 
 DeviceIndex current_device() {
