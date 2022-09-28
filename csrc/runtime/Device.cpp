@@ -73,9 +73,12 @@ static void enumDevices(
           throw std::runtime_error(
               std::string("Failed to apply tile partition: ") + e.what());
         }
-        TORCH_WARN(
-            "Tile partition is UNSUPPORTED : ",
-            root_device.get_info<dpcpp_dev_name>());
+        static auto verbose = Settings::I().get_verbose_level();
+        if (verbose) {
+          TORCH_WARN(
+              "Tile partition is UNSUPPORTED : ",
+              root_device.get_info<dpcpp_dev_name>());
+        }
         devices.push_back(std::make_unique<sycl::device>(root_device));
       }
     }
