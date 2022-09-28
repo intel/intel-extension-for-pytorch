@@ -32,7 +32,6 @@ The latest release version for GPU solution of Intel® Extension for PyTorch\* i
   - [Fusion pattern support](#fusion-pattern-support)
   - [ITT support](#itt-support)
   - [Master weights support](#master-weights-support)
-  - [oneDNN specific layouts](#onednn-specific-layouts)
   - [Operator Coverage](#operator-coverage)
   - [Profile tool](#profile-tool)
   - [Sparse tensor support](#sparse-tensor-support)
@@ -323,7 +322,6 @@ The following lauch options are supported in Intel® Extension for PyTorch* GPU.
 | IPEX_SIMPLE_TRACE | 0 | If set to 1, enable simple trace for all operators. |
 | IPEX_TILE_AS_DEVICE | 1 | Device partition. If set to 0, tile partition will be disabled and map device to physical device. |
 | IPEX_XPU_SYNC_MODE | 0 | Kernel Execution mode. If set to 1, use synchronized execution mode and perform blocking wait for the completion of submitted kernel. |
-| IPEX_XPU_ONEDNN_LAYOUT | 0 | [EXPERIMENTAL] Enable oneDNN specific layouts. If set to 1, Intel® Extension for PyTorch* GPU tries to use blocked layouts querying from oneDNN.  |
 
 Examples to config the launch options:</br>
 
@@ -342,7 +340,7 @@ IPEX_VERBOSE=1 python ResNet50.py
 3. Set multiple options when running model
 
 ```bash
-IPEX_VERBOSE=1 IPEX_XPU_ONEDNN_LAYOUT=1 python ResNet50.py
+IPEX_VERBOSE=1 IPEX_XPU_SYNC_MODE=1 python ResNet50.py
 ```
 
 ## Feature Introduction
@@ -483,10 +481,6 @@ optimizer.step()
 1) optimizer shall be updated to use a new API such as ```SGDMasterWeight``` which contains master weights support
 2) model shall be converted to bfloat16 after optimizer is initiated. Otherwise, optimizer can't get FP32 weights since it is already converted to BF16.
 
-### oneDNN specific layouts:
-
-For models running with IPEX_XPU_ONEDNN_LAYOUT=1, Intel® Extension for PyTorch* GPU will use blocked layouts querying from oneDNN. However, not all the models can gain performance improvement through this feature.
-
 ### Operator Coverage:
 
 | **Operator Type** | **Implemented**| **Completion ratio** |
@@ -600,7 +594,7 @@ This release supports TF32 math mode and provides launch option 'IPEX_FP32_MATH_
 
 ### torch.inference_mode():
 
-The inference_mode is recommended by PyTorch official to get better performance by disabling view tracking and version counter bumps. For Intel® Extension for PyTorch* GPU, we also strongly recommend it, especially if IPEX_XPU_ONEDNN_LAYOUT=1 is set to enable oneDNN private layout, inference_mode is able to significantly enhance performance by removing redundant layout conversions.
+The inference_mode is recommended by PyTorch official to get better performance by disabling view tracking and version counter bumps. For Intel® Extension for PyTorch* GPU, we also strongly recommend it, as inference_mode is able to significantly enhance performance by removing redundant layout conversions when using oneDNN specific layouts.
 
 ### User mode scratchpad:
 
