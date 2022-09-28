@@ -74,10 +74,10 @@ void aminmax_kernel(TensorIterator& iter) {
 }
 
 Tensor& argmax_out(
-    Tensor& result,
     const Tensor& self,
     c10::optional<int64_t> dim,
-    bool keepdim) {
+    bool keepdim,
+    Tensor& result) {
   TORCH_CHECK(
       self.numel() > 0,
       "cannot perform reduction function argmax on a "
@@ -98,14 +98,14 @@ Tensor& argmax_out(
 
 Tensor argmax(const Tensor& self, c10::optional<int64_t> dim, bool keepdims) {
   Tensor result = at::empty({0}, self.options().dtype(at::kLong));
-  return at::AtenIpexTypeXPU::argmax_out(result, self, dim, keepdims);
+  return at::AtenIpexTypeXPU::argmax_out(self, dim, keepdims, result);
 }
 
 Tensor& argmin_out(
-    Tensor& result,
     const Tensor& self,
     c10::optional<int64_t> dim,
-    bool keepdim) {
+    bool keepdim,
+    Tensor& result) {
   TORCH_CHECK(
       self.numel() > 0,
       "cannot perform reduction function argmin on a "
@@ -126,7 +126,7 @@ Tensor& argmin_out(
 
 Tensor argmin(const Tensor& self, c10::optional<int64_t> dim, bool keepdims) {
   Tensor result = at::empty({0}, self.options().dtype(at::kLong));
-  return at::AtenIpexTypeXPU::argmin_out(result, self, dim, keepdims);
+  return at::AtenIpexTypeXPU::argmin_out(self, dim, keepdims, result);
 }
 
 void aminmax_out(Tensor& min_result, Tensor& max_result, const Tensor& self) {

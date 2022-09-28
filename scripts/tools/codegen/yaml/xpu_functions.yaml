@@ -103,8 +103,8 @@ supported:
   - any.dim
   - any.out
   - arange.start_out
-  - argmax
-  - argmin
+  - argmax.out
+  - argmin.out
   - as_strided
   - asin.out
   - asinh.out
