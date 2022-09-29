@@ -25,41 +25,43 @@ class TestNNMethod(TestCase):
                 print(abcd, ', dim:', dim, ', maxdiff:', maxdiff)
                 assert(maxdiff < 1e-5)
 
-    def test_sort_focus_case(self, dtype=torch.float):
-        ''' There is no `stable` option in sort Op
-            Sort of IPEX backend supports stable, we construct a stable index
-            to check case result. The case could be improved after Py1.10 rebase
-        '''
-
+    def test_sort_focus_case_unstable(self, dtype=torch.float):
         x = torch.randn(4, 8193, 3)
-        idx_ref = torch.empty((8193), dtype=torch.long)
-        for i in range(8193):
-            x[0][i][0] = 2.22
-            idx_ref[i] = i
         y = x.to("xpu")
         res_cpu, _ = torch.sort(x, dim=1)
-        res, idx = torch.sort(y, dim=1)
+        res, _ = torch.sort(y, dim=1)
         self.assertEqual(res_cpu, res.cpu())
-        self.assertEqual(idx_ref, idx.cpu()[0, :, 0])
 
         x = torch.randn(4, 2049, 3)
-        idx_ref = torch.empty((2049), dtype=torch.long)
-        for i in range(2049):
-            x[0][i][0] = 2.22
-            idx_ref[i] = i
         y = x.to("xpu")
         res_cpu, _ = torch.sort(x, dim=1)
-        res, idx = torch.sort(y, dim=1)
+        res, _ = torch.sort(y, dim=1)
         self.assertEqual(res_cpu, res.cpu())
-        self.assertEqual(idx_ref, idx.cpu()[0, :, 0])
 
         x = torch.randn(4, 511, 3)
-        idx_ref = torch.empty((511), dtype=torch.long)
-        for i in range(511):
-            x[0][i][0] = 2.22
-            idx_ref[i] = i
         y = x.to("xpu")
         res_cpu, _ = torch.sort(x, dim=1)
-        res, idx = torch.sort(y, dim=1)
+        res, _ = torch.sort(y, dim=1)
         self.assertEqual(res_cpu, res.cpu())
-        self.assertEqual(idx_ref, idx.cpu()[0, :, 0])
+
+    def test_sort_focus_case_stable(self, dtype=torch.float):
+        x = torch.randn(4, 8193, 3)
+        y = x.to("xpu")
+        res_cpu, index_cpu = torch.sort(x, dim=1, stable=True)
+        res, index = torch.sort(y, dim=1, stable=True)
+        self.assertEqual(res_cpu, res.cpu())
+        self.assertEqual(index_cpu, index.cpu())
+
+        x = torch.randn(4, 2049, 3)
+        y = x.to("xpu")
+        res_cpu, index_cpu = torch.sort(x, dim=1, stable=True)
+        res, index = torch.sort(y, dim=1, stable=True)
+        self.assertEqual(res_cpu, res.cpu())
+        self.assertEqual(index_cpu, index.cpu())
+
+        x = torch.randn(4, 511, 3)
+        y = x.to("xpu")
+        res_cpu, index_cpu = torch.sort(x, dim=1, stable=True)
+        res, index = torch.sort(y, dim=1, stable=True)
+        self.assertEqual(res_cpu, res.cpu())
+        self.assertEqual(index_cpu, index.cpu())

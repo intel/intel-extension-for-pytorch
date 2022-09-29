@@ -20,7 +20,7 @@ std::tuple<Tensor&, Tensor&> sort_out(
     const Tensor& input,
     long dim,
     bool order) {
-  return sort_out_stable(input, true, dim, order, sorted, indices);
+  return sort_out_stable(input, false, dim, order, sorted, indices);
 }
 
 std::tuple<at::Tensor, at::Tensor> sort(
@@ -28,7 +28,7 @@ std::tuple<at::Tensor, at::Tensor> sort(
     int64_t dim,
     bool descending) {
   Tensor sorted, indices;
-  return sort_out_stable(self, true, dim, descending, sorted, indices);
+  return sort_out_stable(self, false, dim, descending, sorted, indices);
 }
 
 std::tuple<Tensor, Tensor> sort(
