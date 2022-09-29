@@ -322,6 +322,7 @@ The following lauch options are supported in Intel® Extension for PyTorch* GPU.
 | IPEX_SIMPLE_TRACE | 0 | If set to 1, enable simple trace for all operators. |
 | IPEX_TILE_AS_DEVICE | 1 | Device partition. If set to 0, tile partition will be disabled and map device to physical device. |
 | IPEX_XPU_SYNC_MODE | 0 | Kernel Execution mode. If set to 1, use synchronized execution mode and perform blocking wait for the completion of submitted kernel. |
+| IPEX_FORCE_ONEDNN_PRIMITIVE | 0 | Enable force oneDNN primitive. If set to 1, Intel® Extension for PyTorch* GPU force oneDNN primitive.  |
 
 Examples to config the launch options:</br>
 

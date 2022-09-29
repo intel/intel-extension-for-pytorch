@@ -787,4 +787,4 @@ supported:
 autograd:
   - cdist
   - lstm.input
-  # - gru.input
+  - gru.input

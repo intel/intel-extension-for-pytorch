@@ -57,6 +57,9 @@ class TestVerbose(TestCase):
             torch.xpu.set_backend(backend)
             assert torch.xpu.get_backend() == backend, 'Fail to set XPU backend: ' + backend
 
+    def test_force_onednn_primitive(self):
+        with torch.xpu.force_onednn_primitive():
+            assert torch.xpu.using_force_onednn_primitive(), 'Fail to force onednn primitive'
 
 class TestDevicdeListForCard(TestCase):
     def test_devicelist_empty(self):

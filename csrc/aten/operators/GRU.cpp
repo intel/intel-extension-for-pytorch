@@ -8,6 +8,7 @@
 #include <oneDNN/oneDNN.h>
 #include <torch/autograd.h>
 #include <torch/custom_class.h>
+#include <utils/Settings.h>
 #include <utils/SimpleTrace.h>
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
@@ -347,59 +348,71 @@ std::tuple<Tensor, Tensor> gru(
     bool batch_first) {
   //  TORCH_CHECK(!train || dropout == 0.0, "onednn_rnn doesn't support
   //  dropout");
-
-  auto input = input_;
-  if (batch_first) {
-    input = input.transpose(0, 1);
-  }
-  input = input.contiguous();
-  auto hx = hx_.contiguous();
-
-  int64_t hidden_size = hx.size(2);
-
-  at::MatrixRef<at::Tensor> weights{
-      params, static_cast<size_t>(has_biases ? 4 : 2)};
-
-  auto num_directions = bidirectional ? 2 : 1;
-
-  auto layer_input = input;
-  std::vector<at::Tensor> layer_output(num_directions);
-  std::vector<at::Tensor> layer_hy(num_layers * num_directions);
-
-  for (int64_t layer = 0; layer < num_layers; layer++) {
-    for (int64_t direction = 0; direction < num_directions; direction++) {
-      auto index = layer * num_directions + direction;
-      auto layer_weights = weights[index];
-      auto layer_hx = hx[index];
-      auto reverse = (direction > 0);
-      auto outputs = rnn_layer(
-          layer_input,
-          layer_weights,
-          layer_hx,
-          reverse,
-          hidden_size,
-          num_layers,
-          train,
-          bidirectional);
-      layer_output[direction] = outputs[0];
-      layer_hy[index] = outputs[1];
+  if (Settings::I().is_force_onednn_primitive_enabled()) {
+    auto input = input_;
+    if (batch_first) {
+      input = input.transpose(0, 1);
     }
-    layer_input = num_directions == 1
-        ? layer_output[0]
-        : at::cat(layer_output, /*output_channels*/ -1);
+    input = input.contiguous();
+    auto hx = hx_.contiguous();
 
-    if (dropout != 0 && train && layer < num_layers - 1) {
-      layer_input = at::dropout(layer_input, dropout, /*train=*/true);
+    int64_t hidden_size = hx.size(2);
+
+    at::MatrixRef<at::Tensor> weights{
+        params, static_cast<size_t>(has_biases ? 4 : 2)};
+
+    auto num_directions = bidirectional ? 2 : 1;
+
+    auto layer_input = input;
+    std::vector<at::Tensor> layer_output(num_directions);
+    std::vector<at::Tensor> layer_hy(num_layers * num_directions);
+
+    for (int64_t layer = 0; layer < num_layers; layer++) {
+      for (int64_t direction = 0; direction < num_directions; direction++) {
+        auto index = layer * num_directions + direction;
+        auto layer_weights = weights[index];
+        auto layer_hx = hx[index];
+        auto reverse = (direction > 0);
+        auto outputs = rnn_layer(
+            layer_input,
+            layer_weights,
+            layer_hx,
+            reverse,
+            hidden_size,
+            num_layers,
+            train,
+            bidirectional);
+        layer_output[direction] = outputs[0];
+        layer_hy[index] = outputs[1];
+      }
+      layer_input = num_directions == 1
+          ? layer_output[0]
+          : at::cat(layer_output, /*output_channels*/ -1);
+
+      if (dropout != 0 && train && layer < num_layers - 1) {
+        layer_input = at::dropout(layer_input, dropout, /*train=*/true);
+      }
     }
-  }
-  auto output = layer_input;
-  auto hy = at::stack(layer_hy, 0);
+    auto output = layer_input;
+    auto hy = at::stack(layer_hy, 0);
 
-  if (batch_first) {
-    output = output.transpose(0, 1);
-  }
+    if (batch_first) {
+      output = output.transpose(0, 1);
+    }
 
-  return std::make_tuple(std::move(output), std::move(hy));
+    return std::make_tuple(std::move(output), std::move(hy));
+  } else {
+    return at::native::gru(
+        input_,
+        hx_,
+        params,
+        has_biases,
+        num_layers,
+        dropout,
+        train,
+        bidirectional,
+        batch_first);
+  }
 }
 
 } // namespace AtenIpexTypeXPU

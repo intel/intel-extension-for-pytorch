@@ -729,6 +729,18 @@ void init_module(pybind11::module& m) {
     Settings::I().disable_onednn_layout();
   });
 
+  m.def("_is_force_onednn_primitive_enabled", []() {
+    return Settings::I().is_force_onednn_primitive_enabled();
+  });
+
+  m.def("_enable_force_onednn_primitive", []() {
+    Settings::I().enable_force_onednn_primitive();
+  });
+
+  m.def("_disable_force_onednn_primitive", []() {
+    Settings::I().disable_force_onednn_primitive();
+  });
+
   m.def("_set_onednn_verbose", [](const int level) {
     return Settings::I().set_onednn_verbose(level);
   });

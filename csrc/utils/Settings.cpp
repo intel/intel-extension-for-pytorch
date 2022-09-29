@@ -29,6 +29,9 @@ namespace dpcpp {
  *      Default = 1, Set 0 to disable tile partition and map per root device
  *   IPEX_SIMPLE_TRACE:
  *      Default = 0, Set 1 to enable simple trace for all operators*
+ *   IPEX_FORCE_ONEDNN_PRIMITIVE:
+ *      Default = 0, Set 1 to force oneDNN primitive solution for below
+ * operators: GRU
  *
  * Experimental options:
  *   IPEX_XPU_ONEDNN_LAYOUT:
@@ -107,6 +110,13 @@ Settings::Settings() {
   DPCPP_INIT_ENV_VAL(
       XPU_ONEDNN_LAYOUT, onednn_layout_enabled, ENV_VAL, show_opt);
 
+  force_onednn_primitive_enabled = ENV_VAL::OFF;
+  DPCPP_INIT_ENV_VAL(
+      FORCE_ONEDNN_PRIMITIVE,
+      force_onednn_primitive_enabled,
+      ENV_VAL,
+      show_opt);
+
   fp32_math_mode = FP32_MATH_MODE::FP32;
   DPCPP_INIT_ENV_VAL(FP32_MATH_MODE, fp32_math_mode, FP32_MATH_MODE, show_opt);
 
@@ -182,6 +192,21 @@ void Settings::enable_onednn_layout() {
 void Settings::disable_onednn_layout() {
   std::lock_guard<std::mutex> lock(s_mutex);
   onednn_layout_enabled = ENV_VAL::OFF;
+}
+
+bool Settings::is_force_onednn_primitive_enabled() const {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  return force_onednn_primitive_enabled == ENV_VAL::ON;
+}
+
+void Settings::enable_force_onednn_primitive() {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  force_onednn_primitive_enabled = ENV_VAL::ON;
+}
+
+void Settings::disable_force_onednn_primitive() {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  force_onednn_primitive_enabled = ENV_VAL::OFF;
 }
 
 FP32_MATH_MODE Settings::get_fp32_math_mode() const {

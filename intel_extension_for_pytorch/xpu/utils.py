@@ -278,6 +278,31 @@ class onednn_layout(OnOff):
     def __init__(self):
         super().__init__(using_onednn_layout, enable_onednn_layout, disable_onednn_layout)
 
+# force oneDNN primivite
+def using_force_onednn_primitive():
+    r"""
+    Get the current force onednn primitive setting.
+
+    Return:
+        Force onednn primitive mode
+        The value will be ``ON`` or ``OFF``.
+        ``ON`` means enabled force onednn primitive mode;
+        ``OFF`` means disabled force onednn primitive mode;
+
+    Supported operator list:
+        GRU
+    """
+    return _C._is_force_onednn_primitive_enabled()
+
+def enable_force_onednn_primitive():
+    _C._enable_force_onednn_primitive()
+
+def disable_force_onednn_primitive():
+    _C._disable_force_onednn_primitive()
+
+class force_onednn_primitive(OnOff):
+    def __init__(self):
+        super().__init__(using_force_onednn_primitive, enable_force_onednn_primitive, disable_force_onednn_primitive)
 
 # Simple Trace
 def using_simple_trace():
