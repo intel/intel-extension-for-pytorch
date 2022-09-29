@@ -3,6 +3,7 @@
 #include <ATen/native/ComplexHelper.h>
 #include <ATen/native/TensorIterator.h>
 #include <utils/DPCPP.h>
+#include "comm/AccumulateType.h"
 #include "comm/LoopsMeta.h"
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
@@ -58,6 +59,46 @@ Tensor& nextafter_out(const Tensor& self, const Tensor& other, Tensor& out) {
         });
       });
   return out;
+}
+
+at::Tensor& logit_backward_out(
+    const at::Tensor& grad_output,
+    const at::Tensor& self,
+    c10::optional<double> eps,
+    at::Tensor& grad_input) {
+  Scalar eps_scalar = Scalar(eps ? eps.value() : -1.0);
+  auto iter = TensorIterator::binary_op(grad_input, grad_output, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "logit_xpu",
+      [&]() {
+        using T_ACC = acc_type<scalar_t>;
+        const T_ACC eps = eps_scalar.to<T_ACC>();
+        if (eps < T_ACC(0)) {
+          dpcpp_kernel_with_scalars(
+              iter, [](scalar_t dy, scalar_t x) -> scalar_t {
+                const T_ACC dy_acc = static_cast<T_ACC>(dy);
+                const T_ACC x_acc = static_cast<T_ACC>(x);
+                return (x_acc < T_ACC(0) || x_acc > T_ACC(1))
+                    ? std::numeric_limits<T_ACC>::quiet_NaN()
+                    : dy_acc / (x_acc * (T_ACC(1) - x_acc));
+              });
+        } else {
+          const T_ACC lo = eps;
+          const T_ACC hi = T_ACC(1) - eps;
+          dpcpp_kernel_with_scalars(
+              iter, [lo, hi](scalar_t dy, scalar_t x) -> scalar_t {
+                const T_ACC dy_acc = static_cast<T_ACC>(dy);
+                const T_ACC x_acc = static_cast<T_ACC>(x);
+                return (x_acc < lo || x_acc > hi)
+                    ? T_ACC(0)
+                    : dy_acc / (x_acc * (T_ACC(1) - x_acc));
+              });
+        }
+      });
+  return grad_input;
 }
 
 } // namespace AtenIpexTypeXPU

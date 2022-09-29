@@ -781,6 +781,9 @@ supported:
   - mish.out
   - polar.out
   - var.correction_out
+  - matrix_exp
+  - logit_backward.grad_input
+
 autograd:
   - cdist
   - lstm.input

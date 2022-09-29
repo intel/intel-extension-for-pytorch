@@ -89,6 +89,10 @@ OP_TEST_FOR_INTEGER_ = [
     "__ior__(3)",
 ]
 
+OP_TEST_FOR_BACKWARD = [
+    torch.logit
+]
+
 
 class TetsTorchMethod(TestCase):
     @repeat_test_for_types(FLOATING_DTYPES)
@@ -154,3 +158,30 @@ self.assertEqual(y_cpu, y_xpu.cpu())
         self.assertEqual(sign_cpu, sign_xpu.to(cpu_device))
         sign_xpu = torch.signbit(sign_xpu)
         self.assertFalse(sign_xpu.any())
+
+    def _test_unary_backward(self, op, x_cpu, x_xpu, param):
+        if (len(param) == 0):
+            y_cpu = op(x_cpu)
+            y_xpu = op(x_xpu)
+        else:
+            y_cpu = op(x_cpu, **param)
+            y_xpu = op(x_xpu, **param)
+
+        y_cpu.backward(x_cpu)
+        y_xpu.backward(x_xpu)
+        print("CPU {}: {}".format(op.__name__, x_cpu.grad))
+        print("XPU {}: {}".format(op.__name__, x_xpu.grad))
+        self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
+
+    @repeat_test_for_types(FLOATING_DTYPES)
+    def test_unary_backward_for_floating(self, dtype=torch.float):
+        x_cpu = torch.randn(
+            [2, 2, 2, 2], device=cpu_device, dtype=dtype, requires_grad=True)
+        x_xpu = x_cpu.clone().detach().to("xpu").requires_grad_(True)
+
+
+        for op in OP_TEST_FOR_BACKWARD:
+            param = {}
+            if op == torch.logit:
+                param['eps'] = 0.15
+            self._test_unary_backward(op, x_cpu, x_xpu, param)
