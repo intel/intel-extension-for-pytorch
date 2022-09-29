@@ -46,8 +46,8 @@ supported:
   - _local_scalar_dense
   - _logcumsumexp
   - _logcumsumexp.out
-  - _log_softmax
-  - _log_softmax_backward_data
+  - _log_softmax.out
+  - _log_softmax_backward_data.out
   - _lu_with_info
   - _make_per_channel_quantized_tensor
   - _make_per_tensor_quantized_tensor
@@ -56,8 +56,8 @@ supported:
   - _pin_memory
   - _reshape_alias  # newly added
   - _s_where
-  - _softmax
-  - _softmax_backward_data
+  - _softmax.out
+  - _softmax_backward_data.out
   - _solve_helper
   - _svd_helper
   - _symeig_helper

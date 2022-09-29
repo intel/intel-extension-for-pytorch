@@ -52,7 +52,8 @@ static inline void get_dnnl_format(
 static Tensor softmax(
     const Tensor& input,
     const int64_t dim,
-    const bool half_to_float) {
+    const bool half_to_float,
+    Tensor& output) {
   TORCH_CHECK(input.dim() <= 4 && input.dim() >= 1, "Input Dims out of range");
 
   Device curDevice = Device(at::kXPU, current_device());
@@ -86,12 +87,13 @@ static Tensor softmax(
   auto softmax_forward_pd =
       dnnl::softmax_forward::primitive_desc(softmax_forward_desc, engine);
 
-  Tensor output;
-  if (input_ctx.is_plain()) {
-    output = at::empty_like(input);
-  } else {
-    output = empty_opaque_tensor(
-        softmax_forward_pd.dst_desc(), input.options(), c10::nullopt);
+  if (!output.defined()) {
+    if (input_ctx.is_plain()) {
+      output = at::empty_like(input);
+    } else {
+      output = empty_opaque_tensor(
+          softmax_forward_pd.dst_desc(), input.options(), c10::nullopt);
+    }
   }
   auto input_usr_memory =
       dpcpp_onednn_memory(input_md, engine, input.data_ptr());
@@ -119,13 +121,16 @@ static Tensor softmax_backward(
     const Tensor& grad,
     const Tensor& output,
     int64_t dim,
-    bool half_to_float) {
+    bool half_to_float,
+    Tensor gI) {
   TORCH_CHECK(grad.dim() <= 4 && grad.dim() >= 1, "Input Dims out of range");
 
   Device curDevice = Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
-  auto gI = at::empty_like(grad);
+  if (!gI.defined()) {
+    gI = at::empty_like(grad);
+  }
   memory::format_tag output_dnnl_format;
   memory::format_tag grad_dnnl_format;
   memory::dims output_tz;
