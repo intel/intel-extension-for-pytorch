@@ -22,7 +22,7 @@ python3 -m pip install pytest
 * Or download from the repo with below command.
 
 ```bash
-git clone --depth=1 https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu.git
+git clone https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu.git
 ```
 
 * Please use pytest to run one test, or all of them if ${Test_Name} is empty.
@@ -40,7 +40,7 @@ pytest ${PATH_To_Your_Extension_Source_Code}/tests/gpu/${Test_Name}
 
 ## Example
 
-### General case study:
+### General case study
 
 ```python
 import torch
@@ -89,7 +89,8 @@ class TestTorchMethod2(TestCase):
         self.assertEqual(y, y_dpcpp.to(cpu_device))
 ```
 
-### Skip certain case with reason and comments:
+### Skip certain case with reason and comments
+
 ```python
 import torch
 import intel_extension_for_pytorch
@@ -135,53 +136,31 @@ class TestTorchMethod(TestCase):
 
 ```
 
-### repeat for different dtype
-
-```python
-import torch
-import intel_extension_for_pytorch
-from torch.testing._internal.common_utils import TestCase, repeat_test_for_types
-
-cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("xpu")
 
 
-class TestTorchMethod(TestCase):
-    @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
-    def test_abs(self, dtype=torch.float):
-        data = [[-0.2911, -1.3204,  -2.6425,  -2.4644,  -
-                        0.6018, -0.0839, -0.1322, -0.4713, -0.3586, -0.8882, 0.0000, 0.0000, 1.1111, 2.2222, 3.3333]]
-        excepted = [[0.2911, 1.3204,  2.6425,  2.4644,
-                        0.6018, 0.0839, 0.1322, 0.4713, 0.3586, 0.8882, 0.0000, 0.0000, 1.1111, 2.2222, 3.3333]]
-        x_dpcpp = torch.tensor(data, device=dpcpp_device)
-        y = torch.tensor(excepted, device=dpcpp_device)
-        y_dpcpp = torch.abs(x_dpcpp)
-        self.assertEqual(y.to(cpu_device), y_dpcpp.to(cpu_device))
-```
+## How to RUN and DEBUG Test Cases of Pytorch Test Suite
 
-# How to RUN and DEBUG Test Cases of Pytorch Test Suite
-
-## RUN the Whole Test Suite
+### RUN the Whole Test Suite
 
 * run the python script under `tests/gpu/experimental` like:
 
-```
+```bash
 python tests/gpu/experimental/run_tests.py [--options opts]
 ```
 
 * the default log file is under `tests/gpu/experimental/logs/raw_logs`.
 
-## Get the usage of options
+### Get the usage of options of runner
 
 * run the python script with `--help` like:
 
-```
+```bash
 python tests/gpu/experimental/run_tests.py --help
 ```
 
 * you may see decriptions of options like:
 
-```
+```bash
 usage: run_tests.py [-h] [--logdir logdir] [--spec spectest] [-c count] [-t timeout]
                     [--parallel] [--autoskip] [-q] [--ignore] [--clean]
 
@@ -209,12 +188,11 @@ optional arguments:
   --clean               clean raw logs
 ```
 
-
-## Suggested command for running
+### Suggested command for running
 
 * you can run the whole tests with time threshold, multi-epoches and auto skip core dumped or hang cases like:
 
-```
+```bash
 python tests/gpu/experimental/run_tests.py --clean
 python tests/gpu/experimental/run_tests.py -c 3 -t 3600 --autoskip --quiet
 ```
@@ -229,23 +207,23 @@ python tests/gpu/experimental/run_tests.py -c 3 -t 3600 --autoskip --quiet
 
 * run python script `ut_analyzer.py` under `tests/gpu/experimental/common` like:
 
-```
+```bash
 python tests/gpu/experimental/common/ut_analyzer.py [--options opts]
 ```
 
 * this analyzer will output a summary of result like pass rate, fail rate, etc. And also it will dump out detailed log list for each classified field under `tests/gpu/experimental/logs/anls_logs` as well.
 
-## Get the usage of options
+### Get the usage of options of analyzer
 
 * run the python script with `--help` like:
 
-```
+```bash
 python tests/gpu/experimental/common/ut_analyzer.py --help
 ```
 
 * you may see decriptions of options like:
 
-```
+```bash
 usage: ut_analyzer.py [-h] [--logdir logdir] [--saveref] [--compare] [--clean]
 
 Auto script for analysing raw logs
@@ -258,4 +236,3 @@ optional arguments:
   --compare        compare current pass list against reference to see if regression occurred
   --clean          clean analysis logs
 ```
-
