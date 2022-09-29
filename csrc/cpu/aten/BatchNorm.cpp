@@ -340,6 +340,11 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       torch_ipex::cpu::frozen_batch_norm);
   m.impl(
       "frozen_batch_norm",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::frozen_batch_norm);
+
+  m.impl(
+      "frozen_batch_norm",
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::frozen_batch_norm);
   m.def(

@@ -123,7 +123,7 @@ TORCH_LIBRARY(ipex_prepack, m) {
       "-> __torch__.torch.classes.ipex_prepack.ConvTransposeOpContext");
 }
 
-TORCH_LIBRARY_IMPL(ipex_prepack, AutogradCPU, m) {
+TORCH_LIBRARY_IMPL(ipex_prepack, CPU, m) {
   m.impl("convolution_prepack", TORCH_FN(createConvolutionPrePackOpContext));
   m.impl("linear_prepack", TORCH_FN(createLinearPrePackOpContext));
   m.impl("mkl_sgemm_prepack", TORCH_FN(createLinearMKLPrePackOpContext));
