@@ -38,6 +38,7 @@ supported:
   - _fft_c2c.out
   - _fused_dropout
   - _masked_scale
+  - _index_copy_
   - _index_put_impl_ 
   - _inverse_helper
   - _linalg_qr_helper

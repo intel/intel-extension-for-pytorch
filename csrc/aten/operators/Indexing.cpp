@@ -902,6 +902,25 @@ Tensor& index_add_(
   return self;
 }
 
+Tensor& _index_copy_(
+    Tensor& self,
+    int64_t dim,
+    const Tensor& index,
+    const Tensor& source) {
+  // Handle the case when self /source is 0-dim
+  Tensor self_nonzero = self.dim() == 0 ? self.unsqueeze(0) : self;
+  Tensor source_nonzero = source.dim() == 0 ? source.unsqueeze(0) : source;
+
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "index_copy",
+      [&]() { impl::_index_copy<scalar_t>(self, dim, index, source); });
+  return self;
+}
+
 Tensor& index_copy_(
     Tensor& self,
     int64_t dim,
@@ -991,14 +1010,7 @@ Tensor& index_copy_(
         false, "index_copy is not implemented with deterministic algorithm.");
   }
 
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-      at::ScalarType::Half,
-      at::ScalarType::Bool,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "index_copy",
-      [&]() { impl::_index_copy<scalar_t>(self, dim, index, source); });
-  return self;
+  return at::_index_copy_(self, dim, index, source);
 }
 
 Tensor& index_fill_(
