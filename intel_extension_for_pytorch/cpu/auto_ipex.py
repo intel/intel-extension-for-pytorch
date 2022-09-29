@@ -12,7 +12,7 @@ format_str = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 logging.basicConfig(level=logging.INFO, format=format_str)
 logger = logging.getLogger(__name__)
 
-def apply_monkey_patch(program, dtype, auto_ipex_verbose):
+def apply_monkey_patch(program, dtype, auto_ipex_verbose, disable_ipex_graph_mode):
     # Auto apply the ipex features
     # Open the original file and get the content
     with open(program) as f:
@@ -62,8 +62,17 @@ def module_call_wrapper(mod, *args, **kwargs):
 
             set_optimized_attr(mod)
             dataType = torch.bfloat16 if ({0} == True) else torch.float32
-            optimized_m = ipex.optimize(mod.eval(), dtype=dataType).eval()
+            optimized_m = ipex.optimize(mod.eval(), dtype=dataType, graph_mode=(None if ({2} == True) else True)).eval()
             set_optimized_attr(optimized_m)
+
+            def optimized_m_forward(*args, **kwargs):
+                with torch.cpu.amp.autocast(enabled={0}), torch.no_grad(), nested_optimized():
+                    return optimized_m(*args, **kwargs)
+
+            if not {2}:
+                # Warm up run to finish some warm up steps for graph mode in ipex.optimize
+                for _ in range(3):
+                    optimized_m_forward(*args, **kwargs)
 
             if {1}:
                 # This path is valid only when auto_ipex_verbose is True.
@@ -75,18 +84,14 @@ def module_call_wrapper(mod, *args, **kwargs):
                 with torch.profiler.profile(
                         activities=[torch.profiler.ProfilerActivity.CPU]
                     ) as prof:
-                    with torch.cpu.amp.autocast(enabled={0}), torch.no_grad(), nested_optimized():
-                        optimized_m(*args, **kwargs)
+                    optimized_m_forward(*args, **kwargs)
                 print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=-1))
 
-            def optimized_m_forward(*args, **kwargs):
-                with torch.cpu.amp.autocast(enabled={0}), torch.no_grad(), nested_optimized():
-                    return optimized_m(*args, **kwargs)
             mod.forward = optimized_m_forward
         return _orig_module_call(mod, *args, **kwargs)
     return forward(mod, *args, **kwargs)
 
-setattr(torch.nn.Module, "__call__", module_call_wrapper)\n""".format(dtype.lower() == "bfloat16", auto_ipex_verbose)
+setattr(torch.nn.Module, "__call__", module_call_wrapper)\n""".format(dtype.lower() == "bfloat16", auto_ipex_verbose, disable_ipex_graph_mode)
 
     original_program_lines.insert(0, monkey_patch)
 
@@ -101,8 +106,8 @@ setattr(torch.nn.Module, "__call__", module_call_wrapper)\n""".format(dtype.lowe
 
     return generate_file
 
-def exec(args):
-    monkey_patch_program = apply_monkey_patch(args.program, args.dtype, args.auto_ipex_verbose)
+def _exec(args):
+    monkey_patch_program = apply_monkey_patch(args.program, args.dtype, args.auto_ipex_verbose, args.disable_ipex_graph_mode)
     try:
         cmd = []
         cmd.append(sys.executable)
@@ -126,6 +131,8 @@ def add_auto_ipex_params(parser, auto_ipex_default_enabled=False):
                        help="The data type to run inference. float32 or bfloat16 is allowed.")
     group.add_argument("--auto_ipex_verbose", action='store_true', default=False,
                        help="This flag is only used for debug and UT of auto ipex.")
+    group.add_argument("--disable_ipex_graph_mode", action='store_true', default=False,
+                       help="Enable the Graph Mode for ipex.optimize")
 
 def parse_args():
     """
@@ -173,7 +180,7 @@ def main():
         else:
             os.environ["LD_PRELOAD"] = ""
 
-    exec(args)
+    _exec(args)
 
     for x in sorted(set(os.environ.keys()) - env_before):
         # Print the added ENV

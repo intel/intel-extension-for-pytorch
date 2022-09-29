@@ -458,7 +458,7 @@ class MultiInstanceLauncher(Launcher):
         os.environ["LAUNCH_CMD"] = "#"
 
         if args.auto_ipex:
-            args.program = auto_ipex.apply_monkey_patch(args.program, args.dtype, args.auto_ipex_verbose)
+            args.program = auto_ipex.apply_monkey_patch(args.program, args.dtype, args.auto_ipex_verbose, args.disable_ipex_graph_mode)
 
         for i in range(args.ninstances):
             cmd = []
