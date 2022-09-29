@@ -23,27 +23,22 @@ Tensor& cumsum_out(
     int64_t dim,
     c10::optional<at::ScalarType> dtype,
     Tensor& out) {
-  if (self.dtype() == at::ScalarType::Bool) {
-    IPEX_DISPATCH_ALL_TYPES_AND(
-        at::ScalarType::Bool, out.scalar_type(), "cumsum", [&]() {
-          scan<INCLUSIVE_TYPE, bool, scalar_t>(
-              out,
-              self,
-              dim,
-              ScalarConvert<float, bool>::to(0.0),
-              AddOp<bool>());
-        });
-  } else {
-    IPEX_DISPATCH_ALL_TYPES_AND(
-        at::ScalarType::Half, self.scalar_type(), "cumsum", [&]() {
-          scan<INCLUSIVE_TYPE, scalar_t, scalar_t>(
-              out,
-              self,
-              dim,
-              ScalarConvert<float, scalar_t>::to(0.0),
-              AddOp<scalar_t>());
-        });
-  }
+  // convert input tensor datatype to handle different input/output datatypes
+  // case.
+  Tensor self_tensor = self.to(out.scalar_type());
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+      ScalarType::Half,
+      ScalarType::BFloat16,
+      self_tensor.scalar_type(),
+      "cumsum",
+      [&]() {
+        scan<INCLUSIVE_TYPE, scalar_t, scalar_t>(
+            out,
+            self_tensor,
+            dim,
+            ScalarConvert<float, scalar_t>::to(0.0),
+            AddOp<scalar_t>());
+      });
   return out;
 }
 
@@ -52,11 +47,18 @@ Tensor& cumprod_out(
     int64_t dim,
     c10::optional<at::ScalarType> dtype,
     Tensor& out) {
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, self.scalar_type(), "cumprod", [&]() {
+  // convert input tensor datatype to handle different input/output datatypes
+  // case.
+  Tensor self_tensor = self.to(out.scalar_type());
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+      ScalarType::Half,
+      ScalarType::BFloat16,
+      self_tensor.scalar_type(),
+      "cumprod",
+      [&]() {
         scan<INCLUSIVE_TYPE, scalar_t, scalar_t>(
             out,
-            self,
+            self_tensor,
             dim,
             ScalarConvert<float, scalar_t>::to(1.0),
             MulOp<scalar_t>());

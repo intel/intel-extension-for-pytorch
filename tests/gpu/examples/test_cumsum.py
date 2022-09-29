@@ -41,6 +41,30 @@ class TestTorchMethod(TestCase):
             self.assertEqual(torch.cumsum(x1, dim=0), torch.cumsum(
                 x1_dpcpp, dim=0).to(cpu_device).to(torch.float), rtol=10e-4, atol=atol)
 
+    def test_cumsum_1d_dim0_bf16(self, dtype=torch.bfloat16):
+        print("\n-----------------------1D, dim=0 bf16---------------------------------------------")
+        for shape in test_1d_shapes:
+            x1 = torch.randn(shape, device=cpu_device)
+            x1_dpcpp = x1.to(dpcpp_device).to(dtype)
+            if x1.size(0) > 30:
+                atol = 2
+            else:
+                atol = 1e-1
+            self.assertEqual(torch.cumsum(x1, dim=0), torch.cumsum(
+                x1_dpcpp, dim=0).to(cpu_device).to(torch.float), rtol=1, atol=atol)
+
+    def test_cumsum_1d_dim0_cfloat(self, dtype=torch.cfloat):
+        print("\n-----------------------1D, dim=0 complexfloat---------------------------------------")
+        for shape in test_1d_shapes:
+            x1 = torch.randn(shape, device=cpu_device).to(dtype)
+            x1_dpcpp = x1.to(dpcpp_device)
+            if x1.size(0) > 1000:
+                atol = 1e-4
+            else:
+                atol = 1e-5
+            self.assertEqual(torch.cumsum(x1, dim=0), torch.cumsum(
+                x1_dpcpp, dim=0).to(cpu_device), rtol=1.3e-6, atol=atol)
+
     def test_cumsum_2d_dim0(self, dtype=torch.float):
         print("\n-----------------------2D, dim=0---------------------------------------------")
         for shape in test_2d_shapes:
@@ -64,6 +88,30 @@ class TestTorchMethod(TestCase):
                 atol = 1e-1
             self.assertEqual(torch.cumsum(x2, dim=0), torch.cumsum(
                 x2_dpcpp, dim=0).to(cpu_device).to(torch.float), rtol=10e-4, atol=atol)
+
+    def test_cumsum_2d_dim0_bf16(self, dtype=torch.bfloat16):
+        print("\n-----------------------2D, dim=0 bf16---------------------------------------------")
+        for shape in test_2d_shapes:
+            x2 = torch.randn(shape, device=cpu_device)
+            x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+            if x2.size(0) > 30:
+                atol = 2
+            else:
+                atol = 1e-1
+            self.assertEqual(torch.cumsum(x2, dim=0), torch.cumsum(
+                x2_dpcpp, dim=0).to(cpu_device).to(torch.float), rtol=1, atol=atol)
+
+    def test_cumsum_2d_dim0_cfloat(self, dtype=torch.cfloat):
+        print("\n-----------------------2D, dim=0 complex float------------------------------------")
+        for shape in test_2d_shapes:
+            x2 = torch.randn(shape, device=cpu_device).to(dtype)
+            x2_dpcpp = x2.to(dpcpp_device)
+            if x2.size(0) > 30:
+                atol = 2
+            else:
+                atol = 1e-1
+            self.assertEqual(torch.cumsum(x2, dim=0), torch.cumsum(
+                x2_dpcpp, dim=0).to(cpu_device), rtol=1, atol=atol)
 
     def test_cumsum_2d_dim1(self, dtype=torch.float):
         print("\n-----------------------2D, dim=1---------------------------------------------")
@@ -89,6 +137,18 @@ class TestTorchMethod(TestCase):
             self.assertEqual(torch.cumsum(x2, dim=1), torch.cumsum(
                 x2_dpcpp, dim=1).to(cpu_device).to(torch.float), rtol=10e-4, atol=atol)
 
+    def test_cumsum_2d_dim1_bf16(self, dtype=torch.bfloat16):
+        print("\n-----------------------2D, dim=1 bf16---------------------------------------------")
+        for shape in test_2d_shapes:
+            x2 = torch.randn(shape, device=cpu_device)
+            x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+            if x2.size(1) > 30:
+                atol = 2
+            else:
+                atol = 1e-1
+            self.assertEqual(torch.cumsum(x2, dim=1), torch.cumsum(
+                x2_dpcpp, dim=1).to(cpu_device).to(torch.float), rtol=1, atol=atol)
+
     def test_cumsum_3d_dim0(self, dtype=torch.float):
         print("\n-----------------------3D, dim=0---------------------------------------------")
         for shape in test_3d_shapes:
@@ -112,6 +172,18 @@ class TestTorchMethod(TestCase):
                 atol = 1e-1
             self.assertEqual(torch.cumsum(x2, dim=0), torch.cumsum(
                 x2_dpcpp, dim=0).to(cpu_device).to(torch.float), rtol=10e-4, atol=atol)
+
+    def test_cumsum_3d_dim0_bf16(self, dtype=torch.bfloat16):
+        print("\n-----------------------3D, dim=0 bf16---------------------------------------------")
+        for shape in test_3d_shapes:
+            x2 = torch.randn(shape, device=cpu_device)
+            x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+            if x2.size(0) > 30:
+                atol = 2
+            else:
+                atol = 1e-1
+            self.assertEqual(torch.cumsum(x2, dim=0), torch.cumsum(
+                x2_dpcpp, dim=0).to(cpu_device).to(torch.float), rtol=1, atol=atol)
 
     def test_cumsum_3d_dim1(self, dtype=torch.float):
         print("\n-----------------------3D, dim=1---------------------------------------------")
@@ -137,6 +209,18 @@ class TestTorchMethod(TestCase):
             self.assertEqual(torch.cumsum(x2, dim=1), torch.cumsum(
                 x2_dpcpp, dim=1).to(cpu_device).to(torch.float), rtol=10e-4, atol=atol)
 
+    def test_cumsum_3d_dim1_bf16(self, dtype=torch.bfloat16):
+        print("\n-----------------------3D, dim=1 bf16---------------------------------------------")
+        for shape in test_3d_shapes:
+            x2 = torch.randn(shape, device=cpu_device)
+            x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+            if x2.size(1) > 30:
+                atol = 2
+            else:
+                atol = 1e-1
+            self.assertEqual(torch.cumsum(x2, dim=1), torch.cumsum(
+                x2_dpcpp, dim=1).to(cpu_device).to(torch.float), rtol=1, atol=atol)
+
     def test_cumsum_3d_dim2(self, dtype=torch.float):
         print("\n-----------------------3D, dim=2---------------------------------------------")
         for shape in test_3d_shapes:
@@ -160,6 +244,18 @@ class TestTorchMethod(TestCase):
                 atol = 1e-1
             self.assertEqual(torch.cumsum(x2, dim=2), torch.cumsum(
                 x2_dpcpp, dim=2).to(cpu_device).to(torch.float), rtol=10e-4, atol=atol)
+
+    def test_cumsum_3d_dim2_bf16(self, dtype=torch.bfloat16):
+        print("\n-----------------------3D, dim=2 bf16---------------------------------------------")
+        for shape in test_3d_shapes:
+            x2 = torch.randn(shape, device=cpu_device)
+            x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+            if x2.size(2) > 30:
+                atol = 2
+            else:
+                atol = 1e-1
+            self.assertEqual(torch.cumsum(x2, dim=2), torch.cumsum(
+                x2_dpcpp, dim=2).to(cpu_device).to(torch.float), rtol=1, atol=atol)
 
 
     def test_mult_transposed_dim(self, dtype=torch.float):
