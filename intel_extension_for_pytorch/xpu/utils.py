@@ -63,6 +63,26 @@ def has_fp64_dtype(device: int = -1) -> bool:
     return _C._get_device_properties(device).support_fp64
 
 
+# Basic OnOff
+class OnOff():
+    def __init__(self, checker, enable, disable):
+        self._init_status = checker()
+        self._enabled = True
+        self._disabled = False
+        self._enable_fn = enable
+        self._disable_fn = disable
+
+    def __enter__(self):
+        if self._init_status == self._disabled:
+            self._enable_fn()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._init_status == self._disabled:
+            self._disable_fn()
+        return False
+
+
 class EnumBase(Enum):
     @classmethod
     def convert(cls, value):
@@ -223,26 +243,6 @@ class fp32_math_mode(object):
         return False
 
 
-# Basic OnOff
-class OnOff():
-    def __init__(self, checker, enable, disable):
-        self._init_status = checker()
-        self._enabled = True
-        self._disabled = False
-        self._enable_fn = enable
-        self._disable_fn = disable
-
-    def __enter__(self):
-        if self._init_status == self._disabled:
-            self._enable_fn()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._init_status == self._disabled:
-            self._disable_fn()
-        return False
-
-
 # Sync Execution Mode
 def using_sync_mode():
     return _C._is_sync_mode()
@@ -261,70 +261,18 @@ class sync_mode(OnOff):
         super().__init__(using_sync_mode, enable_sync_mode, disable_sync_mode)
 
 
-# [EXPERIMENTAL] oneDNN Layout
-def using_onednn_layout():
-    return _C._is_onednn_layout_enabled()
-
-
-def enable_onednn_layout():
-    _C._enable_onednn_layout()
-
-
-def disable_onednn_layout():
-    _C._disable_onednn_layout()
-
-
-class onednn_layout(OnOff):
-    def __init__(self):
-        super().__init__(using_onednn_layout, enable_onednn_layout, disable_onednn_layout)
-
-# force oneDNN primivite
-def using_force_onednn_primitive():
-    r"""
-    Get the current force onednn primitive setting.
-
-    Return:
-        Force onednn primitive mode
-        The value will be ``ON`` or ``OFF``.
-        ``ON`` means enabled force onednn primitive mode;
-        ``OFF`` means disabled force onednn primitive mode;
-
-    Supported operator list:
-        GRU
-    """
-    return _C._is_force_onednn_primitive_enabled()
-
-def enable_force_onednn_primitive():
-    _C._enable_force_onednn_primitive()
-
-def disable_force_onednn_primitive():
-    _C._disable_force_onednn_primitive()
-
-class force_onednn_primitive(OnOff):
-    def __init__(self):
-        super().__init__(using_force_onednn_primitive, enable_force_onednn_primitive, disable_force_onednn_primitive)
-
-# Simple Trace
-def using_simple_trace():
-    return _C._is_simple_trace_enabled()
-
-
-def enable_simple_trace():
-    _C._enable_simple_trace()
-
-
-def disable_simple_trace():
-    _C._disable_simple_trace()
-
-
-class simple_trace(OnOff):
-    def __init__(self):
-        super().__init__(using_simple_trace, enable_simple_trace, disable_simple_trace)
-
-
 # Tile Partition As Device
 def using_tile_as_device():
     return _C._is_tile_as_device_enabled()
+
+# Only work before lazy init
+def enable_tile_as_device():
+    _C._enable_tile_as_device()
+
+
+# Only work before lazy init
+def disable_tile_as_device():
+    _C._disable_tile_as_device()
 
 
 # XPU Backend
@@ -342,3 +290,75 @@ def get_backend():
 def set_backend(backend):
     st = Backend.set_value(_C._set_backend, backend)
     assert bool(st), "WARNING: Failed to set XPU backend!"
+
+
+################################################################
+# EXPERIMENTAL options:
+# NOTE: Below options are under experimental.
+#       They are instable, and may be removed without notice!
+################################################################
+
+# oneDNN Layout
+def using_onednn_layout():
+    return _C._is_onednn_layout_enabled()
+
+
+def enable_onednn_layout():
+    _C._enable_onednn_layout()
+
+
+def disable_onednn_layout():
+    _C._disable_onednn_layout()
+
+
+class onednn_layout(OnOff):
+    def __init__(self):
+        super().__init__(using_onednn_layout, enable_onednn_layout, disable_onednn_layout)
+
+
+# force oneDNN primivite
+def using_force_onednn_primitive():
+    r"""
+    Get the current force onednn primitive setting.
+
+    Return:
+        Force onednn primitive mode
+        The value will be ``ON`` or ``OFF``.
+        ``ON`` means enabled force onednn primitive mode;
+        ``OFF`` means disabled force onednn primitive mode;
+
+    Supported operator list:
+        GRU
+    """
+    return _C._is_force_onednn_primitive_enabled()
+
+
+def enable_force_onednn_primitive():
+    _C._enable_force_onednn_primitive()
+
+
+def disable_force_onednn_primitive():
+    _C._disable_force_onednn_primitive()
+
+
+class force_onednn_primitive(OnOff):
+    def __init__(self):
+        super().__init__(using_force_onednn_primitive, enable_force_onednn_primitive, disable_force_onednn_primitive)
+
+
+# Simple Trace
+def using_simple_trace():
+    return _C._is_simple_trace_enabled()
+
+
+def enable_simple_trace():
+    _C._enable_simple_trace()
+
+
+def disable_simple_trace():
+    _C._disable_simple_trace()
+
+
+class simple_trace(OnOff):
+    def __init__(self):
+        super().__init__(using_simple_trace, enable_simple_trace, disable_simple_trace)

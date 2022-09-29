@@ -18,6 +18,8 @@ int dpcppGetDevice(DeviceId* pDI);
 
 int dpcppSetDevice(DeviceId device_id);
 
+bool dpcppIsDevPoolInit();
+
 int dpcppGetDeviceIdFromPtr(DeviceId* device_id, void* ptr);
 
 sycl::device dpcppGetRawDevice(DeviceId device_id);

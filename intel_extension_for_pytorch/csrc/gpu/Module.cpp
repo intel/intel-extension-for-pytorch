@@ -718,6 +718,14 @@ void init_module(pybind11::module& m) {
     return Settings::I().is_tile_as_device_enabled();
   });
 
+  m.def("_enable_tile_as_device", []() {
+    Settings::I().enable_tile_as_device();
+  });
+
+  m.def("_disable_tile_as_device", []() {
+    Settings::I().disable_tile_as_device();
+  });
+
   m.def("_is_onednn_layout_enabled", []() {
     return Settings::I().is_onednn_layout_enabled();
   });

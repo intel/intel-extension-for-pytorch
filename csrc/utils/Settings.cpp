@@ -1,4 +1,5 @@
 #include <oneDNN/Runtime.h>
+#include <runtime/Device.h>
 #include <utils/Settings.h>
 #include <utils/oneMKLUtils.h>
 
@@ -13,29 +14,33 @@ namespace dpcpp {
 /*
  * All available launch options for IPEX
  *
- * IPEX_SHOW_OPTION:
- *    Default = 0, Set 1 to show all launch option values
  * IPEX_VERBOSE:
  *    Default = 0, Set verbose level with synchronization execution mode
  * IPEX_FP32_MATH_MODE:
  *    Default = 0, Set values for FP32 math mode (0: FP32, 1: TF32, 2: BF32)
  *
- * XPU private optionos:
+ *
+ * XPU ONLY optionos:
+ *
  *   IPEX_XPU_BACKEND:
  *      Default = 0 (GPU), Set XPU_BACKEND as global IPEX backend
  *   IPEX_XPU_SYNC_MODE:
  *      Default = 0, Set 1 to enforce synchronization execution mode
  *   IPEX_TILE_AS_DEVICE:
  *      Default = 1, Set 0 to disable tile partition and map per root device
- *   IPEX_SIMPLE_TRACE:
- *      Default = 0, Set 1 to enable simple trace for all operators*
- *   IPEX_FORCE_ONEDNN_PRIMITIVE:
- *      Default = 0, Set 1 to force oneDNN primitive solution for below
- * operators: GRU
  *
- * Experimental options:
+ *
+ * EXPERIMENTAL options:
+ *
+ *   IPEX_SHOW_OPTION:
+ *      Default = 0, Set 1 to show all launch option values
  *   IPEX_XPU_ONEDNN_LAYOUT:
  *      Default = 0, Set 1 to enable onednn specific layouts
+ *   IPEX_FORCE_ONEDNN_PRIMITIVE:
+ *      Default = 0, Set 1 to force oneDNN primitive solution for below
+ *      operators: GRU
+ *   IPEX_SIMPLE_TRACE:
+ *      Default = 0, Set 1 to enable simple trace for all operators*
  */
 
 static std::mutex s_mutex;
@@ -177,6 +182,20 @@ void Settings::disable_sync_mode() {
 bool Settings::is_tile_as_device_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
   return tile_as_device_enabled == ENV_VAL::ON;
+}
+
+void Settings::enable_tile_as_device() {
+  if (!dpcppIsDevPoolInit()) {
+    std::lock_guard<std::mutex> lock(s_mutex);
+    tile_as_device_enabled == ENV_VAL::ON;
+  }
+}
+
+void Settings::disable_tile_as_device() {
+  if (!dpcppIsDevPoolInit()) {
+    std::lock_guard<std::mutex> lock(s_mutex);
+    tile_as_device_enabled == ENV_VAL::OFF;
+  }
 }
 
 bool Settings::is_onednn_layout_enabled() const {

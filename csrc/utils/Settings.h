@@ -49,6 +49,8 @@ class IPEX_API Settings final {
   void disable_sync_mode();
 
   bool is_tile_as_device_enabled() const;
+  void enable_tile_as_device();
+  void disable_tile_as_device();
 
   bool is_onednn_layout_enabled() const;
   void enable_onednn_layout();
