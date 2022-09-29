@@ -7,7 +7,7 @@
 On CNN models, the canonical order of tensor dimensions is assigned with semantic meaning. For example the input tensor of 2D convolution is of NCHW by default on PyTorch - <batch_size, channels, height, width>. NHWC is an alternative way of describing the tensor dimensions - <batch_size, height, width, channels>.
 
 Look at the following image of illustrating NCHW and NHWC when N=1. Actually when N=1, NHWC has the same format with BMP file image.
-![fig-1-memory-layout](../../../images/channels_last/figure1_memory_layout.png)
+![fig-1-memory-layout](../../images/channels_last/figure1_memory_layout.png)
 
 PyTorch refers to NCHW as `torch.contiguous_format` (the default memory format) and to NHWC as `torch.channels_last`, which is a new feature as of the 1.5 release.
 
@@ -64,7 +64,7 @@ offset(n,c,h,w) = stride_n * n + stride_c * c + stride_h * h + stride_w * w
 
 One merit of introducing **stride** is that it can express noncontiguous tensors, e.g. a slice of big tensor. For example, the 'Xs' in the following image have a stride of <n1+n2, 1>.
 
-![fig-3-pytorch-strided-layout](../../../images/channels_last/figure3_strided_layout.png)
+![fig-3-pytorch-strided-layout](../../images/channels_last/figure3_strided_layout.png)
 
 Keep in mind that PyTorch Tensor does not have an attribute called 'memory_format' or something else. The memory format expression completely relies on **size** and **stride**. The design principle can be found at reference: [RFC: Memory format (aka layout aka NHWC) support](https://github.com/pytorch/pytorch/issues/19092). No matter what the tensor's memory format is, we need a logical canonical order for the dimensions - that is **NCHW** on PyTorch. Thus, **size** and **stride** are ALWAYS described in the order of **NCHW**. Let's now look at the Channels Last case of the previous question:
 

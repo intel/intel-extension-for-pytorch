@@ -33,13 +33,13 @@ When import external tensor in `DLManagedTensor` format, a PyTorch tensor is cre
 
 ### Import DLPack Capsule
 
-![fig-1-DLPack-import](../../../images/DLPack/figure1_DLPack_import.svg)
+![fig-1-DLPack-import](../../images/DLPack/figure1_DLPack_import.svg)
 
 When export PyTorch tensor, a `ATenDLMTensor` is created with its `handle` points to the original PyTorch tensor be exported and its `tensor` contains the exported tensor in `DLManagedTensor` format. The required information such as `ndim`, `shape`, `strides` etc. are parsed and extracted from PyTorch tensor to external tensor. The `data pointer` points to the original memory allocation, data copy is not required. Here Intel® Extension for PyTorch\* is responsible to convert device type and id from ATen device to `DLDevice` for XPU backend. <br/>
 
 ### Export DLPack Capsule
 
-![fig-2-DLPack-import](../../../images/DLPack/figure2_DLPack_export.svg)
+![fig-2-DLPack-import](../../images/DLPack/figure2_DLPack_export.svg)
 
 Note: The used `DLManagedTensor` format in above figures is from https://dmlc.github.io/dlpack/latest/python_spec.html.
 
