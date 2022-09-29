@@ -2,6 +2,7 @@ import copy
 
 import torch
 import torch.fx.experimental.optimization as optimization
+from torch.jit._trace import TracerWarning
 import warnings
 
 from .nn import utils
@@ -12,6 +13,7 @@ from enum import IntEnum
 from typing import List
 import functools
 import logging
+import threading
 
 def _copy_model_and_optimizer(model, optimizer):
     new_model = copy.deepcopy(model)
@@ -93,6 +95,7 @@ class GraphCapture(object):
         self.weights_prepack = weights_prepack
         self.auto_kernel_selection = auto_kernel_selection
         self.method = None
+        self.lock = threading.Lock()
 
     def __call__(self, func):
 
@@ -105,56 +108,68 @@ class GraphCapture(object):
         def forward(*input, **kwargs):
             if torch.jit.is_tracing():
                 return func(*input, **kwargs)
-            if self.method:
-                if self.train:
-                    return func(*input, **kwargs)
+            with torch.cpu.amp.autocast(enabled=(self.dtype == torch.bfloat16 or self.dtype == torch.half), dtype=self.dtype):
+                if self.method:
+                    if self.train:
+                        return func(*input, **kwargs)
+                    else:
+                        return self.model(*input, **kwargs)
                 else:
-                    return self.model(*input, **kwargs)
-            else:
-                if self.train:
-                    warnings.warn("graph capture does not support training yet.")
-                    self.method = RunMethods.EagerTrain
-                    return func(*input, **kwargs)
-                else:
-                    try:
-                        # Try JIT trace.
-                        # Tracing only records operations done when the given function is run on the given tensors.
-                        # Therefore, the returned ScriptModule will always run the same traced graph on any input.
-                        # This has some important implications when your module is expected to run different sets of operations,
-                        # depending on the input and/or the module state. In cases like these, tracing would not be appropriate,
-                        # and the tracer will try to emit warnings when doing something that may cause an incorrect trace to be produced.
-                        # Therefore, we catch these warnings and treat them as errors, and let TorchDynamo handle such models appropriately.
-                        with warnings.catch_warnings():
-                            warnings.filterwarnings('error')
-                            traced_model = torch.jit.trace(self.model.eval(), input).eval()
-                            traced_model = torch.jit.freeze(traced_model)
-                            output = traced_model(*input, **kwargs)
-                            self.model = traced_model
-                            self.method = RunMethods.JIT
-                            logging.debug("generate graph by JIT trace.")
-                            return output
-                    except:
-                        try:
-                            # JIT trace failed, try torchdynamo with JIT trace backend.
-                            import torchdynamo
-                            torchdynamo.reset()
-                            torchdynamo.config.dynamic_shapes = True
-                            dynamo_model = torchdynamo.optimize(compiler)(self.model)
-                            output = dynamo_model(*input, **kwargs)
-                            self.model = dynamo_model
-                            self.method = RunMethods.TorchDynamo
-                            logging.debug("generate graph by TorchDynamo.")
-                            return output
-                        except:
-                            warnings.warn("Both JIT and TorchDynamo failed, fallback to original model.")
-                            self.method = RunMethods.EagerInfer
-                            if self.weights_prepack:
-                                if self.dtype == torch.bfloat16:
-                                    assert core.onednn_has_bf16_support(), \
-                                            "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, " + \
-                                            "please set dtype to torch.float or set weights_prepack to False."
-                                self.model, _, _ = utils._weight_prepack.weight_prepack_with_ipex(self.model, None, {}, self.auto_kernel_selection)
-                            return self.model(*input, **kwargs)
+                    # Lock the graph generation process to avoid multiple threads generating graph simultaneously. 
+                    with self.lock:
+                        if self.method:
+                            if self.train:
+                                return func(*input, **kwargs)
+                            else:
+                                return self.model(*input, **kwargs)
+                        if self.train:
+                            warnings.warn("graph capture does not support training yet.")
+                            self.method = RunMethods.EagerTrain
+                            return func(*input, **kwargs)
+                        else:
+                            try:
+                                # Try JIT trace.
+                                # Tracing only records operations done when the given function is run on the given tensors.
+                                # Therefore, the returned ScriptModule will always run the same traced graph on any input.
+                                # This has some important implications when your module is expected to run different sets of operations,
+                                # depending on the input and/or the module state. In cases like these, tracing would not be appropriate,
+                                # and the tracer will try to emit warnings when doing something that may cause an incorrect trace to be produced.
+                                # Therefore, we catch these warnings and treat them as errors, and let TorchDynamo handle such models appropriately.
+                                with warnings.catch_warnings():
+                                    warnings.filterwarnings('error', category=TracerWarning)
+                                    traced_model = torch.jit.trace(self.model.eval(), input).eval()
+                                    traced_model = torch.jit.freeze(traced_model)
+                                    output = traced_model(*input, **kwargs)
+                                    self.model = traced_model
+                                    self.method = RunMethods.JIT
+                                    logging.debug("generate graph by JIT trace.")
+                                    return output
+                            except:
+                                try:
+                                    # JIT trace failed, try torchdynamo with JIT trace backend.
+                                    import torchdynamo
+                                    torchdynamo.reset()
+                                    torchdynamo.config.dynamic_shapes = True
+                                    dynamo_model = torchdynamo.optimize(compiler)(self.model)
+                                    output = dynamo_model(*input, **kwargs)
+                                    self.model = dynamo_model
+                                    self.method = RunMethods.TorchDynamo
+                                    logging.debug("generate graph by TorchDynamo.")
+                                    return output
+                                except:
+                                    warnings.warn("Both JIT and TorchDynamo failed, fallback to original model.")
+                                    self.method = RunMethods.EagerInfer
+                                    if self.weights_prepack:
+                                        if self.dtype == torch.bfloat16:
+                                            assert core.onednn_has_bf16_support(), \
+                                                    "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, " + \
+                                                    "please set dtype to torch.float or set weights_prepack to False."
+                                        if dtype == torch.half:
+                                            assert core.onednn_has_fp16_support(), \
+                                                    "FP16 weight prepack needs the cpu support avx512_core_fp16, " + \
+                                                    "please set dtype to torch.float or set weights_prepack to False."
+                                        self.model, _, _ = utils._weight_prepack.weight_prepack_with_ipex(self.model, None, {}, self.auto_kernel_selection)
+                                    return self.model(*input, **kwargs)
 
         return forward
 

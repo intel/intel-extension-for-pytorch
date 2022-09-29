@@ -234,6 +234,50 @@ class TestGraphCapture(TestCase):
         y = model(x)
         self.assertEqual(y, y_bench)
 
+    def test_throughput_benchmark_graph_mode_jit_autocast(self):
+        model = Conv_Bn_Relu().to(memory_format=torch.channels_last)
+        model.eval()
+        x = torch.rand(3, 6, 10, 10).to(memory_format=torch.channels_last)
+
+        model = ipex.optimize(model, dtype=torch.bfloat16, graph_mode=True)
+
+        bench = ThroughputBenchmark(model)
+        bench.add_input(x)
+        with torch.cpu.amp.autocast():
+            bench.benchmark(
+                    num_calling_threads=14,
+                    num_warmup_iters=10,
+                    num_iters=100)
+
+            y_bench = bench.run_once(x)
+
+            # Calculate the reference result
+            y = model(x)
+        self.assertEqual(y, y_bench)
+        self.assertTrue(y_bench.dtype == torch.bfloat16)
+
+    def test_throughput_benchmark_graph_mode_torchdynamo_autocast(self):
+        model = Conv_IF_Relu().to(memory_format=torch.channels_last)
+        model.eval()
+        x = torch.rand(3, 6, 10, 10).to(memory_format=torch.channels_last)
+
+        model = ipex.optimize(model, dtype=torch.bfloat16, graph_mode=True)
+
+        bench = ThroughputBenchmark(model)
+        bench.add_input(x)
+        with torch.cpu.amp.autocast():
+            bench.benchmark(
+                    num_calling_threads=14,
+                    num_warmup_iters=10,
+                    num_iters=100)
+
+            y_bench = bench.run_once(x)
+
+            # Calculate the reference result
+            y = model(x)
+        self.assertEqual(y, y_bench)
+        self.assertTrue(y_bench.dtype == torch.bfloat16)
+
     @skipIfNoTorchVision
     def test_resnet50(self):
         model = torchvision.models.resnet50(pretrained=False)
@@ -451,6 +495,50 @@ class TestGraphCaptureMultiStream(TestCase):
         # Calculate the reference result
         y = model(x)
         self.assertEqual(y, y_runtime)
+
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
+    def test_multi_stream_graph_mode_jit_autocast(self):
+        model = Conv_Bn_Relu().to(memory_format=torch.channels_last)
+        model.eval()
+        x = torch.rand(56, 6, 10, 10).to(memory_format=torch.channels_last)
+
+        model = ipex.optimize(model, dtype=torch.bfloat16, graph_mode=True)
+
+        # Create MultiStreamModule
+        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(model, num_streams=28, cpu_pool=cpu_pool)
+
+        with torch.cpu.amp.autocast():
+            for _ in range(10):
+                y_runtime = multi_stream_model(x)
+
+            # Calculate the reference result
+            y = model(x)
+        self.assertEqual(y, y_runtime)
+        self.assertTrue(y_runtime.dtype == torch.bfloat16)
+
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
+    def test_multi_stream_graph_mode_torchdynamo_autocast(self):
+        model = Conv_IF_Relu().to(memory_format=torch.channels_last)
+        model.eval()
+        x = torch.rand(56, 6, 10, 10).to(memory_format=torch.channels_last)
+
+        model = ipex.optimize(model, dtype=torch.bfloat16, graph_mode=True)
+
+        # Create MultiStreamModule
+        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(model, num_streams=28, cpu_pool=cpu_pool)
+
+        with torch.cpu.amp.autocast():
+            for _ in range(10):
+                y_runtime = multi_stream_model(x)
+
+            # Calculate the reference result
+            y = model(x)
+        self.assertEqual(y, y_runtime)
+        self.assertTrue(y_runtime.dtype == torch.bfloat16)
 
 
 if __name__ == '__main__':
