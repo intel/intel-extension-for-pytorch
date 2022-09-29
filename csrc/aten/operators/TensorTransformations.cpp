@@ -113,15 +113,21 @@ void roll_dpcpp_kernel(
     int64_t stride,
     int64_t total_dims) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int64_t rng, GRange, tileSize;
   auto offset = ((size - start) * stride);
-  parallel_for_setup(N, tileSize, rng, GRange);
+  int64_t local_range = static_cast<int64_t>(1);
+  int64_t global_range = static_cast<int64_t>(1);
+  if (N != 0) {
+    int64_t wg_size = dpcppMaxWorkGroupSize();
+    local_range = N < wg_size ? N : wg_size;
+    global_range = ((N + local_range - 1) / local_range) * local_range;
+  }
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = in_tensor.data_ptr<scalar_t>();
     auto out_data = out_tensor.data_ptr<scalar_t>();
     cgh.parallel_for(
-        sycl::nd_range<1>(sycl::range<1>(GRange), sycl::range<1>(tileSize)),
+        sycl::nd_range<1>(
+            sycl::range<1>(global_range), sycl::range<1>(local_range)),
         [=](sycl::nd_item<1> item) {
           int64_t linear_index = item.get_global_id(0);
           auto in_ptr = in_data;

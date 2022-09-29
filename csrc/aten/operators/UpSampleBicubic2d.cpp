@@ -30,8 +30,13 @@ static void upsample_bicubic2d_out_frame(
     int64_t onum,
     bool align_corners) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int64_t rng, grng, tile_size;
-  parallel_for_setup(onum, tile_size, rng, grng);
+  int64_t local_range = static_cast<int64_t>(1);
+  int64_t global_range = static_cast<int64_t>(1);
+  if (onum != 0) {
+    int64_t wg_size = dpcppMaxWorkGroupSize();
+    local_range = onum < wg_size ? onum : wg_size;
+    global_range = ((onum + local_range - 1) / local_range) * local_range;
+  }
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = idata;
@@ -132,7 +137,8 @@ static void upsample_bicubic2d_out_frame(
       }
     };
     cgh.parallel_for(
-        sycl::nd_range<1>(sycl::range<1>(grng), sycl::range<1>(tile_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -152,9 +158,13 @@ static void upsample_bicubic2d_backward_out_frame(
     int64_t onum,
     bool align_corners) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int64_t rng, grng, tile_size;
-  parallel_for_setup(onum, tile_size, rng, grng);
-
+  int64_t local_range = static_cast<int64_t>(1);
+  int64_t global_range = static_cast<int64_t>(1);
+  if (onum != 0) {
+    int64_t wg_size = dpcppMaxWorkGroupSize();
+    local_range = onum < wg_size ? onum : wg_size;
+    global_range = ((onum + local_range - 1) / local_range) * local_range;
+  }
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = idata;
     auto out_data = odata;
@@ -229,7 +239,8 @@ static void upsample_bicubic2d_backward_out_frame(
       }
     };
     cgh.parallel_for(
-        sycl::nd_range<1>(sycl::range<1>(grng), sycl::range<1>(tile_size)),
+        sycl::nd_range<1>(
+            sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

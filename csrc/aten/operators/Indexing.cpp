@@ -459,8 +459,13 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   int64_t size = maskLong.numel();
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int64_t rng, GRange, tileSize;
-  parallel_for_setup(size, tileSize, rng, GRange);
+  int64_t local_range = static_cast<int64_t>(1);
+  int64_t global_range = static_cast<int64_t>(1);
+  if (size != 0) {
+    int64_t wg_size = dpcppMaxWorkGroupSize();
+    local_range = size < wg_size ? size : wg_size;
+    global_range = ((size + local_range - 1) / local_range) * local_range;
+  }
 
   auto acc_maskLong_data = maskLong.data_ptr<int64_t>();
   auto acc_maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
@@ -496,7 +501,8 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
     };
 
     cgh.parallel_for(
-        sycl::nd_range<1>(sycl::range<1>(GRange), sycl::range<1>(tileSize)),
+        sycl::nd_range<1>(
+            sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);
   };
 
@@ -545,8 +551,13 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
       (int64_t)0);
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int64_t rng, GRange, tileSize;
-  parallel_for_setup(size, tileSize, rng, GRange);
+  int64_t local_range = static_cast<int64_t>(1);
+  int64_t global_range = static_cast<int64_t>(1);
+  if (size != 0) {
+    int64_t wg_size = dpcppMaxWorkGroupSize();
+    local_range = size < wg_size ? size : wg_size;
+    global_range = ((size + local_range - 1) / local_range) * local_range;
+  }
 
   TensorInfo<scalar_t, uint64_t> src_info =
       getTensorInfo<scalar_t, uint64_t>(src);
@@ -585,7 +596,8 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
       }
     };
     cgh.parallel_for(
-        sycl::nd_range<1>(sycl::range<1>(GRange), sycl::range<1>(tileSize)),
+        sycl::nd_range<1>(
+            sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);
   };
 

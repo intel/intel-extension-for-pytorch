@@ -215,13 +215,20 @@ void kernelPointwiseApply1(
     IndexType totalElements,
     const Op op) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int64_t rng, GRange, tileSize;
-  parallel_for_setup(totalElements, tileSize, rng, GRange);
+  int64_t local_range = static_cast<int64_t>(1);
+  int64_t global_range = static_cast<int64_t>(1);
+  if (totalElements != 0) {
+    int64_t wg_size = dpcppMaxWorkGroupSize();
+    local_range = totalElements < wg_size ? totalElements : wg_size;
+    global_range =
+        ((totalElements + local_range - 1) / local_range) * local_range;
+  }
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     void* a_pointer = a.data;
     cgh.parallel_for(
-        sycl::nd_range<1>(sycl::range<1>(tileSize), sycl::range<1>(tileSize)),
+        sycl::nd_range<1>(
+            sycl::range<1>(global_range), sycl::range<1>(local_range)),
         [=](sycl::nd_item<1> item) {
           for (IndexType linearIndex = item.get_global_id(0) * step;
                linearIndex < totalElements;
@@ -417,15 +424,22 @@ void kernelPointwiseApply2(
     IndexType totalElements,
     const Op op) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int64_t rng, GRange, tileSize;
-  parallel_for_setup(totalElements, tileSize, rng, GRange);
+  int64_t local_range = static_cast<int64_t>(1);
+  int64_t global_range = static_cast<int64_t>(1);
+  if (totalElements != 0) {
+    int64_t wg_size = dpcppMaxWorkGroupSize();
+    local_range = totalElements < wg_size ? totalElements : wg_size;
+    global_range =
+        ((totalElements + local_range - 1) / local_range) * local_range;
+  }
 
   // 1. Initialize temp buffer
   auto cgf = DPCPP_Q_CGF(cgh) {
     void* in_ptr = input.data;
     void* out_ptr = output.data;
     cgh.parallel_for(
-        sycl::nd_range<1>(sycl::range<1>(tileSize), sycl::range<1>(tileSize)),
+        sycl::nd_range<1>(
+            sycl::range<1>(global_range), sycl::range<1>(local_range)),
         [=](sycl::nd_item<1> item) {
           for (IndexType linearIndex = item.get_global_id(0) * step;
                linearIndex < totalElements;
@@ -628,15 +642,22 @@ void kernelPointwiseApply3(
     IndexType totalElements,
     const Op op) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int64_t rng, GRange, tileSize;
-  parallel_for_setup(totalElements, tileSize, rng, GRange);
+  int64_t local_range = static_cast<int64_t>(1);
+  int64_t global_range = static_cast<int64_t>(1);
+  if (totalElements != 0) {
+    int64_t wg_size = dpcppMaxWorkGroupSize();
+    local_range = totalElements < wg_size ? totalElements : wg_size;
+    global_range =
+        ((totalElements + local_range - 1) / local_range) * local_range;
+  }
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     void* in1_ptr = input1.data;
     void* in2_ptr = input2.data;
     void* out_ptr = output.data;
     cgh.parallel_for(
-        sycl::nd_range<1>(sycl::range<1>(tileSize), sycl::range<1>(tileSize)),
+        sycl::nd_range<1>(
+            sycl::range<1>(global_range), sycl::range<1>(local_range)),
         [=](sycl::nd_item<1> item) {
           for (IndexType linearIndex = item.get_global_id(0) * step;
                linearIndex < totalElements;
@@ -876,8 +897,14 @@ void kernelPointwiseApply4(
     IndexType totalElements,
     const Op op) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int64_t rng, GRange, tileSize;
-  parallel_for_setup(totalElements, tileSize, rng, GRange);
+  int64_t local_range = static_cast<int64_t>(1);
+  int64_t global_range = static_cast<int64_t>(1);
+  if (totalElements != 0) {
+    int64_t wg_size = dpcppMaxWorkGroupSize();
+    local_range = totalElements < wg_size ? totalElements : wg_size;
+    global_range =
+        ((totalElements + local_range - 1) / local_range) * local_range;
+  }
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     void* in1_ptr = input1.data;
@@ -885,7 +912,8 @@ void kernelPointwiseApply4(
     void* in3_ptr = input3.data;
     void* out_ptr = output.data;
     cgh.parallel_for(
-        sycl::nd_range<1>(sycl::range<1>(tileSize), sycl::range<1>(tileSize)),
+        sycl::nd_range<1>(
+            sycl::range<1>(global_range), sycl::range<1>(local_range)),
         [=](sycl::nd_item<1> item) {
           for (IndexType linearIndex = item.get_global_id(0) * step;
                linearIndex < totalElements;
