@@ -388,15 +388,30 @@ struct ReduceOp {
           (const scalar_t*)((const char*)src + base_offsets1);
       value = item_reduce<output_vec_size>(pos, input_slice);
     }
+    // TODO: Currently, there are bugs with shuffle_down when the arg_t is a
+    // pair for half dtype, We temporarily workaround to do
+    // "reduce_for_compound_dtype" function.
+    constexpr bool is_pair =
+        std::is_same<std::pair<scalar_t, int64_t>, arg_t>::value;
 
     if (config.should_group_x_reduce() && config.should_group_y_reduce()) {
-      value = group_reduce<output_vec_size>(pos, value, shared);
+      if constexpr (is_pair) {
+        value = group_reduce_for_compound_dtype<output_vec_size>(
+            pos, value, shared);
+      } else {
+        value = group_reduce<output_vec_size>(pos, value, shared);
+      }
     } else {
       if (config.should_group_y_reduce()) {
         value = group_y_reduce<output_vec_size>(pos, value, shared);
       }
       if (config.should_group_x_reduce()) {
-        value = group_x_reduce<output_vec_size>(pos, value, shared);
+        if constexpr (is_pair) {
+          value = group_x_reduce_for_compound_dtype<output_vec_size>(
+              pos, value, shared);
+        } else {
+          value = group_x_reduce<output_vec_size>(pos, value, shared);
+        }
       }
     }
 
@@ -649,6 +664,81 @@ struct ReduceOp {
     return value_list[0];
   }
 
+  // TODO: Currently, there are bugs with shuffle_down when the arg_t is a
+  // pair with half dtype, We temporarily workaround to do
+  // "reduce_for_compound_dtype" function.
+  template <int output_vec_size>
+  at::detail::Array<arg_t, output_vec_size> group_reduce_for_compound_dtype(
+      sycl::nd_item<2> pos,
+      at::detail::Array<arg_t, output_vec_size> value,
+      dpcpp_local_ptr<void> shared_memory) const {
+    auto sg = pos.get_sub_group();
+    uint32_t sbgrpSize = sg.get_local_range()[0];
+    int l_x = pos.get_local_linear_id();
+    int sg_lid = sg.get_local_linear_id();
+    int sg_gid = sg.get_group_linear_id();
+    int sg_range = sg.get_group_range()[0];
+
+    for (int offset = 1; offset < sbgrpSize; offset <<= 1) {
+#pragma unroll(output_vec_size)
+      for (int i = 0; i < output_vec_size; ++i) {
+        arg_t other = sg.shuffle_down(value[i], offset);
+        value[i] = ops.combine(value[i], other);
+      }
+    }
+
+    using args_vec_t = at::detail::Array<arg_t, output_vec_size>;
+    dpcpp_local_ptr<args_vec_t> shared{shared_memory};
+
+    if (sg_lid == 0) {
+      shared[sg_gid] = value;
+    }
+    pos.barrier(dpcpp_local_fence);
+
+    if (sg_range <= sbgrpSize) {
+      // sub-group reduce
+#pragma unroll(output_vec_size)
+      for (int i = 0; i < output_vec_size; i++) {
+        value[i] = ident;
+      }
+      if (sg_gid == 0 && sg_lid < sg_range) {
+        value = shared[sg_lid];
+        for (int offset = 1; offset < sg_range; offset <<= 1) {
+#pragma unroll(output_vec_size)
+          for (int i = 0; i < output_vec_size; ++i) {
+            // Shuffle down separately for first and second pair.
+            std::pair<typename arg_t::first_type, typename arg_t::second_type>
+                other = std::pair<
+                    typename arg_t::first_type,
+                    typename arg_t::second_type>(
+                    sg.shuffle_down(value[i].first, offset),
+                    sg.shuffle_down(value[i].second, offset));
+            value[i] = ops.combine(value[i], other);
+          }
+        }
+      }
+    } else {
+      // work item tree reduce
+      if (l_x < sg_range) {
+        value = shared[l_x];
+      }
+
+      for (int offset = sg_range / 2; offset > 0; offset >>= 1) {
+        if (l_x < offset) {
+          args_vec_t other = shared[l_x + offset];
+#pragma unroll(output_vec_size)
+          for (int i = 0; i < output_vec_size; ++i) {
+            value[i] = ops.combine(value[i], other[i]);
+          }
+          shared[l_x] = value;
+        }
+        pos.barrier(dpcpp_local_fence);
+      }
+    }
+
+    return value;
+  }
+
   template <int output_vec_size>
   at::detail::Array<arg_t, output_vec_size> group_reduce(
       sycl::nd_item<2> pos,
@@ -752,6 +842,56 @@ struct ReduceOp {
 #pragma unroll(output_vec_size)
       for (int i = 0; i < output_vec_size; ++i) {
         arg_t other = sg.shuffle_down(value[i], offset);
+        value[i] = ops.combine(value[i], other);
+      }
+    }
+    return value;
+  }
+
+  // TODO: Currently, there are bugs with shuffle_down when the arg_t is a
+  // pair for half dtype, We temporarily workaround to do
+  // "reduce_for_compound_dtype" function.
+  template <int output_vec_size>
+  at::detail::Array<arg_t, output_vec_size> group_x_reduce_for_compound_dtype(
+      sycl::nd_item<2> pos,
+      at::detail::Array<arg_t, output_vec_size> value,
+      dpcpp_local_ptr<void> shared_memory) const {
+    using args_vec_t = at::detail::Array<arg_t, output_vec_size>;
+    auto l_x = pos.get_local_id(1), l_y = pos.get_local_id(0);
+    auto gp_x = pos.get_local_range(1);
+
+    int dim_x = gp_x;
+    dpcpp_local_ptr<args_vec_t> shared(shared_memory);
+    auto sg = pos.get_sub_group();
+    uint32_t sbgrpSize = sg.get_local_range()[0];
+    if (dim_x > sbgrpSize) {
+      int address_base = l_x + l_y * gp_x;
+      shared[address_base] = value;
+      for (int offset = dim_x / 2; offset >= sbgrpSize; offset >>= 1) {
+        pos.barrier(dpcpp_local_fence);
+        if (l_x < offset && l_x + offset < gp_x /* redundant??? */) {
+          args_vec_t other = shared[address_base + offset];
+#pragma unroll(output_vec_size)
+          for (int i = 0; i < output_vec_size; ++i) {
+            value[i] = ops.combine(value[i], other[i]);
+          }
+          shared[address_base] = value;
+        }
+      }
+      dim_x = sbgrpSize;
+    }
+
+    pos.barrier(dpcpp_local_fence);
+
+    // sub-group reduction
+    for (int offset = 1; offset < dim_x; offset <<= 1) {
+#pragma unroll(output_vec_size)
+      for (int i = 0; i < output_vec_size; ++i) {
+        std::pair<typename arg_t::first_type, typename arg_t::second_type>
+            other = std::
+                pair<typename arg_t::first_type, typename arg_t::second_type>(
+                    sg.shuffle_down(value[i].first, offset),
+                    sg.shuffle_down(value[i].second, offset));
         value[i] = ops.combine(value[i], other);
       }
     }
@@ -937,7 +1077,15 @@ struct ReduceOp {
       }
       value = group_y_reduce(pos, value, shared_memory);
       if (config.should_group_x_reduce()) {
-        value = group_x_reduce<output_vec_size>(pos, value, shared_memory);
+        // TODO: workaround because sg.shuffle_down will fail on `half` dtype.
+        constexpr bool is_pair =
+            std::is_same<std::pair<scalar_t, int64_t>, arg_t>::value;
+        if constexpr (is_pair) {
+          value = group_x_reduce_for_compound_dtype<output_vec_size>(
+              pos, value, shared_memory);
+        } else {
+          value = group_x_reduce<output_vec_size>(pos, value, shared_memory);
+        }
       }
       if (should_store) {
         if (accumulate) {
