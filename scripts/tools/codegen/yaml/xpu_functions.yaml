@@ -237,7 +237,6 @@ supported:
   - fractional_max_pool3d.output
   - fractional_max_pool3d_backward
   - fractional_max_pool3d_backward.grad_input
-  - gather
   - gather.out
   - ge.Scalar
   - ge.Scalar_out

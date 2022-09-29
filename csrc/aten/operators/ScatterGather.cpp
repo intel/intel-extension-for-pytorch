@@ -153,7 +153,6 @@ Tensor& gather_out(
     int64_t dim,
     const Tensor& index,
     bool sparse_grad) {
-  at::assert_no_internal_overlap(self);
   out.resize_(index.sizes());
 
   bool check_result = out.defined();
@@ -169,15 +168,6 @@ Tensor& gather_out(
       "Gather",
       [&]() { impl::Gather<scalar_t>(out, self, dim, index); });
   return out;
-}
-
-Tensor gather(
-    const Tensor& self,
-    int64_t dim,
-    const Tensor& index,
-    bool sparse_grad) {
-  Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::gather_out(out, self, dim, index, sparse_grad);
 }
 
 // scatter family
