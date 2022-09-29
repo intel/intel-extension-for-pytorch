@@ -3,7 +3,7 @@ import os
 
 import intel_extension_for_pytorch._C as core
 
-supported_isa_set = ["default", "avx2", "avx512", "avx512_vnni", "avx512_bf16", "amx"]
+supported_isa_set = ["default", "avx2", "avx2_vnni", "avx512", "avx512_vnni", "avx512_bf16", "amx"]
 
 def get_isa_val(isa_name):
     if isa_name == "default":
@@ -51,7 +51,10 @@ class TestDynDisp(unittest.TestCase):
         
         actural_isa_val = get_isa_val(cur_isa)
 
-        self.assertEqual(actural_isa_val, expected_isa_val)
+        # Isa level and compiler version are not linear relationship.
+        # gcc 9.4 can build avx512_vnni.
+        # gcc 11.3 start to support avx2_vnni.
+        self.assertTrue(actural_isa_val <= expected_isa_val)
         return    
 
     def test_dyndisp_in_supported_set(self):

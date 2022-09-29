@@ -118,7 +118,6 @@ static CPUCapability compute_cpu_capability() {
 
   CPUCapability max_support_isa_level = std::min(
       highest_cpu_supported_isa_level, highest_binary_supported_isa_level);
-
   if (b_manual_setup) {
     if (manual_setup_isa_level <= max_support_isa_level) {
       return manual_setup_isa_level;
@@ -128,9 +127,12 @@ static CPUCapability compute_cpu_capability() {
   return max_support_isa_level;
 }
 
+// Use global variable to trigger cpu capability initialization, when module
+// load.
+static CPUCapability g_cpu_capability = compute_cpu_capability();
+
 CPUCapability get_cpu_capability() {
-  static CPUCapability capability = compute_cpu_capability();
-  return capability;
+  return g_cpu_capability;
 }
 
 void* DispatchStubImpl::get_call_ptr(

@@ -97,7 +97,7 @@ if(CXX_AVX2_VNNI_FOUND)
   endif(MSVC)
 else(CXX_AVX2_VNNI_FOUND)
   if(CMAKE_COMPILER_IS_GNUCXX)
-    message(STATUS "WARNING! Please upgrade gcc version to 11.2+ to support CPU ISA AVX2 VNNI.")
+    message(STATUS "WARNING! Please upgrade gcc version to 11.2+ to support CPU ISA AVX2_VNNI.")
   endif(CMAKE_COMPILER_IS_GNUCXX)
 endif(CXX_AVX2_VNNI_FOUND)
 
