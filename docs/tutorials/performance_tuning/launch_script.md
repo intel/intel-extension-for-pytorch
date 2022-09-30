@@ -40,6 +40,7 @@ Available option settings (knobs) are listed below:
 | ```--enable_tcmalloc``` | - | False | Enable tcmalloc allocator |
 | ```--enable_jemalloc``` | - | False | Enable jemalloc allocator |
 | ```--use_default_allocator``` | - |  False | Use default memory allocator |
+| ```--benchmark``` | - |  False | Enable benchmark config. JeMalloc's MALLOC_CONF has been tuned for low latency. Recommend to use this for benchmarking purpose; for other use cases, this MALLOC_CONF may cause Out-of-Memory crash. |
 
 **Note:** ```--latency_mode``` and ```--throughput_mode``` are exclusive knobs to ```--ninstances```, ```--ncore_per_instance```, ```--node_id``` and ```--use_logical_core```. I.e., setting either of ```--latency_mode``` or ```--throughput_mode``` overwrites settings of ```--ninstances```, ```--ncore_per_instance```, ```--node_id``` and ```--use_logical_core``` if they are explicitly set in command line. ```--latency_mode``` and ```--throughput_mode``` are mutually exclusive.
 

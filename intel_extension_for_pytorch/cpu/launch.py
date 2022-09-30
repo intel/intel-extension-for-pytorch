@@ -259,7 +259,7 @@ class Launcher():
             numactl_available = True
         return numactl_available
 
-    def set_memory_allocator(self, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False):
+    def set_memory_allocator(self, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False, benchmark=False):
         '''
         Enable TCMalloc/JeMalloc with LD_PRELOAD and set configuration for JeMalloc.
         By default, PTMalloc will be used for PyTorch, but TCMalloc and JeMalloc can get better
@@ -290,7 +290,10 @@ class Launcher():
                                .format("JeMalloc", "jemalloc", expanduser("~")))
             else:
                 logger.info("Use JeMalloc memory allocator")
-                self.set_env('MALLOC_CONF', "oversize_threshold:1,background_thread:true,metadata_thp:auto")
+                if benchmark:
+                    self.set_env('MALLOC_CONF', "oversize_threshold:1,background_thread:false,metadata_thp:always,dirty_decay_ms:-1,muzzy_decay_ms:-1")
+                else:
+                    self.set_env('MALLOC_CONF', "oversize_threshold:1,background_thread:true,metadata_thp:auto")
 
         elif use_default_allocator:
             pass
@@ -323,13 +326,13 @@ class Launcher():
         self.logger_env(env_name)
 
     # set_kmp_affinity is used to control whether to set KMP_AFFINITY or not. In scenario that use all cores on all nodes, including logical cores, setting KMP_AFFINITY disables logical cores. In this case, KMP_AFFINITY should not be set.
-    def set_multi_thread_and_allocator(self, ncore_per_instance, disable_iomp=False, set_kmp_affinity=True, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False):
+    def set_multi_thread_and_allocator(self, ncore_per_instance, disable_iomp=False, set_kmp_affinity=True, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False, benchmark=False):
         '''
         Set multi-thread configuration and enable Intel openMP and TCMalloc/JeMalloc.
         By default, GNU openMP and PTMalloc are used in PyTorch. but Intel openMP and TCMalloc/JeMalloc are better alternatives
         to get performance benifit.
         '''
-        self.set_memory_allocator(enable_tcmalloc, enable_jemalloc, use_default_allocator)
+        self.set_memory_allocator(enable_tcmalloc, enable_jemalloc, use_default_allocator, benchmark)
         self.set_env("OMP_NUM_THREADS", str(ncore_per_instance))
         if not disable_iomp:
             find_iomp = self.add_lib_preload(lib_type="iomp5")
@@ -454,7 +457,8 @@ class MultiInstanceLauncher(Launcher):
                                             set_kmp_affinity,
                                             args.enable_tcmalloc,
                                             args.enable_jemalloc,
-                                            args.use_default_allocator)
+                                            args.use_default_allocator,
+                                            args.benchmark)
         os.environ["LAUNCH_CMD"] = "#"
 
         if args.auto_ipex:
@@ -744,6 +748,8 @@ def add_multi_instance_params(parser):
                        help="Disable taskset")
     group.add_argument("--core_list", metavar='\b', default=None, type=str,
                        help="Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used.")
+    group.add_argument("--benchmark", action='store_true', default=False,
+                   help="Enable benchmark config. JeMalloc's MALLOC_CONF has been tuned for low latency. Recommend to use this for benchmarking purpose; for other use cases, this MALLOC_CONF may cause Out-of-Memory crash.")
     group.add_argument("--log_path", metavar='\b', default="", type=str,
                        help="The log file directory. Default path is '', which means disable logging to files.")
     group.add_argument("--log_file_prefix", metavar='\b', default="run", type=str,

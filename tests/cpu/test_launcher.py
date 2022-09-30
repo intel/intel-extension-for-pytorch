@@ -28,6 +28,10 @@ class TestLauncher(TestCase):
                 lib_find = True
                 break
         return lib_find
+    
+    def del_env(self, env_name):
+        if env_name in os.environ:
+            del os.environ[env_name]
 
     def test_memory_allocator_setup(self):
        launcher = Launcher()
@@ -45,8 +49,15 @@ class TestLauncher(TestCase):
        jemalloc_enabled = "libjemalloc.so" in os.environ["LD_PRELOAD"] if ld_preload_in_os else False
        self.assertEqual(find_jemalloc, jemalloc_enabled)
        if jemalloc_enabled:
-           self.assertEqual(jemalloc_enabled, "MALLOC_CONF" in os.environ)
-
+           self.assertTrue("MALLOC_CONF" in os.environ)
+           self.assertTrue(os.environ["MALLOC_CONF"] == "oversize_threshold:1,background_thread:true,metadata_thp:auto")
+       
+       self.del_env("MALLOC_CONF")
+       launcher.set_memory_allocator(enable_tcmalloc=False, enable_jemalloc=True, benchmark=True)
+       if jemalloc_enabled:
+           self.assertTrue("MALLOC_CONF" in os.environ)
+           self.assertTrue(os.environ["MALLOC_CONF"] == "oversize_threshold:1,background_thread:false,metadata_thp:always,dirty_decay_ms:-1,muzzy_decay_ms:-1")
+           
     def test_mpi_pin_domain_and_ccl_worker_affinity(self):
        launcher = DistributedTrainingLauncher()
        total_cores = 56
