@@ -168,7 +168,7 @@ void compute_grad_weight_bags(
 
         acc_type<scalar_t> scale = count_ptr ? 1.0 / count_ptr[idx] : 1.0;
         if (per_sample_weight_defined) {
-          scale *= per_sample_weights_ptr[idx * per_sample_weights_stride];
+          scale *= per_sample_weights_ptr[orig_row * per_sample_weights_stride];
         }
 
         acc_type<scalar_t> gradient =

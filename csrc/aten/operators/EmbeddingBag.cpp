@@ -797,6 +797,132 @@ Tensor _embedding_bag_dense_backward_dpcpp(
   return result;
 }
 
+template <typename scalar_t, typename index_t>
+static void _embedding_bag_per_sample_weights_backward_kernel(
+    const scalar_t* grad,
+    int64_t grad_stride0,
+    int64_t grad_stride1,
+    const scalar_t* weight,
+    int64_t weight_stride0,
+    int64_t weight_stride1,
+    const index_t* indices, // contiguous
+    const index_t* offset2bag, // contiguous
+    int64_t num_samples,
+    int64_t embedding_features,
+    scalar_t* output,
+    index_t padding_idx) {
+  using accscalar_t = acc_type<scalar_t>;
+
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  int64_t max_group_size = 64;
+
+  int64_t num_group = (num_samples + max_group_size - 1) / max_group_size;
+  sycl::range<1> global_range{num_group * max_group_size};
+  sycl::range<1> local_range{max_group_size};
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    cgh.parallel_for(
+        sycl::nd_range<1>(global_range, local_range),
+        [=](sycl::nd_item<1> item_id) {
+          int idx = item_id.get_global_linear_id();
+          auto sg = item_id.get_sub_group();
+          int sgSize =
+              sg.get_local_range()[0]; // number of work-items in this sub-group
+          int sgId = idx / sgSize; // subgroup index
+          int sglid =
+              sg.get_local_id()[0]; // index of the work-item in this sub-group
+
+          int num_sg =
+              num_group * max_group_size / sgSize; // number of sub-groups
+          for (int sample_idx = sgId; sample_idx < num_samples;
+               sample_idx += num_sg) {
+            accscalar_t result = 0.;
+            const int bag_idx = (int)offset2bag[sample_idx];
+            const int embedding_idx = (int)indices[sample_idx];
+            if (embedding_idx != padding_idx) {
+              for (int feature_idx = sglid; feature_idx < embedding_features;
+                   feature_idx += sgSize) {
+                result +=
+                    grad[grad_stride0 * bag_idx + grad_stride1 * feature_idx] *
+                    weight
+                        [weight_stride0 * embedding_idx +
+                         weight_stride1 * feature_idx];
+              }
+            }
+            // subgroup reduce sum
+            for (int offset = sgSize / 2; offset > 0; offset /= 2) {
+              result += sycl::shift_group_left(sg, result, offset);
+            };
+            if (sglid == 0) {
+              output[sample_idx] = result;
+            }
+          }
+        });
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+Tensor _embedding_bag_per_sample_weights_backward_dpcpp(
+    const Tensor& grad,
+    const Tensor& weight, // NB: embedding table, not per_sample_weights
+    const Tensor& indices_,
+    const Tensor& offsets_,
+    const Tensor& offset2bag,
+    int64_t mode,
+    int64_t padding_idx) {
+  TORCH_CHECK(
+      mode == MODE_SUM,
+      "embedding_bag_backward: per_sample_weights only supported for mode='sum'");
+
+  AT_ASSERT(grad.dim() == 2);
+  auto embedding_features = grad.size(1);
+
+  Tensor indices, offsets;
+  std::tie(indices, offsets) = promoteIndicesAndOffsets(indices_, offsets_);
+  AT_ASSERT(indices.dim() == 1);
+  auto num_samples = indices.size(0);
+
+  AT_ASSERT(weight.dim() == 2);
+  AT_ASSERT(weight.size(1) == embedding_features);
+
+  auto output = at::empty({num_samples}, grad.options());
+
+  // Early return when there is no samples in the batch. This saves unnecesary
+  // kernel launch
+  if (num_samples == 0) {
+    return output;
+  }
+
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      grad.scalar_type(),
+      "_embedding_bag_per_sample_weights_backward_dpcpp",
+      [&]() {
+        IPEX_DISPATCH_INDEX_TYPES(
+            indices.scalar_type(),
+            "_embedding_bag_per_sample_weights_backward_dpcpp",
+            [&]() {
+              _embedding_bag_per_sample_weights_backward_kernel<
+                  scalar_t,
+                  index_t>(
+                  grad.data_ptr<scalar_t>(),
+                  grad.stride(0),
+                  grad.stride(1),
+                  weight.data_ptr<scalar_t>(),
+                  weight.stride(0),
+                  weight.stride(1),
+                  indices.data_ptr<index_t>(),
+                  offset2bag.data_ptr<index_t>(),
+                  num_samples,
+                  embedding_features,
+                  output.data_ptr<scalar_t>(),
+                  padding_idx);
+            });
+      });
+  return output;
+}
+
 } // namespace impl
 
 std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag(
@@ -849,6 +975,45 @@ Tensor _embedding_bag_dense_backward(
       mode,
       per_sample_weights,
       padding_idx);
+}
+
+std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_forward_only(
+    const Tensor& weight,
+    const Tensor& indices,
+    const Tensor& offsets,
+    const bool scale_grad_by_freq,
+    const int64_t mode,
+    bool sparse,
+    const c10::optional<Tensor>& per_sample_weights_opt,
+    bool include_last_offset,
+    int64_t padding_idx) {
+  // See [Note: hacky wrapper removal for optional tensor]
+  c10::MaybeOwned<Tensor> per_sample_weights_maybe_owned =
+      at::borrow_from_optional_tensor(per_sample_weights_opt);
+  const Tensor& per_sample_weights = *per_sample_weights_maybe_owned;
+
+  return impl::_embedding_bag_dpcpp(
+      weight,
+      indices,
+      offsets,
+      scale_grad_by_freq,
+      mode,
+      sparse,
+      per_sample_weights,
+      include_last_offset,
+      padding_idx);
+}
+
+Tensor _embedding_bag_per_sample_weights_backward(
+    const Tensor& grad,
+    const Tensor& weight, // NB: embedding table, not per_sample_weights
+    const Tensor& indices_,
+    const Tensor& offsets_,
+    const Tensor& offset2bag,
+    int64_t mode,
+    int64_t padding_idx) {
+  return impl::_embedding_bag_per_sample_weights_backward_dpcpp(
+      grad, weight, indices_, offsets_, offset2bag, mode, padding_idx);
 }
 
 } // namespace AtenIpexTypeXPU

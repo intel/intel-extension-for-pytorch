@@ -23,6 +23,8 @@ supported:
   - cumsum.out  # newly added
   - _embedding_bag
   - _embedding_bag_dense_backward
+  - _embedding_bag_forward_only
+  - _embedding_bag_per_sample_weights_backward
   - _empty_affine_quantized
   - _empty_per_channel_affine_quantized
   - _fake_quantize_learnable_per_channel_affine
