@@ -240,6 +240,7 @@ supported:
   - fractional_max_pool3d.output
   - fractional_max_pool3d_backward
   - fractional_max_pool3d_backward.grad_input
+  - frexp.Tensor_out
   - gather.out
   - ge.Scalar
   - ge.Scalar_out
