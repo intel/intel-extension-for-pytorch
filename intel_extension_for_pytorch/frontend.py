@@ -8,6 +8,7 @@ import warnings
 from .nn import utils
 from .optim._optimizer_utils import optimizer_fusion, IPEX_FUSED_OPTIMIZER_LIST
 import intel_extension_for_pytorch._C as core
+from intel_extension_for_pytorch.utils.channels_last_1d import to_channels_last_1d
 from enum import IntEnum
 
 from typing import List
@@ -31,6 +32,16 @@ def _copy_model_and_optimizer(model, optimizer):
                 group2['params'][i] = new_model_param
                 new_optimizer.state[new_model_param] = copy.deepcopy(optimizer.state[p])
         return new_model, new_optimizer
+
+auto_channels_last = True
+
+def enable_auto_channels_last():
+    global auto_channels_last
+    auto_channels_last = True 
+
+def disable_auto_channels_last():
+    global auto_channels_last 
+    auto_channels_last = False
 
 class _Properties(object):
     r"""
@@ -330,6 +341,10 @@ def optimize(
             "Options are 'O0', 'O1'.")
     else:
         opt_properties = opt_levels[level](opt_properties)
+    
+    # auto model channels_last memory format conversion 
+    if auto_channels_last:
+        _convert_convNd_weight_memory_format(model)
 
     if level is not None:
         opt_properties.opt_level = level
@@ -452,6 +467,22 @@ def enable_onednn_fusion(enabled):
         core.enable_jit_opt()
     else:
         core.disable_jit_opt()
+
+def _convert_convNd_weight_memory_format(module):
+    # inspired from https://github.com/pytorch/pytorch/blob/master/torch/nn/utils/memory_format.py
+    if isinstance(module, torch.nn.Conv1d) or isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Conv3d):
+        if isinstance(module, torch.nn.Conv1d):
+            weight_data = to_channels_last_1d(module.weight.detach().clone())
+            module.weight.data = weight_data.resize_(weight_data.size())
+        elif isinstance(module, torch.nn.Conv2d):
+            weight_data = module.weight.detach().clone().contiguous(memory_format=torch.channels_last)
+            module.weight.data = weight_data.resize_(weight_data.size(), memory_format=torch.channels_last)
+        elif isinstance(module, torch.nn.Conv3d):
+            weight_data = module.weight.detach().clone().contiguous(memory_format=torch.channels_last_3d)
+            module.weight.data = weight_data.resize_(weight_data.size(), memory_format=torch.channels_last_3d)
+
+    for child in module.children():
+        _convert_convNd_weight_memory_format(child)
 
 class FP32MathMode(IntEnum):
     FP32 = int(core.FP32MathMode.FP32)
