@@ -303,6 +303,9 @@ supported:
   - inverse
   - inverse.out
   - is_set_to
+  - isin.Scalar_Tensor_out
+  - isin.Tensor_Scalar_out
+  - isin.Tensor_Tensor_out
   - isnan
   - isneginf.out
   - isposinf.out
