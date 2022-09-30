@@ -224,9 +224,9 @@ def optimize(
 
     Args:
         model (torch.nn.Module): User model to apply optimizations on.
-        dtype (torch.dtype): Only works for ``torch.bfloat16``.
-            Model parameters will be casted to ``torch.bfloat16`` if dtype is set to
-            ``torch.bfloat16``. The default value is None, meaning do nothing.
+        dtype (torch.dtype): Only works for ``torch.bfloat16`` and ``torch.half`` a.k.a ``torch.float16``.
+            Model parameters will be casted to ``torch.bfloat16`` or ``torch.half``
+            according to dtype of settings. The default value is None, meaning do nothing.
             Note: Data type conversion is only applied to ``nn.Conv2d``, ``nn.Linear``
             and ``nn.ConvTranspose2d`` for both training and inference cases. For
             inference mode, additional data type conversion is applied to the weights
@@ -290,8 +290,8 @@ def optimize(
         ``dropout`` may be replaced by ``identity``. In inference scenarios,
         convolutuon, linear and lstm will be replaced with the optimized
         counterparts in Intel® Extension for PyTorch* (weight prepack for
-        convolution and linear) for good performance. In bfloat16 scenarios,
-        parameters of convolution and linear will be casted to bfloat16 dtype.
+        convolution and linear) for good performance. In bfloat16 or float16 scenarios,
+        parameters of convolution and linear will be casted to bfloat16 or float16 dtype.
 
     .. warning::
 
@@ -413,7 +413,7 @@ def optimize(
             optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16)
     if dtype == torch.half and model.training:
         optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
-            optimized_model, optimized_optimizer, params_attr, False, convert_dtype=torch.float16)
+            optimized_model, optimized_optimizer, params_attr, False, convert_dtype=torch.half)
     # Since TorchDynamo cannot handle custom operations yet, for the case of inference graph mode,
     # the weights prepacking here is temporarily cancelled, and it will be completed on the graph.
     if opt_properties.weights_prepack and (opt_properties.graph_mode is not True or optimizer is not None):

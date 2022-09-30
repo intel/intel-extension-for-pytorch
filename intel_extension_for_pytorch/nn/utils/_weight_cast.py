@@ -63,7 +63,7 @@ def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight
                 setattr(m, attr, nn.Parameter(float_param.detach().bfloat16(), requires_grad=float_param.requires_grad))
                 params_attr[float_param]['bf16_param'] = getattr(m, attr)
             else:
-                assert convert_dtype==torch.float16, "Only bf16 and fp16 are supported"
+                assert convert_dtype==torch.half, "Only bf16 and fp16 are supported"
                 setattr(m, attr, nn.Parameter(float_param.detach().half(), requires_grad=float_param.requires_grad))
                 params_attr[float_param]['fp16_param'] = getattr(m, attr)
         # update attr entry, always use params in optimzer as "key"

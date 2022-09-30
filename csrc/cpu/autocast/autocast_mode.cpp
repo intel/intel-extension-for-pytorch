@@ -349,11 +349,9 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
       user_defined_dtype,
       fp32)
 
-  // fp32 and fp32 cast policies a.k.a BlackList
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(mish), "mish", Tensor(const Tensor&), fp32, fp32)
-
   // fallthrough and fp32 cast policies
+  MAKE_REGISTER_FUNC_TWO_POLICIES(
+      ADD_NS(mish), "mish", Tensor(const Tensor&), fallthrough, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       ADD_NS(batch_norm),
       "batch_norm",

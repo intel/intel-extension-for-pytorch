@@ -161,7 +161,6 @@ class AutocastCPUTestLists(object):
             ("linear", mat0_fp32 + mat1_fp32),
         ]
         self.nn_bf16_fp32 = [
-            ("mish", mat0_bf16),
         ]
         self.torch_bf16_fp32_multi_output = [
         ]
