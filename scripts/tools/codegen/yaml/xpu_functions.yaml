@@ -17,6 +17,7 @@ supported:
   - _cdist_forward
   - _compute_linear_combination
   - _compute_linear_combination.out
+  - _convert_indices_from_coo_to_csr.out
   - _ctc_loss
   - _ctc_loss_backward
   - cumprod.out
