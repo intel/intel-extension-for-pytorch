@@ -11,9 +11,9 @@ class TestMergedEmbeddingBagWithSGD(TestCase):
     # table 0, 1, 2, 3 used for other test except inference only
     table0 = nn.EmbeddingBag(100, 16, mode='mean').double()
     table1 = nn.EmbeddingBag(50, 32, mode='sum')
-    table2 = nn.EmbeddingBag(50, 65, mode='mean', include_last_offset=True, _weight=torch.empty(50, 65, dtype=torch.bfloat16))
-    table3 = nn.EmbeddingBag(18000000, 8, mode='mean', include_last_offset=True, _weight=torch.empty(18000000, 8, dtype=torch.bfloat16))
-    table4 = nn.EmbeddingBag(10, 8, mode='sum', include_last_offset=True, _weight=torch.empty(10, 8, dtype=torch.bfloat16))
+    table2 = nn.EmbeddingBag(50, 65, mode='mean', include_last_offset=True).bfloat16()
+    table3 = nn.EmbeddingBag(18000000, 8, mode='mean', include_last_offset=True).bfloat16()
+    table4 = nn.EmbeddingBag(10, 8, mode='sum', include_last_offset=True).bfloat16()
     merged = MergedEmbeddingBagWithSGD.from_embeddingbag_list([table0, table1, table2, table3])
     merged2 = MergedEmbeddingBagWithSGD([
         (100, 16, 'mean', table0.weight.dtype, table0.weight.detach()),
