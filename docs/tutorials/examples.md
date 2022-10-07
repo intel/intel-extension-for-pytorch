@@ -7,9 +7,8 @@ Examples
 
 #### Code Changes Highlight
 
-There are only a few lines of code change required to use Intel® Extension for PyTorch\* on training, as shown:
-1. `torch.channels_last` should be applied to both of the model object and data to raise CPU resource usage efficiency.
-2. `ipex.optimize` function applies optimizations against the model object, as well as an optimizer object.
+There is only a line of code change required to use Intel® Extension for PyTorch\* on training, as shown:
+1. `ipex.optimize` function applies optimizations against the model object, as well as an optimizer object.
 
 ```
 ...
@@ -17,7 +16,6 @@ import torch
 import intel_extension_for_pytorch as ipex
 ...
 model = Model()
-model = model.to(memory_format=torch.channels_last)
 criterion = ...
 optimizer = ...
 model.train()
@@ -26,8 +24,6 @@ model, optimizer = ipex.optimize(model, optimizer=optimizer)
 # For BFloat16
 model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
 ...
-# Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
-data = data.to(memory_format=torch.channels_last)
 optimizer.zero_grad()
 output = model(data)
 ...
@@ -61,15 +57,12 @@ train_loader = torch.utils.data.DataLoader(
 )
 
 model = torchvision.models.resnet50()
-model = model.to(memory_format=torch.channels_last)
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
 model.train()
 model, optimizer = ipex.optimize(model, optimizer=optimizer)
 
 for batch_idx, (data, target) in enumerate(train_loader):
-    # Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
-    data = data.to(memory_format=torch.channels_last)
     optimizer.zero_grad()
     output = model(data)
     loss = criterion(output, target)
@@ -110,7 +103,6 @@ train_loader = torch.utils.data.DataLoader(
 )
 
 model = torchvision.models.resnet50()
-model = model.to(memory_format=torch.channels_last)
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
 model.train()
@@ -119,8 +111,6 @@ model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat1
 for batch_idx, (data, target) in enumerate(train_loader):
     optimizer.zero_grad()
     with torch.cpu.amp.autocast():
-        # Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
-        data = data.to(memory_format=torch.channels_last)
         output = model(data)
         loss = criterion(output, target)
         loss.backward()
@@ -185,8 +175,6 @@ model = torch.nn.parallel.DistributedDataParallel(model)
 
 for batch_idx, (data, target) in enumerate(train_loader):
     optimizer.zero_grad()
-    # Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
-    data = data.to(memory_format=torch.channels_last)
     output = model(data)
     loss = criterion(output, target)
     loss.backward()
@@ -199,8 +187,6 @@ torch.save({
 ```
 
 ## Inference
-
-Channels last is a memory layout format that is more friendly to Intel Architecture. We recommend using this memory layout format for computer vision workloads by invoking `to(memory_format=torch.channels_last)` function against the model object and input data.
 
 The `optimize` function of Intel® Extension for PyTorch\* applies optimizations to the model, bringing additional performance boosts. For both computer vision workloads and NLP workloads, we recommend applying the `optimize` function against the model object.
 
@@ -217,9 +203,6 @@ import torchvision.models as models
 model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
-
-model = model.to(memory_format=torch.channels_last)
-data = data.to(memory_format=torch.channels_last)
 
 #################### code changes ####################
 import intel_extension_for_pytorch as ipex
@@ -266,9 +249,6 @@ import torchvision.models as models
 model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
-
-model = model.to(memory_format=torch.channels_last)
-data = data.to(memory_format=torch.channels_last)
 
 #################### code changes ####################
 import intel_extension_for_pytorch as ipex
@@ -327,9 +307,6 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-model = model.to(memory_format=torch.channels_last)
-data = data.to(memory_format=torch.channels_last)
-
 #################### code changes ####################
 import intel_extension_for_pytorch as ipex
 model = ipex.optimize(model, dtype=torch.bfloat16)
@@ -377,9 +354,6 @@ import torchvision.models as models
 model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
-
-model = model.to(memory_format=torch.channels_last)
-data = data.to(memory_format=torch.channels_last)
 
 #################### code changes ####################
 import intel_extension_for_pytorch as ipex
@@ -540,7 +514,7 @@ oneDNN provides [oneDNN Graph Compiler](https://github.com/oneapi-src/oneDNN/tre
 
 ## C++
 
-To work with libtorch, C++ library of PyTorch, Intel® Extension for PyTorch\* provides its C++ dynamic library as well. The C++ library is supposed to handle inference workload only, such as service deployment. For regular development, use the Python interface. Unlike using libtorch, no specific code changes are required, except for converting input data into channels last data format. Compilation follows the recommended methodology with CMake. Detailed instructions can be found in [PyTorch tutorial](https://pytorch.org/tutorials/advanced/cpp_export.html#depending-on-libtorch-and-building-the-application).
+To work with libtorch, C++ library of PyTorch, Intel® Extension for PyTorch\* provides its C++ dynamic library as well. The C++ library is supposed to handle inference workload only, such as service deployment. For regular development, use the Python interface. Unlike using libtorch, no specific code changes are required. Compilation follows the recommended methodology with CMake. Detailed instructions can be found in [PyTorch tutorial](https://pytorch.org/tutorials/advanced/cpp_export.html#depending-on-libtorch-and-building-the-application).
 
 During compilation, Intel optimizations will be activated automatically once C++ dynamic library of Intel® Extension for PyTorch\* is linked.
 
@@ -563,8 +537,6 @@ int main(int argc, const char* argv[]) {
         return -1;
     }
     std::vector<torch::jit::IValue> inputs;
-    // make sure input data are converted to channels last format
-    inputs.push_back(torch::ones({1, 3, 224, 224}).to(c10::MemoryFormat::ChannelsLast));
 
     at::Tensor output = module.forward(inputs).toTensor();
 

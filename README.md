@@ -37,9 +37,7 @@ model.eval()
 data = torch.rand(1, 3, 224, 224)
 
 import intel_extension_for_pytorch as ipex
-model = model.to(memory_format=torch.channels_last)
 model = ipex.optimize(model)
-data = data.to(memory_format=torch.channels_last)
 
 with torch.no_grad():
   model(data)
