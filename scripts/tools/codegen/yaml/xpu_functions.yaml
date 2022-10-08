@@ -528,6 +528,12 @@ supported:
   - set_.source_Storage
   - set_.source_Storage_storage_offset
   - set_.source_Tensor
+  - bucketize.Scalar
+  - bucketize.Tensor
+  - bucketize.Tensor_out
+  - searchsorted.Scalar
+  - searchsorted.Tensor
+  - searchsorted.Tensor_out
   - sgn.out
   - sigmoid.out
   - sigmoid_backward.grad_input
