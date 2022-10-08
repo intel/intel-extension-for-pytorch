@@ -187,14 +187,14 @@ bool Settings::is_tile_as_device_enabled() const {
 void Settings::enable_tile_as_device() {
   if (!dpcppIsDevPoolInit()) {
     std::lock_guard<std::mutex> lock(s_mutex);
-    tile_as_device_enabled == ENV_VAL::ON;
+    tile_as_device_enabled = ENV_VAL::ON;
   }
 }
 
 void Settings::disable_tile_as_device() {
   if (!dpcppIsDevPoolInit()) {
     std::lock_guard<std::mutex> lock(s_mutex);
-    tile_as_device_enabled == ENV_VAL::OFF;
+    tile_as_device_enabled = ENV_VAL::OFF;
   }
 }
 
