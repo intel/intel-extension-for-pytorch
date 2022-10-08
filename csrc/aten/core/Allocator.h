@@ -11,15 +11,15 @@ namespace xpu {
 namespace dpcpp {
 
 /// Device Allocator
-IPEX_API void emptyCacheInDevAlloc();
+void emptyCacheInDevAlloc();
 
-IPEX_API DeviceStats getDeviceStatsFromDevAlloc(DeviceIndex device_index);
+DeviceStats getDeviceStatsFromDevAlloc(DeviceIndex device_index);
 
-IPEX_API void resetAccumulatedStatsInDevAlloc(DeviceIndex device_index);
+void resetAccumulatedStatsInDevAlloc(DeviceIndex device_index);
 
-IPEX_API void resetPeakStatsInDevAlloc(DeviceIndex device_index);
+void resetPeakStatsInDevAlloc(DeviceIndex device_index);
 
-IPEX_API std::vector<SegmentInfo> snapshotOfDevAlloc();
+std::vector<SegmentInfo> snapshotOfDevAlloc();
 
 at::Allocator* getDeviceAllocator();
 
@@ -32,7 +32,7 @@ void* getBaseAllocationFromDevAlloc(void* ptr, size_t* size);
 
 void recordStreamInDevAlloc(const DataPtr& ptr, DPCPPStream stream);
 
-IPEX_API void dumpMemoryStatusFromDevAlloc(DeviceIndex device_index);
+void dumpMemoryStatusFromDevAlloc(DeviceIndex device_index);
 
 std::mutex* getFreeMutexOfDevAlloc();
 

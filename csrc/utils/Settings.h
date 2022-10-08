@@ -5,19 +5,15 @@
 
 namespace xpu {
 
-enum IPEX_API ENV_VAL { OFF = 0, ON = 1, ENV_VAL_MAX = ON };
-static const char* IPEX_API ENV_VAL_STR[]{"OFF", "ON"};
+enum ENV_VAL { OFF = 0, ON = 1, ENV_VAL_MAX = ON };
+static const char* ENV_VAL_STR[]{"OFF", "ON"};
 
-enum IPEX_API VERBOSE_LEVEL {
-  DISABLE = 0,
-  DEBUG = 1,
-  VERBOSE_LEVEL_MAX = DEBUG
-};
-static const char* IPEX_API VERBOSE_LEVEL_STR[]{"DISABLE", "DEBUG"};
+enum VERBOSE_LEVEL { DISABLE = 0, DEBUG = 1, VERBOSE_LEVEL_MAX = DEBUG };
+static const char* VERBOSE_LEVEL_STR[]{"DISABLE", "DEBUG"};
 
 namespace dpcpp {
 
-class IPEX_API Settings final {
+class Settings final {
  public:
   Settings();
 

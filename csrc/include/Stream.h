@@ -5,6 +5,6 @@
 
 namespace xpu {
 
-sycl::queue& get_queue_from_stream(c10::Stream stream);
+IPEX_API sycl::queue& get_queue_from_stream(c10::Stream stream);
 
 } // namespace xpu

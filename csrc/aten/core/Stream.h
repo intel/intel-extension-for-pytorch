@@ -10,7 +10,7 @@ using namespace at;
 namespace xpu {
 namespace dpcpp {
 
-class IPEX_API DPCPPStream {
+class DPCPPStream {
  public:
   enum Unchecked { UNCHECKED };
 
@@ -51,9 +51,9 @@ DPCPPStream getDPCPPStreamFromPool(bool is_default, DeviceIndex device_index);
 
 DPCPPStream getDefaultDPCPPStream(DeviceIndex device_index = -1);
 
-IPEX_API DPCPPStream getCurrentDPCPPStream(DeviceIndex device_index = -1);
+DPCPPStream getCurrentDPCPPStream(DeviceIndex device_index = -1);
 
-IPEX_API void setCurrentDPCPPStream(DPCPPStream stream);
+void setCurrentDPCPPStream(DPCPPStream stream);
 
 } // namespace dpcpp
 } // namespace xpu

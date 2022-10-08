@@ -6,7 +6,7 @@
 namespace xpu {
 namespace dpcpp {
 
-struct IPEX_API DeviceProp {
+struct DeviceProp {
   dpcpp_info_t<sycl::info::device, dpcpp_dev_name> dev_name;
   dpcpp_info_t<sycl::info::device, dpcpp_dev_type> dev_type;
   dpcpp_info_t<sycl::info::platform, dpcpp_platform_name> platform_name;

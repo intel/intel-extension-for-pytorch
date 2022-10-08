@@ -9,7 +9,7 @@ using namespace at;
 namespace xpu {
 namespace dpcpp {
 
-struct IPEX_API DPCPPGeneratorImpl : public GeneratorImpl {
+struct DPCPPGeneratorImpl : public GeneratorImpl {
   // Constructors
   DPCPPGeneratorImpl(DeviceIndex device_index = -1);
   ~DPCPPGeneratorImpl() = default;
@@ -36,8 +36,7 @@ namespace detail {
 
 Generator createDPCPPGenerator(DeviceIndex device_index = -1);
 
-IPEX_API const Generator& getDefaultDPCPPGenerator(
-    DeviceIndex device_index = -1);
+const Generator& getDefaultDPCPPGenerator(DeviceIndex device_index = -1);
 
 } // namespace detail
 } // namespace dpcpp
