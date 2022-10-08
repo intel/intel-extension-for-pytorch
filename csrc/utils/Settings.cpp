@@ -266,22 +266,45 @@ bool Settings::is_channels_last_1d_enabled() const {
 #endif
 }
 
-#ifdef BUILD_SIMPLE_TRACE
 bool Settings::is_simple_trace_enabled() const {
+#ifdef BUILD_SIMPLE_TRACE
   std::lock_guard<std::mutex> lock(s_mutex);
   return simple_trace_enabled == ENV_VAL::ON;
+#else
+  return false;
+#endif
 }
 
 void Settings::enable_simple_trace() {
+#ifdef BUILD_SIMPLE_TRACE
   std::lock_guard<std::mutex> lock(s_mutex);
   simple_trace_enabled = ENV_VAL::ON;
+#endif
 }
 
 void Settings::disable_simple_trace() {
+#ifdef BUILD_SIMPLE_TRACE
   std::lock_guard<std::mutex> lock(s_mutex);
   simple_trace_enabled = ENV_VAL::OFF;
-}
 #endif
+}
 
 } // namespace dpcpp
+
+XPU_BACKEND get_backend() {
+  return dpcpp::Settings::I().get_backend();
+}
+
+bool set_backend(XPU_BACKEND backend) {
+  return dpcpp::Settings::I().set_backend(backend);
+}
+
+FP32_MATH_MODE get_fp32_math_mode() {
+  return dpcpp::Settings::I().get_fp32_math_mode();
+}
+
+bool set_fp32_math_mode(FP32_MATH_MODE mode) {
+  return dpcpp::Settings::I().set_fp32_math_mode(mode);
+}
+
 } // namespace xpu

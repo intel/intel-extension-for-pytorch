@@ -4,6 +4,7 @@ set(IPEX_GPU_ATEN_CORE_DIR "${IPEX_GPU_ATEN_SRC_DIR}/core")
 set(IPEX_GPU_ATEN_GENERATED "${IPEX_GPU_ATEN_SRC_DIR}/generated")
 set(IPEX_GPU_RUNTIME_SRC_DIR "${IPEX_GPU_ROOT}/runtime")
 set(IPEX_GPU_UTILS_SRC_DIR "${IPEX_GPU_ROOT}/utils")
+set(IPEX_GPU_INCLUDE_DIR "${IPEX_GPU_ROOT}/include")
 
 # sources
 set(IPEX_GPU_GEN_FILES)
@@ -12,7 +13,6 @@ include(${PROJECT_SOURCE_DIR}/cmake/Codegen.cmake)
 
 set(IPEX_ATEN_OPS_SRCS)
 set(IPEX_ATEN_CORE_SRCS)
-set(IPEX_ATEN_HEADERS)
 add_subdirectory(${IPEX_GPU_ATEN_SRC_DIR})
 
 set(IPEX_RUNTIME_SRCS)
@@ -25,7 +25,6 @@ set(IPEX_TENSOR_SRCS)
 add_subdirectory(${IPEX_GPU_ROOT}/tensor)
 
 set(IPEX_UTILS_SRCS)
-set(IPEX_UTILS_HEADERS)
 add_subdirectory(${IPEX_GPU_ROOT}/utils)
 
 set(IPEX_DISTRIBUTED_SRCS)
@@ -237,20 +236,17 @@ install(TARGETS intel-ext-pt-gpu
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-install(FILES ${IPEX_ATEN_HEADERS} DESTINATION include/core)
-install(FILES ${IPEX_UTILS_HEADERS} DESTINATION include/utils)
+set(IPEX_GPU_HEADERS)
+add_subdirectory(${IPEX_GPU_INCLUDE_DIR})
+install(FILES ${IPEX_GPU_HEADERS} DESTINATION include/xpu)
 
 # Generate the IPEX All-In-One header
 set(ipex_header "#pragma once\n")
-foreach(uheader ${IPEX_UTILS_HEADERS})
+foreach(uheader ${IPEX_GPU_HEADERS})
   get_filename_component(header ${uheader} NAME)
-  append(ipex_header "\n#include <utils/${header}>")
+  append(ipex_header "\n#include <xpu/${header}>")
 endforeach()
-append(ipex_header "\n")
-foreach(aheader ${IPEX_ATEN_HEADERS})
-  get_filename_component(header ${aheader} NAME)
-  append(ipex_header "\n#include <core/${header}>")
-endforeach()
+
 file(WRITE ${IPEX_GPU_ATEN_GENERATED}/ipex.h ${ipex_header})
 install(FILES ${IPEX_GPU_ATEN_GENERATED}/ipex.h DESTINATION include)
 

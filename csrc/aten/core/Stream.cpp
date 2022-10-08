@@ -1,4 +1,5 @@
 #include <core/Stream.h>
+#include <include/Stream.h>
 #include <runtime/Device.h>
 #include <runtime/Queue.h>
 
@@ -122,4 +123,10 @@ DPCPPStream getDPCPPStreamOnDevice(DeviceIndex device_index, int stream_index) {
 }
 
 } // namespace dpcpp
+
+sycl::queue& get_queue_from_stream(c10::Stream stream) {
+  dpcpp::DPCPPStream dpcpp_stream(stream);
+  return dpcpp_stream.dpcpp_queue();
+}
+
 } // namespace xpu

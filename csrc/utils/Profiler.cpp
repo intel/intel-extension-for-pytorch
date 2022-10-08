@@ -210,3 +210,22 @@ void reportMemoryUsage(
       ptr, alloc_size, -1, -1, c10::Device(c10::DeviceType::XPU, device_id));
 #endif
 }
+
+namespace xpu {
+
+bool is_profiler_enabled() {
+  return is_profiler_enabled();
+}
+
+void profiler_record(std::string name, cl::sycl::event& event) {
+  return dpcpp_log(name, event);
+}
+
+void profiler_record(
+    std::string name,
+    cl::sycl::event& start_event,
+    cl::sycl::event& end_event) {
+  dpcpp_log(name, start_event, end_event);
+}
+
+} // namespace xpu

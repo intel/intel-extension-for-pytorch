@@ -1,9 +1,9 @@
 #pragma once
 
+#include <include/Settings.h>
 #include <utils/Macros.h>
 
 namespace xpu {
-namespace dpcpp {
 
 enum IPEX_API ENV_VAL { OFF = 0, ON = 1, ENV_VAL_MAX = ON };
 static const char* IPEX_API ENV_VAL_STR[]{"OFF", "ON"};
@@ -15,22 +15,7 @@ enum IPEX_API VERBOSE_LEVEL {
 };
 static const char* IPEX_API VERBOSE_LEVEL_STR[]{"DISABLE", "DEBUG"};
 
-enum IPEX_API XPU_BACKEND {
-  GPU = 0,
-  CPU = 1,
-  AUTO = 2,
-  XPU_BACKEND_MAX = AUTO
-};
-static const char* IPEX_API XPU_BACKEND_STR[]{"GPU", "CPU", "AUTO"};
-
-enum IPEX_API FP32_MATH_MODE {
-  FP32 = 0,
-  TF32 = 1,
-  BF32 = 2,
-  FP32_MATH_MODE_MAX = BF32
-};
-static const char* IPEX_API IPEX_API
-    FP32_MATH_MODE_STR[]{"FP32", "TF32", "BF32"};
+namespace dpcpp {
 
 class IPEX_API Settings final {
  public:
@@ -70,11 +55,9 @@ class IPEX_API Settings final {
 
   bool is_channels_last_1d_enabled() const;
 
-#ifdef BUILD_SIMPLE_TRACE
   bool is_simple_trace_enabled() const;
   void enable_simple_trace();
   void disable_simple_trace();
-#endif
 
  private:
   VERBOSE_LEVEL verbose_level;
@@ -86,9 +69,7 @@ class IPEX_API Settings final {
   ENV_VAL onednn_layout_enabled;
   ENV_VAL force_onednn_primitive_enabled;
 
-#ifdef BUILD_SIMPLE_TRACE
   ENV_VAL simple_trace_enabled;
-#endif
 };
 
 } // namespace dpcpp

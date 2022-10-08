@@ -393,8 +393,7 @@ setup(
             'requirements.txt',
             'lib/*.so',
             'include/*.h',
-            'include/core/*.h',
-            'include/utils/*.h',
+            'include/xpu/*.h',
             'share/cmake/IntelExtensionPytorch/*']
     },
     long_description=long_description,

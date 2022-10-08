@@ -8,6 +8,7 @@
 #include <core/Allocator.h>
 #include <core/Device.h>
 #include <core/Generator.h>
+#include <include/Settings.h>
 #include <intrinsic/intrinsic.h>
 #include <pybind11/stl.h>
 #include <utils/Settings.h>
@@ -695,17 +696,17 @@ void init_module(pybind11::module& m) {
     return Settings::I().set_verbose_level(level);
   });
 
-  py::enum_<xpu::dpcpp::XPU_BACKEND>(m, "XPUBackend")
-      .value("GPU", xpu::dpcpp::XPU_BACKEND::GPU)
-      .value("CPU", xpu::dpcpp::XPU_BACKEND::CPU)
-      .value("AUTO", xpu::dpcpp::XPU_BACKEND::AUTO)
+  py::enum_<xpu::XPU_BACKEND>(m, "XPUBackend")
+      .value("GPU", xpu::XPU_BACKEND::GPU)
+      .value("CPU", xpu::XPU_BACKEND::CPU)
+      .value("AUTO", xpu::XPU_BACKEND::AUTO)
       .export_values();
 
   m.def("_get_backend", []() {
     return static_cast<int>(Settings::I().get_backend());
   });
   m.def("_set_backend", [](const int backend) {
-    return Settings::I().set_backend(static_cast<XPU_BACKEND>(backend));
+    return Settings::I().set_backend(static_cast<xpu::XPU_BACKEND>(backend));
   });
 
   m.def("_is_sync_mode", []() { return Settings::I().is_sync_mode_enabled(); });
@@ -757,37 +758,27 @@ void init_module(pybind11::module& m) {
     return Settings::I().set_onemkl_verbose(level);
   });
 
-  py::enum_<xpu::dpcpp::FP32_MATH_MODE>(m, "FP32MathMode")
-      .value("FP32", xpu::dpcpp::FP32_MATH_MODE::FP32)
-      .value("TF32", xpu::dpcpp::FP32_MATH_MODE::TF32)
-      .value("BF32", xpu::dpcpp::FP32_MATH_MODE::BF32)
+  py::enum_<xpu::FP32_MATH_MODE>(m, "FP32MathMode")
+      .value("FP32", xpu::FP32_MATH_MODE::FP32)
+      .value("TF32", xpu::FP32_MATH_MODE::TF32)
+      .value("BF32", xpu::FP32_MATH_MODE::BF32)
       .export_values();
 
   m.def("_get_fp32_math_mode", []() {
     return static_cast<int>(Settings::I().get_fp32_math_mode());
   });
   m.def("_set_fp32_math_mode", [](const int mode) {
-    return Settings::I().set_fp32_math_mode(static_cast<FP32_MATH_MODE>(mode));
+    return Settings::I().set_fp32_math_mode(
+        static_cast<xpu::FP32_MATH_MODE>(mode));
   });
 
-  m.def("_enable_simple_trace", []() {
-#ifdef BUILD_SIMPLE_TRACE
-    Settings::I().enable_simple_trace();
-#endif
-  });
+  m.def("_enable_simple_trace", []() { Settings::I().enable_simple_trace(); });
 
-  m.def("_disable_simple_trace", []() {
-#ifdef BUILD_SIMPLE_TRACE
-    Settings::I().disable_simple_trace();
-#endif
-  });
+  m.def(
+      "_disable_simple_trace", []() { Settings::I().disable_simple_trace(); });
 
   m.def("_is_simple_trace_enabled", []() {
-#ifdef BUILD_SIMPLE_TRACE
     return Settings::I().is_simple_trace_enabled();
-#else
-    return false;
-#endif
   });
 
   auto module = m.ptr();
