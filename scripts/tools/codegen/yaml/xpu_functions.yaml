@@ -128,6 +128,8 @@ supported:
   - baddbmm
   - baddbmm.out
   - baddbmm_
+  - batch_norm_elemt
+  - batch_norm_elemt.out
   - bernoulli_.Tensor
   - bernoulli_.float
   - bernoulli.out
@@ -423,6 +425,7 @@ supported:
   - nanmedian.dim_values
   - narrow_copy
   - native_batch_norm
+  - native_batch_norm.out
   - native_batch_norm_backward
   - native_group_norm
   - native_group_norm_backward
