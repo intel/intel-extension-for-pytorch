@@ -147,24 +147,18 @@ def get_device_name(device: Optional[_device_t] = None) -> str:
     return get_device_properties(device).name
 
 
-def get_device_capability(device: Optional[_device_t] = None) -> Tuple[int, int]:
-    r"""Gets the xpu capability of a device.
+def get_device_properties(device: _device_t):
+    r"""Gets the xpu properties of a device.
 
     Arguments:
         device (torch.device or int, optional): device for which to return the
-            device capability. This function is a no-op if this argument is
-            a negative integer. It uses the current device, given by
+            device properties. It uses the current device, given by
             :func:`~torch.xpu.current_device`, if :attr:`device` is ``None``
             (default).
 
     Returns:
-        tuple(int, int): the major and minor xpu capability of the device
+        _DeviceProperties: the properties of the device
     """
-    prop = get_device_properties(device)
-    return prop.major, prop.minor
-
-
-def get_device_properties(device: _device_t):
     _lazy_init()  # will define _get_device_properties
     device = _get_device_index(device, optional=True)
     if device < 0 or device >= device_count():
