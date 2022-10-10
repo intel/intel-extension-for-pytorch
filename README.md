@@ -445,19 +445,15 @@ All fusions patterns are only available in PyTorch JIT mode.
 Master weights is enabled for assuring accuracy by using FP32 weights in BF16 training gradient update. To use this feature, model shall be updated as following: 
 
 ```bash
-# optimizer = torch.optim.SGD(model.parameters(),lr=0.1,momentum=0.9,weight_decay=1e-4)
-optimizer = torch.xpu.optim.SGDMasterWeight(model.parameters(),lr=0.1,momentum=0.9,weight_decay=1e-4)
-model.bfloat16()
-
-output = model(input)
+optimized_model, optimized_optimizer = torch.xpu.optimize(model, dtype=torch.bfloat16, optimizer=optimizer)
+output = optimized_model(input)
 loss = criterion(output)
-optimizer.zero_grad()
+optimized_optimizer.zero_grad()
 loss.backward()
-optimizer.step()
+optimized_optimizer.step()
 ```
-
-1) optimizer shall be updated to use a new API such as ```SGDMasterWeight``` which contains master weights support
-2) model shall be converted to bfloat16 after optimizer is initiated. Otherwise, optimizer can't get FP32 weights since it is already converted to BF16.
+1) Some layers(Conv, ConvTranspose and Linear) of the optimized_model will keep two pieces weight, one is FP32 master weight and the other is BF16.
+2) The BF16 weight is for computation and the FP32 master weight is for grad updating for accuracy
 
 ### Operator Coverage:
 

@@ -10,6 +10,7 @@
 #include <core/Generator.h>
 #include <include/Settings.h>
 #include <intrinsic/intrinsic.h>
+#include <oneDNN/Utils.h>
 #include <pybind11/stl.h>
 #include <utils/Settings.h>
 #include "Event.h"
@@ -564,20 +565,6 @@ void init_module(pybind11::module& m) {
       "enable split SGD for BF16 weight update. on Intel device");
 
   m.def(
-      "fusion_amdd",
-      [](at::Tensor& p,
-         at::Tensor& d_p,
-         at::Tensor& buf,
-         float weight_decay,
-         float momentum,
-         float dampening,
-         float lr) {
-        return at::AtenIpexTypeXPU::fusion_amdd(
-            p, d_p, buf, weight_decay, momentum, dampening, lr);
-      },
-      "enable Fusion SGD for weight update. on Intel device");
-
-  m.def(
       "interaction",
       [](at::Tensor& input_mlp, at::Tensor& input_emb) {
         return at::AtenIpexTypeXPU::interaction(input_mlp, input_emb);
@@ -585,94 +572,94 @@ void init_module(pybind11::module& m) {
       "interaction kernel implemtation on Intel device");
 
   m.def(
-      "fused_adamWMasterWeight",
-      [](Tensor& master_weight,
-         Tensor& weight,
-         Tensor& grad,
+      "fused_ADAMW",
+      [](at::Tensor& param_,
+         at::Tensor& exp_avg_,
+         at::Tensor& exp_avg_sq_,
+         at::Tensor& max_exp_avg_sq_,
+         at::Tensor& grad_,
+         at::Tensor& param2_,
          const bool amsgrad,
-         Tensor& avg,
-         Tensor& avg_sq,
-         Tensor& max_avg_sq,
-         int64_t& step,
-         double lr,
-         double eps,
-         double beta1,
-         double beta2,
-         double weight_decay) {
-        return at::AtenIpexTypeXPU::fused_adamWMasterWeight(
-            master_weight,
-            weight,
-            grad,
+         const double step,
+         const double beta1,
+         const double beta2,
+         const double learning_rate,
+         const double weight_decay,
+         const double eps) {
+        return at::AtenIpexTypeXPU::fused_ADAMW(
+            param_,
+            exp_avg_,
+            exp_avg_sq_,
+            max_exp_avg_sq_,
+            grad_,
+            param2_,
             amsgrad,
-            avg,
-            avg_sq,
-            max_avg_sq,
             step,
-            lr,
-            eps,
             beta1,
             beta2,
-            weight_decay);
-      },
-      "optimize official torch AdamW optimizer kernel implemtation");
-
-  m.def(
-      "transformer_adamWMasterWeight",
-      [](Tensor& master_weight,
-         Tensor& weight,
-         Tensor& grad,
-         Tensor& avg,
-         Tensor& avg_sq,
-         Tensor& max_avg_sq,
-         int64_t& step,
-         double lr,
-         double eps,
-         double beta1,
-         double beta2,
-         double weight_decay,
-         const bool correct_bias) {
-        return at::AtenIpexTypeXPU::transformer_adamWMasterWeight(
-            master_weight,
-            weight,
-            grad,
-            avg,
-            avg_sq,
-            max_avg_sq,
-            step,
-            lr,
-            eps,
-            beta1,
-            beta2,
+            learning_rate,
             weight_decay,
-            correct_bias);
+            eps);
       },
-      "optimize transformer AdamW optimizer kernel implemtation");
+      "fuse optimizer AdamW's step implementation on Intel device");
 
   m.def(
-      "fused_SGDMasterWeight",
-      [](at::Tensor& master_weight,
-         at::Tensor& weight,
+      "fused_SGD",
+      [](at::Tensor& fp32_weight,
          at::Tensor& grad,
-         double weight_decay,
-         bool momentum_buffer_existed,
-         at::Tensor& momentum_buffer,
-         double momentum,
-         double dampening,
-         bool nesterov,
-         double lr) {
-        return at::AtenIpexTypeXPU::fused_SGDMasterWeight(
-            master_weight,
-            weight,
+         const c10::optional<at::Tensor>& momentum_buffer_,
+         at::Tensor& weight,
+         const double momentum,
+         const double lr,
+         const double weight_decay,
+         const double dampening,
+         const bool nesterov) {
+        return at::AtenIpexTypeXPU::fused_SGD(
+            fp32_weight,
             grad,
-            weight_decay,
-            momentum_buffer_existed,
-            momentum_buffer,
+            momentum_buffer_,
+            weight,
             momentum,
+            lr,
+            weight_decay,
             dampening,
-            nesterov,
-            lr);
+            nesterov);
       },
-      "optimized SGDMasterWeight optimizer kernel implemtation on Intel device");
+      "fuse optimizer SGD's step implementation on Intel device");
+
+  m.def(
+      "convert_conv_weight_layout",
+      [](const at::Tensor& weight,
+         const IntArrayRef padding,
+         const IntArrayRef stride,
+         IntArrayRef dilation,
+         const int64_t groups,
+         const IntArrayRef input_size) {
+        xpu::oneDNN::convert_conv_weight_layout(
+            weight, padding, stride, dilation, groups, input_size);
+      },
+      "convert oneDNN convolution weight layout");
+
+  m.def(
+      "convert_convtranspose_weight_layout",
+      [](const at::Tensor& weight,
+         const IntArrayRef padding,
+         const IntArrayRef stride,
+         IntArrayRef dilation,
+         const IntArrayRef dst_padding,
+         const int64_t groups,
+         const IntArrayRef input_size) {
+        xpu::oneDNN::convert_convtranspose_weight_layout(
+            weight, padding, stride, dilation, dst_padding, groups, input_size);
+      },
+      "convert oneDNN convolution transpose weight layout");
+
+  m.def(
+      "convert_linear_weight_layout",
+      [](at::Tensor& weight, const IntArrayRef input_size) {
+        return xpu::oneDNN::convert_linear_weight_layout(weight, input_size);
+      },
+      "convert torch layer Linear weight layout");
 
   m.def("to_plain", [](const at::Tensor& input) {
     return at::AtenIpexTypeXPU::to_plain_if_needed(input);

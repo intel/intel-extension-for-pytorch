@@ -992,19 +992,6 @@ at::Tensor trans_addmm_dropout(
   }
 }
 
-at::Tensor fusion_amdd(
-    at::Tensor& p,
-    at::Tensor& d_p,
-    at::Tensor& buf,
-    float weight_decay,
-    float momentum,
-    float dampening,
-    float lr) {
-  const OptionalDeviceGuard device_guard(device_of(p));
-  return at::AtenIpexTypeXPU::fusion_amdd(
-      p, d_p, buf, weight_decay, momentum, dampening, lr);
-}
-
 at::Tensor _convolution_relu(
     at::Tensor& input,
     const at::Tensor& weight,

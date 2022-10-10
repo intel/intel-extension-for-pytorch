@@ -36,7 +36,7 @@ static inline memory::dims deconv_dst_size(
   return dst_size;
 }
 
-static inline memory::format_tag deconv_dat_fomt(int64_t ndim) {
+static inline memory::format_tag deconv_dat_fmt(int64_t ndim) {
   return (ndim == 4)
       ? memory::format_tag::nchw
       : ((ndim == 5) ? memory::format_tag::ncdhw : memory::format_tag::undef);
@@ -122,7 +122,7 @@ static Tensor deconvolution(
   memory::data_type bia_dt =
       with_bias ? get_onednn_dtype(bia) : memory::data_type::undef;
 
-  memory::format_tag src_fmt = deconv_dat_fomt(ndim);
+  memory::format_tag src_fmt = deconv_dat_fmt(ndim);
   memory::format_tag wgh_fmt = deconv_wgh_fmt(ndim, groups != 1);
   memory::format_tag dst_fmt = src_fmt;
   memory::format_tag bia_fmt = memory::format_tag::x;
@@ -234,7 +234,7 @@ static Tensor deconvolution_backward_data(
   memory::data_type bia_dt =
       with_bias ? get_onednn_dtype(wgh) : memory::data_type::undef;
 
-  memory::format_tag src_fmt = deconv_dat_fomt(ndim);
+  memory::format_tag src_fmt = deconv_dat_fmt(ndim);
   memory::format_tag wgh_fmt = deconv_wgh_fmt(ndim, groups != 1);
   memory::format_tag dst_fmt = src_fmt;
   memory::format_tag bia_fmt = memory::format_tag::x;
@@ -360,7 +360,7 @@ static std::tuple<at::Tensor, at::Tensor> deconvolution_backward_weights(
   memory::data_type bia_dt =
       with_bias ? get_onednn_dtype(wgh) : memory::data_type::f32;
 
-  memory::format_tag src_fmt = deconv_dat_fomt(ndim);
+  memory::format_tag src_fmt = deconv_dat_fmt(ndim);
   memory::format_tag wgh_fmt = deconv_wgh_fmt(ndim, groups != 1);
   memory::format_tag dst_fmt = src_fmt;
   memory::format_tag bia_fmt = memory::format_tag::x;

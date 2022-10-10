@@ -2,6 +2,8 @@ import torch
 import intel_extension_for_pytorch
 from torch.optim.optimizer import Optimizer, required
 
+# TODO: low priority. will be deleted and redo in torch.xpu.optimize
+
 
 class SplitSGD(Optimizer):
     r"""Implements low precision stochastic gradient descent with extra state."""

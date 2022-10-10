@@ -61,3 +61,4 @@ def library_paths():
 cmake_prefix_path = os.path.join(os.path.dirname(__file__), 'share', 'cmake')
 
 import intel_extension_for_pytorch.xpu
+from .frontend import optimize

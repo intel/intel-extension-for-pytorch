@@ -1,6 +1,8 @@
 import torch
 from .. import _C
 from enum import Enum
+from .. import frontend
+import intel_extension_for_pytorch  # noqa
 
 
 def to_channels_last_1d(t):
@@ -166,6 +168,18 @@ class onemkl_verbose(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         set_onemkl_verbose(OnemklVerbLevel.OFF)
         return False
+
+
+def optimize(model, dtype=None, optimizer=None, level="O1",
+             inplace=False, conv_bn_folding=None, weights_prepack=None,
+             replace_dropout_with_identity=None, optimize_lstm=None,
+             split_master_weight_for_bf16=None, fuse_update_step=None,
+             sample_input=None):
+    return frontend.optimize(model, dtype, optimizer, level,
+                             inplace, conv_bn_folding, weights_prepack,
+                             replace_dropout_with_identity, optimize_lstm,
+                             split_master_weight_for_bf16, fuse_update_step,
+                             sample_input)
 
 
 # FP32 math mode

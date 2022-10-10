@@ -142,6 +142,13 @@ static inline memory::dims get_onednn_strides(const at::Tensor& tensor) {
   return strides;
 }
 
+static inline memory::desc get_onednn_md(const at::Tensor& tensor) {
+  return {
+      get_onednn_dims(tensor),
+      get_onednn_dtype(tensor),
+      get_onednn_strides(tensor)};
+}
+
 template <typename T>
 inline void array_copy(T* dst, const T* src, size_t size) {
   for (size_t i = 0; i < size; ++i)
@@ -462,6 +469,63 @@ static inline bool cat_valid(const TensorList& tensors) {
   }
   return true;
 }
+
+static inline std::vector<int64_t> gen_dummy_input_size_for(
+    const at::IntArrayRef weight_sizes,
+    const int64_t groups) {
+  // weights_dims is 3 for conv1d, 4 for (de)conv2d and 5 for (de)conv3d
+  auto input_dim = weight_sizes.size();
+
+  std::vector<int64_t> kernel_size;
+  if (5 == input_dim) {
+    kernel_size.push_back(weight_sizes[input_dim - 3]);
+    kernel_size.push_back(weight_sizes[input_dim - 2]);
+  }
+  if (4 == input_dim) {
+    kernel_size.push_back(weight_sizes[input_dim - 2]);
+  }
+  kernel_size.push_back(weight_sizes[input_dim - 1]);
+
+  std::vector<int64_t> input_sizes;
+  auto ic = weight_sizes[1];
+
+  // batch size is 32
+  input_sizes.push_back(32);
+  // input channel
+  input_sizes.push_back(ic);
+  // [important] the factor is 14
+  input_sizes.push_back(14 * kernel_size[0]);
+
+  if (4 == input_dim) {
+    input_sizes.push_back(14 * kernel_size[1]);
+  } else if (5 == input_dim) {
+    input_sizes.push_back(14 * kernel_size[1]);
+    input_sizes.push_back(14 * kernel_size[2]);
+  }
+
+  return input_sizes;
+}
+
+void convert_conv_weight_layout(
+    const at::Tensor& weight,
+    const IntArrayRef padding,
+    const IntArrayRef stride,
+    IntArrayRef dilation,
+    const int64_t groups,
+    const IntArrayRef input_size);
+
+void convert_convtranspose_weight_layout(
+    const at::Tensor& weight,
+    const IntArrayRef padding,
+    const IntArrayRef stride,
+    IntArrayRef dilation,
+    const IntArrayRef dst_padding,
+    const int64_t groups,
+    const IntArrayRef input_size);
+
+at::Tensor convert_linear_weight_layout(
+    at::Tensor& weight,
+    const IntArrayRef input_size);
 
 } // namespace oneDNN
 } // namespace xpu

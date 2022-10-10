@@ -22,47 +22,31 @@ void matmul(
 
 at::Tensor interaction(at::Tensor& input_mlp, at::Tensor& input_emb);
 
-at::Tensor& fused_adamWMasterWeight(
-    at::Tensor& master_weight,
-    at::Tensor& weight,
-    at::Tensor& grad,
+void fused_ADAMW(
+    at::Tensor& param_,
+    at::Tensor& exp_avg_,
+    at::Tensor& exp_avg_sq_,
+    at::Tensor& max_exp_avg_sq_,
+    at::Tensor& grad_,
+    at::Tensor& param2_,
     const bool amsgrad,
-    at::Tensor& avg,
-    at::Tensor& avg_sq,
-    at::Tensor& max_avg_sq,
-    int64_t& step,
-    double lr,
-    double eps,
-    double beta1,
-    double beta2,
-    double weight_decay);
+    const double step,
+    const double beta1,
+    const double beta2,
+    const double learning_rate,
+    const double weight_decay,
+    const double eps);
 
-at::Tensor& transformer_adamWMasterWeight(
-    at::Tensor& master_weight,
-    at::Tensor& weight,
+c10::optional<at::Tensor> fused_SGD(
+    at::Tensor& fp32_weight,
     at::Tensor& grad,
-    at::Tensor& avg,
-    at::Tensor& avg_sq,
-    at::Tensor& max_avg_sq,
-    int64_t& step,
-    double lr,
-    double eps,
-    double beta1,
-    double beta2,
-    double weight_decay,
-    const bool correct_bias);
-
-at::Tensor& fused_SGDMasterWeight(
-    at::Tensor& master_weight,
+    const c10::optional<at::Tensor>& momentum_buffer_,
     at::Tensor& weight,
-    at::Tensor& grad,
-    double weight_decay,
-    bool momentum_buffer_existed,
-    at::Tensor& momentum_buffer,
-    double momentum,
-    double dampening,
-    bool nesterov,
-    double lr);
+    const double momentum,
+    const double lr,
+    const double weight_decay,
+    const double dampening,
+    const bool nesterov);
 
 at::Tensor convolution_sum(
     const at::Tensor& input,
@@ -233,15 +217,6 @@ at::Tensor packed_add(
     at::Tensor& bot_half,
     const at::Tensor& grad,
     float alpha);
-
-at::Tensor fusion_amdd(
-    at::Tensor& p,
-    at::Tensor& d_p,
-    at::Tensor& buf,
-    float weight_decay,
-    float momentum,
-    float dampening,
-    float lr);
 
 at::Tensor empty_opaque_tensor(
     DPCPPTensorContext::Meta meta,

@@ -141,6 +141,59 @@ static inline bool onednn_conv_use_channels_last(
   return (is_smf_channels_last(src) || is_smf_channels_last(weight));
 }
 
+static convolution_forward::primitive_desc get_convolution_pd(
+    const at::Tensor& src,
+    const at::Tensor& wgh,
+    const at::Tensor& bia,
+    const IntArrayRef padding,
+    const IntArrayRef stride,
+    IntArrayRef dilation,
+    const int64_t groups) {
+  auto src_data_t = get_onednn_dtype(src);
+  auto wei_data_t = get_onednn_dtype(wgh);
+  auto bia_data_t =
+      bia.defined() ? get_onednn_dtype(bia) : memory::data_type::undef;
+  auto dst_data_t = src_data_t;
+
+  auto ndim = src.ndimension();
+  memory::dims dst_tz = conv_dst_tz(
+      ndim, src.sizes(), wgh.sizes(), padding, padding, stride, dilation);
+  auto ic = src.size(1);
+  auto oc = dst_tz[1];
+  memory::dims src_tz = src.sizes().vec();
+  memory::dims wgh_tz = compatible_wgh_dims(ndim, groups, oc, ic, wgh.sizes());
+  memory::dims bia_tz = {oc};
+
+  auto fmt_any = memory::format_tag::any;
+  auto src_md = memory::desc(src_tz, src_data_t, fmt_any);
+  auto wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
+  auto bia_md = bia.defined() ? memory::desc(bia_tz, bia_data_t, fmt_any)
+                              : memory::desc();
+  auto dst_md = memory::desc(dst_tz, dst_data_t, fmt_any);
+
+  auto conv_forward_desc = convolution_forward::desc(
+      prop_kind::forward,
+      algorithm::convolution_direct,
+      src_md,
+      wgh_md,
+      bia_md,
+      dst_md,
+      stride.vec(),
+      compatible_dilation(dilation),
+      padding.vec(),
+      padding.vec());
+
+  primitive_attr pattr;
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(scratchpad_mode::user);
+#endif
+
+  return convolution_forward::primitive_desc(
+      conv_forward_desc,
+      pattr,
+      GpuEngineManager::Instance().get_engine({kXPU, current_device()}));
+}
+
 static at::Tensor convolution(
     at::Tensor& dst,
     const at::Tensor& src,
