@@ -228,13 +228,13 @@ batch_normalization_backward(
       GpuEngineManager::Instance().get_engine({at::kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  at::Tensor diff_src, _diff_wgh, _diff_bia;
+  at::Tensor diff_src, diff_wgh, diff_bia;
   if (diff_src_mask[0])
     diff_src = at::empty_like(src);
   if (diff_src_mask[1])
-    _diff_wgh = at::empty(wgh.sizes(), wgh.options().dtype(ScalarType::Float));
+    diff_wgh = at::empty(wgh.sizes(), wgh.options().dtype(ScalarType::Float));
   if (diff_src_mask[2])
-    _diff_bia = at::empty(wgh.sizes(), wgh.options().dtype(ScalarType::Float));
+    diff_bia = at::empty(wgh.sizes(), wgh.options().dtype(ScalarType::Float));
 
   auto flags = normalization_flags::use_scale | normalization_flags::use_shift;
 
@@ -355,10 +355,10 @@ batch_normalization_backward(
         bn_bwd_pd.weights_desc(), engine, bia_f32.data_ptr());
 
     auto diff_wgh_m = dpcpp_onednn_memory(
-        bn_bwd_pd.diff_weights_desc(), engine, _diff_wgh.data_ptr());
+        bn_bwd_pd.diff_weights_desc(), engine, diff_wgh.data_ptr());
 
     auto diff_bia_m = dpcpp_onednn_memory(
-        bn_bwd_pd.diff_weights_desc(), engine, _diff_bia.data_ptr());
+        bn_bwd_pd.diff_weights_desc(), engine, diff_bia.data_ptr());
 
     args.insert({DNNL_ARG_SCALE, wgh_m});
     args.insert({DNNL_ARG_SHIFT, bia_m});
@@ -368,8 +368,6 @@ batch_normalization_backward(
 
   DPCPP_ONEDNN_EXEC(bn_bwd, strm, args);
 
-  auto diff_wgh = _diff_wgh.to(src.dtype());
-  auto diff_bia = _diff_bia.to(src.dtype());
   return {diff_src, diff_wgh, diff_bia};
 }
 
