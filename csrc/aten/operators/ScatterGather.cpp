@@ -161,7 +161,8 @@ Tensor& gather_out(
     at::assert_no_overlap(out, self);
     at::assert_no_partial_overlap(out, index);
   }
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
       self.scalar_type(),
@@ -179,7 +180,8 @@ Tensor& scatter_(
   at::assert_no_internal_overlap(self);
   at::assert_no_overlap(self, index);
   at::assert_no_overlap(self, src);
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
       self.scalar_type(),
@@ -200,7 +202,8 @@ Tensor scatter(
   at::assert_no_overlap(out, index);
   at::assert_no_overlap(out, src);
 
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
       out.scalar_type(),
@@ -264,7 +267,8 @@ Tensor& scatter_add_out(
   at::assert_no_internal_overlap(out);
   at::assert_no_overlap(out, index);
   at::assert_no_overlap(out, src);
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
       self.scalar_type(),
