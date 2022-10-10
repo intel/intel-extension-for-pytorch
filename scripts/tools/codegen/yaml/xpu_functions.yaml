@@ -669,6 +669,9 @@ supported:
   - angle.out
   - linalg_eig
   - linalg_eig.out
+  - linalg_eigh
+  - linalg_eigh.eigvals
+  - linalg_eigvalsh.out
   - _det_lu_based_helper_backward_helper
   - linalg_solve
   - linalg_solve.out
