@@ -53,7 +53,6 @@ def has_onemkl():
 def has_channels_last_1d():
     return _C._is_channels_last_1d_enabled()
 
-
 def has_fp64_dtype(device: int = -1) -> bool:
     r"""Returns a bool indicating if the current XPU device supports dtype float64"""
     return _C._get_device_properties(device).support_fp64
@@ -293,6 +292,10 @@ def set_backend(backend):
 # NOTE: Below options are under experimental.
 #       They are instable, and may be removed without notice!
 ################################################################
+
+def has_jit_quantization_save():
+    return _C._is_jit_quantization_save_enabled()
+
 
 # oneDNN Layout
 def using_onednn_layout():

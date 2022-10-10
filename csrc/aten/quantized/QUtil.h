@@ -3,7 +3,10 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/cpp_custom_type_hack.h>
 #include <ATen/native/quantized/cpu/conv_packed_params.h>
+#include <ATen/native/quantized/cpu/conv_serialization.h>
 #include <ATen/native/quantized/cpu/packed_params.h>
+#include <torch/custom_class.h>
+#include <torch/custom_class_detail.h>
 
 #include <torch/custom_class.h>
 #include <utils/Macros.h>
@@ -19,21 +22,27 @@ struct PackedConvWeightQDPCPP : public ConvPackedParamsBase<kSpatialDim> {
       c10::optional<at::Tensor> bias,
       torch::List<int64_t> stride,
       torch::List<int64_t> padding,
+      torch::List<int64_t> output_padding,
       torch::List<int64_t> dilation,
-      int64_t groups)
+      int64_t groups,
+      bool transpose)
       : weight(std::move(weight)),
         bias(std::move(bias)),
         stride_(std::move(stride)),
         padding_(std::move(padding)),
+        output_padding_(std::move(output_padding)),
         dilation_(std::move(dilation)),
-        groups_(groups) {}
+        groups_(groups),
+        transpose_(transpose) {}
 
   Tensor weight;
   c10::optional<Tensor> bias;
   torch::List<int64_t> stride_;
   torch::List<int64_t> padding_;
+  torch::List<int64_t> output_padding_;
   torch::List<int64_t> dilation_;
   int64_t groups_;
+  bool transpose_;
 
   at::Tensor apply(
       const at::Tensor& input,
@@ -70,11 +79,11 @@ struct PackedConvWeightQDPCPP : public ConvPackedParamsBase<kSpatialDim> {
   }
 
   torch::List<int64_t> output_padding() const override {
-    AT_ERROR("not implemented yet");
+    return output_padding_;
   }
 
   bool transpose() const override {
-    AT_ERROR("not implemented yet");
+    return transpose_;
   }
 
   int64_t groups() const override {
@@ -86,8 +95,10 @@ struct PackedConvWeightQDPCPP : public ConvPackedParamsBase<kSpatialDim> {
       c10::optional<at::Tensor> bias,
       torch::List<int64_t> stride,
       torch::List<int64_t> padding,
+      torch::List<int64_t> output_padding,
       torch::List<int64_t> dilation,
-      int64_t groups);
+      int64_t groups,
+      bool transpose);
 };
 
 struct PackedLinearWeightQDPCPP : public LinearPackedParamsBase {
@@ -156,3 +167,74 @@ T quantize_val(double scale, int64_t zero_point, float value) {
 
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at
+
+#ifdef BUILD_JIT_QUANTIZATION_SAVE
+template <uint32_t kSpatialDim>
+c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>> deserialize_conv_dpcpp(
+    ConvParamsSerializationTypeV3 state) {
+  int64_t version;
+  std::vector<int64_t> config_vals;
+  std::vector<c10::optional<at::Tensor>> tensors;
+
+  std::tie(version, config_vals, tensors) = state;
+  TORCH_INTERNAL_ASSERT(
+      version == 3, "Unexpected serialized qconv version: ", version);
+
+  TORCH_CHECK(tensors.size() == 3, "Wrong number of tensors", tensors.size());
+  c10::optional<at::Tensor> weight = tensors[1];
+  c10::optional<at::Tensor> bias = tensors[2];
+  TORCH_INTERNAL_ASSERT(
+      weight, "Weight should always be present in serialized qconv.");
+
+  torch::List<int64_t> stride, padding, output_padding, dilation;
+  // skip kSpatialDim
+  int idx = 1;
+  for (const auto i : c10::irange(kSpatialDim)) {
+    (void)i; // Suppress unused variable
+    stride.emplace_back(config_vals.at(idx));
+    idx++;
+  }
+  for (const auto i : c10::irange(kSpatialDim)) {
+    (void)i; // Suppress unused variable
+    padding.emplace_back(config_vals.at(idx));
+    idx++;
+  }
+  for (const auto i : c10::irange(kSpatialDim)) {
+    (void)i; // Suppress unused variable
+    dilation.emplace_back(config_vals.at(idx));
+    idx++;
+  }
+  for (const auto i : c10::irange(kSpatialDim)) {
+    (void)i; // Suppress unused variable
+    output_padding.emplace_back(config_vals.at(idx));
+    idx++;
+  }
+  int64_t groups = config_vals.at(idx);
+  idx++;
+  int64_t flags = config_vals.at(idx);
+  idx++;
+  TORCH_INTERNAL_ASSERT(
+      idx == static_cast<int64_t>(config_vals.size()),
+      "Unexpected length of config_vals, expected ",
+      idx,
+      " got ",
+      config_vals.size());
+
+  bool transpose = flags & (1 << 0);
+
+  int64_t other_flags = flags & ~(1 << 0);
+  TORCH_INTERNAL_ASSERT(
+      other_flags == 0, "Unexpected flags set in ", flags, ".");
+
+  return at::AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP<kSpatialDim>::
+      prepack(
+          weight.value(),
+          bias,
+          stride,
+          padding,
+          output_padding,
+          dilation,
+          groups,
+          transpose);
+}
+#endif

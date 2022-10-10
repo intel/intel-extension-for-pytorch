@@ -17,15 +17,25 @@ c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>> at::
         c10::optional<at::Tensor> bias,
         torch::List<int64_t> stride,
         torch::List<int64_t> padding,
+        torch::List<int64_t> output_padding,
         torch::List<int64_t> dilation,
-        int64_t groups) {
+        int64_t groups,
+        bool transpose) {
   c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>> ret_ptr =
       c10::make_intrusive<PackedConvWeightQDPCPP<kSpatialDim>>(
           at::AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP<kSpatialDim>{
-              weight, bias, stride, padding, dilation, groups});
+              weight,
+              bias,
+              stride,
+              padding,
+              output_padding,
+              dilation,
+              groups,
+              transpose});
   return ret_ptr;
 }
-
+template struct at::AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP<2>;
+template struct at::AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP<3>;
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 
@@ -37,8 +47,21 @@ c10::intrusive_ptr<ConvPackedParamsBase<2>> dpcppConvPrepack2d(
     torch::List<int64_t> dilation,
     int64_t groups) {
   // This is just align with Pytorch Python API!
+  torch::List<int64_t> output_padding;
+  int dim = 2;
+  output_padding.reserve(dim);
+  for (int idx = 0; idx < dim; ++idx) {
+    output_padding.push_back((int64_t)0);
+  }
   auto ret_ptr = PackedConvWeightQDPCPP<2>::prepack(
-      weight, bias, stride, padding, dilation, groups);
+      weight,
+      bias,
+      stride,
+      padding,
+      output_padding,
+      dilation,
+      groups,
+      /*transpose=*/false);
   return ret_ptr;
 }
 
@@ -49,8 +72,21 @@ c10::intrusive_ptr<ConvPackedParamsBase<3>> dpcppConvPrepack3d(
     torch::List<int64_t> padding,
     torch::List<int64_t> dilation,
     int64_t groups) {
+  torch::List<int64_t> output_padding;
+  int dim = 3;
+  output_padding.reserve(dim);
+  for (int idx = 0; idx < dim; ++idx) {
+    output_padding.push_back((int64_t)0);
+  }
   auto ret_ptr = PackedConvWeightQDPCPP<3>::prepack(
-      weight, bias, stride, padding, dilation, groups);
+      weight,
+      bias,
+      stride,
+      padding,
+      output_padding,
+      dilation,
+      groups,
+      /*transpose=*/false);
   return ret_ptr;
 }
 

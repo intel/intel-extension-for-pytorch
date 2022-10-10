@@ -266,6 +266,14 @@ bool Settings::is_channels_last_1d_enabled() const {
 #endif
 }
 
+bool Settings::is_jit_quantization_save_enabled() const {
+#if defined(BUILD_JIT_QUANTIZATION_SAVE)
+  return true;
+#else
+  return false;
+#endif
+}
+
 bool Settings::is_simple_trace_enabled() const {
 #ifdef BUILD_SIMPLE_TRACE
   std::lock_guard<std::mutex> lock(s_mutex);

@@ -482,13 +482,6 @@ static at::Tensor convolution(
       bia_ = empty_opaque_tensor(bia_md, bia.options(), c10::nullopt);
       bia_m = dpcpp_onednn_memory(bia_md, engine, bia_.data_ptr());
       xpu::oneDNN::reorder(bia, bia_, reorder_attr);
-
-      if (weight_cache_optimization) {
-        strm.wait();
-        // FIXME: thread safty
-        auto bia_opt_ctx = DPCPPTensorContext::release_tensor_ctx(bia_);
-        DPCPPTensorContext::set_tensor_ctx(bia, std::move(bia_opt_ctx));
-      }
     }
   }
 

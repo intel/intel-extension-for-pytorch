@@ -35,6 +35,7 @@ set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build (for example,
 option(USE_PROFILER "USE XPU Profiler in build." ON)
 option(BUILD_SIMPLE_TRACE "Build simple trace for each registered operator" OFF)
 set(BUILD_OPT_LEVEL "" CACHE STRING "Add build option -Ox, accept values: 0/1")
+option(BUILD_JIT_QUANTIZATION_SAVE "Support jit quantization model save and load" OFF)
 
 if (BUILD_STATS)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "time -v")
@@ -122,8 +123,9 @@ function (print_configuration_summary)
     message(STATUS "  BUILD_SEPARATE_OPS    : ${BUILD_SEPARATE_OPS}")
     message(STATUS "  USE_PROFILER          : ${USE_PROFILER}")
     message(STATUS "  BUILD_SIMPLE_TRACE    : ${BUILD_SIMPLE_TRACE}")
-
+    message(STATUS "  BUILD_JIT_QUANTIZATION_SAVE : ${BUILD_JIT_QUANTIZATION_SAVE}")
     message(STATUS "")
+
 endfunction()
 
 print_configuration_summary()
