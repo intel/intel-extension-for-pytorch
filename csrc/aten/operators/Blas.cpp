@@ -1,546 +1,12 @@
-#include <ATen/ATen.h>
-#include <ATen/CPUApplyUtils.h>
-#include <ATen/ExpandUtils.h>
-#include <ATen/record_function.h>
-#include <core/TensorImplUtils.h>
-
-#include <oneDNN/oneDNN.h>
-#include <runtime/Utils.h>
-#include <utils/oneMKLUtils.h>
-#include <vector>
-
-#include <quantized/QUtil.h>
-#include "comm/ATDispatch.h"
-#include "comm/RegistrationDeclarations.h"
-
-#include <c10/util/typeid.h>
-
-using namespace dnnl;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+#include <ATen/WrapDimUtilsMulti.h>
+#include "BlasImpl.h"
 
 namespace at {
-namespace impl {
-
-bool check_broadcast(const Tensor& src, const IntArrayRef& shape) {
-  auto src_dim = src.dim();
-  auto tgt_dim = shape.size();
-  if (src_dim == 0 && src_dim < tgt_dim)
-    return true;
-  if (src_dim > tgt_dim)
-    return false;
-  do {
-    src_dim--;
-    tgt_dim--;
-    auto size = src.size(src_dim);
-    if (size != 1 && size != shape[tgt_dim])
-      return false;
-  } while (src_dim);
-  return true;
-}
-
-#ifdef USE_ONEMKL
-template <typename scalar_t>
-void gemm_batch(
-    sycl::queue& queue,
-    oneapi::mkl::transpose transa,
-    oneapi::mkl::transpose transb,
-    int64_t m,
-    int64_t n,
-    int64_t k,
-    scalar_t alpha,
-    scalar_t* a,
-    int64_t lda,
-    int64_t stride_a,
-    scalar_t* b,
-    int64_t ldb,
-    int64_t stride_b,
-    scalar_t beta,
-    scalar_t* c,
-    int64_t ldc,
-    int64_t stride_c,
-    int64_t batch_size) {
-  DPCPP_ONEMKL_SUBMIT(
-      queue,
-      oneapi::mkl::blas::column_major::gemm_batch,
-      queue,
-      transa,
-      transb,
-      m,
-      n,
-      k,
-      alpha,
-      a,
-      lda,
-      stride_a,
-      b,
-      ldb,
-      stride_b,
-      beta,
-      c,
-      ldc,
-      stride_c,
-      batch_size);
-}
-
-template <>
-void gemm_batch<c10::complex<double>>(
-    sycl::queue& queue,
-    oneapi::mkl::transpose transa,
-    oneapi::mkl::transpose transb,
-    int64_t m,
-    int64_t n,
-    int64_t k,
-    c10::complex<double> alpha,
-    c10::complex<double>* a,
-    int64_t lda,
-    int64_t stride_a,
-    c10::complex<double>* b,
-    int64_t ldb,
-    int64_t stride_b,
-    c10::complex<double> beta,
-    c10::complex<double>* c,
-    int64_t ldc,
-    int64_t stride_c,
-    int64_t batch_size) {
-  DPCPP_ONEMKL_SUBMIT(
-      queue,
-      oneapi::mkl::blas::column_major::gemm_batch,
-      queue,
-      transa,
-      transb,
-      m,
-      n,
-      k,
-      *reinterpret_cast<std::complex<double>*>(&alpha),
-      reinterpret_cast<std::complex<double>*>(a),
-      lda,
-      stride_a,
-      reinterpret_cast<std::complex<double>*>(b),
-      ldb,
-      stride_b,
-      *reinterpret_cast<std::complex<double>*>(&beta),
-      reinterpret_cast<std::complex<double>*>(c),
-      ldc,
-      stride_c,
-      batch_size);
-}
-
-template <>
-void gemm_batch<c10::complex<float>>(
-    sycl::queue& queue,
-    oneapi::mkl::transpose transa,
-    oneapi::mkl::transpose transb,
-    int64_t m,
-    int64_t n,
-    int64_t k,
-    c10::complex<float> alpha,
-    c10::complex<float>* a,
-    int64_t lda,
-    int64_t stride_a,
-    c10::complex<float>* b,
-    int64_t ldb,
-    int64_t stride_b,
-    c10::complex<float> beta,
-    c10::complex<float>* c,
-    int64_t ldc,
-    int64_t stride_c,
-    int64_t batch_size) {
-  DPCPP_ONEMKL_SUBMIT(
-      queue,
-      oneapi::mkl::blas::column_major::gemm_batch,
-      queue,
-      transa,
-      transb,
-      m,
-      n,
-      k,
-      *reinterpret_cast<std::complex<float>*>(&alpha),
-      reinterpret_cast<std::complex<float>*>(a),
-      lda,
-      stride_a,
-      reinterpret_cast<std::complex<float>*>(b),
-      ldb,
-      stride_b,
-      *reinterpret_cast<std::complex<float>*>(&beta),
-      reinterpret_cast<std::complex<float>*>(c),
-      ldc,
-      stride_c,
-      batch_size);
-}
-#endif
-
-void mkl_baddbmm(
-    Tensor& result,
-    const Tensor& self,
-    Tensor batch1,
-    Tensor batch2,
-    const Scalar& beta,
-    const Scalar& alpha) {
-#ifdef USE_ONEMKL
-  // colum major
-  TORCH_CHECK(batch1.dim() == 3, "batch1 must be a 3D tensor");
-  TORCH_CHECK(batch2.dim() == 3, "batch2 must be a 3D tensor");
-
-  auto batch1_sizes = batch1.sizes();
-  auto batch2_sizes = batch2.sizes();
-  auto batch1_strides = batch1.strides();
-  auto batch2_strides = batch2.strides();
-  auto self_sizes = self.sizes();
-
-  if (beta.toComplexDouble() != 0.0 && !self.is_same(result)) {
-    auto b_self = expand_size(
-        self, {batch1.size(0), batch1.size(1), batch2.size(2)}, "mkl_matmul");
-    result.resize_as_(*b_self).copy_(*b_self);
-  } else {
-    result.resize_({batch1.size(0), batch1.size(1), batch2.size(2)});
-  }
-
-  TORCH_CHECK(
-      self_sizes[0] == batch1_sizes[0], "self dim 0 must match batch1 dim 0");
-  TORCH_CHECK(
-      self_sizes[0] == batch2_sizes[0], "self dim 0 must match batch2 dim 0");
-  TORCH_CHECK(
-      self_sizes[1] == batch1_sizes[1], "self dim 1 must match batch1 dim 1");
-  TORCH_CHECK(
-      self_sizes[2] == batch2_sizes[2], "self dim 2 must match batch2 dim 2");
-  TORCH_CHECK(
-      batch1_sizes[2] == batch2_sizes[1],
-      "batch1 dim 2 must match batch2 dim 1");
-
-  const auto result_strides = result.strides();
-  const auto result_sizes = result.sizes();
-
-  if (result.numel() == 0) {
-    return;
-  } else if (batch1_sizes[2] == 0) {
-    if (beta.to<c10::complex<double>>() == 0.0) {
-      result.zero_();
-    }
-  }
-
-  bool transpose_c = false;
-  Tensor c;
-
-  if ((result_strides[1] == 1) &&
-      ((result_sizes[2] == 1) ||
-       (result_strides[2] >= std::max<int64_t>(1, result_sizes[1])))) {
-    // colum major
-    transpose_c = false;
-    c = result.resolve_conj();
-  } else if (
-      (result_strides[2] == 1) &&
-      (result_sizes[1] == 1 ||
-       (result_strides[1] >= std::max<int64_t>(1, result_sizes[2])))) {
-    // row major
-    std::swap(batch1, batch2);
-    std::swap(batch1_sizes, batch2_sizes);
-    std::swap(batch1_strides, batch2_strides);
-    transpose_c = true;
-    c = result.resolve_conj();
-  } else {
-    transpose_c = false;
-    c = result.resolve_conj().transpose(1, 2).contiguous().transpose_(1, 2);
-  }
-
-  const int64_t m = result_sizes[transpose_c ? 2 : 1];
-  const int64_t n = result_sizes[transpose_c ? 1 : 2];
-  const int64_t k = batch1_sizes[transpose_c ? 1 : 2];
-
-  // Cast batch1 as matrix a
-  bool transpose_a = false;
-  Tensor a;
-  /* Need lda >= max(1, (transpose_a ? k : m)) */
-  if (batch1_strides[transpose_c ? 2 : 1] == 1 &&
-      batch1_strides[transpose_c ? 1 : 2] >= std::max(int64_t{1}, m)) {
-    transpose_a = false;
-    a = batch1.resolve_conj();
-  } else if (
-      batch1_strides[transpose_c ? 1 : 2] == 1 &&
-      batch1_strides[transpose_c ? 2 : 1] >= std::max(int64_t{1}, k)) {
-    transpose_a = true;
-    a = batch1;
-  } else {
-    transpose_a = !transpose_c;
-    a = batch1.clone(at::MemoryFormat::Contiguous);
-  }
-
-  // Cast batch2 as matrix b
-  bool transpose_b = false;
-  Tensor b;
-  /* Need ldm2_ >= max(1, (transpose_m2 == 'n' ? k : n)) */
-  if (batch2_strides[transpose_c ? 2 : 1] == 1 &&
-      batch2_strides[transpose_c ? 1 : 2] >= std::max(int64_t{1}, k)) {
-    transpose_b = false;
-    b = batch2.resolve_conj();
-  } else if (
-      batch2_strides[transpose_c ? 1 : 2] == 1 &&
-      batch2_strides[transpose_c ? 2 : 1] >= std::max(int64_t{1}, n)) {
-    transpose_b = true;
-    b = batch2;
-  } else {
-    transpose_b = !transpose_c;
-    b = batch2.clone(at::MemoryFormat::Contiguous);
-  }
-
-  const int64_t lda = a.strides()[(transpose_a == transpose_c) ? 2 : 1];
-  const int64_t ldb = b.strides()[(transpose_b == transpose_c) ? 2 : 1];
-  // for the corner case: result tensor with size [b, m, 1], stride [m, 1, 1]
-  // we cannot use stride to get its leading dimension, whose value should be m.
-  int64_t ldc;
-  if (c.strides()[1] == c.strides()[2] == 1) {
-    ldc = c.sizes()[transpose_c ? 2 : 1];
-  } else {
-    ldc = c.strides()[transpose_c ? 1 : 2];
-  }
-
-  const int64_t stridea = a.strides()[0];
-  const int64_t strideb = b.strides()[0];
-  const int64_t stridec = c.strides()[0];
-  int64_t num_batch = c.sizes()[0];
-
-  // Always ensure the conjugation for c is resolved since there's no way to
-  // specify c's conjugation in the gemm call
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(!c.is_conj());
-
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
-      result.scalar_type(), "mkl_baddbmm", [&] {
-        gemm_batch<scalar_t>(
-            dpcpp_queue,
-            transpose_a ? a.is_conj() ? oneapi::mkl::transpose::C
-                                      : oneapi::mkl::transpose::T
-                        : oneapi::mkl::transpose::N, // nontrans = 0, trans = 1,
-                                                     // conjtrans = 3,
-            transpose_b ? b.is_conj() ? oneapi::mkl::transpose::C
-                                      : oneapi::mkl::transpose::T
-                        : oneapi::mkl::transpose::N,
-            m,
-            n,
-            k,
-            alpha.to<scalar_t>(),
-            a.data_ptr<scalar_t>(),
-            lda,
-            stridea,
-            b.data_ptr<scalar_t>(),
-            ldb,
-            strideb,
-            beta.to<scalar_t>(),
-            c.data_ptr<scalar_t>(),
-            ldc,
-            stridec,
-            num_batch);
-      });
-
-  if (!result.is_same(c)) {
-    result.copy_(c);
-  }
-#endif
-}
-
-void mkl_matmul(
-    Tensor& result,
-    const Tensor& self,
-    Tensor m1,
-    Tensor m2,
-    Scalar beta,
-    Scalar alpha) {
-#ifdef USE_ONEMKL
-  auto m1_strides = m1.strides();
-  auto m1_sizes = m1.sizes();
-  auto m2_strides = m2.strides();
-  auto m2_sizes = m2.sizes();
-
-  if (beta.toComplexDouble() != 0.0 && !self.is_same(result)) {
-    auto b_self = expand_size(self, {m1_sizes[0], m2_sizes[1]}, "mkl_matmul");
-    result.resize_as_(*b_self).copy_(*b_self);
-  } else {
-    result.resize_({m1_sizes[0], m2_sizes[1]});
-  }
-
-  const auto result_strides = result.strides();
-  const auto result_sizes = result.sizes();
-
-  if (result.numel() == 0) {
-    return;
-  }
-
-  bool transpose_c = false;
-  Tensor c;
-
-  // Cast result as matrix a
-  if (result_strides[0] == 1 &&
-      (result_sizes[1] == 1 ||
-       result_strides[1] >= std::max(int64_t{1}, result_sizes[0]))) {
-    transpose_c = false;
-    c = result.resolve_conj();
-  } else if (
-      result_strides[1] == 1 &&
-      (result_sizes[0] == 1 ||
-       result_strides[0] >= std::max(int64_t{1}, result_sizes[1]))) {
-    std::swap(m1, m2);
-    std::swap(m1_sizes, m2_sizes);
-    std::swap(m1_strides, m2_strides);
-    transpose_c = true;
-    c = result.resolve_conj();
-  } else {
-    transpose_c = false;
-    // make c FORTRAN contiguous
-    c = result.resolve_conj().transpose(0, 1).contiguous().transpose_(0, 1);
-  }
-
-  const int64_t m = result_sizes[transpose_c ? 1 : 0];
-  const int64_t n = result_sizes[transpose_c ? 0 : 1];
-  const int64_t k = m1_sizes[transpose_c ? 0 : 1];
-
-  // Cast m1 as matrix a
-  bool transpose_a = false;
-  Tensor a;
-  /* Need lda >= max(1, (transpose_a ? k : m)) */
-  if (m1_strides[transpose_c ? 1 : 0] == 1 &&
-      m1_strides[transpose_c ? 0 : 1] >= std::max(int64_t{1}, m)) {
-    transpose_a = false;
-    a = m1.resolve_conj();
-  } else if (
-      m1_strides[transpose_c ? 0 : 1] == 1 &&
-      m1_strides[transpose_c ? 1 : 0] >= std::max(int64_t{1}, k)) {
-    transpose_a = true;
-    a = m1;
-  } else {
-    transpose_a = !transpose_c;
-    a = m1.clone(at::MemoryFormat::Contiguous);
-  }
-
-  // Cast m2 as matrix b
-  bool transpose_b = false;
-  Tensor b;
-  /* Need ldm2_ >= max(1, (transpose_m2 == 'n' ? k : n)) */
-  if (m2_strides[transpose_c ? 1 : 0] == 1 &&
-      m2_strides[transpose_c ? 0 : 1] >= std::max(int64_t{1}, k)) {
-    transpose_b = false;
-    b = m2.resolve_conj();
-  } else if (
-      m2_strides[transpose_c ? 0 : 1] == 1 &&
-      m2_strides[transpose_c ? 1 : 0] >= std::max(int64_t{1}, n)) {
-    transpose_b = true;
-    b = m2;
-  } else {
-    transpose_b = !transpose_c;
-    b = m2.clone(at::MemoryFormat::Contiguous);
-  }
-
-  const int64_t lda = a.strides()[(transpose_a == transpose_c) ? 1 : 0];
-  const int64_t ldb = b.strides()[(transpose_b == transpose_c) ? 1 : 0];
-  const int64_t ldc = c.strides()[transpose_c ? 0 : 1];
-
-  // Always ensure the conjugation for c is resolved since there's no way to
-  // specify c's conjugation in the gemm call
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(!c.is_conj());
-
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  // use colum major
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
-      result.scalar_type(), "mkl_matmul", [&] {
-        gemm_batch<scalar_t>(
-            dpcpp_queue,
-            transpose_a ? a.is_conj() ? oneapi::mkl::transpose::C
-                                      : oneapi::mkl::transpose::T
-                        : oneapi::mkl::transpose::N, // nontrans = 0, trans = 1,
-                                                     // conjtrans = 3,
-            transpose_b ? b.is_conj() ? oneapi::mkl::transpose::C
-                                      : oneapi::mkl::transpose::T
-                        : oneapi::mkl::transpose::N,
-            m,
-            n,
-            k,
-            alpha.to<scalar_t>(),
-            a.data_ptr<scalar_t>(),
-            lda,
-            a.numel(),
-            b.data_ptr<scalar_t>(),
-            ldb,
-            b.numel(),
-            beta.to<scalar_t>(),
-            c.data_ptr<scalar_t>(),
-            ldc,
-            c.numel(),
-            1);
-      });
-
-  if (!c.is_same(result)) {
-    result.copy_(c);
-  }
-#endif
-}
-
-} // namespace impl
-
 namespace AtenIpexTypeXPU {
 
 using namespace impl;
 
-// ((m1 x m2 + b) * alpha + beta * c) - relu
-void matmul(
-    Tensor& result,
-    const Tensor& m1,
-    const Tensor& m2,
-    const Tensor& b, // tensor for bias
-    const Tensor& po, // tensor for post_sum
-    float beta, // beta only for post sum
-    float alpha, // oscale
-    bool m2_trans,
-    int fusion) {
-  if (m1.is_quantized()) {
-    if (m2.sizes()[1] == m1.sizes()[1])
-      m2.transpose_(0, 1);
-  }
-
-  MatmulAttr attr(alpha, beta, fusion, m2_trans);
-
-  std::vector<int64_t> result_shape;
-  auto dim = m1.dim();
-  if (dim == 2) {
-    result_shape = attr.m2_trans_
-        ? std::vector<int64_t>{m1.size(0), m2.size(1)}
-        : std::vector<int64_t>{m1.size(0), m2.size(0)};
-  } else {
-    result_shape = attr.m2_trans_
-        ? std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(2)}
-        : std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(1)};
-  }
-
-  if (po.defined() && beta != 0) {
-    TORCH_CHECK(
-        check_broadcast(po, result_shape),
-        "tensor for accumulate ",
-        po.sizes(),
-        " cannot broadcast to ",
-        result_shape);
-    c10::MaybeOwned<Tensor> bc_po =
-        expand_size(po, result_shape, "gemm_broadcast");
-    if (!result.is_same(*bc_po))
-      result.resize_(result_shape).copy_(*bc_po);
-  } else {
-    result.resize_(result_shape);
-  }
-
-  // mat1, mat2, res should satisfy oneDNN supported strides
-  Tensor mat1 =
-      xpu::oneDNN::is_onednn_matmul_strides(m1) ? m1 : m1.contiguous();
-  Tensor mat2 =
-      xpu::oneDNN::is_onednn_matmul_strides(m2) ? m2 : m2.contiguous();
-  Tensor res = xpu::oneDNN::is_onednn_matmul_strides(result, true)
-      ? result
-      : result.contiguous();
-  // bias should always contiguous in oneDNN
-  Tensor bias = b.defined() ? b.contiguous() : b;
-
-  xpu::oneDNN::matmul(res, mat1, mat2, bias, attr);
-  if (!res.is_same(result)) {
-    result.copy_(res);
-  }
-}
-
+// result = beta * self + alpha * (mat1 * mat2)
 Tensor& addmm_out(
     const Tensor& self,
     const Tensor& mat1,
@@ -589,42 +55,17 @@ Tensor& addmm_out(
 #endif
   }
 
-  if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f ||
-      self.is_same(result)) {
-    // post sum
-    matmul(
-        result,
-        mat1,
-        mat2.scalar_type() == mat1.scalar_type()
-            ? mat2
-            : (mat1.scalar_type() == ScalarType::BFloat16 ||
-               mat2.scalar_type() == ScalarType::BFloat16)
-                ? mat2
-                : mat2.to(mat1.scalar_type()),
-        at::Tensor(),
-        self,
-        beta.to<float>(),
-        alpha.to<float>(),
-        true,
-        MatmulAttr::kind_with_sum);
-  } else {
-    // bias
-    matmul(
-        result,
-        mat1,
-        mat2.scalar_type() == mat1.scalar_type()
-            ? mat2
-            : (mat1.scalar_type() == ScalarType::BFloat16 ||
-               mat2.scalar_type() == ScalarType::BFloat16)
-                ? mat2
-                : mat2.to(mat1.scalar_type()),
-        self,
-        at::Tensor(),
-        beta.to<float>(),
-        alpha.to<float>(),
-        true,
-        0);
-  }
+  Tensor bias, accumul, accumul2 = at::Tensor();
+  Attr attr = get_onednn_matmul_attr(
+      result,
+      self,
+      accumul2,
+      alpha.to<float>(),
+      beta.to<float>(),
+      0.f,
+      bias,
+      accumul);
+  onednn_matmul(result, mat1, mat2, bias, accumul, true, attr);
   return result;
 }
 
@@ -661,30 +102,7 @@ Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
 #endif
   }
 
-  auto self_dt = self.scalar_type();
-  auto result_dt = result.scalar_type();
-  auto mat2_dt = mat2.scalar_type();
-
-  matmul(
-      result,
-      (self_dt == result_dt ||
-       ((self_dt == ScalarType::BFloat16 &&
-         result_dt != ScalarType::BFloat16) ||
-        (result_dt == ScalarType::BFloat16 && self_dt != ScalarType::BFloat16)))
-          ? self
-          : self.to(result_dt),
-      (mat2_dt == result_dt ||
-       ((mat2_dt == ScalarType::BFloat16 &&
-         result_dt != ScalarType::BFloat16) ||
-        (result_dt == ScalarType::BFloat16 && mat2_dt != ScalarType::BFloat16)))
-          ? mat2
-          : mat2.to(result_dt),
-      at::Tensor(),
-      at::Tensor(),
-      0.f,
-      1.f,
-      true,
-      0);
+  onednn_matmul(result, self, mat2, at::Tensor(), at::Tensor(), true, Attr());
   return result;
 }
 
@@ -699,6 +117,7 @@ Tensor mv(const Tensor& self, const Tensor& vec) {
   return at::addmv_(result, self, vec, 0, 1);
 }
 
+// result = beta * input + alpha * (batch1 @ batch2)
 Tensor& baddbmm_out(
     const Tensor& input,
     const Tensor& batch1,
@@ -716,7 +135,7 @@ Tensor& baddbmm_out(
       return result;
 
     if (input.defined() && beta.to<float>() != 0.f) {
-      result = at::mul_out(
+      result = at::AtenIpexTypeXPU::mul_out(
           result, input, at::native::wrapped_scalar_tensor(at::Scalar(beta)));
     } else {
       result.zero_();
@@ -734,30 +153,17 @@ Tensor& baddbmm_out(
 #endif
   }
 
-  if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f ||
-      input.is_same(result)) {
-    matmul(
-        result,
-        batch1,
-        batch2,
-        at::Tensor(),
-        input,
-        beta.to<float>(),
-        alpha.to<float>(),
-        true,
-        MatmulAttr::kind_with_sum);
-  } else {
-    matmul(
-        result,
-        batch1,
-        batch2,
-        input,
-        at::Tensor(),
-        beta.to<float>(),
-        alpha.to<float>(),
-        true,
-        0);
-  }
+  Tensor bias, accumul, accumul2 = at::Tensor();
+  Attr attr = get_onednn_matmul_attr(
+      result,
+      input,
+      accumul2,
+      alpha.to<float>(),
+      beta.to<float>(),
+      0.f,
+      bias,
+      accumul);
+  onednn_matmul(result, batch1, batch2, bias, accumul, true, attr);
   return result;
 }
 
@@ -866,164 +272,13 @@ Tensor& bmm_out(Tensor& result, const Tensor& self, const Tensor& batch2) {
         "Double and complex datatype matmul is not supported. Include oneMKL library in compilation");
 #endif
   }
-  matmul(result, self, batch2, at::Tensor(), at::Tensor(), 0.f, 1.f, true, 0);
+  onednn_matmul(result, self, batch2, at::Tensor(), at::Tensor(), true, Attr());
   return result;
 }
 
 Tensor bmm(const Tensor& self, const Tensor& batch2) {
   auto result = at::empty({0}, self.options());
   at::AtenIpexTypeXPU::bmm_out(result, self, batch2);
-  return result;
-}
-
-// FIXME: should not be here
-Tensor trans_addmm_relu(
-    const Tensor& input,
-    const Tensor& weight,
-    const Tensor& bias,
-    Scalar beta,
-    Scalar alpha) {
-  RECORD_FUNCTION(
-      "linear_relu", std::vector<c10::IValue>({input, weight, bias}));
-  if (input.dim() == 2 && bias.defined()) {
-    // Fused op is marginally faster.
-    checkBackend("linear_relu", {input, weight, bias}, Backend::XPU);
-    TORCH_CHECK(input.dim() == 2, "expected 2D tensor");
-    TORCH_CHECK(weight.dim() == 2, "expected 2D tensor");
-
-    auto result = at::empty({0}, input.options());
-
-    if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f) {
-      matmul(
-          result,
-          input,
-          weight,
-          at::Tensor(),
-          bias,
-          beta.to<float>(),
-          alpha.to<float>(),
-          false,
-          (MatmulAttr::kind_with_sum | MatmulAttr::kind_with_relu));
-    } else {
-      matmul(
-          result,
-          input,
-          weight,
-          bias,
-          at::Tensor(),
-          beta.to<float>(),
-          alpha.to<float>(),
-          false,
-          MatmulAttr::kind_with_relu);
-    }
-    return result;
-  }
-
-  auto output = at::matmul(input, weight.t());
-  if (bias.defined()) {
-    output.add_(bias);
-  }
-  return at::relu(output);
-}
-
-Tensor trans_addmm_sigmoid(
-    const Tensor& input,
-    const Tensor& weight,
-    const Tensor& bias,
-    Scalar beta,
-    Scalar alpha) {
-  RECORD_FUNCTION(
-      "linear_sigmoid", std::vector<c10::IValue>({input, weight, bias}));
-  if (input.dim() == 2 && bias.defined()) {
-    // Fused op is marginally faster.
-    checkBackend("linear_sigmoid", {input, weight, bias}, Backend::XPU);
-    TORCH_CHECK(input.dim() == 2, "expected 2D tensor");
-    TORCH_CHECK(weight.dim() == 2, "expected 2D tensor");
-
-    auto result = at::empty({0}, input.options());
-    if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f) {
-      matmul(
-          result,
-          input,
-          weight,
-          at::Tensor(),
-          bias,
-          beta.to<float>(),
-          alpha.to<float>(),
-          false,
-          (MatmulAttr::kind_with_sum | MatmulAttr::kind_with_sigmoid));
-    } else {
-      matmul(
-          result,
-          input,
-          weight,
-          bias,
-          at::Tensor(),
-          beta.to<float>(),
-          alpha.to<float>(),
-          false,
-          MatmulAttr::kind_with_sigmoid);
-    }
-    return result;
-  }
-  auto output = at::matmul(input, weight.t());
-  if (bias.defined()) {
-    output.add_(bias);
-  }
-  return at::sigmoid(output);
-}
-
-Tensor trans_addmm(
-    const Tensor& input,
-    const Tensor& m1,
-    const Tensor& m2,
-    Scalar beta,
-    Scalar alpha) {
-  checkBackend("addmm", {input, m1, m2}, Backend::XPU);
-  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
-
-  Tensor result;
-  if (m1.scalar_type() == at::ScalarType::BFloat16) {
-    // align with bf16 input
-    result = at::empty({0}, m1.options());
-  } else {
-    result = at::empty({0}, input.options());
-  }
-
-  if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f) {
-    matmul(
-        result,
-        m1,
-        m2.scalar_type() == m1.scalar_type()
-            ? m2
-            : (m1.scalar_type() == ScalarType::BFloat16 ||
-               m2.scalar_type() == ScalarType::BFloat16)
-                ? m2
-                : m2.to(m1.scalar_type()),
-        at::Tensor(),
-        input,
-        beta.to<float>(),
-        alpha.to<float>(),
-        false,
-        MatmulAttr::kind_with_sum);
-  } else {
-    matmul(
-        result,
-        m1,
-        m2.scalar_type() == m1.scalar_type()
-            ? m2
-            : (m1.scalar_type() == ScalarType::BFloat16 ||
-               m2.scalar_type() == ScalarType::BFloat16)
-                ? m2
-                : m2.to(m1.scalar_type()),
-        input,
-        at::Tensor(),
-        beta.to<float>(),
-        alpha.to<float>(),
-        false,
-        0);
-  }
   return result;
 }
 
@@ -1117,6 +372,290 @@ Tensor& addmv_(
   return self;
 }
 
+Tensor tensordot(
+    const Tensor& input1,
+    const Tensor& input2,
+    IntArrayRef dims1,
+    IntArrayRef dims2) {
+  TORCH_CHECK(
+      dims1.size() == dims2.size(),
+      "both dimension lists should have same length");
+  int64_t csize = 1; // total size of the contracted dimensions
+  Tensor t1 = input1;
+  Tensor t2 = input2;
+  for (const auto i : c10::irange(dims1.size())) {
+    int s1 = input1.size(dims1[i]);
+    int s2 = input2.size(dims2[i]);
+    if (s2 == 1) { // broadcasted dimensions can be summed right away
+      t1 = t1.sum(dims1[i], true);
+    } else if (s1 == 1) {
+      t2 = t2.sum(dims2[i], true);
+    } else {
+      TORCH_CHECK(
+          s1 == s2,
+          "contracted dimensions need to match, but first has size ",
+          s1,
+          " in dim ",
+          dims1[i],
+          " and second has size ",
+          s2,
+          " in dim ",
+          dims2[i]);
+      csize *= s1;
+    }
+  }
+  auto cdims1 = at::dim_list_to_bitset(dims1, input1.dim());
+  auto cdims2 = at::dim_list_to_bitset(dims2, input2.dim());
+  std::vector<int64_t> p1, p2,
+      rsizes; // p1, p2: input permutations, rsizes: sizes of the result
+  p1.reserve(input1.dim());
+  p2.reserve(input2.dim());
+  rsizes.reserve(input1.dim() + input2.dim() - (int64_t)dims1.size());
+  int64_t size1 = 1; // number of non-contracted elements in input1
+  int64_t size2 = 1; // number of non-contracted elements in input2
+
+  // fill the permutations and compute sizes
+  for (const auto i : c10::irange(input1.dim())) {
+    if (!cdims1[i]) {
+      p1.emplace_back(i);
+      size1 *= t1.size(i);
+      rsizes.emplace_back(t1.size(i));
+    }
+  }
+  for (const auto x : dims1) {
+    p1.emplace_back(x);
+  }
+  for (const auto x : dims2) {
+    p2.emplace_back(x);
+  }
+  for (const auto i : c10::irange(input2.dim())) {
+    if (!cdims2[i]) {
+      p2.emplace_back(i);
+      size2 *= t2.size(i);
+      rsizes.emplace_back(t2.size(i));
+    }
+  }
+  // permut and reshape for matrix multiplication
+  t1 = t1.permute(p1).reshape({size1, csize});
+  t2 = t2.permute(p2).reshape({csize, size2});
+  // multiply and reshape to target size
+  return at::mm(t1, t2).reshape(rsizes);
+}
+
+Tensor& tensordot_out(
+    const Tensor& input1,
+    const Tensor& input2,
+    IntArrayRef dims1,
+    IntArrayRef dims2,
+    Tensor& result) {
+  Tensor result_tmp = at::tensordot(input1, input2, dims1, dims2);
+  auto result_dtype = result_tmp.scalar_type();
+  auto output_tensor_dtype = result.scalar_type();
+  auto output_device = result.device();
+  auto input1_device = input1.device();
+  auto input2_device = input2.device();
+  // check if the input & output tensors are on the same device.
+  TORCH_CHECK(
+      (output_device == input1_device) && (input1_device == input2_device),
+      "tensordot: Expected the output and input tensors to be on the "
+      "same device, but got the output tensor on ",
+      output_device,
+      ", input tensor a on ",
+      input1_device,
+      ", and input tensor b on ",
+      input2_device);
+  // check if the computed result has the same dtype as the out tensor
+  // (because tensordot does not support type promotion)
+  TORCH_CHECK(
+      result_dtype == output_tensor_dtype,
+      "tensordot",
+      ": Expected the output tensor to have dtype ",
+      result_dtype,
+      ", but got an output tensor with dtype ",
+      output_tensor_dtype);
+  at::native::resize_output(result, result_tmp.sizes());
+  result.copy_(result_tmp);
+  return result;
+}
+
+/************************** matmul fusion path **************************/
+// res = m1 * m2 + beta * accumu
+at::Tensor matmul_add(
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2,
+    at::Tensor& accumul1,
+    Scalar beta1) {
+  RECORD_FUNCTION(
+      "matmul_add", std::vector<c10::IValue>({tensor1, tensor2, accumul1}));
+  auto result = at::empty({0}, tensor1.options());
+  Tensor bias, accumul, accumul2 = at::Tensor();
+  Attr attr = get_onednn_matmul_attr(
+      result,
+      accumul1,
+      accumul2,
+      1.f, // alpha
+      beta1.to<float>(),
+      0.f, // beta2
+      bias,
+      accumul);
+
+  bool trans = true, fallback = false;
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, trans, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2);
+    result = result + at::mul(accumul1, beta1);
+  }
+  return result;
+}
+
+// res = m1 * m2.transpose()
+at::Tensor trans_matmul(
+    const at::Tensor& tensor2,
+    int dim1,
+    int dim2,
+    const at::Tensor& tensor1) {
+  RECORD_FUNCTION("trans_matmul", std::vector<c10::IValue>({tensor1, tensor2}));
+  bool trans = false, fallback = false;
+  Tensor bias, accumul;
+  auto result = at::empty({0}, tensor1.options());
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, trans, fallback, Attr());
+}
+
+// res = m1 * m2.t()
+at::Tensor t_matmul(const at::Tensor& tensor2, const at::Tensor& tensor1) {
+  RECORD_FUNCTION("t_matmul", std::vector<c10::IValue>({tensor1, tensor2}));
+  bool trans = false, fallback = false;
+  Tensor bias, accumul;
+  auto result = at::empty({0}, tensor1.options());
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, trans, fallback, Attr());
+}
+
+// res = m1 * m2.t() + beta * accumu
+at::Tensor t_matmul_add(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    at::Tensor& accumul1,
+    Scalar beta1) {
+  RECORD_FUNCTION(
+      "t_matmul_add", std::vector<c10::IValue>({tensor1, tensor2, accumul1}));
+  auto result = at::empty({0}, tensor1.options());
+  Tensor bias, accumul, accumul2 = at::Tensor();
+  Attr attr = get_onednn_matmul_attr(
+      result,
+      accumul1,
+      accumul2,
+      1.f, // alpha
+      beta1.to<float>(),
+      0.f, // beta2
+      bias,
+      accumul);
+
+  bool trans = false, fallback = false;
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, trans, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
+    result = result + at::mul(accumul1, beta1);
+  }
+  return result;
+}
+
+// res = GELU(m1 * m2.t() + beta * accumu)
+at::Tensor t_matmul_add_gelu(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    at::Tensor& accumul1,
+    Scalar beta1) {
+  RECORD_FUNCTION(
+      "t_matmul_add_gelu",
+      std::vector<c10::IValue>({tensor1, tensor2, accumul1}));
+  auto result = at::empty({0}, tensor1.options());
+  Tensor bias, accumul, accumul2 = at::Tensor();
+  Attr attr = get_onednn_matmul_attr(
+      result,
+      accumul1,
+      accumul2,
+      1.f, // alpha
+      beta1.to<float>(),
+      0.f, // beta2
+      bias,
+      accumul);
+  attr.append_post_eltwise(
+      /* gelu_scale */ 1.f,
+      /* alpha */ 0.f,
+      /* beta */ 0.f,
+      attr.kind_with_gelu);
+
+  bool trans = false, fallback = false;
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, trans, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
+    result = at::gelu(result + at::mul(accumul1, beta1));
+  }
+  return result;
+}
+
+// res = alpha * (m1 * m2.t()) + beta1 * accumu1 + beta2 * accumu2
+at::Tensor t_matmul_add_add(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    at::Tensor& accumul1,
+    Scalar beta1,
+    at::Tensor& accumul2,
+    Scalar beta2) {
+  RECORD_FUNCTION(
+      "t_matmul_add_add",
+      std::vector<c10::IValue>({tensor1, tensor2, accumul1, accumul2}));
+  auto result = at::empty({0}, tensor1.options());
+  Tensor bias, accumul;
+  Attr attr = get_onednn_matmul_attr(
+      result,
+      accumul1,
+      accumul2,
+      1.f, // alpha
+      beta1.to<float>(),
+      beta2.to<float>(),
+      bias,
+      accumul);
+
+  bool trans = false, fallback = false;
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, trans, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
+    result = result + at::mul(accumul1, beta1) + at::mul(accumul2, beta2);
+  }
+  return result;
+}
+
+// res = (m1 * m2.transpose()) / oscale
+at::Tensor trans_matmul_div(
+    const at::Tensor& tensor2,
+    int dim1,
+    int dim2,
+    const at::Tensor& tensor1,
+    Scalar oscale) {
+  RECORD_FUNCTION(
+      "trans_matmul_div", std::vector<c10::IValue>({tensor1, tensor2}));
+  TORCH_CHECK(oscale.to<float>() != 0, "expected non-zero value of oscale");
+  Attr attr;
+  attr.append_post_eltwise( // append post linear
+      /* scale */ 1.f,
+      /* alpha */ 1.f / oscale.to<float>(),
+      /* beta */ 0.f,
+      attr.kind_with_linear);
+
+  Tensor bias, accumul;
+  bool trans = false, fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, trans, fallback, attr);
+}
+
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
@@ -1129,7 +668,6 @@ Tensor addmm(
     const Scalar& alpha) {
   checkBackend("addmm", m1, Backend::QuantizedXPU);
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
-
   Tensor result;
   if (input.is_quantized()) {
     result = _empty_affine_quantized(
@@ -1142,50 +680,11 @@ Tensor addmm(
     result = at::empty({0}, input.options());
   }
 
-  at::AtenIpexTypeXPU::matmul(
-      result,
-      m1,
-      m2,
-      Tensor(),
-      input,
-      beta.to<float>(),
-      alpha.to<float>(),
-      true,
-      MatmulAttr::kind_with_sum);
-
+  Attr attr;
+  attr.append_post_sum(/* sum_scale */ beta.to<float>());
+  Tensor bias;
+  onednn_matmul(result, m1, m2, bias, input, true, attr);
   return result;
 }
-
-Tensor trans_addmm(
-    const Tensor& input,
-    const Tensor& m1,
-    const Tensor& m2,
-    Scalar beta,
-    Scalar alpha) {
-  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
-
-  Tensor result;
-  if (m1.scalar_type() == at::ScalarType::BFloat16) {
-    // align with bf16 input
-    result = at::empty({0}, m1.options());
-  } else {
-    result = at::empty({0}, input.options());
-  }
-
-  at::AtenIpexTypeXPU::matmul(
-      result,
-      m1,
-      m2,
-      Tensor(),
-      input,
-      beta.to<float>(),
-      alpha.to<float>(),
-      false,
-      MatmulAttr::kind_with_sum);
-
-  return result;
-}
-
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

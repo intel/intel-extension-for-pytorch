@@ -7,6 +7,7 @@
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
 #include <utils/LRUCache.h>
+#include "Attr.h"
 #include "Utils.h"
 
 #include <oneapi/dnnl/dnnl.hpp>
@@ -17,57 +18,13 @@ using namespace at::AtenIpexTypeXPU;
 
 namespace xpu {
 namespace oneDNN {
-
-struct MatmulAttr {
-  static const int64_t kind_with_relu = xpu::oneDNN::with_relu;
-  static const int64_t kind_with_gelu = xpu::oneDNN::with_gelu;
-  static const int64_t kind_with_sum = xpu::oneDNN::with_sum;
-  static const int64_t kind_with_sigmoid = xpu::oneDNN::with_sigmoid;
-  static const int64_t kind_with_bin_mul = xpu::oneDNN::with_bin_mul;
-  static const int64_t kind_with_bin_add = xpu::oneDNN::with_bin_add;
-  static const int64_t kind_with_bin_sub = xpu::oneDNN::with_bin_sub;
-
-  MatmulAttr() : alpha_(1.f), beta_(0.f), attr_(0), m2_trans_(true) {}
-  MatmulAttr(float alpha, float beta, int64_t attr, bool m2_trans)
-      : alpha_(alpha), beta_(beta), attr_(attr), m2_trans_(m2_trans) {}
-
-  bool with_relu() {
-    return attr_ & kind_with_relu;
-  }
-  bool with_gelu() {
-    return attr_ & kind_with_gelu;
-  }
-  bool with_sigmoid() {
-    return attr_ & kind_with_sigmoid;
-  }
-  bool with_sum() {
-    return attr_ & kind_with_sum;
-  };
-  bool with_bin_mul() {
-    return attr_ & kind_with_bin_mul;
-  };
-  bool with_bin_add() {
-    return attr_ & kind_with_bin_add;
-  };
-  bool with_bin_sub() {
-    return attr_ & kind_with_bin_sub;
-  };
-  int64_t attr() {
-    return attr_;
-  }
-
-  float alpha_;
-  float beta_;
-  int64_t attr_;
-  bool m2_trans_;
-};
-
 static inline void matmul(
     Tensor& dst,
     const Tensor& m1,
     const Tensor& m2,
     const Tensor& b_raw,
-    MatmulAttr attr) {
+    bool m2_trans,
+    Attr attr) {
   size_t dims = dst.dim();
   TORCH_CHECK(
       dims == 2 || dims == 3,
@@ -169,13 +126,13 @@ static inline void matmul(
 
   if (dims == 2) {
     m1_md = memory::desc({m, k}, m1_dt, {m1.stride(0), m1.stride(1)});
-    m2_md = attr.m2_trans_
+    m2_md = m2_trans
         ? memory::desc({k, n}, m2_dt, {m2.stride(0), m2.stride(1)})
         : memory::desc({k, n}, m2_dt, {m2.stride(1), m2.stride(0)});
     dst_md = memory::desc({m, n}, dst_dt, {dst.stride(0), dst.stride(1)});
 
     m1_usr_md = memory::desc({m, k}, m1_usr_dt, {m1.stride(0), m1.stride(1)});
-    m2_usr_md = attr.m2_trans_
+    m2_usr_md = m2_trans
         ? memory::desc({k, n}, m2_usr_dt, {m2.stride(0), m2.stride(1)})
         : memory::desc({k, n}, m2_usr_dt, {m2.stride(1), m2.stride(0)});
     dst_usr_md =
@@ -187,7 +144,7 @@ static inline void matmul(
   } else {
     m1_md = memory::desc(
         {mb, m, k}, m1_dt, {m1.stride(0), m1.stride(1), m1.stride(2)});
-    m2_md = attr.m2_trans_
+    m2_md = m2_trans
         ? memory::desc(
               {mb, k, n}, m2_dt, {m2.stride(0), m2.stride(1), m2.stride(2)})
         : memory::desc(
@@ -197,7 +154,7 @@ static inline void matmul(
 
     m1_usr_md = memory::desc(
         {mb, m, k}, m1_usr_dt, {m1.stride(0), m1.stride(1), m1.stride(2)});
-    m2_usr_md = attr.m2_trans_
+    m2_usr_md = m2_trans
         ? memory::desc(
               {mb, k, n}, m2_usr_dt, {m2.stride(0), m2.stride(1), m2.stride(2)})
         : memory::desc(
@@ -211,40 +168,6 @@ static inline void matmul(
   // STEP2: creat attribute
   primitive_attr pattr;
 
-#ifdef USE_SCRATCHPAD_MODE
-  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-#endif
-
-  if (m1_dt == memory::data_type::f32) {
-    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
-  }
-
-  post_ops po;
-  if (attr.alpha_ != 1.f)
-    pattr.set_output_scales(/* mask */ 0, {(float)attr.alpha_});
-  // Handle difference cases based-on beta value here:
-  // 1. beta == 0, nothing is needed to do
-  // 2. quantization path, no bias fusion support in oneDNN so far
-  // 3. beta == 1, partially support bias fusion in oneDNN
-  // 4. alpha != 1, post-sum is needed for, alpha * (m1 x m2) + post
-  if (attr.with_sum()) {
-    po.append_sum(attr.beta_);
-  }
-
-  if (attr.with_relu()) {
-    po.append_eltwise(1.f, algorithm::eltwise_relu, 0.f, 0.f);
-  }
-
-  if (attr.with_gelu()) {
-    po.append_eltwise(1.f, algorithm::eltwise_gelu, 0.f, 0.f);
-  }
-
-  if (attr.with_sigmoid()) {
-    po.append_eltwise(1.f, algorithm::eltwise_logistic, 0.f, 0.f);
-  }
-
-  pattr.set_post_ops(po);
-
   std::vector<float> weight_scales;
   if (m2.is_quantized()) {
     if (m2.qscheme() == kPerTensorAffine) {
@@ -257,10 +180,10 @@ static inline void matmul(
 
   if (m1.is_quantized()) {
     auto in_scale = m1.q_scale();
-    auto out_scale = dst.is_quantized() ? dst.q_scale() : 1.f;
+    // auto out_scale = dst.is_quantized() ? dst.q_scale() : 1.f;
     std::vector<float> matmul_scale;
     for (int i = 0; i < weight_scales.size(); i++) {
-      matmul_scale.push_back(1.f / (out_scale / (in_scale * weight_scales[i])));
+      matmul_scale.push_back(1.f / (1.f / (in_scale * weight_scales[i])));
     }
     int mask_ac = 0;
     int mask_matmul = weight_scales.size() > 1 ? 1 << 1 : 0;
@@ -269,6 +192,18 @@ static inline void matmul(
         DNNL_ARG_DST,
         mask_ac,
         {static_cast<int>(dst.is_quantized() ? dst.q_zero_point() : 0)});
+  }
+
+  post_ops po;
+  attr.extract_post_ops(po, dst);
+  pattr.set_post_ops(po);
+
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
+  if (m1_dt == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
   }
 
   // STEP3: create primitive
@@ -290,22 +225,13 @@ static inline void matmul(
     if (dims == 2 && Settings::I().is_onednn_layout_enabled()) {
       // attr + blk
 #ifdef USE_PRIMITIVE_CACHE
-      create_key(
-          key,
-          m1_any_md,
-          m2_any_md,
-          b_md,
-          dst_any_md,
-          attr.beta_,
-          attr.alpha_,
-          attr.attr_);
+      create_key(key, m1_any_md, m2_any_md, b_md, dst_any_md, attr);
 #endif
       matmul_desc = matmul::desc(m1_any_md, m2_any_md, b_md, dst_any_md);
     } else {
       // attr + plain
 #ifdef USE_PRIMITIVE_CACHE
-      create_key(
-          key, m1_md, m2_md, b_md, dst_md, attr.beta_, attr.alpha_, attr.attr_);
+      create_key(key, m1_md, m2_md, b_md, dst_md, attr);
 #endif
       matmul_desc = matmul::desc(m1_md, m2_md, b_md, dst_md);
     }
@@ -313,21 +239,13 @@ static inline void matmul(
     if (dims == 2 && Settings::I().is_onednn_layout_enabled()) {
       // no attr + blk
 #ifdef USE_PRIMITIVE_CACHE
-      create_key(
-          key,
-          m1_any_md,
-          m2_any_md,
-          dst_any_md,
-          attr.beta_,
-          attr.alpha_,
-          attr.attr_);
+      create_key(key, m1_any_md, m2_any_md, dst_any_md, attr);
 #endif
       matmul_desc = matmul::desc(m1_any_md, m2_any_md, dst_any_md);
     } else {
       // no attr + plain
 #ifdef USE_PRIMITIVE_CACHE
-      create_key(
-          key, m1_md, m2_md, dst_md, attr.beta_, attr.alpha_, attr.attr_);
+      create_key(key, m1_md, m2_md, dst_md, attr);
 #endif
       matmul_desc = matmul::desc(m1_md, m2_md, dst_md);
     }
@@ -391,7 +309,7 @@ static inline void matmul(
   if (m2_usr_m.get_desc() != expected_m2_md) {
     m2_ = empty_opaque_tensor(expected_m2_md, m2.options(), c10::nullopt);
     m2_m = dpcpp_onednn_memory(expected_m2_md, engine, m2_.data_ptr());
-    xpu::oneDNN::reorder(attr.m2_trans_ ? m2 : m2.t(), m2_);
+    xpu::oneDNN::reorder(m2_trans ? m2 : m2.t(), m2_);
 
     if (weight_cache_optimization) {
       strm.wait();

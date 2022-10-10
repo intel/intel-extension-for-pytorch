@@ -8,40 +8,6 @@ namespace torch {
 namespace jit {
 namespace xpu {
 
-at::Tensor matmul_fusion_variants(
-    at::Tensor& accumul1,
-    at::Tensor& accumul2,
-    const at::Tensor& tensor1,
-    const at::Tensor& tensor2,
-    float oscale,
-    float beta1,
-    float beta2,
-    bool trans,
-    int fusion_type = 0);
-
-at::Tensor matmul_fusion_variants_gelu(
-    at::Tensor& accumul1,
-    at::Tensor& accumul2,
-    const at::Tensor& tensor1,
-    const at::Tensor& tensor2,
-    float oscale,
-    float beta1,
-    float beta2,
-    bool trans);
-
-at::Tensor matmul_fusion_variants_dropout(
-    at::Tensor& accumul1,
-    at::Tensor& accumul2,
-    const at::Tensor& tensor1,
-    const at::Tensor& tensor2,
-    float oscale,
-    float beta1,
-    float beta2,
-    bool trans,
-    double p,
-    bool train,
-    bool inplace);
-
 at::Tensor& conv2d_sum(
     at::Tensor& accumu,
     const at::Tensor& input,
@@ -92,6 +58,70 @@ at::Tensor conv2d_sigmoid(
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     int64_t groups);
+
+at::Tensor _convolution_relu(
+    at::Tensor& input_r,
+    const at::Tensor& weight_r,
+    const at::Tensor& bias_r,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32);
+
+at::Tensor _convolution_sum(
+    at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    at::Tensor& accum,
+    at::Scalar scale);
+
+at::Tensor _convolution_sum_relu(
+    at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    at::Tensor& accum,
+    at::Scalar scale);
+
+at::Tensor _convolution_silu(
+    const at::Tensor& input_r,
+    const at::Tensor& weight_r,
+    const at::Tensor& bias_r,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32);
 
 at::Tensor mul_add(
     const at::Tensor& self,
@@ -217,14 +247,58 @@ at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
     double add_scale,
     int64_t add_zero_point);
 
-at::Tensor trans_addmm(
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    const at::Tensor& input,
-    at::Scalar beta,
-    at::Scalar alpha);
+at::Tensor matmul_add(
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2,
+    at::Tensor& accumul1,
+    at::Scalar beta1);
+
+at::Tensor trans_matmul(
+    const at::Tensor& tensor2,
+    int dim1,
+    int dim2,
+    const at::Tensor& tensor1);
+
+at::Tensor t_matmul(const at::Tensor& tensor2, const at::Tensor& tensor1);
+
+at::Tensor t_matmul_add(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    at::Tensor& accumul1,
+    at::Scalar beta1);
+
+at::Tensor t_matmul_add_gelu(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    at::Tensor& accumul1,
+    at::Scalar beta1);
+
+at::Tensor t_matmul_add_add(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    at::Tensor& accumul1,
+    at::Scalar beta1,
+    at::Tensor& accumul2,
+    at::Scalar beta2);
+
+at::Tensor trans_matmul_div(
+    const at::Tensor& tensor2,
+    int dim1,
+    int dim2,
+    const at::Tensor& tensor1,
+    at::Scalar oscale);
 
 at::Tensor linear_gelu(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias);
+
+at::Tensor linear_relu(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias);
+
+at::Tensor linear_sigmoid(
     const at::Tensor& input,
     const at::Tensor& weight,
     const at::Tensor& bias);
@@ -235,94 +309,6 @@ at::Tensor linear_add(
     const at::Tensor& bias,
     const at::Tensor& accumu,
     at::Scalar alpha);
-
-at::Tensor trans_addmm_relu(
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    const at::Tensor& input,
-    at::Scalar beta,
-    at::Scalar alpha);
-
-at::Tensor trans_addmm_sigmoid(
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    const at::Tensor& input,
-    at::Scalar beta,
-    at::Scalar alpha);
-
-at::Tensor trans_addmm_dropout(
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    const at::Tensor& input,
-    at::Scalar beta,
-    at::Scalar alpha,
-    double p,
-    bool train,
-    bool inplace);
-
-at::Tensor _convolution_relu(
-    at::Tensor& input_r,
-    const at::Tensor& weight_r,
-    const at::Tensor& bias_r,
-    at::IntArrayRef stride_,
-    at::IntArrayRef padding_,
-    at::IntArrayRef dilation_,
-    bool transposed_,
-    at::IntArrayRef output_padding_,
-    int64_t groups_,
-    bool benchmark,
-    bool deterministic,
-    bool cudnn_enabled,
-    bool allow_tf32);
-
-at::Tensor _convolution_sum(
-    at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride_,
-    at::IntArrayRef padding_,
-    at::IntArrayRef dilation_,
-    bool transposed_,
-    at::IntArrayRef output_padding_,
-    int64_t groups_,
-    bool benchmark,
-    bool deterministic,
-    bool cudnn_enabled,
-    bool allow_tf32,
-    at::Tensor& accum,
-    at::Scalar scale);
-
-at::Tensor _convolution_sum_relu(
-    at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride_,
-    at::IntArrayRef padding_,
-    at::IntArrayRef dilation_,
-    bool transposed_,
-    at::IntArrayRef output_padding_,
-    int64_t groups_,
-    bool benchmark,
-    bool deterministic,
-    bool cudnn_enabled,
-    bool allow_tf32,
-    at::Tensor& accum,
-    at::Scalar scale);
-
-at::Tensor _convolution_silu(
-    const at::Tensor& input_r,
-    const at::Tensor& weight_r,
-    const at::Tensor& bias_r,
-    at::IntArrayRef stride_,
-    at::IntArrayRef padding_,
-    at::IntArrayRef dilation_,
-    bool transposed_,
-    at::IntArrayRef output_padding_,
-    int64_t groups_,
-    bool benchmark,
-    bool deterministic,
-    bool cudnn_enabled,
-    bool allow_tf32);
 
 } // namespace xpu
 } // namespace jit

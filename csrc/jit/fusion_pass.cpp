@@ -456,16 +456,20 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_sym,
       Symbol::fromQualString("quantized::add")},
      xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_add_sym},
+    // DLRM: linear with bias + sigmoid
+    {{aten::linear, aten::sigmoid}, xpu::linear_sigmoid_sym},
+    {{aten::linear, Symbol::fromQualString("aten::sigmoid_")},
+     xpu::linear_sigmoid_sym},
+    // DLRM: linear with bias + relu
+    {{aten::linear, aten::relu}, xpu::linear_relu_sym},
+    {{aten::linear, Symbol::fromQualString("aten::relu_")},
+     xpu::linear_relu_sym},
     // BERT: linear with bias + gelu
     {{aten::linear, aten::gelu}, xpu::linear_gelu_sym},
     {{aten::linear, Symbol::fromQualString("aten::gelu_")},
      xpu::linear_gelu_sym},
     // BERT: linear with bias + add
     {{aten::linear, aten::add}, xpu::linear_add_sym},
-    // DLRM: linear with bias + relu/sigmoid
-    {{aten::t, aten::addmm}, xpu::t_addmm_sym},
-    {{xpu::t_addmm_sym, aten::relu}, xpu::t_addmm_relu_sym},
-    {{xpu::t_addmm_sym, aten::sigmoid}, xpu::t_addmm_sigmoid_sym},
     // BERT: linear no bias + add standalone bias + add
     {{aten::t, aten::matmul}, xpu::t_matmul_sym},
     {{xpu::t_matmul_sym, aten::add}, xpu::t_matmul_add_sym},
@@ -473,18 +477,12 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
      xpu::t_matmul_add_sym},
     {{xpu::t_matmul_add_sym, aten::add}, xpu::t_matmul_add_add_sym},
     {{xpu::t_matmul_add_sym, aten::gelu}, xpu::t_matmul_add_gelu_sym},
-    {{xpu::t_matmul_add_sym, Symbol::fromQualString("aten::dropout_")},
-     xpu::t_matmul_add_dropout_sym},
-    {{xpu::t_addmm_sym, Symbol::fromQualString("aten::dropout_")},
-     xpu::t_addmm_dropout_sym},
     // BERT: matmul(m1, m2.t()) * scalar + add
     {{Symbol::fromQualString("aten::transpose"),
       Symbol::fromQualString("aten::matmul")},
      xpu::trans_matmul_sym},
     {{xpu::trans_matmul_sym, Symbol::fromQualString("aten::div")},
      xpu::trans_matmul_div_sym},
-    {{xpu::trans_matmul_div_sym, Symbol::fromQualString("aten::add")},
-     xpu::trans_matmul_scale_add_sym},
     // matmul(m1, m2) + add (bias or post_sum)
     {{Symbol::fromQualString("aten::matmul"), aten::add_}, xpu::matmul_add_sym},
     {{aten::conv2d, Symbol::fromQualString("aten::sigmoid")},

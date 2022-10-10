@@ -526,7 +526,7 @@ void init_module(pybind11::module& m) {
       [](const at::Tensor& input,
          const at::Tensor& weight,
          const at::Tensor& bias) {
-        return at::AtenIpexTypeXPU::trans_addmm_relu(input, weight, bias);
+        return at::AtenIpexTypeXPU::linear_relu(input, weight, bias);
       },
       "fused linear with relu opt. on Intel device");
 
@@ -535,7 +535,7 @@ void init_module(pybind11::module& m) {
       [](const at::Tensor& input,
          const at::Tensor& weight,
          const at::Tensor& bias) {
-        return at::AtenIpexTypeXPU::trans_addmm_sigmoid(input, weight, bias);
+        return at::AtenIpexTypeXPU::linear_sigmoid(input, weight, bias);
       },
       "fused linear with sigmoid opt. on Intel device");
 

@@ -29,16 +29,12 @@ static auto matmul_add_sym = Symbol::fromQualString("xpu::matmul_add");
 static auto t_matmul_sym = Symbol::fromQualString("xpu::t_matmul");
 static auto trans_matmul_sym = Symbol::fromQualString("xpu::trans_matmul");
 static auto t_matmul_add_sym = Symbol::fromQualString("xpu::t_matmul_add");
-static auto t_matmul_add_dropout_sym =
-    Symbol::fromQualString("xpu::t_matmul_add_dropout");
 static auto t_matmul_add_add_sym =
     Symbol::fromQualString("xpu::t_matmul_add_add");
 static auto t_matmul_add_gelu_sym =
     Symbol::fromQualString("xpu::t_matmul_add_gelu");
 static auto trans_matmul_div_sym =
     Symbol::fromQualString("xpu::trans_matmul_div");
-static auto trans_matmul_scale_add_sym =
-    Symbol::fromQualString("xpu::trans_matmul_scale_add");
 static auto mul_add_sym = Symbol::fromQualString("xpu::mul_add");
 static auto q_conv2d_sum_relu_sym =
     Symbol::fromQualString("xpu::q_conv2d_sum_relu");
@@ -59,14 +55,10 @@ static auto q_conv2d_dequantize_softplus_tanh_mul_quantize_sym =
 static auto q_conv2d_dequantize_softplus_tanh_mul_quantize_add_sym =
     Symbol::fromQualString(
         "xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_add");
-static auto t_addmm_sym = Symbol::fromQualString("xpu::t_addmm");
-static auto t_addmm_dropout_sym =
-    Symbol::fromQualString("xpu::t_addmm_dropout");
 static auto linear_gelu_sym = Symbol::fromQualString("xpu::linear_gelu");
+static auto linear_relu_sym = Symbol::fromQualString("xpu::linear_relu");
+static auto linear_sigmoid_sym = Symbol::fromQualString("xpu::linear_sigmoid");
 static auto linear_add_sym = Symbol::fromQualString("xpu::linear_add");
-static auto t_addmm_relu_sym = Symbol::fromQualString("xpu::t_addmm_relu");
-static auto t_addmm_sigmoid_sym =
-    Symbol::fromQualString("xpu::t_addmm_sigmoid");
 static auto dequant_pixelshuffle_sym =
     Symbol::fromQualString("xpu::dequant_pixelshuffle");
 static auto dequant_pixelshuffle_quant_sym =

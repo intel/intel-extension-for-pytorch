@@ -27,15 +27,6 @@ class MatmulSum(torch.nn.Module):
         y += a
         return y
 
-
-class TransMatmulScalePost(torch.nn.Module):
-    def __init__(self):
-        super(TransMatmulScalePost, self).__init__()
-
-    def forward(self, m1, m2, added):
-        return torch.matmul(m1, m2.transpose(-1, -2)) / 8 + added
-
-
 class TransMatmul(torch.nn.Module):
     def __init__(self):
         super(TransMatmul, self).__init__()
@@ -162,17 +153,6 @@ class LinearSigmoid(torch.nn.Module):
         return x
 
 
-class LinearDropout(torch.nn.Module):
-    def __init__(self, in_channels, out_channels, p, inplace=False):
-        super(LinearDropout, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
-        self.dropout = nn.Dropout(p, inplace)
-
-    def forward(self, x):
-        x = self.dropout(self.linear(x))
-        return x
-
-
 class TestNNMethod(TestCase):
     def test_matmul_sum_fusion(self, dtype=torch.float):
         m1 = torch.randn([4, 2], device=cpu_device)
@@ -190,33 +170,6 @@ class TestNNMethod(TestCase):
             real = modelJit(m1_dpcpp, m2_dpcpp, acc_dpcpp)
             print("real: ", real.cpu())
         self.assertEqual(raw, real.to(cpu_device))
-        del modelJit
-
-    def test_trans_baddbmm_scale_sum_fusion(self, dtype=torch.float):
-        m1 = torch.randn((2, 2, 3), device=cpu_device)
-        m2 = torch.randn((2, 2, 3), device=cpu_device)
-        added1 = torch.randn((2, 1, 1), device=cpu_device)
-        added2 = torch.randn((2, 2, 2), device=cpu_device)
-
-        model = TransMatmulScalePost()
-        raw1 = model(m1, m2, added1)
-        raw2 = model(m1, m2, added2)
-        print("raw1: ", raw1)
-        print("raw2: ", raw2)
-
-        m1_dpcpp = m1.to(dpcpp_device)
-        m2_dpcpp = m2.to(dpcpp_device)
-        added1_dpcpp = added1.to(dpcpp_device)
-        added2_dpcpp = added2.to(dpcpp_device)
-
-        modelJit = torch.jit.script(model)
-        with torch.no_grad():
-            real1 = modelJit(m1_dpcpp, m2_dpcpp, added1_dpcpp)
-            real2 = modelJit(m1_dpcpp, m2_dpcpp, added2_dpcpp)
-            print("real1:", real1.to(cpu_device))
-            print("real2:", real2.to(cpu_device))
-        self.assertEqual(raw1, real1.to(cpu_device))
-        self.assertEqual(raw2, real2.to(cpu_device))
         del modelJit
 
     def test_trans_baddbmm_fusion(self, dtype=torch.float):
@@ -563,24 +516,6 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             # print(modelJit.graph_for(x))
-            y_dpcpp = modelJit(x)
-            print("fusion:", y_dpcpp.cpu())
-        self.assertEqual(y, y_dpcpp.to(cpu_device))
-        del modelJit
-
-    def test_linear_dropout(self, dtype=torch.float):
-        x = torch.randn([2, 4], device=cpu_device)
-        inplace = True
-        model = LinearDropout(4, 4, 0.2, True)
-        model.eval()
-        y = model(x)
-        print("raw: ", y)
-
-        x = x.to("xpu")
-        model.to("xpu")
-        modelJit = torch.jit.trace(model, x)
-
-        with torch.no_grad():
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))

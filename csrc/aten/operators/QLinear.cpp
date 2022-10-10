@@ -42,13 +42,9 @@ at::Tensor dpcppLinear(
         bias.is_quantized() ? bias.q_scale() : 1.f,
         output_scale);
   } else {
-    // omit transpose on weight
-    return trans_addmm(
-        bias,
-        input.is_quantized() ? at::dequantize(input) : input,
-        weight,
-        0.f,
-        1.f);
+    // fallback to fp32 linear
+    return at::linear(
+        input.is_quantized() ? at::dequantize(input) : input, weight, bias);
   }
 }
 

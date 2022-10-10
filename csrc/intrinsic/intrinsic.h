@@ -9,17 +9,6 @@ namespace AtenIpexTypeXPU {
 
 struct DPCPPTensorContext;
 
-void matmul(
-    Tensor& result,
-    const Tensor& m1,
-    const Tensor& m2,
-    const Tensor& b,
-    const Tensor& po,
-    float beta,
-    float alpha,
-    bool m2_trans,
-    int fusion);
-
 at::Tensor interaction(at::Tensor& input_mlp, at::Tensor& input_emb);
 
 void fused_ADAMW(
@@ -147,12 +136,6 @@ at::Tensor pad_convolution(
     at::IntArrayRef output_padding,
     int64_t groups);
 
-at::Tensor matmul_add(
-    at::Tensor& accumu,
-    const at::Tensor& m1,
-    const at::Tensor& m2,
-    at::Scalar beta);
-
 at::Tensor& fill_slice_with_index(at::Tensor& t, int dim);
 
 at::Tensor& std_var_out(
@@ -173,7 +156,58 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
     bool keepdim,
     bool take_sqrt);
 
+at::Tensor matmul_add(
+    const at::Tensor& m1,
+    const at::Tensor& m2,
+    at::Tensor& accumu,
+    Scalar beta);
+
+at::Tensor trans_matmul(
+    const at::Tensor& tensor2,
+    int dim1,
+    int dim2,
+    const at::Tensor& tensor1);
+
+at::Tensor t_matmul(const at::Tensor& tensor2, const at::Tensor& tensor1);
+
+at::Tensor t_matmul_add(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    at::Tensor& accumul1,
+    Scalar beta1);
+
+at::Tensor t_matmul_add_gelu(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    at::Tensor& accumul1,
+    Scalar beta1);
+
+at::Tensor t_matmul_add_add(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    at::Tensor& accumul1,
+    Scalar beta1,
+    at::Tensor& accumul2,
+    Scalar beta2);
+
+at::Tensor trans_matmul_div(
+    const at::Tensor& tensor2,
+    int dim1,
+    int dim2,
+    const at::Tensor& tensor1,
+    Scalar oscale);
+
 at::Tensor linear_gelu(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias);
+
+at::Tensor linear_relu(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias);
+
+at::Tensor linear_sigmoid(
     const at::Tensor& input,
     const at::Tensor& weight,
     const at::Tensor& bias);
@@ -184,27 +218,6 @@ at::Tensor linear_add(
     const at::Tensor& bias,
     const at::Tensor& accumu,
     at::Scalar alpha);
-
-at::Tensor trans_addmm_relu(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::Scalar beta = 1.0f,
-    at::Scalar alpha = 1.0f);
-
-at::Tensor trans_addmm_sigmoid(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::Scalar beta = 1.0f,
-    at::Scalar alpha = 1.0f);
-
-at::Tensor trans_addmm(
-    const at::Tensor& input,
-    const at::Tensor& m1,
-    const at::Tensor& m2,
-    at::Scalar beta = 1.0f,
-    at::Scalar alpha = 1.0f);
 
 at::Tensor mul_add(
     const Tensor& self,
@@ -347,16 +360,4 @@ at::Tensor dequantize_tensor_per_channel_affine(
     int64_t axis);
 
 } // namespace AtenIpexTypeXPU
-} // namespace at
-
-namespace at {
-namespace AtenIpexTypeQuantizedXPU {
-
-at::Tensor trans_addmm(
-    const at::Tensor& input,
-    const at::Tensor& m1,
-    const at::Tensor& m2,
-    at::Scalar beta = 1.0f,
-    at::Scalar alpha = 1.0f);
-}
 } // namespace at
