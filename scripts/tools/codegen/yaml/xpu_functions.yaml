@@ -755,6 +755,7 @@ supported:
   - _foreach_addcmul_.Scalar
   - _thnn_fused_gru_cell
   - _thnn_fused_gru_cell_backward
+  - _standard_gamma_grad
   - logaddexp
   - logaddexp.out
   - logaddexp2
@@ -798,7 +799,8 @@ supported:
   - var.correction_out
   - matrix_exp
   - logit_backward.grad_input
-
+  - binomial
+  - _standard_gamma
 autograd:
   - cdist
   - lstm.input

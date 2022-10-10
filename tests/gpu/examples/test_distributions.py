@@ -25,7 +25,7 @@ import math
 from collections import namedtuple
 
 import torch
-from torch.autograd import gradcheck
+from torch.autograd import gradcheck, Variable
 from torch.distributions import (Bernoulli, Exponential, Multinomial, Normal,
                                  Uniform)
 from torch.testing._internal.common_utils import (TestCase, load_tests,
@@ -315,3 +315,47 @@ class TestDistributions(TestCase):
         # self.assertEqual(high.grad, rand)
         #  low.grad.zero_()
         #  high.grad.zero_()
+
+    def test_s_standard_gamma(self):
+        alpha = torch.randn(50, 60).exp()
+        alpha_1d = torch.randn(1).exp()
+        self.assertEqual(torch._standard_gamma(alpha).size(), (50, 60))
+        self.assertEqual(torch._standard_gamma(alpha_1d).size(), (1,))
+
+        beta = torch.ones_like(alpha)
+
+        def ref_log_prob(idx, x, log_prob):
+            a = alpha.view(-1)[idx].detach()
+            b = beta.view(-1)[idx].detach()
+            expected = scipy.stats.gamma.logpdf(x.to("cpu"), a, scale=1 / b)
+            self.assertEqual(log_prob.to("cpu"), expected, atol=1e-3, rtol=0)
+
+        self._check_log_prob(torch.distributions.Gamma(alpha.to("xpu"), beta.to("xpu")), ref_log_prob)
+
+    def test_s_standard_gamma_grad(self):
+        alpha_cpu = torch.randn(2, 3, requires_grad=True).abs()
+        alpha_xpu = alpha_cpu.to("xpu")
+        s_cpu = torch._standard_gamma(alpha_cpu)
+        s_xpu = torch._standard_gamma(alpha_xpu)
+        print("s_cpu: ", s_cpu)
+        print("s_xpu: ", s_xpu)
+
+        grad_cpu = Variable(torch.sum(s_cpu), requires_grad=True)
+        grad_cpu.backward()
+        print("grad_cpu: ", grad_cpu.grad)
+
+        grad_xpu = Variable(torch.sum(s_xpu), requires_grad=True)
+        grad_xpu.backward()
+        print("grad_xpu: ", grad_xpu.grad)
+        self.assertEqual(grad_xpu.grad.to("cpu"), grad_cpu.grad)
+
+    def test_binomial_log_prob(self):
+        for prop in [0., 0.5, 0.3, 0.05, 0.02, 0.75, 0.9, 1.]:
+            total_count = torch.tensor([[8, 70, 100], [3000, 80000, 700000]]).to("xpu")
+            bin0 = torch.distributions.Binomial(total_count, torch.tensor(1.).to("xpu"))
+            self.assertEqualIgnoreType(bin0.sample().to("cpu"), total_count.to("cpu"))
+            bin1 = torch.distributions.Binomial(total_count, torch.tensor(prop).to("xpu"))
+            samples = bin1.sample(torch.Size((100000,)))
+            self.assertTrue((samples <= total_count.type_as(samples)).all())
+            self.assertEqual(samples.mean(dim=0) / total_count, bin1.mean / total_count, atol=0.02, rtol=0)
+            self.assertEqual(samples.var(dim=0) / total_count, bin1.variance / total_count, atol=0.02, rtol=0)

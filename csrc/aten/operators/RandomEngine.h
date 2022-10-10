@@ -9,6 +9,8 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+#define EXTRA_FLAG_NORMAL 0x00000001
+
 template <typename T>
 struct alignas(sizeof(T) * 2) rand_vec2 {
   union {
@@ -49,6 +51,10 @@ typedef struct randStatePhilox4_32_10 {
   uint4 output;
   uint2 key;
   unsigned int STATE;
+  int boxmuller_flag;
+  int boxmuller_flag_double;
+  float boxmuller_extra;
+  double boxmuller_extra_double;
 } randStatePhilox4_32_10_t;
 
 static inline void Philox_State_Incr(
@@ -172,6 +178,32 @@ static inline void rand_init(
   skipahead(offset, state);
 }
 
+static inline unsigned int rand(randStatePhilox4_32_10_t* state) {
+  // Maintain the invariant: output[STATE] is always "good" and
+  //  is the next value to be returned by curand.
+  unsigned int ret;
+  switch (state->STATE++) {
+    default:
+      ret = state->output.x;
+      break;
+    case 1:
+      ret = state->output.y;
+      break;
+    case 2:
+      ret = state->output.z;
+      break;
+    case 3:
+      ret = state->output.w;
+      break;
+  }
+  if (state->STATE == 4) {
+    Philox_State_Incr(state);
+    state->output = rand_Philox4x32_10(state->ctr, state->key);
+    state->STATE = 0;
+  }
+  return ret;
+}
+
 static inline uint4 rand4(randStatePhilox4_32_10_t* state) {
   uint4 r;
   uint4 tmp = state->output;
@@ -211,6 +243,20 @@ static inline uint4 rand4(randStatePhilox4_32_10_t* state) {
 #define RAND_PI_DOUBLE (3.1415926535897932)
 
 // =================== uniform ===================
+
+static inline float _rand_uniform(unsigned int x) {
+  return x * RAND_2POW32_INV + (RAND_2POW32_INV / 2.0f);
+}
+
+static inline float _rand_uniform(unsigned long long x) {
+  unsigned int t;
+  t = (unsigned int)(x >> 32);
+  return t * RAND_2POW32_INV + (RAND_2POW32_INV / 2.0f);
+}
+
+static inline float rand_uniform(randStatePhilox4_32_10_t* state) {
+  return _rand_uniform(rand(state));
+}
 
 static inline float4 rand_uniform4(randStatePhilox4_32_10_t* state) {
   auto x = rand4(state);
@@ -284,6 +330,20 @@ static inline double2 _rand_box_muller_double(
   result.y *= s;
 
   return result;
+}
+
+static inline float rand_normal(randStatePhilox4_32_10_t* state) {
+  if (state->boxmuller_flag != EXTRA_FLAG_NORMAL) {
+    unsigned int x, y;
+    x = rand(state);
+    y = rand(state);
+    float2 v = _rand_box_muller(x, y);
+    state->boxmuller_extra = v.y;
+    state->boxmuller_flag = EXTRA_FLAG_NORMAL;
+    return v.x;
+  }
+  state->boxmuller_flag = 0;
+  return state->boxmuller_extra;
 }
 
 static inline float4 rand_normal4(randStatePhilox4_32_10_t* state) {

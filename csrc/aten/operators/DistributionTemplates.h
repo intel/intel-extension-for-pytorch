@@ -7,6 +7,7 @@
 #include "MemoryAccess.h"
 #include "RandomEngine.h"
 #include "comm/Numerics.h"
+#include "core/detail/OffsetCalculator.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -250,6 +251,235 @@ void distribution_nullary_kernel(
               scalar_t* out = (scalar_t*)&out_data[offsets[0]];
               *out = transform_func(rand);
             });
+      };
+      cgh.parallel_for(
+          sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
+    };
+    DPCPP_Q_SUBMIT(sycl_queue, cgf);
+  }
+}
+
+// Unary kernel
+template <
+    typename scalar1_t,
+    typename scalar2_t,
+    typename func_t,
+    typename inp_offset_calc_t,
+    typename out_offset_calc_t,
+    typename item_t>
+void distribution_unary_elementwise_kernel(
+    item_t& item,
+    int numel,
+    func_t f,
+    PhiloxState philox_args,
+    scalar1_t* output_data,
+    const scalar2_t* input_data,
+    inp_offset_calc_t inp_calc,
+    out_offset_calc_t out_calc) {
+  int group_size = item.get_local_range(0);
+  int global_size = item.get_global_range(0);
+  int idx = item.get_group(0) * group_size + item.get_local_id(0);
+
+  auto seeds = philox_unpack(philox_args);
+  randStatePhilox4_32_10_t state;
+  rand_init(std::get<0>(seeds), idx, std::get<1>(seeds), &state);
+
+  int global_idx;
+#pragma unroll
+  for (int i = 0; i < numel; i += global_size) {
+    global_idx = i + idx;
+    auto in_offsets = inp_calc.get(global_idx);
+    auto out_offsets = out_calc.get(global_idx);
+    f(state, output_data[out_offsets[0]], input_data[in_offsets[0]]);
+  }
+}
+
+template <typename scalar1_t, typename scalar2_t, typename func_t>
+void distribution_unary_kernel(
+    TensorIterator& iter,
+    PhiloxState philox_args,
+    const func_t& f) {
+  if (!iter.can_use_32bit_indexing()) {
+    for (auto& sub_iter : iter.with_32bit_indexing()) {
+      distribution_unary_kernel<scalar1_t, scalar2_t, decltype(f)>(
+          sub_iter, philox_args, f);
+    }
+    return;
+  }
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(iter.can_use_32bit_indexing());
+
+  int64_t numel = iter.numel();
+  if (numel == 0) {
+    return;
+  }
+
+  int group_size = dpcppGpuHWThreadsPerEU() * dpcppMaxSubGroupSize();
+  int num_groups = (numel + group_size - 1) / group_size;
+  int hw_max_groups = dpcppMaxWorkItemsPerTile() / group_size;
+  num_groups = num_groups > hw_max_groups ? hw_max_groups : num_groups;
+
+  scalar1_t* output_data = static_cast<scalar1_t*>(iter.data_ptr(0));
+  const scalar2_t* input_data = static_cast<const scalar2_t*>(iter.data_ptr(1));
+
+  auto& sycl_queue = dpcppGetCurrentQueue();
+
+  if (iter.is_contiguous()) {
+    auto input_offset_calculator = TrivialOffsetCalculator<1>();
+    auto output_offset_calculator = TrivialOffsetCalculator<1>();
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
+        distribution_unary_elementwise_kernel(
+            item,
+            numel,
+            f,
+            philox_args,
+            output_data,
+            input_data,
+            input_offset_calculator,
+            output_offset_calculator);
+      };
+      cgh.parallel_for(
+          sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
+    };
+    DPCPP_Q_SUBMIT(sycl_queue, cgf);
+  } else {
+    auto input_offset_calculator = make_input_offset_calculator<1>(iter);
+    auto output_offset_calculator = make_output_offset_calculator(iter);
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
+        distribution_unary_elementwise_kernel(
+            item,
+            numel,
+            f,
+            philox_args,
+            output_data,
+            input_data,
+            input_offset_calculator,
+            output_offset_calculator);
+      };
+      cgh.parallel_for(
+          sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
+    };
+    DPCPP_Q_SUBMIT(sycl_queue, cgf);
+  }
+}
+
+// Binary kernel
+template <
+    typename func_t,
+    typename inp_offset_calc_t,
+    typename out_offset_calc_t,
+    typename item_t>
+void distribution_binary_elementwise_kernel(
+    item_t& item,
+    int numel,
+    func_t f,
+    PhiloxState philox_args,
+    typename function_traits<func_t>::result_type* output_data,
+    const typename function_traits<func_t>::template arg<1>::type* input_data_1,
+    const typename function_traits<func_t>::template arg<2>::type* input_data_2,
+    inp_offset_calc_t inp_calc,
+    out_offset_calc_t out_calc) {
+  int group_size = item.get_local_range(0);
+  int global_size = item.get_global_range(0);
+  int idx = item.get_group(0) * group_size + item.get_local_id(0);
+
+  auto seeds = philox_unpack(philox_args);
+
+  using input_t_1 = typename function_traits<func_t>::template arg<1>::type;
+  using input_t_2 = typename function_traits<func_t>::template arg<2>::type;
+
+  randStatePhilox4_32_10_t state;
+  rand_init(std::get<0>(seeds), idx, std::get<1>(seeds), &state);
+
+  int global_idx;
+#pragma unroll
+  for (int i = 0; i < numel; i += global_size) {
+    global_idx = i + idx;
+    auto in_offsets = inp_calc.get(global_idx);
+    auto out_offsets = out_calc.get(global_idx);
+    output_data[out_offsets[0]] =
+        f(state, input_data_1[in_offsets[0]], input_data_2[in_offsets[1]]);
+  }
+}
+
+template <typename func_t>
+void distribution_binary_kernel(
+    TensorIterator& iter,
+    PhiloxState philox_args,
+    const func_t& f) {
+  static_assert(
+      std::is_same<
+          typename function_traits<func_t>::template arg<0>::type,
+          randStatePhilox4_32_10_t&>::value,
+      "the first argument of functor must be randStatePhilox4_32_10_t");
+  using input_t_1 = typename function_traits<func_t>::template arg<1>::type;
+  using input_t_2 = typename function_traits<func_t>::template arg<2>::type;
+  using output_t = typename function_traits<func_t>::result_type;
+
+  if (!iter.can_use_32bit_indexing()) {
+    for (auto& sub_iter : iter.with_32bit_indexing()) {
+      distribution_binary_kernel(sub_iter, philox_args, f);
+    }
+    return;
+  }
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(iter.can_use_32bit_indexing());
+
+  int64_t numel = iter.numel();
+  if (numel == 0) {
+    return;
+  }
+
+  int group_size = dpcppGpuHWThreadsPerEU() * dpcppMaxSubGroupSize();
+  int num_groups = (numel + group_size - 1) / group_size;
+  int hw_max_groups = dpcppMaxWorkItemsPerTile() / group_size;
+  num_groups = num_groups > hw_max_groups ? hw_max_groups : num_groups;
+
+  output_t* output_data = static_cast<output_t*>(iter.data_ptr(0));
+  const input_t_1* input_data_1 =
+      static_cast<const input_t_1*>(iter.data_ptr(1));
+  const input_t_2* input_data_2 =
+      static_cast<const input_t_2*>(iter.data_ptr(2));
+
+  auto& sycl_queue = dpcppGetCurrentQueue();
+
+  if (iter.is_contiguous()) {
+    auto input_offset_calculator = TrivialOffsetCalculator<2>();
+    auto output_offset_calculator = TrivialOffsetCalculator<1>();
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
+        distribution_binary_elementwise_kernel(
+            item,
+            numel,
+            f,
+            philox_args,
+            output_data,
+            input_data_1,
+            input_data_2,
+            input_offset_calculator,
+            output_offset_calculator);
+      };
+      cgh.parallel_for(
+          sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
+    };
+    DPCPP_Q_SUBMIT(sycl_queue, cgf);
+  } else {
+    auto input_offset_calculator = make_input_offset_calculator<2>(iter);
+    auto output_offset_calculator = make_output_offset_calculator(iter);
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
+        distribution_binary_elementwise_kernel(
+            item,
+            numel,
+            f,
+            philox_args,
+            output_data,
+            input_data_1,
+            input_data_2,
+            input_offset_calculator,
+            output_offset_calculator);
       };
       cgh.parallel_for(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
