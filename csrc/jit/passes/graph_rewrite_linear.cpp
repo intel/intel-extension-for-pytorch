@@ -54,8 +54,9 @@ void replaceFrozenIPEXLinearWithAtenLinear(
         continue;
       at::Tensor weight_tensor;
       auto weight_dtype =
-          n->inputs().at(1)->type()->cast<TensorType>()->scalarType().value();
-      if (use_mkl_sgemm && weight_dtype != at::ScalarType::BFloat16) {
+          n->inputs().at(1)->type()->cast<TensorType>()->scalarType();
+      if (use_mkl_sgemm && weight_dtype.has_value() &&
+          weight_dtype.value() != at::ScalarType::BFloat16) {
         auto linear_op_ctx =
             toIValue(prepack_node).value().toCustomClass<MKLOpContext>();
         weight_tensor = linear_op_ctx->to_public(
