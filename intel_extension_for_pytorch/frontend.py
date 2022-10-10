@@ -175,7 +175,7 @@ class GraphCapture(object):
                                             assert core.onednn_has_bf16_support(), \
                                                     "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, " + \
                                                     "please set dtype to torch.float or set weights_prepack to False."
-                                        if dtype == torch.half:
+                                        if self.dtype == torch.half:
                                             assert core.onednn_has_fp16_support(), \
                                                     "FP16 weight prepack needs the cpu support avx512_core_fp16, " + \
                                                     "please set dtype to torch.float or set weights_prepack to False."
