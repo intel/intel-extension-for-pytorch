@@ -1,7 +1,6 @@
 set(IPEX_GPU_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 set(IPEX_GPU_ATEN_SRC_DIR "${IPEX_GPU_ROOT}/aten")
 set(IPEX_GPU_ATEN_CORE_DIR "${IPEX_GPU_ATEN_SRC_DIR}/core")
-set(IPEX_GPU_ATEN_GENERATED "${IPEX_GPU_ATEN_SRC_DIR}/generated")
 set(IPEX_GPU_RUNTIME_SRC_DIR "${IPEX_GPU_ROOT}/runtime")
 set(IPEX_GPU_UTILS_SRC_DIR "${IPEX_GPU_ROOT}/utils")
 set(IPEX_GPU_INCLUDE_DIR "${IPEX_GPU_ROOT}/include")
@@ -40,8 +39,7 @@ set(IPEX_INCLUDE_DIRS
         ${SYCL_INCLUDE_DIR}
         ${PROJECT_SOURCE_DIR}/torch_unexported_headers
         ${IPEX_GPU_ROOT}
-        ${IPEX_GPU_ATEN_SRC_DIR}
-        ${IPEX_GPU_ATEN_GENERATED})
+        ${IPEX_GPU_ATEN_SRC_DIR})
 
 set(IPEX_GPU_CORE_SRC
         ${IPEX_JIT_SRCS}
@@ -237,8 +235,8 @@ foreach(uheader ${IPEX_GPU_HEADERS})
   append(ipex_header "\n#include <xpu/${header}>")
 endforeach()
 
-file(WRITE ${IPEX_GPU_ATEN_GENERATED}/ipex.h ${ipex_header})
-install(FILES ${IPEX_GPU_ATEN_GENERATED}/ipex.h DESTINATION include)
+file(WRITE ${BUILD_IPEX_GPU_ATEN_GENERATED}/../ipex.h ${ipex_header})
+install(FILES ${BUILD_IPEX_GPU_ATEN_GENERATED}/../ipex.h DESTINATION include)
 
 # CMake config file for the external project.
 configure_file(
