@@ -30,7 +30,6 @@ The latest release version for GPU solution of Intel® Extension for PyTorch\* i
   - [Distributed Training with DistributedDataParallel (DDP)](#distributed-training-with-distributeddataparallel-ddp)
   - [Distributed Training with Horovod](#distributed-training-with-horovod)
   - [Fusion pattern support](#fusion-pattern-support)
-  - [ITT support](#itt-support)
   - [Master weights support](#master-weights-support)
   - [Operator Coverage](#operator-coverage)
   - [Profile tool](#profile-tool)
@@ -75,7 +74,6 @@ Code organization
     │   │   │   └── comm            // [Header only] Common code for operators
     │   │   └── quantized           // Quantization utilities
     │   ├── intrinsic               // IPEX intrinsic
-    │   ├── itt                     // ITT support
     │   ├── jit                     // JIT passes and patterns
     │   ├── oneDNN                  // [Header only] oneDNN integration layer
     │   ├── runtime                 // DPCPP runtime intergation & utilities
@@ -84,8 +82,7 @@ Code organization
     ├── intel_extension_for_pytorch // IPEX Python layer
     │   ├── autograd                // IPEX autograd implementation for Python
     │   ├── csrc                    // IPEX native implementation for Python
-    │   │   ├── gpu                 // IPEX gpu Python API implementation
-    │   │   └── itt                 // ITT support
+    │   │   └── gpu                 // IPEX gpu Python API implementation
     │   ├── optim                   // Customized optimizer implementation for Python
     |   └── xpu                     // XPU Python API implementation  
     ├── scripts                     // Build scripts
@@ -96,7 +93,6 @@ Code organization
     │       ├── pytorch             // Test suites ported from PyTorch proper
     │       └── regression          // unit tests for regression issues
     ├── third_party                 // third party modules
-    │   ├── ittapi                  // Intel® Instrumentation and Tracing Technology (ITT) API
     │   └── oneDNN                  // oneAPI Deep Neural Network Library
     └── torch_patches               // Remaining patches for PyTorch proper
 ```
@@ -299,7 +295,6 @@ The following build options are supported in Intel® Extension for PyTorch* GPU.
 | USE_QUEUE_BARRIER | ON | Default is ON. Use queue submit barrier if set to ON. Otherwise use dummy kernel. |
 | USE_SCRATCHPAD_MODE | ON | Default is ON. Use oneDNN scratchpad user mode.|
 | USE_MULTI_CONTEXT | ON | Create DPC++ runtime context per device. |
-| USE_ITT | ON | Use Intel(R) VTune Profiler ITT functionality if set to ON. |
 | USE_AOT_DEVLIST | "" | device list for AOT compilation. |
 | BUILD_STATS | OFF | Count statistics for each component during build process if set to ON. |
 | BUILD_BY_PER_KERNEL | OFF | Build by DPC++ per_kernel option if set to ON. |
@@ -444,21 +439,6 @@ All fusions patterns are only available in PyTorch JIT mode.
 | Conv2D + Sigmoid | INT8 |
 | Conv2D + Dequantize | INT8 |
 | Conv2D + Dequantize + Softplus + Tanh + Mul + Quantize + Add | INT8 |
-
-### ITT support:
-
-ITT is Intel® VTune™ Profiler's Instrumentation and Tracing Technology. To enable this feature, <br>
-build Intel® Extension for PyTorch* GPU with USE_ITT=ON and update model as below:
-
-```bash
-with torch.xpu.emit_itt():
-    torch.xpu.itt.mark('single shot marker')
-    torch.xpu.itt.range_push('custom range')
-    output = YourModel(input)
-    torch.xpu.itt.range_pop()
-```
-
-Then start VTune for profiling kernels. Make sure ```INTELONEAPIROOT``` is set for VTune.
 
 ### Master weights support:
 

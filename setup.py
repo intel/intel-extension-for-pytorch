@@ -9,7 +9,6 @@
 # USE_QUEUE_BARRIER     - to use queue submit_barrier API
 # USE_SCRATCHPAD_MODE   - to trun on oneDNN scratchpad user mode
 # USE_MULTI_CONTEXT     - to create DPC++ runtime context per device
-# USE_ITT               - to Use Intel(R) VTune Profiler ITT functionality
 # USE_AOT_DEVLIST       - to set device list for AOT build option, for example, bdw,tgl,ats,..."
 # BUILD_STATS           - to count statistics for each component during build process
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)
@@ -156,7 +155,6 @@ def create_version_files(base_dir, version, git_sha_dict):
 git_sha_dict = {
     "__ipex_git_sha__": get_git_head_sha(base_dir),
     "__torch_git_sha__": torch.version.git_version,
-    "__ittapi_git_sha__": get_submodule_commit(base_dir, "third_party/ittapi"),
     "__onednn_git_sha__": get_submodule_commit(base_dir, "third_party/oneDNN"),
 }
 

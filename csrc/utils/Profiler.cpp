@@ -7,10 +7,6 @@
 #include <utils/Settings.h>
 #include <sstream>
 
-#if defined(USE_ITT)
-#include <itt/itt_wrapper.h>
-#endif
-
 using namespace torch::autograd::profiler;
 
 #if defined(USE_PROFILER)
@@ -59,27 +55,6 @@ struct DPCPPProfilerStubsImpl : public XPUStubs {
   }
   bool enabled() const override {
     return true;
-  }
-  void ittMark(const char* name) const override {
-#if defined(USE_ITT)
-    itt_mark(name);
-#else
-    AT_ERROR("ipex is not compiled with ITT.");
-#endif
-  }
-  void ittRangePush(const char* name) const override {
-#if defined(USE_ITT)
-    itt_range_push(name);
-#else
-    AT_ERROR("ipex is not compiled with ITT.");
-#endif
-  }
-  void ittRangePop() const override {
-#if defined(USE_ITT)
-    itt_range_pop();
-#else
-    AT_ERROR("ipex is not compiled with ITT.");
-#endif
   }
 };
 

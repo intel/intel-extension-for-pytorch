@@ -13,7 +13,6 @@ from torch import device as _device
 from .streams import Stream, Event
 from .intrinsic import *
 from .cpp_extension import *
-from .itt import emit_itt
 from .amp import *
 from .utils import *
 from .random import *

@@ -3,7 +3,7 @@ import torch
 from . import _C
 from ._version import (__version__, __ipex_git_sha__,
                        __torch_version__, __torch_git_sha__,
-                       __ittapi_git_sha__, __onednn_git_sha__)
+                       __onednn_git_sha__)
 
 from . import optim
 
@@ -13,7 +13,6 @@ def version():
     print("intel_extension_for_pytorch gpu git sha:          {}".format(__ipex_git_sha__))
     print("private gpu torch version: {}".format(__torch_version__))
     print("private gpu torch sha:     {}".format(__torch_git_sha__))
-    print("submodule ittapi sha:      {}".format(__ittapi_git_sha__))
     print("submodule oneDNN sha:      {}".format(__onednn_git_sha__))
 
 

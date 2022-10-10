@@ -35,13 +35,6 @@ if(BUILD_SIMPLE_TRACE)
   target_compile_definitions(intel-ext-pt-python PUBLIC BUILD_SIMPLE_TRACE)
 endif()
 
-if (USE_ITT)
-    target_compile_definitions(intel-ext-pt-python PUBLIC USE_ITT)
-    target_include_directories(intel-ext-pt-python PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/itt)
-    target_sources(intel-ext-pt-python PUBLIC ${DPCPP_ITT_SRCS})
-endif()
-
 set_target_properties(intel-ext-pt-python PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_RPATH}")
 
 if(BUILD_STRIPPED_BIN)

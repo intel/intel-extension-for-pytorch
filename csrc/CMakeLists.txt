@@ -171,21 +171,7 @@ if (USE_ONEMKL)
     endif()
 endif()
 
-if (USE_ITT)
-    find_package(ITT QUIET)
-    if (ITT_FOUND)
-        target_link_libraries(intel-ext-pt-gpu PRIVATE ${ITT_LIBRARY})
-        target_include_directories(intel-ext-pt-gpu PRIVATE ${ITT_INCLUDE_DIR})
-        target_compile_definitions(intel-ext-pt-gpu PUBLIC USE_ITT)
-        add_subdirectory(${IPEX_GPU_ROOT}/itt)
-        target_sources(intel-ext-pt-gpu PRIVATE ${DPCPP_ITT_SRCS})
-    else()
-        set(USE_ITT OFF PARENT_SCOPE)
-        message(WARNING "Cannot find ITT! Continue to build without ITT!")
-    endif()
-endif()
-
-# XXX: Try to find ITT & oneMKL support before oneDNN settings
+# XXX: Try to find oneMKL support before oneDNN settings
 find_package(oneDNN QUIET)
 if(ONEDNN_FOUND)
     target_link_libraries(intel-ext-pt-gpu PRIVATE ${ONEDNN_LIBRARY})
