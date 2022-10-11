@@ -186,12 +186,14 @@ at::Tensor layer_norm(
   // so for bfloat16 path(autocast), if input is bfloat16, we need convert it to
   // float.
   auto input_ = input;
-  if (input.scalar_type() == at::kBFloat16) {
+  if (input.scalar_type() == at::kBFloat16 &&
+      weight.scalar_type() == at::kFloat && bias.scalar_type() == at::kFloat) {
     input_ = input.to(at::kFloat);
   }
   at::Tensor output = std::get<0>(
       at::native_layer_norm(input_, normalized_shape, weight, bias, eps));
-  if (input.scalar_type() == at::kBFloat16) {
+  if (input.scalar_type() == at::kBFloat16 &&
+      weight.scalar_type() == at::kFloat && bias.scalar_type() == at::kFloat) {
     return output.to(at::kBFloat16);
   }
   return output;

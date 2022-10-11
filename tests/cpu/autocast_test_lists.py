@@ -154,6 +154,8 @@ class AutocastCPUTestLists(object):
                                               torch.randn((768, 768), device=dev, dtype=torch.float32),
                                               torch.randn((768), device=dev, dtype=torch.float32),
                                               torch.Tensor([[False, True]]), False, True, 1)),
+            ("_transform_bias_rescale_qkv", (torch.randn((1, 96, 1536), device=dev, dtype=torch.float32),
+                                             torch.randn((1536), device=dev, dtype=torch.float32), 8)),
         ]
         self.torch_bf16_fp32 = [
         ]
@@ -192,6 +194,8 @@ class AutocastCPUTestLists(object):
                                               torch.randn((768, 768), device=dev, dtype=torch.float16),
                                               torch.randn((768), device=dev, dtype=torch.float16),
                                               torch.Tensor([[False, True]]), False, True, 1)),
+            ("_transform_bias_rescale_qkv", (torch.randn((1, 96, 1536), device=dev, dtype=torch.float16),
+                                             torch.randn((1536), device=dev, dtype=torch.float16), 8)),
         ]
         self.nn_fp16 = [
         ]

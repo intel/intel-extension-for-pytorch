@@ -136,6 +136,7 @@ struct CPU_WrapFunction_<
 };
 
 #define TUPLE_TWO_TENSORS std::tuple<Tensor, Tensor>
+#define TUPLE_THREE_TENSORS std::tuple<Tensor, Tensor, Tensor>
 #define ADD_NS(RAW_OP) at::RAW_OP
 
 // BF16_CAST_POLICY: cast policy for BF16
@@ -348,7 +349,12 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
           c10::optional<int64_t>),
       user_defined_dtype,
       fp32)
-
+  MAKE_REGISTER_FUNC_TWO_POLICIES(
+      ADD_NS(_transform_bias_rescale_qkv),
+      "_transform_bias_rescale_qkv",
+      TUPLE_THREE_TENSORS(const Tensor&, const Tensor&, int64_t),
+      user_defined_dtype,
+      fp32)
   // fallthrough and fp32 cast policies
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       ADD_NS(mish), "mish", Tensor(const Tensor&), fallthrough, fp32)
@@ -493,6 +499,7 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
       promote)
 }
 #undef TUPLE_TWO_TENSORS
+#undef TUPLE_THREE_TENSORS
 
 } // namespace autocast
 } // namespace torch_ipex

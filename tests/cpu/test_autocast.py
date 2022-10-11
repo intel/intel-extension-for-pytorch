@@ -752,7 +752,7 @@ class TestAutocastOperations(TestCase):
     def test_autocast_nn_bf16_fp32_multi_output(self):
         for op_with_args in self.autocast_lists.nn_bf16_fp32_multi_output:
             op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
-            self._run_autocast_outofplace(op, args, torch.float32, module=torch._C._nn, add_kwargs=maybe_kwargs)
+            self._run_autocast_pass_test(op, args, torch.float32, module=torch._C._nn, add_kwargs=maybe_kwargs)
 
     def test_autocast_torch_fp16(self):
         for op_with_args in self.autocast_lists.torch_fp16:
