@@ -480,6 +480,64 @@ class TestPrepackCases(TestCase):
         model = torchvision.models.resnet.resnext50_32x4d(pretrained=False)
         self._test_imagenet_model(model)
 
+    def test_blas_backend(self):
+        class L(torch.nn.Module):
+            def __init__(self, in_f, out_f, bias):
+                super(L, self).__init__()
+                self.linear = torch.nn.Linear(in_f, out_f, bias=bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        out_features = torch.randint(3, 10, (1,)).item()
+        in_features = torch.randint(3, 10, (1,)).item()
+
+        input_shape = (8, in_features)
+        x = torch.randn(input_shape, dtype=torch.float32)
+        model = L(in_features, out_features, True)
+        origin_model = copy.deepcopy(model).eval()
+
+        def test_mkl():
+            self.assertTrue(ipex._using_dnnl()==False)
+            ipex_model_mkl = ipex.optimize(origin_model, dtype=torch.float32, level='O1')
+            with torch.no_grad():
+                graph = torch.jit.trace(ipex_model_mkl.eval(), x)
+                graph = torch.jit.freeze(graph)
+                graph(x)
+                trace_graph = graph.graph_for(x)
+                self.assertTrue(any(n.kind() == "ipex_prepack::mkl_sgemm_run" for n in trace_graph.nodes()))
+        test_mkl()
+
+        ipex_model_dnnl = ipex.optimize(origin_model, dtype=torch.float32, level='O1', auto_kernel_selection=True)
+        self.assertTrue(ipex._using_dnnl())
+        with torch.no_grad():
+            dnnl_graph = torch.jit.trace(ipex_model_dnnl.eval(), x)
+            dnnl_graph = torch.jit.freeze(dnnl_graph)
+            dnnl_graph(x)
+            trace_graph = dnnl_graph.graph_for(x)
+            self.assertTrue(any(n.kind() == "ipex_prepack::linear_run" for n in trace_graph.nodes()))
+
+        ipex._disable_dnnl()
+        test_mkl()
+
+        ipex_model = ipex.optimize(origin_model, dtype=torch.float32, level='O1', weights_prepack=False)
+        self.assertTrue(ipex._using_dnnl()==False)
+        with torch.no_grad():
+            graph = torch.jit.trace(ipex_model.eval(), x)
+            graph = torch.jit.freeze(graph)
+            graph(x)
+            trace_graph = graph.graph_for(x)
+            self.assertTrue(any(n.kind() == "aten::linear" for n in trace_graph.nodes()))
+
+        ipex_model = ipex.optimize(origin_model, dtype=torch.float32, level='O1', auto_kernel_selection=True, weights_prepack=False)
+        self.assertTrue(ipex._using_dnnl())
+        with torch.no_grad():
+            graph = torch.jit.trace(ipex_model.eval(), x)
+            graph = torch.jit.freeze(graph)
+            graph(x)
+            trace_graph = graph.graph_for(x)
+            self.assertTrue(any(n.kind() == "aten::linear" for n in trace_graph.nodes()))
+
     def test_linear_inference(self):
         class L(torch.nn.Module):
             def __init__(self, in_f, out_f, bias):

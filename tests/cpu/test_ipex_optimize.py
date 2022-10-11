@@ -242,12 +242,9 @@ class TestOptimizeCases(TestCase):
             if level == "O0":
                 self.assertTrue(isinstance(opt_M.linear, torch.nn.Linear))
                 self.assertTrue(isinstance(opt_M.conv, torch.nn.Conv2d))
-            elif dtype is torch.float32 and not auto_kernel_selection:
-              self.assertTrue(isinstance(opt_M.linear, torch.nn.Linear))
-              self.assertTrue(isinstance(opt_M.conv, _IPEXConv2d))
             else:
-              self.assertTrue(isinstance(opt_M.linear, _IPEXLinear))
-              self.assertTrue(isinstance(opt_M.conv, _IPEXConv2d))
+                self.assertTrue(isinstance(opt_M.linear, _IPEXLinear))
+                self.assertTrue(isinstance(opt_M.conv, _IPEXConv2d))
 
     def test_record_shape(self):
         options = itertools.product([OneLayerMLP, TwoLayerMLP], [True, False])

@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import warnings
 import copy
 import logging
 
@@ -262,7 +261,7 @@ IPEX_WEIGHT_PREPACK_MODULE = {
     torch.nn.ConvTranspose3d: _IPEXConvTranspose3d,
 }
 
-def _should_prepack(module, auto_kernel_selection):
+def _should_prepack(module):
     if type(module) not in IPEX_WEIGHT_PREPACK_MODULE:
         return False
     # If hook is on `weight` or `bias`, will not prepack.
@@ -278,10 +277,6 @@ def _should_prepack(module, auto_kernel_selection):
         for _, hook in module._backward_hooks.items():
             if hasattr(hook, 'name') and (hook.name == 'weight' or hook.name == 'bias'):
                 return False
-    # When the auto_kernel_selection is on, dtype is float, IPEX will use the prepack MKL backend
-    # for FP32 Linear in the inference mode.
-    if isinstance(module, torch.nn.Linear) and not auto_kernel_selection and module.weight.dtype is torch.float:
-        return False
     if isinstance(module, torch.nn.ConvTranspose2d):
         if module.padding[0] - module.output_padding[0] + module.stride[0] <= 0:
             return False
@@ -299,9 +294,9 @@ def _should_prepack(module, auto_kernel_selection):
         return False
     return True
 
-def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selection):
-    def convert(m, optimizer, params_attr, auto_kernel_selection):
-        if _should_prepack(m, auto_kernel_selection) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16 or m.weight.dtype == torch.half):
+def weight_prepack_with_ipex(module, optimizer, params_attr):
+    def convert(m, optimizer, params_attr):
+        if _should_prepack(m) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16 or m.weight.dtype == torch.half):
             weight = m.master_weight if hasattr(m, "master_weight") else m.weight
             if weight not in params_attr:
                 params_attr[weight] = {}
@@ -350,13 +345,13 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
         else:
             return m
 
-    def convert_rec(m, optimizer, params_attr, auto_kernel_selection):
-        new_m = convert(m, optimizer, params_attr, auto_kernel_selection)
+    def convert_rec(m, optimizer, params_attr):
+        new_m = convert(m, optimizer, params_attr)
         for name, sub_m in m.named_children():
-            setattr(new_m, name, convert_rec(sub_m, optimizer, params_attr, auto_kernel_selection)[0])
+            setattr(new_m, name, convert_rec(sub_m, optimizer, params_attr)[0])
         return new_m, optimizer, params_attr
 
-    opt_model, opt_optmizer, params_attr = convert_rec(module, optimizer, params_attr, auto_kernel_selection)
+    opt_model, opt_optmizer, params_attr = convert_rec(module, optimizer, params_attr)
     if opt_optmizer is not None:
         setattr(opt_optmizer, 'params_attr', params_attr)
         optim._optimizer_utils.patch_load_state_dict(opt_optmizer)

@@ -1,6 +1,5 @@
 from __future__ import division
 from __future__ import print_function
-from logging import exception
 import logging
 
 '''
@@ -52,7 +51,6 @@ All rights reserved.
 """Tests for rn50."""
 
 import math
-import random
 import unittest
 import time
 import sys
@@ -65,7 +63,6 @@ import torch.fx.experimental.optimization as optimization
 import copy
 
 import intel_extension_for_pytorch as ipex
-import intel_extension_for_pytorch._C as core
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -1112,7 +1109,7 @@ class Tester(TestCase):
             with self._texpr_enable(use_te):
                 ipex.enable_onednn_fusion(False)
                 model = copy.deepcopy(base_model).eval()
-#It will be removed after jit support conv_bn folding
+                #It will be removed after jit support conv_bn folding
                 if level == 'O0':
                     try:
                         model = optimization.fuse(model)
@@ -1128,7 +1125,7 @@ class Tester(TestCase):
 
                 oresult = model(x)
 
-                model = ipex.optimize(model, dtype=torch.float32, level=level)
+                model = ipex.optimize(model, dtype=torch.float32, level=level, weights_prepack=False)
 
                 with torch.no_grad():
                     result = model(x)
@@ -1145,21 +1142,35 @@ class Tester(TestCase):
                     trace_fused_model = torch.jit.freeze(trace_fused_model)
                     y = trace_fused_model(x)
 
-#enable fusiong in ipex.
+                    #enable fusiong in ipex.
                     fused_tresult = trace_fused_model(x)
-#conv relu fusion, conv sum fusion or conv sum relu fusion
+                    #conv relu fusion, conv sum fusion or conv sum relu fusion
                     trace_graph = trace_fused_model.graph_for(x)
                     fused_tresult = trace_fused_model(x)
                 self.assertEqual(result, fused_tresult, prec=prec)
-#check if the fused node exists in the graph
+                #check if the fused node exists in the graph
                 if kind_in_graph is not None:
                     self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
-#check if certain node does not exist in the graph
+                #check if certain node does not exist in the graph
                 if kind_not_in_graph is not None:
                     self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
     def _test_mkl_fp32(self, model, input, kind_in_graph=None, prec=5e-3):
+        model = model.eval()
+        model = ipex.optimize(model, dtype=torch.float32)
+        with torch.no_grad():
+            res_ref = model(input)
+            tr_model = torch.jit.trace(model, (input))
+            tr_model = torch.jit.freeze(tr_model)
+            tr_model(input)
+            trace_graph = tr_model.graph_for(input)
+            res_jit = tr_model(input)
+            self.assertEqual(res_ref, res_jit)
+            if kind_in_graph is not None:
+                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+
+    def _test_dnnl_fp32(self, model, input, kind_in_graph=None, prec=5e-3):
         model = model.eval()
         model = ipex.optimize(model, dtype=torch.float32, auto_kernel_selection=True)
         with torch.no_grad():
@@ -1170,7 +1181,7 @@ class Tester(TestCase):
             trace_graph = tr_model.graph_for(input)
             res_jit = tr_model(input)
             self.assertEqual(res_ref, res_jit)
-            
+
             if kind_in_graph is not None:
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
@@ -1181,7 +1192,7 @@ class Tester(TestCase):
             with self._texpr_enable(use_te):
                 ipex.enable_onednn_fusion(True)
                 model = copy.deepcopy(base_model).eval()
-#It will be removed after jit support conv_bn folding
+                #It will be removed after jit support conv_bn folding
                 if level == 'O0':
                     try:
                         model = optimization.fuse(model)
@@ -1199,24 +1210,24 @@ class Tester(TestCase):
                 x3 = x.clone()
 
                 with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
-#bf16, native path
+                    #bf16, native path
                     result = model(x)
                     trace_fused_model = torch.jit.trace(copy.deepcopy(model), x3)
                     trace_fused_model = torch.jit.freeze(trace_fused_model)
-#enable fusion path.
+                    #enable fusion path.
                     fused_tresult = trace_fused_model(x3)
-#bf16, jit trace path
+                    #bf16, jit trace path
                     trace_graph = trace_fused_model.graph_for(x3)
                     fused_tresult = trace_fused_model(x3)
 
                 self.assertEqual(fused_tresult, result, prec=prec)
                 self.assertEqual(fused_tresult.dtype, torch.bfloat16)
 
-#check if the fused node exists in the graph
+                #check if the fused node exists in the graph
                 if kind_in_graph is not None:
                     self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
-#check if certain node does not exist in the graph
+                #check if certain node does not exist in the graph
                 if kind_not_in_graph is not None:
                     self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
@@ -1247,20 +1258,20 @@ class Tester(TestCase):
 
         freeze_model = torch.jit.freeze(trace_model)
         with torch.no_grad():
-#enable fusiong in ipex.
+            #enable fusiong in ipex.
             result1 = trace_model(x)
             result2 = freeze_model(x)
-#conv relu fusion, conv sum fusion or conv sum relu fusion
+            #conv relu fusion, conv sum fusion or conv sum relu fusion
             trace_graph = trace_model.graph_for(x)
             freeze_graph = freeze_model.graph_for(x)
 
         jit_node = "ipex_prepack::convolution_run"
         pack_node = "ipex_prepack::convolution_prepack"
         imperative_node = "torch_ipex::convolution_forward"
-# for freeze model, there will be only convolution_run in the graph
+        # for freeze model, there will be only convolution_run in the graph
         self.assertTrue(any(n.kind() == jit_node for n in freeze_graph.nodes()))
         self.assertTrue(all(n.kind() != pack_node for n in freeze_graph.nodes()))
-# for non-freeze model, since op-ctx dose not have value, cannot re-pack for this path
+        # for non-freeze model, since op-ctx dose not have value, cannot re-pack for this path
         self.assertTrue(any(n.kind() == imperative_node for n in trace_graph.nodes()))
         
 
@@ -1276,8 +1287,8 @@ class Tester(TestCase):
         origin_model = ModMultLinear(50, 60).eval()
 
         test_val1 = torch.rand([50, 5])
-#call mkl path(fp32)
-        model = ipex.optimize(origin_model, dtype=torch.float32)
+        #call mkl path(fp32)
+        model = ipex.optimize(origin_model, dtype=torch.float32, weights_prepack=False)
         ori_res = model(test_val1)
         with torch.no_grad():
             model_jit = torch.jit.trace(model,(test_val1))
@@ -1290,8 +1301,8 @@ class Tester(TestCase):
             graph_opt = str(model_jit.graph_for(test_val1))
             linear_count_ori = check_op_count(graph_opt, ["aten::linear"])
             self.assertEqual(linear_count_ori, 2)
-#call prepack mkl path(fp32)
-        model = ipex.optimize(origin_model, dtype=torch.float32, auto_kernel_selection=True)
+        #call prepack mkl path(fp32)
+        model = ipex.optimize(origin_model, dtype=torch.float32)
         ori_res = model(test_val1)
         with torch.no_grad():
             model_jit = torch.jit.trace(model,(test_val1))
@@ -1303,6 +1314,21 @@ class Tester(TestCase):
             self.assertEqual(ori_res, jit_res)
             graph_opt = str(model_jit.graph_for(test_val1))
             linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::mkl_sgemm_run"])
+            self.assertEqual(linear_count_ori, 2)
+
+        #call onednn path(fp32)
+        model = ipex.optimize(origin_model, dtype=torch.float32, auto_kernel_selection=True)
+        ori_res = model(test_val1)
+        with torch.no_grad():
+            model_jit = torch.jit.trace(model,(test_val1))
+            graph_ori = str(model_jit.graph_for(test_val1))
+            linear_count_ori = check_op_count(graph_ori, ["torch_ipex::ipex_linear"])
+            self.assertEqual(linear_count_ori, 4)
+            model_jit = torch.jit.freeze(model_jit)
+            jit_res = model_jit(test_val1)
+            self.assertEqual(ori_res, jit_res)
+            graph_opt = str(model_jit.graph_for(test_val1))
+            linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::linear_run"])
             self.assertEqual(linear_count_ori, 2)
 
         model = ipex.optimize(origin_model, dtype=torch.bfloat16)
@@ -1527,7 +1553,7 @@ class Tester(TestCase):
                 _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
-#Test broadcast
+                #Test broadcast
                 mat1 = torch.randn(2, 3, 4, 10)
                 mat2 = torch.randn(2, 3, 16, 10)
                 bias = torch.randn(1, 1, 1, 16)
@@ -2450,7 +2476,7 @@ class Tester(TestCase):
                 kind_not_in_graph="ipex_prepack::convolution_add_prepack",
                 prec=0.1)
 
-#add outputs' have different data format
+            #add outputs' have different data format
             m = ConvSum(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1).eval()
             if dim == 2:
                 m.conv = m.conv.to(memory_format=torch.torch.channels_last)
@@ -2785,8 +2811,8 @@ class Tester(TestCase):
         x2 = torch.rand(15, 64)
 
         model = LinearRelu(64, 241, bias=True).eval()
-        model1 = ipex.optimize(model, dtype=torch.float32, level="O1", auto_kernel_selection=True)
-        model2 = ipex.optimize(model, dtype=torch.float32, level="O1", auto_kernel_selection=True, sample_input=x2)
+        model1 = ipex.optimize(model, dtype=torch.float32, level="O1")
+        model2 = ipex.optimize(model, dtype=torch.float32, level="O1", sample_input=x2)
 
         y1_ref = model(x1)
         y2_ref = model(x2)
@@ -2832,11 +2858,14 @@ class Tester(TestCase):
                 y = traced_model(x)
                 trace_graph = traced_model.graph_for(x)
 
-                if auto_select_kernel and level == 'O1':
-# for auto_select_kernel is True and level is O1, we will use ipex prepacked MKL linear
+                if not auto_select_kernel and level == 'O1':
+                    # for auto_select_kernel is False and level is O1 (weights_prepack is True), we will use ipex prepacked MKL linear
                     self.assertTrue(any(n.kind() == 'ipex_prepack::mkl_sgemm_run' for n in trace_graph.nodes()))
+                elif auto_select_kernel and level == 'O1':
+                    # for auto_select_kernel is True and level is O1 (weights_prepack is True), we will use onednn prepacked linear
+                    self.assertTrue(any(n.kind() == "ipex_prepack::linear_relu_run" for n in trace_graph.nodes()))
                 else:
-# auto_select_kernel is false, we will use mkl linear
+                    # level is O0 (weights_prepack is False), we will use mkl linear
                     self.assertTrue(any(n.kind() == 'aten::linear' for n in trace_graph.nodes()))
 
     def test_linear_auto_kernel_selection_bf16(self):
@@ -2851,7 +2880,7 @@ class Tester(TestCase):
                 y = traced_model(x)
                 trace_graph = traced_model.graph_for(x)
 
-#for bfloat16 path, we will use ipex linear for 'O0' and 'O1'
+                #for bfloat16 path, we will use ipex linear for 'O0' and 'O1'
                 self.assertTrue(any(n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
 
     def test_output_linear_scalar_binary(self):
@@ -3012,6 +3041,10 @@ class Tester(TestCase):
                     m,
                     x,
                     kind_in_graph="ipex_prepack::mkl_sgemm_run")
+                self._test_dnnl_fp32(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op)
                 if bf16_supported:
                     self._test_output_bf16(
                         m,
@@ -3060,6 +3093,10 @@ class Tester(TestCase):
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::mkl_sgemm_run")
+        self._test_dnnl_fp32(
+            LinearAdd(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_add_run")
         self._test_output_bf16(
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
@@ -3079,6 +3116,10 @@ class Tester(TestCase):
                 m,
                 x,
                 kind_in_graph="ipex_prepack::mkl_sgemm_run")
+            self._test_dnnl_fp32(
+                m,
+                x,
+                kind_in_graph="ipex_prepack::linear_add_relu_run")
             self._test_output_bf16(
                 m,
                 x,
@@ -3113,6 +3154,14 @@ class Tester(TestCase):
             LinearSigmoidMul(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::mkl_sgemm_run")
+        self._test_dnnl_fp32(
+            LinearSigmoidMul(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_swish_run")
+        self._test_dnnl_fp32(
+            LinearSigmoidMul(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_swish_run")
         self._test_output_bf16(
             LinearSigmoidMul(3, 32, bias=True),
             torch.rand(32, 3),
@@ -3140,7 +3189,7 @@ class Tester(TestCase):
 
 
     def test_jit_function(self):
-#test hool trace and script can works for function
+        #test hool trace and script can works for function
         def fn(input, weight, bias):
             return F.linear(input, weight, bias)
 
@@ -3626,14 +3675,14 @@ class Tester(TestCase):
         for eltwise in ['sigmoid', 'tanh', 'celu', 'elu', 'hardsigmoid', 'hardswish', 'hardtanh', 'leaky_relu', 'relu6', 'relu', 'rrelu', 'selu', 'silu', 'clamp']:
             eltwise_fn_name = eltwise + '_'
             if eltwise in ['sigmoid', 'tanh', 'celu', 'relu', 'rrelu', 'selu']:
-#use torch.sigmoid_(x)
+                #use torch.sigmoid_(x)
                 eltwise_fn = getattr(torch, eltwise_fn_name)
                 m = M(eltwise_fn)
             elif eltwise == 'clamp':
                 eltwise_fn = getattr(torch, eltwise_fn_name)
                 m = M(eltwise_fn, {"min": 0, "max": 2})
             else:
-#use F.elu(x, inplace = True)
+                #use F.elu(x, inplace = True)
                 eltwise_fn = getattr(F, eltwise)
                 m = M(eltwise_fn, {"inplace": True})
 
@@ -3641,10 +3690,10 @@ class Tester(TestCase):
                 m.eval()
                 x = torch.randn(1, 3, 16, 16)
 
-#test restore inplace
-# Since TE is with priority and it has not supported inplace op yet, we make inplace optimization after TE.
-# Some in place ops replaced by replaceInplaceOpsWithOutplaceOps will be optimized by TE and won't resume by ApplyInplaceOptimization.
-# Thus we need to disable TE here.
+                #test restore inplace
+                # Since TE is with priority and it has not supported inplace op yet, we make inplace optimization after TE.
+                # Some in place ops replaced by replaceInplaceOpsWithOutplaceOps will be optimized by TE and won't resume by ApplyInplaceOptimization.
+                # Thus we need to disable TE here.
                 with self._texpr_enable(False):
                     traced = torch.jit.trace(m, x)
                     trace_graph = traced.graph_for(x)

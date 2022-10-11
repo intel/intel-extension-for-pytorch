@@ -10,6 +10,7 @@ from .optim._optimizer_utils import optimizer_fusion, IPEX_FUSED_OPTIMIZER_LIST
 import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.utils.channels_last_1d import to_channels_last_1d
 from enum import IntEnum
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl
 
 from typing import List
 import functools
@@ -99,12 +100,11 @@ class RunMethods(IntEnum):
 
 class GraphCapture(object):
 
-    def __init__(self, model, train, dtype, weights_prepack, auto_kernel_selection):
+    def __init__(self, model, train, dtype, weights_prepack):
         self.model = copy.deepcopy(model)
         self.train = train
         self.dtype = dtype
         self.weights_prepack = weights_prepack
-        self.auto_kernel_selection = auto_kernel_selection
         self.method = None
         self.lock = threading.Lock()
 
@@ -179,7 +179,7 @@ class GraphCapture(object):
                                             assert core.onednn_has_fp16_support(), \
                                                     "FP16 weight prepack needs the cpu support avx512_core_fp16, " + \
                                                     "please set dtype to torch.float or set weights_prepack to False."
-                                        self.model, _, _ = utils._weight_prepack.weight_prepack_with_ipex(self.model, None, {}, self.auto_kernel_selection)
+                                        self.model, _, _ = utils._weight_prepack.weight_prepack_with_ipex(self.model, None, {})
                                     return self.model(*input, **kwargs)
 
         return forward
@@ -365,6 +365,9 @@ def optimize(
     if graph_mode is not None:
         opt_properties.graph_mode = graph_mode
 
+    _disable_dnnl()
+    if opt_properties.auto_kernel_selection:
+        _enable_dnnl()
     if inplace:
         optimized_model = model
         optimized_optimizer = optimizer
@@ -426,11 +429,11 @@ def optimize(
                     "FP16 weight prepack needs the cpu support avx512_core_fp16, " + \
                     "please set dtype to torch.float or set weights_prepack to False."
         optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
-            optimized_model, optimized_optimizer, params_attr, opt_properties.auto_kernel_selection)
+            optimized_model, optimized_optimizer, params_attr)
 
     if opt_properties.graph_mode:
         _old_forward = optimized_model.forward
-        wrapper = GraphCapture(optimized_model, optimizer is not None, dtype, opt_properties.weights_prepack, opt_properties.auto_kernel_selection)
+        wrapper = GraphCapture(optimized_model, optimizer is not None, dtype, opt_properties.weights_prepack)
         optimized_model.forward = wrapper(_old_forward)
 
     # TODO: model list, optimizer list.
