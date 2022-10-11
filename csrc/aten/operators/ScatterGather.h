@@ -156,7 +156,6 @@ static void _launch_scatter_gather_kernel(int64_t N, const func_t& f) {
       auto wg_id = item.get_group_linear_id();
       auto local_id = item.get_local_linear_id();
       int idx = nv * wg_id + local_id;
-#pragma unroll
       for (int i = 0; i < thread_work_size; ++i) {
         if (idx < N) {
           f(idx);
