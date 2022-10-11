@@ -27,7 +27,7 @@ def autotune(prepared_model, calib_dataloader, eval_func, sampling_sizes=[100], 
         import neural_compressor
     except ImportError:
         try:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'neural_compressor'])
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'neural_compressor==1.14.1'])
             import neural_compressor
         except:
             assert False, "Unable to import neural_compressor from the local environment."
