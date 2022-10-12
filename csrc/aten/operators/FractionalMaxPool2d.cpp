@@ -404,17 +404,24 @@ void fractional_max_pool2d_backward_out_template(
     indices_ = indices_.reshape({1, indices_.size(0), outputH, outputW});
   }
 
-  fractional_max_pool2d_backward_out_frame<float>(
-      gradInput_.data_ptr<float>(),
-      gradOutput_.data_ptr<float>(),
-      indices_.data_ptr<int64_t>(),
-      gradInput_.size(0),
-      gradInput_.size(1),
-      inputH,
-      inputW,
-      outputH,
-      outputW,
-      is_smf_channels_last(input));
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      gradOutput.scalar_type(),
+      "fractional_max_pool2d_backward_out_frame",
+      [&] {
+        fractional_max_pool2d_backward_out_frame<scalar_t>(
+            gradInput_.data_ptr<scalar_t>(),
+            gradOutput_.data_ptr<scalar_t>(),
+            indices_.data_ptr<int64_t>(),
+            gradInput_.size(0),
+            gradInput_.size(1),
+            inputH,
+            inputW,
+            outputH,
+            outputW,
+            is_smf_channels_last(input));
+      });
 }
 
 } // namespace impl
