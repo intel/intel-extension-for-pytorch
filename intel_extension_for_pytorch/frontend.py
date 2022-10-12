@@ -9,6 +9,7 @@ from .nn import utils
 from .optim._optimizer_utils import optimizer_fusion, IPEX_FUSED_OPTIMIZER_LIST
 import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.utils.channels_last_1d import to_channels_last_1d
+from intel_extension_for_pytorch.utils.linear_bn_folding import linear_bn_fuse
 from enum import IntEnum
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl
 
@@ -65,6 +66,7 @@ class _O0:
     def __call__(self, properties):
         properties.opt_level = "O0"
         properties.conv_bn_folding = False
+        properties.linear_bn_folding = False
         properties.weights_prepack = False
         properties.replace_dropout_with_identity = False
         properties.optimize_lstm = False
@@ -80,6 +82,7 @@ class _O1:
     def __call__(self, properties):
         properties.opt_level = "O1"
         properties.conv_bn_folding = True
+        properties.linear_bn_folding = True
         properties.weights_prepack = True
         properties.replace_dropout_with_identity = True
         properties.optimize_lstm = True
@@ -191,6 +194,7 @@ def optimize(
     level="O1",
     inplace=False,
     conv_bn_folding=None,
+    linear_bn_folding=None,
     weights_prepack=None,
     replace_dropout_with_identity=None,
     optimize_lstm=None,
@@ -243,6 +247,9 @@ def optimize(
         inplace (bool): Whether to perform inplace optimization. Default value is
             ``False``.
         conv_bn_folding (bool): Whether to perform ``conv_bn`` folding. It only
+            works for inference model. The default value is ``None``. Explicitly
+            setting this knob overwrites the configuration set by ``level`` knob.
+        linear_bn_folding (bool): Whether to perform ``linear_bn`` folding. It only
             works for inference model. The default value is ``None``. Explicitly
             setting this knob overwrites the configuration set by ``level`` knob.
         weights_prepack (bool): Whether to perform weight prepack for convolution
@@ -350,6 +357,8 @@ def optimize(
         opt_properties.opt_level = level
     if conv_bn_folding is not None:
         opt_properties.conv_bn_folding = conv_bn_folding
+    if linear_bn_folding is not None:
+        opt_properties.linear_bn_folding = linear_bn_folding
     if weights_prepack is not None:
         opt_properties.weights_prepack = weights_prepack
     if replace_dropout_with_identity is not None:
@@ -385,6 +394,11 @@ def optimize(
                 optimized_model = optimization.fuse(optimized_model, inplace=inplace)
             except:  # noqa E722
                 warnings.warn("Conv BatchNorm folding failed during the optimize process.")
+        if opt_properties.linear_bn_folding:
+            try:
+                optimized_model = linear_bn_fuse(optimized_model, inplace=inplace)
+            except:
+                warnings.warn("Linear BatchNorm folding failed during the optimize process.")
         if opt_properties.replace_dropout_with_identity:
             utils._model_convert.replace_dropout_with_identity(optimized_model)
         if dtype == torch.bfloat16:
