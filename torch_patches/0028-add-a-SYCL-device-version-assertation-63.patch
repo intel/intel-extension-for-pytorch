@@ -1,0 +1,66 @@
+From 725fe5774d0cc9e7cf2d9d21b8d75c5c28b8aefc Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
+Date: Thu, 1 Sep 2022 00:47:07 +0800
+Subject: [PATCH 28/35] add a SYCL device version assertation (#63)
+
+* add a SYCL device version assertation
+
+* format code
+
+* format code
+---
+ c10/macros/Macros.h | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/c10/macros/Macros.h b/c10/macros/Macros.h
+index 8706181f30..9cc3f00944 100644
+--- a/c10/macros/Macros.h
++++ b/c10/macros/Macros.h
+@@ -318,21 +318,31 @@ constexpr uint32_t CUDA_THREADS_PER_BLOCK_FALLBACK = 256;
+     (defined(__HIP_PLATFORM_HCC__) && ROCM_VERSION < 40100)
+ // Those platforms do not support assert()
+ #define CUDA_KERNEL_ASSERT(cond)
++#define SYCL_KERNEL_ASSERT(cond)
+ #elif defined(_MSC_VER)
+ #if defined(NDEBUG)
+ extern "C" {
+ C10_IMPORT
++#if defined(__SYCL_DEVICE_ONLY__)
++extern SYCL_EXTERNAL void _wassert(
++    const wchar_t *wexpr, const wchar_t *wfile, unsigned line);
++#else
+ #if defined(__CUDA_ARCH__) || defined(__HIP_ARCH__) || defined(__HIP__)
+ __host__ __device__
+ #endif // __CUDA_ARCH__
+     void
+     _wassert(wchar_t const* _Message, wchar_t const* _File, unsigned _Line);
+ }
+-#endif
++#endif // __SYCL_DEVICE_ONLY__
++#endif // NDEBUG
+ #define CUDA_KERNEL_ASSERT(cond)                                                                 \
+   if (C10_UNLIKELY(!(cond))) {                                                                   \
+     (void)(_wassert(_CRT_WIDE(#cond), _CRT_WIDE(__FILE__), static_cast<unsigned>(__LINE__)), 0); \
+   }
++#define SYCL_KERNEL_ASSERT(cond)                                                                 \
++  if (C10_UNLIKELY(!(cond))) {                                                                   \
++    (void)(_wassert(_CRT_WIDE(#cond), _CRT_WIDE(__FILE__), static_cast<unsigned>(__LINE__)), 0); \
++  }
+ #else // __APPLE__, _MSC_VER
+ #if defined(NDEBUG)
+ extern "C" {
+@@ -368,6 +378,11 @@ __host__ __device__
+     __assert_fail(                                                       \
+         #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
+   }
++#define SYCL_KERNEL_ASSERT(cond)                                         \
++  if (C10_UNLIKELY(!(cond))) {                                           \
++    __assert_fail(                                                       \
++        #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
++  }
+ #endif // __APPLE__
+ 
+ #ifdef __APPLE__
+-- 
+2.25.1
+

@@ -1,0 +1,34 @@
+From 4bd47d798c959fe975dae4aa42584d67b45f01ff Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
+Date: Wed, 7 Sep 2022 09:09:01 +0800
+Subject: [PATCH 29/35] fix dispatch declaration bug about quantized op (#64)
+
+---
+ aten/src/ATen/native/native_functions.yaml | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/aten/src/ATen/native/native_functions.yaml b/aten/src/ATen/native/native_functions.yaml
+index afa9af3df6..592d0f79ae 100644
+--- a/aten/src/ATen/native/native_functions.yaml
++++ b/aten/src/ATen/native/native_functions.yaml
+@@ -5352,6 +5352,8 @@
+ 
+ - func: _fake_quantize_learnable_per_tensor_affine_backward(Tensor grad, Tensor self, Tensor scale, Tensor zero_point, int quant_min, int quant_max, float grad_factor=1.0) -> (Tensor, Tensor, Tensor)
+   variants: function
++  dispatch:
++    CPU, CUDA: _fake_quantize_learnable_per_tensor_affine_backward
+ 
+ - func: fake_quantize_per_channel_affine(Tensor self, Tensor scale, Tensor zero_point, int axis, int quant_min, int quant_max) -> Tensor
+   device_check: NoCheck   # TensorIterator
+@@ -5372,6 +5374,8 @@
+ 
+ - func: _fake_quantize_learnable_per_channel_affine_backward(Tensor grad, Tensor self, Tensor scale, Tensor zero_point, int axis, int quant_min, int quant_max, float grad_factor=1.0) -> (Tensor, Tensor, Tensor)
+   variants: function
++  dispatch:
++    CPU, CUDA: _fake_quantize_learnable_per_channel_affine_backward
+ 
+ - func: fused_moving_avg_obs_fake_quant(Tensor self, Tensor observer_on, Tensor fake_quant_on, Tensor(a!) running_min, Tensor(b!) running_max, Tensor(c!) scale, Tensor(d!) zero_point, float averaging_const, int quant_min, int quant_max, int ch_axis, bool per_row_fake_quant=False, bool symmetric_quant=False) -> Tensor
+   variants: function
+-- 
+2.25.1
+

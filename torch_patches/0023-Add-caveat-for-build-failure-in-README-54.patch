@@ -1,0 +1,32 @@
+From 03912b54edc81d6d2a895dc01404e638e43a9a0e Mon Sep 17 00:00:00 2001
+From: Ye Ting <ting.ye@intel.com>
+Date: Mon, 25 Jul 2022 12:01:33 +0800
+Subject: [PATCH 23/35] Add caveat for build failure in README (#54)
+
+* Add cavert for build failure
+
+* Update configuration in caveat
+---
+ README.md | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/README.md b/README.md
+index 7ffdc2180b..5514ea6350 100644
+--- a/README.md
++++ b/README.md
+@@ -430,3 +430,12 @@ Note: This project is unrelated to [hughperkins/pytorch](https://github.com/hugh
+ ## License
+ 
+ PyTorch has a BSD-style license, as found in the [LICENSE](LICENSE) file.
++
++## Caveat
++
++### build failure
++
++```
++c++: fatal error: Killed signal terminated program cc1plus compilation terminated.
++```
++You might meet such build failure if you build PyTorch on a system which doesn't have sufficient memory. The problem occurs when your system runs out of memory. You may use MAX_JOBS=1 to workaround this issue, i.e. `MAX_JOBS=1 python setup.py install`
+-- 
+2.25.1
+

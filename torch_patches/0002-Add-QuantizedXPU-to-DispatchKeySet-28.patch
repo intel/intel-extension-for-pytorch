@@ -1,7 +1,7 @@
 From a642474c362816032917045b138adaa185d1bf0b Mon Sep 17 00:00:00 2001
 From: xiaolil1 <xiaoli.liu@intel.com>
 Date: Tue, 15 Feb 2022 14:01:53 +0800
-Subject: [PATCH 02/12] Add QuantizedXPU to DispatchKeySet (#28)
+Subject: [PATCH 02/35] Add QuantizedXPU to DispatchKeySet (#28)
 
 ---
  c10/core/DispatchKeySet.h | 1 +

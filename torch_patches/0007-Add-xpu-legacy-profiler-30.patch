@@ -1,7 +1,7 @@
 From f33532427193bf0b9498bd9ac03c36a09071e05d Mon Sep 17 00:00:00 2001
 From: "Xunsong, Huang" <xunsong.huang@intel.com>
 Date: Thu, 3 Mar 2022 14:15:47 +0800
-Subject: [PATCH 07/12] Add xpu legacy profiler (#30)
+Subject: [PATCH 07/35] Add xpu legacy profiler (#30)
 
 Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
 ---

@@ -1,0 +1,25 @@
+From 5d95de97cb99bf541a85f89212b8417ee1970017 Mon Sep 17 00:00:00 2001
+From: chengjunlu <chengjun.lu@intel.com>
+Date: Mon, 9 May 2022 09:20:27 +0800
+Subject: [PATCH 14/35] Fix pytorch issue in sparce_coo_tensor (#46)
+
+---
+ aten/src/ATen/native/sparse/SparseTensor.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/aten/src/ATen/native/sparse/SparseTensor.cpp b/aten/src/ATen/native/sparse/SparseTensor.cpp
+index 90a2c68299..ecc0c2784a 100644
+--- a/aten/src/ATen/native/sparse/SparseTensor.cpp
++++ b/aten/src/ATen/native/sparse/SparseTensor.cpp
+@@ -295,7 +295,7 @@ void _validate_sparse_coo_tensor_args(
+     Tensor max_indices =
+         std::get</* values */ 0>(indices.max(/* dim */ 1, /* keepdim */ false));
+     Tensor cpu_min_indices, cpu_max_indices;
+-    if (indices.is_cuda()) {
++    if (!indices.is_cpu()) {
+       cpu_min_indices = min_indices.to(at::DeviceType::CPU);
+       cpu_max_indices = max_indices.to(at::DeviceType::CPU);
+     } else {
+-- 
+2.25.1
+

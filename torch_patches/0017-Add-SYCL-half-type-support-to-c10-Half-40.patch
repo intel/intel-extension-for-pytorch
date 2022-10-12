@@ -1,0 +1,77 @@
+From 38d4b0415adf94676878059b4622c1d6bc1a9b56 Mon Sep 17 00:00:00 2001
+From: ch <hao3.chen@intel.com>
+Date: Thu, 26 May 2022 14:28:42 +0800
+Subject: [PATCH 17/35] Add SYCL half type support to c10::Half (#40)
+
+---
+ c10/util/Half-inl.h | 13 ++++++++++++-
+ c10/util/Half.h     |  8 ++++++++
+ 2 files changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/c10/util/Half-inl.h b/c10/util/Half-inl.h
+index 1982dc7fbc..f634afd7df 100644
+--- a/c10/util/Half-inl.h
++++ b/c10/util/Half-inl.h
+@@ -12,7 +12,7 @@
+ #include <hip/hip_fp16.h>
+ #endif
+ 
+-#ifdef __SYCL_DEVICE_ONLY__
++#ifdef SYCL_LANGUAGE_VERSION
+ #include <CL/sycl.hpp>
+ #endif
+ 
+@@ -51,6 +51,15 @@ inline C10_HOST_DEVICE Half::operator __half() const {
+ }
+ #endif
+ 
++#ifdef SYCL_LANGUAGE_VERSION
++inline C10_HOST_DEVICE Half::Half(const sycl::half& value) {
++  x = *reinterpret_cast<const unsigned short*>(&value);
++}
++inline C10_HOST_DEVICE Half::operator sycl::half() const {
++  return *reinterpret_cast<const sycl::half*>(&x);
++}
++#endif
++
+ // CUDA intrinsics
+ 
+ #if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 350)) || \
+@@ -83,6 +92,8 @@ inline C10_HOST_DEVICE Half operator-(const Half& a) {
+ #if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 530) || \
+     defined(__HIP_DEVICE_COMPILE__)
+   return __hneg(a);
++#elif defined(__SYCL_DEVICE_ONLY__)
++  return -static_cast<sycl::half>(a);
+ #else
+   return -static_cast<float>(a);
+ #endif
+diff --git a/c10/util/Half.h b/c10/util/Half.h
+index c22db1fab2..580b5cd73b 100644
+--- a/c10/util/Half.h
++++ b/c10/util/Half.h
+@@ -43,6 +43,10 @@
+ #include <hip/hip_fp16.h>
+ #endif
+ 
++#ifdef SYCL_LANGUAGE_VERSION
++#include <CL/sycl.hpp>
++#endif
++
+ // Standard check for compiling CUDA with clang
+ #if defined(__clang__) && defined(__CUDA__) && defined(__CUDA_ARCH__)
+ #define C10_DEVICE_HOST_FUNCTION __device__ __host__
+@@ -386,6 +390,10 @@ struct alignas(2) Half {
+   inline C10_HOST_DEVICE Half(const __half& value);
+   inline C10_HOST_DEVICE operator __half() const;
+ #endif
++#ifdef SYCL_LANGUAGE_VERSION
++  inline C10_HOST_DEVICE Half(const sycl::half& value);
++  inline C10_HOST_DEVICE operator sycl::half() const;
++#endif
+ };
+ 
+ // This is just a placeholder for whatever complex representation we
+-- 
+2.25.1
+

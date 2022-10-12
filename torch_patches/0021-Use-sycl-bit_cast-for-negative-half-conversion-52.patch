@@ -1,0 +1,25 @@
+From 2e33d5167dce2ec80cd84483eba7e473eda1ce52 Mon Sep 17 00:00:00 2001
+From: ch <hao3.chen@intel.com>
+Date: Thu, 2 Jun 2022 21:05:32 +0800
+Subject: [PATCH 21/35] Use sycl::bit_cast for negative half conversion (#52)
+
+---
+ c10/util/Half-inl.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/c10/util/Half-inl.h b/c10/util/Half-inl.h
+index f634afd7df..3801080fb5 100644
+--- a/c10/util/Half-inl.h
++++ b/c10/util/Half-inl.h
+@@ -93,7 +93,7 @@ inline C10_HOST_DEVICE Half operator-(const Half& a) {
+     defined(__HIP_DEVICE_COMPILE__)
+   return __hneg(a);
+ #elif defined(__SYCL_DEVICE_ONLY__)
+-  return -static_cast<sycl::half>(a);
++  return -sycl::bit_cast<sycl::half>(a);
+ #else
+   return -static_cast<float>(a);
+ #endif
+-- 
+2.25.1
+

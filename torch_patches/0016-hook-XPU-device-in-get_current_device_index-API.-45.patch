@@ -1,0 +1,42 @@
+From 496f22ff6d08813edda35b75fa5d5a19a6295018 Mon Sep 17 00:00:00 2001
+From: Feng Yuan <feng1.yuan@intel.com>
+Date: Thu, 26 May 2022 14:14:37 +0800
+Subject: [PATCH 16/35] hook XPU device in get_current_device_index API. (#45)
+
+* hook XPU device in get_current_device_index API.
+usage: get_device_properties("xpu") where no device id provided
+
+Signed-off-by: Feng Yuan <feng1.yuan@intel.com>
+
+* check `xpu` attr of torch
+
+Signed-off-by: Feng Yuan <feng1.yuan@intel.com>
+---
+ torch/_utils.py | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/torch/_utils.py b/torch/_utils.py
+index 4245c25b21..bb018664eb 100644
+--- a/torch/_utils.py
++++ b/torch/_utils.py
+@@ -437,6 +437,8 @@ class ExceptionWrapper(object):
+ def _get_available_device_type():
+     if torch.cuda.is_available():
+         return "cuda"
++    if hasattr(torch, "xpu") and torch.xpu.is_available():
++        return "xpu"
+     # add more available device types here
+     return None
+ 
+@@ -445,6 +447,8 @@ def _get_device_attr(get_member):
+     device_type = _get_available_device_type()
+     if device_type and device_type.lower() == "cuda":
+         return get_member(torch.cuda)
++    elif device_type and device_type.lower() == "xpu":
++        return get_member(torch.xpu)
+     # add more available device types here
+     return None
+ 
+-- 
+2.25.1
+

@@ -1,7 +1,7 @@
 From ca942ce28515a826d70a515ddeebd10076ae0b6a Mon Sep 17 00:00:00 2001
 From: zhuhong61 <95205772+zhuhong61@users.noreply.github.com>
 Date: Thu, 14 Apr 2022 11:25:28 +0800
-Subject: [PATCH 11/12] add python API to print all operators that have kernels
+Subject: [PATCH 11/35] add python API to print all operators that have kernels
  registered to a particular DispatchKey (#63575) (#38)
 
 Summary: Pull Request resolved: https://github.com/pytorch/pytorch/pull/63575

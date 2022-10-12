@@ -1,0 +1,686 @@
+From 15e0f70b6a267c8356a00349cac9622974169aa4 Mon Sep 17 00:00:00 2001
+From: chengjunlu <chengjun.lu@intel.com>
+Date: Thu, 2 Jun 2022 15:15:21 +0800
+Subject: [PATCH 20/35] Add DLPack support to pytorch1.10 (#51)
+
+---
+ aten/src/ATen/Context.h                    |  8 ++
+ aten/src/ATen/DLConvertor.cpp              | 20 +++--
+ aten/src/ATen/DLConvertor.h                |  1 -
+ aten/src/ATen/Version.cpp                  |  4 +
+ aten/src/ATen/detail/XPUHooksInterface.cpp | 29 +++++++
+ aten/src/ATen/detail/XPUHooksInterface.h   | 75 ++++++++++++++++++
+ aten/src/ATen/dlpack.h                     | 72 ++++++++++++-----
+ aten/src/ATen/templates/Functions.h        |  4 +-
+ caffe2/python/dlpack.h                     | 90 ++++++++++++++++++----
+ caffe2/python/pybind_state_dlpack.cc       |  2 +-
+ caffe2/python/pybind_state_dlpack.h        |  8 +-
+ torch/_tensor.py                           |  2 +
+ torch/utils/dlpack.py                      |  1 +
+ 13 files changed, 268 insertions(+), 48 deletions(-)
+ create mode 100644 aten/src/ATen/detail/XPUHooksInterface.cpp
+ create mode 100644 aten/src/ATen/detail/XPUHooksInterface.h
+
+diff --git a/aten/src/ATen/Context.h b/aten/src/ATen/Context.h
+index 4a45ac6f8a..b0c8017d46 100644
+--- a/aten/src/ATen/Context.h
++++ b/aten/src/ATen/Context.h
+@@ -10,6 +10,7 @@
+ #include <ATen/detail/CUDAHooksInterface.h>
+ #include <ATen/detail/HIPHooksInterface.h>
+ #include <ATen/detail/ORTHooksInterface.h>
++#include <ATen/detail/XPUHooksInterface.h>
+ #include <c10/util/Exception.h>
+ #include <c10/core/impl/DeviceGuardImplInterface.h>
+ #include <c10/core/QEngine.h>
+@@ -74,6 +75,9 @@ class TORCH_API Context {
+   static bool hasXLA() {
+     return c10::impl::hasDeviceGuardImpl(at::DeviceType::XLA);
+   }
++  static bool hasXPU() {
++    return detail::getXPUHooks().hasXPU();
++  }
+   static bool hasLazy() {
+     return c10::impl::hasDeviceGuardImpl(at::DeviceType::Lazy);
+   }
+@@ -300,6 +304,10 @@ static inline bool hasORT() {
+   return globalContext().hasORT();
+ }
+ 
++static inline bool hasXPU() {
++  return globalContext().hasXPU();
++}
++
+ // Despite its name, this function returns the number of *CUDA* GPUs.
+ static inline size_t getNumGPUs() {
+   // WARNING: DO NOT ADD LOGIC TO HANDLE OTHER DEVICE TYPES TO THIS
+diff --git a/aten/src/ATen/DLConvertor.cpp b/aten/src/ATen/DLConvertor.cpp
+index ed0fa7e1cf..f6600b7651 100644
+--- a/aten/src/ATen/DLConvertor.cpp
++++ b/aten/src/ATen/DLConvertor.cpp
+@@ -80,7 +80,7 @@ DLDevice getDLDevice(const Tensor& tensor, const int64_t& device_id) {
+       // while everyone else should see HIP
+       ctx.device_type = DLDeviceType::kDLROCM;
+ #else
+-      ctx.device_type = DLDeviceType::kDLGPU;
++      ctx.device_type = DLDeviceType::kDLCUDA;
+ #endif
+       break;
+     case DeviceType::OPENCL:
+@@ -89,19 +89,23 @@ DLDevice getDLDevice(const Tensor& tensor, const int64_t& device_id) {
+     case DeviceType::HIP:
+       ctx.device_type = DLDeviceType::kDLROCM;
+       break;
++    case DeviceType::XPU:
++      ctx = at::detail::getXPUHooks().getDLPackDeviceFromATenDevice(
++          tensor.device(), tensor.data_ptr());
++      break;
+     default:
+       TORCH_CHECK(false, "Cannot pack tensors on " + tensor.device().str());
+   }
+   return ctx;
+ }
+ 
+-static Device getATenDevice(const DLDevice& ctx) {
++static Device getATenDevice(const DLDevice& ctx, void* data) {
+   switch (ctx.device_type) {
+     case DLDeviceType::kDLCPU:
+       return at::Device(DeviceType::CPU);
+ #ifndef USE_ROCM
+     // if we are compiled under HIP, we cannot do cuda
+-    case DLDeviceType::kDLGPU:
++    case DLDeviceType::kDLCUDA:
+       return at::Device(DeviceType::CUDA, ctx.device_id);
+ #endif
+     case DLDeviceType::kDLOpenCL:
+@@ -113,6 +117,8 @@ static Device getATenDevice(const DLDevice& ctx) {
+ #else
+       return at::Device(DeviceType::HIP, ctx.device_id);
+ #endif
++    case DLDeviceType::kDLOneAPI:
++      return at::detail::getXPUHooks().getATenDeviceFromDLPackDevice(ctx, data);
+     default:
+       TORCH_CHECK(
+           false, "Unsupported device_type: " + c10::to_string(ctx.device_type));
+@@ -237,17 +243,19 @@ DLManagedTensor* toDLPack(const Tensor& src) {
+ }
+ 
+ Tensor fromDLPack(const DLManagedTensor* src) {
+-  Device device = getATenDevice(src->dl_tensor.device);
++  Device device = getATenDevice(src->dl_tensor.device, src->dl_tensor.data);
+   ScalarType stype = toScalarType(src->dl_tensor.dtype);
+   auto deleter = [src](void* self) {
+     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+     src->deleter(const_cast<DLManagedTensor*>(src));
+   };
+   if (!src->dl_tensor.strides) {
+-    return at::from_blob(src->dl_tensor.data,
++    return at::from_blob(
++        src->dl_tensor.data,
+         IntArrayRef(src->dl_tensor.shape, src->dl_tensor.ndim),
+         deleter,
+-        at::device(device).dtype(stype));
++        at::device(device).dtype(stype),
++        {device});
+   }
+   return at::from_blob(
+       src->dl_tensor.data,
+diff --git a/aten/src/ATen/DLConvertor.h b/aten/src/ATen/DLConvertor.h
+index a34d4b3e7a..922ecd0170 100644
+--- a/aten/src/ATen/DLConvertor.h
++++ b/aten/src/ATen/DLConvertor.h
+@@ -14,6 +14,5 @@ TORCH_API ScalarType toScalarType(const DLDataType& dtype);
+ TORCH_API DLManagedTensor* toDLPack(const Tensor& src);
+ TORCH_API Tensor fromDLPack(const DLManagedTensor* src);
+ TORCH_API DLDataType getDLDataType(const Tensor& t);
+-TORCH_API DLContext getDLContext(const Tensor& tensor, const int64_t& device_id);
+ 
+ } //namespace at
+diff --git a/aten/src/ATen/Version.cpp b/aten/src/ATen/Version.cpp
+index 0c0ea61ceb..d45badcb68 100644
+--- a/aten/src/ATen/Version.cpp
++++ b/aten/src/ATen/Version.cpp
+@@ -188,6 +188,10 @@ std::string show_config() {
+     ss << detail::getORTHooks().showConfig();
+   }
+ 
++  if (hasXPU()) {
++    ss << detail::getXPUHooks().showConfig();
++  }
++
+   ss << "  - Build settings: ";
+   for (const auto& pair : caffe2::GetBuildOptions()) {
+     if (!pair.second.empty()) {
+diff --git a/aten/src/ATen/detail/XPUHooksInterface.cpp b/aten/src/ATen/detail/XPUHooksInterface.cpp
+new file mode 100644
+index 0000000000..d740068379
+--- /dev/null
++++ b/aten/src/ATen/detail/XPUHooksInterface.cpp
+@@ -0,0 +1,29 @@
++#include <ATen/detail/XPUHooksInterface.h>
++
++#include <c10/util/Exception.h>
++
++#include <cstddef>
++#include <memory>
++#include <mutex>
++
++namespace at {
++namespace detail {
++
++static XPUHooksInterface *xpu_hooks = nullptr;
++
++const XPUHooksInterface &getXPUHooks() {
++  static std::once_flag once;
++  std::call_once(once, [] {
++    xpu_hooks =
++        XPUHooksRegistry()->Create("XPUHooks", XPUHooksArgs{}).release();
++    if (!xpu_hooks) {
++      xpu_hooks = new XPUHooksInterface();
++    }
++  });
++  return *xpu_hooks;
++}
++} // namespace detail
++
++C10_DEFINE_REGISTRY(XPUHooksRegistry, XPUHooksInterface, XPUHooksArgs)
++
++} // namespace at
+diff --git a/aten/src/ATen/detail/XPUHooksInterface.h b/aten/src/ATen/detail/XPUHooksInterface.h
+new file mode 100644
+index 0000000000..ff42ca60d4
+--- /dev/null
++++ b/aten/src/ATen/detail/XPUHooksInterface.h
+@@ -0,0 +1,75 @@
++#pragma once
++
++#include <ATen/dlpack.h>
++#include <c10/core/Device.h>
++#include <c10/util/Exception.h>
++
++#include <c10/util/Registry.h>
++
++#include <cstddef>
++#include <functional>
++#include <memory>
++
++namespace at {
++class Context;
++}
++
++namespace at {
++
++constexpr const char* XPU_HELP =
++    "The XPU backend requires Intel Extension for Pytorch;"
++    "this error has occurred because you are trying "
++    "to use some XPU's functionality, but the Intel Extension for Pytorch has not been "
++    "loaded for some reason. The Intel Extension for Pytorch MUST "
++    "be loaded, EVEN IF you don't directly use any symbols from that!";
++
++struct TORCH_API XPUHooksInterface {
++  virtual ~XPUHooksInterface() {}
++
++  virtual void initXPU() const {
++    TORCH_CHECK(
++        false,
++        "Cannot initialize XPU without Intel Extension for Pytorch.",
++        XPU_HELP);
++  }
++
++  virtual bool hasXPU() const {
++    return false;
++  }
++
++  virtual std::string showConfig() const {
++    TORCH_CHECK(
++        false,
++        "Cannot query detailed XPU version without Intel Extension for Pytorch. ",
++        XPU_HELP);
++  }
++
++  virtual Device getATenDeviceFromDLPackDevice(
++      const DLDevice& dl_device,
++      void* data) const {
++    TORCH_CHECK(
++        false,
++        "Cannot get XPU device without Intel Extension for Pytorch. ",
++        XPU_HELP);
++  };
++
++  virtual DLDevice getDLPackDeviceFromATenDevice(
++      const Device& aten_device,
++      void* data) const {
++    TORCH_CHECK(
++        false,
++        "Cannot get XPU DL device without Intel Extension for Pytorch. ",
++        XPU_HELP);
++  };
++};
++
++struct TORCH_API XPUHooksArgs {};
++
++C10_DECLARE_REGISTRY(XPUHooksRegistry, XPUHooksInterface, XPUHooksArgs);
++#define REGISTER_XPU_HOOKS(clsname) \
++  C10_REGISTER_CLASS(XPUHooksRegistry, clsname, clsname)
++
++namespace detail {
++TORCH_API const XPUHooksInterface& getXPUHooks();
++} // namespace detail
++} // namespace at
+diff --git a/aten/src/ATen/dlpack.h b/aten/src/ATen/dlpack.h
+index bc346d9c71..42fd060a03 100644
+--- a/aten/src/ATen/dlpack.h
++++ b/aten/src/ATen/dlpack.h
+@@ -6,6 +6,9 @@
+ #ifndef DLPACK_DLPACK_H_
+ #define DLPACK_DLPACK_H_
+ 
++/**
++ * \brief Compatibility with C++
++ */
+ #ifdef __cplusplus
+ #define DLPACK_EXTERN_C extern "C"
+ #else
+@@ -13,7 +16,10 @@
+ #endif
+ 
+ /*! \brief The current version of dlpack */
+-#define DLPACK_VERSION 040
++#define DLPACK_VERSION 60
++
++/*! \brief The current ABI version of dlpack */
++#define DLPACK_ABI_VERSION 1
+ 
+ /*! \brief DLPACK_DLL prefix for windows */
+ #ifdef _WIN32
+@@ -35,16 +41,19 @@ extern "C" {
+ /*!
+  * \brief The device type in DLDevice.
+  */
+-typedef enum {
++#ifdef __cplusplus
++typedef enum : int32_t {
++#else
++  typedef enum {
++#endif
+   /*! \brief CPU device */
+   kDLCPU = 1,
+   /*! \brief CUDA GPU device */
+-  kDLGPU = 2,
++  kDLCUDA = 2,
+   /*!
+-   * \brief Pinned CUDA GPU device by cudaMallocHost
+-   * \note kDLCPUPinned = kDLCPU | kDLGPU
++   * \brief Pinned CUDA CPU memory by cudaMallocHost
+    */
+-  kDLCPUPinned = 3,
++  kDLCUDAHost = 3,
+   /*! \brief OpenCL devices. */
+   kDLOpenCL = 4,
+   /*! \brief Vulkan buffer for next generation graphics. */
+@@ -55,12 +64,31 @@ typedef enum {
+   kDLVPI = 9,
+   /*! \brief ROCm GPUs for AMD GPUs */
+   kDLROCM = 10,
++  /*!
++   * \brief Pinned ROCm CPU memory allocated by hipMallocHost
++   */
++  kDLROCMHost = 11,
+   /*!
+    * \brief Reserved extension device type,
+    * used for quickly test extension device
+    * The semantics can differ depending on the implementation.
+    */
+   kDLExtDev = 12,
++  /*!
++   * \brief CUDA managed/unified memory allocated by cudaMallocManaged
++   */
++  kDLCUDAManaged = 13,
++  /*!
++   * \brief Unified shared memory allocated on a oneAPI non-partititioned
++   * device. Call to oneAPI runtime is required to determine the device
++   * type, the USM allocation type and the sycl context it is bound to.
++   *
++   */
++  kDLOneAPI = 14,
++  /*! \brief GPU support for next generation WebGPU standard. */
++  kDLWebGPU = 15,
++  /*! \brief Qualcomm Hexagon DSP */
++  kDLHexagon = 16,
+ } DLDeviceType;
+ 
+ /*!
+@@ -69,15 +97,13 @@ typedef enum {
+ typedef struct {
+   /*! \brief The device type used in the device. */
+   DLDeviceType device_type;
+-  /*! \brief The device index */
+-  int device_id;
++  /*!
++   * \brief The device index.
++   * For vanilla CPU memory, pinned memory, or managed memory, this is set to 0.
++   */
++  int32_t device_id;
+ } DLDevice;
+ 
+-/*!
+- * \brief This is an alias for DLDevice. Notice that this will be removed in the next release.
+- */
+-typedef DLDevice DLContext;
+-
+ /*!
+  * \brief The type code options DLDataType.
+  */
+@@ -103,12 +129,15 @@ typedef enum {
+ } DLDataTypeCode;
+ 
+ /*!
+- * \brief The data type the tensor can hold.
++ * \brief The data type the tensor can hold. The data type is assumed to follow the
++ * native endian-ness. An explicit error message should be raised when attempting to
++ * export an array with non-native endianness
+  *
+  *  Examples
+  *   - float: type_code = 2, bits = 32, lanes=1
+  *   - float4(vectorized 4 float): type_code = 2, bits = 32, lanes=4
+  *   - int8: type_code = 0, bits = 8, lanes=1
++ *   - std::complex<float>: type_code = 5, bits = 64, lanes = 1
+  */
+ typedef struct {
+   /*!
+@@ -130,9 +159,16 @@ typedef struct {
+  */
+ typedef struct {
+   /*!
+-   * \brief The opaque data pointer points to the allocated data. This will be
+-   * CUDA device pointer or cl_mem handle in OpenCL. This pointer is always
+-   * aligned to 256 bytes as in CUDA.
++   * \brief The data pointer points to the allocated data. This will be CUDA
++   * device pointer or cl_mem handle in OpenCL. It may be opaque on some device
++   * types. This pointer is always aligned to 256 bytes as in CUDA. The
++   * `byte_offset` field should be used to point to the beginning of the data.
++   *
++   * Note that as of Nov 2021, multiply libraries (CuPy, PyTorch, TensorFlow,
++   * TVM, perhaps others) do not adhere to this 256 byte aligment requirement
++   * on CPU/CUDA/ROCm, and always use `byte_offset=0`.  This must be fixed
++   * (after which this note will be updated); at the moment it is recommended
++   * to not rely on the data pointer being correctly aligned.
+    *
+    * For given DLTensor, the size of memory required to store the contents of
+    * data is calculated as follows:
+@@ -152,7 +188,7 @@ typedef struct {
+   /*! \brief The device of the tensor */
+   DLDevice device;
+   /*! \brief Number of dimensions */
+-  int ndim;
++  int32_t ndim;
+   /*! \brief The data type of the pointer*/
+   DLDataType dtype;
+   /*! \brief The shape of the tensor */
+diff --git a/aten/src/ATen/templates/Functions.h b/aten/src/ATen/templates/Functions.h
+index 6a33b648a5..2bb6f49c90 100644
+--- a/aten/src/ATen/templates/Functions.h
++++ b/aten/src/ATen/templates/Functions.h
+@@ -161,10 +161,12 @@ inline Tensor from_blob(
+     void* data,
+     IntArrayRef sizes,
+     const std::function<void(void*)>& deleter,
+-    const TensorOptions& options = {}) {
++    const TensorOptions& options = {},
++    const c10::optional<Device> target_device = c10::nullopt) {
+   return for_blob(data, sizes)
+       .deleter(deleter)
+       .options(options)
++      .target_device(target_device)
+       .make_tensor();
+ }
+ 
+diff --git a/caffe2/python/dlpack.h b/caffe2/python/dlpack.h
+index d122b09c78..53bd551663 100644
+--- a/caffe2/python/dlpack.h
++++ b/caffe2/python/dlpack.h
+@@ -6,6 +6,9 @@
+ #ifndef DLPACK_DLPACK_H_
+ #define DLPACK_DLPACK_H_
+ 
++/**
++ * \brief Compatibility with C++
++ */
+ #ifdef __cplusplus
+ #define DLPACK_EXTERN_C extern "C"
+ #else
+@@ -13,7 +16,10 @@
+ #endif
+ 
+ /*! \brief The current version of dlpack */
+-#define DLPACK_VERSION 020
++#define DLPACK_VERSION 60
++
++/*! \brief The current ABI version of dlpack */
++#define DLPACK_ABI_VERSION 1
+ 
+ /*! \brief DLPACK_DLL prefix for windows */
+ #ifdef _WIN32
+@@ -33,18 +39,21 @@
+ extern "C" {
+ #endif
+ /*!
+- * \brief The device type in DLContext.
++ * \brief The device type in DLDevice.
+  */
++#ifdef __cplusplus
++typedef enum : int32_t {
++#else
+ typedef enum {
++#endif
+   /*! \brief CPU device */
+   kDLCPU = 1,
+   /*! \brief CUDA GPU device */
+-  kDLGPU = 2,
++  kDLCUDA = 2,
+   /*!
+-   * \brief Pinned CUDA GPU device by cudaMallocHost
+-   * \note kDLCPUPinned = kDLCPU | kDLGPU
++   * \brief Pinned CUDA CPU memory by cudaMallocHost
+    */
+-  kDLCPUPinned = 3,
++  kDLCUDAHost = 3,
+   /*! \brief OpenCL devices. */
+   kDLOpenCL = 4,
+   /*! \brief Vulkan buffer for next generation graphics. */
+@@ -55,41 +64,81 @@ typedef enum {
+   kDLVPI = 9,
+   /*! \brief ROCm GPUs for AMD GPUs */
+   kDLROCM = 10,
++  /*!
++   * \brief Pinned ROCm CPU memory allocated by hipMallocHost
++   */
++  kDLROCMHost = 11,
+   /*!
+    * \brief Reserved extension device type,
+    * used for quickly test extension device
+    * The semantics can differ depending on the implementation.
+    */
+   kDLExtDev = 12,
++  /*!
++   * \brief CUDA managed/unified memory allocated by cudaMallocManaged
++   */
++  kDLCUDAManaged = 13,
++  /*!
++   * \brief Unified shared memory allocated on a oneAPI non-partititioned
++   * device. Call to oneAPI runtime is required to determine the device
++   * type, the USM allocation type and the sycl context it is bound to.
++   *
++   */
++  kDLOneAPI = 14,
++  /*! \brief GPU support for next generation WebGPU standard. */
++  kDLWebGPU = 15,
++  /*! \brief Qualcomm Hexagon DSP */
++  kDLHexagon = 16,
+ } DLDeviceType;
+ 
+ /*!
+- * \brief A Device context for Tensor and operator.
++ * \brief A Device for Tensor and operator.
+  */
+ typedef struct {
+   /*! \brief The device type used in the device. */
+   DLDeviceType device_type;
+-  /*! \brief The device index */
+-  int device_id;
+-} DLContext;
++  /*!
++   * \brief The device index.
++   * For vanilla CPU memory, pinned memory, or managed memory, this is set to 0.
++   */
++  int32_t device_id;
++} DLDevice;
+ 
+ /*!
+  * \brief The type code options DLDataType.
+  */
+ typedef enum {
++  /*! \brief signed integer */
+   kDLInt = 0U,
++  /*! \brief unsigned integer */
+   kDLUInt = 1U,
++  /*! \brief IEEE floating point */
+   kDLFloat = 2U,
++  /*!
++   * \brief Opaque handle type, reserved for testing purposes.
++   * Frameworks need to agree on the handle data type for the exchange to be
++   * well-defined.
++   */
++  kDLOpaqueHandle = 3U,
++  /*! \brief bfloat16 */
+   kDLBfloat = 4U,
++  /*!
++   * \brief complex number
++   * (C/C++/Python layout: compact struct per complex number)
++   */
++  kDLComplex = 5U,
+ } DLDataTypeCode;
+ 
+ /*!
+- * \brief The data type the tensor can hold.
++ * \brief The data type the tensor can hold. The data type is assumed to follow
++ * the native endian-ness. An explicit error message should be raised when
++ * attempting to export an array with non-native endianness
+  *
+  *  Examples
+  *   - float: type_code = 2, bits = 32, lanes=1
+  *   - float4(vectorized 4 float): type_code = 2, bits = 32, lanes=4
+  *   - int8: type_code = 0, bits = 8, lanes=1
++ *   - std::complex<float>: type_code = 5, bits = 64, lanes = 1
+  */
+ typedef struct {
+   /*!
+@@ -111,9 +160,16 @@ typedef struct {
+  */
+ typedef struct {
+   /*!
+-   * \brief The opaque data pointer points to the allocated data. This will be
+-   * CUDA device pointer or cl_mem handle in OpenCL. This pointer is always
+-   * aligned to 256 bytes as in CUDA.
++   * \brief The data pointer points to the allocated data. This will be CUDA
++   * device pointer or cl_mem handle in OpenCL. It may be opaque on some device
++   * types. This pointer is always aligned to 256 bytes as in CUDA. The
++   * `byte_offset` field should be used to point to the beginning of the data.
++   *
++   * Note that as of Nov 2021, multiply libraries (CuPy, PyTorch, TensorFlow,
++   * TVM, perhaps others) do not adhere to this 256 byte aligment requirement
++   * on CPU/CUDA/ROCm, and always use `byte_offset=0`.  This must be fixed
++   * (after which this note will be updated); at the moment it is recommended
++   * to not rely on the data pointer being correctly aligned.
+    *
+    * For given DLTensor, the size of memory required to store the contents of
+    * data is calculated as follows:
+@@ -130,10 +186,10 @@ typedef struct {
+    * \endcode
+    */
+   void* data;
+-  /*! \brief The device context of the tensor */
+-  DLContext ctx;
++  /*! \brief The device of the tensor */
++  DLDevice device;
+   /*! \brief Number of dimensions */
+-  int ndim;
++  int32_t ndim;
+   /*! \brief The data type of the pointer*/
+   DLDataType dtype;
+   /*! \brief The shape of the tensor */
+diff --git a/caffe2/python/pybind_state_dlpack.cc b/caffe2/python/pybind_state_dlpack.cc
+index 36070f58d8..83b856f672 100644
+--- a/caffe2/python/pybind_state_dlpack.cc
++++ b/caffe2/python/pybind_state_dlpack.cc
+@@ -8,7 +8,7 @@ namespace py = pybind11;
+ const DLDeviceType* CaffeToDLDeviceType(int device_type) {
+   static std::map<int, DLDeviceType> dl_device_type_map{
+       {PROTO_CPU, kDLCPU},
+-      {PROTO_CUDA, kDLGPU},
++      {PROTO_CUDA, kDLCUDA},
+   };
+   const auto it = dl_device_type_map.find(device_type);
+   return it == dl_device_type_map.end() ? nullptr : &it->second;
+diff --git a/caffe2/python/pybind_state_dlpack.h b/caffe2/python/pybind_state_dlpack.h
+index bcdbc50a61..1fdb3502fc 100644
+--- a/caffe2/python/pybind_state_dlpack.h
++++ b/caffe2/python/pybind_state_dlpack.h
+@@ -28,7 +28,7 @@ class DLPackWrapper {
+       : tensor(tensor), device_option(device_option) {}
+ 
+   py::object data() {
+-    DLContext tensor_context;
++    DLDevice tensor_context;
+     auto device_type_ptr = CaffeToDLDeviceType(device_option.device_type());
+     CAFFE_ENFORCE(
+         device_type_ptr,
+@@ -55,7 +55,7 @@ class DLPackWrapper {
+ 
+     DLTensor dlTensor;
+     dlTensor.data = const_cast<void*>(tensor->raw_data());
+-    dlTensor.ctx = tensor_context;
++    dlTensor.device = tensor_context;
+     dlTensor.ndim = tensor->dim();
+     dlTensor.dtype = tensor_type;
+     dlTensor.shape = const_cast<int64_t*>(&(tensor->sizes()[0]));
+@@ -83,9 +83,9 @@ class DLPackWrapper {
+         "Unsupported device type: ",
+         device_option.device_type());
+     CAFFE_ENFORCE(
+-        dlTensor->ctx.device_type == *device_type_ptr,
++        dlTensor->device.device_type == *device_type_ptr,
+         "DLPack tensor device type mismatch");
+-    int dlpack_device_id = dlTensor->ctx.device_id;
++    int dlpack_device_id = dlTensor->device.device_id;
+     CAFFE_ENFORCE_EQ(
+         dlpack_device_id,
+         device_option.device_id(),
+diff --git a/torch/_tensor.py b/torch/_tensor.py
+index 2e4b7a3681..1a4fd9f5cc 100644
+--- a/torch/_tensor.py
++++ b/torch/_tensor.py
+@@ -1111,6 +1111,8 @@ class Tensor(torch._C._TensorBase):
+             device_type = DLDeviceType.kDLGPU
+         elif self.device.type == 'cpu':
+             device_type = DLDeviceType.kDLCPU
++        elif self.device.type == 'xpu':
++            device_type = DLDeviceType.kDLOneAPI
+         else:
+             raise ValueError('Unknown device type {} for Dlpack'.format(self.device.type))
+         return (device_type, idx)
+diff --git a/torch/utils/dlpack.py b/torch/utils/dlpack.py
+index 06424be335..45682e1f09 100644
+--- a/torch/utils/dlpack.py
++++ b/torch/utils/dlpack.py
+@@ -18,6 +18,7 @@ class DLDeviceType(enum.IntEnum):
+     kDLVPI = 9,
+     kDLROCM = 10,
+     kDLExtDev = 12,
++    kDLOneAPI = 14,
+ 
+ 
+ torch._C._add_docstr(to_dlpack, r"""to_dlpack(tensor) -> PyCapsule
+-- 
+2.25.1
+
