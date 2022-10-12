@@ -485,6 +485,21 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
       [](const Match& match,
          const std::unordered_map<std::string, Value*>& vmap) {
         Node* node = match.anchor;
+        // Find the masked_fill node
+        auto qk_node = node->input(0)->node();
+        TORCH_CHECK(
+            qk_node->kind() == aten::masked_fill ||
+            qk_node->kind() == aten::masked_fill_);
+
+        // Check whether the fill value of masked_fill is constant
+        // This constant fill value could be either 0-dim tensor or just a
+        // scalar
+        auto fill_value_node = qk_node->input(2)->node();
+        if (fill_value_node->kind() != prim::Constant) {
+          return false;
+        }
+
+        // Find the view node to get the mask value
         auto mask_node =
             node->input(0)->node()->input(1)->node()->input(0)->node();
         TORCH_CHECK(mask_node->kind() == aten::view);
@@ -496,7 +511,6 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
 
         // Only support when expand from the mid dims shape (bs :: seq_length)
         auto mask_reshape_node = mask_node->input(1)->node();
-        auto qk_node = node->input(0)->node();
         auto qk_value = qk_node->input(0)->type()->cast<TensorType>();
         for (int i = 1; i < qk_value->dim().value() - 1; i++) {
           auto expand_check =
