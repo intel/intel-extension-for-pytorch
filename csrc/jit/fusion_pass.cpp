@@ -147,7 +147,8 @@ class OpFuser {
   //
   bool isFoldable(Node* node, Node* prev) {
     bool foldable =
-        (node->kind() == aten::batch_norm && prev->kind() == aten::conv2d);
+        (node->kind() == aten::batch_norm &&
+         (prev->kind() == aten::conv2d || prev->kind() == aten::_convolution));
 
     //
     // Check whether all the sources are constant ???
