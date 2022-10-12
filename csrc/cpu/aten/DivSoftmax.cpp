@@ -4,7 +4,6 @@ namespace torch_ipex {
 namespace cpu {
 
 DEFINE_DISPATCH(div_maskedfill_softmax_kernel_stub);
-
 at::Tensor DivMaskedfillSoftmax(
     at::Tensor& a,
     const at::Tensor& b,

@@ -954,6 +954,22 @@ torch::jit::RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
+        "ipex::vit_mha_scores_calc(Tensor q, Tensor k, Tensor _mask_qk_reshp, "
+        "Scalar fill, Scalar dim_per_head) "
+        "-> Tensor",
+        [](Stack& stack) {
+          auto result = dil_vit_mha_scores_calc(
+              peek(stack, 0, 5).toTensor(),
+              peek(stack, 1, 5).toTensor(),
+              peek(stack, 2, 5).toTensor(),
+              peek(stack, 3, 5).toScalar(),
+              peek(stack, 4, 5).toScalar());
+          drop(stack, 5);
+          torch::jit::pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
         "ipex::maskedfill_softmax(Tensor qk, Tensor mask_qk, "
         "int[] mask_qk_reshp, "
         "Scalar fill) "

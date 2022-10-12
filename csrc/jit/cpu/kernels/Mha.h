@@ -27,6 +27,13 @@ at::Tensor dil_distil_mha_scores_calc(
     const at::Scalar& fill,
     const at::Scalar& dim_per_head);
 
+at::Tensor dil_vit_mha_scores_calc(
+    const at::Tensor& q,
+    const at::Tensor& k,
+    const at::Tensor& mask_qk_reshp,
+    const at::Scalar& fill,
+    const at::Scalar& dim_per_head);
+
 at::Tensor dil_maskedfill_softmax(
     at::Tensor& qk,
     const at::Tensor& mask_qk,
