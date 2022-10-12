@@ -137,7 +137,7 @@ void GroupNormKernelImplInternal(
       T mean_val;
       T rstd_val;
       std::tie(mean_val, rstd_val) =
-          at::native::RowwiseMoments(X_ptr, inner_size);
+          at::native::utils::RowwiseMoments(X_ptr, inner_size);
       rstd_val = T(1) / std::sqrt(std::max(rstd_val, T(0)) + eps);
       if (gamma_null && beta_null) {
         T* Y_ptr = Y_data + i * inner_size;

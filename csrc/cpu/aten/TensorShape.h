@@ -7,9 +7,12 @@
 namespace torch_ipex {
 namespace cpu {
 
-at::Tensor& cat_out_cpu(at::TensorList tensors, int64_t dim, at::Tensor& out);
+at::Tensor& cat_out_cpu(
+    const at::ITensorList& tensors,
+    int64_t dim,
+    at::Tensor& out);
 
-at::Tensor cat_cpu(at::TensorList tensors, int64_t dim);
+at::Tensor cat_cpu(const at::ITensorList& tensors, int64_t dim);
 
 namespace {
 

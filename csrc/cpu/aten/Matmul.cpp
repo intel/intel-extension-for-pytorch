@@ -64,7 +64,7 @@ variable_list BmmBackward0::apply(variable_list&& grads) {
 namespace torch_ipex {
 namespace cpu {
 
-at::IntArrayRef strides_or_error(
+at::SymIntArrayRef strides_or_error(
     const at::Tensor& input,
     c10::string_view const& input_name) {
   // TODO: Ideally, this function would never be called if requires_grad is
@@ -79,9 +79,13 @@ at::IntArrayRef strides_or_error(
         "Please either use a strided tensor or set requires_grad=False for '",
         input_name,
         "'");
-    return input.strides();
+    if (input.is_mkldnn())
+      return {};
+    if (input.is_sparse_csr())
+      return {};
+    return input.sym_strides();
   } else {
-    return at::IntArrayRef({});
+    return {};
   }
 }
 
@@ -132,11 +136,11 @@ void handle_grad(
       if (grad_fn->should_compute_output(1)) {
         grad_fn->self_ = torch::autograd::SavedVariable(self, false);
       }
-      grad_fn->mat2_sizes = mat2.sizes().vec();
-      grad_fn->mat2_strides = strides_or_error(mat2, "mat2").vec();
+      grad_fn->mat2_sym_sizes = mat2.sym_sizes().vec();
+      grad_fn->mat2_sym_strides = strides_or_error(mat2, "mat2").vec();
       grad_fn->mat2_layout = mat2.layout();
-      grad_fn->self_sizes = self.sizes().vec();
-      grad_fn->self_strides = strides_or_error(self, "self").vec();
+      grad_fn->self_sym_sizes = self.sym_sizes().vec();
+      grad_fn->self_sym_strides = strides_or_error(self, "self").vec();
       grad_fn->self_layout = self.layout();
       if (grad_fn->should_compute_output(0)) {
         grad_fn->mat2_ = torch::autograd::SavedVariable(mat2, false);
