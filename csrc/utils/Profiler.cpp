@@ -9,6 +9,9 @@
 
 using namespace torch::autograd::profiler;
 
+namespace xpu {
+namespace dpcpp {
+
 #if defined(USE_PROFILER)
 struct DPCPPEventStubImpl : public KernelEventBase {
  public:
@@ -186,21 +189,21 @@ void reportMemoryUsage(
 #endif
 }
 
-namespace xpu {
+} // namespace dpcpp
 
 bool is_profiler_enabled() {
-  return is_profiler_enabled();
+  return xpu::dpcpp::is_profiler_enabled();
 }
 
 void profiler_record(std::string name, cl::sycl::event& event) {
-  return dpcpp_log(name, event);
+  return xpu::dpcpp::dpcpp_log(name, event);
 }
 
 void profiler_record(
     std::string name,
     cl::sycl::event& start_event,
     cl::sycl::event& end_event) {
-  dpcpp_log(name, start_event, end_event);
+  xpu::dpcpp::dpcpp_log(name, start_event, end_event);
 }
 
 } // namespace xpu

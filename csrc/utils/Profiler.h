@@ -5,6 +5,9 @@
 
 #include <utils/Macros.h>
 
+namespace xpu {
+namespace dpcpp {
+
 bool is_profiler_enabled();
 
 void dpcpp_mark(std::string name, cl::sycl::event& event);
@@ -25,3 +28,6 @@ void reportMemoryUsage(
     void* ptr,
     int64_t alloc_size,
     at::DeviceIndex device_id);
+
+} // namespace dpcpp
+} // namespace xpu

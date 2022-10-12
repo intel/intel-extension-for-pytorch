@@ -7,6 +7,9 @@
 
 using namespace std::chrono;
 
+namespace xpu {
+namespace dpcpp {
+
 struct ipex_timer {
  public:
   ipex_timer(int verbose_level, std::string tag);
@@ -27,3 +30,6 @@ struct ipex_timer {
 };
 
 #define IPEX_TIMER(t, ...) struct ipex_timer t(__VA_ARGS__)
+
+} // namespace dpcpp
+} // namespace xpu

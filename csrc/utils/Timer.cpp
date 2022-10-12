@@ -1,5 +1,8 @@
 #include <utils/Timer.h>
 
+namespace xpu {
+namespace dpcpp {
+
 ipex_timer::ipex_timer(int verbose_level, std::string tag)
     : vlevel_(verbose_level) {
   if (verbose_level >= 1) {
@@ -39,3 +42,6 @@ ipex_timer::~ipex_timer() {
               << "us)" << std::endl;
   }
 }
+
+} // namespace dpcpp
+} // namespace xpu

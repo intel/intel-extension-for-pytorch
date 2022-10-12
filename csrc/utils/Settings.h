@@ -66,7 +66,9 @@ class Settings final {
   ENV_VAL onednn_layout_enabled;
   ENV_VAL force_onednn_primitive_enabled;
 
+#ifdef BUILD_SIMPLE_TRACE
   ENV_VAL simple_trace_enabled;
+#endif
 };
 
 } // namespace dpcpp
