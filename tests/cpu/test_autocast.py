@@ -485,7 +485,7 @@ class TestLSTM(TorchTestCase):
             c_ipex = c.clone().requires_grad_(training)
             model_ipex = copy.deepcopy(model_cpu)
             model_ipex.train() if training else model_ipex.eval()
-            ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model_ipex)
+            ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model_ipex, None)
 
             with torch.cpu.amp.autocast(enabled=bf16, dtype=torch.bfloat16):
                 if empty_state:
@@ -549,7 +549,7 @@ class TestLSTM(TorchTestCase):
         model = M(embedding_dim, hidden_dim, num_layers=num_layers, bidirectional=bidirectional, batch_first=True, bias=True, dropout=0.2)
 
         model_ipex = copy.deepcopy(model)
-        ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model_ipex)
+        ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model_ipex, None)
 
         lstm_out, hidden_out = model(embeds, (hidden_0, hidden_1))
         lstm_out, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_out, batch_first=True)
