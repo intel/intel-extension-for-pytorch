@@ -937,6 +937,48 @@ torch::jit::RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
+        "ipex::mha_scores_calc_v2(Tensor q, Tensor k, Tensor rel_qk, Scalar "
+        "alpha, "
+        "Tensor scale, int softmax_dim, ScalarType ? dtype) -> Tensor",
+        [](Stack& stack) {
+          auto scale_tensor = std::move(peek(stack, 4, 7).toTensor());
+          auto scale_data = scale_tensor.item();
+          // divide scale to reuse dil_mha_scores_calc function
+          auto div_scale_data = 1 / scale_data.to<float>();
+          auto result = dil_mha_scores_calc(
+              peek(stack, 0, 7).toTensor(),
+              peek(stack, 1, 7).toTensor(),
+              peek(stack, 2, 7).toTensor(),
+              peek(stack, 3, 7).toScalar(),
+              div_scale_data,
+              peek(stack, 5, 7).toInt(),
+              peek(stack, 6, 7));
+          drop(stack, 7);
+          torch::jit::pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::mha_scores_calc_v2(Tensor q, Tensor k, Tensor rel_qk, Scalar "
+        "alpha, "
+        "Scalar scale, int softmax_dim, ScalarType ? dtype) -> Tensor",
+        [](Stack& stack) {
+          // divide scale to reuse dil_mha_scores_calc function
+          auto div_scale_data = 1 / peek(stack, 4, 7).toScalar().to<float>();
+          auto result = dil_mha_scores_calc(
+              peek(stack, 0, 7).toTensor(),
+              peek(stack, 1, 7).toTensor(),
+              peek(stack, 2, 7).toTensor(),
+              peek(stack, 3, 7).toScalar(),
+              div_scale_data,
+              peek(stack, 5, 7).toInt(),
+              peek(stack, 6, 7));
+          drop(stack, 7);
+          torch::jit::pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
         "ipex::distil_mha_scores_calc(Tensor q, Tensor k, Tensor mask_qk, "
         "int[] mask_qk_reshp, Scalar fill, Scalar dim_per_head) "
         "-> Tensor",

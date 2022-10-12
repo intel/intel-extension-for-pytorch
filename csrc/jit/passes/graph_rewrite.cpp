@@ -329,6 +329,9 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
   std::string args_matmul_div_add_softmax = R"(
       graph(%q: Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype): )";
 
+  std::string args_matmul_mul_add_softmax = R"(
+      graph(%q: Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %scale:float, %softmax_dim:int, %dtype): )";
+
   std::string args_matmul_mul_maskedfill_softmax = R"(
       graph(%q: Tensor, %k: Tensor, %_mask_qk_shape: Tensor, %dim_per_head:int, %fill:float, %softmax_dim:int, %dtype): )";
 
@@ -337,6 +340,11 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
 
   std::string args_matmul_div_expand_maskedfill_softmax = R"(
       graph(%q: Tensor, %k: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %fill:float, %dim_per_head:float, %softmax_dim:int, %dtype): )";
+
+  std::string matmul_mul_add = R"(
+        %_qk = aten::matmul(%q, %k)
+        %qk = aten::mul(%_qk, %scale)
+        %_scores = aten::add(%qk, %relative_qk, %alpha) )";
 
   std::string matmul_div_add = R"(
         %qk = aten::matmul(%q, %k)
@@ -370,6 +378,8 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
   // below are MHA score combinations from Bert Model (matmul+div+add+softmax)
   std::string matmul_div_add_softmax =
       args_matmul_div_add_softmax + matmul_div_add + aten_softmax + set_return;
+  std::string matmul_mul_add_softmax =
+      args_matmul_mul_add_softmax + matmul_mul_add + aten_softmax + set_return;
 
   // below are MHA score combinations from DistilBert Model
   // (matmul+div+expand+masked_fill+softmax)
@@ -408,7 +418,13 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
         %scores = ipex::mha_scores_calc(%q, %k, %relative_qk, %alpha, %dim_per_head, %softmax_dim, %dtype)
         return (%scores) )";
 
+  std::string matmul_mul_add_softmax_fusion = R"(
+      graph(%q: Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %scale:float, %softmax_dim:int, %dtype):
+        %scores = ipex::mha_scores_calc_v2(%q, %k, %relative_qk, %alpha, %scale, %softmax_dim, %dtype)
+        return (%scores) )";
+
   std::string matmul_div_maskedfill_softmax_fusion = R"(
+
       graph(%q: Tensor, %k: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %fill:float, %dim_per_head:float, %softmax_dim:int, %dtype):
         %scores = ipex::distil_mha_scores_calc(%q, %k, %mask_qk, %mask_qk_reshp, %fill, %dim_per_head)
         return (%scores) )";
@@ -526,6 +542,8 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
   SubgraphRewriter maskedfill_softmax_fusion;
   SubgraphRewriter vit_mha_fusion;
 
+  mha_fusion.RegisterRewritePattern(
+      matmul_mul_add_softmax, matmul_mul_add_softmax_fusion);
   mha_fusion.RegisterRewritePattern(
       matmul_div_add_softmax, matmul_div_add_softmax_fusion);
 

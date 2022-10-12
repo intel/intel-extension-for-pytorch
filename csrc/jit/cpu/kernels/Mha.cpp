@@ -57,6 +57,7 @@ at::Tensor dil_mha_scores_calc(
     return dil_softmax(qk, softmax_dim, dtype);
   }
 }
+
 /**
  * For BF16/FP32 path, We split the distil mha fusion into two parts - Matmul
  * and Div+2DMaskedfill+Softmax.
