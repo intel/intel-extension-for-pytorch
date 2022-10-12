@@ -84,6 +84,8 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
 
   // Fuse the scores calculation(dim + matmul + (add)? + softmax) for
   // Multi-Head-Attention
+  // Note that we make scalar div or mul after matmul first
+  graph_rewrite::PostScalarDivOrMul(graph);
   graph_rewrite::FuseMHAScoreCalc(graph);
 
   // Fuse bmm + add for bmm_add

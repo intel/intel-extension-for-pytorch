@@ -875,53 +875,116 @@ class MHAScoresCalculation(nn.Module):
         qk = torch.matmul(mat1, mat2.transpose(2, 3))
         scores = qk + bias
         return self.softmax(scores)
+    
+class MHAScoresCalculation_v2(nn.Module):
+    def __init__(self, dim_per_head, softmax_dim=-1):
+        super(MHAScoresCalculation_v2, self).__init__()
+        self.softmax = nn.Softmax(dim=softmax_dim)
+        self.scale = 1 / math.sqrt(dim_per_head)
+
+    def forward(self, mat1, mat2, bias):
+        qk = torch.matmul(mat1, mat2.transpose(2, 3))
+        qk = qk* self.scale
+        scores = qk + bias
+        return self.softmax(scores)
+
+class MHAScoresCalculation_v3(nn.Module):
+    def __init__(self, dim_per_head, softmax_dim=-1):
+        super(MHAScoresCalculation_v3, self).__init__()
+        self.softmax = nn.Softmax(dim=softmax_dim)
+        self.scale = 1 / math.sqrt(dim_per_head)
+
+    def forward(self, mat1, mat2, bias):
+        mat1 = mat1 * self.scale
+        qk = torch.matmul(mat1, mat2.transpose(2, 3))
+        scores = qk + bias
+        return self.softmax(scores)
+
+class MHAScoresCalculation_v1(nn.Module):
+    def __init__(self, dim_per_head, softmax_dim=-1):
+        super(MHAScoresCalculation_v1, self).__init__()
+        self.softmax = nn.Softmax(dim=softmax_dim)
+        self.dim_per_head = dim_per_head
+
+    def forward(self, mat1, mat2, bias):
+        qk = torch.matmul(mat1, mat2.transpose(2, 3))
+        qk = qk / math.sqrt(self.dim_per_head)
+        scores = qk + bias
+        return self.softmax(scores)
 
 class DistilMHAScoresCalculation_v1(nn.Module):
-    def __init__(self, dim_per_head, softmax_dim=-1):
+    def __init__(self, dim_per_head, fill_value, softmax_dim=-1):
         super(DistilMHAScoresCalculation_v1, self).__init__()
         self.softmax = nn.Softmax(dim=softmax_dim)
         self.dim_per_head = dim_per_head
+        self.fill = fill_value
 
     def forward(self, mat1, mat2, mask):
         mask_shape=[mat1.shape[0],1,1,mat1.shape[3]]
         mat1 = mat1 / math.sqrt(self.dim_per_head)
         qk = torch.matmul(mat1, mat2.transpose(2, 3))
         mask = (mask == 0).view(mask_shape).expand_as(qk)
-        qk.masked_fill_(mask, -float("inf"))
+        qk.masked_fill_(mask, self.fill)
         return self.softmax(qk)
 
 class DistilMHAScoresCalculation_v2(nn.Module):
-    def __init__(self, dim_per_head):
+    def __init__(self, dim_per_head, fill_value, softmax_dim=-1):
         super(DistilMHAScoresCalculation_v2, self).__init__()
+        self.softmax = nn.Softmax(dim=softmax_dim)
         self.dim_per_head = dim_per_head
+        self.fill = fill_value
 
     def forward(self, mat1, mat2, mask):
         mask_shape=[mat1.shape[0],1,1,mat1.shape[3]]
         mat1 = mat1 / math.sqrt(self.dim_per_head)
         qk = torch.matmul(mat1, mat2.transpose(2, 3))
         mask = (mask == 0).view(mask_shape).expand_as(qk)
-        qk = qk.masked_fill(mask, -float("inf"))
+        qk.masked_fill_(mask, self.fill)
+        return self.softmax(qk)
+
+class VitMHAScoresCalculation_v1(nn.Module):
+    def __init__(self, dim_per_head):
+        super(VitMHAScoresCalculation_v1, self).__init__()
+        self.scale = dim_per_head ** -0.5
+
+    def forward(self, mat1, mat2, mask):
+        qk = torch.matmul(mat1, mat2.transpose(-1, 2)) * self.scale
+        mask_value = -torch.finfo(qk.dtype).max
+        qk = qk.masked_fill(mask, mask_value)
+        return nn.functional.softmax(qk, dim=-1)
+
+class VitMHAScoresCalculation_v2(nn.Module):
+    def __init__(self, dim_per_head):
+        super(VitMHAScoresCalculation_v2, self).__init__()
+        self.scale = dim_per_head ** -0.5
+
+    def forward(self, mat1, mat2, mask):
+        q = mat1 * self.scale
+        qk = torch.matmul(q, mat2.transpose(-1, 2))
+        mask_value = -torch.finfo(qk.dtype).max
+        qk = qk.masked_fill(mask, mask_value)
         return nn.functional.softmax(qk, dim=-1)
 
 class Maskedfill__softmax(nn.Module):
-    def __init__(self, softmax_dim=-1):
+    def __init__(self, fill_value, softmax_dim=-1):
         super(Maskedfill__softmax, self).__init__()
         self.softmax = nn.Softmax(dim=softmax_dim)
-
+        self.fill = fill_value
     def forward(self, qk, mask):
         mask_shape=[qk.shape[0],1,1,qk.shape[3]]
         mask = (mask == 0).view(mask_shape).expand_as(qk)
-        qk.masked_fill_(mask, -float("inf"))
+        qk.masked_fill_(mask, self.fill)
         return self.softmax(qk)
 
 class Maskedfill_softmax(nn.Module):
-    def __init__(self):
+    def __init__(self, fill_value):
         super(Maskedfill_softmax, self).__init__()
+        self.fill = fill_value
 
     def forward(self, qk, mask):
         mask_shape=[qk.shape[0],1,1,qk.shape[3]]
         mask = (mask == 0).view(mask_shape).expand_as(qk)
-        qk = qk.masked_fill(mask, -float("inf"))
+        qk = qk.masked_fill(mask, self.fill)
         return nn.functional.softmax(qk, dim=-1)
 
 class AtenSoftmaxRepalce(nn.Module):
@@ -1493,97 +1556,124 @@ class Tester(TestCase):
             graph = trace_model.graph_for((mat1, mat2, bias))
             self.assertTrue(any(n.kind() == node for n in graph.nodes()))
 
-        def _test_pure_bf16(model, trace_model, mat1, mat2, bias, prec=3e-2):
+        def _test_pure_bf16(model, trace_model, mat1, mat2, bias, prec=3e-2, node = "ipex::mha_scores_calc"):
             mat1_bf16 = mat1.to(torch.bfloat16)
             mat2_bf16 = mat2.to(torch.bfloat16)
             bias_bf16 = bias.to(torch.bfloat16)
             res_ref = model(mat1_bf16, mat2_bf16, bias_bf16)
             res_jit = trace_model(mat1_bf16, mat2_bf16, bias_bf16)
             self.assertEqual(res_ref, res_jit, prec=prec)
-            _check_match_mha(trace_model, mat1, mat2, bias)
+            _check_match_mha(trace_model, mat1, mat2, bias, node)
 
-        mat1 = torch.randn(56, 16, 384, 384)
-        mat2 = torch.randn(56, 16, 384, 384)
+        # shape case from bert-large
+        mat1 = torch.randn(56, 16, 384, 64)
+        mat2 = torch.randn(56, 16, 384, 64)
         bias = torch.randn(56, 16, 384, 384)
+        mha = MHAScoresCalculation(64, -1)
+        with torch.no_grad():
+            mha_jit = torch.jit.trace(mha, (mat1, mat2, bias))
+            mha_jit.eval()
+            res_ref = mha(mat1, mat2, bias)
+            res_jit = mha_jit(mat1, mat2, bias)
+            self.assertEqual(res_ref, res_jit)
+            _check_match_mha(mha_jit, mat1, mat2, bias)
+            _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+
+        # other shape cases for mha
         for softmax_dim in [0, 1, 2, -1]:
-            mha = MHAScoresCalculation(4, softmax_dim)
-            with torch.no_grad():
-                mha_jit = torch.jit.trace(mha, (mat1, mat2, bias))
-                mha_jit.eval()
 
-                res_ref = mha(mat1, mat2, bias)
-                res_jit = mha_jit(mat1, mat2, bias)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+            for v in [0, 1, 2, 3]:
+                if v == 0:
+                    mha = MHAScoresCalculation(4, softmax_dim)
+                    node = "ipex::mha_scores_calc"
+                if v == 1 :
+                    mha = MHAScoresCalculation_v1(4, softmax_dim)
+                    node = "ipex::mha_scores_calc"
+                elif v == 2:
+                    mha = MHAScoresCalculation_v2(4, softmax_dim)
+                    node = "ipex::mha_scores_calc_v2"
+                else:
+                    mha = MHAScoresCalculation_v3(4, softmax_dim)
+                    node = "ipex::mha_scores_calc_v2"
 
-                mat1 = torch.randn(1, 1, 2, 3)
-                mat2 = torch.randn(1, 1, 16, 3)
-                bias = torch.randn(1, 1, 2, 16)
-                res_ref = mha(mat1, mat2, bias)
-                res_jit = mha_jit(mat1, mat2, bias)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+                with torch.no_grad():
+                    mha_jit = torch.jit.trace(mha, (mat1, mat2, bias))
+                    mha_jit.eval()
 
-                mat1 = torch.randn(1, 1, 2, 3)
-                mat2 = torch.randn(1, 1, 32, 3)
-                bias = torch.randn(1, 1, 2, 32)
-                res_ref = mha(mat1, mat2, bias)
-                res_jit = mha_jit(mat1, mat2, bias)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+                    res_ref = mha(mat1, mat2, bias)
+                    res_jit = mha_jit(mat1, mat2, bias)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
 
-                mat1 = torch.randn(1, 1, 2, 3)
-                mat2 = torch.randn(1, 1, 33, 3)
-                bias = torch.randn(1, 1, 2, 33)
-                res_ref = mha(mat1, mat2, bias)
-                res_jit = mha_jit(mat1, mat2, bias)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+                    mat1 = torch.randn(1, 1, 2, 3)
+                    mat2 = torch.randn(1, 1, 16, 3)
+                    bias = torch.randn(1, 1, 2, 16)
+                    res_ref = mha(mat1, mat2, bias)
+                    res_jit = mha_jit(mat1, mat2, bias)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
 
-                mat1 = torch.randn(2, 3, 4, 6)
-                mat2 = torch.randn(2, 3, 6, 6)
-                bias = torch.randn(2, 3, 4, 6)
-                res_ref = mha(mat1, mat2, bias)
-                res_jit = mha_jit(mat1, mat2, bias)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+                    mat1 = torch.randn(1, 1, 2, 3)
+                    mat2 = torch.randn(1, 1, 32, 3)
+                    bias = torch.randn(1, 1, 2, 32)
+                    res_ref = mha(mat1, mat2, bias)
+                    res_jit = mha_jit(mat1, mat2, bias)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
 
-                #Test broadcast
-                mat1 = torch.randn(2, 3, 4, 10)
-                mat2 = torch.randn(2, 3, 16, 10)
-                bias = torch.randn(1, 1, 1, 16)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
-                bias = torch.randn(4, 16)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
-                bias = torch.randn(3, 1, 1)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
-                bias = torch.randn(2, 1, 1, 1)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
-                bias = torch.randn(3, 4, 16)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
-                bias = torch.randn(2, 1, 1, 16)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
-                bias = torch.randn(2, 1, 4, 16)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+                    mat1 = torch.randn(1, 1, 2, 3)
+                    mat2 = torch.randn(1, 1, 33, 3)
+                    bias = torch.randn(1, 1, 2, 33)
+                    res_ref = mha(mat1, mat2, bias)
+                    res_jit = mha_jit(mat1, mat2, bias)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+
+                    mat1 = torch.randn(2, 3, 4, 6)
+                    mat2 = torch.randn(2, 3, 6, 6)
+                    bias = torch.randn(2, 3, 4, 6)
+                    res_ref = mha(mat1, mat2, bias)
+                    res_jit = mha_jit(mat1, mat2, bias)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+
+                    #Test broadcast
+                    mat1 = torch.randn(2, 3, 4, 10)
+                    mat2 = torch.randn(2, 3, 16, 10)
+                    bias = torch.randn(1, 1, 1, 16)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+                    bias = torch.randn(4, 16)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+                    bias = torch.randn(3, 1, 1)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+                    bias = torch.randn(2, 1, 1, 1)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+                    bias = torch.randn(3, 4, 16)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+                    bias = torch.randn(2, 1, 1, 16)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+                    bias = torch.randn(2, 1, 4, 16)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+
 
     def test_linear_swish(self):
         mat1 = torch.randn(10000, 5)
@@ -1655,56 +1745,90 @@ class Tester(TestCase):
             self.assertEqual(res_ref, res_jit, prec=prec)
             _check_match_mha_parts(trace_model, qk_bf16, mask)
         
-        for sequance_length in [128, 100]:
-            mat1 = torch.randn(56, 12, sequance_length, sequance_length)
-            mat2 = torch.randn(56, 12, sequance_length, sequance_length)
-            mask = torch.randn(56, sequance_length)
+        for sequence_length in [128, 100]:
+            mat1 = torch.randn(56, 12, sequence_length, sequence_length)
+            mat2 = torch.randn(56, 12, sequence_length, sequence_length)
+            mask = torch.randn(56, sequence_length)
             qk = torch.matmul(mat1,mat2)
             mask = (mask > 0.5)
 
-            mha_v1 = DistilMHAScoresCalculation_v1(4, -1)
+            for fill_value in [-float("inf"), torch.tensor(torch.finfo(float).min)]:
+                model_v1 = DistilMHAScoresCalculation_v1(64, fill_value)
+                with torch.no_grad():
+                    mha_jit = torch.jit.trace(model_v1, (mat1, mat2, mask))
+                    mha_jit.eval()
+                    res_ref = model_v1(mat1, mat2, mask)
+                    res_jit = mha_jit(mat1, mat2, mask)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, mask)
+                    _test_pure_bf16(model_v1, mha_jit, mat1, mat2, mask)
+
+                model_v2 = DistilMHAScoresCalculation_v2(64, fill_value)
+                with torch.no_grad():
+                    mha_jit = torch.jit.trace(model_v2, (mat1, mat2, mask))
+                    mha_jit.eval()
+                    res_ref = model_v2(mat1, mat2, mask)
+                    res_jit = mha_jit(mat1, mat2, mask)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, mask)
+                    _test_pure_bf16(model_v2, mha_jit, mat1, mat2, mask)
+
+                model_v3 = Maskedfill__softmax(fill_value)
+                with torch.no_grad():
+                    mha_jit = torch.jit.trace(model_v3, (qk, mask))
+                    mha_jit.eval()
+                    res_ref = model_v3(qk, mask)
+                    res_jit = mha_jit(qk, mask)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha_parts(mha_jit, qk, mask)
+                    _test_pure_bf16_parts(model_v3, mha_jit, qk, mask)
+
+                model_v4 = Maskedfill_softmax(fill_value)
+                with torch.no_grad():
+                    mha_jit = torch.jit.trace(model_v4, (qk, mask))
+                    mha_jit.eval()
+                    res_ref = model_v4(qk, mask)
+                    res_jit = mha_jit(qk, mask)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha_parts(mha_jit, qk, mask)
+                    _test_pure_bf16_parts(model_v4, mha_jit, qk, mask)
+
+
+    def test_vit_mha_scores_calculation(self):
+        def _check_match_mha(trace_model, mat1, mat2, mask, node = "ipex::vit_mha_scores_calc"):
+            graph = trace_model.graph_for(mat1, mat2, mask)
+            self.assertTrue(any(n.kind() == node for n in graph.nodes()))
+
+        def _test_amp_bf16(model, mat1, mat2, mask, prec=3e-2, node ="ipex::vit_mha_scores_calc"):
+            with torch.cpu.amp.autocast():
+                trace_model = torch.jit.trace(model, (mat1, mat2, mask))
+                trace_model = torch.jit.freeze(trace_model)
+                res_ref = model(mat1, mat2, mask)
+                res_jit = trace_model(mat1, mat2, mask)
+                self.assertEqual(res_ref, res_jit, prec=prec)
+                _check_match_mha(trace_model, mat1, mat2, mask, node)
+
+        for patch in [128, 257]:
+            mat1 = torch.randn(56, 12, patch, patch)
+            mat2 = torch.randn(56, 12, patch, patch)
+            mask_1 = torch.randn(56, 1, patch, patch)
+            mask = ~(mask_1 > 0.5)
+            mha_v1 = VitMHAScoresCalculation_v1(64).eval()
             with torch.no_grad():
                 mha_jit = torch.jit.trace(mha_v1, (mat1, mat2, mask))
-                mha_jit.eval()
-
                 res_ref = mha_v1(mat1, mat2, mask)
                 res_jit = mha_jit(mat1, mat2, mask)
                 self.assertEqual(res_ref, res_jit)
                 _check_match_mha(mha_jit, mat1, mat2, mask)
-                _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
+                _test_amp_bf16(mha_v1, mat1, mat2, mask)
 
-            mha_v2 = DistilMHAScoresCalculation_v2(4)
+            mha_v2 = VitMHAScoresCalculation_v2(64).eval()
             with torch.no_grad():
                 mha_jit = torch.jit.trace(mha_v2, (mat1, mat2, mask))
-                mha_jit.eval()
-
                 res_ref = mha_v2(mat1, mat2, mask)
                 res_jit = mha_jit(mat1, mat2, mask)
                 self.assertEqual(res_ref, res_jit)
                 _check_match_mha(mha_jit, mat1, mat2, mask)
-                _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
-
-            mha_v3 = Maskedfill__softmax()
-            with torch.no_grad():
-                mha_jit = torch.jit.trace(mha_v3, (qk, mask))
-                mha_jit.eval()
-
-                res_ref = mha_v3(qk, mask)
-                res_jit = mha_jit(qk, mask)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha_parts(mha_jit, qk, mask)
-                _test_pure_bf16_parts(mha_v3, mha_jit, qk, mask)
-
-            mha_v4 = Maskedfill_softmax()
-            with torch.no_grad():
-                mha_jit = torch.jit.trace(mha_v4, (qk, mask))
-                mha_jit.eval()
-
-                res_ref = mha_v4(qk, mask)
-                res_jit = mha_jit(qk, mask)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha_parts(mha_jit, qk, mask)
-                _test_pure_bf16_parts(mha_v4, mha_jit, qk, mask)
 
     def _test_conv_unary_fusion(self, op_list, seed=None):
         batch_size = 8

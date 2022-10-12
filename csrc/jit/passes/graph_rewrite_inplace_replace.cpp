@@ -222,8 +222,13 @@ void replaceOpsWithAtenInplaceOps(std::shared_ptr<Graph>& graph) {
         auto inputDtype = input->type()->expect<TensorType>()->scalarType();
         auto outputDtype = output->type()->expect<TensorType>()->scalarType();
 
-        // If type promotion is allowed, then perform dtype check
-        bool check_dtype = activation_type_promotion_mapping.at(node->kind());
+        // If type promotion (from the op list that needs to do check) is
+        // allowed, then perform dtype check
+        bool check_dtype =
+            activation_type_promotion_mapping.find(node->kind()) !=
+                activation_type_promotion_mapping.end()
+            ? activation_type_promotion_mapping.at(node->kind())
+            : false;
         if (check_dtype &&
             (!inputDtype || !outputDtype ||
              inputDtype.value() != outputDtype.value())) {
@@ -317,8 +322,12 @@ void replaceInplaceOpsWithOutplaceOps(std::shared_ptr<Graph>& graph, Block* b) {
     auto outputDtype = output->type()->expect<TensorType>()->scalarType();
     auto schema_name = n->schema().name();
     auto new_schema = schema_name.substr(0, schema_name.size() - 1);
-    bool check_dtype = activation_type_promotion_mapping.at(
-        Symbol::fromQualString(new_schema));
+    bool check_dtype = activation_type_promotion_mapping.find(
+                           Symbol::fromQualString(new_schema)) !=
+            activation_type_promotion_mapping.end()
+        ? activation_type_promotion_mapping.at(
+              Symbol::fromQualString(new_schema))
+        : false;
     if (check_dtype &&
         (!inputDtype || !outputDtype ||
          inputDtype.value() != outputDtype.value())) {

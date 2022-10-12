@@ -23,8 +23,7 @@ at::Tensor div_maskedfill_softmax_kernel_impl(
     const at::IntArrayRef& mask_shape,
     const float& fill,
     const float& dim_per_head);
-
-}
+} // namespace
 
 using div_maskedfill_softmax_kernel_fn = at::Tensor (*)(
     at::Tensor&,
@@ -32,6 +31,7 @@ using div_maskedfill_softmax_kernel_fn = at::Tensor (*)(
     const at::IntArrayRef&,
     const float&,
     const float&);
+
 DECLARE_DISPATCH(
     div_maskedfill_softmax_kernel_fn,
     div_maskedfill_softmax_kernel_stub);

@@ -57,15 +57,15 @@ at::Tensor dil_mha_scores_calc(
     return dil_softmax(qk, softmax_dim, dtype);
   }
 }
+
 /**
  * For BF16/FP32 path, We split the distil mha fusion into two parts - Matmul
- * and Div+Maskedfill+Softmax.
+ * and Div+2DMaskedfill+Softmax.
  * We do input checkings at graph rewrite time,
  * so we assume here:
  * Only support last dimension for softmax
  * Only support contiguous tensor for qk and mask
  * Only support qk.dim >=2D
- * Only support 64byte aligned
  * Only support when expand from the mid dims shape (bs :: seq_length)
  * Also checking the dtype as None
  **/
@@ -85,6 +85,32 @@ at::Tensor dil_distil_mha_scores_calc(
   auto _mask_qk = mask_qk.toType(at::kFloat);
   return DivMaskedfillSoftmax(
       qk, _mask_qk, mask_qk_reshp, _fill, _dim_per_head);
+}
+
+/**
+ * For BF16/FP32 path, We split the vit (ats_vit) mha fusion into two parts -
+ * Matmul and Div+4DMaskedfill+Softmax.
+ * We do input checkings at graph rewrite time, so we assume here:
+ * Only support last dimension for softmax
+ * Only support contiguous tensor for qk and mask
+ * Only support qk.dim >=2D
+ * Only support mask has the same dim as qk (broadcastable)
+ * Also checking the dtype as None
+ **/
+at::Tensor dil_vit_mha_scores_calc(
+    const at::Tensor& q,
+    const at::Tensor& k,
+    const at::Tensor& mask_qk_reshp,
+    const at::Scalar& fill,
+    const at::Scalar& dim_per_head) {
+  RECORD_FUNCTION("dil_vit_mha_scores_calc", c10::ArrayRef<c10::IValue>({}));
+  auto _dim_per_head = 1 / dim_per_head.to<float>();
+  auto _fill = fill.to<float>();
+  auto qk = at::Tensor();
+  qk = bmm_impl(q, k, qk, ideep::attr_t(), {}, 1.f);
+  //  convert the mask to float for creating vec mask for kernel computation
+  auto _mask_qk = mask_qk_reshp.toType(at::kFloat);
+  return DivMaskedfillSoftmax(qk, _mask_qk, {}, _fill, _dim_per_head);
 }
 
 /**

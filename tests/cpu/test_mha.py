@@ -38,7 +38,7 @@ class MHA_Model_BERT(nn.Module):
         return context_layer
 
 class MHA_Model_Distil(nn.Module):
-    def __init__(self, scale, num_heads, head_dims, trans_a, trans_b, trans_c):
+    def __init__(self, scale, num_heads, head_dims, trans_a, trans_b, trans_c, fill_value=-float("inf")):
         super(MHA_Model_Distil, self).__init__()
         self.scale = scale
         self.n_head = num_heads
@@ -50,6 +50,7 @@ class MHA_Model_Distil(nn.Module):
         self.trans_a = trans_a
         self.trans_b = trans_b
         self.trans_c = trans_c
+        self.fill_value = fill_value
 
     def forward(self, x, mask):
         bs, q_length, dim = x.size()
@@ -68,7 +69,7 @@ class MHA_Model_Distil(nn.Module):
         q = q / self.scale
         scores = torch.matmul(q, k.transpose(self.trans_b, self.trans_c))
         mask = (mask == 0).view(mask_reshp).expand_as(scores)
-        scores = scores.masked_fill(mask, -float("inf"))
+        scores = scores.masked_fill(mask, self.fill_value)
         weights = nn.functional.softmax(scores, dim=-1)
         context = torch.matmul(weights, v)
         context_layer = unshape(context)
@@ -117,9 +118,6 @@ class TransFreeMHATester(TestCase):
             mha_model = MHA_Model_BERT(scales[i], num_heads[i], head_dims[i], [0, 2, 1, 3], -1, -2).eval()
             mha_ipex = ipex.optimize(mha_model, dtype=torch.bfloat16, level="O1")
 
-            distil_mha_model = MHA_Model_Distil(scales[i], num_heads[i], head_dims[i], 1, 2, 3).eval()
-            distil_mha_ipex = ipex.optimize(distil_mha_model, dtype=torch.bfloat16, level="O1")
-
             vit_mha_model = MHA_Model_ViT(scales[i], num_heads[i], head_dims[i], [2, 0, 3, 1, 4], -2, -1, 1, 2).eval()
             vit_mha_ipex = ipex.optimize(vit_mha_model, dtype=torch.bfloat16, level="O1")
 
@@ -127,32 +125,39 @@ class TransFreeMHATester(TestCase):
                 mha_ipex = torch.jit.trace(mha_ipex, (mat, mask_base, ))
                 mha_ipex = torch.jit.freeze(mha_ipex)
 
-                distil_mha_ipex = torch.jit.trace(distil_mha_ipex, (mat, mask_distil, ))
-                distil_mha_ipex = torch.jit.freeze(distil_mha_ipex)
-
                 vit_mha_ipex = torch.jit.trace(vit_mha_ipex, (mat, ))
                 vit_mha_ipex = torch.jit.freeze(vit_mha_ipex)
 
                 for _ in range(2):
                     mha_jit = mha_ipex(mat, mask_base)
-                    distil_mha_jit = distil_mha_ipex(mat, mask_distil)
                     vit_mha_jit = vit_mha_ipex(mat)
                 
                 mha_ref = mha_model(mat, mask_base)
-                distil_mha_ref = distil_mha_model(mat, mask_distil)
                 vit_mha_ref = vit_mha_model(mat)
 
                 self.assertEqual(mha_ref, mha_jit, prec=1e-2)
-                self.assertEqual(distil_mha_ref, distil_mha_jit, prec=1e-2)
                 self.assertEqual(vit_mha_ref, vit_mha_jit, prec=1e-2)
 
                 mha_graph = mha_ipex.graph_for(mat, mask_base)
-                distil_mha_graph = distil_mha_ipex.graph_for(mat, mask_distil)
                 vit_mha_graph = vit_mha_ipex.graph_for(mat)
 
                 self.assertTrue(any(n.kind() == "ipex::transfree_mha" for n in mha_graph.nodes()))
-                self.assertTrue(any(n.kind() == "ipex::transfree_distil_mha" for n in distil_mha_graph.nodes()))
                 self.assertTrue(any(n.kind() == "ipex::transfree_vit_mha" for n in vit_mha_graph.nodes()))
+
+            for fill_value in [-float("inf"), torch.tensor(torch.finfo(float).min)]:
+                distil_mha_model = MHA_Model_Distil(scales[i], num_heads[i], head_dims[i], 1, 2, 3, fill_value).eval()
+                distil_mha_ipex = ipex.optimize(distil_mha_model, dtype=torch.bfloat16, level="O1")
+
+                with torch.cpu.amp.autocast(), torch.no_grad():
+                    distil_mha_ipex = torch.jit.trace(distil_mha_ipex, (mat, mask_distil, ))
+                    distil_mha_ipex = torch.jit.freeze(distil_mha_ipex)
+
+                    for _ in range(2):
+                        distil_mha_jit = distil_mha_ipex(mat, mask_distil)
+                    distil_mha_ref = distil_mha_model(mat, mask_distil)
+                    self.assertEqual(distil_mha_ref, distil_mha_jit, prec=1e-2)
+                    distil_mha_graph = distil_mha_ipex.graph_for(mat, mask_distil)
+                    self.assertTrue(any(n.kind() == "ipex::transfree_distil_mha" for n in distil_mha_graph.nodes()))
 
     def test_fake_mha_bf16(self):
         mat = torch.randn(16, 16, 256).to(torch.bfloat16)
