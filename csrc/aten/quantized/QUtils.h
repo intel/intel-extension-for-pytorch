@@ -5,7 +5,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/cpp_custom_type_hack.h>
 #include <ATen/native/quantized/PackedParams.h>
-#include <ATen/native/quantized/cpu/conv_serialization.h>
+// #include <ATen/native/quantized/cpu/conv_serialization.h>
 #include <torch/custom_class.h>
 #include <torch/custom_class_detail.h>
 

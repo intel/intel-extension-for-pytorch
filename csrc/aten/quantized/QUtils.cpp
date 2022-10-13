@@ -1,10 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorFactories.h>
-#include <ATen/native/quantized/cpu/conv_packed_params.h>
-#include <ATen/native/quantized/cpu/conv_serialization.h>
-#include <ATen/native/quantized/cpu/embedding_packed_params.h>
-#include <ATen/native/quantized/cpu/packed_params.h>
-#include <ATen/native/quantized/cpu/qnnpack_utils.h>
+// #include <ATen/native/quantized/cpu/conv_serialization.h>
+// #include <ATen/native/quantized/cpu/embedding_packed_params.h>
+// #include <ATen/native/quantized/cpu/packed_params.h>
+// #include <ATen/native/quantized/cpu/qnnpack_utils.h>
 #include <ATen/quantized/QTensorImpl.h>
 #include <ATen/quantized/Quantizer.h>
 #include <c10/core/QScheme.h>

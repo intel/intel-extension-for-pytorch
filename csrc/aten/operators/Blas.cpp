@@ -136,7 +136,7 @@ Tensor& baddbmm_out(
 
     if (input.defined() && beta.to<float>() != 0.f) {
       result = at::AtenIpexTypeXPU::mul_out(
-          result, input, at::native::wrapped_scalar_tensor(at::Scalar(beta)));
+          input, at::native::wrapped_scalar_tensor(at::Scalar(beta)), result);
     } else {
       result.zero_();
     }
@@ -594,7 +594,7 @@ at::Tensor t_matmul_add_gelu(
       result, tensor1, tensor2, bias, accumul, trans, fallback, attr);
   if (fallback) {
     result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
-    result = at::gelu(result + at::mul(accumul1, beta1));
+    // result = at::gelu(result + at::mul(accumul1, beta1)); NOTE:gelu
   }
   return result;
 }

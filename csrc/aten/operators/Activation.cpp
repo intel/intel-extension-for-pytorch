@@ -388,16 +388,18 @@ inline scalar_t gelu_erf_forward(scalar_t self) {
   const accscalar_t one = accscalar_t(1);
   const accscalar_t pointfive = accscalar_t(0.5);
   const accscalar_t x = static_cast<accscalar_t>(self);
-  return (
-      scalar_t)(x * pointfive * (one + Numerics<accscalar_t>::erf(x * alpha)));
+  return (scalar_t)(
+      x * pointfive * (one + Numerics<accscalar_t>::erf(x * alpha)));
 }
 
 template <typename scalar_t>
 inline scalar_t gelu_erf_backward(scalar_t grad, scalar_t self) {
   using accscalar_t = acc_type<scalar_t>;
   auto v = static_cast<accscalar_t>(self) * M_SQRT1_2;
-  return (
-      scalar_t)(grad * 0.5 * (1.0 + Numerics<accscalar_t>::erf(v) + v * M_2_SQRTPI * Numerics<accscalar_t>::exp(-v * v)));
+  return (scalar_t)(
+      grad * 0.5 *
+      (1.0 + Numerics<accscalar_t>::erf(v) +
+       v * M_2_SQRTPI * Numerics<accscalar_t>::exp(-v * v)));
 }
 
 Tensor& silu_out_kernel(const Tensor& self, Tensor& result) {
@@ -794,9 +796,10 @@ Tensor hardswish_backward(const Tensor& grad_output, const Tensor& self) {
   return result;
 }
 
-Tensor& gelu_out(const Tensor& self,
-                 c10::string_view approximate,
-                 Tensor& result) {
+Tensor& gelu_out(
+    const Tensor& self,
+    c10::string_view approximate,
+    Tensor& result) {
   if (xpu::oneDNN::is_onednn_layout(self) &&
       xpu::oneDNN::eltwise_forward_valid(self)) {
     xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(

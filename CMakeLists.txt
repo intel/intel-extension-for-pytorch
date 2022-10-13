@@ -29,7 +29,7 @@ option(BUILD_SEPARATE_OPS "Build each operator in separate library" OFF)
 set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build (for example, skl,ats,...)")
 option(USE_PROFILER "USE XPU Profiler in build." ON)
 option(USE_SYCL_ASSERT "Enables assert in sycl kernel" OFF)
-option(BUILD_SIMPLE_TRACE "Build simple trace for each registered operator" ON)
+option(BUILD_SIMPLE_TRACE "Build simple trace for each registered operator" OFF)
 set(BUILD_OPT_LEVEL "" CACHE STRING "Add build option -Ox, accept values: 0/1")
 option(BUILD_JIT_QUANTIZATION_SAVE "Support jit quantization model save and load" OFF)
 

@@ -38,9 +38,9 @@ void avg_pool2d_out_template(
       "avg_pool2d: stride must either be omitted, a single int, or a "
       "tuple of two ints");
   const int dH = stride.empty() ? kH : safe_downcast<int, int64_t>(stride[0]);
-  const int dW = stride.empty() ? kW
-      : stride.size() == 1      ? dH
-                                : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty()
+      ? kW
+      : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 2,
@@ -169,9 +169,9 @@ Tensor& avg_pool2d_backward_out_template(
       "avg_pool2d: stride must either be omitted, a single int, or a "
       "tuple of two ints");
   const int dH = stride.empty() ? kH : safe_downcast<int, int64_t>(stride[0]);
-  const int dW = stride.empty() ? kW
-      : stride.size() == 1      ? dH
-                                : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty()
+      ? kW
+      : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 2,
