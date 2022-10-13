@@ -1,3 +1,4 @@
+#include <ATen/native/quantized/PackedParams.h>
 #include <quantized/QUtil.h>
 #include <torch/csrc/jit/runtime/custom_operator.h>
 #include <torch/csrc/jit/runtime/operator.h>

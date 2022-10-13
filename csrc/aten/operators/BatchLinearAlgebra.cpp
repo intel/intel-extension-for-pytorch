@@ -1977,7 +1977,8 @@ static Tensor& linalg_solve_out_info(
       infos_vec_1.end(),
       infos.template data_ptr<int64_t>());
 
-  at::_linalg_check_errors(infos, "lu_solve_dpcpp", input_working_copy.dim() == 2);
+  at::_linalg_check_errors(
+      infos, "lu_solve_dpcpp", input_working_copy.dim() == 2);
 
   // for 1-dimensional 'other', we need to squeeze the result after
   // "apply_solve"
@@ -1998,8 +1999,9 @@ Tensor _lu_solve_helper(
       LU_pivots.is_contiguous() ? LU_pivots : LU_pivots.contiguous();
   // FIXME: oneMKL only support int64_t datatype of pivots
   LU_pivots_working_copy = LU_pivots.to(kLong);
-  auto infos_tensor =
-      at::zeros(native::batchCount(self), self.options().dtype(kLong).device(DeviceType::CPU));
+  auto infos_tensor = at::zeros(
+      native::batchCount(self),
+      self.options().dtype(kLong).device(DeviceType::CPU));
   std::vector<int64_t> infos(native::batchCount(self), 0);
 
   if (self.numel() == 0 || LU_data.numel() == 0) {
@@ -2081,8 +2083,9 @@ std::tuple<Tensor, Tensor> _solve_helper(const Tensor& self, const Tensor& A) {
   req_size.pop_back();
   auto pivots_tensor = at::empty(req_size, A.options().dtype(kLong));
 
-  auto infos_tensor =
-      at::zeros(native::batchCount(self), self.options().dtype(kLong).device(DeviceType::CPU));
+  auto infos_tensor = at::zeros(
+      native::batchCount(self),
+      self.options().dtype(kLong).device(DeviceType::CPU));
   std::vector<int64_t> infos(native::batchCount(self), 0);
 
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "solve_dpcpp", [&] {
@@ -2120,8 +2123,9 @@ std::tuple<Tensor&, Tensor&> solve_out(
 }
 
 Tensor _inverse_helper(const Tensor& self) {
-  auto infos_tensor =
-      at::zeros(native::batchCount(self), self.options().dtype(kLong).device(DeviceType::CPU));
+  auto infos_tensor = at::zeros(
+      native::batchCount(self),
+      self.options().dtype(kLong).device(DeviceType::CPU));
   std::vector<int64_t> infos_lu_vec(native::batchCount(self), 0);
   std::vector<int64_t> infos_getri_vec(native::batchCount(self), 0);
 
@@ -2137,10 +2141,14 @@ Tensor _inverse_helper(const Tensor& self) {
       });
 
   std::copy(
-      infos_lu_vec.begin(), infos_lu_vec.end(), infos_tensor.template data_ptr<int64_t>());
+      infos_lu_vec.begin(),
+      infos_lu_vec.end(),
+      infos_tensor.template data_ptr<int64_t>());
   at::_linalg_check_errors(infos_tensor, "infos_lu_vec", self.dim() == 2);
   std::copy(
-      infos_getri_vec.begin(), infos_getri_vec.end(), infos_tensor.template data_ptr<int64_t>());
+      infos_getri_vec.begin(),
+      infos_getri_vec.end(),
+      infos_tensor.template data_ptr<int64_t>());
   at::_linalg_check_errors(infos_tensor, "infos_getri_vec", self.dim() == 2);
 
   return self_inv_working_copy;
@@ -2514,8 +2522,9 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
     const Tensor& self,
     bool some,
     bool compute_uv) {
-  auto infos_tensor =
-      at::zeros(native::batchCount(self), self.options().dtype(kLong).device(DeviceType::CPU));
+  auto infos_tensor = at::zeros(
+      native::batchCount(self),
+      self.options().dtype(kLong).device(DeviceType::CPU));
   std::vector<int64_t> infos(native::batchCount(self), 0);
   int64_t m = self.size(-2), n = self.size(-1);
   int64_t k = std::min(m, n);
@@ -2586,8 +2595,9 @@ std::tuple<Tensor, Tensor> _symeig_helper(
     const Tensor& self,
     bool eigenvectors,
     bool upper) {
-  auto infos_tensor =
-      at::zeros(native::batchCount(self), self.options().dtype(kLong).device(DeviceType::CPU));
+  auto infos_tensor = at::zeros(
+      native::batchCount(self),
+      self.options().dtype(kLong).device(DeviceType::CPU));
   std::vector<int64_t> infos(native::batchCount(self), 0);
 
   auto self_sizes = self.sizes().vec();
@@ -2680,8 +2690,9 @@ Tensor _cholesky_solve_helper(
     bool upper) {
   auto self_working_copy = native::cloneBatchedColumnMajor(self);
   auto input2_working_copy = native::cloneBatchedColumnMajor(input2);
-  auto infos_tensor =
-      at::zeros(native::batchCount(self), self.options().dtype(kLong).device(DeviceType::CPU));
+  auto infos_tensor = at::zeros(
+      native::batchCount(self),
+      self.options().dtype(kLong).device(DeviceType::CPU));
   std::vector<int64_t> infos(native::batchCount(self), 0);
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "cholesky_solve_dpcpp", [&] {
     impl::apply_cholesky_solve_dpcpp_<scalar_t>(
@@ -2690,14 +2701,16 @@ Tensor _cholesky_solve_helper(
 
   std::copy(
       infos.begin(), infos.end(), infos_tensor.template data_ptr<int64_t>());
-  at::_linalg_check_errors(infos_tensor, "cholesky_solve_dpcpp", self.dim() == 2);
+  at::_linalg_check_errors(
+      infos_tensor, "cholesky_solve_dpcpp", self.dim() == 2);
 
   return self_working_copy;
 }
 
 Tensor _cholesky_helper(const Tensor& self, bool upper) {
-  auto infos_tensor =
-      at::zeros(native::batchCount(self), self.options().dtype(kLong).device(DeviceType::CPU));
+  auto infos_tensor = at::zeros(
+      native::batchCount(self),
+      self.options().dtype(kLong).device(DeviceType::CPU));
   std::vector<int64_t> infos(native::batchCount(self), 0);
   auto self_working_copy = native::cloneBatchedColumnMajor(self);
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
@@ -2840,8 +2853,9 @@ Tensor _det_lu_based_helper_backward_helper(
 
   auto trans = self.is_complex() ? TransposeType::ConjTranspose
                                  : TransposeType::Transpose;
-  auto infos_tensor =
-      at::zeros(native::batchCount(d), self.options().dtype(kLong).device(DeviceType::CPU));
+  auto infos_tensor = at::zeros(
+      native::batchCount(d),
+      self.options().dtype(kLong).device(DeviceType::CPU));
   std::vector<int64_t> infos(native::batchCount(d), 0);
 
   // d is modified in-place and will contain the result
@@ -2852,7 +2866,8 @@ Tensor _det_lu_based_helper_backward_helper(
 
   std::copy(
       infos.begin(), infos.end(), infos_tensor.template data_ptr<int64_t>());
-  at::_linalg_check_errors(infos_tensor, "_det_lu_based_helper_backward_helper", self.dim() == 2);
+  at::_linalg_check_errors(
+      infos_tensor, "_det_lu_based_helper_backward_helper", self.dim() == 2);
 
   return d;
 }
@@ -2875,9 +2890,9 @@ void linalg_eigh_impl(
   });
 
   if (eigenvectors.dim() > 2) {
-    at::native::batchCheckErrors(infos_vec, "symeig");
+    // at::native::batchCheckErrors(infos_vec, "symeig");
   } else {
-    at::native::singleCheckErrors(infos_vec[0], "symeig");
+    // at::native::singleCheckErrors(infos_vec[0], "symeig");
   }
 
   if (compute_eigenvectors) {
@@ -2906,8 +2921,8 @@ void linalg_eigh_out_info(
 
   // eigenvalues are always real-valued
   // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
-  ScalarType real_dtype = toValueType(input.scalar_type());
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(values.scalar_type() == real_dtype);
+  // ScalarType real_dtype = toValueType(input.scalar_type());
+  // TORCH_INTERNAL_ASSERT_DEBUG_ONLY(values.scalar_type() == real_dtype);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
       input.scalar_type() == vectors.scalar_type());
 
@@ -2967,24 +2982,24 @@ void linalg_eigh_out_info(
 std::tuple<Tensor, Tensor> linalg_eigh(
     const Tensor& input,
     c10::string_view uplo) {
-  at::native::squareCheckInputs(input);
-  at::native::checkUplo(uplo);
-  ScalarType real_dtype = c10::toValueType(input.scalar_type());
-  Tensor values = at::empty({0}, input.options().dtype(real_dtype));
-  Tensor vectors = at::empty({0}, input.options());
-  Tensor infos = at::zeros(
-      {std::max<int64_t>(1, native::batchCount(input))},
-      input.options().dtype(kInt));
+  // at::native::squareCheckInputs(input);
+  // at::native::checkUplo(uplo);
+  // ScalarType real_dtype = c10::toValueType(input.scalar_type());
+  // Tensor values = at::empty({0}, input.options().dtype(real_dtype));
+  // Tensor vectors = at::empty({0}, input.options());
+  // Tensor infos = at::zeros(
+  //     {std::max<int64_t>(1, native::batchCount(input))},
+  //     input.options().dtype(kInt));
 
-  linalg_eigh_out_info(input, values, vectors, infos, true, uplo);
+  // linalg_eigh_out_info(input, values, vectors, infos, true, uplo);
 
-  if (input.dim() > 2) {
-    at::native::batchCheckErrors(infos, "torch.linalg.eigh");
-  } else {
-    at::native::singleCheckErrors(infos.item().toInt(), "torch.linalg.eigh");
-  }
+  // if (input.dim() > 2) {
+  //   at::native::batchCheckErrors(infos, "torch.linalg.eigh");
+  // } else {
+  //   at::native::singleCheckErrors(infos.item().toInt(), "torch.linalg.eigh");
+  // }
 
-  return std::tuple<Tensor, Tensor>(values, vectors);
+  // return std::tuple<Tensor, Tensor>(values, vectors);
 }
 
 // TODO: it's possible to make the _out variant to be a primal function and
@@ -2996,102 +3011,103 @@ std::tuple<Tensor&, Tensor&> linalg_eigh_out(
     c10::string_view uplo,
     Tensor& eigvals,
     Tensor& eigvecs) {
-  TORCH_CHECK(
-      input.device() == eigvals.device(),
-      "Expected two tensors to be on the same device, but "
-      "found at least two devices, ",
-      input.device(),
-      " and ",
-      eigvals.device(),
-      "!");
+  // TORCH_CHECK(
+  //     input.device() == eigvals.device(),
+  //     "Expected two tensors to be on the same device, but "
+  //     "found at least two devices, ",
+  //     input.device(),
+  //     " and ",
+  //     eigvals.device(),
+  //     "!");
 
-  TORCH_CHECK(
-      input.device() == eigvecs.device(),
-      "Expected two tensors to be on the same device, but "
-      "found at least two devices, ",
-      input.device(),
-      " and ",
-      eigvecs.device(),
-      "!");
-  at::native::checkLinalgCompatibleDtype(
-      "torch.linalg.eigh", eigvecs, input, "eigenvectors");
+  // TORCH_CHECK(
+  //     input.device() == eigvecs.device(),
+  //     "Expected two tensors to be on the same device, but "
+  //     "found at least two devices, ",
+  //     input.device(),
+  //     " and ",
+  //     eigvecs.device(),
+  //     "!");
+  // at::native::checkLinalgCompatibleDtype(
+  //     "torch.linalg.eigh", eigvecs, input, "eigenvectors");
 
-  // eigenvalues are always real-valued here
-  ScalarType real_dtype = c10::toValueType(input.scalar_type());
-  at::native::checkLinalgCompatibleDtype(
-      "torch.linalg.eigh", eigvals.scalar_type(), real_dtype, "eigenvalues");
+  // // eigenvalues are always real-valued here
+  // ScalarType real_dtype = c10::toValueType(input.scalar_type());
+  // at::native::checkLinalgCompatibleDtype(
+  //     "torch.linalg.eigh", eigvals.scalar_type(), real_dtype, "eigenvalues");
 
-  Tensor eigvals_tmp, eigvecs_tmp;
-  std::tie(eigvals_tmp, eigvecs_tmp) =
-      at::AtenIpexTypeXPU::linalg_eigh(input, uplo);
+  // Tensor eigvals_tmp, eigvecs_tmp;
+  // std::tie(eigvals_tmp, eigvecs_tmp) =
+  //     at::AtenIpexTypeXPU::linalg_eigh(input, uplo);
 
-  at::native::resize_output(eigvals, eigvals_tmp.sizes());
-  eigvals.copy_(eigvals_tmp);
-  at::native::resize_output(eigvecs, eigvecs_tmp.sizes());
-  eigvecs.copy_(eigvecs_tmp);
+  // at::native::resize_output(eigvals, eigvals_tmp.sizes());
+  // eigvals.copy_(eigvals_tmp);
+  // at::native::resize_output(eigvecs, eigvecs_tmp.sizes());
+  // eigvecs.copy_(eigvecs_tmp);
 
-  return std::tuple<Tensor&, Tensor&>(eigvals, eigvecs);
+  // return std::tuple<Tensor&, Tensor&>(eigvals, eigvecs);
 }
 
 Tensor& linalg_eigvalsh_out(
     const Tensor& input,
     c10::string_view uplo,
     Tensor& result) {
-  ScalarType real_dtype = c10::toValueType(input.scalar_type());
-  TORCH_CHECK(
-      input.device() == result.device(),
-      "Expected two tensors to be on the same device, but "
-      "found at least two devices, ",
-      input.device(),
-      " and ",
-      result.device(),
-      "!");
-  at::native::checkLinalgCompatibleDtype(
-      "torch.linalg.eigvalsh", result.scalar_type(), real_dtype);
+  // ScalarType real_dtype = c10::toValueType(input.scalar_type());
+  // TORCH_CHECK(
+  //     input.device() == result.device(),
+  //     "Expected two tensors to be on the same device, but "
+  //     "found at least two devices, ",
+  //     input.device(),
+  //     " and ",
+  //     result.device(),
+  //     "!");
+  // at::native::checkLinalgCompatibleDtype(
+  //     "torch.linalg.eigvalsh", result.scalar_type(), real_dtype);
 
-  at::native::squareCheckInputs(input);
-  at::native::checkUplo(uplo);
+  // at::native::squareCheckInputs(input);
+  // at::native::checkUplo(uplo);
 
-  auto expected_result_shape =
-      IntArrayRef(input.sizes().data(), input.dim() - 1); // input.shape[:-1]
-  bool result_equal_expected_shape =
-      result.sizes().equals(expected_result_shape);
-  bool expected_result_type = (result.scalar_type() == real_dtype);
-  bool copy_needed = !expected_result_type;
-  copy_needed |= (result.numel() != 0 && !result_equal_expected_shape);
-  copy_needed |= (result.numel() != 0 && !result.is_contiguous());
+  // auto expected_result_shape =
+  //     IntArrayRef(input.sizes().data(), input.dim() - 1); // input.shape[:-1]
+  // bool result_equal_expected_shape =
+  //     result.sizes().equals(expected_result_shape);
+  // bool expected_result_type = (result.scalar_type() == real_dtype);
+  // bool copy_needed = !expected_result_type;
+  // copy_needed |= (result.numel() != 0 && !result_equal_expected_shape);
+  // copy_needed |= (result.numel() != 0 && !result.is_contiguous());
 
-  Tensor vectors = at::empty({0}, input.options());
-  Tensor infos = at::zeros(
-      {std::max<int64_t>(1, at::native::batchCount(input))},
-      input.options().dtype(kInt));
+  // Tensor vectors = at::empty({0}, input.options());
+  // Tensor infos = at::zeros(
+  //     {std::max<int64_t>(1, at::native::batchCount(input))},
+  //     input.options().dtype(kInt));
 
-  if (copy_needed) { // we have to allocate a temporary tensor
-    Tensor result_tmp =
-        at::empty({expected_result_shape}, input.options().dtype(real_dtype));
-    linalg_eigh_out_info(
-        input,
-        result_tmp,
-        vectors,
-        infos,
-        /*compute_eigenvectors=*/false,
-        uplo);
-    at::native::resize_output(result, result_tmp.sizes());
-    result.copy_(result_tmp);
-  } else {
-    // else use the provided output storage directly
-    linalg_eigh_out_info(
-        input, result, vectors, infos, /*compute_eigenvectors=*/false, uplo);
-  }
+  // if (copy_needed) { // we have to allocate a temporary tensor
+  //   Tensor result_tmp =
+  //       at::empty({expected_result_shape},
+  //       input.options().dtype(real_dtype));
+  //   linalg_eigh_out_info(
+  //       input,
+  //       result_tmp,
+  //       vectors,
+  //       infos,
+  //       /*compute_eigenvectors=*/false,
+  //       uplo);
+  //   at::native::resize_output(result, result_tmp.sizes());
+  //   result.copy_(result_tmp);
+  // } else {
+  //   // else use the provided output storage directly
+  //   linalg_eigh_out_info(
+  //       input, result, vectors, infos, /*compute_eigenvectors=*/false, uplo);
+  // }
 
-  if (input.dim() > 2) {
-    at::native::batchCheckErrors(infos, "torch.linalg.eigvalsh");
-  } else {
-    at::native::singleCheckErrors(
-        infos.item().toInt(), "torch.linalg.eigvalsh");
-  }
+  // if (input.dim() > 2) {
+  //   at::native::batchCheckErrors(infos, "torch.linalg.eigvalsh");
+  // } else {
+  //   at::native::singleCheckErrors(
+  //       infos.item().toInt(), "torch.linalg.eigvalsh");
+  // }
 
-  return result;
+  // return result;
 }
 
 } // namespace AtenIpexTypeXPU

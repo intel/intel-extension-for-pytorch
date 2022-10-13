@@ -73,7 +73,8 @@ Tensor sum(
     bool keepdim,
     c10::optional<ScalarType> opt_dtype) {
   ScalarType dtype = get_dtype_from_self(self, opt_dtype, true);
-  Tensor result = create_reduction_result(self, dim.value_or(IntArrayRef{}), keepdim, dtype);
+  Tensor result = create_reduction_result(
+      self, dim.value_or(IntArrayRef{}), keepdim, dtype);
   return at::AtenIpexTypeXPU::sum_out(self, dim, keepdim, dtype, result);
 }
 

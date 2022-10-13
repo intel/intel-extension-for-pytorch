@@ -212,7 +212,7 @@ static void isin_sorting(
   // 2. Stable sort all elements, maintaining order indices to reverse the
   //    operation. Stable sort is necessary to keep elements before test
   //    elements within the sorted list.
-  Tensor all_elements = at::_cat({elements_flat, test_elements_flat});
+  Tensor all_elements = at::cat({elements_flat, test_elements_flat});
   // use pstl sort here, equals to "all_elements.sort(true, 0, false)"
   auto index_options = all_elements.options().dtype(kLong);
   Tensor sorted_elements = all_elements.clone().reshape(-1);

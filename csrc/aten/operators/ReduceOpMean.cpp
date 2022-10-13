@@ -115,7 +115,8 @@ Tensor mean(
 }
 
 Tensor mean(const Tensor& self, optional<ScalarType> dtype) {
-  return at::AtenIpexTypeXPU::mean(self, OptionalIntArrayRef{IntArrayRef{}}, false, dtype);
+  return at::AtenIpexTypeXPU::mean(
+      self, OptionalIntArrayRef{IntArrayRef{}}, false, dtype);
 }
 
 } // namespace AtenIpexTypeXPU

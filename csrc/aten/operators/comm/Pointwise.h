@@ -23,7 +23,9 @@ const Tensor& resize_as_(
       out = CFUNC(in);                                           \
     }                                                            \
                                                                  \
-    inline void operator()(scalar_t& v) const { v = CFUNC(v); }  \
+    inline void operator()(scalar_t& v) const {                  \
+      v = CFUNC(v);                                              \
+    }                                                            \
   };                                                             \
                                                                  \
   template <typename scalar_t>                                   \

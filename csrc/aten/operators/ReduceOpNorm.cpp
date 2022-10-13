@@ -383,7 +383,8 @@ static Tensor& linalg_vector_norm_impl(
   }
   Tensor self_;
   self_ = self;
-  ScalarType out_dtype = opt_dtype.value_or(toRealValueType(self.scalar_type()));
+  ScalarType out_dtype =
+      opt_dtype.value_or(toRealValueType(self.scalar_type()));
   TORCH_CHECK(
       !result.defined() || out_dtype == result.scalar_type(),
       "linalg.vector_norm expected out tensor dtype ",
@@ -408,9 +409,9 @@ Tensor linalg_vector_norm(
     c10::OptionalArrayRef<long> opt_dim,
     bool keepdim,
     optional<ScalarType> opt_dtype) {
-  ScalarType out_dtype = opt_dtype.value_or(toRealValueType(self.scalar_type()));
-  Tensor result = create_reduction_result(
-      self, opt_dim, keepdim, out_dtype);
+  ScalarType out_dtype =
+      opt_dtype.value_or(toRealValueType(self.scalar_type()));
+  Tensor result = create_reduction_result(self, opt_dim, keepdim, out_dtype);
   return linalg_vector_norm_impl(
       self, ord, opt_dim, keepdim, opt_dtype, result);
 }
