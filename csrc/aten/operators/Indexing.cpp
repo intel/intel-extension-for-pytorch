@@ -1010,7 +1010,7 @@ Tensor& index_copy_(
         false, "index_copy is not implemented with deterministic algorithm.");
   }
 
-  return at::_index_copy_(self, dim, index, source);
+  // return at::index_copy(self, dim, index, source);
 }
 
 Tensor& index_fill_(

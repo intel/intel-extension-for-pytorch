@@ -100,7 +100,7 @@ Tensor linear_gelu(
   };
   Tensor output = linear_wrapper.call(input, weight, bias, post_op);
   if (!linear_wrapper.is_fused()) {
-    output = at::AtenIpexTypeXPU::gelu(output);
+    // output = at::AtenIpexTypeXPU::gelu(output); NOTE:gelu
   }
   return output;
 }

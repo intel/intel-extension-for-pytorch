@@ -271,19 +271,19 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           bool,
           bool),
       lower_precision)
-  KERNEL_XPU(
-      ADD_NS(_convolution_nogroup),
-      "_convolution_nogroup",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const c10::optional<Tensor>&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          bool,
-          IntArrayRef),
-      lower_precision)
+  //   KERNEL_XPU(
+  //       ADD_NS(_convolution_nogroup),
+  //       "_convolution_nogroup",
+  //       Tensor(
+  //           const Tensor&,
+  //           const Tensor&,
+  //           const c10::optional<Tensor>&,
+  //           IntArrayRef,
+  //           IntArrayRef,
+  //           IntArrayRef,
+  //           bool,
+  //           IntArrayRef),
+  //       lower_precision)
   KERNEL_XPU(
       ADD_NS(conv1d),
       "conv1d",
@@ -870,7 +870,8 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
                 &ADD_NS(native_layer_norm)>::type::call)));
 
   // promote
-  KERNEL_XPU(ADD_NS(cat), "cat", Tensor(const at::ITensorListRef&, int64_t), promote)
+  KERNEL_XPU(
+      ADD_NS(cat), "cat", Tensor(const at::ITensorListRef&, int64_t), promote)
   KERNEL_XPU(ADD_NS(stack), "stack", Tensor(TensorList, int64_t), promote)
   KERNEL_XPU(
       ADD_NS(addcdiv),

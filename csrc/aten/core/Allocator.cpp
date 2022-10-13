@@ -92,7 +92,6 @@ class DeviceAllocator final : public at::Allocator {
   }
 
  private:
-
   Queue* DPCPPStreamToQueue(DPCPPStream stream) const {
     auto di = stream.device_index();
     auto st = queueType(static_cast<QueueId>(stream.unwrap().id()));
@@ -116,7 +115,7 @@ static DeviceAllocator myInstance;
 
 REGISTER_ALLOCATOR(kXPU, &myInstance);
 
-DeviceAllocator* DeviceAllocator::Instance(){
+DeviceAllocator* DeviceAllocator::Instance() {
   return &myInstance;
 }
 

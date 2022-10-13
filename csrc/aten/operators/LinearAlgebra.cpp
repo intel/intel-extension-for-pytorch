@@ -970,11 +970,11 @@ inline Tensor _blob_to_Tensor(
   // Blob is assumed to be a 1D array, that is why
   // we also insert a fake dimension so that the result could directly
   // be used in _compute_linear_combination
-  auto tensor =
-      at::from_blob(
-          (void*)blob.begin(), blob.size(), c10::toValueType(in.scalar_type()))
-          .unsqueeze(0);
-  return _move_memory_if_xpu_input(tensor, in);
+  // auto tensor =
+  //     at::from_blob(
+  //         (void*)blob.begin(), blob.size(),
+  //         c10::toValueType(in.scalar_type())) .unsqueeze(0);
+  // return _move_memory_if_xpu_input(tensor, in);
 }
 
 template <typename scalar_t, int ROW, int COL>
@@ -1101,28 +1101,28 @@ Tensor compute_T12(const Tensor& A) {
 
   // gather coefficients `b` from above into a tensor,
   // and move them to device `device_of(A)`
-  auto bs = at::from_blob(
-      reinterpret_cast<void*>(&b),
-      {num_prods, num_prods},
-      {num_prods, 1},
-      c10::toValueType(A.scalar_type()));
-  bs = _move_memory_if_xpu_input(bs, A);
+  // auto bs = at::from_blob(
+  //     reinterpret_cast<void*>(&b),
+  //     {num_prods, num_prods},
+  //     {num_prods, 1},
+  //     c10::toValueType(A.scalar_type()));
+  // bs = _move_memory_if_xpu_input(bs, A);
 
-  auto As = _allocate_buffer(A, num_prods);
-  _fill_matrix_powers(As, A, num_prods);
+  // auto As = _allocate_buffer(A, num_prods);
+  // _fill_matrix_powers(As, A, num_prods);
 
-  auto Bs = AtenIpexTypeXPU::_compute_linear_combination(As, bs);
+  // auto Bs = AtenIpexTypeXPU::_compute_linear_combination(As, bs);
 
-  // tmp buffer for this matrix product
-  auto out_for_a6 = As.select(0, 0);
-  // compute A6
-  Bs.select(0, 2).add_(
-      at::native::matmul_out(Bs.select(0, 3), Bs.select(0, 3), out_for_a6));
+  // // tmp buffer for this matrix product
+  // auto out_for_a6 = As.select(0, 0);
+  // // compute A6
+  // Bs.select(0, 2).add_(
+  //     at::native::matmul_out(Bs.select(0, 3), Bs.select(0, 3), out_for_a6));
 
-  // tmp buffer for this matrix product
-  auto out = As.select(0, 0);
-  return Bs.select(0, 0).add_(at::native::matmul_out(
-      Bs.select(0, 1).add_(Bs.select(0, 2)), Bs.select(0, 2), out));
+  // // tmp buffer for this matrix product
+  // auto out = As.select(0, 0);
+  // return Bs.select(0, 0).add_(at::native::matmul_out(
+  //     Bs.select(0, 1).add_(Bs.select(0, 2)), Bs.select(0, 2), out));
 }
 
 template <typename scalar_t>
@@ -1157,28 +1157,28 @@ Tensor compute_T18(const Tensor& A) {
 
   // gather coefficients `b` from above into a tensor,
   // and move them to device `device_of(A)`
-  auto bs = at::from_blob(
-      reinterpret_cast<void*>(&b),
-      {num_prods, num_prods},
-      {num_prods, 1},
-      c10::toValueType(A.scalar_type()));
-  bs = _move_memory_if_xpu_input(bs, A);
+  // auto bs = at::from_blob(
+  //     reinterpret_cast<void*>(&b),
+  //     {num_prods, num_prods},
+  //     {num_prods, 1},
+  //     c10::toValueType(A.scalar_type()));
+  // bs = _move_memory_if_xpu_input(bs, A);
 
-  auto As = _allocate_buffer(A, num_prods);
-  _fill_matrix_powers(As, A, num_prods);
+  // auto As = _allocate_buffer(A, num_prods);
+  // _fill_matrix_powers(As, A, num_prods);
 
-  auto Bs = AtenIpexTypeXPU::_compute_linear_combination(As, bs);
+  // auto Bs = AtenIpexTypeXPU::_compute_linear_combination(As, bs);
 
-  // tmp buffer for this matrix product
-  auto out_for_a9 = As.select(0, 0);
-  // compute A9
-  Bs.select(0, 3).add_(
-      at::native::matmul_out(Bs.select(0, 0), Bs.select(0, 4), out_for_a9));
+  // // tmp buffer for this matrix product
+  // auto out_for_a9 = As.select(0, 0);
+  // // compute A9
+  // Bs.select(0, 3).add_(
+  //     at::native::matmul_out(Bs.select(0, 0), Bs.select(0, 4), out_for_a9));
 
-  // tmp buffer for this matrix product
-  auto out = As.select(0, 0);
-  return Bs.select(0, 1).add_(at::native::matmul_out(
-      Bs.select(0, 2).add_(Bs.select(0, 3)), Bs.select(0, 3), out));
+  // // tmp buffer for this matrix product
+  // auto out = As.select(0, 0);
+  // return Bs.select(0, 1).add_(at::native::matmul_out(
+  //     Bs.select(0, 2).add_(Bs.select(0, 3)), Bs.select(0, 3), out));
 }
 
 template <typename scalar_t>

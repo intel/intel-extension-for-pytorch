@@ -136,7 +136,8 @@ Tensor& searchsorted_out(
     bool out_int32,
     bool right,
     Tensor& result) {
-  at::native::searchsorted_pre_check(sorted_sequence, self, result, out_int32);
+  // at::native::searchsorted_pre_check(sorted_sequence, self, result,
+  // out_int32);
   if (result.numel() == 0) {
     result.resize_(self.sizes());
   }

@@ -12,7 +12,7 @@ supported:
   - _amp_update_scale_
   - _assert_async
 #  - _cat
-  - cat.out
+#  - _cat.out
 #  - _cdist_backward
 #  - _cdist_forward
   - _compute_linear_combination
@@ -41,7 +41,7 @@ supported:
   - _fft_c2c.out
   - _fused_dropout
   - _masked_scale
-  - _index_copy_
+#  - _index_copy_
   - _index_put_impl_
 #  - _inverse_helper
 #  - _linalg_qr_helper
@@ -174,8 +174,8 @@ supported:
   - clone
   - col2im
   - col2im.out
-  - col2im_backward
-  - col2im_backward.grad_input
+#  - col2im_backward
+#  - col2im_backward.grad_input
   - conv_tbc
   - convolution_backward_overrideable
   - convolution_overrideable
@@ -295,8 +295,8 @@ supported:
   - igammac.out
   - im2col
   - im2col.out
-  - im2col_backward
-  - im2col_backward.grad_input
+#  - im2col_backward
+#  - im2col_backward.grad_input
   - index.Tensor
   - index_copy_
   - index_fill_.int_Scalar
@@ -307,9 +307,9 @@ supported:
   - inverse
   - inverse.out
   - is_set_to
-  - isin.Scalar_Tensor_out
-  - isin.Tensor_Scalar_out
-  - isin.Tensor_Tensor_out
+#  - isin.Scalar_Tensor_out
+#  - isin.Tensor_Scalar_out
+#  - isin.Tensor_Tensor_out
   - isnan
   - isneginf.out
   - isposinf.out
@@ -531,9 +531,9 @@ supported:
   - bucketize.Scalar
   - bucketize.Tensor
   - bucketize.Tensor_out
-  - searchsorted.Scalar
-  - searchsorted.Tensor
-  - searchsorted.Tensor_out
+#  - searchsorted.Scalar
+#  - searchsorted.Tensor
+#  - searchsorted.Tensor_out
   - sgn.out
   - sigmoid.out
   - sigmoid_backward.grad_input
@@ -635,7 +635,7 @@ supported:
 #  - upsample_nearest1d_backward.grad_input
 #  - upsample_nearest1d_backward.vec
 #  - upsample_nearest2d
-  - upsample_nearest2d.out
+#  - upsample_nearest2d.out
 #  - upsample_nearest2d.vec
 #  - upsample_nearest2d_backward
 #  - upsample_nearest2d_backward.grad_input
@@ -669,9 +669,9 @@ supported:
   - angle.out
   - linalg_eig
   - linalg_eig.out
-  - linalg_eigh
-  - linalg_eigh.eigvals
-  - linalg_eigvalsh.out
+#  - linalg_eigh
+#  - linalg_eigh.eigvals
+#  - linalg_eigvalsh.out
 #  - _det_lu_based_helper_backward_helper
 #  - linalg_solve
 #  - linalg_solve.out
@@ -800,8 +800,8 @@ supported:
   - mish.out
   - polar.out
   - var.correction_out
-  - matrix_exp
-  - logit_backward.grad_input
+#  - matrix_exp
+#  - logit_backward.grad_input
   - binomial
   - _standard_gamma
 autograd:

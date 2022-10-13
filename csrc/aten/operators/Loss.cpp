@@ -19,7 +19,6 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-
 Tensor& sum_out(
     const Tensor& self,
     OptionalIntArrayRef dim,
@@ -304,9 +303,11 @@ Tensor& binary_cross_entropy_out(
       loss.mul_(weight);
     }
     if (reduction == Reduction::Mean) {
-      at::AtenIpexTypeXPU::mean_out(loss, OptionalIntArrayRef{IntArrayRef{}}, false, c10::nullopt, out);
+      at::AtenIpexTypeXPU::mean_out(
+          loss, OptionalIntArrayRef{IntArrayRef{}}, false, c10::nullopt, out);
     } else {
-      at::AtenIpexTypeXPU::sum_out(loss, OptionalIntArrayRef{IntArrayRef{}}, false, c10::nullopt, out);
+      at::AtenIpexTypeXPU::sum_out(
+          loss, OptionalIntArrayRef{IntArrayRef{}}, false, c10::nullopt, out);
     }
   } else {
     auto iter = TensorIterator::binary_op(out, self, target);
@@ -379,9 +380,19 @@ Tensor& soft_margin_loss_out(
     auto iter = TensorIterator::binary_op(loss, self, target);
     impl::soft_margin_kernel(iter);
     if (reduction == Reduction::Mean) {
-      at::AtenIpexTypeXPU::mean_out(iter.output(), OptionalIntArrayRef{IntArrayRef{}}, false, c10::nullopt, out);
+      at::AtenIpexTypeXPU::mean_out(
+          iter.output(),
+          OptionalIntArrayRef{IntArrayRef{}},
+          false,
+          c10::nullopt,
+          out);
     } else {
-      at::AtenIpexTypeXPU::sum_out(iter.output(), OptionalIntArrayRef{IntArrayRef{}}, false, c10::nullopt, out);
+      at::AtenIpexTypeXPU::sum_out(
+          iter.output(),
+          OptionalIntArrayRef{IntArrayRef{}},
+          false,
+          c10::nullopt,
+          out);
     }
   } else {
     auto iter = TensorIterator::binary_op(out, self, target);
@@ -434,9 +445,19 @@ Tensor& l1_loss_out(
     Tensor loss;
     auto iter = TensorIterator::binary_op(loss, self, target);
     if (reduction == Reduction::Mean) {
-      at::AtenIpexTypeXPU::mean_out(iter.output(), OptionalIntArrayRef{IntArrayRef{}}, false, c10::nullopt, out);
+      at::AtenIpexTypeXPU::mean_out(
+          iter.output(),
+          OptionalIntArrayRef{IntArrayRef{}},
+          false,
+          c10::nullopt,
+          out);
     } else {
-      at::AtenIpexTypeXPU::sum_out(iter.output(), OptionalIntArrayRef{IntArrayRef{}}, false, c10::nullopt, out);
+      at::AtenIpexTypeXPU::sum_out(
+          iter.output(),
+          OptionalIntArrayRef{IntArrayRef{}},
+          false,
+          c10::nullopt,
+          out);
     }
   } else {
     auto iter = TensorIterator::binary_op(out, self, target);
@@ -526,9 +547,19 @@ Tensor& smooth_l1_loss_out(
     auto iter = TensorIterator::binary_op(loss, self, target);
     impl::smooth_l1_kernel(iter, beta);
     if (reduction == Reduction::Mean) {
-      at::AtenIpexTypeXPU::mean_out(iter.output(), OptionalIntArrayRef{IntArrayRef{}}, false, c10::nullopt, out);
+      at::AtenIpexTypeXPU::mean_out(
+          iter.output(),
+          OptionalIntArrayRef{IntArrayRef{}},
+          false,
+          c10::nullopt,
+          out);
     } else {
-      at::AtenIpexTypeXPU::sum_out(iter.output(), OptionalIntArrayRef{IntArrayRef{}}, false, c10::nullopt, out);
+      at::AtenIpexTypeXPU::sum_out(
+          iter.output(),
+          OptionalIntArrayRef{IntArrayRef{}},
+          false,
+          c10::nullopt,
+          out);
     }
   } else {
     auto iter = TensorIterator::binary_op(out, self, target);
@@ -569,9 +600,19 @@ Tensor& mse_loss_out(
     auto iter = TensorIterator::binary_op(loss, self, target);
     impl::mse_kernel(iter);
     if (reduction == Reduction::Mean) {
-      at::AtenIpexTypeXPU::mean_out(iter.output(), OptionalIntArrayRef{IntArrayRef{}}, false, c10::nullopt, out);
+      at::AtenIpexTypeXPU::mean_out(
+          iter.output(),
+          OptionalIntArrayRef{IntArrayRef{}},
+          false,
+          c10::nullopt,
+          out);
     } else {
-      at::AtenIpexTypeXPU::sum_out(iter.output(), OptionalIntArrayRef{IntArrayRef{}}, false, c10::nullopt, out);
+      at::AtenIpexTypeXPU::sum_out(
+          iter.output(),
+          OptionalIntArrayRef{IntArrayRef{}},
+          false,
+          c10::nullopt,
+          out);
     }
   } else {
     auto iter = TensorIterator::binary_op(out, self, target);
