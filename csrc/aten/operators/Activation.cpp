@@ -15,8 +15,9 @@
 #include "comm/RegistrationDeclarations.h"
 
 #include <oneDNN/oneDNN.h>
+#include "DistributionTemplates.h"
 #include "Loops.h"
-#include "Random.h"
+#include "RandomEngine.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -28,152 +29,139 @@ Tensor& mul_out(Tensor& out, const Tensor& self, const Tensor& other);
 
 namespace impl {
 
-template <typename scalar_t>
-static inline bool is_contiguous(const int64_t* strides) {
-  return strides[0] == sizeof(scalar_t) && strides[1] == sizeof(scalar_t) &&
-      strides[2] == sizeof(scalar_t);
-}
-
-template <typename scalar_t>
-static void RReLU_updateOutput(
-    const Tensor& input,
-    Tensor& output,
-    const Tensor& noise,
+template <typename scalar_t, int unroll_factor, typename F, typename item_t>
+inline void rrelu_with_noise_kernel(
+    item_t& item,
+    int numel,
+    PhiloxState philox_args,
+    scalar_t* output,
+    scalar_t* input,
+    scalar_t* noise,
     double lower,
     double upper,
-    bool train,
-    bool inplace,
-    c10::optional<Generator> generator) {
-  auto gen = at::get_generator_or_default<DPCPPGeneratorImpl>(
-      generator, getDefaultDPCPPGenerator());
-  if (train) {
-    auto input_ = input.contiguous();
-    noise.resize_as_(input_);
+    const F& random_func) {
+  auto thread_idx = item.get_local_id(0);
+  auto thread_range = item.get_local_range(0);
+  auto group_idx = item.get_group(0);
+  auto group_range = item.get_group_range(0);
 
-    std::pair<uint64_t, uint64_t> seeds;
-    {
-      // See Note [Acquire lock when using random generators]
-      // this philox_engine_inputs('1') is aligned with Distribution.cpp,
-      // yet they use '((n - 1) / (BLOCK_SIZE * grid.x) + 1) *
-      // curand4_engine_calls' in the same place.
-      std::lock_guard<std::mutex> lock(gen->mutex_);
-      seeds = gen->philox_engine_inputs(1);
+  auto seeds = philox_unpack(philox_args);
+  int idx = group_idx * thread_range + thread_idx;
+  randStatePhilox4_32_10_t state;
+  rand_init(std::get<0>(seeds), idx, std::get<1>(seeds), &state);
+
+  int range_stride = thread_range * group_range * unroll_factor;
+  int rounded_size = ((numel - 1) / range_stride + 1) * range_stride;
+  double range = upper - lower;
+
+  for (int linear_index = idx; linear_index < rounded_size;
+       linear_index += range_stride) {
+    auto rand = random_func(&state);
+
+    // ensure that (&rand.x)[ii] is safe
+    static_assert(sizeof(rand) / sizeof(rand.x) == unroll_factor, "");
+
+#pragma unroll
+    for (int ii = 0; ii < unroll_factor; ii++) {
+      int li = linear_index + thread_range * group_range * ii;
+      if (li >= numel) {
+        continue;
+      }
+      scalar_t r = static_cast<scalar_t>((&rand.x)[ii]);
+      r = r * range + lower;
+      if (input[li] <= 0) {
+        output[li] = input[li] * r;
+        noise[li] = r;
+      } else {
+        output[li] = input[li];
+        noise[li] = static_cast<scalar_t>(1);
+      }
     }
-    if (inplace) {
-      auto& dpcpp_queue = dpcppGetCurrentQueue();
-      auto total_threads = input_.numel();
-
-      auto cgf = DPCPP_Q_CGF(cgh) {
-        auto in_data = input_.data_ptr<scalar_t>();
-        auto noise_data = noise.data_ptr<scalar_t>();
-        cgh.parallel_for(
-            sycl::range<1>(total_threads), [=](sycl::item<1> itemId) {
-              auto in_ptr = in_data;
-              auto noise_ptr = noise_data;
-              auto id = itemId.get_id(0);
-              auto linear_id = itemId.get_linear_id();
-
-              RandomState<Philox4_32_10> state(
-                  seeds.first, linear_id, seeds.second);
-
-              if (in_ptr[id] <= 0) {
-                double rand = state.uniform<double>();
-                scalar_t r = ScalarConvert<double, scalar_t>::to(
-                    rand * (upper - lower) + lower);
-                in_ptr[id] = static_cast<scalar_t>(in_ptr[id]) * r;
-                noise_ptr[id] = r;
-              } else {
-                noise_ptr[id] = 1;
-              }
-            });
-      };
-      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-      output.set_(input_);
-    } else {
-      output.resize_as_(input_);
-
-      auto& dpcpp_queue = dpcppGetCurrentQueue();
-      auto total_threads = input_.numel();
-
-      auto cgf = DPCPP_Q_CGF(cgh) {
-        auto in_data = input_.data_ptr<scalar_t>();
-        auto out_data = output.data_ptr<scalar_t>();
-        auto noise_data = noise.data_ptr<scalar_t>();
-        cgh.parallel_for(
-            sycl::range<1>(total_threads), [=](sycl::item<1> itemId) {
-              auto in_ptr = in_data;
-              auto out_ptr = out_data;
-              auto noise_ptr = noise_data;
-              auto id = itemId.get_id(0);
-              auto linear_id = itemId.get_linear_id();
-
-              RandomState<Philox4_32_10> state(
-                  seeds.first, linear_id, seeds.second);
-
-              if (in_ptr[id] <= 0) {
-                double rand = state.uniform<double>();
-                scalar_t r = ScalarConvert<double, scalar_t>::to(
-                    rand * (upper - lower) + lower);
-                out_ptr[id] = static_cast<scalar_t>(in_ptr[id]) * r;
-                noise_ptr[id] = r;
-              } else {
-                out_ptr[id] = in_ptr[id];
-                noise_ptr[id] = 1;
-              }
-            });
-      };
-      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-    }
-  } else {
-    const scalar_t negSlope =
-        ScalarConvert<double, scalar_t>::to((lower + upper) / 2);
-    output.resize_as_(input);
-    auto iter = TensorIteratorConfig()
-                    .set_check_mem_overlap(true)
-                    .add_output(output)
-                    .add_input(input)
-                    .build();
-    dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t in) -> scalar_t {
-      return (in <= 0) ? in * negSlope : in;
-    });
   }
 }
 
 template <typename scalar_t>
-static void RReLU_updateGradInput(
-    const Tensor& input,
-    const Tensor& gradOutput,
-    Tensor& gradInput,
-    const Tensor& noise,
-    double lower,
-    double upper,
-    bool train,
-    bool inplace) {
-  TORCH_CHECK(
-      input.numel() == gradOutput.numel(),
-      "input and gradOutput have different number of elements");
-  if (train && upper - lower > 1E-6) {
-    if (inplace) {
-      gradOutput.mul_(noise);
-      gradInput.set_(gradOutput);
-    } else {
-      gradInput.resize_as_(input);
-      at::AtenIpexTypeXPU::mul_out(gradInput, gradOutput, noise);
-    }
+inline void _rrelu_with_noise_train(
+    Tensor& output,
+    const Tensor& input_,
+    const Tensor& noise_,
+    const Scalar& lower_,
+    const Scalar& upper_,
+    c10::optional<Generator> generator) {
+  auto& sycl_queue = dpcppGetCurrentQueue();
+  auto input = input_.contiguous();
+  auto noise = noise_.contiguous();
+  Tensor tmp_output = output.contiguous();
+
+  int64_t numel = input.numel();
+  auto execution_policy = calc_execution_policy(numel);
+
+  auto counter_offset = std::get<0>(execution_policy);
+  auto num_groups = std::get<1>(execution_policy);
+  auto group_size = std::get<2>(execution_policy);
+
+  auto gen = at::get_generator_or_default<DPCPPGeneratorImpl>(
+      generator, getDefaultDPCPPGenerator());
+  std::pair<uint64_t, uint64_t> seeds;
+  {
+    // See Note [Acquire lock when using random generators]
+    std::lock_guard<std::mutex> lock(gen->mutex_);
+    seeds = gen->philox_engine_inputs(counter_offset);
+  }
+  PhiloxState rng_engine_inputs(std::get<0>(seeds), std::get<1>(seeds));
+
+  scalar_t* input_data = input.data_ptr<scalar_t>();
+  scalar_t* noise_data = noise.data_ptr<scalar_t>();
+  scalar_t* output_data = tmp_output.data_ptr<scalar_t>();
+
+  double lower = lower_.to<double>();
+  double upper = upper_.to<double>();
+
+  if (std::is_same<scalar_t, double>::value) {
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
+        rrelu_with_noise_kernel<scalar_t, 2>(
+            item,
+            numel,
+            rng_engine_inputs,
+            output_data,
+            input_data,
+            noise_data,
+            lower,
+            upper,
+            [](randStatePhilox4_32_10_t* state) {
+              return rand_uniform2_double(state);
+            });
+      };
+      cgh.parallel_for(
+          sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
+    };
+    DPCPP_Q_SUBMIT(sycl_queue, cgf);
   } else {
-    const scalar_t negSlope =
-        ScalarConvert<double, scalar_t>::to((lower + upper) / 2);
-    gradInput.resize_as_(input);
-    auto iter = TensorIteratorConfig()
-                    .set_check_mem_overlap(true)
-                    .add_output(gradInput)
-                    .add_input(gradOutput)
-                    .add_input(input)
-                    .build();
-    dpcpp_kernel_for_tensor_iter(
-        iter, [=](scalar_t grad_out, scalar_t in) -> scalar_t {
-          return (in <= 0) ? grad_out * negSlope : grad_out;
-        });
+    // half and float
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
+        rrelu_with_noise_kernel<scalar_t, 4>(
+            item,
+            numel,
+            rng_engine_inputs,
+            output_data,
+            input_data,
+            noise_data,
+            lower,
+            upper,
+            [](randStatePhilox4_32_10_t* state) {
+              return rand_uniform4(state);
+            });
+      };
+      cgh.parallel_for(
+          sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
+    };
+    DPCPP_Q_SUBMIT(sycl_queue, cgf);
+  }
+
+  if (!output.is_contiguous()) {
+    output.copy_(tmp_output);
   }
 }
 
@@ -459,50 +447,6 @@ Tensor& threshold_backward_out(
   return gradInput;
 }
 
-Tensor rrelu_with_noise(
-    const Tensor& self,
-    const Tensor& noise,
-    const Scalar& lower,
-    const Scalar& upper,
-    bool training,
-    c10::optional<Generator> generator) {
-  auto self_ = self.contiguous();
-  Tensor output = at::empty_like(self_);
-  auto lower_ = lower.toDouble();
-  auto upper_ = upper.toDouble();
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "RReLU_updateOutput",
-      [&]() {
-        impl::RReLU_updateOutput<scalar_t>(
-            self, output, noise, lower_, upper_, training, false, generator);
-      });
-  return output;
-}
-// TODO: fix const self
-Tensor& rrelu_with_noise_(
-    Tensor& self,
-    const Tensor& noise,
-    const Scalar& lower,
-    const Scalar& upper,
-    bool training,
-    c10::optional<Generator> generator) {
-  auto lower_ = lower.toDouble();
-  auto upper_ = upper.toDouble();
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "RReLU_updateOutput",
-      [&]() {
-        impl::RReLU_updateOutput<scalar_t>(
-            self, self, noise, lower_, upper_, training, true, generator);
-      });
-  return self;
-}
-
 Tensor& rrelu_with_noise_out(
     const Tensor& self,
     const Tensor& noise,
@@ -511,18 +455,50 @@ Tensor& rrelu_with_noise_out(
     bool training,
     c10::optional<Generator> generator,
     Tensor& out) {
-  auto lower_ = lower.toDouble();
-  auto upper_ = upper.toDouble();
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "RReLU_updateOutput",
-      [&]() {
-        impl::RReLU_updateOutput<scalar_t>(
-            self, out, noise, lower_, upper_, training, false, generator);
-      });
+  at::native::resize_output(out, self.sizes());
+  if (self.numel() == 0) {
+    return out;
+  }
+  if (training) {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        self.scalar_type(),
+        "rrelu_with_noise_out",
+        [&] {
+          impl::_rrelu_with_noise_train<scalar_t>(
+              out, self, noise, lower, upper, generator);
+        });
+  } else {
+    auto lower_tensor = lower.to<double>();
+    auto upper_tensor = upper.to<double>();
+    Scalar negative_slope = (lower_tensor + upper_tensor) / 2;
+    at::leaky_relu_out(out, self, negative_slope);
+  }
   return out;
+}
+
+Tensor rrelu_with_noise(
+    const Tensor& self,
+    const Tensor& noise,
+    const Scalar& lower,
+    const Scalar& upper,
+    bool training,
+    c10::optional<Generator> generator) {
+  Tensor output = at::empty_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  return rrelu_with_noise_out(
+      self, noise, lower, upper, training, generator, output);
+}
+
+Tensor& rrelu_with_noise_(
+    Tensor& self,
+    const Tensor& noise,
+    const Scalar& lower,
+    const Scalar& upper,
+    bool training,
+    c10::optional<Generator> generator) {
+  return rrelu_with_noise_out(
+      self, noise, lower, upper, training, generator, self);
 }
 
 Tensor rrelu_with_noise_backward(
@@ -533,30 +509,14 @@ Tensor rrelu_with_noise_backward(
     const Scalar& upper,
     bool training,
     bool self_is_result) {
-  TORCH_CHECK(
-      !self_is_result,
-      "In-place rrelu_ backward calculation is triggered with a negative slope which is not supported. "
-      "This is caused by calling in-place forward function with a negative slope, "
-      "please call out-of-place version instead.");
-  Tensor grad_input = at::empty_like(grad_output);
-  auto lower_ = lower.toDouble();
-  auto upper_ = upper.toDouble();
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "RReLU_updateGradInput",
-      [&]() {
-        impl::RReLU_updateGradInput<scalar_t>(
-            grad_output,
-            self,
-            grad_input,
-            noise,
-            lower_,
-            upper_,
-            training,
-            self_is_result);
-      });
-  return grad_input;
+  if (training) {
+    return noise * grad_output;
+  } else {
+    auto l = lower.toDouble();
+    auto u = upper.toDouble();
+    auto mid = (l + u) / 2.;
+    return at::leaky_relu_backward(grad_output, self, mid, self_is_result);
+  }
 }
 
 Tensor prelu(const Tensor& self, const Tensor& weight) {

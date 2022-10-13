@@ -149,6 +149,21 @@ inline void distribution_vectorize_kernel(
   }
 }
 
+inline std::tuple<uint64_t, uint32_t, uint32_t> calc_execution_policy(
+    int64_t total_elements) {
+  auto group_size = dpcppGpuHWThreadsPerEU() * dpcppMaxSubGroupSize();
+  auto num_groups = (total_elements + group_size - 1) / group_size;
+  auto hw_max_groups = dpcppMaxWorkItemsPerTile() / group_size;
+  num_groups = num_groups > hw_max_groups ? hw_max_groups : num_groups;
+  // number of times random will be generated per thread, to offset philox
+  // counter in thc random state
+  uint64_t counter_offset =
+      ((total_elements - 1) / (group_size * num_groups * PHILOX_ENGINE_CALLS) +
+       1) *
+      PHILOX_ENGINE_CALLS;
+  return std::make_tuple(counter_offset, num_groups, group_size);
+}
+
 template <
     typename scalar_t,
     typename accscalar_t,
@@ -167,16 +182,10 @@ void distribution_nullary_kernel(
     return;
   }
 
-  int group_size = dpcppGpuHWThreadsPerEU() * dpcppMaxSubGroupSize();
-  int num_groups = (numel + group_size - 1) / group_size;
-  int hw_max_groups = dpcppMaxWorkItemsPerTile() / group_size;
-  num_groups = num_groups > hw_max_groups ? hw_max_groups : num_groups;
-
-  // number of times random will be generated per thread, to offset philox
-  // counter in thc random state
-  uint64_t counter_offset =
-      ((numel - 1) / (group_size * num_groups * PHILOX_ENGINE_CALLS) + 1) *
-      PHILOX_ENGINE_CALLS;
+  auto execution_policy = calc_execution_policy(numel);
+  auto counter_offset = std::get<0>(execution_policy);
+  auto num_groups = std::get<1>(execution_policy);
+  auto group_size = std::get<2>(execution_policy);
 
   std::pair<uint64_t, uint64_t> rng_engine_inputs;
   {
