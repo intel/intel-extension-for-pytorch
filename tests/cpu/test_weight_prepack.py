@@ -978,8 +978,9 @@ class TestPrepackCases(TestCase):
                 rtol=1e-5
                 atol=1e-5
                 if dtype == torch.bfloat16:
+                    # align atol with that in _test_lstm in test_autocast.py of bf16
                     rtol=2e-2
-                    atol=2e-2
+                    atol=3e-2
                 x = input.to(dtype=dtype).float()
                 h = h.to(dtype=dtype).float()
                 c = c.to(dtype=dtype).float()
