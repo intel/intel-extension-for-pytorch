@@ -285,7 +285,6 @@ void distribution_unary_elementwise_kernel(
   rand_init(std::get<0>(seeds), idx, std::get<1>(seeds), &state);
 
   int global_idx;
-#pragma unroll
   for (int i = 0; i < numel; i += global_size) {
     global_idx = i + idx;
     auto in_offsets = inp_calc.get(global_idx);
