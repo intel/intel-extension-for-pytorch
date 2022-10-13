@@ -35,8 +35,6 @@ if(BUILD_SIMPLE_TRACE)
   target_compile_definitions(intel-ext-pt-python PUBLIC BUILD_SIMPLE_TRACE)
 endif()
 
-set_target_properties(intel-ext-pt-python PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_RPATH}")
-
 if(BUILD_STRIPPED_BIN)
   set_target_properties(intel-ext-pt-python PROPERTIES LINK_FLAGS_RELEASE -s)
 endif()

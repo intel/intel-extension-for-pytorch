@@ -9,12 +9,7 @@ set(CMAKE_INSTALL_MESSAGE NEVER)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # relocatable binary with automatically rpath of depend libraries
-set(RPATH_VALUE $ORIGIN)
-set(CMAKE_SKIP_BUILD_RPATH  FALSE)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-set(CMAKE_INSTALL_RPATH "${RPATH_VALUE}")
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-set(CMAKE_GENERATOR "Unix Makefiles")
+set(CMAKE_INSTALL_RPATH $ORIGIN)
 
 # The options to build ipex
 include(CMakeDependentOption)
