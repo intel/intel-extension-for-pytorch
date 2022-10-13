@@ -407,7 +407,7 @@ def optimize(
             optimized_model = utils._model_convert.convert_module_data_type(optimized_model, torch.half)
 
     if opt_properties.optimize_lstm:
-        utils._model_convert.replace_lstm_with_ipex_lstm(optimized_model)
+        utils._model_convert.replace_lstm_with_ipex_lstm(optimized_model, optimized_optimizer)
     if model.training and opt_properties.split_master_weight_for_bf16 and dtype is torch.bfloat16:
         if not opt_properties.fuse_update_step:
             opt_properties.split_master_weight_for_bf16 = False
