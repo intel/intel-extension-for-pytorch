@@ -285,7 +285,9 @@ void CachingDeviceAllocator::free(void* buffer) {
 
   auto it = allocated_blocks.find(buffer);
   if (it == allocated_blocks.end()) {
-    AT_ERROR("invalid device pointer: ", buffer);
+    // FIXME: This is a wordaround to avoid crash due to free twice by HVD
+    // AT_ERROR("invalid device pointer: ", buffer);
+    return;
   }
 
   Block* block = it->second;
