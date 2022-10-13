@@ -1,0 +1,218 @@
+From d02a1bf33505cbf4d5b150590e8943eb39cc1674 Mon Sep 17 00:00:00 2001
+From: Guo Yejun <yejun.guo@intel.com>
+Date: Thu, 26 May 2022 14:32:24 +0800
+Subject: [PATCH 18/35] add XPU support for autocast (#35)
+
+Co-authored-by: xiaolil1 <xiaoli.liu@intel.com>
+---
+ aten/src/ATen/autocast_mode.cpp | 19 +++++++++++++++++++
+ aten/src/ATen/autocast_mode.h   | 21 ++++++++++++++++++---
+ c10/core/DispatchKey.h          |  1 +
+ c10/core/DispatchKeySet.cpp     |  2 ++
+ c10/core/DispatchKeySet.h       |  2 ++
+ torch/autocast_mode.py          | 20 ++++++++++++++++++++
+ 6 files changed, 62 insertions(+), 3 deletions(-)
+
+diff --git a/aten/src/ATen/autocast_mode.cpp b/aten/src/ATen/autocast_mode.cpp
+index 4770d174d1..3fbbd6edcd 100644
+--- a/aten/src/ATen/autocast_mode.cpp
++++ b/aten/src/ATen/autocast_mode.cpp
+@@ -28,6 +28,14 @@ void set_cpu_enabled(bool new_enabled) {
+   c10::impl::tls_set_dispatch_key_excluded(DispatchKey::AutocastCPU, !new_enabled);
+ }
+ 
++bool is_xpu_enabled() {
++  return !c10::impl::tls_is_dispatch_key_excluded(DispatchKey::AutocastXPU);
++}
++
++void set_xpu_enabled(bool new_enabled) {
++  c10::impl::tls_set_dispatch_key_excluded(DispatchKey::AutocastXPU, !new_enabled);
++}
++
+ namespace {
+ // Imitate Apex and cache some of the casts to streamline parameter reuse.
+ // Our heuristic is to cache lower_precision_fp casts of fp32 model weights (see cached_cast below).
+@@ -58,6 +66,9 @@ thread_local int nesting = 0;
+ // autocast_cpu_dtype is the lower_precision_fp used by AutocastCPU.
+ thread_local at::ScalarType autocast_cpu_dtype = at::kBFloat16;
+ 
++// autocast_xpu_dtype is the lower_precision_fp used by AutocastXPU.
++thread_local at::ScalarType autocast_xpu_dtype = at::kBFloat16;
++
+ // should we enabled the cache inside autocast.
+ thread_local bool cache_enabled = true;
+ 
+@@ -85,6 +96,10 @@ at::ScalarType get_autocast_cpu_dtype() {
+   return autocast_cpu_dtype;
+ }
+ 
++at::ScalarType get_autocast_xpu_dtype() {
++  return autocast_xpu_dtype;
++}
++
+ void set_autocast_cpu_dtype(at::ScalarType dtype) {
+   TORCH_CHECK(
+       dtype == at::kBFloat16,
+@@ -96,6 +111,10 @@ void set_autocast_gpu_dtype(at::ScalarType dtype) {
+   autocast_gpu_dtype = dtype;
+ }
+ 
++void set_autocast_xpu_dtype(at::ScalarType dtype) {
++  autocast_xpu_dtype = dtype;
++}
++
+ bool is_autocast_cache_enabled() {
+   return cache_enabled;
+ }
+diff --git a/aten/src/ATen/autocast_mode.h b/aten/src/ATen/autocast_mode.h
+index bede6cd597..2831c2633d 100644
+--- a/aten/src/ATen/autocast_mode.h
++++ b/aten/src/ATen/autocast_mode.h
+@@ -14,15 +14,26 @@ TORCH_API at::ScalarType get_autocast_gpu_dtype();
+ TORCH_API at::ScalarType get_autocast_cpu_dtype();
+ TORCH_API void set_autocast_gpu_dtype(at::ScalarType dtype);
+ TORCH_API void set_autocast_cpu_dtype(at::ScalarType dtype);
++TORCH_API bool is_xpu_enabled();
++TORCH_API void set_xpu_enabled(bool enabled);
++TORCH_API at::ScalarType get_autocast_xpu_dtype();
++TORCH_API void set_autocast_xpu_dtype(at::ScalarType dtype);
+ TORCH_API bool is_autocast_cache_enabled();
+ TORCH_API void set_autocast_cache_enabled(bool enabled);
+ 
+ 
+ namespace {
+   bool is_autocast_eligible(const Tensor& tensor, DeviceType device_type) {
+-    return device_type == DeviceType::CUDA
+-        ? (tensor.is_cuda() || tensor.is_xla()) && tensor.is_floating_point()
+-        : (tensor.is_cpu() || tensor.is_mkldnn()) && tensor.is_floating_point();
++    switch (device_type) {
++      case DeviceType::CUDA:
++        return  (tensor.is_cuda() || tensor.is_xla()) && tensor.is_floating_point();
++      case DeviceType::CPU:
++        return (tensor.is_cpu() || tensor.is_mkldnn()) && tensor.is_floating_point();
++      case DeviceType::XPU:
++        return tensor.is_xpu() && tensor.is_floating_point();
++      default:
++        return false;
++    }
+   }
+ } // namespace
+ 
+@@ -33,6 +44,8 @@ inline DispatchKey get_autocast_dispatch_key_from_device_type(
+       return DispatchKey::Autocast;
+     case DeviceType::CPU:
+       return DispatchKey::AutocastCPU;
++    case DeviceType::XPU:
++      return DispatchKey::AutocastXPU;
+     default:
+       throw std::runtime_error(
+           "unknown device type for autocast in get_autocast_dispatch_key_from_device_type");
+@@ -46,6 +59,8 @@ inline at::ScalarType get_lower_precision_fp_from_device_type(
+       return get_autocast_gpu_dtype();
+     case DeviceType::CPU:
+       return get_autocast_cpu_dtype();
++    case DeviceType::XPU:
++      return get_autocast_xpu_dtype();
+     default:
+       throw std::runtime_error(
+           "unknown device type for autocast in get_lower_precision_fp_from_device_type");
+diff --git a/c10/core/DispatchKey.h b/c10/core/DispatchKey.h
+index 5117326f3a..d5563a9959 100644
+--- a/c10/core/DispatchKey.h
++++ b/c10/core/DispatchKey.h
+@@ -254,6 +254,7 @@ enum class DispatchKey : uint8_t {
+   // Autocasting precedes VariableTypeId, to ensure casts are autograd-exposed
+   // and inputs are saved for backward in the post-autocast type.
+   AutocastCPU,
++  AutocastXPU,
+   // Naughtily, AutocastCUDA is also being used for XLA.  In the terminal state,
+   // it probably should get its own Autocast key
+   AutocastCUDA,
+diff --git a/c10/core/DispatchKeySet.cpp b/c10/core/DispatchKeySet.cpp
+index 21433d4ace..6f66f356be 100644
+--- a/c10/core/DispatchKeySet.cpp
++++ b/c10/core/DispatchKeySet.cpp
+@@ -86,6 +86,8 @@ DispatchKeySet getAutocastRelatedKeySetFromBackend(DispatchKey t) {
+   switch (t) {
+     case DispatchKey::CPU:
+       return DispatchKeySet(DispatchKey::AutocastCPU);
++    case DispatchKey::XPU:
++      return DispatchKeySet(DispatchKey::AutocastXPU);
+     case DispatchKey::CUDA:
+     case DispatchKey::XLA:
+       return DispatchKeySet(DispatchKey::AutocastCUDA);
+diff --git a/c10/core/DispatchKeySet.h b/c10/core/DispatchKeySet.h
+index 2ad7a0fb05..ad0f42ac70 100644
+--- a/c10/core/DispatchKeySet.h
++++ b/c10/core/DispatchKeySet.h
+@@ -226,6 +226,7 @@ constexpr DispatchKeySet autograd_dispatch_keyset = DispatchKeySet({
+ constexpr DispatchKeySet autocast_dispatch_keyset = DispatchKeySet({
+     DispatchKey::AutocastCPU,
+     DispatchKey::AutocastCUDA,
++    DispatchKey::AutocastXPU,
+ });
+ 
+ // See Note [TLS Initialization]
+@@ -237,6 +238,7 @@ constexpr DispatchKeySet default_included_set = DispatchKeySet({
+ constexpr DispatchKeySet default_excluded_set = DispatchKeySet({
+     DispatchKey::AutocastCPU,
+     DispatchKey::AutocastCUDA,
++    DispatchKey::AutocastXPU,
+ });
+ 
+ constexpr DispatchKeySet autograd_dispatch_keyset_with_ADInplaceOrView =
+diff --git a/torch/autocast_mode.py b/torch/autocast_mode.py
+index dcb69a88bd..df63d411b5 100644
+--- a/torch/autocast_mode.py
++++ b/torch/autocast_mode.py
+@@ -134,6 +134,8 @@ class autocast(object):
+             self.fast_dtype = torch.get_autocast_gpu_dtype()
+         elif self.device == 'cpu':
+             self.fast_dtype = torch.get_autocast_cpu_dtype()
++        elif self.device == 'xpu':
++            self.fast_dtype = torch.xpu.get_autocast_xpu_dtype()
+         else:
+             raise RuntimeError('User specified autocast device_type must be \'cuda\' or \'cpu\'')
+         self._cache_enabled = torch.is_autocast_cache_enabled()
+@@ -155,6 +157,13 @@ class autocast(object):
+                 error_message += 'CPU Autocast only supports dtype of torch.bfloat16 currently.'
+                 warnings.warn(error_message)
+                 enabled = False
++        if self.device == 'xpu':
++            supported_dtype = [torch.bfloat16, torch.float16]
++            if self.fast_dtype not in supported_dtype:
++                error_message = 'In XPU autocast, but the target dtype is not supported. Disabling autocast.\n'
++                error_message += 'XPU Autocast only supports dtype of torch.bfloat16 currently.'
++                warnings.warn(error_message)
++                enabled = False
+         if self.device == 'cuda':
+             if self.fast_dtype == torch.bfloat16 and not torch.cuda.is_bf16_supported():
+                 raise RuntimeError('Current CUDA Device does not support bfloat16. Please switch dtype to float16.')
+@@ -168,6 +177,12 @@ class autocast(object):
+             torch.set_autocast_cpu_enabled(self._enabled)
+             torch.set_autocast_cpu_dtype(self.fast_dtype)
+             torch.autocast_increment_nesting()
++        elif self.device == 'xpu':
++            self.prev = torch.xpu.is_autocast_xpu_enabled()
++            self.prev_fastdtype = torch.xpu.get_autocast_xpu_dtype()
++            torch.xpu.set_autocast_xpu_enabled(self._enabled)
++            torch.xpu.set_autocast_xpu_dtype(self.fast_dtype)
++            torch.autocast_increment_nesting()
+         else:
+             self.prev = torch.is_autocast_enabled()
+             self.prev_fastdtype = torch.get_autocast_gpu_dtype()
+@@ -183,6 +198,11 @@ class autocast(object):
+                 torch.clear_autocast_cache()
+             torch.set_autocast_cpu_enabled(self.prev)
+             torch.set_autocast_cpu_dtype(self.prev_fastdtype)
++        elif self.device == 'xpu':
++            if torch.autocast_decrement_nesting() == 0:
++                torch.clear_autocast_cache()
++            torch.xpu.set_autocast_xpu_enabled(self.prev)
++            torch.xpu.set_autocast_xpu_dtype(self.prev_fastdtype)
+         else:
+             if torch.autocast_decrement_nesting() == 0:
+                 torch.clear_autocast_cache()
+-- 
+2.25.1
+
