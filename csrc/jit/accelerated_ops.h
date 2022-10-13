@@ -9,6 +9,54 @@ namespace jit {
 // And the alias analysis is not working for namespace other than aten ...
 // So we fake some op namespaces to workaround that.
 namespace xpu {
+
+namespace {
+/* IPEX_GENERAL_CONV_SYMBOL_DECLARATION
+This macro is used to convinently delcare the necessary Symbols which will be
+used in op fusion, all the Symbol defined by this macro will be in form like:
+
+static auto conv2d_op_sym = Symbol::fromQualString("xpu::conv2d_op")
+static auto _convolution_op_sym = Symbol::fromQualString("xpu::_convolution_op")
+static auto q_conv2d_op_sym = Symbol::fromQualString("xpu::q_conv2d_op")
+
+and those defination above can be adopted by macro IPEX_DEFINE_CONV_FUSION to
+generate the rule of pots-op fusion.
+*/
+#define IPEX_QCONV_SYMBOL_DECLARATION(func) \
+  static auto q_conv2d_##func##_sym =       \
+      Symbol::fromQualString("xpu::q_conv2d_" #func)
+
+#define IPEX_CONV_SYMBOL_DECLARATION(func) \
+  static auto conv2d_##func##_sym = Symbol::fromQualString("xpu::conv2d_" #func)
+
+#define IPEX__CONV_SYMBOL_DECLARATION(func) \
+  static auto _convolution_##func##_sym =   \
+      Symbol::fromQualString("xpu::_convolution_" #func)
+
+#define IPEX_GENERAL_CONV_SYMBOL_DECLARATION(func) \
+  IPEX_QCONV_SYMBOL_DECLARATION(func);             \
+  IPEX_CONV_SYMBOL_DECLARATION(func);              \
+  IPEX__CONV_SYMBOL_DECLARATION(func);
+} // namespace
+
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(sqrt);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(tanh);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(square);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(abs);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(exp);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(log);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(round);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(log_sigmoid);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(hardswish);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(mish);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(silu);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(gelu);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(hardsigmoid);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(elu);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(pow);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(hardtanh);
+
+static auto _conv_sym = Symbol::fromQualString("aten::_convolution");
 static auto reorder_sym = Symbol::fromQualString("xpu::reorder");
 static auto batch_norm_sym = Symbol::fromQualString("xpu::batch_norm");
 static auto pad_conv2d_sym = Symbol::fromQualString("xpu::pad_conv2d");
@@ -49,6 +97,7 @@ static auto softplus_tanh_mul_sym =
     Symbol::fromQualString("xpu::softplus_tanh_mul");
 static auto q_conv2d_dequantize_softplus_tanh_mul_sym =
     Symbol::fromQualString("xpu::q_conv2d_dequantize_softplus_tanh_mul");
+static auto q_conv2d_sym = Symbol::fromQualString("quantized::conv2d");
 static auto q_conv2d_dequantize_softplus_tanh_mul_quantize_sym =
     Symbol::fromQualString(
         "xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize");

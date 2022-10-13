@@ -1,8 +1,10 @@
 # from turtle import forward
+import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
+import copy
 
 import intel_extension_for_pytorch # noqa
 
@@ -16,7 +18,40 @@ torch._C._jit_set_profiling_executor(False)
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+print_graph = False
 
+def conv2d_fusion(input1, input2, model, print_graph=False, dtype=torch.float):
+    y = model(input1, input2)
+    # print("raw: ", y)
+
+    input1 = input1.to("xpu")
+    input2 = input2.to("xpu")
+    input3 = input2.clone()
+    model = model.to("xpu")
+    modelJit = torch.jit.script(model)
+    with torch.no_grad():
+        if print_graph:
+            print(modelJit.graph_for(input1, input2))
+        y_script = modelJit(input1, input3)
+        # print("fusion:", y_script)
+    del modelJit
+    return y, y_script
+
+def _conv_fusion(input1, input2, model, print_graph=False, dtype=torch.float):
+    y = model(input1, input2)
+    # print("half raw: ", y)
+    input1 = input1.to("xpu").half()
+    input2 = input2.to("xpu").half()
+    model = model.to("xpu").half()
+    jit_model = torch.jit.trace(model, (input1, input2), check_trace=False)
+    jit_model = wrap_cpp_module(torch._C._jit_pass_fold_convbn(jit_model._c))
+    with torch.no_grad():
+        if print_graph:
+            print(jit_model.graph_for(input1, input2))
+        y_script = jit_model(input1, input2)
+    # print("fusion: ", y_script)
+    del jit_model
+    return y, y_script.to(torch.float32)
 
 class MatmulSum(torch.nn.Module):
     def __init__(self):
@@ -75,7 +110,40 @@ class Conv2dRelu(torch.nn.Module):
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return F.relu(self.conv(x) + a, inplace=True)
+        return F.relu(self.conv(x))
+
+class Conv2dSum(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dSum, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return self.conv(x) + a
+
+class Conv2dSumRelu(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dSumRelu, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return F.relu(self.conv(x) + a)
+
+class Conv2dAbs(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dAbs, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.abs(self.conv(x))
+
+class Conv2dLeakyrelu(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dLeakyrelu, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.neg = random.random()
+
+    def forward(self, x, a):
+        return F.leaky_relu(self.conv(x), self.neg)
 
 
 class Conv2dSigmoid(torch.nn.Module):
@@ -86,6 +154,151 @@ class Conv2dSigmoid(torch.nn.Module):
     def forward(self, x, a):
         return torch.sigmoid(self.conv(x))
 
+class Conv2dSqrt(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dSqrt, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+
+    def forward(self, x, a):
+        return torch.sqrt(self.conv(x))
+
+class Conv2dTanh(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dTanh, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+
+    def forward(self, x, a):
+        return torch.tanh(self.conv(x))
+
+class Conv2dSquare(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dSquare, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+
+    def forward(self, x, a):
+        return torch.square(self.conv(x))
+
+class Conv2dExp(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dExp, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+
+    def forward(self, x, a):
+        return torch.exp(self.conv(x))
+
+class Conv2dLog(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dLog, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+
+    def forward(self, x, a):
+        return torch.log(self.conv(x))
+
+class Conv2dRound(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dRound, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+
+    def forward(self, x, a):
+        return torch.round(self.conv(x))
+
+class Conv2dLogSigmoid(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dLogSigmoid, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+        self.activation = torch.nn.LogSigmoid()
+
+    def forward(self, x, a):
+        return self.activation(self.conv(x))
+
+class Conv2dHardswish(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dHardswish, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+        self.activation = torch.nn.Hardswish()
+
+    def forward(self, x, a):
+        return self.activation(self.conv(x))
+
+class Conv2dMish(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dMish, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+        self.activation = torch.nn.Mish()
+
+    def forward(self, x, a):
+        return self.activation(self.conv(x))
+
+class Conv2dSilu(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dSilu, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+        self.activation = torch.nn.SiLU()
+
+    def forward(self, x, a):
+        return self.activation(self.conv(x))
+
+class Conv2dGelu(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dGelu, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+        self.activation = torch.nn.GELU()
+
+    def forward(self, x, a):
+        return self.activation(self.conv(x))
+
+class Conv2dHardsigmoid(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dHardsigmoid, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+        self.activation = torch.nn.Hardsigmoid()
+
+    def forward(self, x, a):
+        return self.activation(self.conv(x))
+
+class Conv2dPow(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dPow, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+        self.exponent = 1.0
+
+    def forward(self, x, a):
+        x = self.conv(x)
+        # print("x:res: ", x)
+        return torch.pow(x, self.exponent)
+
+class Conv2dRelu6(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dRelu6, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+        self.activation = torch.nn.ReLU6()
+
+    def forward(self, x, a):
+        return self.activation(self.conv(x))
+
+class Conv2dElu(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs) -> None:
+        super(Conv2dElu, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.conv.weight = torch.nn.parameter.Parameter(torch.abs(self.conv.weight))
+        self.activation = torch.nn.ELU()
+
+    def forward(self, x, a):
+        return self.activation(self.conv(x))
 
 class PadConv2d(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -304,6 +517,38 @@ class TestNNMethod(TestCase):
         self.assertEqual(raw, real.to(cpu_device), atol=1e-3, rtol=1.3e-6)
         del modelJit
 
+    def test_conv_sqrt_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+        x = torch.abs(x)
+        model = Conv2dSqrt(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_abs_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dAbs(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
     def test_conv_relu_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
@@ -314,20 +559,45 @@ class TestNNMethod(TestCase):
         a3.fill_(2)
 
         model = Conv2dRelu(2, 2, kernel_size=3, stride=1, bias=True)
-        y = model(x, a1)
-        print("raw: ", y)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
 
-        x = x.to("xpu")
-        model.to("xpu")
-        modelJit = torch.jit.script(model)
-        # modelJit.to("xpu")
-        # print(modelJit.graph)
-        with torch.no_grad():
-            # print(modelJit.graph_for(x, a2))
-            y_dpcpp = modelJit(x, a3)
-            print("fusion:", y_dpcpp.cpu())
-        self.assertEqual(y, y_dpcpp.to(cpu_device))
-        del modelJit
+    def test_conv_sum_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dSum(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        # y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        # self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+
+    def test_conv_sum_relu_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dSumRelu(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
 
     def test_conv_sigmoid_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
@@ -339,17 +609,259 @@ class TestNNMethod(TestCase):
         a3.fill_(2)
 
         model = Conv2dSigmoid(2, 2, kernel_size=3, stride=1, bias=True)
-        y = model(x, a1)
-        print("raw: ", y)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
 
-        x = x.to("xpu")
-        model.to("xpu")
-        modelJit = torch.jit.script(model)
-        with torch.no_grad():
-            y_dpcpp = modelJit(x, a3)
-            print("fusion:", y_dpcpp.cpu())
-        self.assertEqual(y, y_dpcpp.to(cpu_device))
-        del modelJit
+    def test_conv_leaky_relu_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dLeakyrelu(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_tanh_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dTanh(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_square_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dSquare(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_exp_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dExp(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_log_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+        x = torch.abs(x)
+        model = Conv2dLog(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_round_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dRound(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+
+    def test_conv_logsigmoid_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dLogSigmoid(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_hardswish_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dHardswish(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    @pytest.mark.skip("Mish is not a valid op in IPEX, This test can be enabled")
+    def test_conv_mish_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dMish(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_silu_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dSilu(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_gelu_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dGelu(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script, atol=1e5, rtol=1e5)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_hardsigmoid_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dHardsigmoid(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_pow_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dPow(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_hardtanh_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dRelu6(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_elu_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dElu(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
 
     def test_pad_conv_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)

@@ -22,6 +22,18 @@ namespace {
 // the struct announced below should only be used in this file for the
 // defination of quantized convolution with post op implementation.
 
+template <class T, class = typename std::enable_if<std::is_integral<T>::value>>
+T quantize_value(float scale, int64_t zero_point, float value) {
+  int64_t qvalue;
+  constexpr int64_t qmin = std::numeric_limits<T>::min();
+  constexpr int64_t qmax = std::numeric_limits<T>::max();
+  float inv_scale = 1.0f / static_cast<float>(scale);
+  qvalue = static_cast<int64_t>(zero_point + std::nearbyint(value * inv_scale));
+  qvalue = std::max<int64_t>(qvalue, qmin);
+  qvalue = std::min<int64_t>(qvalue, qmax);
+  return static_cast<T>(qvalue);
+}
+
 template <int N>
 struct QuantizeConvConverter {
   QuantizeConvConverter(
@@ -130,6 +142,18 @@ struct QuantizeConvConverter {
   int64_t q_zero_point_;
   at::ScalarType dtype_;
 };
+
+#define IPEX_QCONV_DEFINATION(op, lambda)                                \
+  at::Tensor q_conv2d_##op(                                              \
+      const Tensor& input,                                               \
+      const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,  \
+      double output_scale,                                               \
+      int64_t output_zero_point) {                                       \
+    auto qconv_wrapper =                                                 \
+        QuantizeConvConverter<2>(packed_weight, 0.00392157, 0, kQUInt8); \
+    return qconv_wrapper.call(input, lambda);                            \
+  }
+
 } // namespace
 
 namespace at {
@@ -149,14 +173,14 @@ Tensor q_conv2d(
   return qconv_wrapper.call(input, post_op);
 }
 
-Tensor q_conv2d_relu(
+at::Tensor q_conv2d_relu(
     Tensor input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double output_scale,
     int64_t output_zero_point) {
   auto qconv_wrapper = QuantizeConvConverter<2>(
       packed_weight, output_scale, output_zero_point, kQUInt8);
-  auto post_op = [=]() {
+  auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
@@ -164,7 +188,7 @@ Tensor q_conv2d_relu(
         /* beta */ 0.f,
         attr.kind_with_relu);
   };
-  return qconv_wrapper.call(input, post_op);
+  return qconv_wrapper.call(input, att);
 }
 
 Tensor q_conv3d(
@@ -209,59 +233,40 @@ TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
 } // namespace AtenIpexTypeQuantizedXPU
 
 namespace AtenIpexTypeXPU {
-// haven't been covered by ut
-at::Tensor q_conv2d_sum_relu(
-    Tensor& accumu,
+
+at::Tensor q_conv2d_sum(
     const Tensor& input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
-    double q_conv_scale,
-    int64_t q_conv_zero_point,
-    double q_sum_scale,
-    int64_t q_sum_zero_point) {
-  auto pack_ptr =
-      dynamic_cast<AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP<2>*>(
-          packed_weight.get());
+    double output_scale,
+    int64_t output_zero_point,
+    Tensor& accumu,
+    float sum_scale,
+    int sum_zero_point) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, sum_scale, sum_zero_point, kQInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(sum_scale));
+    return attr.append_post_sum(1.f, accumu.q_scale());
+  };
+  return qconv_wrapper.call(input, accumu, att);
+}
 
-  at::Tensor weight = pack_ptr->weight;
-  at::Tensor bias;
-  if (pack_ptr->bias.has_value())
-    bias = pack_ptr->bias.value();
-  auto padding = pack_ptr->padding();
-  auto stride = pack_ptr->stride();
-  auto groups = pack_ptr->groups();
-  auto dilation = pack_ptr->dilation();
-
-  // output = eltwise_scale * Relu(conv_scale * Conv(input, weight) + sum_scale
-  // * accumu)
-
-  // since the input/output for RELU are share the same scale,
-  // then the fused op q_scale = q_sum_scale
-  Attr attr(/* q_scale */ static_cast<float>(q_sum_scale));
-  attr.append_post_sum(/*sum_scale*/ 1.f, /* sum_q_scale */ accumu.q_scale());
-  attr.append_post_eltwise(
-      /* eltwise_scale */ 1.f,
-      /* alpha */ 0.f,
-      /* beta */ 0.f,
-      attr.kind_with_relu);
-
-  convolution(
-      accumu,
-      input,
-      weight,
-      bias,
-      padding.vec(),
-      padding.vec(),
-      stride.vec(),
-      dilation.vec(),
-      groups,
-      attr);
-
-  set_quantizer_(
-      accumu,
-      dpcpp_make_per_tensor_affine_quantizer(
-          q_sum_scale, q_sum_zero_point, accumu.scalar_type()));
-
-  return accumu;
+at::Tensor q_conv2d_sum_relu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    Tensor& accumu,
+    float sum_scale,
+    int sum_zero_point) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, sum_scale, sum_zero_point, kQUInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(sum_scale));
+    return attr.append_post_sum(1.f, accumu.q_scale())
+        .append_post_eltwise(1.f, 0.f, 0.f, attr.kind_with_relu);
+  };
+  return qconv_wrapper.call(input, accumu, att);
 }
 
 at::Tensor q_conv2d_sigmoid(
@@ -278,6 +283,24 @@ at::Tensor q_conv2d_sigmoid(
         /* alpha */ 0.f,
         /* beta */ 0.f,
         attr.kind_with_sigmoid);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_relu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, ScalarType::QUInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_relu);
   };
   return qconv_wrapper.call(input, att);
 }
@@ -395,6 +418,304 @@ Tensor q_conv2d_dequantize_softplus_tanh_mul(
       input, packed_weight, output_scale, output_zero_point);
   return at::AtenIpexTypeXPU::softplus_tanh_mul(
       dequantize_out, beta, threshold, input);
+}
+
+at::Tensor q_conv2d_sqrt(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper =
+      QuantizeConvConverter<2>(packed_weight, 0.00392157, 0, kQUInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_sqrt);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_abs(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper =
+      QuantizeConvConverter<2>(packed_weight, 0.00392157, 0, kQUInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_abs);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_tanh(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, kQUInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_tanh);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_square(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper =
+      QuantizeConvConverter<2>(packed_weight, 0.00392157, 0, kQUInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_tanh);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_exp(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper =
+      QuantizeConvConverter<2>(packed_weight, 0.00392157, 0, kQUInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_exp);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_log(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, kQInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_log);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_round(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, kQInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_round);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_log_sigmoid(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, kQInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_logsigmoid);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_hardswish(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, kQInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_hardswish);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_mish(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, kQInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_mish);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_silu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, kQInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 1.f,
+        /* beta */ 0.f,
+        attr.kind_with_swish);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_gelu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, kQInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_gelu);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_hardsigmoid(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper =
+      QuantizeConvConverter<2>(packed_weight, 0.00392157, 0, kQUInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 1. / 6.,
+        /* beta */ 1. / 2.,
+        attr.kind_with_hardsigmoid);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_pow(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    Scalar exponent) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, kQInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ 1.f,
+        /* beta */ exponent.toFloat(),
+        attr.kind_with_pow);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_hardtanh(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    Scalar minval,
+    Scalar maxval) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, kQInt8);
+  auto att = [=]() {
+    int32_t min_q = quantize_value<int32_t>(
+        output_scale, output_zero_point, minval.toFloat());
+    int32_t max_q = quantize_value<int32_t>(
+        output_scale, output_zero_point, maxval.toFloat());
+    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ static_cast<float>(min_q),
+        /* beta */ static_cast<float>(max_q),
+        attr.kind_with_clip);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
+at::Tensor q_conv2d_elu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    Scalar alpha,
+    Scalar scale,
+    Scalar input_scale) {
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, kQInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    return attr.append_post_eltwise(
+        /* eltwise_scale */ 1.f,
+        /* alpha */ alpha.toFloat(),
+        /* beta */ 1.0,
+        attr.kind_with_elu);
+  };
+  return qconv_wrapper.call(input, att);
 }
 
 } // namespace AtenIpexTypeXPU

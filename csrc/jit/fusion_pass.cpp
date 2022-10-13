@@ -26,6 +26,55 @@ struct hash<std::pair<Symbol, Symbol>> {
 };
 } // namespace std
 
+namespace {
+/*IPEX_DEFINE_CONV_FUSION
+
+This macro will convinently generate the rule of conv related fusion pattern.
+This macro can be adopt when the fusion symbol have aten::post-op form in jit
+ir, and the symbol of fusion op is defined with variabe named: conv2d_op_sym,
+_convolution_op_sym, q_conv2d_op_sym, this is aligned with the defination of
+macro IPEX_GENERAL_CONV_SYMBOL_DECLARATION. The expansion of this macro should
+be:
+
+{{q_conv2d_sym, Symbol::fromQualString("aten::op")},
+   xpu::q_conv2d_op_sym},
+{{aten::conv2d, Symbol::fromQualString("aten::op")},
+    xpu::conv2d_op_sym},
+{{_conv_sym, Symbol::fromQualString("aten::op")},
+    xpu::_convolution_op_sym}
+
+and for INT8 scenario, aten::dequantize might be inserted between q_conv2d and
+post-op. we can adopt IPEX_DEFINE_CONV_FUSION_DEQUANTIZE instead to handle this
+kind of cases which will automatically fuse the aten::dequantize.
+*/
+// TODO: verify the accuracy of quantized convolution with post op fusion and
+// enable it in jit
+#define IPEX_DEFINE_CONV_FUSION(func)                      \
+  {{aten::conv2d, Symbol::fromQualString("aten::" #func)}, \
+   xpu::conv2d_##func##_sym},                              \
+  {                                                        \
+    {_conv_sym, Symbol::fromQualString("aten::" #func)},   \
+        xpu::_convolution_##func##_sym                     \
+  }
+// {                                                         \
+  //   {q_conv2d_sym, Symbol::fromQualString("aten::" #func)}, \
+  //       xpu::q_conv2d_##func##_sym                          \
+  // }
+
+#define IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(func)      \
+  {{aten::conv2d, Symbol::fromQualString("aten::" #func)}, \
+   xpu::conv2d_##func##_sym},                              \
+  {                                                        \
+    {_conv_sym, Symbol::fromQualString("aten::" #func)},   \
+        xpu::_convolution_##func##_sym                     \
+  }
+// {                                                                    \
+  //   {q_conv2d_dequantize_sym, Symbol::fromQualString("aten::" #func)}, \
+  //       xpu::q_conv2d_##func##_sym                                     \
+  // }
+
+} // namespace
+
 namespace torch {
 namespace jit {
 namespace xpu {
@@ -409,7 +458,8 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{xpu::conv2d_sum_sym, Symbol::fromQualString("aten::relu_")},
      xpu::conv2d_sum_relu_sym},
     // RN50/RCAN: conv + add
-    {{aten::conv2d, aten::add}, xpu::conv2d_sum_sym},
+    // note: sum post op can only used in inplace scenario
+    // {{aten::conv2d, aten::add}, xpu::conv2d_sum_sym},
     {{aten::conv2d, aten::add_}, xpu::conv2d_sum_sym},
     // RCAN: mul + add
     {{aten::mul, aten::add_}, xpu::mul_add_sym},
@@ -504,7 +554,25 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
      xpu::_convolution_sum_relu_sym},
     {{Symbol::fromQualString("aten::_convolution"),
       Symbol::fromQualString("aten::silu_")},
-     xpu::convolution_silu_sym}};
+     xpu::convolution_silu_sym},
+
+    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(sqrt),
+    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(square),
+    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(abs),
+    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(exp),
+    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(log),
+    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(round),
+    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(silu),
+    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(gelu),
+    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(log_sigmoid),
+    IPEX_DEFINE_CONV_FUSION(hardswish),
+    IPEX_DEFINE_CONV_FUSION(mish),
+    IPEX_DEFINE_CONV_FUSION(hardsigmoid),
+    IPEX_DEFINE_CONV_FUSION(tanh),
+    IPEX_DEFINE_CONV_FUSION(elu),
+    IPEX_DEFINE_CONV_FUSION(hardtanh)
+    // IPEX_DEFINE_CONV_FUSION(soft_relu)
+};
 
 void FusionPass(std::shared_ptr<Graph>& graph) {
   // Pattern based fusion was lack of alias analysis

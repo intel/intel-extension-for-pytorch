@@ -7,6 +7,8 @@
 #include <tensor/Context.h>
 
 #include <oneDNN/oneDNN.h>
+#include "ATen/core/interned_strings.h"
+#include "c10/util/Optional.h"
 #include "comm/ParamUtils.h"
 #include "comm/RegistrationDeclarations.h"
 
@@ -17,6 +19,71 @@ using namespace xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+namespace {
+
+/* IPEX_CONV_DEFINATION
+This macro is used to generate the defination of conv2d, _convolution related
+post-op functions in a convinent way. It can only be used when post-op's name in
+function defination is exactly the same as the name in Attr's defined post-ops,
+and no any extra parameters is brought in compared to the original convolution
+signiture.
+*/
+
+#define IPEX_CONV_DEFINATION(op)                                   \
+  Tensor convolution_##op(                                         \
+      const Tensor& input,                                         \
+      const Tensor& weight,                                        \
+      const c10::optional<Tensor>& bias,                           \
+      std::vector<int64_t> stride_,                                \
+      std::vector<int64_t> padding_,                               \
+      std::vector<int64_t> dilation_,                              \
+      int64_t groups_) {                                           \
+    Attr att;                                                      \
+    att.append_post_eltwise(1.0f, 0.0f, 0.0f, att.kind_with_##op); \
+    Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor(); \
+    return _convolution(                                           \
+        input,                                                     \
+        weight,                                                    \
+        bias_,                                                     \
+        stride_,                                                   \
+        padding_,                                                  \
+        dilation_,                                                 \
+        false,                                                     \
+        {{0, 0}},                                                  \
+        groups_,                                                   \
+        att);                                                      \
+  }                                                                \
+                                                                   \
+  Tensor _convolution_##op(                                        \
+      const Tensor& input,                                         \
+      const Tensor& weight,                                        \
+      const c10::optional<Tensor>& bias,                           \
+      std::vector<int64_t> stride_,                                \
+      std::vector<int64_t> padding_,                               \
+      std::vector<int64_t> dilation_,                              \
+      bool transposed,                                             \
+      std::vector<int64_t> output_padding_,                        \
+      int groups,                                                  \
+      bool benchmark,                                              \
+      bool deterministic,                                          \
+      bool cudnn_enabled,                                          \
+      bool allow_tf32) {                                           \
+    Attr att;                                                      \
+    att.append_post_eltwise(1.0f, 0.0f, 0.0f, att.kind_with_##op); \
+    Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor(); \
+    return _convolution(                                           \
+        input,                                                     \
+        weight,                                                    \
+        bias_,                                                     \
+        stride_,                                                   \
+        padding_,                                                  \
+        dilation_,                                                 \
+        transposed,                                                \
+        output_padding_,                                           \
+        groups,                                                    \
+        att);                                                      \
+  }
+} // namespace
 namespace impl {
 
 Tensor dpcpp_convolution_backward_input(
@@ -670,8 +737,6 @@ Tensor pad_convolution(
     IntArrayRef stride_,
     IntArrayRef padding_,
     IntArrayRef dilation_,
-    bool transposed_,
-    IntArrayRef output_padding_,
     int64_t groups_) {
   // oneDNN only support padding value with 0
   if (value.to<float>() != 0.0) {
@@ -685,8 +750,8 @@ Tensor pad_convolution(
         stride_,
         padding_,
         dilation_,
-        transposed_,
-        output_padding_,
+        false,
+        {{0, 0}},
         groups_,
         Attr());
   }
@@ -700,198 +765,11 @@ Tensor pad_convolution(
       stride_,
       padding_,
       dilation_,
-      transposed_,
-      output_padding_,
+      false,
+      {{0, 0}},
       groups_,
       Attr(),
       pad_nd);
-}
-
-Tensor convolution_sum(
-    const Tensor& input_r,
-    const Tensor& weight_r,
-    const Tensor& bias_r,
-    IntArrayRef stride_,
-    IntArrayRef padding_,
-    IntArrayRef dilation_,
-    bool transposed_,
-    IntArrayRef output_padding_,
-    int64_t groups_,
-    Tensor& accumu,
-    Scalar scale,
-    Scalar alpha,
-    Scalar beta) {
-  // only support scale = 1.0f in oneDNN for non-quantized case.
-  TORCH_CHECK(
-      scale.to<float>() == 1.f,
-      "only support convolution sum fusion with sum scale equals to 1");
-  // output = conv_scale * (Conv(input, weight) + bias) + sum_scale * accumu;
-  Attr attr;
-  attr.append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
-  return _convolution_out(
-      accumu,
-      input_r,
-      weight_r,
-      bias_r,
-      stride_,
-      padding_,
-      dilation_,
-      transposed_,
-      output_padding_,
-      groups_,
-      attr);
-}
-
-Tensor convolution_sum_relu(
-    const Tensor& input_r,
-    const Tensor& weight_r,
-    const Tensor& bias_r,
-    IntArrayRef stride_,
-    IntArrayRef padding_,
-    IntArrayRef dilation_,
-    bool transposed_,
-    IntArrayRef output_padding_,
-    int64_t groups_,
-    Tensor& accumu,
-    Scalar scale,
-    Scalar alpha,
-    Scalar beta) {
-  // only support scale = 1.0f in oneDNN for non-quantized case.
-  TORCH_CHECK(
-      scale.to<float>() == 1.f,
-      "only support convolution sum fusion with sum scale equals to 1");
-  // output = relu_scale * Relu(conv_scale * (Conv(input, weight) + bias) +
-  // sum_scale * accumu);
-  Attr attr;
-  attr.append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
-  attr.append_post_eltwise( // append post relu
-      /* relu_scale */ 1.f,
-      /* alpha */ 0.f,
-      /* beta */ 0.f,
-      attr.kind_with_relu);
-  return _convolution_out(
-      accumu,
-      input_r,
-      weight_r,
-      bias_r,
-      stride_,
-      padding_,
-      dilation_,
-      transposed_,
-      output_padding_,
-      groups_,
-      attr);
-}
-
-Tensor convolution_relu(
-    const Tensor& input_r,
-    const Tensor& weight_r,
-    const Tensor& bias_r,
-    IntArrayRef stride_,
-    IntArrayRef padding_,
-    IntArrayRef dilation_,
-    bool transposed_,
-    IntArrayRef output_padding_,
-    int64_t groups_,
-    Scalar scale,
-    Scalar alpha,
-    Scalar beta) {
-  // only support scale = 1.0f in oneDNN for non-quantized case.
-  TORCH_CHECK(
-      scale.to<float>() == 1.f,
-      "only support convolution relu fusion with relu scale equals to 1");
-  // output = relu_scale * Relu(conv_scale * (Conv(input, weight) + bias));
-  Attr attr;
-  attr.append_post_eltwise(
-      /* relu_scale */ 1.0,
-      /* alpha */ 0.f,
-      /* beta */ 0.f,
-      attr.kind_with_relu);
-  return _convolution(
-      input_r,
-      weight_r,
-      bias_r,
-      stride_,
-      padding_,
-      dilation_,
-      transposed_,
-      output_padding_,
-      groups_,
-      attr);
-}
-
-Tensor convolution_silu(
-    const Tensor& input_r,
-    const Tensor& weight_r,
-    const Tensor& bias_r,
-    IntArrayRef stride_,
-    IntArrayRef padding_,
-    IntArrayRef dilation_,
-    bool transposed_,
-    IntArrayRef output_padding_,
-    int64_t groups_,
-    Scalar scale,
-    Scalar alpha,
-    Scalar beta) {
-  // only support scale = 1.0f in oneDNN for non-quantized case.
-  TORCH_CHECK(
-      scale.to<float>() == 1.f && alpha.to<float>() == 1.f,
-      "only support convolution silu fusion with silu scale equals to 1, alpha equal to 1");
-  Attr attr;
-  attr.append_post_eltwise(
-      /* relu_scale */ 1.0,
-      /* alpha */ 1.f,
-      /* beta */ 0.f,
-      attr.kind_with_swish);
-  return _convolution(
-      input_r,
-      weight_r,
-      bias_r,
-      stride_,
-      padding_,
-      dilation_,
-      transposed_,
-      output_padding_,
-      groups_,
-      attr);
-}
-
-Tensor convolution_sigmoid(
-    const Tensor& input_r,
-    const Tensor& weight_r,
-    const Tensor& bias_r,
-    IntArrayRef stride_,
-    IntArrayRef padding_,
-    IntArrayRef dilation_,
-    bool transposed_,
-    IntArrayRef output_padding_,
-    int64_t groups_,
-    Scalar scale,
-    Scalar alpha,
-    Scalar beta) {
-  // only support scale = 1.0f in oneDNN for non-quantized case.
-  TORCH_CHECK(
-      scale.to<float>() == 1.f,
-      "only support convolution sigmoid fusion with sigmoid scale equals to 1");
-  // output = sigmoid_scale * Sigmoid(conv_scale * (Conv(input, weight) +
-  // bias));
-  Attr attr;
-  attr.append_post_eltwise(
-      /* sigmoid_scale */ 1.f,
-      /* alpha */ 0.f,
-      /* beta */ 0.f,
-      attr.kind_with_sigmoid);
-  return _convolution(
-      input_r,
-      weight_r,
-      bias_r,
-      stride_,
-      padding_,
-      dilation_,
-      transposed_,
-      output_padding_,
-      groups_,
-      attr);
 }
 
 Tensor convolution_overrideable(
@@ -1014,6 +892,580 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
   }
 
   return std::tuple<Tensor, Tensor, Tensor>{grad_input, grad_weight, grad_bias};
+}
+
+// It is recommand to define the post-op function name follow the pytorch's
+// inner op rather than oneDNN post op name, for example, we can find pytorch's
+// silu op named swish in oneDNN. For clarity, we use all the pytorch's op name
+// in function defination. Therefore, for the fusion of convolution + silu, we
+// name the funciton as convolution_silu.
+IPEX_CONV_DEFINATION(sqrt)
+IPEX_CONV_DEFINATION(abs)
+IPEX_CONV_DEFINATION(tanh)
+IPEX_CONV_DEFINATION(square)
+IPEX_CONV_DEFINATION(exp)
+IPEX_CONV_DEFINATION(log)
+IPEX_CONV_DEFINATION(round)
+IPEX_CONV_DEFINATION(sigmoid)
+IPEX_CONV_DEFINATION(relu)
+IPEX_CONV_DEFINATION(hardswish)
+IPEX_CONV_DEFINATION(mish)
+IPEX_CONV_DEFINATION(gelu)
+
+Tensor convolution_silu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    int64_t groups_) {
+  Attr att;
+  att.append_post_eltwise(1.0f, 1.0f, 0.0f, att.kind_with_swish);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
+      groups_,
+      att);
+}
+
+Tensor _convolution_silu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32) {
+  Attr att;
+  att.append_post_eltwise(1.0f, 1.0f, 0.0f, att.kind_with_swish);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      transposed,
+      output_padding_,
+      groups,
+      att);
+}
+
+Tensor convolution_log_sigmoid(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    int64_t groups_) {
+  Attr att;
+  att.append_post_eltwise(1.0f, 1.0f, 0.0f, att.kind_with_logsigmoid);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
+      groups_,
+      att);
+}
+
+Tensor _convolution_log_sigmoid(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32) {
+  Attr att;
+  att.append_post_eltwise(1.0f, 1.0f, 0.0f, att.kind_with_logsigmoid);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      transposed,
+      output_padding_,
+      groups,
+      att);
+}
+
+Tensor convolution_hardsigmoid(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    int64_t groups_) {
+  Attr att;
+  att.append_post_eltwise(
+      1.0f, 1.0f / 6., 1.0f / 2., att.kind_with_hardsigmoid);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
+      groups_,
+      att);
+}
+
+Tensor _convolution_hardsigmoid(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32) {
+  Attr att;
+  att.append_post_eltwise(
+      1.0f, 1.0f / 6., 1.0f / 2., att.kind_with_hardsigmoid);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      transposed,
+      output_padding_,
+      groups,
+      att);
+}
+
+Tensor convolution_pow(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    int64_t groups_,
+    Scalar exponent) {
+  Attr att;
+  att.append_post_eltwise(1.0f, 1.0f, exponent.toFloat(), att.kind_with_pow);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
+      groups_,
+      att);
+}
+
+Tensor _convolution_pow(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar exponent) {
+  Attr att;
+  att.append_post_eltwise(1.0f, 1.0f, exponent.toFloat(), att.kind_with_pow);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      transposed,
+      output_padding_,
+      groups,
+      att);
+}
+
+Tensor convolution_leaky_relu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    int64_t groups_,
+    Scalar negative_slope) {
+  Attr att;
+  att.append_post_eltwise(
+      1.0f, negative_slope.toFloat(), 0.f, att.kind_with_relu);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
+      groups_,
+      att);
+}
+
+Tensor _convolution_leaky_relu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar negative_slope) {
+  Attr att;
+  att.append_post_eltwise(
+      1.0f, negative_slope.toFloat(), 0.f, att.kind_with_relu);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      transposed,
+      output_padding_,
+      groups,
+      att);
+}
+
+Tensor convolution_hardtanh(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    int64_t groups_,
+    Scalar minval,
+    Scalar maxval) {
+  Attr att;
+  att.append_post_eltwise(
+      1.0f, minval.toFloat(), maxval.toFloat(), att.kind_with_clip);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
+      groups_,
+      att);
+}
+
+Tensor _convolution_hardtanh(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar minval,
+    Scalar maxval) {
+  Attr att;
+  att.append_post_eltwise(
+      1.0f, minval.toFloat(), maxval.toFloat(), att.kind_with_clip);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      transposed,
+      output_padding_,
+      groups,
+      att);
+}
+
+Tensor convolution_elu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    int64_t groups_,
+    Scalar alpha,
+    Scalar scale,
+    Scalar input_scale) {
+  AT_ASSERT(
+      scale.toFloat() == 1.0f && input_scale.toFloat() == 1.0f,
+      "elu's scale and input scale can only be 1.f in jit fusion");
+  Attr att;
+  att.append_post_eltwise(1.0f, alpha.toFloat(), 1.0f, att.kind_with_elu);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
+      groups_,
+      att);
+}
+
+Tensor _convolution_elu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar alpha,
+    Scalar scale,
+    Scalar input_scale) {
+  AT_ASSERT(
+      scale.toFloat() == 1.0f && input_scale.toFloat() == 1.0f,
+      "elu's scale and input scale can only be 1.f in jit fusion");
+  Attr att;
+  att.append_post_eltwise(1.0f, alpha.toFloat(), 1.0f, att.kind_with_elu);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      transposed,
+      output_padding_,
+      groups,
+      att);
+}
+
+Tensor convolution_sum(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    int64_t groups_,
+    Tensor& accumu,
+    Scalar scale) {
+  std::cout << "input1: " << input_r << std::endl;
+  std::cout << "input2: " << accumu << std::endl;
+  // only support scale = 1.0f in oneDNN for non-quantized case.
+  TORCH_CHECK(
+      scale.to<float>() == 1.f,
+      "only support convolution sum fusion with sum scale equals to 1");
+  // output = conv_scale * (Conv(input, weight) + bias) + sum_scale * accumu;
+  Attr attr;
+  attr.append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
+  Tensor res = _convolution_out(
+      accumu,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
+      groups_,
+      attr);
+  std::cout << "result Tensor: " << res << std::endl;
+  return res;
+}
+
+Tensor _convolution_sum(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Tensor& accumu,
+    Scalar scale) {
+  // only support scale = 1.0f in oneDNN for non-quantized case.
+  TORCH_CHECK(
+      scale.to<float>() == 1.f,
+      "only support convolution sum fusion with sum scale equals to 1");
+  // output = conv_scale * (Conv(input, weight) + bias) + sum_scale * accumu;
+  Attr attr;
+  attr.append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
+  return _convolution_out(
+      accumu,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      attr);
+}
+
+Tensor convolution_sum_relu(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    int64_t groups_,
+    Tensor& accumu,
+    Scalar scale) {
+  // only support scale = 1.0f in oneDNN for non-quantized case.
+  TORCH_CHECK(
+      scale.to<float>() == 1.f,
+      "only support convolution sum fusion with sum scale equals to 1");
+  // output = relu_scale * Relu(conv_scale * (Conv(input, weight) + bias) +
+  // sum_scale * accumu);
+  Attr attr;
+  attr.append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
+  attr.append_post_eltwise( // append post relu
+      /* relu_scale */ 1.f,
+      /* alpha */ 0.f,
+      /* beta */ 0.f,
+      attr.kind_with_relu);
+  return _convolution_out(
+      accumu,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
+      groups_,
+      attr);
+}
+
+Tensor _convolution_sum_relu(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Tensor& accumu,
+    Scalar scale) {
+  // only support scale = 1.0f in oneDNN for non-quantized case.
+  TORCH_CHECK(
+      scale.to<float>() == 1.f,
+      "only support convolution sum fusion with sum scale equals to 1");
+  // output = relu_scale * Relu(conv_scale * (Conv(input, weight) + bias) +
+  // sum_scale * accumu);
+  Attr attr;
+  attr.append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
+  attr.append_post_eltwise( // append post relu
+      /* relu_scale */ 1.f,
+      /* alpha */ 0.f,
+      /* beta */ 0.f,
+      attr.kind_with_relu);
+  return _convolution_out(
+      accumu,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      attr);
 }
 
 } // namespace AtenIpexTypeXPU

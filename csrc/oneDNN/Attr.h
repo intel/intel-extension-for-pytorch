@@ -111,6 +111,21 @@ class Attr {
   algorithm kind_with_mish = algorithm::eltwise_mish;
   algorithm kind_with_linear = algorithm::eltwise_linear;
   algorithm kind_with_swish = algorithm::eltwise_swish;
+  algorithm kind_with_sqrt = algorithm::eltwise_sqrt;
+  algorithm kind_with_tanh = algorithm::eltwise_tanh;
+  algorithm kind_with_square = algorithm::eltwise_square;
+  algorithm kind_with_abs = algorithm::eltwise_abs;
+  algorithm kind_with_exp = algorithm::eltwise_exp;
+  algorithm kind_with_log = algorithm::eltwise_log;
+  algorithm kind_with_round = algorithm::eltwise_round;
+  algorithm kind_with_logsigmoid = algorithm::eltwise_logsigmoid;
+  algorithm kind_with_hardswish = algorithm::eltwise_hardswish;
+  algorithm kind_with_soft_relu = algorithm::eltwise_soft_relu;
+  algorithm kind_with_elu = algorithm::eltwise_elu;
+  algorithm kind_with_pow = algorithm::eltwise_pow;
+  algorithm kind_with_clip = algorithm::eltwise_clip;
+  // note: hardsigmoid seems oneDNN still not support
+  algorithm kind_with_hardsigmoid = algorithm::eltwise_hardsigmoid;
 
   // append sum post op
   Attr& append_post_sum(

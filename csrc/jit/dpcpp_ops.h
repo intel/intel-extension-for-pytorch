@@ -8,126 +8,48 @@ namespace torch {
 namespace jit {
 namespace xpu {
 
-at::Tensor& conv2d_sum(
-    at::Tensor& accumu,
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    int64_t groups,
-    at::Scalar alpha);
+namespace {
 
-at::Tensor& conv2d_sum_relu(
-    at::Tensor& accumu,
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    int64_t groups,
-    at::Scalar alpha);
+template <typename T, int N>
+struct TypeSelector {
+  template <typename... Args>
+  void extract_type(Args... args) {
+    return;
+  }
 
-at::Tensor conv2d_relu(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    int64_t groups);
+  template <typename... Args>
+  void extract_type(T type, Args... args) {
+    container_.push_back(type);
+    extract_type(args...);
+  }
 
-at::Tensor pad_conv2d(
-    const at::Tensor& input,
-    at::IntArrayRef pad_nd,
-    Scalar value,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    int64_t groups);
+  template <typename U, typename... Args>
+  void extract_type(U type, Args... args) {
+    extract_type(args...);
+  }
 
-at::Tensor conv2d_sigmoid(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    int64_t groups);
+  at::ArrayRef<T> retrive_types() {
+    return at::ArrayRef<T>(container_.begin(), container_.end());
+  }
 
-at::Tensor _convolution_relu(
-    at::Tensor& input_r,
-    const at::Tensor& weight_r,
-    const at::Tensor& bias_r,
-    at::IntArrayRef stride_,
-    at::IntArrayRef padding_,
-    at::IntArrayRef dilation_,
-    bool transposed_,
-    at::IntArrayRef output_padding_,
-    int64_t groups_,
-    bool benchmark,
-    bool deterministic,
-    bool cudnn_enabled,
-    bool allow_tf32);
+  at::SmallVector<T, N> container_;
+};
 
-at::Tensor _convolution_sum(
-    at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride_,
-    at::IntArrayRef padding_,
-    at::IntArrayRef dilation_,
-    bool transposed_,
-    at::IntArrayRef output_padding_,
-    int64_t groups_,
-    bool benchmark,
-    bool deterministic,
-    bool cudnn_enabled,
-    bool allow_tf32,
-    at::Tensor& accum,
-    at::Scalar scale);
+} // namespace
 
-at::Tensor _convolution_sum_relu(
-    at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride_,
-    at::IntArrayRef padding_,
-    at::IntArrayRef dilation_,
-    bool transposed_,
-    at::IntArrayRef output_padding_,
-    int64_t groups_,
-    bool benchmark,
-    bool deterministic,
-    bool cudnn_enabled,
-    bool allow_tf32,
-    at::Tensor& accum,
-    at::Scalar scale);
-
-at::Tensor _convolution_silu(
-    const at::Tensor& input_r,
-    const at::Tensor& weight_r,
-    const at::Tensor& bias_r,
-    at::IntArrayRef stride_,
-    at::IntArrayRef padding_,
-    at::IntArrayRef dilation_,
-    bool transposed_,
-    at::IntArrayRef output_padding_,
-    int64_t groups_,
-    bool benchmark,
-    bool deterministic,
-    bool cudnn_enabled,
-    bool allow_tf32);
-
-at::Tensor mul_add(
-    const at::Tensor& self,
-    const at::Tensor& other,
-    const at::Tensor& accumu,
-    at::Scalar alpha);
+template <typename Func>
+struct JitFusionProxy {
+  template <typename... Args>
+  at::Tensor operator()(Func func, std::string str, Args... args) {
+    RECORD_FUNCTION(str, std::vector<c10::IValue>({args...}));
+    TypeSelector<at::Tensor, sizeof...(args)> selector;
+    selector.extract_type(args...);
+    // std::vector<at::Tensor> guard_vars;
+    // tensor_extractor(guard_vars, args...);
+    const OptionalDeviceGuard device_guard(device_of(selector.retrive_types()));
+    return func(args...);
+  }
+};
 
 at::Tensor dequant_pixelshuffle(const at::Tensor& self, int64_t upscale_factor);
 
@@ -169,146 +91,6 @@ at::Tensor reorder(
     dnnl::memory::format_tag from,
     dnnl::memory::format_tag to,
     int64_t groups);
-
-at::Tensor permute_contiguous(
-    const at::Tensor& input,
-    at::IntArrayRef dims,
-    at::MemoryFormat dim_contiguous);
-
-at::Tensor q_conv2d_sum_relu(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
-    double conv_scale,
-    int64_t conv_zpoint,
-    at::Tensor& accumu,
-    double sum_scale,
-    int64_t sum_zpoint);
-
-at::Tensor q_conv2d_leaky_relu(
-    const Tensor& input,
-    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
-    double out_scale,
-    int64_t out_zpoint,
-    Scalar negative_scope);
-
-at::Tensor q_conv2d_sigmoid(
-    const Tensor& input,
-    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
-    double output_scale,
-    int64_t output_zpoint);
-
-at::Tensor q_conv2d_dequantize(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
-    double output_scale,
-    int64_t output_zero_point);
-
-at::Tensor softplus_tanh(
-    const Tensor& self,
-    const Scalar& beta,
-    const Scalar& threshold);
-
-at::Tensor softplus_tanh_mul(
-    const Tensor& self,
-    const Scalar& beta,
-    const Scalar& threshold,
-    const Tensor& mul_input);
-
-at::Tensor q_conv2d_dequantize_softplus_tanh_mul(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
-    double output_scale,
-    int64_t output_zero_point,
-    const Scalar& beta,
-    const Scalar& threshold);
-
-at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
-    double output_scale,
-    int64_t output_zero_point,
-    const Scalar& beta,
-    const Scalar& threshold,
-    double q_scale,
-    int64_t q_zpoint,
-    at::ScalarType dtype);
-
-at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
-    double output_scale,
-    int64_t output_zero_point,
-    const Scalar& beta,
-    const Scalar& threshold,
-    double q_scale,
-    int64_t q_zpoint,
-    at::ScalarType dtype,
-    Tensor qb,
-    double add_scale,
-    int64_t add_zero_point);
-
-at::Tensor matmul_add(
-    const at::Tensor& tensor1,
-    const at::Tensor& tensor2,
-    at::Tensor& accumul1,
-    at::Scalar beta1);
-
-at::Tensor trans_matmul(
-    const at::Tensor& tensor2,
-    int dim1,
-    int dim2,
-    const at::Tensor& tensor1);
-
-at::Tensor t_matmul(const at::Tensor& tensor2, const at::Tensor& tensor1);
-
-at::Tensor t_matmul_add(
-    const at::Tensor& tensor2,
-    const at::Tensor& tensor1,
-    at::Tensor& accumul1,
-    at::Scalar beta1);
-
-at::Tensor t_matmul_add_gelu(
-    const at::Tensor& tensor2,
-    const at::Tensor& tensor1,
-    at::Tensor& accumul1,
-    at::Scalar beta1);
-
-at::Tensor t_matmul_add_add(
-    const at::Tensor& tensor2,
-    const at::Tensor& tensor1,
-    at::Tensor& accumul1,
-    at::Scalar beta1,
-    at::Tensor& accumul2,
-    at::Scalar beta2);
-
-at::Tensor trans_matmul_div(
-    const at::Tensor& tensor2,
-    int dim1,
-    int dim2,
-    const at::Tensor& tensor1,
-    at::Scalar oscale);
-
-at::Tensor linear_gelu(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias);
-
-at::Tensor linear_relu(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias);
-
-at::Tensor linear_sigmoid(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias);
-
-at::Tensor linear_add(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    const at::Tensor& accumu,
-    at::Scalar alpha);
 
 } // namespace xpu
 } // namespace jit

@@ -37,92 +37,6 @@ c10::optional<at::Tensor> fused_SGD(
     const double dampening,
     const bool nesterov);
 
-at::Tensor convolution_sum(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool transposed,
-    at::IntArrayRef output_padding,
-    int64_t groups,
-    at::Tensor& accumu,
-    at::Scalar scale = 1.0,
-    at::Scalar alpha = 0.f,
-    at::Scalar beta = 0.f);
-
-at::Tensor _convolution_relu_(
-    at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool transposed,
-    at::IntArrayRef output_padding,
-    int64_t groups,
-    at::Scalar scale = 1.0,
-    at::Scalar alpha = 0.f,
-    at::Scalar beta = 0.f);
-
-at::Tensor convolution_silu(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool transposed,
-    at::IntArrayRef output_padding,
-    int64_t groups,
-    at::Scalar scale = 1.0,
-    at::Scalar alpha = 1.f,
-    at::Scalar beta = 0.f);
-
-at::Tensor convolution_sum_relu(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool transposed,
-    at::IntArrayRef output_padding,
-    int64_t groups,
-    at::Tensor& accumu,
-    at::Scalar scale = 1.0,
-    at::Scalar alpha = 0.f,
-    at::Scalar beta = 0.f);
-
-at::Tensor convolution_relu(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool transposed,
-    at::IntArrayRef output_padding,
-    int64_t groups,
-    at::Scalar scale = 1.0,
-    at::Scalar alpha = 0.f,
-    at::Scalar beta = 0.f);
-
-at::Tensor convolution_sigmoid(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool transposed,
-    at::IntArrayRef output_padding,
-    int64_t groups,
-    at::Scalar scale = 1.0,
-    at::Scalar alpha = 0.f,
-    at::Scalar beta = 0.f);
-
 at::Tensor pad_convolution(
     const at::Tensor& input,
     at::IntArrayRef pad_nd,
@@ -132,8 +46,6 @@ at::Tensor pad_convolution(
     at::IntArrayRef stride,
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
-    bool transposed,
-    at::IntArrayRef output_padding,
     int64_t groups);
 
 at::Tensor& fill_slice_with_index(at::Tensor& t, int dim);
@@ -261,28 +173,6 @@ at::Tensor dequant_pixelshuffle_quant(
     int64_t zero_pad,
     at::ScalarType dtype);
 
-at::Tensor q_conv2d_sum_relu(
-    at::Tensor& accumu,
-    const at::Tensor& input,
-    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
-    double conv_scale,
-    int64_t conv_zero_point,
-    double sum_scale,
-    int64_t sum_zero_point);
-
-at::Tensor q_conv2d_leaky_relu(
-    const Tensor& input,
-    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
-    double output_scale,
-    int64_t output_zero_point,
-    Scalar negative_slope);
-
-at::Tensor q_conv2d_sigmoid(
-    const Tensor& input,
-    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
-    double output_scale,
-    int64_t output_zero_point);
-
 at::Tensor q_conv2d_dequantize(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
@@ -359,5 +249,277 @@ at::Tensor dequantize_tensor_per_channel_affine(
     const at::Tensor& zero_points,
     int64_t axis);
 
+at::Tensor permute_contiguous(
+    const at::Tensor& self,
+    at::IntArrayRef dims,
+    at::MemoryFormat dim_contiguous);
+
+/* DECALRE_CONV
+This macro is used to convinentlt generate conv related post op declaration when
+no extra parameters are brought in.
+*/
+#define DECLARE_CONV(op, ...)                                           \
+  at::Tensor q_conv2d_##op(                                             \
+      const Tensor& input,                                              \
+      const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight, \
+      double output_scale,                                              \
+      int64_t output_zero_point);                                       \
+                                                                        \
+  at::Tensor convolution_##op(                                          \
+      const at::Tensor& input,                                          \
+      const at::Tensor& weight,                                         \
+      const c10::optional<at::Tensor>& bias,                            \
+      std::vector<int64_t> stride,                                      \
+      std::vector<int64_t> padding,                                     \
+      std::vector<int64_t> dilation,                                    \
+      int64_t groups);                                                  \
+                                                                        \
+  Tensor _convolution_##op(                                             \
+      const Tensor& input,                                              \
+      const Tensor& weight,                                             \
+      const c10::optional<at::Tensor>& bias,                            \
+      std::vector<int64_t> stride_,                                     \
+      std::vector<int64_t> padding_,                                    \
+      std::vector<int64_t> dilation_,                                   \
+      bool transposed,                                                  \
+      std::vector<int64_t> output_padding_,                             \
+      int groups,                                                       \
+      bool benchmark,                                                   \
+      bool deterministic,                                               \
+      bool cudnn_enabled,                                               \
+      bool allow_tf32);
+
+DECLARE_CONV(sqrt)
+DECLARE_CONV(abs)
+DECLARE_CONV(tanh)
+DECLARE_CONV(square)
+DECLARE_CONV(exp)
+DECLARE_CONV(log)
+DECLARE_CONV(round)
+DECLARE_CONV(log_sigmoid)
+DECLARE_CONV(hardswish)
+DECLARE_CONV(mish)
+DECLARE_CONV(silu)
+DECLARE_CONV(gelu)
+DECLARE_CONV(hardsigmoid)
+DECLARE_CONV(sigmoid)
+DECLARE_CONV(relu)
+
+at::Tensor q_conv2d_pow(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    Scalar pow);
+
+at::Tensor convolution_pow(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    std::vector<int64_t> stride,
+    std::vector<int64_t> padding,
+    std::vector<int64_t> dilation,
+    int64_t groups,
+    Scalar pow);
+
+Tensor _convolution_pow(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar pow);
+
+at::Tensor q_conv2d_leaky_relu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    Scalar negative_slope);
+
+at::Tensor convolution_leaky_relu(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    std::vector<int64_t> stride,
+    std::vector<int64_t> padding,
+    std::vector<int64_t> dilation,
+    int64_t groups,
+    Scalar negative_slope);
+
+Tensor _convolution_leaky_relu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar negative_slope);
+
+at::Tensor q_conv2d_hardtanh(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    Scalar minval,
+    Scalar maxval);
+
+at::Tensor convolution_hardtanh(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    std::vector<int64_t> stride,
+    std::vector<int64_t> padding,
+    std::vector<int64_t> dilation,
+    int64_t groups,
+    Scalar minval,
+    Scalar maxval);
+
+Tensor _convolution_hardtanh(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar minval,
+    Scalar maxval);
+
+at::Tensor q_conv2d_elu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    Scalar alpha,
+    Scalar scale,
+    Scalar input_scale);
+
+at::Tensor convolution_elu(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    std::vector<int64_t> stride,
+    std::vector<int64_t> padding,
+    std::vector<int64_t> dilation,
+    int64_t groups,
+    Scalar alpha,
+    Scalar scale,
+    Scalar input_scale);
+
+Tensor _convolution_elu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar alpha,
+    Scalar scale,
+    Scalar input_scale);
+
+Tensor convolution_sum(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    int64_t groups_,
+    Tensor& accumu,
+    Scalar scale);
+
+Tensor _convolution_sum(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Tensor& accumu,
+    Scalar scale);
+
+at::Tensor q_conv2d_sum(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    Tensor& accumu,
+    float sum_scale,
+    int sum_zero_point);
+
+Tensor convolution_sum_relu(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    int64_t groups_,
+    Tensor& accumu,
+    Scalar scale);
+
+Tensor _convolution_sum_relu(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Tensor& accumu,
+    Scalar scale);
+
+at::Tensor q_conv2d_sum_relu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    Tensor& accumu,
+    float sum_scale,
+    int sum_zero_point);
+
 } // namespace AtenIpexTypeXPU
+// namespace AtenIpexTypeXPU
 } // namespace at
