@@ -1,4 +1,5 @@
 #include <c10/core/Allocator.h>
+#include <include/xpu/Profiler.h>
 #include <runtime/Utils.h>
 #include <torch/csrc/autograd/profiler_legacy.h>
 #include <utils/DPCPP.h>

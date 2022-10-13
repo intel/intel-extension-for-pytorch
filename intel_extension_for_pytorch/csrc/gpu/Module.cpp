@@ -8,7 +8,7 @@
 #include <core/Allocator.h>
 #include <core/Device.h>
 #include <core/Generator.h>
-#include <include/Settings.h>
+#include <include/xpu/Settings.h>
 #include <intrinsic/intrinsic.h>
 #include <oneDNN/Utils.h>
 #include <pybind11/stl.h>
