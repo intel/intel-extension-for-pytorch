@@ -1,6 +1,6 @@
 #pragma once
 
-#include <include/Settings.h>
+#include <include/xpu/Settings.h>
 #include <utils/Macros.h>
 
 namespace xpu {

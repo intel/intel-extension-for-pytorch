@@ -224,19 +224,8 @@ install(TARGETS intel-ext-pt-gpu
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-set(IPEX_GPU_HEADERS)
-add_subdirectory(${IPEX_GPU_INCLUDE_DIR})
-install(FILES ${IPEX_GPU_HEADERS} DESTINATION include/xpu)
-
-# Generate the IPEX All-In-One header
-set(ipex_header "#pragma once\n")
-foreach(uheader ${IPEX_GPU_HEADERS})
-  get_filename_component(header ${uheader} NAME)
-  append(ipex_header "\n#include <xpu/${header}>")
-endforeach()
-
-file(WRITE ${BUILD_IPEX_GPU_ATEN_GENERATED}/../ipex.h ${ipex_header})
-install(FILES ${BUILD_IPEX_GPU_ATEN_GENERATED}/../ipex.h DESTINATION include)
+# install IPEX GPU public header files
+install(DIRECTORY ${IPEX_GPU_INCLUDE_DIR} DESTINATION .)
 
 # CMake config file for the external project.
 configure_file(

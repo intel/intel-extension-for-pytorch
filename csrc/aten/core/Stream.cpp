@@ -1,5 +1,5 @@
 #include <core/Stream.h>
-#include <include/Stream.h>
+#include <include/xpu/Stream.h>
 #include <runtime/Device.h>
 #include <runtime/Queue.h>
 
