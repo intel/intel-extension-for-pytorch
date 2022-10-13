@@ -1,6 +1,7 @@
 [submodule "third_party/oneDNN"]
 	path = third_party/oneDNN
-	url = https://github.com/intel-innersource/libraries.performance.math.onednn.git
+	url = https://github.com/oneapi-src/oneDNN.git
+	branch = rls-v2.7
 [submodule "third_party/oneDPL"]
 	path = third_party/oneDPL
 	url = https://github.com/oneapi-src/oneDPL
