@@ -302,9 +302,9 @@ supported:
   - inverse
   - inverse.out
   - is_set_to
-  - isin.Scalar_Tensor_out
-  - isin.Tensor_Scalar_out
-  - isin.Tensor_Tensor_out
+#  - isin.Scalar_Tensor_out
+#  - isin.Tensor_Scalar_out
+#  - isin.Tensor_Tensor_out
   - isnan
   - isneginf.out
   - isposinf.out
@@ -518,9 +518,9 @@ supported:
   - bucketize.Scalar
   - bucketize.Tensor
   - bucketize.Tensor_out
-  - searchsorted.Scalar
-  - searchsorted.Tensor
-  - searchsorted.Tensor_out
+#  - searchsorted.Scalar
+#  - searchsorted.Tensor
+#  - searchsorted.Tensor_out
   - sgn.out
   - sigmoid.out
   - sigmoid_backward.grad_input
@@ -756,8 +756,8 @@ supported:
   - mish.out
   - polar.out
   - var.correction_out
-  - matrix_exp
-  - logit_backward.grad_input
+#  - matrix_exp
+#  - logit_backward.grad_input
   - binomial
   - _standard_gamma
   - where.self_out

@@ -15,9 +15,7 @@ namespace dpcpp {
 
 #define DPCPP_DESC_BUFF_LEN 64
 
-using DPCPPDescBuff = struct DPCPPDescBuff {
-  char str[DPCPP_DESC_BUFF_LEN];
-};
+using DPCPPDescBuff = struct DPCPPDescBuff { char str[DPCPP_DESC_BUFF_LEN]; };
 
 TensorImpl* TensorImpl_new(bool is_quantized);
 at::Tensor TensorImpl_wrap(TensorImpl* tensor);

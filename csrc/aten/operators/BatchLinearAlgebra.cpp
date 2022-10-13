@@ -2973,7 +2973,7 @@ std::tuple<Tensor, Tensor> linalg_eigh(
   linalg_eigh_out_info(input, values, vectors, infos, true, uplo);
   at::_linalg_check_errors(infos, "torch.linalg.eigh", infos.dim() == 2);
 
-  return std::tuple<Tensor, Tensor>(values, vectors);
+  // return std::tuple<Tensor, Tensor>(values, vectors);
 }
 
 // TODO: it's possible to make the _out variant to be a primal function and

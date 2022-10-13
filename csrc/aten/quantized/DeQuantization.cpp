@@ -51,17 +51,18 @@ Tensor dequantize_tensor_per_channel_affine(
   auto q_eng =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
 
-  memory::dims q_dims = qtensor.dim() == 4 ? memory::dims(
-                                                 {qtensor.size(0),
-                                                  qtensor.size(1),
-                                                  qtensor.size(2),
-                                                  qtensor.size(3)})
+  memory::dims q_dims = qtensor.dim() == 4
+      ? memory::dims(
+            {qtensor.size(0),
+             qtensor.size(1),
+             qtensor.size(2),
+             qtensor.size(3)})
       : qtensor.dim() == 2 ? memory::dims({qtensor.size(0), qtensor.size(1)})
                            : memory::dims({qtensor.size(0)});
   memory::data_type q_dt = get_onednn_dtype(qtensor);
-  memory::format_tag q_fmt = qtensor.dim() == 4 ? memory::format_tag::nchw
-      : qtensor.dim() == 2                      ? memory::format_tag::nc
-                                                : memory::format_tag::x;
+  memory::format_tag q_fmt = qtensor.dim() == 4
+      ? memory::format_tag::nchw
+      : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
   memory::desc q_md = memory::desc(q_dims, q_dt, q_fmt);
   memory q_m = dpcpp_onednn_memory(q_md, q_eng, qtensor.data_ptr());
 
