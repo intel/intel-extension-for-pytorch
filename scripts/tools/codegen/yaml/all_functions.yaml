@@ -1957,8 +1957,6 @@ supported:
 #  - slow_conv_dilated3d_backward
   - col2im.out
   - col2im
-  - col2im_backward.grad_input
-  - col2im_backward
   - column_stack
   - column_stack.out
   - im2col.out
