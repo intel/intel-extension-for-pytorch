@@ -296,6 +296,7 @@ The following build options are supported in Intel® Extension for PyTorch* GPU.
 | USE_SCRATCHPAD_MODE | ON | Default is ON. Use oneDNN scratchpad user mode.|
 | USE_MULTI_CONTEXT | ON | Create DPC++ runtime context per device. |
 | USE_AOT_DEVLIST | "" | device list for AOT compilation. |
+| USE_SYCL_ASSERT | OFF | Enable assert in sycl kernel if set to ON. |
 | BUILD_STATS | OFF | Count statistics for each component during build process if set to ON. |
 | BUILD_BY_PER_KERNEL | OFF | Build by DPC++ per_kernel option if set to ON. |
 | BUILD_STRIPPED_BIN | OFF | Strip all symbols when building Intel® Extension for PyTorch* GPU libraries. |

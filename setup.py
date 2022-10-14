@@ -10,6 +10,7 @@
 # USE_SCRATCHPAD_MODE   - to trun on oneDNN scratchpad user mode
 # USE_MULTI_CONTEXT     - to create DPC++ runtime context per device
 # USE_AOT_DEVLIST       - to set device list for AOT build option, for example, bdw,tgl,ats,..."
+# USE_SYCL_ASSERT       - to enable assert in sycl kernel
 # BUILD_STATS           - to count statistics for each component during build process
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)
 # BUILD_STRIPPED_BIN    - to strip all symbols after build
@@ -233,9 +234,11 @@ class DPCPPBuild(BuildExtension, object):
             build_type = 'Release'
 
             build_separate_ops = 'OFF'
+            use_sycl_assert = 'OFF'
             if _check_env_flag('DEBUG'):
                 build_type = 'Debug'
                 build_separate_ops = 'ON'
+                use_sycl_assert = 'ON'
 
             def convert_cmake_dirs(paths):
                 def converttostr(input_seq, seperator):
@@ -271,6 +274,7 @@ class DPCPPBuild(BuildExtension, object):
                 'PYTHON_INCLUDE_DIR': distutils.sysconfig.get_python_inc(),
                 'PYTHON_PLATFORM_INFO': platform.platform(),
                 'BUILD_SEPARATE_OPS': build_separate_ops,
+                'USE_SYCL_ASSERT': use_sycl_assert,
                 'LIB_NAME': ext.name,
             }
 

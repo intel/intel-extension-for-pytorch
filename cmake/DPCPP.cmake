@@ -131,6 +131,11 @@ if(USE_AOT_DEVLIST)
   set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -Xs '-device ${USE_AOT_DEVLIST}'")
 endif()
 
+# Make assert available in sycl kernel 
+if(USE_SYCL_ASSERT)
+  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -DSYCL_FALLBACK_ASSERT=1")
+endif()
+
 # Since 2016 Debian start using RUNPATH instead of normally RPATH, which gave the annoy effect that
 # allow LD_LIBRARY_PATH to override dynamic linking path. Depends on intention of linking priority,
 # change below for best outcome: disable, using RPATH, enable, using RUNPATH
