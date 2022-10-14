@@ -60,7 +60,7 @@ class TestFunction(TestCase):
             out_autocast = _conv(_in_cpu)
         self.assertEqual(out_autocast.dtype, torch.bfloat16)
 
-    @unittest.skipIf(not core.onednn_has_fp16_support(), "ipex fp16 is not supported on this CPU device")
+    @unittest.skip("fp16 is not yet fully supported")
     def test_gradscaler(self):
         scaler = torch.cpu.amp.GradScaler()
         niters = 100

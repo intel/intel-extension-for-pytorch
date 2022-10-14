@@ -275,49 +275,6 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
       user_defined_dtype,
       fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(conv_transpose1d),
-      "conv_transpose1d",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const c10::optional<Tensor>&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          int64_t,
-          IntArrayRef),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(conv_transpose2d),
-      "conv_transpose2d.input",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const c10::optional<Tensor>&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          int64_t,
-          IntArrayRef),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(conv_transpose3d),
-      "conv_transpose3d.input",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const c10::optional<Tensor>&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          int64_t,
-          IntArrayRef),
-      user_defined_dtype,
-      fp32)
-
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
       ADD_NS(group_norm),
       "group_norm",
       Tensor(
@@ -329,7 +286,6 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
           bool),
       user_defined_dtype,
       fp32)
-
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       ADD_NS(_native_multi_head_attention),
       "_native_multi_head_attention",
@@ -355,9 +311,12 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
       TUPLE_THREE_TENSORS(const Tensor&, const Tensor&, int64_t),
       user_defined_dtype,
       fp32)
-  // fallthrough and fp32 cast policies
+
+  // fp32 and fp32 cast policies
   MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(mish), "mish", Tensor(const Tensor&), fallthrough, fp32)
+      ADD_NS(mish), "mish", Tensor(const Tensor&), fp32, fp32)
+
+  // fallthrough and fp32 cast policies
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       ADD_NS(batch_norm),
       "batch_norm",
@@ -377,19 +336,6 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
       ADD_NS(avg_pool1d),
       "avg_pool1d",
       Tensor(const Tensor&, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(avg_pool3d),
-      "avg_pool3d",
-      Tensor(
-          const Tensor&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          bool,
-          bool,
-          c10::optional<int64_t>),
       fallthrough,
       fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
@@ -420,18 +366,6 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       ADD_NS(max_pool2d),
       "max_pool2d",
-      Tensor(
-          const Tensor&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          bool),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(max_pool3d),
-      "max_pool3d",
       Tensor(
           const Tensor&,
           IntArrayRef,
