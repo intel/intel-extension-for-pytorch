@@ -13,7 +13,6 @@
 #include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
-#include "Random.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
