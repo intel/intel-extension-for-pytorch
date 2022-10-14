@@ -138,17 +138,6 @@ static void col2im_out_template(
       });
 }
 
-void col2im_backward_out_template(
-    Tensor& grad_input,
-    const Tensor& grad_output,
-    IntArrayRef kernel_size,
-    IntArrayRef dilation,
-    IntArrayRef padding,
-    IntArrayRef stride) {
-  at::AtenIpexTypeXPU::im2col_out(
-      grad_output, kernel_size, dilation, padding, stride, grad_input);
-}
-
 } // namespace impl
 
 Tensor& col2im_out(
@@ -176,31 +165,6 @@ Tensor col2im(
   impl::col2im_out_template(
       output, self, output_size, kernel_size, dilation, padding, stride);
   return output;
-}
-
-Tensor& col2im_backward_out(
-    const Tensor& grad_output,
-    IntArrayRef kernel_size,
-    IntArrayRef dilation,
-    IntArrayRef padding,
-    IntArrayRef stride,
-    Tensor& grad_input) {
-  impl::col2im_backward_out_template(
-      grad_input, grad_output, kernel_size, dilation, padding, stride);
-  return grad_input;
-}
-
-Tensor col2im_backward(
-    const Tensor& grad_output,
-    IntArrayRef kernel_size,
-    IntArrayRef dilation,
-    IntArrayRef padding,
-    IntArrayRef stride) {
-  Tensor grad_input = at::empty_like(grad_output);
-
-  impl::col2im_backward_out_template(
-      grad_input, grad_output, kernel_size, dilation, padding, stride);
-  return grad_input;
 }
 
 } // namespace AtenIpexTypeXPU
