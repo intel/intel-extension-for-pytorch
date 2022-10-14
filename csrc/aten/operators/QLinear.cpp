@@ -31,7 +31,7 @@ at::Tensor dpcppLinear(
   if (pack_ptr->bias_.has_value()) {
     bias = pack_ptr->bias_.value();
   } else {
-    bias = at::empty({0}, input.options());
+    bias = Tensor();
   }
 
   if (weight.is_quantized()) {
