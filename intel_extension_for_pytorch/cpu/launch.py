@@ -131,7 +131,13 @@ class CPUinfo():
             raise RuntimeError("Windows platform is not supported!!!")
         elif platform.system() == "Linux":
             args = ["lscpu", "--parse=CPU,Core,Socket,Node"]
-            lscpu_info = subprocess.check_output(args, universal_newlines=True).split("\n")
+            env_lang = os.getenv('LANG', 'UNSET')
+            os.environ['LANG'] = 'C'
+            lscpu_info = subprocess.check_output(args, env=os.environ, universal_newlines=True).split("\n")
+            if env_lang == 'UNSET':
+                del os.environ['LANG']
+            else:
+                os.environ['LANG'] = env_lang
 
             # Get information about  cpu, core, socket and node
             for line in lscpu_info:
