@@ -2,9 +2,9 @@
 
 ## Introduction
 
-`torch.xpu.amp` provides convenience for auto data type conversion at runtime. Deep learning workloads can benefit from lower-precision floating point data types such as `torch.float16` or `torch.bfloat16`, because of its lighter calculation workload and smaller memory usage. Accuracy is sacrificed when using lower-precision floating point data types so there's a trade-off between accuracy and performance. Thus, some operations should use the slower but more accurate`torch.float32`, while others can be converted to use the faster but less accurate `torch.float16` or `torch.bfloat16` data type. The Auto Mixed Precision (AMP) feature automates the tuning of data type conversions over all operators.
+`torch.xpu.amp` provides convenience for auto data type conversion at runtime. Deep learning workloads can benefit from lower-precision floating point data types such as `torch.float16` or `torch.bfloat16`, because of its lighter calculation workload and smaller memory usage. Accuracy is sacrificed when using lower-precision floating point data types so there's a trade-off between accuracy and performance. Thus, some operations should use the slower but more accurate `torch.float32`, while others can be converted to use the faster but less accurate `torch.float16` or `torch.bfloat16` data type. The Auto Mixed Precision (AMP) feature automates the tuning of data type conversions over all operators.
 
-Inference workloads using `torch.xpu.amp` supports `torch.bfloat16` and `torch.float16`, training workloads using `torch.xpu.amp` supports `torch.bfloat16`. `torch.bfloat16` is the default lower precision floating point data type when `torch.xpu.amp` is enabled.
+Inference workloads using `torch.xpu.amp` support `torch.bfloat16` and `torch.float16`. Training workloads using `torch.xpu.amp` support `torch.bfloat16`. `torch.bfloat16` is the default lower precision floating point data type when `torch.xpu.amp` is enabled.
 
 ## Use Case
 
@@ -103,4 +103,4 @@ These ops don't require a particular dtype for stability, but take multiple inpu
 
 `cat`, `stack`, `addcdiv`, `addcmul`, `atan2`, `bilinear`, `cross`, `dot`, `grid_sampler`, `index_put`, `tensordot`, `scatter_add`
 
-Some ops not listed here (e.g., binary ops like `add`) natively promote inputs without autocasting's intervention.  If inputs are a mixture of `bfloat16` and `float32`, these ops run in `float32` and produce `float32` output, regardless of whether autocast is enabled.
+Some ops not listed here (e.g., binary ops such as `add`) natively promote inputs without autocasting's intervention.  If inputs are a mixture of `bfloat16` and `float32`, these ops run in `float32` and produce `float32` output, regardless of whether autocast is enabled.
