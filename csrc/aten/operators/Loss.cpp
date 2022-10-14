@@ -55,6 +55,7 @@ void bce_kernel(TensorIterator& iter) {
       [&iter]() {
         dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t input, scalar_t target) -> scalar_t {
+              SYCL_KERNEL_ASSERT(input >= 0 && input <= 1);
               return (target - scalar_t(1)) *
                   Numerics<scalar_t>::max(
                          scalar_t(Numerics<scalar_t>::log(scalar_t(1) - input)),
@@ -267,11 +268,6 @@ Tensor binary_cross_entropy(
       at::borrow_from_optional_tensor(weight_opt);
   const Tensor& weight = *weight_maybe_owned;
 
-  auto minvalue = self.min().item<float>();
-  auto maxvalue = self.max().item<float>();
-  TORCH_CHECK(
-      minvalue >= 0. && maxvalue <= 1.,
-      "all elements of input should be between 0 and 1");
   Tensor loss = at::empty_like(self);
   auto iter = TensorIterator::binary_op(loss, self, target);
   impl::bce_kernel(iter);
@@ -290,11 +286,6 @@ Tensor& binary_cross_entropy_out(
   c10::MaybeOwned<Tensor> weight_maybe_owned =
       at::borrow_from_optional_tensor(weight_opt);
   const Tensor& weight = *weight_maybe_owned;
-  auto minvalue = self.min().item<float>();
-  auto maxvalue = self.max().item<float>();
-  TORCH_CHECK(
-      minvalue >= 0. && maxvalue <= 1.,
-      "all elements of input should be between 0 and 1");
   if (reduction != Reduction::None) {
     Tensor loss = at::empty_like(self);
     auto iter = TensorIterator::binary_op(loss, self, target);
@@ -352,7 +343,8 @@ Tensor binary_cross_entropy_backward(
   c10::MaybeOwned<Tensor> weight_maybe_owned =
       at::borrow_from_optional_tensor(weight_opt);
   const Tensor& weight = *weight_maybe_owned;
-  Tensor grad_input = at::zeros_like(
+  // XXX: Replace zeros_like with empty_like to avoid unnecessary zero fills
+  Tensor grad_input = at::empty_like(
       self, self.options().memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT));
   return at::AtenIpexTypeXPU::binary_cross_entropy_backward_out(
       grad_output, self, target, weight, reduction, grad_input);
