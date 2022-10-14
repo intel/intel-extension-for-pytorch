@@ -109039,6 +109039,190 @@
   with_gil: false
   deprecated: false
   has_math_kernel: false
+- name: col2im_backward_out
+  operator_name: col2im_backward
+  overload_name: grad_input
+  use_c10_dispatcher: with_codegenerated_unboxing_wrapper
+  manual_kernel_registration: false
+  category_override: ''
+  matches_jit_signature: true
+  schema_string: aten::col2im_backward.grad_input(Tensor grad_output, int[2] kernel_size, int[2] dilation, int[2] padding, int[2] stride, *, Tensor(a!) grad_input) -> Tensor(a!)
+  arguments:
+  - allocate: true
+    annotation: a!
+    dynamic_type: Tensor
+    is_nullable: false
+    name: grad_input
+    output: true
+    type: Tensor &
+  - annotation: null
+    dynamic_type: Tensor
+    is_nullable: false
+    name: grad_output
+    type: const Tensor &
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: kernel_size
+    size: 2
+    type: IntArrayRef
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: dilation
+    size: 2
+    type: IntArrayRef
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: padding
+    size: 2
+    type: IntArrayRef
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: stride
+    size: 2
+    type: IntArrayRef
+  schema_order_cpp_signature: Tensor & (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, IntArrayRef, Tensor &)
+  schema_order_arguments:
+  - annotation: null
+    dynamic_type: Tensor
+    is_nullable: false
+    name: grad_output
+    type: const Tensor &
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: kernel_size
+    size: 2
+    type: IntArrayRef
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: dilation
+    size: 2
+    type: IntArrayRef
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: padding
+    size: 2
+    type: IntArrayRef
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: stride
+    size: 2
+    type: IntArrayRef
+  - allocate: true
+    annotation: a!
+    dynamic_type: Tensor
+    is_nullable: false
+    name: grad_input
+    output: true
+    type: Tensor &
+  method_of:
+  - Type
+  - namespace
+  mode: native
+  python_module: nn
+  returns:
+  - dynamic_type: Tensor
+    name: grad_input
+    type: Tensor &
+  inplace: false
+  is_factory_method: false
+  abstract: true
+  device_guard: true
+  with_gil: false
+  deprecated: false
+  has_math_kernel: false
+- name: col2im_backward
+  operator_name: col2im_backward
+  overload_name: ''
+  use_c10_dispatcher: full
+  manual_kernel_registration: false
+  category_override: ''
+  matches_jit_signature: true
+  schema_string: aten::col2im_backward(Tensor grad_output, int[2] kernel_size, int[2] dilation, int[2] padding, int[2] stride) -> Tensor
+  arguments:
+  - annotation: null
+    dynamic_type: Tensor
+    is_nullable: false
+    name: grad_output
+    type: const Tensor &
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: kernel_size
+    size: 2
+    type: IntArrayRef
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: dilation
+    size: 2
+    type: IntArrayRef
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: padding
+    size: 2
+    type: IntArrayRef
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: stride
+    size: 2
+    type: IntArrayRef
+  schema_order_cpp_signature: Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, IntArrayRef)
+  schema_order_arguments:
+  - annotation: null
+    dynamic_type: Tensor
+    is_nullable: false
+    name: grad_output
+    type: const Tensor &
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: kernel_size
+    size: 2
+    type: IntArrayRef
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: dilation
+    size: 2
+    type: IntArrayRef
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: padding
+    size: 2
+    type: IntArrayRef
+  - annotation: null
+    dynamic_type: IntArrayRef
+    is_nullable: false
+    name: stride
+    size: 2
+    type: IntArrayRef
+  method_of:
+  - Type
+  - namespace
+  mode: native
+  python_module: nn
+  returns:
+  - dynamic_type: Tensor
+    name: result
+    type: Tensor
+  inplace: false
+  is_factory_method: false
+  abstract: true
+  device_guard: true
+  with_gil: false
+  deprecated: false
+  has_math_kernel: false
 - name: im2col_out
   operator_name: im2col
   overload_name: out
