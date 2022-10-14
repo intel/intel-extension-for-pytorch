@@ -456,7 +456,6 @@ namespace AtenIpexTypeXPU {
  at::Tensor & clip_(at::Tensor & self, const c10::optional<at::Tensor> & min, const c10::optional<at::Tensor> & max);
  at::Tensor & clip_out(const at::Tensor & self, const c10::optional<at::Scalar> & min, const c10::optional<at::Scalar> & max, at::Tensor & out);
  at::Tensor & clip_out(const at::Tensor & self, const c10::optional<at::Tensor> & min, const c10::optional<at::Tensor> & max, at::Tensor & out);
- at::Tensor & col2im_backward_out(const at::Tensor & grad_output, at::IntArrayRef kernel_size, at::IntArrayRef dilation, at::IntArrayRef padding, at::IntArrayRef stride, at::Tensor & grad_input);
  at::Tensor & col2im_out(const at::Tensor & self, at::IntArrayRef output_size, at::IntArrayRef kernel_size, at::IntArrayRef dilation, at::IntArrayRef padding, at::IntArrayRef stride, at::Tensor & out);
  at::Tensor & column_stack_out(at::TensorList tensors, at::Tensor & out);
  at::Tensor & complex_out(const at::Tensor & real, const at::Tensor & imag, at::Tensor & out);
@@ -1258,7 +1257,6 @@ namespace AtenIpexTypeXPU {
  at::Tensor clone(const at::Tensor & self, c10::optional<at::MemoryFormat> memory_format);
  at::Tensor coalesce(const at::Tensor & self);
  at::Tensor col2im(const at::Tensor & self, at::IntArrayRef output_size, at::IntArrayRef kernel_size, at::IntArrayRef dilation, at::IntArrayRef padding, at::IntArrayRef stride);
- at::Tensor col2im_backward(const at::Tensor & grad_output, at::IntArrayRef kernel_size, at::IntArrayRef dilation, at::IntArrayRef padding, at::IntArrayRef stride);
  at::Tensor col_indices(const at::Tensor & self);
  at::Tensor column_stack(at::TensorList tensors);
  at::Tensor combinations(const at::Tensor & self, int64_t r, bool with_replacement);
