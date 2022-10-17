@@ -8,6 +8,10 @@
 namespace xpu {
 namespace dpcpp {
 
+// NOTE: Make it global to avoid its destruction
+// too early during workload exit
+static CachingDeviceAllocator myInstance;
+
 constexpr size_t kDevAlignment = 512;
 constexpr size_t kMinBlockSize = 512;
 constexpr size_t kSmallSize = 1048576;
@@ -59,12 +63,12 @@ static void update_stat(Stat& stat, int64_t amount) {
 }
 
 CachingDeviceAllocator* CachingDeviceAllocator::Instance() {
-  static CachingDeviceAllocator myInstance;
   return &myInstance;
 }
 
 CachingDeviceAllocator::~CachingDeviceAllocator() {
-  emptyCache();
+  // Do not empty cache here to avoid dependence issue
+  // between other components
 }
 
 void CachingDeviceAllocator::update_stat_array(
