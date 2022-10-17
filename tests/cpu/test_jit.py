@@ -1471,6 +1471,7 @@ class Tester(TestCase):
                     self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
                     self.assertEqual(jit_res, ori_res, prec=5e-2)
 
+                torch._C._jit_set_texpr_fuser_enabled(pre_te_enable_status)
                 # stock pytorch does not support BF16 now
                 #input weight both bf16
                 # a_bf16 = a.to(torch.bfloat16)
