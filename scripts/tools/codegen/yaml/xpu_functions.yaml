@@ -50,7 +50,7 @@ supported:
   - _logcumsumexp
   - _logcumsumexp.out
   - _log_softmax.out
-#  - _log_softmax_backward_data.out
+  - _log_softmax_backward_data.out
   - _lu_with_info
   - _make_per_channel_quantized_tensor
   - _make_per_tensor_quantized_tensor
