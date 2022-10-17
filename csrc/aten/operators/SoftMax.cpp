@@ -1406,9 +1406,9 @@ at::Tensor& _log_softmax_backward_data_out(
     const at::Tensor& grad_output,
     const at::Tensor& output,
     int64_t dim,
-    const at::Tensor& self,
+    at::ScalarType input_dtype,
     at::Tensor& out) {
-  bool half_to_float = grad_output.scalar_type() != self.scalar_type();
+  bool half_to_float = grad_output.scalar_type() != input_dtype;
   if (half_to_float) {
     TORCH_INTERNAL_ASSERT(
         !half_to_float,
