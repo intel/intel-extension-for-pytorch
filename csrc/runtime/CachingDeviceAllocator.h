@@ -80,10 +80,6 @@ class CachingDeviceAllocator final {
   std::unordered_map<void*, Block*> allocated_blocks;
   std::deque<std::pair<sycl::event, Block*>> dpcpp_events;
 
-  CachingDeviceAllocator();
-
-  ~CachingDeviceAllocator();
-
   DeviceStats& get_stats_for_device(DeviceId device);
 
   void update_stat_array(
@@ -123,6 +119,10 @@ class CachingDeviceAllocator final {
       size_t* largest);
 
  public:
+  CachingDeviceAllocator();
+
+  ~CachingDeviceAllocator();
+
   static CachingDeviceAllocator* Instance(); // Singleton
 
   std::mutex* getDPCPPFreeMutex() const;
