@@ -293,8 +293,6 @@ supported:
   - igammac.out
   - im2col
   - im2col.out
-#  - im2col_backward
-#  - im2col_backward.grad_input
   - index.Tensor
   - index_fill_.int_Scalar
   - index_fill_.int_Tensor
@@ -304,9 +302,9 @@ supported:
   - inverse
   - inverse.out
   - is_set_to
-#  - isin.Scalar_Tensor_out
-#  - isin.Tensor_Scalar_out
-#  - isin.Tensor_Tensor_out
+  - isin.Scalar_Tensor_out
+  - isin.Tensor_Scalar_out
+  - isin.Tensor_Tensor_out
   - isnan
   - isneginf.out
   - isposinf.out
