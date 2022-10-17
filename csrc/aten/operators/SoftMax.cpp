@@ -1362,9 +1362,9 @@ Tensor& _softmax_backward_data_out(
     const Tensor& grad_output,
     const Tensor& output,
     int64_t dim,
-    const Tensor& self,
+    at::ScalarType input_dtype,
     Tensor& grad_input) {
-  bool half_to_float = grad_output.scalar_type() != self.scalar_type();
+  bool half_to_float = grad_output.scalar_type() != input_dtype;
   if (half_to_float) {
     TORCH_CHECK(
         !half_to_float,
@@ -1378,7 +1378,7 @@ Tensor& _softmax_backward_data_out(
   // when satify the aformentioned conditions,
   // the oneDNN path will be selected,
   // all the other cases will go to DPCPP path
-  if (xpu::oneDNN::softmax_backward_valid(grad_output, output, self) &&
+  if (xpu::oneDNN::softmax_backward_valid(grad_output, output, grad_input) &&
       IPEX_ANY(xpu::oneDNN::is_onednn_layout, grad_output, output)) {
     xpu::oneDNN::softmax_backward(
         grad_output, output, dim, half_to_float, grad_input);
