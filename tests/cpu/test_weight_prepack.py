@@ -237,9 +237,9 @@ class TestPrepackCases(TestCase):
 
         # TODO: add inference case.
 
-    @unittest.skip("Stock Pytorch does not support channelslast for Conv3d")
     def test_conv3d_training(self):
-        self._test_convolution_training_base(dim=3, dtype=torch.float)
+        # Stock Pytorch does not support channelslast for Conv3d
+        # self._test_convolution_training_base(dim=3, dtype=torch.float)
         if core.onednn_has_bf16_support():
             self._test_convolution_training_base(dim=3, dtype=torch.bfloat16, rtol=1e-2, atol=1e-03)
         # TODO: add inference case.
