@@ -16,7 +16,7 @@ Once you implement and test your feature or bug-fix, submit a Pull Request to ht
 
 ## Developing Intel® Extension for PyTorch\*
 
-A full set of instructions on installing Intel® Extension for PyTorch\* from source is in the [Installation document](instalation.md#install-via-source-compilation).
+A full set of instructions on installing Intel® Extension for PyTorch\* from source is in the [Installation document](installation.md#install-via-source-compilation).
 
 To develop on your machine, here are some tips:
 
@@ -41,8 +41,6 @@ To develop on your machine, here are some tips:
    git submodule update --init --recursive --jobs 0
    ```
 
-   If you want to have no-op incremental rebuilds (which are fast), see the section below titled "Make no-op build fast."
-
 3. Install Intel® Extension for PyTorch\* in `develop` mode:
 
    Replace:
@@ -62,10 +60,6 @@ To develop on your machine, here are some tips:
    For example:
    - Install local Intel® Extension for PyTorch\* in `develop` mode
    - modify your Python file `intel_extension_for_pytorch/__init__.py` (for example)
-   - test functionality
-   - modify your Python file `intel_extension_for_pytorch/__init__.py`
-   - test functionality
-   - modify your Python file `intel_extension_for_pytorch/__init__.py`
    - test functionality
 
 You do not need to repeatedly install after modifying Python files (`.py`). However, you would need to reinstall if you modify a Python interface (`.pyi`, `.pyi.in`) or non-Python files (`.cpp`, `.cc`, `.cu`, `.h`, etc.).
