@@ -535,7 +535,7 @@ def run(
 
     # Assumes that this file lives at PYTORCH_ROOT/torchgen/gen_backend_stubs.py
     pytorch_root = pathlib.Path(__file__).parent.parent.absolute()
-    template_dir = os.path.join(pytorch_root, "aten/src/ATen/templates")
+    template_dir = os.path.join(pytorch_root, "torchgen/packaged/ATen/templates")
 
     def make_file_manager(install_dir: str) -> FileManager:
         return FileManager(
@@ -545,9 +545,9 @@ def run(
     fm = make_file_manager(output_dir)
 
     native_yaml_path = os.path.join(
-        pytorch_root, "aten/src/ATen/native/native_functions.yaml"
+        pytorch_root, "torchgen/yaml/native_functions.yaml"
     )
-    tags_yaml_path = os.path.join(pytorch_root, "aten/src/ATen/native/tags.yaml")
+    tags_yaml_path = os.path.join(pytorch_root, "torchgen/yaml/tags.yaml")
     parsed_yaml = parse_native_yaml(native_yaml_path, tags_yaml_path)
     native_functions, backend_indices = (
         parsed_yaml.native_functions,
