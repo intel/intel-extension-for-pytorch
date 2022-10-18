@@ -33,10 +33,15 @@ from torch.nn import Parameter
 from torch.nn.parameter import UninitializedParameter, UninitializedBuffer
 from torch.nn.parallel._functions import Broadcast
 from torch.testing._internal.common_dtype import integral_types, get_all_fp_dtypes, get_all_math_dtypes
+# from torch.testing._internal.common_utils import freeze_rng_state, run_tests, skipIfNoLapack, skipIfRocm, \
+#     skipIfRocmVersionLessThan, skipIfNotMiopenSuggestNHWC, TEST_NUMPY, TEST_SCIPY, TEST_WITH_ROCM, download_file, \
+#     get_function_arglist, load_tests, repeat_test_for_types, ALL_TENSORTYPES, \
+#     ALL_TENSORTYPES2, suppress_warnings, TemporaryFileName, TEST_WITH_UBSAN, IS_PPC
 from torch.testing._internal.common_utils import freeze_rng_state, run_tests, skipIfNoLapack, skipIfRocm, \
     skipIfRocmVersionLessThan, skipIfNotMiopenSuggestNHWC, TEST_NUMPY, TEST_SCIPY, TEST_WITH_ROCM, download_file, \
-    get_function_arglist, load_tests, repeat_test_for_types, ALL_TENSORTYPES, \
-    ALL_TENSORTYPES2, suppress_warnings, TemporaryFileName, TEST_WITH_UBSAN, IS_PPC
+    get_function_arglist, load_tests, \
+    suppress_warnings, TemporaryFileName, TEST_WITH_UBSAN, IS_PPC
+
 from torch.testing._internal.common_nn import NNTestCase, NewModuleTest, CriterionTest, \
     module_tests, criterion_tests, loss_reference_fns, \
     ctcloss_reference, new_module_tests, single_batch_reference_fn
@@ -5944,7 +5949,7 @@ class TestNN(NNTestCase):
         nn.functional.conv2d(inputs.float(), weights.float(), bias.float())
 
     @unittest.skipIf(not TEST_XPU, 'XPU not available')
-    @repeat_test_for_types(get_all_fp_dtypes(include_bfloat16=AMPERE_OR_ROCM))
+    # @repeat_test_for_types(get_all_fp_dtypes(include_bfloat16=AMPERE_OR_ROCM))
     def test_Conv2d_deterministic(self, dtype=torch.float):
         inputs = torch.randn(2, 3, 5, 5, device="xpu", dtype=dtype, requires_grad=True)
         conv1 = torch.nn.Conv2d(3, 3, 3).to("xpu", dtype)
@@ -5973,7 +5978,7 @@ class TestNN(NNTestCase):
                                lambda: o1.sum().backward())
 
     @unittest.skipIf(not TEST_XPU, 'XPU not available')
-    @repeat_test_for_types(get_all_fp_dtypes(include_bfloat16=AMPERE_OR_ROCM))
+    # @repeat_test_for_types(get_all_fp_dtypes(include_bfloat16=AMPERE_OR_ROCM))
     def test_Conv2d_large_workspace(self, dtype=torch.float):
         # These sizes require huge cuDNN workspaces. Make sure we choose a
         # reasonable algorithm that does not run out of memory
@@ -6093,7 +6098,7 @@ class TestNN(NNTestCase):
         output.mean().backward()
 
     @unittest.skipIf(not TEST_XPU, 'XPU not available')
-    @repeat_test_for_types([torch.half, torch.float])
+    # @repeat_test_for_types([torch.half, torch.float])
     def test_ConvTranspose2d_large_output_padding(self, dtype=torch.half):
         net1 = torch.nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1)\
             .to(device='xpu', dtype=dtype)
@@ -6251,7 +6256,7 @@ class TestNN(NNTestCase):
     # Very similar to test_Conv2d_naive_groups but with special care to handle
     # the number of groups == number of input channels
     @unittest.skipIf(not TEST_XPU, 'XPU not available')
-    @repeat_test_for_types(ALL_TENSORTYPES)
+    # @repeat_test_for_types(ALL_TENSORTYPES)
     @tf32_on_and_off(0.01)
     def test_Conv2d_depthwise_naive_groups_xpu(self, dtype=torch.float):
         for depth_multiplier in [1, 2]:
@@ -6292,7 +6297,7 @@ class TestNN(NNTestCase):
                              atol=dtype2prec_DONTUSE[dtype], rtol=0)
 
     @unittest.skipIf(not TEST_XPU, 'XPU not available')
-    @repeat_test_for_types(ALL_TENSORTYPES)
+    # @repeat_test_for_types(ALL_TENSORTYPES)
     @tf32_on_and_off(0.005)
     def test_Conv3d_depthwise_naive_groups_xpu(self, dtype=torch.float):
         for depth_multiplier in [1, 2]:
@@ -8758,7 +8763,7 @@ class TestNN(NNTestCase):
             self.assertEqual(grad_output, grad_output_clone)
 
     @unittest.skipIf(not TEST_XPU, 'XPU not available')
-    @repeat_test_for_types(get_all_fp_dtypes(include_bfloat16=AMPERE_OR_ROCM))
+    # @repeat_test_for_types(get_all_fp_dtypes(include_bfloat16=AMPERE_OR_ROCM))
     def test_noncontig_conv_grad_xpu(self, dtype=torch.float):
         # FIXME: remove after adding non-contiguous grad tests for all modules
         module = nn.Conv2d(3, 5, kernel_size=3, padding=1).to("xpu", dtype)
@@ -9288,7 +9293,7 @@ class TestNN(NNTestCase):
         self.assertEqualTypeString(output, input)
 
     @unittest.skipIf(not TEST_XPU, "XPU unavailable")
-    @repeat_test_for_types([torch.float, torch.half])
+    # @repeat_test_for_types([torch.float, torch.half])
     def test_batchnorm_large_batch(self, dtype=torch.float):
         bn = nn.BatchNorm2d(1).to('xpu', dtype)
         data = torch.rand(880801, 1, 1, 1, device="xpu", dtype=dtype)
@@ -10993,7 +10998,7 @@ class TestNN(NNTestCase):
                          F.conv1d(input, weights2, bias=None, stride=2, dilation=2))
 
     @unittest.skipIf(not TEST_XPU, "XPU unavailable")
-    @repeat_test_for_types(DOUBLE_TENSORTYPES)
+    # @repeat_test_for_types(DOUBLE_TENSORTYPES)
     def test_conv_double_backward_xpu(self, dtype=torch.double):
         # Double backward only runs with DoubleTensor due to precison reason
         batch_size = 1
@@ -14663,7 +14668,7 @@ class TestNNDeviceType(NNTestCase):
         self.assertEqual(embedding.weight.grad._indices(), tensorTwice)
         self.assertEqual(embedding.weight.grad._values(), onesTwice)
 
-    @dtypesIfXPU(*ALL_TENSORTYPES2)
+    # @dtypesIfXPU(*ALL_TENSORTYPES2)
     @dtypes(torch.float32)
     def test_embedding_padding_idx(self, device, dtype):
         embedding = nn.Embedding(10, 20, padding_idx=0).to(device, dtype)
@@ -15586,7 +15591,7 @@ class TestNNDeviceType(NNTestCase):
             torch.__future__.set_overwrite_module_params_on_conversion(False)
 
     @onlyXPU
-    @dtypes(*ALL_TENSORTYPES2)
+    # @dtypes(*ALL_TENSORTYPES2)
     def test_embedding_max_norm_device(self, device, dtype):
         embedding = nn.Embedding(22, 5, max_norm=1.0).to(device, dtype=dtype)
         # nn.Embedding only takes LongTensor as input
