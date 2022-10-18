@@ -387,6 +387,14 @@ def get_ipex_cpu_dir():
 def get_ipex_cpu_build_dir():
     return os.path.join(get_build_type_dir(), 'csrc', 'cpu')
 
+def get_ipex_python_dir():
+    project_root_dir = os.path.dirname(__file__)
+    python_root_dir = os.path.join(project_root_dir, 'intel_extension_for_pytorch', 'csrc', 'python')
+    return os.path.abspath(python_root_dir)
+
+def get_ipex_python_build_dir():
+    return os.path.join(get_build_type_dir(), 'csrc', 'python')
+
 # initialize variables for compilation
 IS_WINDOWS = (platform.system() == 'Windows')
 IS_DARWIN = (platform.system() == 'Darwin')
@@ -434,6 +442,21 @@ def get_cpp_test_dir():
 def get_cpp_test_build_dir():
     return os.path.join(get_build_type_dir(), 'tests', 'cpu', 'cpp')
 
+def get_pybind11_abi_compiler_flags():
+    import torch
+    pybind11_abi_flags = []
+
+    for pname in ["COMPILER_TYPE", "STDLIB", "BUILD_ABI"]:
+        pval = getattr(torch._C, f"_PYBIND11_{pname}")
+        if pval is not None:
+            pybind11_abi_flags.append(f'-DPYBIND11_{pname}=\\"{pval}\\"')
+
+    cl_flags = ""
+    for flag in pybind11_abi_flags:
+        cl_flags += (flag +' ')
+
+    return cl_flags
+
 class IPEXCPPLibBuild(build_clib, object):
     def run(self):
         self.build_lib = os.path.relpath(get_package_dir())
@@ -452,9 +475,11 @@ class IPEXCPPLibBuild(build_clib, object):
 
         project_dir = get_project_dir()
         ipex_cpu_dir = get_ipex_cpu_dir()
+        ipex_cpu_build_dir = get_ipex_cpu_build_dir()
         build_type_dir = get_build_type_dir()
         output_lib_path = get_package_lib_dir()
-        ipex_cpu_build_dir = get_ipex_cpu_build_dir()
+        ipex_python_dir = get_ipex_python_dir()
+        ipex_python_build_dir = get_ipex_python_build_dir()
 
         if not os.path.exists(build_type_dir):
             Path(build_type_dir).mkdir(parents=True, exist_ok=True)
@@ -465,6 +490,9 @@ class IPEXCPPLibBuild(build_clib, object):
         if not os.path.exists(ipex_cpu_build_dir):
             Path(ipex_cpu_build_dir).mkdir(parents=True, exist_ok=True)
 
+        if not os.path.exists(ipex_python_build_dir):
+            Path(ipex_python_build_dir).mkdir(parents=True, exist_ok=True)
+
         cmake_args = [
             '-DCMAKE_BUILD_TYPE=' + get_build_type(),
             '-DCMAKE_INSTALL_PREFIX=' + os.path.abspath(output_lib_path),
@@ -473,7 +501,9 @@ class IPEXCPPLibBuild(build_clib, object):
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
             '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
-            '-DMKL_INSTALL_DIR=' + mkl_install_dir]
+            '-DMKL_INSTALL_DIR=' + mkl_install_dir,
+            '-DPYBIND11_CL_FLAGS=' + get_pybind11_abi_compiler_flags()
+            ]
 
         if _check_env_flag("IPEX_DISP_OP"):
             cmake_args += ['-DIPEX_DISP_OP=1']
@@ -503,6 +533,14 @@ class IPEXCPPLibBuild(build_clib, object):
             check_call(['ninja'] + build_args, cwd=ipex_cpu_build_dir, env=env)
         else:
             check_call(['make'] + build_args, cwd=ipex_cpu_build_dir, env=env)
+
+        # Build python.so
+        check_call([self.cmake, ipex_python_dir] + cmake_args, cwd=ipex_python_build_dir, env=env)
+
+        if use_ninja:
+            check_call(['ninja'] + build_args, cwd=ipex_python_build_dir, env=env)
+        else:
+            check_call(['make'] + build_args, cwd=ipex_python_build_dir, env=env)
 
         # Build the CPP UT
         cpp_test_dir = get_cpp_test_dir()
@@ -635,22 +673,20 @@ elif mode == 'python':
             return '-Wl,-rpath,$ORIGIN/' + path
 
     def pyi_module():
-        main_libraries = ['intel-ext-pt-cpu']
-        main_sources = [
-            os.path.join(package_name, "csrc", "python", "_C.cpp"),
-            os.path.join(package_name, "csrc", "python", "cpu", "init_python_bindings.cpp"),
-            os.path.join(package_name, "csrc", "python", "cpu", "TaskModule.cpp")]
+        main_libraries = ['intel-ext-pt-python']
+        main_sources = [os.path.join("intel_extension_for_pytorch", "csrc", "python", "_C.cpp")]
 
         include_dirs = [
             os.path.realpath("."),
-            os.path.realpath(os.path.join(package_name, "csrc")),
+            os.path.realpath(os.path.join("intel_extension_for_pytorch", "csrc", "python")),
             os.path.join(mkl_include_path),
             os.path.join(pytorch_install_dir, "include"),
             os.path.join(pytorch_install_dir, "include", "torch", "csrc", "api", "include")]
 
         library_dirs = [
             "lib",
-            os.path.join(pytorch_install_dir, "lib")]
+            os.path.join(pytorch_install_dir, "lib")
+            ]
 
         extra_compile_args = [
             '-Wall',

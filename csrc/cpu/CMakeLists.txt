@@ -83,6 +83,12 @@ else()
   message(FATAL_ERROR, "Cannot find installed PyTorch directory")
 endif()
 
+if(DEFINED PYBIND11_CL_FLAGS)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PYBIND11_CL_FLAGS}")
+else()
+  message(FATAL_ERROR, "Cannot get pybind11 abi compiler flags")
+endif()
+
 # Set Python include dir
 if(DEFINED PYTHON_INCLUDE_DIR)
   include_directories(${PYTHON_INCLUDE_DIR})

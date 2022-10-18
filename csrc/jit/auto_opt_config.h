@@ -3,7 +3,7 @@
 
 namespace torch_ipex {
 
-class AutoOptConfig {
+class TORCH_API AutoOptConfig {
  public:
   static AutoOptConfig& singleton() {
     static AutoOptConfig auto_opt_conf;

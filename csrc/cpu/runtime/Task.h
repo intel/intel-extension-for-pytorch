@@ -18,7 +18,7 @@ namespace runtime {
 // refer to http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2008/n2709.html
 /*Task is used to handle input of general C++ functions*/
 template <class F, class... Args>
-class Task {
+class TORCH_API Task {
  public:
   explicit Task(F&& f, std::shared_ptr<TaskExecutor> task_executor);
   Task(const Task& task) = delete;

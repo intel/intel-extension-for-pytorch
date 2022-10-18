@@ -14,15 +14,15 @@ static std::atomic<bool>& getLlgaEnabled() {
   return onednn_enabled;
 }
 
-bool is_llga_fp32_bf16_enabled();
+TORCH_API bool is_llga_fp32_bf16_enabled();
 
-void set_llga_fp32_bf16_enabled(bool new_enabled);
+TORCH_API void set_llga_fp32_bf16_enabled(bool new_enabled);
 
 TORCH_API void fuseGraph(std::shared_ptr<torch::jit::Graph>& g);
 
-void setLlgaWeightCacheEnabled(bool enabled);
+TORCH_API void setLlgaWeightCacheEnabled(bool enabled);
 
-bool getLlgaWeightCacheEnabled();
+TORCH_API bool getLlgaWeightCacheEnabled();
 
 } // namespace onednn
 } // namespace fuser

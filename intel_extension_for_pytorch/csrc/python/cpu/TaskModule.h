@@ -16,7 +16,7 @@
 
 namespace torch_ipex {
 namespace runtime {
-struct FutureTensor {
+struct TORCH_API FutureTensor {
   // script module
   std::future<c10::IValue> future_script_tensor;
   bool script_module_initialized_{false};

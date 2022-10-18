@@ -16,7 +16,7 @@ using at::Tensor;
 using at::TensorList;
 using namespace c10;
 
-enum class DtypeCastPolicy : uint8_t {
+enum class TORCH_API DtypeCastPolicy : uint8_t {
   user_defined_dtype = 0,
   fp32, // Cast all inputs to at::kFloat before running the op.
   fp32_set_opt_dtype, // Treats functions (like softmax) that
@@ -38,9 +38,9 @@ enum class DtypeCastPolicy : uint8_t {
   fallthrough, // Do not cast inputs.
 };
 
-at::ScalarType get_autocast_dtype();
-void set_autocast_dtype(at::ScalarType dtype);
-void clear_autocast_cache();
+TORCH_API at::ScalarType get_autocast_dtype();
+TORCH_API void set_autocast_dtype(at::ScalarType dtype);
+TORCH_API void clear_autocast_cache();
 
 Tensor cpu_cached_cast(at::ScalarType to_type, const Tensor& arg);
 

@@ -7,10 +7,11 @@
 namespace torch_ipex {
 namespace jit {
 
-void FusionPass(std::shared_ptr<torch::jit::Graph>& graph);
-void ApplyInplaceOptimization(std::shared_ptr<torch::jit::Graph>& graph);
-void IPEXFusionPass(std::shared_ptr<torch::jit::Graph>& graph);
-void FoldPrepackingOps(torch::jit::script::Module& m);
+TORCH_API void FusionPass(std::shared_ptr<torch::jit::Graph>& graph);
+TORCH_API void ApplyInplaceOptimization(
+    std::shared_ptr<torch::jit::Graph>& graph);
+TORCH_API void IPEXFusionPass(std::shared_ptr<torch::jit::Graph>& graph);
+TORCH_API void FoldPrepackingOps(torch::jit::script::Module& m);
 
 } // namespace jit
 } // namespace torch_ipex

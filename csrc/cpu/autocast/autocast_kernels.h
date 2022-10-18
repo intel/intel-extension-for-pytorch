@@ -12,12 +12,12 @@
 namespace torch_ipex {
 namespace autocast {
 
-void _amp_foreach_non_finite_check_and_unscale_cpu_(
+TORCH_API void _amp_foreach_non_finite_check_and_unscale_cpu_(
     std::vector<at::Tensor> scaled_grads,
     at::Tensor& found_inf,
     const at::Tensor& inv_scale);
 
-at::Tensor& _amp_update_scale_cpu_(
+TORCH_API at::Tensor& _amp_update_scale_cpu_(
     at::Tensor& current_scale,
     at::Tensor& growth_tracker,
     const at::Tensor& found_inf,
