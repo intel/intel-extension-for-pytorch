@@ -701,43 +701,5 @@ Tensor& huber_loss_backward_out(
   return grad_input;
 }
 
-Tensor kl_div_backward(
-    const Tensor& grad,
-    const Tensor& self,
-    const Tensor& target,
-    int64_t reduction,
-    bool log_target) {
-  auto grad_input = at::empty_like(self);
-  if (!log_target) {
-    TensorIterator iter = TensorIteratorConfig()
-                              .add_output(grad_input)
-                              .add_input(target)
-                              .add_input(grad)
-                              .build();
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::Half,
-        at::ScalarType::BFloat16,
-        self.scalar_type(),
-        "kl_div_backward",
-        [&]() {
-          scalar_t inv = (reduction == at::Reduction::Mean)
-              ? scalar_t(1.0 / self.numel())
-              : scalar_t(1.0);
-          dpcpp_kernel_for_tensor_iter(
-              iter, [inv](scalar_t target_val, scalar_t grad_val) {
-                return (target_val > 0) ? scalar_t(-target_val * grad_val * inv)
-                                        : scalar_t(0.0);
-              });
-        });
-  } else {
-    grad_input = -at::exp(target) * grad;
-    if (reduction == at::Reduction::Mean) {
-      grad_input /= self.numel();
-    }
-  }
-
-  return grad_input;
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at
