@@ -22,7 +22,7 @@
 namespace torch_ipex {
 namespace runtime {
 
-class TaskExecutor {
+class TORCH_API TaskExecutor {
  public:
   explicit TaskExecutor(const torch_ipex::runtime::CPUPool& cpu_pool);
   std::mutex& get_mutex();

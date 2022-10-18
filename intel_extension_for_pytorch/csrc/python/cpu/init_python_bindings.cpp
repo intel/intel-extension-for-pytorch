@@ -23,7 +23,6 @@
 
 #include "csrc/cpu/utils/fpmath_mode.h"
 #include "csrc/cpu/utils/onednn_utils.h"
-#include "csrc/cpu/utils/rw_lock.h"
 #include "csrc/jit/auto_opt_config.h"
 #include "csrc/jit/cpu/tensorexpr/nnc_fuser_register.h"
 
@@ -41,7 +40,6 @@
 
 namespace torch_ipex {
 namespace {
-
 py::object GetBinaryInfo() {
   auto py_dict = py::dict();
   py_dict["__version__"] = __version__();
@@ -216,13 +214,11 @@ void InitIpexModuleBindings(py::module m) {
         return;
       });
 }
-
 } // namespace
 
 using namespace torch::jit;
 
-void InitIpexBindings(py::module m) {
-  InitIpexModuleBindings(m);
+void InitIpexCpuBindings(py::module m) {
+  torch_ipex::InitIpexModuleBindings(m);
 }
-
 } // namespace torch_ipex
