@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Functions.h>
 #include <ATen/native/Activation.h>
+#include "ATen/OpMathType.h"
 
 #include <core/Generator.h>
 #include <core/TensorImplUtils.h>
@@ -19,6 +20,7 @@
 #include "Loops.h"
 #include "RandomEngine.h"
 
+#include <iostream>
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
 
@@ -382,14 +384,23 @@ inline scalar_t relu_forward(scalar_t self) {
 }
 
 template <typename scalar_t>
-inline scalar_t gelu_erf_forward(scalar_t self) {
-  using accscalar_t = acc_type<scalar_t>;
-  const accscalar_t alpha = accscalar_t(M_SQRT1_2);
-  const accscalar_t one = accscalar_t(1);
-  const accscalar_t pointfive = accscalar_t(0.5);
-  const accscalar_t x = static_cast<accscalar_t>(self);
-  return (scalar_t)(
-      x * pointfive * (one + Numerics<accscalar_t>::erf(x * alpha)));
+inline scalar_t gelu_erf_forward(scalar_t x) {
+  using opmath_t = at::opmath_type<scalar_t>;
+  constexpr opmath_t kAlpha = M_SQRT1_2;
+  return static_cast<opmath_t>(x) * opmath_t(0.5) *
+      (opmath_t(1) + ::erf(static_cast<opmath_t>(x) * kAlpha));
+}
+
+template <typename scalar_t>
+inline scalar_t gelu_tanh_forward(scalar_t x) {
+  using opmath_t = at::opmath_type<scalar_t>;
+  constexpr opmath_t kBeta = M_SQRT2 * M_2_SQRTPI * opmath_t(0.5);
+  constexpr opmath_t kKappa = 0.044715;
+  auto x_cube = static_cast<opmath_t>(x) * static_cast<opmath_t>(x) *
+      static_cast<opmath_t>(x);
+  auto inner = kBeta * (static_cast<opmath_t>(x) + kKappa * x_cube);
+  return opmath_t(0.5) * static_cast<opmath_t>(x) *
+      (opmath_t(1) + Numerics<opmath_t>::tanh(inner));
 }
 
 template <typename scalar_t>
@@ -800,34 +811,64 @@ Tensor& gelu_out(
     const Tensor& self,
     c10::string_view approximate,
     Tensor& result) {
+  at::native::GeluType approximate_gelu =
+      at::native::get_gelutype_enum(approximate);
   if (xpu::oneDNN::is_onednn_layout(self) &&
       xpu::oneDNN::eltwise_forward_valid(self)) {
-    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
-        result, self, 0.0f, 0.0f);
+    if (approximate_gelu == at::native::GeluType::Tanh) {
+      std::cout << "--------onednn go to tanh path------" << std::endl;
+      xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_tanh>(
+          result, self, 0.0f, 0.0f);
+    } else {
+      std::cout << "--------onednn go to erf path------" << std::endl;
+      xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
+          result, self, 0.0f, 0.0f);
+    }
     return result;
+    // if (xpu::oneDNN::is_onednn_layout(self) &&
+    //     xpu::oneDNN::eltwise_forward_valid(self)) {
+    //   xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
+    //       result, self, 0.0f, 0.0f);
+    //   return result;
   } else {
     auto _self = to_plain_if_needed(self);
     if (!result.defined()) {
       result = at::empty_like(_self);
     }
     auto iter = TensorIterator::unary_op(result, _self);
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::BFloat16,
-        at::ScalarType::Half,
-        iter.dtype(),
-        "gelu",
-        [&]() {
-          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t self) -> scalar_t {
-            return impl::gelu_erf_forward<scalar_t>(self);
+
+    if (approximate_gelu == at::native::GeluType::Tanh) {
+      std::cout << "--------go to tanh path------" << std::endl;
+      IPEX_DISPATCH_FLOATING_TYPES_AND2(
+          at::ScalarType::BFloat16,
+          at::ScalarType::Half,
+          iter.dtype(),
+          "gelu",
+          [&]() {
+            dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t self) -> scalar_t {
+              return impl::gelu_tanh_forward<scalar_t>(self);
+            });
           });
-        });
+    } else {
+      std::cout << "--------go to erf path------" << std::endl;
+      IPEX_DISPATCH_FLOATING_TYPES_AND2(
+          at::ScalarType::BFloat16,
+          at::ScalarType::Half,
+          iter.dtype(),
+          "gelu",
+          [&]() {
+            dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t self) -> scalar_t {
+              return impl::gelu_erf_forward<scalar_t>(self);
+            });
+          });
+    }
     return result;
   }
 }
 
-Tensor gelu(const Tensor& self) {
+Tensor gelu(const Tensor& self, c10::string_view approximate) {
   Tensor result;
-  return gelu_out(self, "none", result);
+  return gelu_out(self, approximate, result);
 }
 
 Tensor& gelu_backward_out(
@@ -835,6 +876,7 @@ Tensor& gelu_backward_out(
     const Tensor& self,
     c10::string_view approximate,
     Tensor& grad_input) {
+  std::cout << "--------gelu backward------" << std::endl;
   if (IPEX_ANY(xpu::oneDNN::is_onednn_layout, grad, self) &&
       IPEX_ALL(xpu::oneDNN::eltwise_backward_valid, grad, self)) {
     xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_gelu_erf>(
