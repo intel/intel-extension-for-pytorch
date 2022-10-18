@@ -20,6 +20,7 @@
 #include "Loops.h"
 #include "RandomEngine.h"
 
+#include <iostream>
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
 
@@ -847,6 +848,11 @@ Tensor& gelu_out(
           result, self, 0.0f, 0.0f);
     }
     return result;
+    // if (xpu::oneDNN::is_onednn_layout(self) &&
+    //     xpu::oneDNN::eltwise_forward_valid(self)) {
+    //   xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
+    //       result, self, 0.0f, 0.0f);
+    //   return result;
   } else {
     auto _self = to_plain_if_needed(self);
     if (!result.defined()) {
