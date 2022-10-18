@@ -64,7 +64,7 @@ To develop on your machine, here are some tips:
 
 You do not need to repeatedly install after modifying Python files (`.py`). However, you would need to reinstall if you modify a Python interface (`.pyi`, `.pyi.in`) or non-Python files (`.cpp`, `.h`, etc.).
 
-If you want to reinstall, make sure that you uninstall Intel® Extension for PyTorch\* first by running `pip uninstall intel_extension_for_pytorch` until you see `WARNING: Skipping intel_extension_for_pytorch as it is not installed`; next run `python setup.py clean`. After that, you can install in `develop` mode again.
+If you want to reinstall, make sure that you uninstall Intel® Extension for PyTorch\* first by running `pip uninstall intel_extension_for_pytorch` until you see `WARNING: Skipping intel_extension_for_pytorch as it is not installed`. Then run `python setup.py clean`. After that, you can install in `develop` mode again.
 
 ### Tips and Debugging
 
@@ -99,7 +99,7 @@ For more information about unit tests, please read [README.md](../../tests/gpu/R
 
 ## Writing documentation
 
-So you want to write some documentation for your code contribution and don't know where to start?
+Do you want to write some documentation for your code contribution and don't know where to start?
 
 Intel® Extension for PyTorch\* uses [Google style](http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html) for formatting docstrings. Length of line inside docstrings block must be limited to 80 characters to fit into Jupyter documentation popups.
 
