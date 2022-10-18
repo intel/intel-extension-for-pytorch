@@ -21,7 +21,7 @@ Function(GEN_BACKEND file_yaml)
                 --output_dir ${BUILD_IPEX_GPU_ATEN_GENERATED}
                 --source_yaml ${PROJECT_SOURCE_DIR}/scripts/tools/codegen/yaml/${file_yaml}
                 ${SIMPLE_TRACE}
-                WORKING_DIRECTORY ${IPEX_ROOT_DIR}/scripts
+                WORKING_DIRECTORY ${IPEX_ROOT_DIR}/scripts/tools
                 DEPENDS
                 ${depended_files}
                 ${PROJECT_SOURCE_DIR}/scripts/tools/codegen/yaml/${file_yaml})
