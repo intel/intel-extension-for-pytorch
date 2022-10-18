@@ -404,13 +404,45 @@ inline scalar_t gelu_tanh_forward(scalar_t x) {
 }
 
 template <typename scalar_t>
-inline scalar_t gelu_erf_backward(scalar_t grad, scalar_t self) {
-  using accscalar_t = acc_type<scalar_t>;
-  auto v = static_cast<accscalar_t>(self) * M_SQRT1_2;
-  return (scalar_t)(
-      grad * 0.5 *
-      (1.0 + Numerics<accscalar_t>::erf(v) +
-       v * M_2_SQRTPI * Numerics<accscalar_t>::exp(-v * v)));
+inline scalar_t gelu_erf_backward(scalar_t dy, scalar_t x) {
+  // using accscalar_t = acc_type<scalar_t>;
+  // auto v = static_cast<accscalar_t>(self) * M_SQRT1_2;
+  // return (scalar_t)(
+  //     grad * 0.5 *
+  //     (1.0 + Numerics<accscalar_t>::erf(v) +
+  //      v * M_2_SQRTPI * Numerics<accscalar_t>::exp(-v * v)));
+  using opmath_t = at::opmath_type<scalar_t>;
+  constexpr opmath_t kBeta = M_2_SQRTPI * M_SQRT1_2 * opmath_t(0.5);
+  constexpr opmath_t kAlpha = M_SQRT1_2;
+  const opmath_t cdf =
+      opmath_t(0.5) * (opmath_t(1) + ::erf(static_cast<opmath_t>(x) * kAlpha));
+  const opmath_t pdf = Numerics<opmath_t>::exp(
+                           opmath_t(-0.5) * static_cast<opmath_t>(x) *
+                           static_cast<opmath_t>(x)) *
+      kBeta;
+  return static_cast<opmath_t>(dy) * (cdf + static_cast<opmath_t>(x) * pdf);
+}
+
+template <typename scalar_t>
+inline scalar_t gelu_tanh_backward(scalar_t dy, scalar_t x) {
+  using opmath_t = at::opmath_type<scalar_t>;
+  constexpr opmath_t kBeta = M_SQRT2 * M_2_SQRTPI * opmath_t(0.5);
+  constexpr opmath_t kKappa = 0.044715;
+  auto x_sq = static_cast<opmath_t>(x) * static_cast<opmath_t>(x);
+  auto x_cube = x_sq * static_cast<opmath_t>(x);
+  auto inner = kBeta * (static_cast<opmath_t>(x) + kKappa * x_cube);
+  auto tanh_inner = Numerics<opmath_t>::tanh(inner);
+
+  auto left = opmath_t(0.5) * static_cast<opmath_t>(x);
+  auto right = opmath_t(1) + tanh_inner;
+
+  auto left_derivative = 0.5 * right;
+
+  auto tanh_derivative = opmath_t(1) - tanh_inner * tanh_inner;
+  auto inner_derivative = kBeta * (opmath_t(1) + opmath_t(3) * kKappa * x_sq);
+  auto right_derivative = left * tanh_derivative * inner_derivative;
+
+  return static_cast<opmath_t>(dy) * (left_derivative + right_derivative);
 }
 
 Tensor& silu_out_kernel(const Tensor& self, Tensor& result) {
@@ -815,21 +847,9 @@ Tensor& gelu_out(
       at::native::get_gelutype_enum(approximate);
   if (xpu::oneDNN::is_onednn_layout(self) &&
       xpu::oneDNN::eltwise_forward_valid(self)) {
-    if (approximate_gelu == at::native::GeluType::Tanh) {
-      std::cout << "--------onednn go to tanh path------" << std::endl;
-      xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_tanh>(
-          result, self, 0.0f, 0.0f);
-    } else {
-      std::cout << "--------onednn go to erf path------" << std::endl;
-      xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
-          result, self, 0.0f, 0.0f);
-    }
+    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
+        result, self, 0.0f, 0.0f);
     return result;
-    // if (xpu::oneDNN::is_onednn_layout(self) &&
-    //     xpu::oneDNN::eltwise_forward_valid(self)) {
-    //   xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
-    //       result, self, 0.0f, 0.0f);
-    //   return result;
   } else {
     auto _self = to_plain_if_needed(self);
     if (!result.defined()) {
@@ -876,7 +896,8 @@ Tensor& gelu_backward_out(
     const Tensor& self,
     c10::string_view approximate,
     Tensor& grad_input) {
-  std::cout << "--------gelu backward------" << std::endl;
+  at::native::GeluType approximate_gelu =
+      at::native::get_gelutype_enum(approximate);
   if (IPEX_ANY(xpu::oneDNN::is_onednn_layout, grad, self) &&
       IPEX_ALL(xpu::oneDNN::eltwise_backward_valid, grad, self)) {
     xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_gelu_erf>(
@@ -889,24 +910,40 @@ Tensor& gelu_backward_out(
       grad_input = at::empty_like(_self);
     }
     auto iter = TensorIterator::binary_op(grad_input, _grad, _self);
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::BFloat16,
-        at::ScalarType::Half,
-        iter.dtype(),
-        "gelu_backward",
-        [&]() {
-          dpcpp_kernel_with_scalars(
-              iter, [=](scalar_t grad, scalar_t self) -> scalar_t {
-                return impl::gelu_erf_backward<scalar_t>(grad, self);
-              });
-        });
+    if (approximate_gelu == at::native::GeluType::Tanh) {
+      std::cout << "--------gelu backward tanh------" << std::endl;
+      IPEX_DISPATCH_FLOATING_TYPES_AND2(
+          at::ScalarType::BFloat16,
+          at::ScalarType::Half,
+          iter.dtype(),
+          "gelu_backward",
+          [&]() {
+            dpcpp_kernel_with_scalars(
+                iter, [=](scalar_t grad, scalar_t self) -> scalar_t {
+                  return impl::gelu_tanh_backward<scalar_t>(grad, self);
+                });
+          });
+    } else {
+      std::cout << "--------gelu backward none------" << std::endl;
+      IPEX_DISPATCH_FLOATING_TYPES_AND2(
+          at::ScalarType::BFloat16,
+          at::ScalarType::Half,
+          iter.dtype(),
+          "gelu_backward",
+          [&]() {
+            dpcpp_kernel_with_scalars(
+                iter, [=](scalar_t grad, scalar_t self) -> scalar_t {
+                  return impl::gelu_erf_backward<scalar_t>(grad, self);
+                });
+          });
+    }
     return grad_input;
   }
 }
 
-Tensor gelu_backward(const Tensor& grad, const Tensor& self) {
+Tensor gelu_backward(const Tensor& grad, const Tensor& self, c10::string_view approximate) {
   Tensor result;
-  return gelu_backward_out(grad, self, "none", result);
+  return gelu_backward_out(grad, self, approximate, result);
 }
 
 Tensor& silu_out(const Tensor& self, Tensor& output) {
