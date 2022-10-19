@@ -94,6 +94,7 @@ OP_TEST_FOR_BACKWARD = [
 
 class TetsTorchMethod(TestCase):
     @repeat_test_for_types(FLOATING_DTYPES)
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_unary_op_for_floating(self, dtype=torch.float):
         a = torch.randn(
             [2, 2, 2, 2], dtype=torch.float)
@@ -169,11 +170,11 @@ self.assertEqual(y_cpu, y_xpu.cpu())
         self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
 
     @repeat_test_for_types(FLOATING_DTYPES)
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_unary_backward_for_floating(self, dtype=torch.float):
         x_cpu = torch.randn(
             [2, 2, 2, 2], dtype=dtype, requires_grad=True)
         x_xpu = x_cpu.clone().detach().to("xpu").requires_grad_(True)
-
 
         for op in OP_TEST_FOR_BACKWARD:
             param = {}

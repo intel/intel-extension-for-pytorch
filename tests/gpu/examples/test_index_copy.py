@@ -4,7 +4,8 @@ from torch.testing._internal.common_utils import (TestCase,
 
 from torch.testing._internal.common_dtype import (get_all_int_dtypes,
                                                   get_all_fp_dtypes)
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
+import pytest
 
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")
@@ -12,6 +13,7 @@ xpu_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     @repeat_test_for_types([*(get_all_int_dtypes() + get_all_fp_dtypes())])
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_index_copy_dim_0(self, dtype):
         x = torch.ones([5, 3], device=cpu_device, dtype=dtype)
         t = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=dtype)
@@ -26,6 +28,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(x, x_xpu.to(cpu_device))
 
     @repeat_test_for_types([*(get_all_int_dtypes() + get_all_fp_dtypes())])
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_index_copy_dim_1(self, dtype):
         x = torch.zeros([3, 5], device=cpu_device, dtype=dtype)
         t = torch.tensor([[1, 2, 3], [6, 7, 8], [11, 12, 13]], dtype=dtype)
@@ -40,6 +43,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(x, x_xpu.to(cpu_device))
 
     @repeat_test_for_types([*(get_all_int_dtypes() + get_all_fp_dtypes())])
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_index_copy_multi_dim(self, dtype):
         # dim = 0
         x = torch.zeros([100, 3, 5], device=cpu_device, dtype=dtype)

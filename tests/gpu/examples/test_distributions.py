@@ -350,6 +350,7 @@ class TestDistributions(TestCase):
         print("grad_xpu: ", grad_xpu.grad)
         self.assertEqual(grad_xpu.grad.to("cpu"), grad_cpu.grad)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_binomial_log_prob(self):
         for prop in [0., 0.5, 0.3, 0.05, 0.02, 0.75, 0.9, 1.]:
             total_count = torch.tensor([[8, 70, 100], [3000, 80000, 700000]]).to("xpu")
