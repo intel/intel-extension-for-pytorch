@@ -2,7 +2,6 @@ r"""
 This package is lazily initialized, so you can always import it.
 """
 
-import contextlib
 import sys
 from typing import List, Optional, Tuple, Union
 import torch
@@ -184,6 +183,87 @@ def synchronize(device: _device_t = None) -> None:
     return intel_extension_for_pytorch._C._synchronize(idx)
 
 
+class StreamContext(object):
+    r"""Context-manager that selects a given stream.
+
+    All XPU kernels queued within its context will be enqueued on a selected
+    stream.
+
+    Args:
+        Stream (Stream): selected stream. This manager is a no-op if it's
+            ``None``.
+    .. note:: Streams are per-device.
+    """
+    cur_stream : Optional['Stream']
+
+    def __init__(self, stream: Optional['Stream']):
+        self.stream = stream
+        self.idx = _get_device_index(None, True)
+        if not torch.jit.is_scripting():
+            if self.idx is None:
+                self.idx = -1
+
+        self.src_prev_stream = None
+        self.dst_prev_stream = None
+
+    def __enter__(self):
+        # Local cur_stream variable for type refinement
+        cur_stream = self.stream
+        # Return if stream is None or XPU device not available
+        if cur_stream is None or self.idx == -1:
+            return
+        self.src_prev_stream = current_stream(None)
+
+        # If the stream is not on the current device, then
+        # set the current stream on the device
+        if self.src_prev_stream.device != cur_stream.device:
+            with device(cur_stream.device):
+                self.dst_prev_stream = current_stream(cur_stream.device)
+        set_stream(cur_stream)
+
+    def __exit__(self, type: Any, value: Any, traceback: Any):
+        # Local cur_stream variable for type refinement
+        cur_stream = self.stream
+        # If stream is None or no XPU device available, return
+        if cur_stream is None or self.idx == -1:
+            return
+
+        # Reset the stream on the original device
+        # and destination device
+        if self.src_prev_stream.device != cur_stream.device:
+            set_stream(self.dst_prev_stream)
+        set_stream(self.src_prev_stream)
+
+
+def stream(stream: Optional['Stream']) -> StreamContext:
+    r"""Wrapper around the Context-manager StreamContext that
+    selects a given stream.
+
+    Arguments:
+        stream (Stream): selected stream. This manager is a no-op if it's
+            ``None``.
+
+    .. note:: Streams are per-device. If the selected stream is not on the
+        current device, this function will also change the current device to
+        match the stream.
+    """
+    return StreamContext(stream)
+
+
+def set_stream(stream: Stream):
+    r"""Sets the current stream.This is a wrapper API to set the stream.
+        Usage of this function is discouraged in favor of the ``stream``
+        context manager.
+
+    Args:
+        stream (Stream): selected stream. This function is a no-op
+            if this argument is ``None``.
+    """
+    if stream is None:
+        return
+    intel_extension_for_pytorch._C._setCurrentStream(stream._cdata)
+
+
 def current_stream(device: Optional[_device_t] = None) -> Stream:
     r"""Returns the currently selected :class:`Stream` for a given device.
 
@@ -196,38 +276,6 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
     _lazy_init()
     return Stream(_cdata=intel_extension_for_pytorch._C._getCurrentStream(
         _get_device_index(device, optional=True)))
-
-
-@contextlib.contextmanager
-def stream(stream):
-    r"""Context-manager that selects a given stream.
-
-    Arguments:
-        stream (Stream): selected stream. This manager is a no-op if it's
-            ``None``.
-
-    .. note:: Streams are per-device. If the selected stream is not on the
-        current device, this function will also change the current device to
-        match the stream.
-    """
-    if stream is None:
-        yield
-        return
-    src_prev_stream = current_stream()
-
-    if src_prev_stream.device != stream.device:
-        # The given stream is on a different device; have to restore the
-        # current_stream on that device on exit as well
-        with device(stream.device):
-            dst_prev_stream = current_stream()
-
-    intel_extension_for_pytorch._C._setCurrentStream(stream._cdata)
-    try:
-        yield
-    finally:
-        if src_prev_stream.device != stream.device:
-            intel_extension_for_pytorch._C._setCurrentStream(dst_prev_stream._cdata)
-        intel_extension_for_pytorch._C._setCurrentStream(src_prev_stream._cdata)
 
 
 from torch.storage import _StorageBase

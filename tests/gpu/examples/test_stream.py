@@ -4,7 +4,6 @@ from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch # noqa
 
 
-
 class TestStream(TestCase):
     def test_multi_stream_and_dependence(self, dtype=torch.half):
         a = torch.randn(4096, 4096)
