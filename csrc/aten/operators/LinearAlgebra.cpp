@@ -916,6 +916,24 @@ Tensor operator_1_norm(const Tensor& tensor) {
   return std::get<0>(tensor.abs().sum(-2).max(-1));
 }
 
+static inline void squareCheckInputs(
+    const Tensor& self,
+    const char* const f_name,
+    const char* const arg_name = "A") {
+  checkIsMatrix(self, f_name, arg_name);
+  TORCH_CHECK(
+      self.size(-1) == self.size(-2),
+      f_name,
+      ": ",
+      arg_name,
+      " must be batches of square matrices, "
+      "but they are ",
+      self.size(-2),
+      " by ",
+      self.size(-1),
+      " matrices");
+}
+
 // Makes `buffer` to store `num_matrices` number of matrices needed for
 // compute the matrix exponentials of different orders, i.e.
 // first `num_matrices` matrices from the list l := {I, A, A^2, A^3, A^6}
@@ -970,11 +988,12 @@ inline Tensor _blob_to_Tensor(
   // Blob is assumed to be a 1D array, that is why
   // we also insert a fake dimension so that the result could directly
   // be used in _compute_linear_combination
-  // auto tensor =
-  //     at::from_blob(
-  //         (void*)blob.begin(), blob.size(),
-  //         c10::toValueType(in.scalar_type())) .unsqueeze(0);
-  // return _move_memory_if_xpu_input(tensor, in);
+  auto tensor = at::from_blob(
+                    (void*)blob.begin(),
+                    blob.size(),
+                    c10::toRealValueType(in.scalar_type()))
+                    .unsqueeze(0);
+  return _move_memory_if_xpu_input(tensor, in);
 }
 
 template <typename scalar_t, int ROW, int COL>
@@ -992,6 +1011,20 @@ Tensor _allocate_buffer(const Tensor& a, int n_copies, bool is_zero = false) {
   }
 
   return res;
+}
+
+template <typename scalar_t>
+inline Tensor _linear_combination(
+    const Tensor& t,
+    std::initializer_list<scalar_t> blob) {
+  // _blob_to_Tensor converts blob to a 2D tensor for
+  // _compute_linear_combination. If this tensor is of shape (1, *), the result
+  // of _compute_linear_combination is going to be of shape (1, *t.shape) so we
+  // squeeze(0) so that for any t with t.dim() >= 1: t.dim() ==
+  // _compute_linear_combination(t, ...).dim().
+  return AtenIpexTypeXPU::_compute_linear_combination(
+             t, _blob_to_Tensor<scalar_t>(blob, t))
+      .squeeze(0);
 }
 
 // I + A
@@ -1024,14 +1057,12 @@ Tensor compute_T4(const Tensor& A) {
       // contains A^2
       As.select(0, 2),
       // computes (I / 2 + A / 6 + A^2 / 24)
-      AtenIpexTypeXPU::_compute_linear_combination(
-          As.narrow(0, 0, 3),
-          _blob_to_Tensor<scalar_t>({1 / 2.0, 1 / 6.0, 1 / 24.0}, A)),
+      _linear_combination<scalar_t>(
+          As.narrow(0, 0, 3), {1 / 2.0, 1 / 6.0, 1 / 24.0}),
       out_for_a2);
 
   // I + A + A^2 * (I / 2 + A / 6 + A^2 / 24)
-  return AtenIpexTypeXPU::_compute_linear_combination(
-      As, _blob_to_Tensor<scalar_t>({1.0, 1.0, 0.0, 1.0}, A));
+  return _linear_combination<scalar_t>(As, {1.0, 1.0, 0.0, 1.0});
 }
 
 template <typename scalar_t>
@@ -1056,10 +1087,10 @@ Tensor compute_T8(const Tensor& A) {
   at::native::matmul_out(
       // As.select(0, 2) = A^2
       As.select(0, 2),
-      AtenIpexTypeXPU::_compute_linear_combination(
+      _linear_combination<scalar_t>(
           // extract {A, A^2} from As
           As.narrow(0, 1, 2),
-          _blob_to_Tensor<scalar_t>({x1, x2}, A)),
+          {x1, x2}),
       out_for_a4);
 
   // output for A8
@@ -1067,15 +1098,12 @@ Tensor compute_T8(const Tensor& A) {
   // A8 = (x3 * A2 + A4) * (x4 * I + x5 * A + x6 * A2 + x7 * A4)
   at::native::matmul_out(
       // x3 * A2 + A4
-      AtenIpexTypeXPU::_compute_linear_combination(
-          As.narrow(0, 2, 2), _blob_to_Tensor<scalar_t>({x3, 1.0}, A)),
-      AtenIpexTypeXPU::_compute_linear_combination(
-          As.narrow(0, 0, 4), _blob_to_Tensor<scalar_t>({x4, x5, x6, x7}, A)),
+      _linear_combination<scalar_t>(As.narrow(0, 2, 2), {x3, 1.0}),
+      _linear_combination<scalar_t>(As.narrow(0, 0, 4), {x4, x5, x6, x7}),
       out_for_a8);
 
   // return I + A + y2 * A2 + A8;
-  return AtenIpexTypeXPU::_compute_linear_combination(
-      As, _blob_to_Tensor<scalar_t>({1.0, 1.0, y2, 0.0, 1.0}, A));
+  return _linear_combination<scalar_t>(As, {1.0, 1.0, y2, 0.0, 1.0});
 }
 
 template <typename scalar_t>
@@ -1101,28 +1129,27 @@ Tensor compute_T12(const Tensor& A) {
 
   // gather coefficients `b` from above into a tensor,
   // and move them to device `device_of(A)`
-  // auto bs = at::from_blob(
-  //     reinterpret_cast<void*>(&b),
-  //     {num_prods, num_prods},
-  //     {num_prods, 1},
-  //     c10::toValueType(A.scalar_type()));
-  // bs = _move_memory_if_xpu_input(bs, A);
+  auto bs = at::from_blob(
+      reinterpret_cast<void*>(&b),
+      {num_prods, num_prods},
+      {num_prods, 1},
+      c10::toRealValueType(A.scalar_type()));
+  bs = _move_memory_if_xpu_input(bs, A);
 
-  // auto As = _allocate_buffer(A, num_prods);
-  // _fill_matrix_powers(As, A, num_prods);
+  auto As = _allocate_buffer(A, num_prods);
+  _fill_matrix_powers(As, A, num_prods);
 
-  // auto Bs = AtenIpexTypeXPU::_compute_linear_combination(As, bs);
+  auto Bs = AtenIpexTypeXPU::_compute_linear_combination(As, bs);
 
-  // // tmp buffer for this matrix product
-  // auto out_for_a6 = As.select(0, 0);
-  // // compute A6
-  // Bs.select(0, 2).add_(
-  //     at::native::matmul_out(Bs.select(0, 3), Bs.select(0, 3), out_for_a6));
+  // output for A6
+  auto out_for_a6 = As.select(0, 0);
+  // compute A6
+  Bs.select(0, 2).add_(
+      at::native::matmul_out(Bs.select(0, 3), Bs.select(0, 3), out_for_a6));
 
-  // // tmp buffer for this matrix product
-  // auto out = As.select(0, 0);
-  // return Bs.select(0, 0).add_(at::native::matmul_out(
-  //     Bs.select(0, 1).add_(Bs.select(0, 2)), Bs.select(0, 2), out));
+  // tmp buffer for this matrix product
+  return Bs.select(0, 0).add_(at::native::matmul_out(
+      Bs.select(0, 1).add_(Bs.select(0, 2)), Bs.select(0, 2), out_for_a6));
 }
 
 template <typename scalar_t>
@@ -1157,28 +1184,27 @@ Tensor compute_T18(const Tensor& A) {
 
   // gather coefficients `b` from above into a tensor,
   // and move them to device `device_of(A)`
-  // auto bs = at::from_blob(
-  //     reinterpret_cast<void*>(&b),
-  //     {num_prods, num_prods},
-  //     {num_prods, 1},
-  //     c10::toValueType(A.scalar_type()));
-  // bs = _move_memory_if_xpu_input(bs, A);
+  auto bs = at::from_blob(
+      reinterpret_cast<void*>(&b),
+      {num_prods, num_prods},
+      {num_prods, 1},
+      c10::toRealValueType(A.scalar_type()));
+  bs = _move_memory_if_xpu_input(bs, A);
 
-  // auto As = _allocate_buffer(A, num_prods);
-  // _fill_matrix_powers(As, A, num_prods);
+  auto As = _allocate_buffer(A, num_prods);
+  _fill_matrix_powers(As, A, num_prods);
 
-  // auto Bs = AtenIpexTypeXPU::_compute_linear_combination(As, bs);
+  auto Bs = AtenIpexTypeXPU::_compute_linear_combination(As, bs);
 
-  // // tmp buffer for this matrix product
-  // auto out_for_a9 = As.select(0, 0);
-  // // compute A9
-  // Bs.select(0, 3).add_(
-  //     at::native::matmul_out(Bs.select(0, 0), Bs.select(0, 4), out_for_a9));
+  // tmp buffer for this matrix product
+  auto out_for_a9 = As.select(0, 0);
+  // compute A9
+  Bs.select(0, 3).add_(
+      at::native::matmul_out(Bs.select(0, 0), Bs.select(0, 4), out_for_a9));
 
-  // // tmp buffer for this matrix product
-  // auto out = As.select(0, 0);
-  // return Bs.select(0, 1).add_(at::native::matmul_out(
-  //     Bs.select(0, 2).add_(Bs.select(0, 3)), Bs.select(0, 3), out));
+  // tmp buffer for this matrix product
+  return Bs.select(0, 1).add_(at::native::matmul_out(
+      Bs.select(0, 2).add_(Bs.select(0, 3)), Bs.select(0, 3), out_for_a9));
 }
 
 template <typename scalar_t>
@@ -1312,33 +1338,26 @@ Tensor mexp(const Tensor& a, bool compute_highest_degree_approx = false) {
 // Computing the Matrix Exponential with an Optimized Taylor Polynomial
 // Approximation. Mathematics 2019, 7, 1174.
 //
-at::Tensor matrix_exp(const at::Tensor& self) {
-  TORCH_CHECK(
-      self.dim() >= 2 &&
-          (at::isFloatingType(self.scalar_type()) ||
-           at::isComplexType(self.scalar_type())),
-      "matrix_exp(",
-      self.scalar_type(),
-      "{",
-      self.sizes(),
-      "}): expected self tensor "
-      "of floating or complex types with dim at least 2");
-  TORCH_CHECK(
-      self.size(-1) == self.size(-2),
-      "matrix_exp(",
-      self.scalar_type(),
-      "{",
-      self.sizes(),
-      "}): expected self tensor "
-      "of squared matrices");
+Tensor linalg_matrix_exp(const Tensor& a) {
+  squareCheckInputs(a, "linalg.matrix_exp");
+  checkFloatingOrComplex(a, "matrix_exp");
 
   NoTF32Guard disable_tf32;
 
-  if (self.size(-1) == 1) {
-    return self.exp();
+  // Trivial cases
+  const auto n = a.size(-1);
+  if (n == 0) {
+    return a.clone();
+  } else if (n == 1) {
+    return a.exp();
+  } else {
+    return AtenIpexTypeXPU::mexp(a);
   }
+}
 
-  return mexp(self);
+// Alias
+Tensor matrix_exp(const Tensor& a) {
+  return AtenIpexTypeXPU::linalg_matrix_exp(a);
 }
 
 } // namespace AtenIpexTypeXPU
