@@ -574,7 +574,6 @@ class CppSignatureGroup:
             symint_faithful_signature=symint_faithful_signature,
         )
 
-
 @dataclass(frozen=True)
 class DispatcherSignature:
     # The schema this signature is derived from

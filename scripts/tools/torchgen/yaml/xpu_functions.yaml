@@ -11,10 +11,10 @@ supported:
   - _amp_foreach_non_finite_check_and_unscale_
   - _amp_update_scale_
   - _assert_async
-#  - _cat
-#  - _cat.out
-#  - _cdist_backward
-#  - _cdist_forward
+  - cat
+  - cat.out
+  - _cdist_backward
+  - _cdist_forward
   - _compute_linear_combination
   - _compute_linear_combination.out
   - _convert_indices_from_coo_to_csr.out
@@ -41,11 +41,9 @@ supported:
   - _fft_c2c.out
   - _fused_dropout
   - _masked_scale
-#  - _index_copy_
+  - index_copy.out
   - _index_put_impl_
-#  - _inverse_helper
-#  - _linalg_qr_helper
-#  - _linalg_inv_out_helper_
+  - linalg_qr.out
   - _local_scalar_dense
   - _logcumsumexp
   - _logcumsumexp.out
@@ -58,11 +56,13 @@ supported:
   - _pdist_forward
   - _pin_memory
   - _reshape_alias  # newly added
-#  - _s_where
   - _softmax.out
   - _softmax_backward_data.out
-#  - _solve_helper
-#  - _svd_helper
+  - _linalg_svd.U
+  - linalg_inv_ex.inverse
+  - _linalg_solve_ex.result
+  - linalg_lu_factor_ex.out
+  - linalg_lu_solve.out
   - _symeig_helper
   - _unique
   - _unique2
@@ -264,10 +264,10 @@ supported:
   - gt.Scalar_out
   - gt.Tensor
   - gt.Tensor_out
-#  - grid_sampler_2d
-#  - grid_sampler_3d
-#  - grid_sampler_2d_backward
-#  - grid_sampler_3d_backward
+  - grid_sampler_2d
+  - grid_sampler_3d
+  - grid_sampler_2d_backward
+  - grid_sampler_3d_backward
   - hardshrink
   - hardshrink.out
   - hardshrink_backward
@@ -293,31 +293,24 @@ supported:
   - igammac.out
   - im2col
   - im2col.out
-#  - im2col_backward
-#  - im2col_backward.grad_input
   - index.Tensor
-  - index_copy_
   - index_fill_.int_Scalar
   - index_fill_.int_Tensor
   - index_select
   - index_select.out
-#  - index_add_.alpha
+  - index_add.out
   - inverse
   - inverse.out
   - is_set_to
-#  - isin.Scalar_Tensor_out
-#  - isin.Tensor_Scalar_out
-#  - isin.Tensor_Tensor_out
+  - isin.Scalar_Tensor_out
+  - isin.Tensor_Scalar_out
+  - isin.Tensor_Tensor_out
   - isnan
   - isneginf.out
   - isposinf.out
   - is_pinned
-#  - kl_div_backward
   - kthvalue.values
   - l1_loss
-#  - l1_loss.out
-#  - l1_loss_backward
-#  - l1_loss_backward.grad_input
   - le.Scalar
   - le.Scalar_out
   - le.Tensor
@@ -375,12 +368,8 @@ supported:
   - max_pool3d_with_indices_backward.grad_input
   - max_unpool2d
   - max_unpool2d.out
-#  - max_unpool2d_backward
-#  - max_unpool2d_backward.grad_input
   - max_unpool3d
   - max_unpool3d.out
-#  - max_unpool3d_backward
-#  - max_unpool3d_backward.grad_input
   - maximum
   - maximum.out
   - mean
@@ -550,8 +539,7 @@ supported:
   - soft_margin_loss_backward.grad_input
   - softplus
   - softplus.out
-#  - softplus_backward
-#  - softplus_backward.grad_input
+  - softplus_backward.grad_input
   - softshrink.out
   - softshrink_backward.grad_input
   - sort
@@ -575,8 +563,7 @@ supported:
   - sum.IntList_out
   - sum.dim_IntList
   - nansum
-#  - nansum.IntList_out
-#  - nansum.dim_IntList
+  - nansum.out
   - take
   - take.out
   - tan.out
@@ -608,48 +595,22 @@ supported:
   - unique_consecutive
   - unique_dim
   - unique_dim_consecutive
-#  - upsample_bicubic2d
-#  - upsample_bicubic2d.out
-#  - upsample_bicubic2d.vec
-#  - upsample_bicubic2d_backward
-#  - upsample_bicubic2d_backward.grad_input
-#  - upsample_bicubic2d_backward.vec
-#  - upsample_bilinear2d
-#  - upsample_bilinear2d.out
-#  - upsample_bilinear2d.vec
-#  - upsample_bilinear2d_backward
-#  - upsample_bilinear2d_backward.grad_input
-#  - upsample_bilinear2d_backward.vec
-#  - upsample_linear1d
-#  - upsample_linear1d.out
-#  - upsample_linear1d.vec
-#  - upsample_linear1d_backward
-#  - upsample_linear1d_backward.grad_input
-#  - upsample_linear1d_backward.vec
-#  - upsample_nearest1d
-#  - upsample_nearest1d.out
-#  - upsample_nearest1d.vec
-#  - upsample_nearest1d_backward
-#  - upsample_nearest1d_backward.grad_input
-#  - upsample_nearest1d_backward.vec
-#  - upsample_nearest2d
-#  - upsample_nearest2d.out
-#  - upsample_nearest2d.vec
-#  - upsample_nearest2d_backward
-#  - upsample_nearest2d_backward.grad_input
-#  - upsample_nearest2d_backward.vec
-#  - upsample_nearest3d
-#  - upsample_nearest3d.out
-#  - upsample_nearest3d.vec
-#  - upsample_nearest3d_backward
-#  - upsample_nearest3d_backward.grad_input
-#  - upsample_nearest3d_backward.vec
-#  - upsample_trilinear3d
-#  - upsample_trilinear3d.out
-#  - upsample_trilinear3d.vec
-#  - upsample_trilinear3d_backward
-#  - upsample_trilinear3d_backward.grad_input
-#  - upsample_trilinear3d_backward.vec
+  - upsample_bicubic2d.out
+  - upsample_bicubic2d_backward.grad_input
+  - upsample_bilinear2d.out
+  - upsample_bilinear2d_backward.grad_input
+  - upsample_linear1d.out
+  - upsample_linear1d_backward.grad_input
+  - upsample_nearest1d.out
+  - upsample_nearest1d_backward.grad_input
+  - upsample_nearest2d.out
+  - upsample_nearest2d_backward.grad_input
+  - upsample_nearest3d.out
+  - upsample_nearest3d.vec
+  - upsample_nearest3d_backward.grad_input
+  - upsample_nearest3d_backward.vec
+  - upsample_trilinear3d.out
+  - upsample_trilinear3d_backward.grad_input
   - var.correction
   - var_mean.correction
   - view
@@ -660,25 +621,22 @@ supported:
   - channel_shuffle
   - linalg_slogdet
   - linalg_slogdet.out
-#  - _det_lu_based_helper
+  - _linalg_det.result
   - conj_physical.out
   - conj_physical_
   - angle
   - angle.out
   - linalg_eig
   - linalg_eig.out
-#  - linalg_eigh
-#  - linalg_eigh.eigvals
-#  - linalg_eigvalsh.out
-#  - _det_lu_based_helper_backward_helper
-#  - linalg_solve
-#  - linalg_solve.out
-#  - linalg_householder_product
-#  - linalg_householder_product.out
+  - linalg_eigh
+  - linalg_eigh.eigvals
+  - linalg_eigvalsh
+  - linalg_eigvalsh.out
+  - linalg_householder_product
+  - linalg_householder_product.out
   - linalg_vector_norm
   - linalg_vector_norm.out
   - complex.out
-#  - eig          # must register
   - vdot
   - __lshift__.Scalar
   - __lshift__.Tensor
@@ -798,10 +756,12 @@ supported:
   - mish.out
   - polar.out
   - var.correction_out
-#  - matrix_exp
-#  - logit_backward.grad_input
+  - matrix_exp
+  - logit_backward.grad_input
   - binomial
   - _standard_gamma
+  - where.self_out
+  - where.self
 autograd:
   - cdist
   - lstm.input
