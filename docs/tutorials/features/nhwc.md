@@ -17,7 +17,7 @@ TensorFlow uses NHWC as the default memory format because NHWC has a performance
 
 ## Memory Format Is All That Matters
 
-On CNN models, memory format is almost the foundation of any upper level design. One important fact is that converting memory format could be very expensive. Thus, in case that multiple CNN operators are performed in sequence, e.g. `Conv2d -> ReLU -> Conv2d`, it's beneficial to transform them from different memory formats once, do computation and reorder them back.
+On CNN models, memory format is almost the foundation of any upper level design. One important fact is that converting memory format could be very expensive. Thus, in case that multiple CNN operators are performed in sequence, e.g. `Conv2d -> ReLU -> Conv2d`, it's beneficial to transform them from different memory formats once, do computation, and reorder them back.
 
 On XPU, you can use 2 types of memory formats on CNN models:
 
@@ -51,9 +51,9 @@ output = model(input)
 
 ## PyTorch Strided Layout
 
-Before moving on, I feel it is necessary to explain how PyTorch organizes tensors in memory - the **layout**. Here we only focus on **dense** tensors, skip 'coo' layout of **sparse** tensor.
+Before moving on, let's explain how PyTorch organizes tensors in memory - the **layout**. Here we only focus on **dense** tensors, skipping 'coo' layout of **sparse** tensor.
 
-The question itself can be reinterpreted as for a tensor of size <N, C, H, W>, how does PyTorch access the element with index <n, c, h, w> from memory, the answer is **stride**:
+The question itself can be reinterpreted as, for a tensor of size <N, C, H, W>, how does PyTorch access the element with index <n, c, h, w> from memory? The answer is **stride**:
 ```python
 tensor: <N, C, H, W>
 index: <n, c, h, w>
@@ -62,7 +62,7 @@ offset(n,c,h,w) = stride_n * n + stride_c * c + stride_h * h + stride_w * w
                 = CHW * n + HW * c + W * h + 1 * w
 ```
 
-One merit of introducing **stride** is that it can express noncontiguous tensors, e.g. a slice of big tensor. For example, the 'Xs' in the following image have a stride of <n1+n2, 1>.
+One merit of introducing **stride** is that it can express noncontiguous tensors, e.g. a slice of a big tensor. For example, the 'Xs' in the following image have a stride of <n1+n2, 1>.
 
 ![fig-3-pytorch-strided-layout](../../images/channels_last/figure3_strided_layout.png)
 
@@ -110,12 +110,12 @@ input = input.to("xpu").to(memory_format=torch.channels_last)
 
 Some spontaneous questions:
 * **How to tell whether this model or operator support Channels Last?** - This requires manual memory format check, aka. 'torch.channels_last' input and weight shall NOT generate 'torch.contiguous_format' output.
-* **What if the model comprises of operator not supported Channels Last?** - No errors messages will be shown, the NHWC tensor will be handled by the operator as a non-contiguous NCHW tensor, so result might not be correct depending on the algorithm of this operator.
+* **What if the model comprises of operator not supporting Channels Last?** - No errors messages will be shown, the NHWC tensor will be handled by the operator as a non-contiguous NCHW tensor, so result might not be correct depending on the algorithm of this operator.
 
 ## Channels Last 1D support on XPU
 
 Both stock PyTorch and Intel® Extension for PyTorch\* support Channels Last(2D) and Channels Last 3D, however, regarding Channels Last 1D, they are different. Stock PyTorch doesn't support Channels Last 1D, while XPU could supply limited support for Channels Last 1D.
-Now, only support Channels Last 1D memory format in these operators: Conv1D, BatchNorm1D, MaxPool1D, Concat, binary add, binary div, upsample linear and upsample nearest.
+We only support Channels Last 1D memory format in these operators: Conv1D, BatchNorm1D, MaxPool1D, Concat, binary add, binary div, upsample linear and upsample nearest.
 
 The usage of Channels Last 1D on XPU is different from stock PyTorch Channels Last(2D) or Channels Last 3D. We use torch.xpu.to_channels_last_1d() to do conversation for both input tensor and model. See below:
 
@@ -168,4 +168,4 @@ model = torch.xpu.to_channels_last_1d(model)
 print(torch.xpu.is_contiguous_channels_last_1d(input))
 ```
 
-Note that because Meta doens't plan support Channels Last 1D feature now: [RFC: A suggestion of channels last memory format implementation for 3D tensor](https://github.com/pytorch/pytorch/issues/74935), expect Channels Last 1D APIs above, other APIs from stock PyTorch may be invalid. E.g.: If you want to use memory format corrsponding API for Channels Last 1D, it cannot work as you wish.
+Note that because Meta doesn't support Channels Last 1D feature now: [RFC: A suggestion of channels last memory format implementation for 3D tensor](https://github.com/pytorch/pytorch/issues/74935), expect Channels Last 1D APIs above, other APIs from stock PyTorch may be invalid. E.g.: If you want to use memory format corrsponding API for Channels Last 1D, it cannot work as you wish.
