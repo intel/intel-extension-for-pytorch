@@ -3,36 +3,31 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
-
-cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("xpu")
+import pytest
 
 
 class TestNNMethod(TestCase):
     def test_distance(self, dtype=torch.float):
         pdist = nn.PairwiseDistance(p=2)
-        input1 = torch.randn(100, 128, device=cpu_device,
-                             dtype=dtype, requires_grad=True)
-        input2 = torch.randn(100, 128, device=cpu_device,
-                             dtype=dtype, requires_grad=True)
-
+        input1 = torch.randn(100, 128, dtype=dtype, requires_grad=True)
+        input2 = torch.randn(100, 128, dtype=dtype, requires_grad=True)
         input1_dpcpp = input1.to("xpu")
         input2_dpcpp = input2.to("xpu")
+
         output = pdist(input1, input2)
-        pdist_dpcpp = pdist.to(dpcpp_device)
+        pdist_dpcpp = pdist.to("xpu")
         output_dpcpp = pdist_dpcpp(input1_dpcpp, input2_dpcpp)
-        self.assertEqual(output, output_dpcpp.to(cpu_device))
+        self.assertEqual(output, output_dpcpp.cpu())
 
         cos = nn.CosineSimilarity(dim=1, eps=1e-6)
         output = cos(input1, input2)
-        cos_dpcpp = cos.to(dpcpp_device)
+        cos_dpcpp = cos.to("xpu")
         output_dpcpp = cos_dpcpp(input1_dpcpp, input2_dpcpp)
-        self.assertEqual(output, output_dpcpp.to(cpu_device))
+        self.assertEqual(output, output_dpcpp.cpu())
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_pdist(self, dtype=torch.float):
         for p in (0, 1, 2, 3, float('inf')):
-            print("p = ", p)
-
             a = torch.randn([10, 15], requires_grad=True)
             y = torch.pdist(a, p)
             g = torch.ones_like(y, requires_grad=True)
@@ -51,9 +46,9 @@ class TestNNMethod(TestCase):
             self.assertEqual(y, y_xpu)
             self.assertEqual(grad_cpu, grad_xpu)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_cdist(self, dtype=torch.float):
         for p in (0, 1, 2, 3, float('inf')):
-            print("p = ", p)
 
             # small test: P < 25 & R < 25
             a = torch.randn([3, 10, 15], requires_grad=True)

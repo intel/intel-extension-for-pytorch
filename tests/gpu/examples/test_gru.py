@@ -4,12 +4,11 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
-
-cpu_device = torch.device('cpu')
-xpu_device = torch.device("xpu")
+import intel_extension_for_pytorch  # noqa
+import pytest
 
 
+@pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
 class TestNNMethod(TestCase):
     def test_gru(self, dtype=torch.float):
         rnn = nn.GRU(2, 3, 2, bias=True, bidirectional=False)
@@ -24,10 +23,10 @@ class TestNNMethod(TestCase):
         input.requires_grad = True
         h0.requires_grad = True
         output, hn = rnn(input, h0)
-        print(output)
+        # print(output)
         grad_output.requires_grad = True
         output.backward(grad_output)
-        print(input.grad)
+        # print(input.grad)
         param_grad = []
         for param in rnn._parameters.values():
             param_grad.append(param._grad.clone())
@@ -35,10 +34,10 @@ class TestNNMethod(TestCase):
         input_xpu.requires_grad = True
         h0_xpu.requires_grad = True
         output_xpu, hn_xpu = rnn_xpu(input_xpu, h0_xpu)
-        print(output_xpu.cpu())
+        # print(output_xpu.cpu())
         grad_output_xpu.requires_grad = True
         output_xpu.backward(grad_output_xpu)
-        print(input_xpu.grad.cpu())
+        # print(input_xpu.grad.cpu())
         param_grad_xpu = []
         for param in rnn_xpu._parameters.values():
             param_grad_xpu.append(param._grad.clone())

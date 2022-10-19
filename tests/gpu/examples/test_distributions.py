@@ -31,7 +31,7 @@ from torch.distributions import (Bernoulli, Exponential, Multinomial, Normal,
 from torch.testing._internal.common_utils import (TestCase, load_tests,
                                                   set_rng_seed)
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 import pytest
 import scipy
@@ -121,6 +121,7 @@ class TestDistributions(TestCase):
             asset_fn(i, val.squeeze(), log_prob)
         torch.set_default_dtype(dtype_origin)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_bernoulli(self):
         torch.set_default_dtype(torch.double)
         p = torch.tensor([0.7, 0.2, 0.4], requires_grad=True)

@@ -3,9 +3,6 @@ from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 import pytest
 
-cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("xpu")
-
 
 class TestTorchMethod(TestCase):
     def test_complex_float(self, dtype=torch.float):
@@ -15,7 +12,6 @@ class TestTorchMethod(TestCase):
         img_xpu = img.to("xpu")
         real_xpu = real.to("xpu")
         y_xpu = torch.complex(real_xpu, img_xpu)
-
         self.assertEqual(y_cpu, y_xpu.to("cpu"))
 
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
@@ -26,7 +22,6 @@ class TestTorchMethod(TestCase):
         img_xpu = img.to("xpu")
         real_xpu = real.to("xpu")
         y_xpu = torch.complex(real_xpu, img_xpu)
-
         self.assertEqual(y_cpu, y_xpu.to("cpu"))
 
     def test_real_imag(self, dtype=torch.float):

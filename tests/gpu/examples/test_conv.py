@@ -33,9 +33,6 @@ class TestNNMethod(TestCase):
         y_dpcpp.backward(grad_dpcpp)
         y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
-        print("ref (cpu):\n", "output:\n", y_cpu, "\ngrad weight:\n", y_cpu_gw)
-        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
-
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
 
@@ -55,9 +52,6 @@ class TestNNMethod(TestCase):
         y_dpcpp = conv_dpcpp(x_dpcpp)
         y_dpcpp.backward(grad_dpcpp)
         y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
-
-        print("ref (cpu):\n", "output:\n", y_cpu, "\ngrad weight:\n", y_cpu_gw)
-        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
@@ -80,9 +74,6 @@ class TestNNMethod(TestCase):
         y_dpcpp.backward(grad_dpcpp)
         y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
-        print("ref (cpu):\n", "output:\n", y_cpu, "\ngrad weight:\n", y_cpu_gw)
-        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
-
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
 
@@ -102,9 +93,6 @@ class TestNNMethod(TestCase):
         y_dpcpp = conv_dpcpp(x_dpcpp)
         y_dpcpp.backward(grad_dpcpp)
         y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
-
-        print("ref (cpu):\n", "output:\n", y_cpu, "\ngrad weight:\n", y_cpu_gw)
-        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
@@ -126,9 +114,6 @@ class TestNNMethod(TestCase):
         y_dpcpp.backward(grad_dpcpp)
         y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
-        print("ref (cpu):\n", "output:\n", y_cpu, "\ngrad weight:\n", y_cpu_gw)
-        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
-
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
 
@@ -148,9 +133,6 @@ class TestNNMethod(TestCase):
         y_dpcpp = conv_dpcpp(x_dpcpp)
         y_dpcpp.backward(grad_dpcpp)
         y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
-
-        print("ref (cpu):\n", "output:\n", y_cpu, "\ngrad weight:\n", y_cpu_gw)
-        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
@@ -172,9 +154,6 @@ class TestNNMethod(TestCase):
         y_dpcpp.backward(grad_dpcpp)
         y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
-        print("ref (cpu):\n", "output:\n", y_cpu, "\ngrad weight:\n", y_cpu_gw)
-        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
-
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
 
@@ -186,9 +165,6 @@ class TestNNMethod(TestCase):
         x_dpcpp = x_cpu.to(dpcpp_device).to(memory_format=torch.channels_last_3d)
         conv_dpcpp = conv_cpu.to(dpcpp_device).to(memory_format=torch.channels_last_3d)
         y_dpcpp = conv_dpcpp(x_dpcpp)
-
-        print("ref (cpu):\n", "output:\n", y_cpu)
-        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu())
 
         self.assertEqual(y_cpu, y_dpcpp.cpu())
 
@@ -208,9 +184,6 @@ class TestNNMethod(TestCase):
         y_dpcpp = conv_dpcpp(x_dpcpp)
         y_dpcpp.backward(grad_dpcpp)
         y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
-
-        print("ref (cpu):\n", "output:\n", y_cpu, "\ngrad weight:\n", y_cpu_gw)
-        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
@@ -232,9 +205,6 @@ class TestNNMethod(TestCase):
         y_dpcpp.backward(grad_dpcpp)
         y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
-        print("ref (cpu):\n", "output:\n", y_cpu, "\ngrad weight:\n", y_cpu_gw)
-        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
-
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
 
@@ -255,9 +225,6 @@ class TestNNMethod(TestCase):
         y_dpcpp.backward(grad_dpcpp)
         y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
-        print("ref (cpu):\n", "output:\n", y_cpu, "\ngrad weight:\n", y_cpu_gw)
-        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
-
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
 
@@ -277,9 +244,6 @@ class TestNNMethod(TestCase):
         y_dpcpp = conv_dpcpp(x_dpcpp)
         y_dpcpp.backward(grad_dpcpp)
         y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
-
-        print("ref (cpu):\n", "output:\n", y_cpu, "\ngrad weight:\n", y_cpu_gw)
-        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
@@ -303,9 +267,6 @@ class TestNNMethod(TestCase):
         x = x_cpu.to("xpu")
         y = conv6(conv5(conv4(conv3(conv2(conv1(x))))))
 
-        print("ref: ", y_cpu)
-        print("real: ", y.cpu())
-
         self.assertEqual(y_cpu, y.cpu())
 
     def test_group_conv_fwd(self, dtype=torch.float):
@@ -316,9 +277,6 @@ class TestNNMethod(TestCase):
         conv = conv.cpu()
         x = x.cpu()
         ref = conv(x)
-
-        print("real: ", real.cpu())
-        print("ref: ", ref)
 
         self.assertEqual(real.cpu(), ref)
 
@@ -331,9 +289,6 @@ class TestNNMethod(TestCase):
         x_xpu = x.to(dpcpp_device).to(memory_format=torch.channels_last)
         real = conv_xpu(x_xpu)
 
-        print("real: ", real.cpu())
-        print("ref: ", ref)
-
         self.assertEqual(real.cpu(), ref)
 
     @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(),
@@ -342,7 +297,7 @@ class TestNNMethod(TestCase):
         shapes = [(2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
                   (4, 1, 1), (1, 4, 4), (1, 4, 1)]
         for shape in shapes:
-            print("\n====== test shape: ", shape, "======")
+
             N, C, H, W = shape[0], shape[1], 1, shape[2]
             x = torch.ones(N, C, H, W, dtype=torch.float)
             conv_ic, conv_oc, conv_ks = C, 5, 3
@@ -372,18 +327,9 @@ class TestNNMethod(TestCase):
                 w = w.to("xpu")
                 conv.weight.data = w
                 conv = torch.xpu.to_channels_last_1d(conv)
-                print("input.is_contiguous(): ", x.is_contiguous())
-                print("input is channles last 1d: ",
-                      torch.xpu.is_contiguous_channels_last_1d(x))
-                print("conv.weight.data.is_contiguous(): ", conv.weight.data.is_contiguous())
-                print("conv.weight.data is channles last 1d: ",
-                      torch.xpu.is_contiguous_channels_last_1d(conv.weight.data))
+
                 real = conv(x)
 
-                print(real.shape)
-                print(real.stride())
-                print("real is CF: ", real.is_contiguous())
-                print("real is CL: ", torch.xpu.is_contiguous_channels_last_1d(real))
                 if 1 == real.shape[1] or (1 == real.shape[2]) or \
                    (1 == real.shape[1] and 1 == real.shape[2]):
                     self.assertEqual(real.is_contiguous(), True)
@@ -391,7 +337,6 @@ class TestNNMethod(TestCase):
                 else:
                     self.assertEqual(real.is_contiguous(), False)
                     self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(real), True)
-                print(real.contiguous().cpu())
 
                 self.assertEqual(real.contiguous().cpu(), ref)
 
@@ -401,7 +346,6 @@ class TestNNMethod(TestCase):
         shapes = [(1, 7, 15000), (2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
                   (4, 1, 1), (1, 4, 4), (1, 4, 1)]
         for shape in shapes:
-            print("\n================== test shape: ", shape, "==================")
             N, C, H, W = shape[0], shape[1], 1, shape[2]
             x_cpu = torch.randn([N, C, H, W], dtype=dtype, device=cpu_device, requires_grad=True)
 
@@ -425,7 +369,7 @@ class TestNNMethod(TestCase):
                 x_dpcpp = x_cpu.view(x_cpu.shape[0], x_cpu.shape[1], x_cpu.shape[3])
                 x_dpcpp = x_dpcpp.to(dpcpp_device).requires_grad_()
                 x_dpcpp = torch.xpu.to_channels_last_1d(x_dpcpp)
-                print("\n---test_weight_pollution: ", test_weight_pollution)
+
                 grad_dpcpp = grad_cpu.view(grad_cpu.shape[0], grad_cpu.shape[1], grad_cpu.shape[3])
                 if not test_weight_pollution:
                     grad_dpcpp = torch.xpu.to_channels_last_1d(grad_dpcpp.to(dpcpp_device))
@@ -438,24 +382,10 @@ class TestNNMethod(TestCase):
                 conv_dpcpp.bias.data.fill_(0.01)
                 conv_dpcpp = torch.xpu.to_channels_last_1d(conv_dpcpp.to(dpcpp_device))
                 y_dpcpp = conv_dpcpp(x_dpcpp)
-                print("y_dpcpp.shape: ", y_dpcpp.shape)
-                print("y_dpcpp.is_contiguous(): ", y_dpcpp.is_contiguous())
-                print("y_dpcpp is channels last 1d: ",
-                      torch.xpu.is_contiguous_channels_last_1d(y_dpcpp))
-                print("grad_dpcpp.shape: ", grad_dpcpp.shape)
-                print("grad_dpcpp.is_contiguous(): ", grad_dpcpp.is_contiguous())
-                print("grad_dpcpp is channels last 1d: ",
-                      torch.xpu.is_contiguous_channels_last_1d(grad_dpcpp))
-                print("x_dpcpp.shape: ", x_dpcpp.shape)
-                print("x_dpcpp.is_contiguous(): ", x_dpcpp.is_contiguous())
-                print("x_dpcpp.is_contiguous(memory_format=torch.channels_last_1d): ",
-                      torch.xpu.is_contiguous_channels_last_1d(x_dpcpp))
+
                 y_dpcpp.backward(grad_dpcpp)
                 y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
-                print("y_dpcpp_gw.shape: ", y_dpcpp_gw.shape)
-                print("y_dpcpp_gw.is_contiguous(): ", y_dpcpp_gw.is_contiguous())
-                print("y_dpcpp_gw is channels last 1d: ",
-                      torch.xpu.is_contiguous_channels_last_1d(y_dpcpp_gw))
+
                 conv_dpcpp.zero_grad()
 
                 self.assertEqual(y_cpu, y_dpcpp.cpu(), atol=5 * 1e-5, rtol=0)
@@ -466,7 +396,7 @@ class TestNNMethod(TestCase):
         shapes = [(2, 2, 3, 3), (4, 4, 4, 4), (4, 4, 1, 1), (4, 1, 4, 4),
                   (4, 1, 4, 1), (4, 1, 1, 4), (1, 4, 1, 4), (1, 4, 4, 1), (4, 1, 1, 1)]
         for shape in shapes:
-            print("\n====== test shape: ", shape, "======")
+
             N, C, H, W = shape[0], shape[1], shape[2], shape[3]
             x = torch.ones(N, C, H, W, dtype=torch.float)
             conv_ic, conv_oc, conv_ks = C, 5, 3
@@ -477,7 +407,7 @@ class TestNNMethod(TestCase):
             ref = conv(x)
 
             for test_weight_pollution in [False, True]:
-                print("\n---test_weight_pollution: ", test_weight_pollution)
+
                 if not test_weight_pollution:
                     x = x.to(memory_format=torch.channels_last).to("xpu")
                 else:
@@ -485,18 +415,9 @@ class TestNNMethod(TestCase):
                 w = w.to("xpu")
                 conv.weight.data = w
                 conv = conv.to(memory_format=torch.channels_last)
-                print("input.is_contiguous(): ", x.is_contiguous())
-                print("input.is_contiguous(memory_format=torch.channels_last): ",
-                      x.is_contiguous(memory_format=torch.channels_last))
-                print("conv.weight.data.is_contiguous(): ", conv.weight.data.is_contiguous())
-                print("conv.weight.data.is_contiguous(memory_format=torch.channels_last): ",
-                      conv.weight.data.is_contiguous(memory_format=torch.channels_last))
+
                 real = conv(x)
 
-                print(real.shape)
-                print(real.stride())
-                print("real is CF: ", real.is_contiguous())
-                print("real is CL: ", real.is_contiguous(memory_format=torch.channels_last))
                 if 1 == real.shape[1] or (1 == real.shape[2] and 1 == real.shape[3]) or \
                    (1 == real.shape[1] and 1 == real.shape[2] and 1 == real.shape[3]):
                     self.assertEqual(real.is_contiguous(), True)
@@ -504,7 +425,6 @@ class TestNNMethod(TestCase):
                 else:
                     self.assertEqual(real.is_contiguous(), False)
                     self.assertEqual(real.is_contiguous(memory_format=torch.channels_last), True)
-                print(real.contiguous().cpu())
 
                 self.assertEqual(real.contiguous().cpu(), ref)
 
@@ -528,7 +448,7 @@ class TestNNMethod(TestCase):
 
                 x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
                 x_dpcpp = x_dpcpp.to(memory_format=torch.channels_last)
-                print("\n---test_weight_pollution: ", test_weight_pollution)
+
                 if not test_weight_pollution:
                     grad_dpcpp = grad_cpu.to(dpcpp_device).to(memory_format=torch.channels_last)
                 else:
@@ -536,24 +456,10 @@ class TestNNMethod(TestCase):
 
                 conv_dpcpp = conv_cpu.to(dpcpp_device).to(memory_format=torch.channels_last)
                 y_dpcpp = conv_dpcpp(x_dpcpp)
-                print("y_dpcpp.shape: ", y_dpcpp.shape)
-                print("y_dpcpp.is_contiguous(): ", y_dpcpp.is_contiguous())
-                print("y_dpcpp.is_contiguous(memory_format=torch.channels_last): ",
-                      y_dpcpp.is_contiguous(memory_format=torch.channels_last))
-                print("grad_dpcpp.shape: ", grad_dpcpp.shape)
-                print("grad_dpcpp.is_contiguous(): ", grad_dpcpp.is_contiguous())
-                print("grad_dpcpp.is_contiguous(memory_format=torch.channels_last): ",
-                      grad_dpcpp.is_contiguous(memory_format=torch.channels_last))
-                print("x_dpcpp.shape: ", x_dpcpp.shape)
-                print("x_dpcpp.is_contiguous(): ", x_dpcpp.is_contiguous())
-                print("x_dpcpp.is_contiguous(memory_format=torch.channels_last): ",
-                      x_dpcpp.is_contiguous(memory_format=torch.channels_last))
+
                 y_dpcpp.backward(grad_dpcpp)
                 y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
-                print("y_dpcpp_gw.shape: ", y_dpcpp_gw.shape)
-                print("y_dpcpp_gw.is_contiguous(): ", y_dpcpp_gw.is_contiguous())
-                print("y_dpcpp_gw.is_contiguous(memory_format=torch.channels_last): ",
-                      y_dpcpp_gw.is_contiguous(memory_format=torch.channels_last))
+
                 conv_dpcpp.zero_grad()
 
                 self.assertEqual(y_cpu, y_dpcpp.cpu(), atol=5 * 1e-5, rtol=0)

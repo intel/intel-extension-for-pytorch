@@ -1,10 +1,12 @@
 import torch
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 from torch.testing._internal.common_utils import (TestCase,
                                                   repeat_test_for_types)
+import pytest
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_grad_scaling_update_scale(self, device="xpu", dtype=torch.float):
         growth = 2.0
         backoff = 0.25

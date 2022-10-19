@@ -78,6 +78,5 @@ class TestDevicdeListForCard(TestCase):
 
 class TestHasDtypes(TestCase):
     def test_has_fp64_dtype(self):
-        assert (has_fp64_dtype() ==
-                (torch.tensor(1, device="xpu", dtype=torch.double)**2).cpu().numpy() == np.array(1)), \
-            "This Device Not Support FP64"
+        y = (torch.tensor(1, device="xpu", dtype=torch.double)**2).cpu().numpy() == np.array(1)
+        assert (y == has_fp64_dtype()), "This Device Not Support FP64"

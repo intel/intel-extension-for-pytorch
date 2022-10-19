@@ -1,9 +1,8 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
+import pytest
 
-cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     def test_conj_physical(self, dtype=torch.float):
@@ -19,6 +18,7 @@ class TestTorchMethod(TestCase):
         output_xpu = torch.conj_physical(input_xpu)
         self.assertEqual(output, output_xpu.to("cpu"))
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_angle(self, dtype=torch.float):
         input1 = torch.tensor([-1 + 1j, -2 + 2j, 3 - 3j])
         input2 = torch.tensor([-1, -2, 3])

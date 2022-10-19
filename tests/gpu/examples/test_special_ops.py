@@ -1,11 +1,12 @@
 import torch
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 from scipy import special
 from torch.testing._internal.common_utils import TestCase
+import pytest
 
 
 class TestTorchMethod(TestCase):
-
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_erfcx(self, dtype=torch.float):
         dtypes = [torch.float32, torch.float64, torch.bfloat16]
         device = "xpu"
@@ -37,6 +38,7 @@ class TestTorchMethod(TestCase):
             t = torch.tensor([min, max, eps, tiny], dtype=dtype, device=device)
             check_equal(t, torch.special.erfcx, special.erfcx)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_ndtri_entr(self, dtype=torch.float):
         dtypes = [torch.float32, torch.float64, torch.bfloat16]
         device = "xpu"

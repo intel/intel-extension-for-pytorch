@@ -6,7 +6,8 @@ from torch.testing._internal.common_nn import NNTestCase
 from torch.testing._internal.common_utils import repeat_test_for_types
 from torch.testing._internal.common_device_type import dtypes
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
+import pytest
 ALL_TENSORTYPES = [torch.float,
                    torch.double,
                    torch.bfloat16]
@@ -17,11 +18,13 @@ dtype_origin = torch.get_default_dtype()
 # Depthwise convolution is very similar to test_Conv2d_naive_groups but with special care to handle
 # the number of groups == number of input channels
 
+
 class TestNN(NNTestCase):
     _do_xpu_memory_leak_check = True
     _do_xpu_non_default_stream = True
 
     @repeat_test_for_types(ALL_TENSORTYPES)
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_conv2d_depthwise(self, dtype=torch.float):
         torch.set_default_dtype(torch.double)
         for depth_multiplier in [1, 2]:
@@ -63,6 +66,7 @@ class TestNN(NNTestCase):
         torch.set_default_dtype(dtype_origin)
 
     @repeat_test_for_types(ALL_TENSORTYPES)
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_Conv3d_depthwise(self, dtype=torch.float):
         torch.set_default_dtype(torch.double)
         for depth_multiplier in [1, 2]:
@@ -104,6 +108,7 @@ class TestNN(NNTestCase):
         torch.set_default_dtype(dtype_origin)
 
     @dtypes(torch.double)
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_Conv2d_backward_depthwise(self, device="xpu", dtype=torch.double):
         torch.set_default_dtype(torch.double)
         x = torch.randn(2, 2, 4, 20, device=device, dtype=dtype, requires_grad=True)
@@ -117,6 +122,7 @@ class TestNN(NNTestCase):
         torch.set_default_dtype(dtype_origin)
 
     @dtypes(torch.double)
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_Conv3d_backward_depthwise(self, device="xpu", dtype=torch.double):
         torch.set_default_dtype(torch.double)
         x = torch.randn(1, 2, 5, 5, 5, device=device, dtype=dtype, requires_grad=True)

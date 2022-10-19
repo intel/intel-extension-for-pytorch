@@ -1,8 +1,8 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
-
+import intel_extension_for_pytorch  # noqa
+import pytest
 
 
 class TestTorchMethod(TestCase):
@@ -24,6 +24,7 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(dst, dst_gpu)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_dequantize_per_channel(self, dtype=torch.float):
         src = torch.randn(1, 3, 2, 2)
         src_gpu = src.to("xpu")

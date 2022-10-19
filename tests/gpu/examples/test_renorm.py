@@ -1,20 +1,19 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
-
-cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("xpu")
+import intel_extension_for_pytorch  # noqa
+import pytest
 
 
 class TestNNMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_renorm(self, dtype=torch.float):
 
-        x_cpu = torch.ones(3, 3, device=cpu_device)
+        x_cpu = torch.ones(3, 3)
 
         x_cpu[1].fill_(2)
         x_cpu[2].fill_(3)
-        x_dpcpp = x_cpu.to(dpcpp_device)
+        x_dpcpp = x_cpu.to("xpu")
 
         renorm1 = torch.renorm(x_cpu, 1, 1, 5)
 

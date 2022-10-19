@@ -2,13 +2,12 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
-
-cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("xpu")
+import intel_extension_for_pytorch  # noqa
+import pytest
 
 
 class TestNNMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_multiabel_margin_loss(self, dtype=torch.float):
         input = torch.randn(3, 5)
         target = torch.LongTensor(3, 5).random_(-1, 5)
@@ -23,12 +22,12 @@ class TestNNMethod(TestCase):
             loss = nn.MultiLabelMarginLoss(reduction=reduc)
             input.requires_grad = True
             output = loss(input, target)
-            print(output)
+            # print(output)
             if(reduc == "none"):
                 output.backward(torch.ones_like(output, dtype=torch.float))
             else:
                 output.backward(torch.tensor((1.0), dtype=torch.float))
-            print(input.grad)
+            # print(input.grad)
             try:
                 return output, input
             finally:
@@ -38,47 +37,47 @@ class TestNNMethod(TestCase):
             loss = nn.MultiLabelMarginLoss(reduction=reduc)
             input.requires_grad = True
             output = loss(input, target)
-            print(output.cpu())
+            # print(output.cpu())
             if(reduc == "none"):
                 output.backward(torch.ones_like(
                     output, dtype=torch.float).to("xpu"))
             else:
                 output.backward(torch.tensor(
                     (1.0), dtype=torch.float).to("xpu"))
-            print(input.grad.cpu())
+            # print(input.grad.cpu())
             try:
                 return output, input
             finally:
                 input.grad.zero_()
 
-        print('none')
-        print("cpu")
+        # print('none')
+        # print("cpu")
         output_cpu, input_cpu = _test_cpu(input_cpu, target_cpu, "none")
-        print("xpu")
+        # print("xpu")
         output_dpcpp, input_dpcpp = _test_dpcpp(
             input_dpcpp, target_dpcpp, "none")
         self.assertEqual(output_cpu, output_dpcpp.cpu())
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())
 
-        print('sum')
-        print("cpu")
+        # print('sum')
+        # print("cpu")
         output_cpu, input_cpu = _test_cpu(input_cpu, target_cpu, "sum")
-        print("xpu")
+        # print("xpu")
         output_dpcpp, input_dpcpp = _test_dpcpp(
             input_dpcpp, target_dpcpp, "sum")
         self.assertEqual(output_cpu, output_dpcpp.cpu())
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())
 
-        print('mean')
-        print("cpu")
+        # print('mean')
+        # print("cpu")
         output_cpu, input_cpu = _test_cpu(input_cpu, target_cpu, "mean")
-        print("xpu")
+        # print("xpu")
         output_dpcpp, input_dpcpp = _test_dpcpp(
             input_dpcpp, target_dpcpp, "mean")
         self.assertEqual(output_cpu, output_dpcpp.cpu())
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())
 
-        print('sum-1024*1024')
+        # print('sum-1024*1024')
         input = torch.randn(1024, 1024)
         target = torch.LongTensor(1024, 1024).random_(-1, 1024)
 
@@ -88,9 +87,9 @@ class TestNNMethod(TestCase):
         input_dpcpp = input.to("xpu")
         target_dpcpp = target.to("xpu")
 
-        print('cpu')
+        # print('cpu')
         output_cpu, input_cpu = _test_cpu(input_cpu, target_cpu, "sum")
-        print("xpu")
+        # print("xpu")
         output_dpcpp, input_dpcpp = _test_dpcpp(
             input_dpcpp, target_dpcpp, "sum")
         self.assertTrue(torch.allclose(output_cpu, output_dpcpp.cpu(), rtol=5e-5))
