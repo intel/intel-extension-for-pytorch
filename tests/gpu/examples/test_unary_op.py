@@ -1,8 +1,9 @@
 from functools import partial, update_wrapper
 
 import torch
-from torch.testing._internal.common_utils import (TestCase,
-                                                  repeat_test_for_types)
+from torch.testing._internal.common_utils import (TestCase)
+
+from torch.testing._internal.common_device_type import (dtypes)
 
 import intel_extension_for_pytorch  # noqa
 import pytest
@@ -93,8 +94,8 @@ OP_TEST_FOR_BACKWARD = [
 
 
 class TetsTorchMethod(TestCase):
-    @repeat_test_for_types(FLOATING_DTYPES)
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @dtypes(FLOATING_DTYPES)
     def test_unary_op_for_floating(self, dtype=torch.float):
         a = torch.randn(
             [2, 2, 2, 2], dtype=torch.float)
@@ -119,7 +120,7 @@ self.assertEqual(y_cpu, y_xpu.cpu())
                 """.format(op_str, op_str, op_str, op_str)
                  )
 
-    @repeat_test_for_types(INTEGRAL_DTYPES)
+    @dtypes(INTEGRAL_DTYPES)
     def test_unary_op_for_integer(self, dtype=torch.int):
         a = torch.randint(
             -5, 5, [2, 2, 2, 2], dtype=torch.int)
@@ -144,8 +145,8 @@ self.assertEqual(y_cpu, y_xpu.cpu())
                 """.format(op_str, op_str, op_str, op_str)
                  )
 
-    @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @dtypes([torch.float, torch.half, torch.bfloat16])
     def test_unary_op_signbit(self, dtype=torch.float):
         x_cpu = torch.randn(5, 5, requires_grad=True)
         sign_cpu = torch.signbit(x_cpu)
@@ -169,8 +170,8 @@ self.assertEqual(y_cpu, y_xpu.cpu())
         print("XPU {}: {}".format(op.__name__, x_xpu.grad))
         self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
 
-    @repeat_test_for_types(FLOATING_DTYPES)
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @dtypes(FLOATING_DTYPES)
     def test_unary_backward_for_floating(self, dtype=torch.float):
         x_cpu = torch.randn(
             [2, 2, 2, 2], dtype=dtype, requires_grad=True)
