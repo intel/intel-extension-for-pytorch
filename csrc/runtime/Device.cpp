@@ -75,7 +75,7 @@ static void enumDevices(
         }
         static auto verbose = Settings::I().get_verbose_level();
         if (verbose) {
-          TORCH_WARN(
+          TORCH_WARN_ONCE(
               "Tile partition is UNSUPPORTED : ",
               root_device.get_info<dpcpp_dev_name>());
         }
