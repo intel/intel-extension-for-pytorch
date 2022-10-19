@@ -31,7 +31,7 @@ from torch.distributions import (Bernoulli, Exponential, Multinomial, Normal,
 from torch.testing._internal.common_utils import (TestCase, load_tests,
                                                   set_rng_seed)
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 import pytest
 import scipy
@@ -121,6 +121,7 @@ class TestDistributions(TestCase):
             asset_fn(i, val.squeeze(), log_prob)
         torch.set_default_dtype(dtype_origin)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_bernoulli(self):
         torch.set_default_dtype(torch.double)
         p = torch.tensor([0.7, 0.2, 0.4], requires_grad=True)
@@ -349,6 +350,7 @@ class TestDistributions(TestCase):
         print("grad_xpu: ", grad_xpu.grad)
         self.assertEqual(grad_xpu.grad.to("cpu"), grad_cpu.grad)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_binomial_log_prob(self):
         for prop in [0., 0.5, 0.3, 0.05, 0.02, 0.75, 0.9, 1.]:
             total_count = torch.tensor([[8, 70, 100], [3000, 80000, 700000]]).to("xpu")

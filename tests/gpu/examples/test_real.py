@@ -2,15 +2,14 @@ import torch
 from torch.testing._internal.common_utils import (TestCase,
                                                   repeat_test_for_types)
 
-import intel_extension_for_pytorch # noqa
-
-cpu_device = torch.device("cpu")
-xpu_device = torch.device("xpu")
+import intel_extension_for_pytorch  # noqa
+import pytest
 
 
 class TestTorchMethod(TestCase):
     @repeat_test_for_types([torch.cfloat, torch.cdouble])
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_real(self, dtype=torch.cfloat):
-        x = torch.randn(3, 4, 5, dtype=dtype, device=cpu_device)
-        x_xpu = x.to(xpu_device)
-        self.assertEqual(x.real, x_xpu.real.to(cpu_device))
+        x = torch.randn(3, 4, 5, dtype=dtype)
+        x_xpu = x.to("xpu")
+        self.assertEqual(x.real, x_xpu.real.cpu())

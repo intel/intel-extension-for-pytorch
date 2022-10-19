@@ -3,7 +3,7 @@ import torch.nn.functional
 from torch import nn as nn
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
-import pytest # noqa
+import pytest  # noqa
 
 device = 'xpu'
 
@@ -129,6 +129,7 @@ class TestTorchMethod(TestCase):
         check_pos = 0
         check_no_dropout_but_identity(optimized_module, check_pos)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_master_weight_fusion_optimizer(self):
         lr = 0.01
         weight_decay = 0.01

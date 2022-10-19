@@ -1,18 +1,17 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
-
-cpu_device = torch.device("cpu")
-sycl_device = torch.device("xpu")
+import intel_extension_for_pytorch  # noqa
+import pytest
 
 
 class TestNNMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_random(self):
         # This test is flaky with p<=(2/(ub-lb))^200=6e-36
         original_dtype = torch.get_default_dtype()
         torch.set_default_dtype(torch.double)
-        t = torch.empty(200, device=sycl_device)
+        t = torch.empty(200, device="xpu")
         lb = 1
         ub = 4
 
@@ -29,7 +28,7 @@ class TestNNMethod(TestCase):
 
     def test_random_bool(self):
         size = 2000
-        t = torch.empty(size, dtype=torch.bool, device=sycl_device)
+        t = torch.empty(size, dtype=torch.bool, device="xpu")
 
         t.fill_(False)
         t.random_()
@@ -57,7 +56,7 @@ class TestNNMethod(TestCase):
 
         for from_ in froms:
             for to_ in tos:
-                t = torch.empty(size, dtype=torch.bool, device=sycl_device)
+                t = torch.empty(size, dtype=torch.bool, device="xpu")
                 if to_ > from_:
                     if not (min_val <= from_ <= max_val) or not (min_val <= (to_ - 1) <= max_val):
                         if not (min_val <= from_ <= max_val):
@@ -96,7 +95,7 @@ class TestNNMethod(TestCase):
         int64_min_val = torch.iinfo(torch.int64).min
         int64_max_val = torch.iinfo(torch.int64).max
 
-        t = torch.empty(size, device=sycl_device)
+        t = torch.empty(size, device="xpu")
 
         if dtype in [torch.float, torch.double, torch.half]:
             from_ = int(max(torch.finfo(dtype).min, int64_min_val))
@@ -152,7 +151,7 @@ class TestNNMethod(TestCase):
 
         for from_ in froms:
             for to_ in tos:
-                t = torch.empty(size, device=sycl_device)
+                t = torch.empty(size, device="xpu")
                 if to_ > from_:
                     if not (min_val <= from_ <= max_val) or not (min_val <= (to_ - 1) <= max_val):
                         if not (min_val <= from_ <= max_val):
@@ -218,7 +217,7 @@ class TestNNMethod(TestCase):
 
         from_ = 0
         for to_ in tos:
-            t = torch.empty(size, device=sycl_device)
+            t = torch.empty(size, device="xpu")
             if to_ > from_:
                 if not (min_val <= (to_ - 1) <= max_val):
                     self.assertWarnsRegex(
@@ -262,7 +261,7 @@ class TestNNMethod(TestCase):
         else:
             to_inc = torch.iinfo(dtype).max
 
-        t = torch.empty(size, device=sycl_device, dtype=dtype)
+        t = torch.empty(size, device="xpu", dtype=dtype)
         t.random_()
         self.assertTrue(0 <= t.min() < alpha * to_inc)
         self.assertTrue((to_inc - alpha * to_inc) < t.max() <= to_inc)

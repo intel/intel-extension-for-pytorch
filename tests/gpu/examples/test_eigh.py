@@ -2,17 +2,20 @@ from torch.testing._internal.common_utils import random_hermitian_matrix, TestCa
 from torch.testing._internal.common_device_type import dtypes
 from torch.testing import make_tensor
 
-import torch 
+import torch
 import warnings
 import numpy as np
 import itertools
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
+import pytest
 
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
+
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_linalg_eigh(self, dtype=torch.float64):
 
         matrix_cpu = random_hermitian_matrix(3, 1, dtype=dtype, device=cpu_device)
@@ -23,6 +26,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(L, L_xpu.to(cpu_device))
         self.assertEqual(V, V_xpu.to(cpu_device))
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_eigvalsh(self, dtype=torch.float64, device=dpcpp_device):
         def run_test(shape, batch, uplo):
             matrix = random_hermitian_matrix(shape, *batch, dtype=dtype, device=device)
@@ -42,7 +46,7 @@ class TestTorchMethod(TestCase):
         for shape, batch, uplo in itertools.product(shapes, batches, uplos):
             run_test(shape, batch, uplo)
 
-
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_eigh_lower_uplo(self, device=dpcpp_device, dtype=torch.float64):
         def run_test(shape, batch, uplo):
             # check lower case uplo
@@ -109,8 +113,8 @@ class TestTorchMethod(TestCase):
             with self.assertRaisesRegex(RuntimeError, "tensors to be on the same device"):
                 torch.linalg.eigh(a, out=(out_w, out_v))
 
-
     @dtypes(torch.float32, torch.float64)
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_eigh_non_contiguous(self, dtype=torch.float64, device=dpcpp_device):
 
         def run_test(matrix, uplo):
@@ -140,7 +144,6 @@ class TestTorchMethod(TestCase):
             run_test_permuted(shape, batch, uplo)
             run_test_skipped_elements(shape, batch, uplo)
 
-
     @dtypes(torch.float64)
     def test_eigh_hermitian_grad(self, dtype=torch.float64, device=dpcpp_device):
         def run_test(dims, uplo):
@@ -153,6 +156,7 @@ class TestTorchMethod(TestCase):
             run_test(dims, uplo)
 
     @dtypes(torch.float32, torch.float64)
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_eigvalsh_non_contiguous(self, device=dpcpp_device, dtype=torch.float64):
         def run_test(matrix, uplo):
             self.assertFalse(matrix.is_contiguous())

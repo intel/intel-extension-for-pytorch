@@ -2,11 +2,10 @@ import torch
 import torch.nn.functional
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 import copy
+import pytest
 
-cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
 
@@ -19,23 +18,18 @@ class TestNNMethod(TestCase):
 
         relu_(x_cpu)
         relu_(x_dpcpp)
-        print("cpu relu_ ", x_cpu)
-        print("dpcpp relu_ ", x_dpcpp.cpu())
         self.assertEqual(x_cpu, x_dpcpp.cpu())
 
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)
         y_cpu = relu(x_cpu)
         y_dpcpp = relu(x_dpcpp)
-        print("cpu relu ", y_cpu)
-        print("dpcpp relu ", y_dpcpp.cpu())
+
         self.assertEqual(y_cpu, y_dpcpp.cpu())
 
         y_cpu.backward(x_cpu)
         y_dpcpp.backward(x_dpcpp)
 
-        print("cpu relu bwd", x_cpu.grad)
-        print("dpcpp relu bwd", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_activation_relu_block(self, dtype=torch.float):
@@ -49,20 +43,17 @@ class TestNNMethod(TestCase):
             x_dpcpp = x_cpu.to("xpu")
             relu_(to_block_cpu(x_cpu))
             relu_(to_block_dpcpp(x_dpcpp))
-            print("cpu relu_ ", x_cpu)
-            print("dpcpp relu_ ", x_dpcpp.cpu())
+
             self.assertEqual(x_cpu, x_dpcpp.cpu())
             x_cpu.requires_grad_(True)
             x_dpcpp.requires_grad_(True)
             y_cpu = relu(to_block_cpu(x_cpu))
             y_dpcpp = relu(to_block_dpcpp(x_dpcpp))
-            print("cpu relu ", y_cpu)
-            print("dpcpp relu ", y_dpcpp.cpu())
+
             self.assertEqual(y_cpu, y_dpcpp.cpu())
             y_cpu.backward(x_cpu)
             y_dpcpp.backward(x_dpcpp)
-            print("cpu relu bwd", x_cpu.grad)
-            print("dpcpp relu bwd", x_dpcpp.grad.cpu())
+
             self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_activation_relu_channels_last(self, dtype=torch.float):
@@ -86,8 +77,6 @@ class TestNNMethod(TestCase):
         real = relu(real)
         real = real.contiguous().cpu()
 
-        print(real)
-        print(ref)
         self.assertEqual(real, ref)
 
     def test_activation_relu_channels_last_bwd(self, dtype=torch.float):
@@ -101,15 +90,12 @@ class TestNNMethod(TestCase):
         x_dpcpp.requires_grad_(True)
         y_cpu = relu(x_cpu)
         y_dpcpp = relu(x_dpcpp)
-        print("cpu relu ", y_cpu)
-        print("dpcpp relu ", y_dpcpp.cpu())
+
         self.assertEqual(y_cpu, y_dpcpp.cpu())
 
         y_cpu.backward(grad_cpu)
         y_dpcpp.backward(grad_dpcpp)
 
-        print("cpu relu bwd", x_cpu.grad)
-        print("dpcpp relu bwd", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_activation_rrelu(self, dtype=torch.float):
@@ -123,17 +109,14 @@ class TestNNMethod(TestCase):
         x_dpcpp.requires_grad_(True)
         y_cpu = RReLU(x_cpu)
         y_dpcpp = RReLU_dpcpp(x_dpcpp)
-        print("cpu rrelu ", y_cpu)
-        print("dpcpp rrelu ", y_dpcpp.cpu())
+
         #  self.assertEqual(y_cpu, y_dpcpp.cpu())
 
         y_cpu.backward(x_cpu)
         y_dpcpp.backward(x_dpcpp)
 
-        print("cpu rrelu bwd", x_cpu.grad)
-        print("dpcpp rrelu bwd", x_dpcpp.grad.cpu())
         #  self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
-
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_activation_gelu(self, dtype=torch.float):
         GELU = torch.nn.GELU()
         GELU_dpcpp = copy.deepcopy(GELU).to("xpu")
@@ -144,8 +127,7 @@ class TestNNMethod(TestCase):
         x_dpcpp.requires_grad_(True)
         y_cpu = GELU(x_cpu)
         y_dpcpp = GELU_dpcpp(x_dpcpp)
-        print("cpu gelu ", y_cpu)
-        print("dpcpp gelu ", y_dpcpp.cpu())
+
         self.assertEqual(y_cpu, y_dpcpp.cpu())
 
         # y_cpu = torch.tensor([[1, 1],[1, 1],[1, 1],[1, 1]]);
@@ -153,8 +135,6 @@ class TestNNMethod(TestCase):
         y_cpu.backward(x_cpu)
         y_dpcpp.backward(x_dpcpp)
 
-        print("cpu gelu bwd", x_cpu.grad)
-        print("dpcpp gelu bwd", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_activation_gelu_block(self, dtype=torch.float):
@@ -170,13 +150,11 @@ class TestNNMethod(TestCase):
             x_dpcpp.requires_grad_(True)
             y_cpu = GELU(to_block_cpu(x_cpu))
             y_dpcpp = GELU_dpcpp(to_block_dpcpp(x_dpcpp))
-            print("cpu gelu ", y_cpu)
-            print("dpcpp gelu ", y_dpcpp.cpu())
+
             self.assertEqual(y_cpu, y_dpcpp.cpu())
             y_cpu.backward(x_cpu)
             y_dpcpp.backward(x_dpcpp)
-            print("cpu gelu bwd", x_cpu.grad)
-            print("dpcpp gelu bwd", x_dpcpp.grad.cpu())
+
             self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_activation_prelu(self, dtype=torch.float):
@@ -189,15 +167,12 @@ class TestNNMethod(TestCase):
         x_dpcpp.requires_grad_(True)
         y_cpu = PReLU(x_cpu)
         y_dpcpp = PReLU_dpcpp(x_dpcpp)
-        print("cpu prelu ", y_cpu)
-        print("dpcpp prelu ", y_dpcpp.cpu())
+
         self.assertEqual(y_cpu, y_dpcpp.cpu())
 
         y_cpu.backward(x_cpu)
         y_dpcpp.backward(x_dpcpp)
 
-        print("cpu prelu bwd", x_cpu.grad)
-        print("dpcpp prelu bwd", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_activation_prelu_multi_weight(self, dtype=torch.float):
@@ -210,15 +185,12 @@ class TestNNMethod(TestCase):
         x_dpcpp.requires_grad_(True)
         y_cpu = PReLU(x_cpu)
         y_dpcpp = PReLU_dpcpp(x_dpcpp)
-        print("cpu prelu ", y_cpu)
-        print("dpcpp prelu ", y_dpcpp.cpu())
+
         self.assertEqual(y_cpu, y_dpcpp.cpu())
 
         y_cpu.backward(x_cpu)
         y_dpcpp.backward(x_dpcpp)
 
-        print("cpu prelu bwd", x_cpu.grad)
-        print("dpcpp prelu bwd", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_activation_mish(self, dtype=torch.float):
@@ -229,14 +201,11 @@ class TestNNMethod(TestCase):
         x_dpcpp = x_cpu.to("xpu")
         y_cpu = Mish(x_cpu)
         y_dpcpp = Mish_dpcpp(x_dpcpp)
-        print("cpu mish ", y_cpu)
-        print("dpcpp mish ", y_dpcpp)
+
         self.assertEqual(y_cpu, y_dpcpp.cpu())
 
         Mish = torch.nn.Mish(inplace=True)
         Mish_dpcpp = copy.deepcopy(Mish).to("xpu")
         Mish(x_cpu)
         Mish_dpcpp(x_dpcpp)
-        print("cpu mish inplace ", x_cpu)
-        print("dpcpp mish inplace", x_dpcpp)
         self.assertEqual(x_cpu, x_dpcpp.cpu())

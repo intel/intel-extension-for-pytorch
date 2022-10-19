@@ -1,13 +1,16 @@
 import torch
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 from torch.testing._internal.common_utils import TestCase
 from torch.testing._internal.common_dtype import (
     all_types, all_types_and
 )
 from itertools import product
 import numpy as np
+import pytest
+
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_isin(self, device="xpu", dtype=torch.float):
         def assert_isin_equal(a, b):
             # Compare to the numpy reference implementation.
@@ -90,6 +93,7 @@ class TestTorchMethod(TestCase):
                     c = torch.isin(a, b, invert=invert, assume_unique=assume_unique)
                     self.assertEqual(c, ec)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_isin_different_dtypes(self, device="xpu"):
         supported_types = all_types() if device == 'cpu' else all_types_and(torch.half)
         for mult in [1, 10]:
