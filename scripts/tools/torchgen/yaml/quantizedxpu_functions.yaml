@@ -1,0 +1,49 @@
+backend: QuantizedXPU
+cpp_namespace: at
+class_name: AtenIpexTypeQuantizedXPU
+use_out_as_primary: true
+device_guard: true
+supported:
+  - _adaptive_avg_pool2d
+  - _empty_affine_quantized
+  - _to_copy
+#  - adaptive_avg_pool2d        # should not register
+  - adaptive_avg_pool2d.out
+  - add.Tensor
+  - addmm
+  - as_strided
+  - avg_pool2d
+  - avg_pool2d.out
+  - clone
+  - copy_
+  - dequantize.self
+  - empty.memory_format
+  - empty_strided
+  - equal
+  - int_repr
+  - leaky_relu
+  - leaky_relu_
+  - max_pool2d_with_indices
+  - q_per_channel_axis
+  - q_per_channel_scales
+  - q_per_channel_zero_points
+  - q_scale
+  - q_zero_point
+  - qscheme
+  - quantize_per_tensor
+  - quantize_per_tensor.tensor_qparams
+  - quantized_max_pool2d
+  - record_stream
+  - resize_
+#  - set_quantizer_	# different schema
+  - set_.source_Storage_storage_offset
+  - upsample_nearest2d
+  - upsample_nearest2d.vec
+  - view
+  - empty_quantized
+  - transpose_
+  - as_strided_
+  - _reshape_alias
+  - sigmoid
+  - sigmoid_
+  - sigmoid.out

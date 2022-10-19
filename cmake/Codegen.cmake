@@ -11,7 +11,7 @@ Function(GEN_BACKEND file_yaml)
                 LIST(APPEND generated_files "${BUILD_IPEX_GPU_ATEN_GENERATED}/${f}")
         ENDFOREACH()
         file(GLOB_RECURSE depended_files
-                ${PROJECT_SOURCE_DIR}/scripts/tools/codegen/yaml/${file_yaml})
+                ${PROJECT_SOURCE_DIR}/scripts/tools/torchgen/yaml/${file_yaml})
         add_custom_command(OUTPUT
                 ${generated_files}
                 COMMAND
@@ -19,12 +19,12 @@ Function(GEN_BACKEND file_yaml)
                 COMMAND
                 "${PYTHON_EXECUTABLE}" -m torchgen.gen_backend_stubs
                 --output_dir ${BUILD_IPEX_GPU_ATEN_GENERATED}
-                --source_yaml ${PROJECT_SOURCE_DIR}/scripts/tools/codegen/yaml/${file_yaml}
+                --source_yaml ${PROJECT_SOURCE_DIR}/scripts/tools/torchgen/yaml/${file_yaml}
                 ${SIMPLE_TRACE}
                 WORKING_DIRECTORY ${IPEX_ROOT_DIR}/scripts/tools
                 DEPENDS
                 ${depended_files}
-                ${PROJECT_SOURCE_DIR}/scripts/tools/codegen/yaml/${file_yaml})
+                ${PROJECT_SOURCE_DIR}/scripts/tools/torchgen/yaml/${file_yaml})
 endfunction(GEN_BACKEND)
 
 GEN_BACKEND(xpu_functions.yaml XPUNativeFunctions.h RegisterXPU.cpp RegisterAutogradXPU.cpp)
