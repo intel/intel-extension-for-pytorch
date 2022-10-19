@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -15,31 +15,18 @@ class TestNNMethod(TestCase):
                              dtype=dtype, requires_grad=True)
         input2 = torch.randn(100, 128, device=cpu_device,
                              dtype=dtype, requires_grad=True)
+
+        input1_dpcpp = input1.to("xpu")
+        input2_dpcpp = input2.to("xpu")
         output = pdist(input1, input2)
-        print(output)
         pdist_dpcpp = pdist.to(dpcpp_device)
-        input1_dpcpp = torch.randn(
-            100, 128, device=dpcpp_device, dtype=dtype, requires_grad=True)
-        input2_dpcpp = torch.randn(
-            100, 128, device=dpcpp_device, dtype=dtype, requires_grad=True)
-        output_dpcpp = pdist_dpcpp(input1, input2)
-        print(output_dpcpp.to(cpu_device))
+        output_dpcpp = pdist_dpcpp(input1_dpcpp, input2_dpcpp)
         self.assertEqual(output, output_dpcpp.to(cpu_device))
 
         cos = nn.CosineSimilarity(dim=1, eps=1e-6)
-        input1 = torch.randn(100, 128, device=cpu_device,
-                             dtype=dtype, requires_grad=True)
-        input2 = torch.randn(100, 128, device=cpu_device,
-                             dtype=dtype, requires_grad=True)
         output = cos(input1, input2)
-        print(output)
         cos_dpcpp = cos.to(dpcpp_device)
-        input1_dpcpp = torch.randn(
-            100, 128, device=dpcpp_device, dtype=dtype, requires_grad=True)
-        input2_dpcpp = torch.randn(
-            100, 128, device=dpcpp_device, dtype=dtype, requires_grad=True)
-        output_dpcpp = cos_dpcpp(input1, input2)
-        print(output_dpcpp.to(cpu_device))
+        output_dpcpp = cos_dpcpp(input1_dpcpp, input2_dpcpp)
         self.assertEqual(output, output_dpcpp.to(cpu_device))
 
     def test_pdist(self, dtype=torch.float):
@@ -51,8 +38,6 @@ class TestNNMethod(TestCase):
             g = torch.ones_like(y, requires_grad=True)
             y.backward(g)
             grad_cpu = a.grad.detach().clone()
-            print("output_cpu = ", y)
-            print("grad_cpu = ", grad_cpu)
             a.grad.zero_()
 
             a_xpu = a.to('xpu')
@@ -61,8 +46,6 @@ class TestNNMethod(TestCase):
             g_xpu = torch.ones_like(y_xpu, requires_grad=True).to('xpu')
             y_xpu.backward(g_xpu)
             grad_xpu = a_xpu.grad.detach().clone()
-            print("output_xpu = ", y_xpu.cpu())
-            print("grad_xpu = ", grad_xpu.cpu())
             a_xpu.grad.zero_()
 
             self.assertEqual(y, y_xpu)
@@ -79,8 +62,6 @@ class TestNNMethod(TestCase):
             g = torch.ones_like(y, requires_grad=True)
             y.backward(g)
             grad_cpu = a.grad.detach().clone()
-            print("output_cpu = ", y)
-            print("grad_cpu = ", grad_cpu)
             a.grad.zero_()
 
             a_xpu = a.to('xpu')
@@ -91,8 +72,6 @@ class TestNNMethod(TestCase):
             g_xpu = torch.ones_like(y_xpu, requires_grad=True).to('xpu')
             y_xpu.backward(g_xpu)
             grad_xpu = a_xpu.grad.detach().clone()
-            print("output_xpu = ", y_xpu.cpu())
-            print("grad_xpu = ", grad_xpu.cpu())
             a_xpu.grad.zero_()
 
             self.assertEqual(y, y_xpu)
@@ -105,8 +84,6 @@ class TestNNMethod(TestCase):
             g = torch.ones_like(y, requires_grad=True)
             y.backward(g)
             grad_cpu = a.grad.detach().clone()
-            print("output_cpu = ", y)
-            print("grad_cpu = ", grad_cpu)
             a.grad.zero_()
 
             a_xpu = a.to('xpu')
@@ -117,8 +94,6 @@ class TestNNMethod(TestCase):
             g_xpu = torch.ones_like(y_xpu, requires_grad=True).to('xpu')
             y_xpu.backward(g_xpu)
             grad_xpu = a_xpu.grad.detach().clone()
-            print("output_xpu = ", y_xpu.cpu())
-            print("grad_xpu = ", grad_xpu.cpu())
             a_xpu.grad.zero_()
 
             self.assertEqual(y, y_xpu)
