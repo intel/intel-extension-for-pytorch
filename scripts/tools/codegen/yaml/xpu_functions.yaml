@@ -602,48 +602,24 @@ supported:
   - unique_consecutive
   - unique_dim
   - unique_dim_consecutive
-#  - upsample_bicubic2d
-#  - upsample_bicubic2d.out
-#  - upsample_bicubic2d.vec
-#  - upsample_bicubic2d_backward
-#  - upsample_bicubic2d_backward.grad_input
-#  - upsample_bicubic2d_backward.vec
-#  - upsample_bilinear2d
-#  - upsample_bilinear2d.out
-#  - upsample_bilinear2d.vec
-#  - upsample_bilinear2d_backward
-#  - upsample_bilinear2d_backward.grad_input
-#  - upsample_bilinear2d_backward.vec
-#  - upsample_linear1d
-#  - upsample_linear1d.out
-#  - upsample_linear1d.vec
-#  - upsample_linear1d_backward
-#  - upsample_linear1d_backward.grad_input
-#  - upsample_linear1d_backward.vec
-#  - upsample_nearest1d
-#  - upsample_nearest1d.out
-#  - upsample_nearest1d.vec
-#  - upsample_nearest1d_backward
-#  - upsample_nearest1d_backward.grad_input
-#  - upsample_nearest1d_backward.vec
-#  - upsample_nearest2d
-#  - upsample_nearest2d.out
-#  - upsample_nearest2d.vec
-#  - upsample_nearest2d_backward
-#  - upsample_nearest2d_backward.grad_input
-#  - upsample_nearest2d_backward.vec
+  - upsample_bicubic2d
+  - upsample_bicubic2d_backward
+  - upsample_bilinear2d
+  - upsample_bilinear2d_backward
+  - upsample_linear1d
+  - upsample_linear1d_backward
+  - upsample_nearest1d
+  - upsample_nearest1d_backward
+  - upsample_nearest2d
+  - upsample_nearest2d_backward
 #  - upsample_nearest3d
 #  - upsample_nearest3d.out
 #  - upsample_nearest3d.vec
 #  - upsample_nearest3d_backward
 #  - upsample_nearest3d_backward.grad_input
 #  - upsample_nearest3d_backward.vec
-#  - upsample_trilinear3d
-#  - upsample_trilinear3d.out
-#  - upsample_trilinear3d.vec
-#  - upsample_trilinear3d_backward
-#  - upsample_trilinear3d_backward.grad_input
-#  - upsample_trilinear3d_backward.vec
+  - upsample_trilinear3d
+  - upsample_trilinear3d_backward
   - var.correction
   - var_mean.correction
   - view
