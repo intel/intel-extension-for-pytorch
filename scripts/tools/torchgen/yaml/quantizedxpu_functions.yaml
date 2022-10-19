@@ -7,8 +7,6 @@ supported:
   - _adaptive_avg_pool2d
   - _empty_affine_quantized
   - _to_copy
-#  - adaptive_avg_pool2d        # should not register
-  - adaptive_avg_pool2d.out
   - add.Tensor
   - addmm
   - as_strided
@@ -35,10 +33,10 @@ supported:
   - quantized_max_pool2d
   - record_stream
   - resize_
-#  - set_quantizer_	# different schema
   - set_.source_Storage_storage_offset
   - upsample_nearest2d
-  - upsample_nearest2d.vec
+  - upsample_nearest3d
+  - upsample_nearest3d.vec
   - view
   - empty_quantized
   - transpose_

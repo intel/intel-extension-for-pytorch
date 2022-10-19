@@ -26,16 +26,22 @@
 #include <c10/core/TensorImpl.h>
 #include <c10/core/Allocator.h>
 #include <ATen/DeviceGuard.h>
+#include <ATen/NativeFunctions.h>
 #include <ATen/NamedTensorUtils.h>
 #include <ATen/Utils.h>
 #include <ATen/WrapDimUtils.h>
 #include <ATen/Dispatch.h>
+#include <ATen/Functions.h>
 #include <c10/util/ExclusivelyOwned.h>
 #include <c10/util/Half.h>
+#include <c10/core/TensorImpl.h>
 #include <c10/core/UndefinedTensorImpl.h>
 #include <c10/util/Optional.h>
 #include <ATen/Tensor.h>
 #include <ATen/native/Resize.h>
+
+#include <intrinsic/intrinsic.h>
+#include <utils/SimpleTrace.h>
 
 #include <cstddef>
 #include <functional>
