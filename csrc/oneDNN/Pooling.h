@@ -151,7 +151,7 @@ static at::Tensor pooling(
       pooling_forward::primitive_desc(pooling_fwd_desc, engine);
 
   memory src_m, dst_m;
-  if (!Settings::I().is_onednn_layout_enabled() || is_smf_channels_last(src)) {
+  if (src_ctx.is_plain()) {
     src_m = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
     dst_m = dpcpp_onednn_memory(dst_md, engine, dst.data_ptr());
   } else {
@@ -310,8 +310,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   auto expected_dst_md = pooling_fwd_pd.dst_desc();
 
   memory src_usr_m, dst_usr_m;
-  if (!Settings::I().is_onednn_layout_enabled() ||
-      onednn_pool_use_channels_last(src)) {
+  if (src_ctx.is_plain() || onednn_pool_use_channels_last(src)) {
     src_usr_m = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
     dst_usr_m = dpcpp_onednn_memory(dst_md, engine, dst.data_ptr());
   } else {
@@ -340,8 +339,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   if (prop_kind == dnnl::prop_kind::forward_training) {
     at::Tensor idx_;
     memory idx_m;
-    if (!Settings::I().is_onednn_layout_enabled() ||
-        onednn_pool_use_channels_last(src)) {
+    if (src_ctx.is_plain() || onednn_pool_use_channels_last(src)) {
       idx_ = at::empty({dst_tz}, at::TensorOptions(at::kXPU).dtype(at::kInt));
       idx_m = dpcpp_onednn_memory(idx_md, engine, idx_.data_ptr());
     } else {
@@ -366,8 +364,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
          {DNNL_ARG_DST, dst_m},
          {DNNL_ARG_WORKSPACE, idx_m}});
 
-    if (!Settings::I().is_onednn_layout_enabled() ||
-        onednn_pool_use_channels_last(src)) {
+    if (src_ctx.is_plain() || onednn_pool_use_channels_last(src)) {
       dtype_convert_by_scalar(
           idx.data_ptr<int64_t>(), idx_.data_ptr<int32_t>(), idx_.numel());
     } else {

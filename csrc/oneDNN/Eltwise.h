@@ -42,13 +42,13 @@ static inline void eltwise(
                         src.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
   auto src_md = memory::desc({src_tz}, data_t, format_data);
 
+  auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
+
   memory src_memory;
-  if (!Settings::I().is_onednn_layout_enabled() ||
-      src.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+  if (src_ctx.is_plain() || src.is_contiguous(at::MemoryFormat::ChannelsLast) ||
       src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     src_memory = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
   } else {
-    auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
     src_md = src_ctx.is_plain() ? src_md : src_ctx.meta();
     src_memory = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
   }
@@ -69,7 +69,7 @@ static inline void eltwise(
       eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, attr, engine);
 
   memory dst_memory;
-  if (!Settings::I().is_onednn_layout_enabled()) {
+  if (src_ctx.is_plain()) {
     if (!dst.defined()) {
       dst = src.is_contiguous(at::MemoryFormat::ChannelsLast)
           ? at::empty_like(src, at::MemoryFormat::ChannelsLast)

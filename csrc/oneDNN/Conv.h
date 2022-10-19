@@ -217,7 +217,8 @@ static at::Tensor convolution(
       padding_back_bottom_right,
       stride,
       dilation);
-  if (!Settings::I().is_onednn_layout_enabled() && !dst.defined()) {
+  auto is_suggested_block = use_blocked_format_for_conv(src);
+  if (!is_suggested_block && !dst.defined()) {
     auto dst_opt = src.options();
     if (src.is_quantized()) {
       dst_opt = attr.get_dst_dtype();
@@ -288,7 +289,7 @@ static at::Tensor convolution(
                               : memory::desc();
 
   // block combination
-  if (Settings::I().is_onednn_layout_enabled()) {
+  if (is_suggested_block) {
     // In blocked format scenario, oneDNN accept the src in plain format
     // when src ic = 3
     if (ic == 3) {
@@ -396,7 +397,7 @@ static at::Tensor convolution(
       ? memory::desc(wgh_tz, wei_usr_data_t, fmt_wgh)
       : wgh_ctx.meta();
 
-  if (!Settings::I().is_onednn_layout_enabled()) {
+  if (!is_suggested_block) {
     src_usr_md = memory::desc(src_tz, src_data_t, fmt_src);
     dst_usr_md = memory::desc(dst_tz, dst_data_t, fmt_src);
   } else {
@@ -444,7 +445,7 @@ static at::Tensor convolution(
 
   auto weight_cache_optimization = [&]() {
     bool onoff = false;
-    onoff |= Settings::I().is_onednn_layout_enabled();
+    onoff |= is_suggested_block;
     onoff |= onednn_conv_use_channels_last(src, wgh);
     onoff &= !at::GradMode::is_enabled();
     return onoff;
@@ -494,7 +495,7 @@ static at::Tensor convolution(
   auto expected_dst_md = conv_fwd_pd.dst_desc();
   auto dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
   if (dst_usr_md != expected_dst_md) {
-    if (Settings::I().is_onednn_layout_enabled() && dst.is_quantized()) {
+    if (is_suggested_block && dst.is_quantized()) {
       auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
           (get_onednn_dtype_include_double(dst) == memory::data_type::u8 &&
            dst.q_zero_point() == 128)
@@ -580,8 +581,7 @@ static at::Tensor convolution(
        {DNNL_ARG_DST, dst_m}});
 #endif
 
-  if (Settings::I().is_onednn_layout_enabled() &&
-      dst_.data_ptr() != dst.data_ptr()) {
+  if (is_suggested_block && dst_.data_ptr() != dst.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));
   }

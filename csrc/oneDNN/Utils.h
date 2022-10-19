@@ -4,6 +4,7 @@
 #include <core/MemoryFormat.h>
 #include <core/detail/TensorInfo.h>
 #include <oneapi/dnnl/dnnl.hpp>
+#include <runtime/Utils.h>
 #include <tensor/Context.h>
 #include <utils/Macros.h>
 #include <utils/Settings.h>
@@ -468,6 +469,55 @@ static inline bool cat_valid(const TensorList& tensors) {
     }
   }
   return true;
+}
+
+// judge to use block or not for Conv
+static inline bool use_blocked_format_for_conv(const at::Tensor& src) {
+  if (!src.defined() || src.is_sparse()) {
+    // suggest plain
+    return false;
+  }
+
+  if (Settings::I().is_onednn_layout_enabled()) {
+    // suggest block
+    return true;
+  }
+
+  // inference workloads on ATSM platform, the conv will use blocked format
+  // used double support to distinguish is atsm or not
+  auto is_auto_transpose = !dpcppSupportFP64();
+  auto suggest_weight_block = is_auto_transpose &&
+      (c10::InferenceMode::is_enabled() || !at::GradMode::is_enabled()) &&
+      !is_smf_channels_last(src);
+  if (suggest_weight_block) {
+    // suggest block
+    return true;
+  }
+
+  // suggest plain
+  return false;
+}
+
+// judge to use block or not for Matmul
+static inline bool use_blocked_format_for_matmul(const at::Tensor& src) {
+  if (!src.defined() || src.is_sparse()) {
+    // suggest plain
+    return false;
+  }
+
+  if (Settings::I().is_onednn_layout_enabled()) {
+    // suggest block
+    return true;
+  }
+
+  auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
+  if (!src_ctx.is_plain()) {
+    // suggest block
+    return true;
+  }
+
+  // suggest plain
+  return false;
 }
 
 static inline std::vector<int64_t> gen_dummy_input_size_for(
