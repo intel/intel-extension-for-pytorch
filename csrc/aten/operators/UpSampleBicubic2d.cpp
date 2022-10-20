@@ -362,12 +362,12 @@ using at::native::upsample::compute_output_size;
 using at::native::upsample::get_scale_value;
 
 Tensor& upsample_bicubic2d_out(
-    Tensor& out,
     const Tensor& self,
     IntArrayRef output_size,
     bool align_corners,
     c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
+    c10::optional<double> scales_w,
+    Tensor& out) {
   impl::upsample_bicubic2d_out_template(out, self, output_size, align_corners);
   return out;
 }
@@ -398,13 +398,13 @@ Tensor upsample_bicubic2d(
 }
 
 Tensor& upsample_bicubic2d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size,
     bool align_corners,
     c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
+    c10::optional<double> scales_w,
+    Tensor& grad_input) {
   impl::upsample_bicubic2d_backward_out_template(
       grad_input, grad_output, output_size, input_size, align_corners);
   return grad_input;
