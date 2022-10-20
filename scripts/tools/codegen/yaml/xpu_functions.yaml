@@ -263,10 +263,10 @@ supported:
   - gt.Scalar_out
   - gt.Tensor
   - gt.Tensor_out
-#  - grid_sampler_2d
-#  - grid_sampler_3d
-#  - grid_sampler_2d_backward
-#  - grid_sampler_3d_backward
+  - grid_sampler_2d
+  - grid_sampler_3d
+  - grid_sampler_2d_backward
+  - grid_sampler_3d_backward
   - hardshrink
   - hardshrink.out
   - hardshrink_backward
@@ -673,7 +673,6 @@ supported:
   - linalg_vector_norm
   - linalg_vector_norm.out
   - complex.out
-#  - eig          # must register
   - vdot
   - __lshift__.Scalar
   - __lshift__.Tensor
