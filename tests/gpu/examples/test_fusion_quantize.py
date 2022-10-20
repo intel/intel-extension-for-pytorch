@@ -3,15 +3,17 @@ import copy
 from torch.testing._internal.common_utils import TestCase
 
 import time
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 from torch.quantization.quantize_jit import (
     convert_jit,
     prepare_jit,
 )
+import pytest
 
 checking_atol = 3e-2
 checking_rtol = 3e-2
+
 
 class ConvSigmoid(torch.nn.Module):
     def __init__(self):
@@ -27,6 +29,7 @@ class ConvSigmoid(torch.nn.Module):
         x = self.block(x)
         return x
 
+
 class ConvLeakyRelu(torch.nn.Module):
     def __init__(self):
         super().__init__()
@@ -39,6 +42,7 @@ class ConvLeakyRelu(torch.nn.Module):
         x = self.block(x)
         return x
 
+
 class Mish(torch.nn.Module):
     def __init__(self):
         super().__init__()
@@ -46,6 +50,7 @@ class Mish(torch.nn.Module):
     def forward(self, x):
         x = x * (torch.tanh(torch.nn.functional.softplus(x)))
         return x
+
 
 class ConvMish(torch.nn.Module):
     def __init__(self):
@@ -59,6 +64,7 @@ class ConvMish(torch.nn.Module):
         x = self.activation(x)
         x = self.conv2(x)
         return x
+
 
 class ConvMishAdd(torch.nn.Module):
     def __init__(self):
@@ -75,9 +81,11 @@ class ConvMishAdd(torch.nn.Module):
         x = x + h
         return x
 
+
 def impe_fp32_model(model, device, test_input):
     modelImpe = model.to(device)
     return modelImpe(test_input.clone().to(device))
+
 
 def impe_int8_model(model, device, test_input):
     modelImpe = torch.quantization.QuantWrapper(model)
@@ -104,6 +112,7 @@ def impe_int8_model(model, device, test_input):
 
     return modelImpe(test_input.to(device))
 
+
 def trace_int8_model(model, device, test_input):
     model = model.to(device)
     modelJit = torch.jit.trace(model, test_input.to(device))
@@ -121,7 +130,6 @@ def trace_int8_model(model, device, test_input):
         ),
         weight=torch.quantization.default_weight_observer
     )
-
 
     modelJit = prepare_jit(modelJit, {'': qconfig_u8}, True)
 
@@ -149,7 +157,9 @@ def trace_int8_model(model, device, test_input):
         print("finish ", device, " testing.......")
     return output
 
+
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_qConv2d_sigmoid(self, dtype=torch.float):
         model = ConvSigmoid()
         model1 = copy.deepcopy(model)
