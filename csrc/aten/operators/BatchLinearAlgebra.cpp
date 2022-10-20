@@ -2783,26 +2783,6 @@ std::tuple<Tensor&, Tensor&> linalg_eig_out(
   return std::tuple<Tensor&, Tensor&>(values, vectors);
 }
 
-#if 0
-std::tuple<Tensor, Tensor> eig(const Tensor& self, bool eigenvectors) {
-  // fall back to CPU
-  // 1, mkl doesn't have GPU interface for GEEV routine. and Due to this lack of
-  // uniqueness, different hardware and software may compute different
-  // eigenvectors.
-  // 2, we will try to dep on IPEX oneMKL package as long as if it supports CPU
-  // device
-  // 3, magma CPU is potential path, as well
-
-  auto self_tmp = self.cpu();
-  Tensor e_tmp = at::empty({0}, self_tmp.options());
-  Tensor v_tmp = at::empty({0}, self_tmp.options());
-  at::eig_out(e_tmp, v_tmp, self_tmp, eigenvectors);
-  Tensor e = e_tmp.to(kXPU);
-  Tensor v = v_tmp.to(kXPU);
-  return std::tuple<Tensor, Tensor>(e, v);
-}
-#endif
-
 Tensor linalg_solve(const Tensor& input, const Tensor& other) {
   return at::native::linalg_solve(input, other);
 }
