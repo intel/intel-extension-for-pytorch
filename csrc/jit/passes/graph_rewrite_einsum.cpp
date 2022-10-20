@@ -30,12 +30,12 @@ void FusedEinsumPost(std::shared_ptr<Graph>& graph) {
   SubgraphRewriter rewriter_einsum_binary;
   std::array<std::string, 2> binarys = {"add", "add_"};
   auto aten_einsum_binary = CodeTemplate(R"(
-     graph(%equation, %inputs, %add_arg, %alpha):
-        %x = aten::einsum(%equation, %inputs)
+     graph(%equation, %inputs, %path, %add_arg, %alpha):
+        %x = aten::einsum(%equation, %inputs, %path)
         %res = aten::${binary}(%x, %add_arg, %alpha)
         return (%res))");
   std::string fused_einsum_binary = R"(
-    graph(%equation, %inputs, %add_arg, %alpha):
+    graph(%equation, %inputs, %path, %add_arg, %alpha):
         %res = ipex::einsum_binary(%equation, %inputs, %add_arg, %alpha)
         return (%res))";
 

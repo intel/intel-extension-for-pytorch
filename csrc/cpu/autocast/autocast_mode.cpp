@@ -482,7 +482,11 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
 
   // promote cast policies
   MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(cat), "cat", Tensor(TensorList, int64_t), promote, promote)
+      ADD_NS(cat),
+      "cat",
+      Tensor(const at::ITensorListRef&, int64_t),
+      promote,
+      promote)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       ADD_NS(stack), "stack", Tensor(TensorList, int64_t), promote, promote)
   MAKE_REGISTER_FUNC_TWO_POLICIES(

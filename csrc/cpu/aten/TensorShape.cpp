@@ -105,7 +105,7 @@ inline c10::MemoryFormat cat_compute_output_memory_format(
 }
 
 at::Tensor& cat_out_cpu(
-    at::TensorList tensors,
+    const at::ITensorList& tensors,
     int64_t dim,
     at::Tensor& result) {
 #if defined(IPEX_DISP_OP)
@@ -117,13 +117,13 @@ at::Tensor& cat_out_cpu(
   // 1-dimensional, so we allowed these tensors to be "skipped".  We maintain
   // this behavior for backwards compatibility, but only for this specific size
   // (i.e. other empty sizes are not skipped).
-  auto materialized = at::ITensorListRef(tensors).materialize();
+  auto materialized = tensors.materialize();
 
   cat_check_no_zero_dim(materialized);
-  dim = at::legacy_cat_wrap_dim(dim, tensors);
+  dim = at::legacy_cat_wrap_dim(dim, materialized);
 
   // Checking names before the actual dimensions.
-  auto maybe_outnames = at::namedinference::compute_cat_outnames(tensors);
+  auto maybe_outnames = at::namedinference::compute_cat_outnames(materialized);
 
   TORCH_CHECK(
       materialized.size() > 0,
@@ -285,7 +285,7 @@ at::Tensor& cat_out_cpu(
   return result;
 }
 
-at::Tensor cat_cpu(at::TensorList tensors, int64_t dim) {
+at::Tensor cat_cpu(const at::ITensorList& tensors, int64_t dim) {
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::cat_cpu\n");
 #endif
