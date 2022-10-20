@@ -58,7 +58,6 @@ supported:
   - _pdist_forward
   - _pin_memory
   - _reshape_alias  # newly added
-#  - _s_where
   - _softmax.out
   - _softmax_backward_data.out
 #  - _solve_helper
