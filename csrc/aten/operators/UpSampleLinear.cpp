@@ -330,13 +330,13 @@ using at::native::upsample::compute_output_size;
 using at::native::upsample::get_scale_value;
 
 Tensor& upsample_trilinear3d_out(
-    Tensor& output,
     const Tensor& input,
     IntArrayRef output_size,
     bool align_corners,
     c10::optional<double> scales_d,
     c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
+    c10::optional<double> scales_w,
+    Tensor& output) {
   if (align_corners)
     printf(
         "we don't support this path by currently as oneDNN don't support this "
@@ -404,14 +404,14 @@ Tensor upsample_trilinear3d(
 }
 
 Tensor& upsample_trilinear3d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size,
     bool align_corners,
     c10::optional<double> scales_d,
     c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
+    c10::optional<double> scales_w,
+    Tensor& grad_input) {
   if (align_corners)
     printf(
         "we don't support this path by currently as oneDNN don't support this "
@@ -502,12 +502,12 @@ Tensor upsample_trilinear3d_backward(
 }
 
 Tensor& upsample_bilinear2d_out(
-    Tensor& output,
     const Tensor& input,
     IntArrayRef output_size,
     bool align_corners,
     c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
+    c10::optional<double> scales_w,
+    Tensor& output) {
   if (align_corners)
     upsample_bilinear2d_out_dpcpp_template(
         output, input, output_size, true, scales_h, scales_w);
@@ -567,13 +567,13 @@ Tensor upsample_bilinear2d(
 }
 
 Tensor& upsample_bilinear2d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size,
     bool align_corners,
     c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
+    c10::optional<double> scales_w,
+    Tensor& grad_input) {
   if (align_corners)
     upsample_bilinear2d_backward_out_dpcpp_template(
         grad_input,

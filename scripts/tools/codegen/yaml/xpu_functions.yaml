@@ -604,8 +604,8 @@ supported:
   - unique_dim_consecutive
   - upsample_bicubic2d.out
   - upsample_bicubic2d_backward.grad_input
-  - upsample_bilinear2d
-  - upsample_bilinear2d_backward
+  - upsample_bilinear2d.out
+  - upsample_bilinear2d_backward.grad_input
   - upsample_linear1d
   - upsample_linear1d_backward
   - upsample_nearest1d
@@ -618,8 +618,8 @@ supported:
 #  - upsample_nearest3d_backward
 #  - upsample_nearest3d_backward.grad_input
 #  - upsample_nearest3d_backward.vec
-  - upsample_trilinear3d
-  - upsample_trilinear3d_backward
+  - upsample_trilinear3d.out
+  - upsample_trilinear3d_backward.grad_input
   - var.correction
   - var_mean.correction
   - view
