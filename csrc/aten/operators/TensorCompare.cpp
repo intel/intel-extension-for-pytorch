@@ -59,28 +59,6 @@ void isin_default_kernel(
 
 } // namespace impl
 
-Tensor _s_where(
-    const Tensor& condition,
-    const Tensor& self,
-    const Tensor& other) {
-  TORCH_CHECK(
-      self.dtype() == other.dtype(),
-      "expected scalar type ",
-      self.dtype(),
-      " but found ",
-      other.dtype());
-  Tensor ret = at::empty(self.sizes(), self.options());
-  auto iter = at::TensorIteratorConfig()
-                  .check_all_same_dtype(false)
-                  .add_output(ret)
-                  .add_input(condition)
-                  .add_input(self)
-                  .add_input(other)
-                  .build();
-  impl::where_kernel(iter, condition.scalar_type());
-  return ret;
-}
-
 Tensor isnan(const Tensor& self) {
   return self != self;
 }
