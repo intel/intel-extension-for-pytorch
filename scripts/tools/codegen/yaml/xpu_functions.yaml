@@ -602,8 +602,8 @@ supported:
   - unique_consecutive
   - unique_dim
   - unique_dim_consecutive
-  - upsample_bicubic2d
-  - upsample_bicubic2d_backward
+  - upsample_bicubic2d.out
+  - upsample_bicubic2d_backward.grad_input
   - upsample_bilinear2d
   - upsample_bilinear2d_backward
   - upsample_linear1d
