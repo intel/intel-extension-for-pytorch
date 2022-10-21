@@ -889,17 +889,21 @@ Tensor count_nonzero(const Tensor& self, IntArrayRef dims) {
   return (self != 0).sum(dims);
 }
 
-Tensor& index_add_(
+Tensor& index_add_out(
     Tensor& self,
     int64_t dim,
     const Tensor& index,
     const Tensor& source,
-    const Scalar& alpha) {
+    const Scalar& alpha,
+    Tensor& result) {
+  if (!result.is_same(self)) {
+    result.copy_(self);
+  }
   IPEX_DISPATCH_ATOMIC_ALL_TYPES_AND_COMPLEX(
-      self.scalar_type(), "index_add_", [&] {
-        impl::_index_add<scalar_t>(self, dim, index, source, alpha);
+      result.scalar_type(), "index_add_", [&] {
+        impl::_index_add<scalar_t>(result, dim, index, source, alpha);
       });
-  return self;
+  return result;
 }
 
 at::Tensor& index_copy_out(
