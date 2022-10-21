@@ -90,16 +90,5 @@ Tensor& softplus_backward_out(
   return grad_input;
 }
 
-Tensor softplus_backward(
-    const Tensor& grad_output,
-    const Tensor& self,
-    const Scalar& beta,
-    const Scalar& threshold,
-    const Tensor& output) {
-  Tensor grad_input = at::empty({0}, grad_output.options());
-  return at::AtenIpexTypeXPU::softplus_backward_out(
-      grad_output, self, beta, threshold, output, grad_input);
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at
