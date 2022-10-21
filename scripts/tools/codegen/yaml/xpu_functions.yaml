@@ -606,12 +606,24 @@ supported:
   - upsample_bicubic2d_backward.grad_input
   - upsample_bilinear2d.out
   - upsample_bilinear2d_backward.grad_input
-  - upsample_linear1d
-  - upsample_linear1d_backward
-  - upsample_nearest1d
-  - upsample_nearest1d_backward
-  - upsample_nearest2d
-  - upsample_nearest2d_backward
+#  - upsample_linear1d
+#  - upsample_linear1d.out
+#  - upsample_linear1d.vec
+#  - upsample_linear1d_backward
+#  - upsample_linear1d_backward.grad_input
+#  - upsample_linear1d_backward.vec
+#  - upsample_nearest1d
+#  - upsample_nearest1d.out
+#  - upsample_nearest1d.vec
+#  - upsample_nearest1d_backward
+#  - upsample_nearest1d_backward.grad_input
+#  - upsample_nearest1d_backward.vec
+#  - upsample_nearest2d
+#  - upsample_nearest2d.out
+#  - upsample_nearest2d.vec
+#  - upsample_nearest2d_backward
+#  - upsample_nearest2d_backward.grad_input
+#  - upsample_nearest2d_backward.vec
 #  - upsample_nearest3d
 #  - upsample_nearest3d.out
 #  - upsample_nearest3d.vec
