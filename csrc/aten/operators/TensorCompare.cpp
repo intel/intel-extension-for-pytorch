@@ -23,22 +23,21 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+Tensor& where_out(
+    const Tensor& condition,
+    const Tensor& self,
+    const Tensor& other,
+    Tensor& out);
 namespace impl {
 
-void where_kernel(TensorIterator& iter, ScalarType condition_type) {
+void where_kernel(TensorIterator& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       kHalf, kBFloat16, kBool, iter.dtype(), "where_dpcpp", [&] {
-        if (condition_type == at::ScalarType::Byte) {
-          dpcpp_kernel_for_tensor_iter(
-              iter,
-              [=](uint8_t cond_val, scalar_t self_val, scalar_t other_val)
-                  -> scalar_t { return cond_val ? self_val : other_val; });
-        } else {
-          dpcpp_kernel_for_tensor_iter(
-              iter,
-              [=](bool cond_val, scalar_t self_val, scalar_t other_val)
-                  -> scalar_t { return cond_val ? self_val : other_val; });
-        }
+        dpcpp_kernel_for_tensor_iter(
+            iter,
+            [=](bool cond_val, scalar_t self_val, scalar_t other_val)
+                -> scalar_t { return cond_val ? self_val : other_val; });
       });
 }
 
@@ -304,6 +303,50 @@ Tensor& isin_out(
       invert,
       out);
   return out;
+}
+
+Tensor& where_out(
+    const Tensor& condition,
+    const Tensor& self,
+    const Tensor& other,
+    Tensor& out) {
+  Tensor self_, other_;
+  if (self.dtype() != other.dtype()) {
+    auto result_type = at::native::result_type(self, other);
+    self_ = self.to(result_type);
+    other_ = other.to(result_type);
+  } else {
+    self_ = self;
+    other_ = other;
+  }
+  if (condition.scalar_type() == ScalarType::Byte) {
+    TORCH_WARN_ONCE(
+        "where received a uint8 condition tensor. This behavior is deprecated and will be removed in a future version of PyTorch. Use a boolean condition instead.");
+  } else {
+    TORCH_CHECK(
+        condition.scalar_type() == ScalarType::Bool,
+        "where expected condition to be a boolean tensor, but got a tensor with dtype ",
+        condition.scalar_type());
+  }
+  Tensor cond_bool = condition.scalar_type() == ScalarType::Byte
+      ? condition.to(ScalarType::Bool)
+      : condition;
+  auto iter = at::TensorIteratorConfig()
+                  .check_all_same_dtype(false)
+                  .add_output(out)
+                  .add_input(cond_bool)
+                  .add_input(self_)
+                  .add_input(other_)
+                  .build();
+  impl::where_kernel(iter);
+  return out;
+}
+
+Tensor where(const Tensor& condition, const Tensor& self, const Tensor& other) {
+  auto result_type = at::native::result_type(self, other);
+  Tensor ret = at::empty({0}, self.options().dtype(result_type));
+  at::AtenIpexTypeXPU::where_out(condition, self, other, ret);
+  return ret;
 }
 
 } // namespace AtenIpexTypeXPU
