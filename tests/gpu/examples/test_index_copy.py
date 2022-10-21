@@ -1,18 +1,33 @@
 import torch
-from torch.testing._internal.common_utils import (TestCase,
-                                                  repeat_test_for_types)
+from torch.testing._internal.common_utils import (TestCase)
+from itertools import product
+from torch.testing._internal.common_device_type import (
+    dtypes,get_all_dtypes)
 
-from torch.testing._internal.common_dtype import (get_all_int_dtypes,
-                                                  get_all_fp_dtypes)
 import intel_extension_for_pytorch # noqa
+from functools import wraps
+from torch.testing import make_tensor
 
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")
 
+# TODO : Rebasing 1.13. 1.13 retires the repeat_test_for_types.
+# However, by the time submitting this change, the tests in experiments folder 
+# are not handled correctly, thus, we put the function here for simplicity.
+def repeat_test_for_types(dtypes):
+    def repeat_helper(f):
+        @wraps(f)
+        def call_helper(self, *args):
+            for dtype in dtypes:
+                with TestCase.subTest(self, dtype=dtype):
+                    f(self, *args, dtype=dtype)
+
+        return call_helper
+    return repeat_helper
 
 class TestTorchMethod(TestCase):
-    @repeat_test_for_types([*(get_all_int_dtypes() + get_all_fp_dtypes())])
-    def test_index_copy_dim_0(self, dtype):
+    @repeat_test_for_types([*get_all_dtypes()])
+    def test_index_copy_dim_0(self, dtype = torch.float):
         x = torch.ones([5, 3], device=cpu_device, dtype=dtype)
         t = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=dtype)
         index = torch.tensor([0, 4, 2])
@@ -21,12 +36,14 @@ class TestTorchMethod(TestCase):
         x_xpu = torch.ones([5, 3], device=xpu_device, dtype=dtype)
         index_xpu = torch.tensor([0, 4, 2], device=xpu_device)
         t_d = t.to("xpu")
+        print("shape of x_xpu", x_xpu.shape)
+        print("t_d shape", t_d.shape)
         x_xpu.index_copy_(0, index_xpu, t_d)
 
         self.assertEqual(x, x_xpu.to(cpu_device))
 
-    @repeat_test_for_types([*(get_all_int_dtypes() + get_all_fp_dtypes())])
-    def test_index_copy_dim_1(self, dtype):
+    @repeat_test_for_types([*get_all_dtypes()])
+    def test_index_copy_dim_1(self, dtype=torch.float):
         x = torch.zeros([3, 5], device=cpu_device, dtype=dtype)
         t = torch.tensor([[1, 2, 3], [6, 7, 8], [11, 12, 13]], dtype=dtype)
         index = torch.tensor([0, 4, 2])
@@ -39,8 +56,8 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(x, x_xpu.to(cpu_device))
 
-    @repeat_test_for_types([*(get_all_int_dtypes() + get_all_fp_dtypes())])
-    def test_index_copy_multi_dim(self, dtype):
+    @repeat_test_for_types([*get_all_dtypes()])
+    def test_index_copy_multi_dim(self, dtype=torch.float):
         # dim = 0
         x = torch.zeros([100, 3, 5], device=cpu_device, dtype=dtype)
         t = torch.tensor([[[1, 2, 3, 4, 5], [4, 5, 6, 7, 8], [9, 10, 11, 12, 13]],
