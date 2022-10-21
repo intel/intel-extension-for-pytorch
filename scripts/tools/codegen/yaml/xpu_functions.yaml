@@ -43,9 +43,7 @@ supported:
   - _masked_scale
   - index_copy.out
   - _index_put_impl_
-#  - _inverse_helper
-#  - _linalg_qr_helper
-#  - _linalg_inv_out_helper_
+  - linalg_qr.out
   - _local_scalar_dense
   - _logcumsumexp
   - _logcumsumexp.out
@@ -60,8 +58,11 @@ supported:
   - _reshape_alias  # newly added
   - _softmax.out
   - _softmax_backward_data.out
-#  - _solve_helper
-#  - _svd_helper
+  - _linalg_svd.U
+  - linalg_inv_ex.inverse
+  - _linalg_solve_ex.result
+  - linalg_lu_factor_ex.out
+  - linalg_lu_solve.out
   - _symeig_helper
   - _unique
   - _unique2
@@ -627,7 +628,7 @@ supported:
   - channel_shuffle
   - linalg_slogdet
   - linalg_slogdet.out
-#  - _det_lu_based_helper
+  - _linalg_det.result
   - conj_physical.out
   - conj_physical_
   - angle
@@ -637,9 +638,6 @@ supported:
 #  - linalg_eigh
 #  - linalg_eigh.eigvals
 #  - linalg_eigvalsh.out
-#  - _det_lu_based_helper_backward_helper
-#  - linalg_solve
-#  - linalg_solve.out
 #  - linalg_householder_product
 #  - linalg_householder_product.out
   - linalg_vector_norm
