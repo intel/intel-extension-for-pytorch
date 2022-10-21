@@ -7,8 +7,6 @@ supported:
   - _adaptive_avg_pool2d
   - _empty_affine_quantized
   - _to_copy
-#  - adaptive_avg_pool2d        # should not register
-  - adaptive_avg_pool2d.out
   - add.Tensor
   - addmm
   - as_strided
