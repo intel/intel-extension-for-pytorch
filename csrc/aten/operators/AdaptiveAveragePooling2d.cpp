@@ -273,29 +273,7 @@ Tensor _adaptive_avg_pool2d_backward(
 
 namespace AtenIpexTypeQuantizedXPU {
 
-Tensor& adaptive_avg_pool2d_out(
-    const Tensor& self,
-    IntArrayRef output_size,
-    Tensor& out) {
-  at::AtenIpexTypeXPU::impl::adaptive_avg_pool2d_out_template(
-      out, self, output_size);
-  return out;
-}
-
 Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
-  Tensor output;
-  output = at::_empty_affine_quantized(
-      {0},
-      self.options(),
-      self.q_scale(),
-      self.q_zero_point(),
-      MemoryFormat::Contiguous);
-  at::AtenIpexTypeXPU::impl::adaptive_avg_pool2d_out_template(
-      output, self, output_size);
-  return output;
-}
-
-Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
   Tensor output;
   output = at::_empty_affine_quantized(
       {0},
