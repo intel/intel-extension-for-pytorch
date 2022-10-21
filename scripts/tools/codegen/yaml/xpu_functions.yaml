@@ -41,7 +41,7 @@ supported:
   - _fft_c2c.out
   - _fused_dropout
   - _masked_scale
-#  - _index_copy_
+  - index_copy.out
   - _index_put_impl_
 #  - _inverse_helper
 #  - _linalg_qr_helper
@@ -295,7 +295,6 @@ supported:
 #  - im2col_backward
 #  - im2col_backward.grad_input
   - index.Tensor
-  - index_copy_
   - index_fill_.int_Scalar
   - index_fill_.int_Tensor
   - index_select

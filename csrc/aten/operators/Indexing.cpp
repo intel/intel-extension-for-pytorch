@@ -909,39 +909,24 @@ Tensor& index_add_(
   return self;
 }
 
-Tensor& _index_copy_(
-    Tensor& self,
+at::Tensor& index_copy_out(
+    const at::Tensor& self,
     int64_t dim,
-    const Tensor& index,
-    const Tensor& source) {
-  // Handle the case when self /source is 0-dim
-  Tensor self_nonzero = self.dim() == 0 ? self.unsqueeze(0) : self;
-  Tensor source_nonzero = source.dim() == 0 ? source.unsqueeze(0) : source;
-
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-      at::ScalarType::Half,
-      at::ScalarType::Bool,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "index_copy",
-      [&]() { impl::_index_copy<scalar_t>(self, dim, index, source); });
-  return self;
-}
-
-Tensor& index_copy_(
-    Tensor& self,
-    int64_t dim,
-    const Tensor& index,
-    const Tensor& source) {
-  dim = maybe_wrap_dim(dim, self.dim());
+    const at::Tensor& index,
+    const at::Tensor& source,
+    at::Tensor& out) {
+  if (!out.is_same(self)) {
+    out.copy_(self);
+  }
+  dim = maybe_wrap_dim(dim, out.dim());
   TORCH_CHECK_INDEX(
       index.dim() < 2,
       "index_copy_(): Index should have dimension 1 or 0 (got ",
       index.dim(),
       ")");
-  at::assert_no_internal_overlap(self);
-  at::assert_no_overlap(self, index);
-  at::assert_no_overlap(self, source);
+  at::assert_no_internal_overlap(out);
+  at::assert_no_overlap(out, index);
+  at::assert_no_overlap(out, source);
 
   int64_t numIndices = index.numel();
   if (source.dim() == 0 && numIndices != 1) {
@@ -951,13 +936,13 @@ Tensor& index_copy_(
         numIndices,
         ")");
   } else if (
-      (source.dim() != self.dim()) && (source.dim() != 0 && self.dim() != 0)) {
+      (source.dim() != out.dim()) && (source.dim() != 0 && self.dim() != 0)) {
     TORCH_CHECK_INDEX(
         false,
         "index_copy_(): When source and destination are not scalars, their dimensionality must match. Source dimensionality (",
         source.dim(),
         "), destination dimensionality (",
-        self.dim(),
+        out.dim(),
         ")");
   }
 
@@ -966,37 +951,37 @@ Tensor& index_copy_(
       "index_copy_(): Expected a long tensor for index, but got ",
       index.scalar_type())
   TORCH_CHECK(
-      self.scalar_type() == source.scalar_type(),
-      "index_copy_(): self and source expected to have the same dtype, but got (self) ",
-      self.scalar_type(),
+      out.scalar_type() == source.scalar_type(),
+      "index_copy_(): out and source expected to have the same dtype, but got (out) ",
+      out.scalar_type(),
       " and (source) ",
       source.scalar_type());
   TORCH_CHECK(
-      self.device() == source.device() && self.device() == index.device(),
-      "index_copy_(): self, index and source expected to be in the same device, but got (self) ",
-      self.device(),
+      out.device() == source.device() && out.device() == index.device(),
+      "index_copy_(): out, index and source expected to be in the same device, but got (out) ",
+      out.device(),
       ", (index) ",
       index.device(),
       ", and (source) ",
       source.device());
 
   // Check that source and destination slices have the same size
-  auto selfSlicedSizes = self.sizes().vec();
-  if (selfSlicedSizes.size() > 0) {
-    selfSlicedSizes.erase(selfSlicedSizes.begin() + dim);
+  auto outSlicedSizes = out.sizes().vec();
+  if (outSlicedSizes.size() > 0) {
+    outSlicedSizes.erase(outSlicedSizes.begin() + dim);
   }
   auto sourceSlicedSizes = source.sizes().vec();
   if (sourceSlicedSizes.size() > 0) {
     sourceSlicedSizes.erase(sourceSlicedSizes.begin() + dim);
   }
-  if (selfSlicedSizes.size() != sourceSlicedSizes.size() ||
+  if (outSlicedSizes.size() != sourceSlicedSizes.size() ||
       !std::equal(
-          selfSlicedSizes.begin(),
-          selfSlicedSizes.end(),
+          outSlicedSizes.begin(),
+          outSlicedSizes.end(),
           sourceSlicedSizes.begin())) {
     std::stringstream ss;
     ss << "index_copy_(): Source/destination tensor must have same slice shapes. ";
-    ss << "Destination slice shape: " << selfSlicedSizes << " at dimension "
+    ss << "Destination slice shape: " << outSlicedSizes << " at dimension "
        << dim;
     ss << " and source slice shape: " << sourceSlicedSizes
        << " at dimension 0.";
@@ -1017,7 +1002,15 @@ Tensor& index_copy_(
         false, "index_copy is not implemented with deterministic algorithm.");
   }
 
-  // return at::index_copy(self, dim, index, source);
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
+      out.scalar_type(),
+      "index_copy",
+      [&]() { impl::_index_copy<scalar_t>(out, dim, index, source); });
+
+  return out;
 }
 
 Tensor& index_fill_(
