@@ -80,11 +80,6 @@ int64_t q_per_channel_axis(const Tensor& self) {
   return at::native::q_per_channel_axis(self);
 }
 
-Tensor& set_quantizer_(Tensor& self, ConstQuantizerPtr quantizer) {
-  get_qtensorimpl(self)->set_quantizer_(quantizer);
-  return self;
-}
-
 Tensor& set_(
     Tensor& self,
     Storage storage,
