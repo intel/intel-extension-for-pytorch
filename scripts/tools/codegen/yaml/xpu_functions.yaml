@@ -782,6 +782,8 @@ supported:
   - logit_backward.grad_input
   - binomial
   - _standard_gamma
+  - where.self_out
+  - where.self
 autograd:
   - cdist
   - lstm.input
