@@ -185,6 +185,7 @@ class TestTorchMethod(TestCase):
 
     # for float32 or complex64 results might be very different from float64 or complex128
     @dtypes(torch.float64)
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_eigvals_numpy(self, device=dpcpp_device, dtype=torch.float64):
         def run_test(shape, *, symmetric=True):
             if not dtype.is_complex and symmetric:
