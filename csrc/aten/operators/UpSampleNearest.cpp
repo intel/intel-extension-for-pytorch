@@ -599,5 +599,25 @@ Tensor upsample_nearest2d(
       scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0);
   return output;
 }
+
+Tensor upsample_nearest3d(
+    const Tensor& input,
+    IntArrayRef output_size,
+    c10::optional<double> scales_d,
+    c10::optional<double> scales_h,
+    c10::optional<double> scales_w) {
+  TORCH_INTERNAL_ASSERT(
+      false,
+      "upsample_nearest3d dosen't support quantized input, we will enable it in the future.");
+}
+
+Tensor upsample_nearest3d(
+    const Tensor& input,
+    c10::optional<IntArrayRef> output_size,
+    c10::optional<ArrayRef<double>> scale_factors) {
+  TORCH_INTERNAL_ASSERT(
+      false,
+      "upsample_nearest3d dosen't support quantized input, we will enable it in the future.");
+}
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at
