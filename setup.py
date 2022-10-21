@@ -278,13 +278,16 @@ def _check_env_flag(name, default=''):
 
 
 def get_git_head_sha(base_dir):
-    ipex_git_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=base_dir).decode('ascii').strip()
-    if os.path.isdir(os.path.join(base_dir, '..', '.git')):
-        torch_git_sha = subprocess.check_output(
-            ['git', 'rev-parse', 'HEAD'],
-            cwd=os.path.join(base_dir, '..')).decode('ascii').strip()
-    else:
-        torch_git_sha = ''
+    ipex_git_sha = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=base_dir).decode('ascii').strip()
+
+    try:
+        import torch
+    except ImportError as e:
+        print("Unable to import torch from the local environment.")
+        raise e
+
+    torch_git_sha = torch.__version__
+
     return ipex_git_sha, torch_git_sha
 
 
@@ -467,7 +470,12 @@ def get_cpp_test_build_dir():
     return os.path.join(get_build_type_dir(), 'tests', 'cpu', 'cpp')
 
 def get_pybind11_abi_compiler_flags():
-    import torch
+    try:
+        import torch
+    except ImportError as e:
+        print("Unable to import torch from the local environment.")
+        raise e
+
     pybind11_abi_flags = []
 
     for pname in ["COMPILER_TYPE", "STDLIB", "BUILD_ABI"]:
