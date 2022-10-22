@@ -405,12 +405,6 @@ inline scalar_t gelu_tanh_forward(scalar_t x) {
 
 template <typename scalar_t>
 inline scalar_t gelu_erf_backward(scalar_t dy, scalar_t x) {
-  // using accscalar_t = acc_type<scalar_t>;
-  // auto v = static_cast<accscalar_t>(self) * M_SQRT1_2;
-  // return (scalar_t)(
-  //     grad * 0.5 *
-  //     (1.0 + Numerics<accscalar_t>::erf(v) +
-  //      v * M_2_SQRTPI * Numerics<accscalar_t>::exp(-v * v)));
   using opmath_t = at::opmath_type<scalar_t>;
   constexpr opmath_t kBeta = M_2_SQRTPI * M_SQRT1_2 * opmath_t(0.5);
   constexpr opmath_t kAlpha = M_SQRT1_2;
@@ -843,12 +837,16 @@ Tensor& gelu_out(
     const Tensor& self,
     c10::string_view approximate,
     Tensor& result) {
-  at::native::GeluType approximate_gelu =
-      at::native::get_gelutype_enum(approximate);
+  auto _approximate = at::native::get_gelutype_enum(approximate);
   if (xpu::oneDNN::is_onednn_layout(self) &&
       xpu::oneDNN::eltwise_forward_valid(self)) {
-    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
-        result, self, 0.0f, 0.0f);
+    if (_approximate == at::native::GeluType::Tanh) {
+      xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_tanh>(
+          result, self, 0.0f, 0.0f);
+    } else {
+      xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
+          result, self, 0.0f, 0.0f);
+    }
     return result;
   } else {
     auto _self = to_plain_if_needed(self);
@@ -857,8 +855,7 @@ Tensor& gelu_out(
     }
     auto iter = TensorIterator::unary_op(result, _self);
 
-    if (approximate_gelu == at::native::GeluType::Tanh) {
-      std::cout << "--------go to tanh path------" << std::endl;
+    if (_approximate == at::native::GeluType::Tanh) {
       IPEX_DISPATCH_FLOATING_TYPES_AND2(
           at::ScalarType::BFloat16,
           at::ScalarType::Half,
@@ -870,7 +867,6 @@ Tensor& gelu_out(
             });
           });
     } else {
-      std::cout << "--------go to erf path------" << std::endl;
       IPEX_DISPATCH_FLOATING_TYPES_AND2(
           at::ScalarType::BFloat16,
           at::ScalarType::Half,
@@ -896,12 +892,16 @@ Tensor& gelu_backward_out(
     const Tensor& self,
     c10::string_view approximate,
     Tensor& grad_input) {
-  at::native::GeluType approximate_gelu =
-      at::native::get_gelutype_enum(approximate);
+  auto _approximate = at::native::get_gelutype_enum(approximate);
   if (IPEX_ANY(xpu::oneDNN::is_onednn_layout, grad, self) &&
       IPEX_ALL(xpu::oneDNN::eltwise_backward_valid, grad, self)) {
-    xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_gelu_erf>(
-        grad_input, self, grad, 0.0f, 0.0f);
+    if (_approximate == at::native::GeluType::Tanh) {
+      xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_gelu_tanh>(
+          grad_input, self, grad, 0.0f, 0.0f);
+    } else {
+      xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_gelu_erf>(
+          grad_input, self, grad, 0.0f, 0.0f);
+    }
     return grad_input;
   } else {
     auto _self = to_plain_if_needed(self);
@@ -910,8 +910,7 @@ Tensor& gelu_backward_out(
       grad_input = at::empty_like(_self);
     }
     auto iter = TensorIterator::binary_op(grad_input, _grad, _self);
-    if (approximate_gelu == at::native::GeluType::Tanh) {
-      std::cout << "--------gelu backward tanh------" << std::endl;
+    if (_approximate == at::native::GeluType::Tanh) {
       IPEX_DISPATCH_FLOATING_TYPES_AND2(
           at::ScalarType::BFloat16,
           at::ScalarType::Half,
@@ -924,7 +923,6 @@ Tensor& gelu_backward_out(
                 });
           });
     } else {
-      std::cout << "--------gelu backward none------" << std::endl;
       IPEX_DISPATCH_FLOATING_TYPES_AND2(
           at::ScalarType::BFloat16,
           at::ScalarType::Half,
@@ -941,7 +939,10 @@ Tensor& gelu_backward_out(
   }
 }
 
-Tensor gelu_backward(const Tensor& grad, const Tensor& self, c10::string_view approximate) {
+Tensor gelu_backward(
+    const Tensor& grad,
+    const Tensor& self,
+    c10::string_view approximate) {
   Tensor result;
   return gelu_backward_out(grad, self, approximate, result);
 }
