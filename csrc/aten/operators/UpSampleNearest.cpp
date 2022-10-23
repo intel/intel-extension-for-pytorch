@@ -314,7 +314,7 @@ Tensor& upsample_nearest3d_backward_out(
 
 Tensor upsample_nearest3d_backward(
     const Tensor& grad_output,
-    c10::optional<IntArrayRef> output_size,
+    at::OptionalIntArrayRef output_size,
     IntArrayRef input_size,
     c10::optional<ArrayRef<double>> scale_factors) {
   auto osize = compute_output_size(input_size, output_size, scale_factors);
