@@ -258,12 +258,12 @@ using at::native::upsample::compute_output_size;
 using at::native::upsample::get_scale_value;
 
 Tensor& upsample_nearest3d_out(
-    Tensor& output,
     const Tensor& input,
     IntArrayRef output_size,
     c10::optional<double> scales_d,
     c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
+    c10::optional<double> scales_w,
+    Tensor& output) {
   upsample_nearest_out_dpcpp_kernel(
       output,
       input,
@@ -276,24 +276,7 @@ Tensor& upsample_nearest3d_out(
 
 Tensor upsample_nearest3d(
     const Tensor& input,
-    IntArrayRef output_size,
-    c10::optional<double> scales_d,
-    c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
-  auto output = at::empty({0}, input.options());
-  upsample_nearest_out_dpcpp_kernel(
-      output,
-      input,
-      output_size,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
-  return output;
-}
-
-Tensor upsample_nearest3d(
-    const Tensor& input,
-    c10::optional<IntArrayRef> output_size,
+    c10::OptionalIntArrayRef output_size,
     c10::optional<ArrayRef<double>> scale_factors) {
   auto output = at::empty({0}, input.options());
   auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
@@ -311,32 +294,13 @@ Tensor upsample_nearest3d(
 }
 
 Tensor& upsample_nearest3d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size,
     c10::optional<double> scales_d,
     c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
-  upsample_nearest_backward_out_dpcpp_kernel(
-      grad_input,
-      grad_output,
-      output_size,
-      input_size,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
-  return grad_input;
-}
-
-Tensor upsample_nearest3d_backward(
-    const Tensor& grad_output,
-    IntArrayRef output_size,
-    IntArrayRef input_size,
-    c10::optional<double> scales_d,
-    c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
-  auto grad_input = at::empty({0}, grad_output.options());
+    c10::optional<double> scales_w,
+    Tensor& grad_input) {
   upsample_nearest_backward_out_dpcpp_kernel(
       grad_input,
       grad_output,
@@ -384,45 +348,13 @@ Tensor& upsample_nearest2d_out(
   return output;
 }
 
-Tensor upsample_nearest2d(
-    const Tensor& input,
-    IntArrayRef output_size,
-    c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
-  auto output = at::empty({0}, input.options());
-  upsample_nearest_out_dpcpp_kernel(
-      output,
-      input,
-      output_size,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
-  return output;
-}
-
-Tensor upsample_nearest2d(
-    const Tensor& input,
-    c10::optional<IntArrayRef> output_size,
-    c10::optional<ArrayRef<double>> scale_factors) {
-  auto output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
-  auto scale_h = get_scale_value(scale_factors, 0);
-  auto scale_w = get_scale_value(scale_factors, 1);
-  upsample_nearest_out_dpcpp_kernel(
-      output,
-      input,
-      osize,
-      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
-      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0);
-  return output;
-}
-
 Tensor& upsample_nearest2d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size,
     c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
+    c10::optional<double> scales_w,
+    Tensor& grad_input) {
   upsample_nearest_backward_out_dpcpp_kernel(
       grad_input,
       grad_output,
@@ -430,130 +362,34 @@ Tensor& upsample_nearest2d_backward_out(
       input_size,
       scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
       scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
-  return grad_input;
-}
-
-Tensor upsample_nearest2d_backward(
-    const Tensor& grad_output,
-    IntArrayRef output_size,
-    IntArrayRef input_size,
-    c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
-  auto grad_input = at::empty({0}, grad_output.options());
-  upsample_nearest_backward_out_dpcpp_kernel(
-      grad_input,
-      grad_output,
-      output_size,
-      input_size,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
-  return grad_input;
-}
-
-Tensor upsample_nearest2d_backward(
-    const Tensor& grad_output,
-    c10::optional<IntArrayRef> output_size,
-    IntArrayRef input_size,
-    c10::optional<ArrayRef<double>> scale_factors) {
-  auto osize = compute_output_size(input_size, output_size, scale_factors);
-  auto scale_h = get_scale_value(scale_factors, 0);
-  auto scale_w = get_scale_value(scale_factors, 1);
-  auto grad_input = at::empty({0}, grad_output.options());
-  upsample_nearest_backward_out_dpcpp_kernel(
-      grad_input,
-      grad_output,
-      osize,
-      input_size,
-      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
-      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0);
   return grad_input;
 }
 
 Tensor& upsample_nearest1d_out(
-    Tensor& output,
     const Tensor& input,
     IntArrayRef output_size,
-    c10::optional<double> scales) {
+    c10::optional<double> scales,
+    Tensor& output) {
   upsample_nearest_out_dpcpp_kernel(
       output,
       input,
       output_size,
       scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
-  return output;
-}
-
-Tensor upsample_nearest1d(
-    const Tensor& input,
-    IntArrayRef output_size,
-    c10::optional<double> scales) {
-  auto output = at::empty({0}, input.options());
-  upsample_nearest_out_dpcpp_kernel(
-      output,
-      input,
-      output_size,
-      scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
-  return output;
-}
-
-Tensor upsample_nearest1d(
-    const Tensor& input,
-    c10::optional<IntArrayRef> output_size,
-    c10::optional<ArrayRef<double>> scale_factors) {
-  auto output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
-  auto scale_w = get_scale_value(scale_factors, 0);
-  upsample_nearest_out_dpcpp_kernel(
-      output,
-      input,
-      osize,
-      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
   return output;
 }
 
 Tensor& upsample_nearest1d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size,
-    c10::optional<double> scales) {
+    c10::optional<double> scales,
+    Tensor& grad_input) {
   upsample_nearest_backward_out_dpcpp_kernel(
       grad_input,
       grad_output,
       output_size,
       input_size,
       scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
-  return grad_input;
-}
-
-Tensor upsample_nearest1d_backward(
-    const Tensor& grad_output,
-    IntArrayRef output_size,
-    IntArrayRef input_size,
-    c10::optional<double> scales) {
-  auto grad_input = at::empty({0}, grad_output.options());
-  upsample_nearest_backward_out_dpcpp_kernel(
-      grad_input,
-      grad_output,
-      output_size,
-      input_size,
-      scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
-  return grad_input;
-}
-
-Tensor upsample_nearest1d_backward(
-    const Tensor& grad_output,
-    c10::optional<IntArrayRef> output_size,
-    IntArrayRef input_size,
-    c10::optional<ArrayRef<double>> scale_factors) {
-  auto osize = compute_output_size(input_size, output_size, scale_factors);
-  auto scale_w = get_scale_value(scale_factors, 0);
-  auto grad_input = at::empty({0}, grad_output.options());
-  upsample_nearest_backward_out_dpcpp_kernel(
-      grad_input,
-      grad_output,
-      osize,
-      input_size,
-      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
   return grad_input;
 }
 
@@ -579,27 +415,6 @@ Tensor upsample_nearest2d(
   return output;
 }
 
-Tensor upsample_nearest2d(
-    const Tensor& input,
-    OptionalIntArrayRef output_size,
-    c10::optional<ArrayRef<double>> scale_factors) {
-  Tensor output = at::_empty_affine_quantized(
-      input.sizes(),
-      input.options().dtype(toQIntType(input.scalar_type())),
-      input.q_scale(),
-      input.q_zero_point());
-  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
-  auto scale_h = get_scale_value(scale_factors, 0);
-  auto scale_w = get_scale_value(scale_factors, 1);
-  upsample_nearest_out_dpcpp_kernel(
-      output,
-      input,
-      osize,
-      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
-      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0);
-  return output;
-}
-
 Tensor upsample_nearest3d(
     const Tensor& input,
     IntArrayRef output_size,
@@ -613,7 +428,7 @@ Tensor upsample_nearest3d(
 
 Tensor upsample_nearest3d(
     const Tensor& input,
-    c10::optional<IntArrayRef> output_size,
+    at::OptionalIntArrayRef output_size,
     c10::optional<ArrayRef<double>> scale_factors) {
   TORCH_INTERNAL_ASSERT(
       false,

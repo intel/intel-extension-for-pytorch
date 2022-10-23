@@ -35,7 +35,6 @@ supported:
   - resize_
   - set_.source_Storage_storage_offset
   - upsample_nearest2d
-  - upsample_nearest2d.vec
   - upsample_nearest3d
   - upsample_nearest3d.vec
   - view
