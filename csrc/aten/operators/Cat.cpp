@@ -150,8 +150,8 @@ void CatArrayBatchedCopy(
 
 template <typename scalar_t>
 void parallel_cat(
-    Tensor& out,
-    const TensorList& inputs,
+    const Tensor& out,
+    const MaterializedITensorListRef& inputs,
     int64_t dimension,
     int nDims) {
   // First, let's set up our kernel parameters. We start with a raw pointer to
@@ -186,13 +186,15 @@ void parallel_cat(
       for (batchCounter = 0; batchCounter < CAT_ARRAY_BATCH_SIZE &&
            (i + batchCounter) < inputs.size();
            ++batchCounter) {
-        int64_t dimSize = at::native::size(inputs[i + batchCounter], dimension);
+        int64_t dimSize =
+            at::native::size(inputs[i + batchCounter].get(), dimension);
 
         stackInputs[batchCounter].input =
-            inputs[i + batchCounter].data_ptr<scalar_t>();
+            inputs[i + batchCounter].get().data_ptr<scalar_t>();
         stackInputs[batchCounter].offset = offset;
         stackInputs[batchCounter].dimSize = dimSize;
-        stackInputs[batchCounter].nElements = inputs[i + batchCounter].numel();
+        stackInputs[batchCounter].nElements =
+            inputs[i + batchCounter].get().numel();
 
         // update offset
         offset += dimSize;
@@ -249,7 +251,7 @@ void check_shape_except_dim(Tensor& first, Tensor& second, int dimension) {
 
 static void cat(
     Tensor& result,
-    TensorList inputs,
+    MaterializedITensorListRef inputs,
     int numInputs,
     int dimension,
     bool allSameType) {
@@ -287,7 +289,7 @@ static void cat(
       hasSkippedInput = true;
       continue;
     }
-    nDims = inputs[i].dim();
+    nDims = inputs[i].get().dim();
     notSkippedTensor = inputs[i];
   }
 
@@ -354,7 +356,7 @@ static void cat(
     for (j = 0; j < numInputs; j++) {
       if (should_skip(inputs[j]))
         continue;
-      int64_t dimSize = inputs[j].size(dimension);
+      int64_t dimSize = inputs[j].get().size(dimension);
       Tensor nt = at::narrow(result, dimension, offset, dimSize);
       nt.copy_(inputs[j]);
       offset += dimSize;
@@ -364,7 +366,8 @@ static void cat(
 
 } // namespace impl
 
-Tensor& cat_out(TensorList tensors, int64_t dim, Tensor& out) {
+Tensor& cat_out(const ITensorListRef& container, int64_t dim, Tensor& out) {
+  auto tensors = container.materialize();
   // Inputs cannot alias the output tensor
   for (const auto i : c10::irange(tensors.size())) {
     auto lap = at::get_overlap_status(out, tensors[i]);
@@ -378,7 +381,7 @@ Tensor& cat_out(TensorList tensors, int64_t dim, Tensor& out) {
   }
   at::assert_no_internal_overlap(out);
 
-  ScalarType firstType = tensors[0].scalar_type();
+  ScalarType firstType = tensors[0].get().scalar_type();
   bool allSameType =
       std::all_of(tensors.begin(), tensors.end(), [firstType](const Tensor& t) {
         return t.scalar_type() == firstType;
@@ -394,16 +397,16 @@ Tensor& cat_out(TensorList tensors, int64_t dim, Tensor& out) {
   // cat will go to DPCPP path, all the other cases will go to oneDNN path
   if (!isBlockfmt) {
     auto atens = at::AtenIpexTypeXPU::to_plain_if_needed(tensors);
-    impl::cat(out, at::TensorList(atens), atens.size(), dim, allSameType);
+    impl::cat(out, atens, atens.size(), dim, allSameType);
   } else {
     xpu::oneDNN::concat(out, tensors, dim);
   }
   return out;
 }
 
-Tensor _cat(TensorList tensors, int64_t dim) {
+Tensor cat(const ITensorListRef& tensors, int64_t dim) {
   auto high_type = at::native::result_type(tensors);
-  auto out = at::empty({0}, tensors[0].options().dtype(high_type));
+  auto out = at::empty({0}, tensors.front().options().dtype(high_type));
   return at::AtenIpexTypeXPU::cat_out(tensors, dim, out);
 }
 
