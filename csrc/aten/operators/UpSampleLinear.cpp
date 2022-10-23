@@ -691,55 +691,13 @@ Tensor& upsample_linear1d_out(
   return output;
 }
 
-Tensor upsample_linear1d(
-    const Tensor& input,
-    IntArrayRef output_size,
-    bool align_corners,
-    c10::optional<double> scales) {
-  auto output = at::empty({0}, input.options());
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    xpu::oneDNN::resample(
-        input,
-        output,
-        output_size,
-        algorithm::resampling_linear,
-        scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
-  return output;
-}
-
-Tensor upsample_linear1d(
-    const Tensor& input,
-    c10::optional<IntArrayRef> output_size,
-    bool align_corners,
-    c10::optional<ArrayRef<double>> scale_factors) {
-  auto output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
-  auto scale_w = get_scale_value(scale_factors, 0);
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    xpu::oneDNN::resample(
-        input,
-        output,
-        osize,
-        algorithm::resampling_linear,
-        scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
-  return output;
-}
-
 Tensor& upsample_linear1d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size,
     bool align_corners,
-    c10::optional<double> scales) {
+    c10::optional<double> scales,
+    Tensor& grad_input) {
   if (align_corners)
     printf(
         "we don't support this path by currently as oneDNN don't support this "
@@ -752,68 +710,6 @@ Tensor& upsample_linear1d_backward_out(
         output_size,
         algorithm::resampling_linear,
         scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
-  return grad_input;
-}
-
-Tensor upsample_linear1d_backward(
-    const Tensor& grad_output,
-    IntArrayRef output_size,
-    IntArrayRef input_size,
-    bool align_corners,
-    c10::optional<double> scales) {
-  auto ndim = grad_output.ndimension();
-  Tensor grad_input;
-  if (is_smf_channels_last(grad_output)) {
-    grad_input =
-        at::empty(input_size, grad_output.options(), get_cl_tag_by_ndim(ndim));
-  } else {
-    grad_input = at::empty(input_size, grad_output.options());
-  }
-
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    xpu::oneDNN::resample_backward(
-        grad_input,
-        grad_output,
-        input_size,
-        output_size,
-        algorithm::resampling_linear,
-        scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
-  return grad_input;
-}
-
-Tensor upsample_linear1d_backward(
-    const Tensor& grad_output,
-    c10::optional<IntArrayRef> output_size,
-    IntArrayRef input_size,
-    bool align_corners,
-    c10::optional<ArrayRef<double>> scale_factors) {
-  auto osize = compute_output_size(input_size, output_size, scale_factors);
-  auto scale_w = get_scale_value(scale_factors, 0);
-  auto ndim = grad_output.ndimension();
-  Tensor grad_input;
-  if (is_smf_channels_last(grad_output)) {
-    grad_input =
-        at::empty(input_size, grad_output.options(), get_cl_tag_by_ndim(ndim));
-  } else {
-    grad_input = at::empty(input_size, grad_output.options());
-  }
-
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    xpu::oneDNN::resample_backward(
-        grad_input,
-        grad_output,
-        input_size,
-        osize,
-        algorithm::resampling_linear,
-        scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
   return grad_input;
 }
 
