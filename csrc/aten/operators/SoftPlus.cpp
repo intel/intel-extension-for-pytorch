@@ -19,13 +19,7 @@ Tensor& softplus_out(
     const Scalar& beta,
     const Scalar& threshold,
     Tensor& out) {
-  checkBackend("softplus_forward", {out}, self.options().backend());
-  auto iter = TensorIteratorConfig()
-                  .set_check_mem_overlap(true)
-                  .add_output(out)
-                  .add_input(self)
-                  .build();
-
+  auto iter = TensorIterator::unary_op(out, self);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -60,21 +54,15 @@ Tensor& softplus_backward_out(
     const Tensor& self,
     const Scalar& beta,
     const Scalar& threshold,
-    const Tensor& output,
     Tensor& grad_input) {
-  checkBackend(
+  auto iter =
+      TensorIterator::borrowing_binary_op(grad_input, grad_output, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
       "softplus_backward",
-      {grad_input, grad_output, output},
-      self.options().backend());
-  auto iter = TensorIteratorConfig()
-                  .set_check_mem_overlap(true)
-                  .add_output(grad_input)
-                  .add_input(grad_output)
-                  .add_input(output)
-                  .build();
-
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16, iter.dtype(), "softplus_backward", [&]() {
+      [&]() {
         auto b = beta.to<scalar_t>();
         auto t = threshold.to<scalar_t>();
         dpcpp_kernel_for_tensor_iter(
@@ -83,7 +71,7 @@ Tensor& softplus_backward_out(
               scalar_t beta_out = b * output_data;
               scalar_t exp_bo = Numerics<scalar_t>::exp(beta_out);
               return beta_out > t ? grad_output_data
-                                  : grad_output_data * (exp_bo - 1) / exp_bo;
+                                  : grad_output_data * exp_bo / (exp_bo + 1);
             });
       });
 
