@@ -11,8 +11,8 @@ supported:
   - _amp_foreach_non_finite_check_and_unscale_
   - _amp_update_scale_
   - _assert_async
-#  - _cat
-#  - _cat.out
+  - cat
+  - cat.out
 #  - _cdist_backward
 #  - _cdist_forward
   - _compute_linear_combination

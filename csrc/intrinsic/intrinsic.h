@@ -247,6 +247,9 @@ at::Tensor to_plain_if_needed_(const Tensor& tensor);
 
 std::vector<at::Tensor> to_plain_if_needed(TensorList tensor);
 
+MaterializedITensorListRef to_plain_if_needed(
+    MaterializedITensorListRef tensors);
+
 at::Tensor new_qtensor(
     IntArrayRef sizes,
     const TensorOptions& options,

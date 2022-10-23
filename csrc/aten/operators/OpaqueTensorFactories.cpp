@@ -143,6 +143,17 @@ std::vector<Tensor> to_plain_if_needed(TensorList tensors) {
   return _tensors;
 }
 
+MaterializedITensorListRef to_plain_if_needed(
+    MaterializedITensorListRef tensors) {
+  if (!Settings::I().is_onednn_layout_enabled())
+    return tensors;
+  MaterializedITensorListRef _tensors;
+  for (auto tensor : tensors) {
+    _tensors.push_back(std::reference_wrapper<const at::Tensor>(tensor.get()));
+  }
+  return _tensors;
+}
+
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
