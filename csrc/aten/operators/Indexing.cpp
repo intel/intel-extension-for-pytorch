@@ -890,20 +890,20 @@ Tensor count_nonzero(const Tensor& self, IntArrayRef dims) {
 }
 
 Tensor& index_add_out(
-    Tensor& self,
+    const Tensor& self,
     int64_t dim,
     const Tensor& index,
     const Tensor& source,
     const Scalar& alpha,
-    Tensor& result) {
-  if (!result.is_same(self)) {
-    result.copy_(self);
+    Tensor& out) {
+  if (!out.is_same(self)) {
+    out.copy_(self);
   }
   IPEX_DISPATCH_ATOMIC_ALL_TYPES_AND_COMPLEX(
-      result.scalar_type(), "index_add_", [&] {
-        impl::_index_add<scalar_t>(result, dim, index, source, alpha);
+      out.scalar_type(), "index_add_", [&] {
+        impl::_index_add<scalar_t>(out, dim, index, source, alpha);
       });
-  return result;
+  return out;
 }
 
 at::Tensor& index_copy_out(
