@@ -5,7 +5,6 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/cpp_custom_type_hack.h>
 #include <ATen/native/quantized/PackedParams.h>
-// #include <ATen/native/quantized/cpu/conv_serialization.h>
 #include <torch/custom_class.h>
 #include <torch/custom_class_detail.h>
 
@@ -176,6 +175,25 @@ T quantize_val(double scale, int64_t zero_point, float value) {
 } // namespace at
 
 #ifdef BUILD_JIT_QUANTIZATION_SAVE
+
+// Repeat torch type definition here again
+using ConvParamsSerializationTypeV2 = std::tuple<
+    // version, for versions 2 and up
+    std::string,
+    // non-optional tensors
+    std::vector<at::Tensor>,
+    // optional tensors
+    std::vector<c10::optional<at::Tensor>>>;
+using ConvParamsSerializationTypeV3 = std::tuple<
+    // version, int for versions 3 and up
+    int64_t,
+    // configuration values
+    std::vector<int64_t>,
+    // optional tensors
+    std::vector<c10::optional<at::Tensor>>>;
+
+using ConvParamsSerializationType = ConvParamsSerializationTypeV2;
+
 template <uint32_t kSpatialDim>
 c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>> deserialize_conv_dpcpp(
     ConvParamsSerializationTypeV3 state) {
