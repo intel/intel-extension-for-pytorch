@@ -1,9 +1,7 @@
-# Build and Install from Source Code
+Installation Guide
+==================
 
-This is guide to build an Intel® Extension for PyTorch* PyPI package from source and install it in Linux.
-
-
-## Prepare
+## System Requirements
 
 ### Hardware Requirement
 
@@ -16,7 +14,17 @@ Verified Hardware Platforms:
 - Intel GPU Drivers 
   - Intel® Data Center GPU Flex Series [419.40](https://dgpu-docs.intel.com/releases/stable_419_40_20220914.html)
 - Intel® oneAPI Base Toolkit 2022.3
-- Python 3.7-3.10
+- Python 3.6-3.9
+
+## PyTorch-Intel® Extension for PyTorch\* Version Mapping
+
+Intel® Extension for PyTorch\* has to work with a corresponding version of PyTorch. Here are the PyTorch versions that we support and the mapping relationship:
+
+|PyTorch Version|Extension Version|
+|--|--|
+|[v1.10.0](https://github.com/pytorch/pytorch/tree/v1.10.0) (patches needed)|[v1.10.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.10.200+gpu)|
+
+## Preparations
 
 ### Install Intel GPU Driver
 
@@ -34,51 +42,70 @@ Need to install components of Intel® oneAPI Base Toolkit:
 
 Default installation location is /opt/intel/oneapi for root account, ${HOME}/intel/oneapi for other accounts.
 
-### Configure the AOT
+## Install via wheel files
 
-Please refer to [AOT documentation](./AOT.md) for how to configure AOT.
+Prebuilt wheel files availability matrix for Python versions
 
-### Build and Install from Source Code
+| Extension Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 | Python 3.10 |
+| :--: | :--: | :--: | :--: | :--: | :--: |
+| 1.10.200+gpu | ✔️ | ✔️ | ✔️ | ✔️ |  |
 
-Make sure PyTorch is installed so that the extension will work properly. For each PyTorch release, we have a corresponding release of the extension. Here are the PyTorch versions that we support and the mapping relationship:
+### Install PyTorch
 
-|PyTorch Version|Intel® Extension for PyTorch* Version|
-|--|--|
-|[v1.10.\*](https://github.com/pytorch/pytorch/tree/v1.10.0 "v1.10.0")|[v1.10.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.10.200)|
+```bash
+python -m pip install torch==1.10.0a0 -f https://developer.intel.com/ipex-whl-stable-xpu
+```
 
+### Install Intel® Extension for PyTorch\*
 
-Build and Install PyTorch:
+```bash
+python -m pip install intel_extension_for_pytorch==1.10.200+gpu -f https://developer.intel.com/ipex-whl-stable-xpu
+```
+
+## Install via compiling from source
+
+### Download source code of PyTorch and Intel® Extension for PyTorch\*:
 
 ```bash
 $ git clone https://github.com/pytorch/pytorch.git
 $ cd pytorch
-# checkout to specific release branch if in need
-$ git checkout ${PYTORCH_RELEASE_BRANCH_NAME}
-# apply git patch to pytorch code, e.g., apply patch for pytorch v1.10.
-$ git apply ${intel_extension_for_pytorch_directory}/torch_patches/{xpu-1.10}.patch 
+$ git checkout v1.10.0
+
+$ git clone https://github.com/intel/intel-extension-for-pytorch.git 
+$ cd intel-extension-for-pytorch
+$ git checkout v1.10.200+gpu
+```
+
+### Install PyTorch:
+
+```bash
+$ cd pytorch
+$ git apply ${intel_extension_for_pytorch_directory}/torch_patches/*.patch 
+$ git submodule sync
 $ git submodule update --init --recursive
 $ pip install -r requirements.txt
-# configure MKL env to enable MKL features
 $ source ${oneAPI_HOME}/mkl/latest/env/vars.sh
-# build pypi package and install it locally
 $ python setup.py bdist_wheel
 $ pip install dist/*.whl
 ```
 
-Build and Install Intel® Extension for PyTorch*:
+### Configure the AOT (Optional)
+
+Please refer to [AOT documentation](./AOT.md) for how to configure `USE_AOT_DEVLIST`.
 
 ```bash
-$ git clone -b xpu-master https://github.com/intel/intel-extension-for-pytorch.git 
+$ export USE_AOT_DEVLIST='dg2-g10-c0'
+```
+
+### Install Intel® Extension for PyTorch\*:
+
+```bash
 $ cd intel-extension-for-pytorch
-# checkout to specific release branch if in need
-$ git checkout ${IPEX_RELEASE_BRANCH_NAME}
+$ git submodule sync
 $ git submodule update --init --recursive
 $ pip install -r requirements.txt
-# configure dpcpp compiler env
 $ source ${oneAPI_HOME}/compiler/latest/env/vars.sh
-# configure MKL env to enable MKL features
 $ source ${oneAPI_HOME}/mkl/latest/env/vars.sh
-# build pypi package and install it locally
-$ ${USE_AOT_DEVLIST} python setup.py bdist_wheel
+$ python setup.py bdist_wheel
 $ pip install dist/*.whl
 ```
