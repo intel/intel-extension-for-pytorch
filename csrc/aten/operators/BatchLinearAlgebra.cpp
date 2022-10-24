@@ -2870,11 +2870,10 @@ void linalg_eigh_impl(
         self_working_copy, eigenvalues, compute_eigenvectors, upper, infos_vec);
   });
 
-  if (eigenvectors.dim() > 2) {
-    // at::native::batchCheckErrors(infos_vec, "symeig");
-  } else {
-    // at::native::singleCheckErrors(infos_vec[0], "symeig");
-  }
+  Tensor infos_tensor = from_blob(infos_vec.data(), {1, infos_vec.size()});
+  infos_tensor = infos_tensor.to(kInt);
+  at::_linalg_check_errors(infos_tensor, "symeig", infos.dim() == 2);
+  // at::_linalg_check_errors(infos, "symeig", infos.dim() == 2);
 
   if (compute_eigenvectors) {
     eigenvectors.copy_(self_working_copy);
@@ -2902,8 +2901,8 @@ void linalg_eigh_out_info(
 
   // eigenvalues are always real-valued
   // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
-  // ScalarType real_dtype = toValueType(input.scalar_type());
-  // TORCH_INTERNAL_ASSERT_DEBUG_ONLY(values.scalar_type() == real_dtype);
+  ScalarType real_dtype = c10::toRealValueType(input.scalar_type());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(values.scalar_type() == real_dtype);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
       input.scalar_type() == vectors.scalar_type());
 
@@ -2963,24 +2962,18 @@ void linalg_eigh_out_info(
 std::tuple<Tensor, Tensor> linalg_eigh(
     const Tensor& input,
     c10::string_view uplo) {
-  // at::native::squareCheckInputs(input);
-  // at::native::checkUplo(uplo);
-  // ScalarType real_dtype = c10::toValueType(input.scalar_type());
-  // Tensor values = at::empty({0}, input.options().dtype(real_dtype));
-  // Tensor vectors = at::empty({0}, input.options());
-  // Tensor infos = at::zeros(
-  //     {std::max<int64_t>(1, native::batchCount(input))},
-  //     input.options().dtype(kInt));
+  at::native::squareCheckInputs(input, "eigh input");
+  at::native::checkUplo(uplo);
+  ScalarType real_dtype = c10::toRealValueType(input.scalar_type());
+  Tensor values = at::empty({0}, input.options().dtype(real_dtype));
+  Tensor vectors = at::empty({0}, input.options());
+  Tensor infos = at::zeros(
+      {std::max<int64_t>(1, native::batchCount(input))},
+      input.options().dtype(kInt));
+  linalg_eigh_out_info(input, values, vectors, infos, true, uplo);
+  at::_linalg_check_errors(infos, "torch.linalg.eigh", infos.dim() == 2);
 
-  // linalg_eigh_out_info(input, values, vectors, infos, true, uplo);
-
-  // if (input.dim() > 2) {
-  //   at::native::batchCheckErrors(infos, "torch.linalg.eigh");
-  // } else {
-  //   at::native::singleCheckErrors(infos.item().toInt(), "torch.linalg.eigh");
-  // }
-
-  // return std::tuple<Tensor, Tensor>(values, vectors);
+  return std::tuple<Tensor, Tensor>(values, vectors);
 }
 
 // TODO: it's possible to make the _out variant to be a primal function and
@@ -2992,103 +2985,101 @@ std::tuple<Tensor&, Tensor&> linalg_eigh_out(
     c10::string_view uplo,
     Tensor& eigvals,
     Tensor& eigvecs) {
-  // TORCH_CHECK(
-  //     input.device() == eigvals.device(),
-  //     "Expected two tensors to be on the same device, but "
-  //     "found at least two devices, ",
-  //     input.device(),
-  //     " and ",
-  //     eigvals.device(),
-  //     "!");
+  TORCH_CHECK(
+      input.device() == eigvals.device(),
+      "Expected two tensors to be on the same device, but "
+      "found at least two devices, ",
+      input.device(),
+      " and ",
+      eigvals.device(),
+      "!");
 
-  // TORCH_CHECK(
-  //     input.device() == eigvecs.device(),
-  //     "Expected two tensors to be on the same device, but "
-  //     "found at least two devices, ",
-  //     input.device(),
-  //     " and ",
-  //     eigvecs.device(),
-  //     "!");
-  // at::native::checkLinalgCompatibleDtype(
-  //     "torch.linalg.eigh", eigvecs, input, "eigenvectors");
+  TORCH_CHECK(
+      input.device() == eigvecs.device(),
+      "Expected two tensors to be on the same device, but "
+      "found at least two devices, ",
+      input.device(),
+      " and ",
+      eigvecs.device(),
+      "!");
+  at::native::checkLinalgCompatibleDtype(
+      "torch.linalg.eigh", eigvecs, input, "eigenvectors");
 
-  // // eigenvalues are always real-valued here
-  // ScalarType real_dtype = c10::toValueType(input.scalar_type());
-  // at::native::checkLinalgCompatibleDtype(
-  //     "torch.linalg.eigh", eigvals.scalar_type(), real_dtype, "eigenvalues");
+  // eigenvalues are always real-valued here
+  ScalarType real_dtype = c10::toRealValueType(input.scalar_type());
+  at::native::checkLinalgCompatibleDtype(
+      "torch.linalg.eigh", eigvals.scalar_type(), real_dtype, "eigenvalues");
 
-  // Tensor eigvals_tmp, eigvecs_tmp;
-  // std::tie(eigvals_tmp, eigvecs_tmp) =
-  //     at::AtenIpexTypeXPU::linalg_eigh(input, uplo);
+  Tensor eigvals_tmp, eigvecs_tmp;
+  std::tie(eigvals_tmp, eigvecs_tmp) =
+      at::AtenIpexTypeXPU::linalg_eigh(input, uplo);
 
-  // at::native::resize_output(eigvals, eigvals_tmp.sizes());
-  // eigvals.copy_(eigvals_tmp);
-  // at::native::resize_output(eigvecs, eigvecs_tmp.sizes());
-  // eigvecs.copy_(eigvecs_tmp);
+  at::native::resize_output(eigvals, eigvals_tmp.sizes());
+  eigvals.copy_(eigvals_tmp);
+  at::native::resize_output(eigvecs, eigvecs_tmp.sizes());
+  eigvecs.copy_(eigvecs_tmp);
 
-  // return std::tuple<Tensor&, Tensor&>(eigvals, eigvecs);
+  return std::tuple<Tensor&, Tensor&>(eigvals, eigvecs);
+}
+
+Tensor linalg_eigvalsh(const Tensor& A, c10::string_view uplo) {
+  return std::get<0>(at::AtenIpexTypeXPU::linalg_eigh(A, uplo));
 }
 
 Tensor& linalg_eigvalsh_out(
     const Tensor& input,
     c10::string_view uplo,
     Tensor& result) {
-  // ScalarType real_dtype = c10::toValueType(input.scalar_type());
-  // TORCH_CHECK(
-  //     input.device() == result.device(),
-  //     "Expected two tensors to be on the same device, but "
-  //     "found at least two devices, ",
-  //     input.device(),
-  //     " and ",
-  //     result.device(),
-  //     "!");
-  // at::native::checkLinalgCompatibleDtype(
-  //     "torch.linalg.eigvalsh", result.scalar_type(), real_dtype);
+  ScalarType real_dtype = c10::toRealValueType(input.scalar_type());
+  TORCH_CHECK(
+      input.device() == result.device(),
+      "Expected two tensors to be on the same device, but "
+      "found at least two devices, ",
+      input.device(),
+      " and ",
+      result.device(),
+      "!");
+  at::native::checkLinalgCompatibleDtype(
+      "torch.linalg.eigvalsh", result.scalar_type(), real_dtype);
 
-  // at::native::squareCheckInputs(input);
-  // at::native::checkUplo(uplo);
+  at::native::squareCheckInputs(input, "eigvalsh input");
+  at::native::checkUplo(uplo);
 
-  // auto expected_result_shape =
-  //     IntArrayRef(input.sizes().data(), input.dim() - 1); // input.shape[:-1]
-  // bool result_equal_expected_shape =
-  //     result.sizes().equals(expected_result_shape);
-  // bool expected_result_type = (result.scalar_type() == real_dtype);
-  // bool copy_needed = !expected_result_type;
-  // copy_needed |= (result.numel() != 0 && !result_equal_expected_shape);
-  // copy_needed |= (result.numel() != 0 && !result.is_contiguous());
+  auto expected_result_shape =
+      IntArrayRef(input.sizes().data(), input.dim() - 1); // input.shape[:-1]
+  bool result_equal_expected_shape =
+      result.sizes().equals(expected_result_shape);
+  bool expected_result_type = (result.scalar_type() == real_dtype);
+  bool copy_needed = !expected_result_type;
+  copy_needed |= (result.numel() != 0 && !result_equal_expected_shape);
+  copy_needed |= (result.numel() != 0 && !result.is_contiguous());
 
-  // Tensor vectors = at::empty({0}, input.options());
-  // Tensor infos = at::zeros(
-  //     {std::max<int64_t>(1, at::native::batchCount(input))},
-  //     input.options().dtype(kInt));
+  Tensor vectors = at::empty({0}, input.options());
+  Tensor infos = at::zeros(
+      {std::max<int64_t>(1, at::native::batchCount(input))},
+      input.options().dtype(kInt));
 
-  // if (copy_needed) { // we have to allocate a temporary tensor
-  //   Tensor result_tmp =
-  //       at::empty({expected_result_shape},
-  //       input.options().dtype(real_dtype));
-  //   linalg_eigh_out_info(
-  //       input,
-  //       result_tmp,
-  //       vectors,
-  //       infos,
-  //       /*compute_eigenvectors=*/false,
-  //       uplo);
-  //   at::native::resize_output(result, result_tmp.sizes());
-  //   result.copy_(result_tmp);
-  // } else {
-  //   // else use the provided output storage directly
-  //   linalg_eigh_out_info(
-  //       input, result, vectors, infos, /*compute_eigenvectors=*/false, uplo);
-  // }
+  if (copy_needed) { // we have to allocate a temporary tensor
+    Tensor result_tmp =
+        at::empty({expected_result_shape}, input.options().dtype(real_dtype));
+    linalg_eigh_out_info(
+        input,
+        result_tmp,
+        vectors,
+        infos,
+        /*compute_eigenvectors=*/false,
+        uplo);
+    at::native::resize_output(result, result_tmp.sizes());
+    result.copy_(result_tmp);
+  } else {
+    // else use the provided output storage directly
+    linalg_eigh_out_info(
+        input, result, vectors, infos, /*compute_eigenvectors=*/false, uplo);
+  }
 
-  // if (input.dim() > 2) {
-  //   at::native::batchCheckErrors(infos, "torch.linalg.eigvalsh");
-  // } else {
-  //   at::native::singleCheckErrors(
-  //       infos.item().toInt(), "torch.linalg.eigvalsh");
-  // }
+  at::_linalg_check_errors(infos, "torch.linalg.eigvalsh", infos.dim() == 2);
 
-  // return result;
+  return result;
 }
 
 // As P is a permutation matrix
