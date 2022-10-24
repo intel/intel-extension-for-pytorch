@@ -186,37 +186,6 @@ void mse_backward_kernel(TensorIterator& iter, Scalar norm) {
       });
 }
 
-void l1_kernel(TensorIterator& iter) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      iter.dtype(),
-      "l1_kernel",
-      [&iter]() {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t input, scalar_t target) -> scalar_t {
-              return Numerics<scalar_t>::abs(input - target);
-            });
-      });
-}
-
-void l1_backward_kernel(TensorIterator& iter, Scalar norm) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16,
-      iter.dtype(),
-      "l1_backward_kernel",
-      [&iter, &norm] {
-        auto norm_val = norm.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter(
-            iter,
-            [norm_val](scalar_t input, scalar_t target, scalar_t grad_output)
-                -> scalar_t {
-              return input < target ? -norm_val * grad_output
-                                    : norm_val * grad_output;
-            });
-      });
-}
-
 void huber_kernel(TensorIterator& iter, double delta) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       kBFloat16, kHalf, iter.dtype(), "huber", [&iter, delta] {
@@ -422,68 +391,7 @@ Tensor soft_margin_loss_backward(
 }
 
 Tensor l1_loss(const Tensor& self, const Tensor& target, int64_t reduction) {
-  Tensor loss;
-  auto iter = TensorIterator::binary_op(loss, self, target);
-  impl::l1_kernel(iter);
-  return apply_loss_reduction(iter.output(), reduction);
-}
-
-Tensor& l1_loss_out(
-    Tensor& out,
-    const Tensor& self,
-    const Tensor& target,
-    int64_t reduction) {
-  if (reduction != Reduction::None) {
-    Tensor loss;
-    auto iter = TensorIterator::binary_op(loss, self, target);
-    if (reduction == Reduction::Mean) {
-      at::AtenIpexTypeXPU::mean_out(
-          iter.output(),
-          OptionalIntArrayRef{IntArrayRef{}},
-          false,
-          c10::nullopt,
-          out);
-    } else {
-      at::AtenIpexTypeXPU::sum_out(
-          iter.output(),
-          OptionalIntArrayRef{IntArrayRef{}},
-          false,
-          c10::nullopt,
-          out);
-    }
-  } else {
-    auto iter = TensorIterator::binary_op(out, self, target);
-    impl::l1_kernel(iter);
-  }
-  return out;
-}
-
-Tensor& l1_loss_backward_out(
-    Tensor& grad_input,
-    const Tensor& grad_output,
-    const Tensor& self,
-    const Tensor& target,
-    int64_t reduction) {
-  auto norm = reduction == Reduction::Mean ? 1. / self.numel() : 1.;
-  auto iter = at::TensorIteratorConfig()
-                  .add_output(grad_input)
-                  .add_input(self)
-                  .add_input(target)
-                  .add_input(grad_output)
-                  .build();
-  impl::l1_backward_kernel(iter, norm);
-  return grad_input;
-}
-
-Tensor l1_loss_backward(
-    const Tensor& grad_output,
-    const Tensor& self,
-    const Tensor& target,
-    int64_t reduction) {
-  Tensor grad_input = at::zeros_like(
-      self, self.options().memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT));
-  return at::AtenIpexTypeXPU::l1_loss_backward_out(
-      grad_input, grad_output, self, target, reduction);
+  return apply_loss_reduction((self - target).abs(), reduction);
 }
 
 Tensor smooth_l1_loss(
@@ -509,15 +417,15 @@ Tensor& smooth_l1_loss_backward_out(
     int64_t reduction,
     double beta,
     Tensor& grad_input) {
-  if (beta <= 0)
-    return at::AtenIpexTypeXPU::l1_loss_backward_out(
-        grad_input, grad_output, self, target, reduction);
   auto norm = reduction == Reduction::Mean ? 1. / self.numel() : 1.;
   auto iter = at::TensorIteratorConfig()
                   .add_output(grad_input)
                   .add_input(self)
                   .add_input(target)
                   .add_input(grad_output)
+                  .promote_inputs_to_common_dtype(true)
+                  .cast_common_dtype_to_outputs(true)
+                  .enforce_safe_casting_to_output(true)
                   .build();
   impl::smooth_l1_backward_kernel(iter, norm, beta);
   return grad_input;
@@ -531,9 +439,6 @@ Tensor& smooth_l1_loss_out(
     Tensor& out) {
   TORCH_CHECK(
       beta >= 0, "smooth_l1_loss does not support negative values for beta.")
-  if (beta == 0) {
-    return at::AtenIpexTypeXPU::l1_loss_out(out, self, target, reduction);
-  }
   if (reduction != Reduction::None) {
     Tensor loss;
     auto iter = TensorIterator::binary_op(loss, self, target);
@@ -566,9 +471,6 @@ Tensor smooth_l1_loss_backward(
     const Tensor& target,
     int64_t reduction,
     double beta) {
-  if (beta <= 0)
-    return at::AtenIpexTypeXPU::l1_loss_backward(
-        grad_output, self, target, reduction);
   Tensor grad_input = at::zeros_like(
       self, self.options().memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT));
   return at::AtenIpexTypeXPU::smooth_l1_loss_backward_out(

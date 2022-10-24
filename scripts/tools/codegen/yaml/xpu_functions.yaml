@@ -13,8 +13,8 @@ supported:
   - _assert_async
   - cat
   - cat.out
-#  - _cdist_backward
-#  - _cdist_forward
+  - _cdist_backward
+  - _cdist_forward
   - _compute_linear_combination
   - _compute_linear_combination.out
   - _convert_indices_from_coo_to_csr.out
@@ -311,9 +311,6 @@ supported:
   - is_pinned
   - kthvalue.values
   - l1_loss
-#  - l1_loss.out
-#  - l1_loss_backward
-#  - l1_loss_backward.grad_input
   - le.Scalar
   - le.Scalar_out
   - le.Tensor
@@ -566,8 +563,7 @@ supported:
   - sum.IntList_out
   - sum.dim_IntList
   - nansum
-#  - nansum.IntList_out
-#  - nansum.dim_IntList
+  - nansum.out
   - take
   - take.out
   - tan.out
