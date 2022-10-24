@@ -87,11 +87,11 @@ If an op is unlisted, we assume it's numerically stable in `bfloat16` or `float1
 
 #### Ops that can autocast to `bfloat16`
 
-`conv1d`, `conv2d`, `conv3d`, `_convolution`, `convolution`, `_convolution_nogroup`, `conv_tbc`, `conv_transpose1d`, `conv_transpose1d`, `conv_transpose3d`, `prelu`, `addmm`, `addmv`, `addr`, `linear`, `matmul`, `mm`, `mv`, `bmm`, `baddbmm`, `addbmm`, `chain_matmul`, `linalg_multi_dot`, `_thnn_fused_gru_cell`, `gru_cell`
+`conv1d`, `conv2d`, `conv3d`, `_convolution`, `convolution`, `conv_tbc`, `conv_transpose1d`, `conv_transpose1d`, `conv_transpose3d`, `prelu`, `addmm`, `addmv`, `addr`, `linear`, `matmul`, `mm`, `mv`, `bmm`, `baddbmm`, `addbmm`, `chain_matmul`, `linalg_multi_dot`, `_thnn_fused_gru_cell`, `gru_cell`
 
 #### Ops that can autocast to `float16`
 
-`conv1d`, `conv2d`, `conv3d`, `_convolution`, `convolution`, `_convolution_nogroup`, `conv_tbc`, `conv_transpose1d`, `conv_transpose1d`, `conv_transpose3d`, `prelu`, `addmm`, `addmv`, `addr`, `linear`, `matmul`, `mm`, `mv`, `bmm`, `baddbmm`, `addbmm`, `chain_matmul`, `linalg_multi_dot`, `_thnn_fused_gru_cell`, `gru_cell`
+`conv1d`, `conv2d`, `conv3d`, `_convolution`, `convolution`, `conv_tbc`, `conv_transpose1d`, `conv_transpose1d`, `conv_transpose3d`, `prelu`, `addmm`, `addmv`, `addr`, `linear`, `matmul`, `mm`, `mv`, `bmm`, `baddbmm`, `addbmm`, `chain_matmul`, `linalg_multi_dot`, `_thnn_fused_gru_cell`, `gru_cell`
 
 #### Ops that can autocast to `float32`
 
