@@ -109,8 +109,15 @@ static void upsample_nearest_out_dpcpp_kernel(
 #endif
 
   if (!src_ctx.is_plain()) {
-    output = empty_opaque_tensor(
-        resampling_pd.dst_desc(), input.options(), c10::nullopt);
+    if (input.is_quantized()) {
+      auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
+          input.q_scale(), input.q_zero_point(), input.scalar_type());
+      output = empty_opaque_qtensor(
+          resampling_pd.dst_desc(), c10::nullopt, quantizer);
+    } else {
+      output = empty_opaque_tensor(
+          resampling_pd.dst_desc(), input.options(), c10::nullopt);
+    }
   }
   memory src_memory =
       dpcpp_onednn_memory(resampling_pd.src_desc(), eng, input.data_ptr());
