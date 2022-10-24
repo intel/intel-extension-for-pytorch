@@ -1,7 +1,7 @@
 From 5d95de97cb99bf541a85f89212b8417ee1970017 Mon Sep 17 00:00:00 2001
 From: chengjunlu <chengjun.lu@intel.com>
 Date: Mon, 9 May 2022 09:20:27 +0800
-Subject: [PATCH 14/35] Fix pytorch issue in sparce_coo_tensor (#46)
+Subject: [PATCH 14/36] Fix pytorch issue in sparce_coo_tensor (#46)
 
 ---
  aten/src/ATen/native/sparse/SparseTensor.cpp | 2 +-

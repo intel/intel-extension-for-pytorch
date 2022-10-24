@@ -1,7 +1,7 @@
 From d033511e7fdf63f83d29f52db98011bd3c2ab49b Mon Sep 17 00:00:00 2001
 From: chengjunlu <chengjun.lu@intel.com>
 Date: Wed, 1 Jun 2022 09:16:43 +0800
-Subject: [PATCH 19/35] Add the device module to the module list with the name
+Subject: [PATCH 19/36] Add the device module to the module list with the name
  of torch.xxx in _register_device_module. The user can use the extension
  device module as a native module in torch namespace. (#50)
 

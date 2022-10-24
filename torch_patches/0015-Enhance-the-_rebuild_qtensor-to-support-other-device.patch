@@ -1,7 +1,7 @@
 From 81642df65495a71c395af9a611877348b894e74f Mon Sep 17 00:00:00 2001
 From: chengjunlu <chengjun.lu@intel.com>
 Date: Thu, 26 May 2022 14:13:35 +0800
-Subject: [PATCH 15/35] Enhance the _rebuild_qtensor to support other device
+Subject: [PATCH 15/36] Enhance the _rebuild_qtensor to support other device
  type other than CPU. (#49)
 
 ---

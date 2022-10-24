@@ -1,7 +1,7 @@
 From 5e735105ac4fa444433b849ce1690b4c8c35b1ca Mon Sep 17 00:00:00 2001
 From: Jinghui <jinghui.gu@intel.com>
 Date: Mon, 25 Jul 2022 12:01:01 +0800
-Subject: [PATCH 22/35] [PyTorch] Add fused addmm path in linear for contiguous
+Subject: [PATCH 22/36] [PyTorch] Add fused addmm path in linear for contiguous
  3D input (#72728) (#57)
 
 Summary:

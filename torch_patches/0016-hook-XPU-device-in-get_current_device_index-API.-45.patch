@@ -1,7 +1,7 @@
 From 496f22ff6d08813edda35b75fa5d5a19a6295018 Mon Sep 17 00:00:00 2001
 From: Feng Yuan <feng1.yuan@intel.com>
 Date: Thu, 26 May 2022 14:14:37 +0800
-Subject: [PATCH 16/35] hook XPU device in get_current_device_index API. (#45)
+Subject: [PATCH 16/36] hook XPU device in get_current_device_index API. (#45)
 
 * hook XPU device in get_current_device_index API.
 usage: get_device_properties("xpu") where no device id provided

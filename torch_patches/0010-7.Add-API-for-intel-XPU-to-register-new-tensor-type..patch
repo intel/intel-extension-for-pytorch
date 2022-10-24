@@ -1,7 +1,7 @@
 From e583a1b78114c24d7653636f56455ea25e6dfffd Mon Sep 17 00:00:00 2001
 From: chengjunlu <chengjun.lu@intel.com>
 Date: Thu, 7 Apr 2022 12:11:01 +0800
-Subject: [PATCH 10/35] 7.Add API for intel XPU to register new tensor type.
+Subject: [PATCH 10/36] 7.Add API for intel XPU to register new tensor type.
  (#36)
 
 ---

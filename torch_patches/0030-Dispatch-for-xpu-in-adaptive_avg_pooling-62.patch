@@ -1,7 +1,7 @@
 From 3702f05af71e723ad3d235f95919f5ba133859a8 Mon Sep 17 00:00:00 2001
 From: ch <hao3.chen@intel.com>
 Date: Fri, 16 Sep 2022 11:53:39 +0800
-Subject: [PATCH 30/35] Dispatch for xpu in adaptive_avg_pooling (#62)
+Subject: [PATCH 30/36] Dispatch for xpu in adaptive_avg_pooling (#62)
 
 * Dispatch adaptive_avg_pool2d for XPU
 

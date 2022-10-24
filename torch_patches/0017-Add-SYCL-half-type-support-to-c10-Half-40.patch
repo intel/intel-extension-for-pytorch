@@ -1,7 +1,7 @@
 From 38d4b0415adf94676878059b4622c1d6bc1a9b56 Mon Sep 17 00:00:00 2001
 From: ch <hao3.chen@intel.com>
 Date: Thu, 26 May 2022 14:28:42 +0800
-Subject: [PATCH 17/35] Add SYCL half type support to c10::Half (#40)
+Subject: [PATCH 17/36] Add SYCL half type support to c10::Half (#40)
 
 ---
  c10/util/Half-inl.h | 13 ++++++++++++-

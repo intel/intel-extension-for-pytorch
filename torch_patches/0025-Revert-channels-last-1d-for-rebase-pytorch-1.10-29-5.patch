@@ -1,7 +1,7 @@
 From 8cab93822010cd5eef89cad9900701f8da5051d3 Mon Sep 17 00:00:00 2001
 From: KevinYuk <kevin.yu@intel.com>
 Date: Fri, 5 Aug 2022 15:04:30 +0800
-Subject: [PATCH 25/35] Revert "channels last 1d for rebase pytorch 1.10 (#29)"
+Subject: [PATCH 25/36] Revert "channels last 1d for rebase pytorch 1.10 (#29)"
  (#53)
 
 This reverts commit be2033436a83b80f91e9bd793802a3ad96875122.

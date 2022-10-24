@@ -1,7 +1,7 @@
 From 2e33d5167dce2ec80cd84483eba7e473eda1ce52 Mon Sep 17 00:00:00 2001
 From: ch <hao3.chen@intel.com>
 Date: Thu, 2 Jun 2022 21:05:32 +0800
-Subject: [PATCH 21/35] Use sycl::bit_cast for negative half conversion (#52)
+Subject: [PATCH 21/36] Use sycl::bit_cast for negative half conversion (#52)
 
 ---
  c10/util/Half-inl.h | 2 +-

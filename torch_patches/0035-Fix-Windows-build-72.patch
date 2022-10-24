@@ -1,7 +1,7 @@
 From 6c1c578a4cbeda5d515c89f5e6bcfb948d93ea1c Mon Sep 17 00:00:00 2001
 From: sanchitintel <sanchit.jain@intel.com>
 Date: Mon, 10 Oct 2022 00:10:39 +0000
-Subject: [PATCH 35/35] Fix Windows build (#72)
+Subject: [PATCH 35/36] Fix Windows build (#72)
 
 __declspec(dllexport) should be present in the declaration as well, if it's present in the definition
 ---

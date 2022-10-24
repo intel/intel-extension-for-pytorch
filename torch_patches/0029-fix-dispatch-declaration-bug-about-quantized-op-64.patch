@@ -1,7 +1,7 @@
 From 4bd47d798c959fe975dae4aa42584d67b45f01ff Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Wed, 7 Sep 2022 09:09:01 +0800
-Subject: [PATCH 29/35] fix dispatch declaration bug about quantized op (#64)
+Subject: [PATCH 29/36] fix dispatch declaration bug about quantized op (#64)
 
 ---
  aten/src/ATen/native/native_functions.yaml | 4 ++++

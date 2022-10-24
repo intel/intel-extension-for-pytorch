@@ -1,7 +1,7 @@
 From e80dae14711376bd01ac34dadf1d9b0b01068dd2 Mon Sep 17 00:00:00 2001
 From: leizhenyuan <110007460+leizhenyuan@users.noreply.github.com>
 Date: Sat, 8 Oct 2022 17:24:32 +0800
-Subject: [PATCH 33/35] Revert "enable pin memory on xpu (#67)" (#69)
+Subject: [PATCH 33/36] Revert "enable pin memory on xpu (#67)" (#69)
 
 This reverts commit ec76f1d45f4affe39aa8a284a368f7f92eb06401.
 ---

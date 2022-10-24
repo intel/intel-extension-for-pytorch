@@ -1,7 +1,7 @@
 From 28c69d4b4a71a71b2919cc3cb4ad22d8edd933ea Mon Sep 17 00:00:00 2001
 From: wuhuikx <hui.h.wu@intel.com>
 Date: Fri, 5 Aug 2022 15:00:23 +0800
-Subject: [PATCH 24/35] Speedup Philox on XPU device (#58)
+Subject: [PATCH 24/36] Speedup Philox on XPU device (#58)
 
 ---
  aten/src/ATen/core/PhiloxRNGEngine.h | 7 +++++++

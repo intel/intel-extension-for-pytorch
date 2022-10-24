@@ -1,7 +1,7 @@
 From be2033436a83b80f91e9bd793802a3ad96875122 Mon Sep 17 00:00:00 2001
 From: KevinYuk <kevin.yu@intel.com>
 Date: Mon, 21 Feb 2022 16:49:34 +0800
-Subject: [PATCH 03/35] channels last 1d for rebase pytorch 1.10 (#29)
+Subject: [PATCH 03/36] channels last 1d for rebase pytorch 1.10 (#29)
 
 ---
  aten/src/ATen/core/TensorBase.h           |  8 ++-

@@ -1,7 +1,7 @@
 From 878b181bce5648570c3c09283767a99bb8767486 Mon Sep 17 00:00:00 2001
 From: leizhenyuan <110007460+leizhenyuan@users.noreply.github.com>
 Date: Sun, 9 Oct 2022 14:57:07 +0800
-Subject: [PATCH 34/35] port from pytorch and add xpu device (#71)
+Subject: [PATCH 34/36] port from pytorch and add xpu device (#71)
 
 ---
  torch/utils/data/_utils/pin_memory.py | 43 ++++++++++++++++++--------

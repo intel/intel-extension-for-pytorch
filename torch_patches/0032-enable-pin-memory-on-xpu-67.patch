@@ -1,7 +1,7 @@
 From ec76f1d45f4affe39aa8a284a368f7f92eb06401 Mon Sep 17 00:00:00 2001
 From: leizhenyuan <110007460+leizhenyuan@users.noreply.github.com>
 Date: Sat, 8 Oct 2022 14:39:39 +0800
-Subject: [PATCH 32/35] enable pin memory on xpu (#67)
+Subject: [PATCH 32/36] enable pin memory on xpu (#67)
 
 * enable pin memory on xpu
 ---

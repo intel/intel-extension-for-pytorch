@@ -1,7 +1,7 @@
 From 725fe5774d0cc9e7cf2d9d21b8d75c5c28b8aefc Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Thu, 1 Sep 2022 00:47:07 +0800
-Subject: [PATCH 28/35] add a SYCL device version assertation (#63)
+Subject: [PATCH 28/36] add a SYCL device version assertation (#63)
 
 * add a SYCL device version assertation
 

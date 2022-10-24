@@ -1,7 +1,7 @@
 From d02a1bf33505cbf4d5b150590e8943eb39cc1674 Mon Sep 17 00:00:00 2001
 From: Guo Yejun <yejun.guo@intel.com>
 Date: Thu, 26 May 2022 14:32:24 +0800
-Subject: [PATCH 18/35] add XPU support for autocast (#35)
+Subject: [PATCH 18/36] add XPU support for autocast (#35)
 
 Co-authored-by: xiaolil1 <xiaoli.liu@intel.com>
 ---

@@ -1,7 +1,7 @@
 From 3453dab17d9a5795b4448aee6a595e4206026b22 Mon Sep 17 00:00:00 2001
 From: chengjunlu <chengjun.lu@intel.com>
 Date: Mon, 9 May 2022 09:16:56 +0800
-Subject: [PATCH 13/35] Fix issue in sparse op only checks the CUDA device
+Subject: [PATCH 13/36] Fix issue in sparse op only checks the CUDA device
  (#48)
 
 ---
