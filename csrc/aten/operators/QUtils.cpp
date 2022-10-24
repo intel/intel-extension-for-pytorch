@@ -1,9 +1,5 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorFactories.h>
-// #include <ATen/native/quantized/cpu/conv_serialization.h>
-// #include <ATen/native/quantized/cpu/embedding_packed_params.h>
-// #include <ATen/native/quantized/cpu/packed_params.h>
-// #include <ATen/native/quantized/cpu/qnnpack_utils.h>
 #include <ATen/quantized/QTensorImpl.h>
 #include <ATen/quantized/Quantizer.h>
 #include <c10/core/QScheme.h>
@@ -23,6 +19,17 @@ extern template torch::class_<ConvPackedParamsBase<2>> register_conv_params<
     2>();
 extern template torch::class_<ConvPackedParamsBase<3>> register_conv_params<
     3>();
+
+template <int kSpatialDim = 2>
+ConvParamsSerializationTypeV2 serialize_conv(
+    const c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>>& params);
+extern template ConvParamsSerializationTypeV2 serialize_conv(
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& params);
+extern template ConvParamsSerializationTypeV2 serialize_conv(
+    const c10::intrusive_ptr<ConvPackedParamsBase<3>>& params);
+
+template <uint32_t kSpatialDim>
+ConvParamsSerializationTypeV3 parse_conv_serialized_state(c10::IValue v);
 
 template <int kSpatialDim>
 int redefine_prepack() {
