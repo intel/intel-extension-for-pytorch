@@ -191,7 +191,7 @@ Tensor _euclidean_dist(const Tensor& x1, const Tensor& x2) {
   Tensor x2_pad = at::ones_like(x2_norm, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   Tensor x1_ = at::cat({x1.mul(-2), x1_norm, x1_pad}, -1);
   Tensor x2_ = at::cat({x2, x2_pad, x2_norm}, -1);
-  Tensor result = x1_.matmul(x2_.transpose(-2, -1));
+  Tensor result = x1_.matmul(x2_.mT());
   result.clamp_min_(0).sqrt_();
   return result;
 }
@@ -459,7 +459,8 @@ static void cdist_forward_kernel_impl(
     const double p,
     const int64_t r1,
     const int64_t r2,
-    const int64_t m,
+    const int64_t c1,
+    const int64_t c2,
     const int64_t r_size,
     const int64_t l1_size,
     const int64_t l2_size) {
@@ -486,10 +487,10 @@ static void cdist_forward_kernel_impl(
       const int64_t j = k % r2;
       const size_t stride = item_id.get_local_range().size();
 
-      scalar_t* start = x1_ptr + l * l1_size + i * m;
-      scalar_t* end = start + m;
+      scalar_t* start = x1_ptr + l * l1_size + i * c1;
+      scalar_t* end = start + c1;
       scalar_t* a = start + local_id;
-      scalar_t* b = x2_ptr + l * l2_size + j * m + local_id;
+      scalar_t* b = x2_ptr + l * l2_size + j * c2 + local_id;
 
       scalar_t agg = 0.0;
       for (; a < end; a += stride, b += stride) {
@@ -518,43 +519,46 @@ static Tensor cdist_forward(
     const double p,
     c10::optional<int64_t> compute_mode) {
   int64_t mode = compute_mode.value_or(0);
+  TORCH_CHECK(
+      mode >= 0 && mode <= 2, "possible modes: 0, 1, 2, but was: ", mode);
+
+  int64_t c1 = x1.size(-1);
+  int64_t c2 = x2.size(-1);
   int64_t r1 = x1.size(-2);
   int64_t r2 = x2.size(-2);
-  int64_t m = x1.size(-1);
   int64_t dim1 = x1.dim();
   int64_t dim2 = x2.dim();
-  IntArrayRef batchsize1(x1.sizes().data(), dim1 - 2);
-  IntArrayRef batchsize2(x2.sizes().data(), dim2 - 2);
-  std::vector<int64_t> expand_batchsize =
-      at::infer_size(batchsize1, batchsize2);
-  std::vector<int64_t> x1_expand_size(expand_batchsize);
-  x1_expand_size.insert(x1_expand_size.end(), {r1, m});
-  std::vector<int64_t> x2_expand_size(expand_batchsize);
-  x2_expand_size.insert(x2_expand_size.end(), {r2, m});
+  IntArrayRef batch_tensor1(x1.sizes().data(), dim1 - 2);
+  IntArrayRef batch_tensor2(x2.sizes().data(), dim2 - 2);
+  std::vector<int64_t> expand_batch_portion =
+      at::infer_size(batch_tensor1, batch_tensor2);
+  std::vector<int64_t> tensor1_expand_size(expand_batch_portion);
+  tensor1_expand_size.insert(tensor1_expand_size.end(), {r1, c1});
+  std::vector<int64_t> tensor2_expand_size(expand_batch_portion);
+  tensor2_expand_size.insert(tensor2_expand_size.end(), {r2, c2});
 
-  int expand_batch_product = std::accumulate(
-      expand_batchsize.begin(),
-      expand_batchsize.end(),
-      1,
-      std::multiplies<int64_t>());
-  std::vector<int64_t> x1_view{expand_batch_product, r1, m};
-  std::vector<int64_t> x2_view{expand_batch_product, r2, m};
+  const int64_t expand_batch_product =
+      c10::multiply_integers(expand_batch_portion);
+  std::vector<int64_t> tensor1_view{expand_batch_product, r1, c1};
+  std::vector<int64_t> tensor2_view{expand_batch_product, r2, c2};
 
-  Tensor x1_expanded = x1.expand(x1_expand_size).contiguous().view(x1_view);
-  Tensor x2_expanded = x2.expand(x2_expand_size).contiguous().view(x2_view);
+  Tensor tensor1_expanded =
+      x1.expand(tensor1_expand_size).contiguous().view(tensor1_view);
+  Tensor tensor2_expanded =
+      x2.expand(tensor2_expand_size).contiguous().view(tensor2_view);
 
-  std::vector<int64_t> output_shape(expand_batchsize);
+  std::vector<int64_t> output_shape(expand_batch_portion);
   output_shape.insert(output_shape.end(), {r1, r2});
 
   Tensor result;
-  if (r1 == 0 || r2 == 0) {
+  if (r1 == 0 || r2 == 0 || expand_batch_product == 0) {
     result = at::empty(output_shape, x1.options());
-  } else if (m == 0) {
+  } else if (c1 == 0) {
     result = at::zeros(output_shape, x1.options());
   } else if (p == 2 && (mode == 1 || (mode == 0 && (r1 > 25 || r2 > 25)))) {
     Tensor dist = (expand_batch_product == 1)
         ? impl::_euclidean_dist(x1, x2)
-        : impl::_euclidean_dist(x1_expanded, x2_expanded);
+        : impl::_euclidean_dist(tensor1_expanded, tensor2_expanded);
     result = dist.view(output_shape);
   } else {
     result = at::empty(output_shape, x1.options());
@@ -567,63 +571,68 @@ static Tensor cdist_forward(
           if (p == 0.0) {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::zero, 0>(
                 result,
-                x1_expanded,
-                x2_expanded,
+                tensor1_expanded,
+                tensor2_expanded,
                 p,
                 r1,
                 r2,
-                m,
+                c1,
+                c2,
                 r1 * r2,
-                r1 * m,
-                r2 * m);
+                r1 * c1,
+                r2 * c2);
           } else if (p == 1.0) {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::one, 1>(
                 result,
-                x1_expanded,
-                x2_expanded,
+                tensor1_expanded,
+                tensor2_expanded,
                 p,
                 r1,
                 r2,
-                m,
+                c1,
+                c2,
                 r1 * r2,
-                r1 * m,
-                r2 * m);
+                r1 * c1,
+                r2 * c2);
           } else if (p == 2.0) {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
                 result,
-                x1_expanded,
-                x2_expanded,
+                tensor1_expanded,
+                tensor2_expanded,
                 p,
                 r1,
                 r2,
-                m,
+                c1,
+                c2,
                 r1 * r2,
-                r1 * m,
-                r2 * m);
+                r1 * c1,
+                r2 * c2);
           } else if (Numerics<scalar_t>::isinf(p)) {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
                 result,
-                x1_expanded,
-                x2_expanded,
+                tensor1_expanded,
+                tensor2_expanded,
                 p,
                 r1,
                 r2,
-                m,
+                c1,
+                c2,
                 r1 * r2,
-                r1 * m,
-                r2 * m);
+                r1 * c1,
+                r2 * c2);
           } else {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
                 result,
-                x1_expanded,
-                x2_expanded,
+                tensor1_expanded,
+                tensor2_expanded,
                 p,
                 r1,
                 r2,
-                m,
+                c1,
+                c2,
                 r1 * r2,
-                r1 * m,
-                r2 * m);
+                r1 * c1,
+                r2 * c2);
           }
         });
   }
