@@ -635,8 +635,8 @@ supported:
 #  - linalg_eigh
 #  - linalg_eigh.eigvals
 #  - linalg_eigvalsh.out
-#  - linalg_householder_product
-#  - linalg_householder_product.out
+  - linalg_householder_product
+  - linalg_householder_product.out
   - linalg_vector_norm
   - linalg_vector_norm.out
   - complex.out
