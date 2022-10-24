@@ -18,7 +18,7 @@ torch._C._jit_set_profiling_executor(False)
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
-print_graph = False
+print_graph = True
 
 def conv2d_fusion(input1, input2, model, print_graph=False, dtype=torch.float):
     y = model(input1, input2)
@@ -118,7 +118,8 @@ class Conv2dSum(torch.nn.Module):
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return self.conv(x) + a
+        x = self.conv(x).add_(a)
+        return x
 
 class Conv2dSumRelu(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -126,7 +127,7 @@ class Conv2dSumRelu(torch.nn.Module):
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return F.relu(self.conv(x) + a)
+        return F.relu(self.conv(x).add_(a))
 
 class Conv2dAbs(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -578,8 +579,8 @@ class TestNNMethod(TestCase):
         model1 = copy.deepcopy(model)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script)
-        # y, y_script = _conv_fusion(x, a1, model1, print_graph)
-        # self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
 
 
     def test_conv_sum_relu_fusion(self, dtype=torch.float):
@@ -744,7 +745,6 @@ class TestNNMethod(TestCase):
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
         self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
 
-    @pytest.mark.skip("Mish is not a valid op in IPEX, This test can be enabled")
     def test_conv_mish_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)

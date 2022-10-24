@@ -49,24 +49,32 @@ kind of cases which will automatically fuse the aten::dequantize.
 */
 // TODO: verify the accuracy of quantized convolution with post op fusion and
 // enable it in jit
-#define IPEX_DEFINE_CONV_FUSION(func)                      \
-  {{aten::conv2d, Symbol::fromQualString("aten::" #func)}, \
-   xpu::conv2d_##func##_sym},                              \
-  {                                                        \
-    {_conv_sym, Symbol::fromQualString("aten::" #func)},   \
-        xpu::_convolution_##func##_sym                     \
+#define IPEX_DEFINE_CONV_FUSION(func)                              \
+  {{aten::conv2d, Symbol::fromQualString("aten::" #func)},         \
+   xpu::conv2d_##func##_sym},                                      \
+      {{_conv_sym, Symbol::fromQualString("aten::" #func)},        \
+       xpu::_convolution_##func##_sym},                            \
+      {{aten::conv2d, Symbol::fromQualString("aten::" #func "_")}, \
+       xpu::conv2d_##func##_sym},                                  \
+  {                                                                \
+    {_conv_sym, Symbol::fromQualString("aten::" #func "_")},       \
+        xpu::_convolution_##func##_sym                             \
   }
 // {                                                         \
   //   {q_conv2d_sym, Symbol::fromQualString("aten::" #func)}, \
   //       xpu::q_conv2d_##func##_sym                          \
   // }
 
-#define IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(func)      \
-  {{aten::conv2d, Symbol::fromQualString("aten::" #func)}, \
-   xpu::conv2d_##func##_sym},                              \
-  {                                                        \
-    {_conv_sym, Symbol::fromQualString("aten::" #func)},   \
-        xpu::_convolution_##func##_sym                     \
+#define IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(func)              \
+  {{aten::conv2d, Symbol::fromQualString("aten::" #func)},         \
+   xpu::conv2d_##func##_sym},                                      \
+      {{_conv_sym, Symbol::fromQualString("aten::" #func)},        \
+       xpu::_convolution_##func##_sym},                            \
+      {{aten::conv2d, Symbol::fromQualString("aten::" #func "_")}, \
+       xpu::conv2d_##func##_sym},                                  \
+  {                                                                \
+    {_conv_sym, Symbol::fromQualString("aten::" #func "_")},       \
+        xpu::_convolution_##func##_sym                             \
   }
 // {                                                                    \
   //   {q_conv2d_dequantize_sym, Symbol::fromQualString("aten::" #func)}, \
@@ -449,14 +457,13 @@ class OpFuser {
 
 // TODO: These rules should be more scalable
 OpFuser::RuleTab OpFuser::dnnlRules = {
-    // RN50/RCAN: conv + relu
-    {{aten::conv2d, aten::relu}, xpu::conv2d_relu_sym},
-    {{aten::conv2d, Symbol::fromQualString("aten::relu_")},
-     xpu::conv2d_relu_sym},
     // RN50/RCAN: conv + add + relu
     {{xpu::conv2d_sum_sym, aten::relu}, xpu::conv2d_sum_relu_sym},
     {{xpu::conv2d_sum_sym, Symbol::fromQualString("aten::relu_")},
      xpu::conv2d_sum_relu_sym},
+    {{xpu::_convolution_sum_sym, aten::relu}, xpu::_convolution_sum_relu_sym},
+    {{xpu::_convolution_sum_sym, Symbol::fromQualString("aten::relu_")},
+     xpu::_convolution_sum_relu_sym},
     // RN50/RCAN: conv + add
     // note: sum post op can only used in inplace scenario
     // {{aten::conv2d, aten::add}, xpu::conv2d_sum_sym},
@@ -536,25 +543,21 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
      xpu::trans_matmul_div_sym},
     // matmul(m1, m2) + add (bias or post_sum)
     {{Symbol::fromQualString("aten::matmul"), aten::add_}, xpu::matmul_add_sym},
-    {{aten::conv2d, Symbol::fromQualString("aten::sigmoid")},
-     xpu::conv2d_sigmoid_sym},
     {{Symbol::fromQualString("aten::dequantize"), aten::pixel_shuffle},
      xpu::dequant_pixelshuffle_sym},
     {{xpu::dequant_pixelshuffle_sym,
       Symbol::fromQualString("aten::quantize_per_tensor")},
      xpu::dequant_pixelshuffle_quant_sym},
-    {{Symbol::fromQualString("aten::_convolution"),
-      Symbol::fromQualString("aten::relu_")},
-     xpu::_convolution_relu__sym},
+    // Note: when model adopting fp16 as datatype and generate modelscript by
+    // jit.trace, convolution will be parsed as _convolution on ir.
+
+    // YOLOv4 fp16: conv + add_
     {{Symbol::fromQualString("aten::_convolution"), aten::add_},
      xpu::_convolution_sum_sym},
     {{Symbol::fromQualString("aten::_convolution"), aten::add},
      xpu::_convolution_sum_sym},
     {{xpu::_convolution_sum_sym, Symbol::fromQualString("aten::relu_")},
      xpu::_convolution_sum_relu_sym},
-    {{Symbol::fromQualString("aten::_convolution"),
-      Symbol::fromQualString("aten::silu_")},
-     xpu::convolution_silu_sym},
 
     IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(sqrt),
     IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(square),
@@ -570,7 +573,11 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     IPEX_DEFINE_CONV_FUSION(hardsigmoid),
     IPEX_DEFINE_CONV_FUSION(tanh),
     IPEX_DEFINE_CONV_FUSION(elu),
-    IPEX_DEFINE_CONV_FUSION(hardtanh)
+    IPEX_DEFINE_CONV_FUSION(hardtanh),
+    IPEX_DEFINE_CONV_FUSION(sigmoid),
+    IPEX_DEFINE_CONV_FUSION(leaky_relu),
+    IPEX_DEFINE_CONV_FUSION(pow),
+    IPEX_DEFINE_CONV_FUSION(relu),
     // IPEX_DEFINE_CONV_FUSION(soft_relu)
 };
 

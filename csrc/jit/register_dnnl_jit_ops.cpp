@@ -405,10 +405,28 @@ of all the registerations, should always
 
 */
 
+// NOTE: in some cases, quantized pass can bring different schema change
+// compared with non-quantized pass. For example of convolution + sum fusion, we
+// have
+//
+//        IPEX_CONV_JIT_OP_REGISTER(sum,
+//           EXTRA_SCHEMA("Tensor(a!) accumu, *, Scalar scale")),
+
+// for non-quantized pass registration and
+
+//        IPEX_QCONV2D_JIT_OP_REGISTER(sum,
+//           EXTRA_SCHEMA( "Tensor(a!) accumu, *, Scalar sum_scale, Scalar
+//           sum_zpoint")),
+
+// for quantized pass registration.
+
+#define IPEX_CONV_JIT_OP_REGISTER(func, ...)      \
+  IPEX_CONV2D_JIT_OP_REGISTER(func, __VA_ARGS__), \
+      IPEX__CONV_JIT_OP_REGISTER(func, __VA_ARGS__)
+
 #define IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(func, ...) \
   IPEX_QCONV2D_JIT_OP_REGISTER(func, __VA_ARGS__),     \
-      IPEX_CONV2D_JIT_OP_REGISTER(func, __VA_ARGS__),  \
-      IPEX__CONV_JIT_OP_REGISTER(func, __VA_ARGS__)
+      IPEX_CONV_JIT_OP_REGISTER(func, __VA_ARGS__)
 
 } // namespace
 
@@ -550,11 +568,22 @@ RegisterOperators op({
         elu,
         EXTRA_SCHEMA("Scalar alpha=1, Scalar scale=1, Scalar input_scale=1")),
 
-    IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(
+    // note: It is found that convolution + sum fusion may result with different
+    // schema when it comes with INT8 path.
+    IPEX_CONV_JIT_OP_REGISTER(
         sum,
-        EXTRA_SCHEMA("Tensor(a!) accumu, *, Scalar alpha")),
+        EXTRA_SCHEMA("Tensor(a!) accumu, *, Scalar scale")),
 
-    IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(
+    IPEX_QCONV2D_JIT_OP_REGISTER(
+        sum,
+        EXTRA_SCHEMA(
+            "Tensor(a!) accumu, *, Scalar sum_scale, Scalar sum_zpoint")),
+
+    IPEX_CONV_JIT_OP_REGISTER(
+        sum_relu,
+        EXTRA_SCHEMA("Tensor(a!) accumu, *, Scalar scale")),
+
+    IPEX_QCONV2D_JIT_OP_REGISTER(
         sum_relu,
         EXTRA_SCHEMA(
             "Tensor(a!) accumu, *, Scalar sum_scale, Scalar sum_zpoint")),

@@ -55,24 +55,23 @@ IPEX_GENERAL_CONV_SYMBOL_DECLARATION(hardsigmoid);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(elu);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(pow);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(hardtanh);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(sigmoid);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(leaky_relu);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(relu);
 
 static auto _conv_sym = Symbol::fromQualString("aten::_convolution");
 static auto reorder_sym = Symbol::fromQualString("xpu::reorder");
 static auto batch_norm_sym = Symbol::fromQualString("xpu::batch_norm");
 static auto pad_conv2d_sym = Symbol::fromQualString("xpu::pad_conv2d");
-static auto conv2d_relu_sym = Symbol::fromQualString("xpu::conv2d_relu");
 static auto conv2d_sum_sym = Symbol::fromQualString("xpu::conv2d_sum");
 static auto conv2d_relu_sum_sym =
     Symbol::fromQualString("xpu::conv2d_relu_sum");
-static auto _convolution_relu__sym =
-    Symbol::fromQualString("xpu::_convolution_relu");
 static auto _convolution_sum_sym =
     Symbol::fromQualString("xpu::_convolution_sum");
 static auto _convolution_sum_relu_sym =
     Symbol::fromQualString("xpu::_convolution_sum_relu");
 static auto conv2d_sum_relu_sym =
     Symbol::fromQualString("xpu::conv2d_sum_relu");
-static auto conv2d_sigmoid_sym = Symbol::fromQualString("xpu::conv2d_sigmoid");
 static auto matmul_add_sym = Symbol::fromQualString("xpu::matmul_add");
 static auto t_matmul_sym = Symbol::fromQualString("xpu::t_matmul");
 static auto trans_matmul_sym = Symbol::fromQualString("xpu::trans_matmul");
@@ -86,10 +85,6 @@ static auto trans_matmul_div_sym =
 static auto mul_add_sym = Symbol::fromQualString("xpu::mul_add");
 static auto q_conv2d_sum_relu_sym =
     Symbol::fromQualString("xpu::q_conv2d_sum_relu");
-static auto q_conv2d_leaky_relu_sym =
-    Symbol::fromQualString("xpu::q_conv2d_leaky_relu");
-static auto q_conv2d_sigmoid_sym =
-    Symbol::fromQualString("xpu::q_conv2d_sigmoid");
 static auto q_conv2d_dequantize_sym =
     Symbol::fromQualString("xpu::q_conv2d_dequantize");
 static auto softplus_tanh_sym = Symbol::fromQualString("xpu::softplus_tanh");
@@ -114,8 +109,6 @@ static auto dequant_pixelshuffle_quant_sym =
     Symbol::fromQualString("xpu::dequant_pixelshuffle_quant");
 static auto permute_contiguous_sym =
     Symbol::fromQualString("xpu::permute_contiguous");
-static auto convolution_silu_sym =
-    Symbol::fromQualString("xpu::_convolution_silu");
 
 // Fold weights of batch_norm with conv2d's
 static auto fold_weight_sym = Symbol::fromQualString("xpu::fold_weight");
