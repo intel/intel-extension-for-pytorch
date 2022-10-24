@@ -196,5 +196,38 @@ class TestLauncher(TestCase):
                 assert r.returncode == 0
                 assert expected_msg in str(r.stdout, "utf-8")
 
+    def test_specified_core_list(self):
+        # Test for basic use
+        expected_cores = " -C 0-2,4-4"
+        for launch_script in self.launch_scripts:
+            cmd = launch_script + ["--core_list 0-2,4",         \
+                                   "--ninstances 1",            \
+                                   "--ncore_per_instance 4",    \
+                                   "--no_python",               \
+                                   "pwd"]
+            cmd = ' '.join(cmd)
+            r = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            assert r.returncode == 0
+            assert expected_cores in str(r.stdout, "utf-8")
+        # Test for mixed usage of core_id numbers and ranges, out-of-order handling, space char tolerance,
+        #  and dispatching cores to multiple instances
+        # It is needed to generate the subprocess.run() cmd args with another separator (using '#')
+        #  to keep the integrity of core_list argument value which has space characters in it.
+        expected_cores_proc1 = " -C 0-2,4-4"
+        expected_cores_proc2 = " -C 6-7,9-10"
+        for launch_script in self.launch_scripts:
+            cmd = launch_script + ["--core_list",               \
+                                   "4, 6 - 6, 0-2, 7, 10-9",    \
+                                   "--ninstances",              \
+                                   "2",                         \
+                                   "--ncore_per_instance",      \
+                                   "4",                         \
+                                   "--no_python",               \
+                                   "pwd"]
+            cmd = '#'.join(cmd)
+            r = subprocess.run(cmd.split('#'), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            assert r.returncode == 0
+            assert expected_cores_proc1 in str(r.stdout, "utf-8")
+            assert expected_cores_proc2 in str(r.stdout, "utf-8")
 if __name__ == '__main__':
     test = unittest.main()

@@ -99,7 +99,7 @@ for well-improved multi-node distributed training performance as well.
 2. Multi-Node multi-process distributed training: (e.g. two nodes)
 
 
-rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*
+rank 0: *(IP: 192.168.10.10, and has a free port: 29500)*
 
 ::
 
@@ -365,7 +365,22 @@ class MultiInstanceLauncher(Launcher):
         set_kmp_affinity = True
         enable_taskset = False
         if args.core_list:  # user specify what cores will be used by params
-            cores = [int(x) for x in args.core_list.split(",")]
+            for core_list_elem in args.core_list.split(","):
+                spec_core = core_list_elem.strip()
+                if spec_core.isdigit():
+                    cores.append(int(spec_core))
+                else:
+                    core_range = [int(x.strip()) for x in spec_core.split("-")]
+                    assert len(core_range) == 2, "Invalid core_list argument format"
+                    beg, end = core_range
+                    if beg > end:
+                        beg, end = end, beg
+                    cores.extend(list(range(beg, end + 1)))
+            cores = list(set(cores))
+            valid_cores = self.cpuinfo.get_all_physical_cores() + self.cpuinfo.get_all_logical_cores()
+            for c in cores:
+                assert c in valid_cores, "Invalid core ID {} in core_list argument".format(c)
+
             if args.ncore_per_instance == -1:
                 logger.error("please specify the '--ncore_per_instance' if you have pass the --core_list params")
                 exit(-1)
@@ -753,7 +768,7 @@ def add_multi_instance_params(parser):
     group.add_argument("--disable_taskset", action='store_true', default=False,
                        help="Disable taskset")
     group.add_argument("--core_list", metavar='\b', default=None, type=str,
-                       help="Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used.")
+                       help="Specify the core list as 'core_id, core_id, ...' or 'core_id-core_id, ...', otherwise, all the cores will be used.")
     group.add_argument("--benchmark", action='store_true', default=False,
                    help="Enable benchmark config. JeMalloc's MALLOC_CONF has been tuned for low latency. Recommend to use this for benchmarking purpose; for other use cases, this MALLOC_CONF may cause Out-of-Memory crash.")
     group.add_argument("--log_path", metavar='\b', default="", type=str,
