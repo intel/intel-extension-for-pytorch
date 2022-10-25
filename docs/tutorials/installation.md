@@ -94,7 +94,7 @@ $ pip install dist/*.whl
 Please refer to [AOT documentation](./AOT.md) for how to configure `USE_AOT_DEVLIST`.
 
 ```bash
-$ export USE_AOT_DEVLIST='dg2-g10-c0'
+$ export USE_AOT_DEVLIST='ats-m150'
 ```
 
 ### Install Intel® Extension for PyTorch\*:

@@ -180,7 +180,7 @@ data = data.to(memory_format=torch.channels_last)
 model = model.to("xpu")
 data = data.to("xpu")
 model = torch.xpu.optimize(model, dtype=torch.float32)
-######################################################
+#################### code changes ####################
 
 with torch.no_grad():
   model(data)
@@ -207,7 +207,7 @@ data = torch.randint(vocab_size, size=[batch_size, seq_length])
 model = model.to("xpu")
 data = data.to("xpu")
 model = torch.xpu.optimize(model, dtype=torch.float32)
-######################################################
+#################### code changes ####################
 
 with torch.no_grad():
   model(data)
@@ -237,7 +237,7 @@ data = data.to(memory_format=torch.channels_last)
 model = model.to("xpu")
 data = data.to("xpu")
 model = torch.xpu.optimize(model, dtype=torch.float32)
-######################################################
+#################### code changes ####################
 
 with torch.no_grad():
   d = torch.rand(1, 3, 224, 224)
@@ -271,7 +271,7 @@ data = torch.randint(vocab_size, size=[batch_size, seq_length])
 model = model.to("xpu")
 data = data.to("xpu")
 model = torch.xpu.optimize(model, dtype=torch.float32)
-######################################################
+#################### code changes ####################
 
 with torch.no_grad():
   d = torch.randint(vocab_size, size=[batch_size, seq_length])
@@ -311,7 +311,7 @@ data = data.to(memory_format=torch.channels_last)
 model = model.to("xpu")
 data = data.to("xpu")
 model = torch.xpu.optimize(model, dtype=torch.bfloat16)
-######################################################
+#################### code changes ####################
 
 with torch.no_grad():
   ################################# code changes ######################################
@@ -341,7 +341,7 @@ data = torch.randint(vocab_size, size=[batch_size, seq_length])
 model = model.to("xpu")
 data = data.to("xpu")
 model = torch.xpu.optimize(model, dtype=torch.bfloat16)
-######################################################
+#################### code changes ####################
 
 with torch.no_grad():
   ################################# code changes ######################################
@@ -374,7 +374,7 @@ data = data.to(memory_format=torch.channels_last)
 model = model.to("xpu")
 data = data.to("xpu")
 model = torch.xpu.optimize(model, dtype=torch.bfloat16)
-######################################################
+#################### code changes ####################
 
 with torch.no_grad():
   d = torch.rand(1, 3, 224, 224)
@@ -408,7 +408,7 @@ data = torch.randint(vocab_size, size=[batch_size, seq_length])
 model = model.to("xpu")
 data = data.to("xpu")
 model = torch.xpu.optimize(model, dtype=torch.bfloat16)
-######################################################
+#################### code changes ####################
 
 with torch.no_grad():
   d = torch.randint(vocab_size, size=[batch_size, seq_length])
@@ -448,7 +448,7 @@ data = data.to(memory_format=torch.channels_last)
 model = model.to("xpu")
 data = data.to("xpu")
 model = torch.xpu.optimize(model, dtype=torch.float16)
-######################################################
+#################### code changes ####################
 
 with torch.no_grad():
   ################################# code changes ######################################
@@ -478,7 +478,7 @@ data = torch.randint(vocab_size, size=[batch_size, seq_length])
 model = model.to("xpu")
 data = data.to("xpu")
 model = torch.xpu.optimize(model, dtype=torch.float16)
-######################################################
+#################### code changes ####################
 
 with torch.no_grad():
   ################################# code changes ######################################
@@ -511,7 +511,7 @@ data = data.to(memory_format=torch.channels_last)
 model = model.to("xpu")
 data = data.to("xpu")
 model = torch.xpu.optimize(model, dtype=torch.float16)
-######################################################
+#################### code changes ####################
 
 with torch.no_grad():
   d = torch.rand(1, 3, 224, 224)
@@ -545,7 +545,7 @@ data = torch.randint(vocab_size, size=[batch_size, seq_length])
 model = model.to("xpu")
 data = data.to("xpu")
 model = torch.xpu.optimize(model, dtype=torch.float16)
-######################################################
+#################### code changes ####################
 
 with torch.no_grad():
   d = torch.randint(vocab_size, size=[batch_size, seq_length])
