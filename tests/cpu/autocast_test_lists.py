@@ -163,6 +163,7 @@ class AutocastCPUTestLists(object):
             ("linear", mat0_fp32 + mat1_fp32),
         ]
         self.nn_bf16_fp32 = [
+            ("avg_pool3d", dummy_bf16[3], {"kernel_size": (3, 3, 3), "stride": (1, 1, 1)}),
         ]
         self.torch_bf16_fp32_multi_output = [
         ]

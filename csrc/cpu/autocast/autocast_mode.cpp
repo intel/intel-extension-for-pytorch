@@ -355,6 +355,20 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
       TUPLE_THREE_TENSORS(const Tensor&, const Tensor&, int64_t),
       user_defined_dtype,
       fp32)
+  // fp32 and fp32 cast policies
+  MAKE_REGISTER_FUNC_TWO_POLICIES(
+      ADD_NS(avg_pool3d),
+      "avg_pool3d",
+      Tensor(
+          const Tensor&,
+          IntArrayRef,
+          IntArrayRef,
+          IntArrayRef,
+          bool,
+          bool,
+          c10::optional<int64_t>),
+      fp32,
+      fp32)
   // fallthrough and fp32 cast policies
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       ADD_NS(mish), "mish", Tensor(const Tensor&), fallthrough, fp32)
@@ -377,19 +391,6 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
       ADD_NS(avg_pool1d),
       "avg_pool1d",
       Tensor(const Tensor&, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(avg_pool3d),
-      "avg_pool3d",
-      Tensor(
-          const Tensor&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          bool,
-          bool,
-          c10::optional<int64_t>),
       fallthrough,
       fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
