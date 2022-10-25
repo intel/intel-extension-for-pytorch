@@ -1,5 +1,6 @@
 import unittest
 import os
+import subprocess
 
 import intel_extension_for_pytorch._C as core
 
@@ -36,6 +37,9 @@ def get_highest_binary_support_isa_level():
 def get_highest_cpu_support_isa_level():
     return core._get_highest_cpu_support_isa_level().lower()
 
+def check_not_sync_onednn_isa_level():
+    return core._check_not_sync_onednn_isa_level()
+
 class TestDynDisp(unittest.TestCase):
 
     def test_manual_select_kernel(self):
@@ -68,6 +72,23 @@ class TestDynDisp(unittest.TestCase):
 
         self.assertTrue(expected_isa)
         return        
+
+    @unittest.skipIf(check_not_sync_onednn_isa_level(), 'skip this if not sync onednn isa level')
+    def test_ipex_set_onednn_isa_level(self):
+        command = 'ATEN_CPU_CAPABILITY=avx2 python -c "import torch; import intel_extension_for_pytorch._C as core; print(core._get_current_onednn_isa_level())" '
+        with subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
+          out = p.stdout.readlines()
+          onednn_isa_level = str(out[-1], 'utf-8').strip()
+          self.assertTrue(onednn_isa_level == 'AVX2')
+
+    @unittest.skipIf(check_not_sync_onednn_isa_level(), 'skip this if not sync onednn isa level')
+    def test_onednn_do_not_set_isa_level(self):
+        command = 'ONEDNN_MAX_CPU_ISA=avx2 python -c "import torch; import intel_extension_for_pytorch._C as core; print(core._get_current_isa_level().lower())" '
+        cur_ipex_isa = get_currnet_isa_level()
+        with subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
+          out = p.stdout.readlines()
+          cur_ipex_isa_1 = str(out[-1], 'utf-8').strip()
+          self.assertTrue(cur_ipex_isa == cur_ipex_isa_1)
 
 if __name__ == '__main__':
     unittest.main()

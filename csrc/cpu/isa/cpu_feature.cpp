@@ -2,6 +2,13 @@
 #include <stdio.h>
 #include "embedded_function.h"
 
+#ifdef __linux__
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
+
+#include <ATen/ATen.h>
+
 namespace torch_ipex {
 namespace cpu {
 CPUFeature::CPUFeature() {
@@ -277,6 +284,44 @@ bool CPUFeature::os_amx() {
   return false;
 }
 
+#ifdef __linux__
+
+#define XFEATURE_XTILECFG 17
+#define XFEATURE_XTILEDATA 18
+#define XFEATURE_MASK_XTILECFG (1 << XFEATURE_XTILECFG)
+#define XFEATURE_MASK_XTILEDATA (1 << XFEATURE_XTILEDATA)
+#define XFEATURE_MASK_XTILE (XFEATURE_MASK_XTILECFG | XFEATURE_MASK_XTILEDATA)
+#define ARCH_GET_XCOMP_PERM 0x1022
+#define ARCH_REQ_XCOMP_PERM 0x1023
+
+bool CPUFeature::init_amx() {
+  unsigned long bitmask = 0;
+  long status = syscall(SYS_arch_prctl, ARCH_GET_XCOMP_PERM, &bitmask);
+  if (0 != status)
+    return false;
+  if (bitmask & XFEATURE_MASK_XTILEDATA)
+    return true;
+
+  status = syscall(SYS_arch_prctl, ARCH_REQ_XCOMP_PERM, XFEATURE_XTILEDATA);
+  if (0 != status)
+    return false; // XFEATURE_XTILEDATA setup is failed, TMUL usage is not
+                  // allowed
+  status = syscall(SYS_arch_prctl, ARCH_GET_XCOMP_PERM, &bitmask);
+
+  // XFEATURE_XTILEDATA setup is failed, can't use TMUL
+  if (0 != status || !(bitmask & XFEATURE_MASK_XTILEDATA))
+    return false;
+
+  // XFEATURE_XTILEDATA set successfully, TMUL usage is allowed
+  return true;
+}
+#else
+bool CPUFeature::init_amx() {
+  AT_ERROR("DispatchStub: only support init amx on Linux now");
+  return false;
+}
+#endif
+
 bool CPUFeature::isa_level_avx2() {
   static bool b_is_support = os_avx2() && cpuid_avx2() && cpuid_fma();
   return b_is_support;
@@ -304,9 +349,19 @@ bool CPUFeature::isa_level_avx512_bf16() {
   return b_is_support;
 }
 
+bool CPUFeature::_do_check_and_init_amx() {
+  bool b_is_support = isa_level_avx512_bf16() && os_amx() && cpuid_amx_bf16() &&
+      cpuid_amx_int8() && cpuid_amx_tile();
+  if (b_is_support) {
+    b_is_support = init_amx();
+  }
+  return b_is_support;
+}
+
 bool CPUFeature::isa_level_amx() {
-  static bool b_is_support = isa_level_avx512_bf16() && os_amx() &&
-      cpuid_amx_bf16() && cpuid_amx_int8() && cpuid_amx_tile();
+  // check and init in a funtion, avoid to double init.
+  static bool b_is_support = _do_check_and_init_amx();
+
   return b_is_support;
 }
 

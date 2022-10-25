@@ -61,6 +61,16 @@ void InitIpexModuleBindings(py::module m) {
     return get_current_isa_level();
   });
 
+  m.def("_get_current_onednn_isa_level", []() {
+    using namespace torch_ipex::cpu;
+    return get_current_onednn_isa_level();
+  });
+
+  m.def("_check_not_sync_onednn_isa_level", []() {
+    using namespace torch_ipex::cpu;
+    return check_not_sync_onednn_isa_level();
+  });
+
   m.def("_get_highest_cpu_support_isa_level", []() {
     using namespace torch_ipex::cpu;
     return get_highest_cpu_support_isa_level();
