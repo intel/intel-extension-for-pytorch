@@ -41,7 +41,7 @@ void DPCPPGuardImpl::uncheckedSetDevice(Device d) const noexcept {
 }
 
 Stream DPCPPGuardImpl::getStream(Device d) const noexcept {
-  return getCurrentDPCPPStream().unwrap();
+  return getCurrentDPCPPStream(d.index()).unwrap();
 }
 
 Stream DPCPPGuardImpl::exchangeStream(Stream s) const noexcept {
