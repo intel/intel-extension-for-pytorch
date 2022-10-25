@@ -145,6 +145,11 @@ target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC dnnl_graph)
 if (DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
   get_target_property(DNNL_GRAPHCOMPILER_LLVM_LIB dnnl_graphcompiler_llvm_lib INTERFACE_LINK_LIBRARIES)
   target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC graphcompiler ${DNNL_GRAPHCOMPILER_LLVM_LIB})
+  # BUILD_SHARED_LIBS is not used to control ipex library type, it is always shared
+  if (NOT MSVC)
+    get_target_property(DNNL_GRAPHCOMPILER_LLVM_LIB_EXCLUDE dnnl_graphcompiler_llvm_lib_exclude_string INTERFACE_LINK_LIBRARIES)
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--exclude-libs=${DNNL_GRAPHCOMPILER_LLVM_LIB_EXCLUDE}")
+  endif()
 endif()
 
 find_library(MKL_LIBRARY libmkl_core.a PATHS "${MKL_INSTALL_DIR}/lib" "${MKL_INSTALL_DIR}/lib/intel64")
