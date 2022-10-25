@@ -30,7 +30,7 @@ Intel® Extension for PyTorch\* has to work with a corresponding version of PyTo
 
 |Release|OS|Intel GPU|Install Intel GPU Driver|
 |-|-|-|-|
-|v1.0.0|Ubuntu 20.04|Intel® Data Center GPU Flex Series| Refer to the [Installation Guides](https://dgpu-docs.intel.com/installation-guides/ubuntu/ubuntu-focal-dc.html) for latest driver installation. If install the verified Intel® Data Center GPU Flex Series [419.40](https://dgpu-docs.intel.com/releases/stable_419_40_20220914.html), please append the specific version after components, such as `sudo apt-get install intel-opencl-icd=22.28.23726.1+i419~u20.04`|
+|v1.0.0|Ubuntu 20.04|Intel® Data Center GPU Flex Series| Refer to the [Installation Guides](https://dgpu-docs.intel.com/installation-guides/ubuntu/ubuntu-focal-dc.html) for the latest driver installation. If installing the verified Intel® Data Center GPU Flex Series [419.40](https://dgpu-docs.intel.com/releases/stable_419_40_20220914.html), use a specific version for component package names, such as `sudo apt-get install intel-opencl-icd=22.28.23726.1+i419~u20.04`|
 
 ### Install oneAPI Base Toolkit
 
