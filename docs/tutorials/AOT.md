@@ -6,13 +6,15 @@
 
 ## Use case
 
-Intel® Extension for PyTorch\* provides build option `USE_AOT_DEVLIST` for end-users who install Intel® Extension for PyTorch\* via source compilation to configure device list for AOT compilation. The target device in device list is specified by DEVICE name of the target. Multi-target AOT compilation is supported by using a comma (,) as a delimiter in device list. See below table for the AOT setting targeting [Intel® Data Center GPU Flex Series](https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html).
+Intel® Extension for PyTorch\* provides build option `USE_AOT_DEVLIST` for users who install Intel® Extension for PyTorch\* via source compilation to configure device list for AOT compilation. The target device in device list is specified by DEVICE type of the target. Multi-target AOT compilation is supported by using a comma (,) as a delimiter in device list. See below table for the AOT setting targeting [Intel® Data Center GPU Flex Series 170](https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html).
 
 | Supported HW | AOT Setting |
 | ------------ |---------------------|
-| Intel® Data Center GPU Flex Series | USE_AOT_DEVLIST='dg2-g10-c0' |
+| Intel® Data Center GPU Flex Series 170 | USE_AOT_DEVLIST='ats-m150' |
 
-Intel® Extension for PyTorch\* enables AOT compilation for Intel GPU target devices in prebuilt wheel files. Intel® Data Center GPU Flex Series is the enabled target device in current release. If Intel® Extension for PyTorch\* is executed on a device which is not pre-configured in `USE_AOT_DEVLIST`, this application can still run because JIT compilation will be triggered automatically to allow execution on the current device. It causes additional compilation time during execution however.
+Intel® Extension for PyTorch\* enables AOT compilation for Intel GPU target devices in prebuilt wheel files. Intel® Data Center GPU Flex Series 170 is the enabled target device in current release. If Intel® Extension for PyTorch\* is executed on a device which is not pre-configured in `USE_AOT_DEVLIST`, this application can still run because JIT compilation will be triggered automatically to allow execution on the current device. It causes additional compilation time during execution.
+
+For more GPU platforms, please refer to [Use AOT for Integrated Graphics (Intel GPU)](https://www.intel.com/content/www/us/en/develop/documentation/oneapi-dpcpp-cpp-compiler-dev-guide-and-reference/top/compilation/ahead-of-time-compilation.html).
 
 ## Requirement
 
