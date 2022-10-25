@@ -1,11 +1,12 @@
-From d9d6d5b62d14716bb7170b8d52aa228a60224b30 Mon Sep 17 00:00:00 2001
+From a5e977e098aa8540bd38c8f98a9d219c38d4c578 Mon Sep 17 00:00:00 2001
 From: zhuyuhua-v <yuhua.zhu@intel.com>
-Date: Thu, 18 Aug 2022 21:06:43 +0800
-Subject: [PATCH 26/35] Add xpu path for GRUCell (#61)
+Date: Thu, 15 Sep 2022 06:01:14 +0000
+Subject: [PATCH 18/28] Add xpu path for GRUCell (#83723)
 
-Signed-off-by: zhuyuhuav <yuhua.zhu@intel.com>
-
-Signed-off-by: zhuyuhuav <yuhua.zhu@intel.com>
+Add xpu path for GRUCell.
+We supported a new kernel named _thnn_fused_gru_cell to fuse the small ops of GRU.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/83723
+Approved by: https://github.com/ezyang
 ---
  aten/src/ATen/native/RNN.cpp | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

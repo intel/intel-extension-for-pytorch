@@ -1,8 +1,16 @@
-From 5d95de97cb99bf541a85f89212b8417ee1970017 Mon Sep 17 00:00:00 2001
-From: chengjunlu <chengjun.lu@intel.com>
-Date: Mon, 9 May 2022 09:20:27 +0800
-Subject: [PATCH 14/35] Fix pytorch issue in sparce_coo_tensor (#46)
+From 09a779feae2c14ef309e5057229cce4ed7bbf5df Mon Sep 17 00:00:00 2001
+From: johnlu <chengjun.lu@intel.com>
+Date: Tue, 26 Apr 2022 00:56:10 +0000
+Subject: [PATCH 09/28] Fix issue in sparce_coo_tensor only supporting CUDA
+ device.
 
+## Motivation
+The at::native::_validate_sparse_coo_tensor_args only supports checking the indices on CUDA device and CPU device. To extend the function to support more device type.
+
+## Solution
+Copy  the indices to the CPU to validate the correctness.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/76293
+Approved by: https://github.com/mrshenli
 ---
  aten/src/ATen/native/sparse/SparseTensor.cpp | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

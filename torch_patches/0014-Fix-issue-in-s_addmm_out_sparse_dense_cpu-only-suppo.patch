@@ -1,9 +1,16 @@
-From 3453dab17d9a5795b4448aee6a595e4206026b22 Mon Sep 17 00:00:00 2001
-From: chengjunlu <chengjun.lu@intel.com>
-Date: Mon, 9 May 2022 09:16:56 +0800
-Subject: [PATCH 13/35] Fix issue in sparse op only checks the CUDA device
- (#48)
+From f2d1c428fc3253258efc19eb113c5fee0340881c Mon Sep 17 00:00:00 2001
+From: johnlu <chengjun.lu@intel.com>
+Date: Sat, 7 May 2022 10:35:29 +0000
+Subject: [PATCH 14/28] Fix issue in s_addmm_out_sparse_dense_cpu only
+ supporting CUDA device checking (#77018)
 
+## Motivation
+The at::native::s_addmm_out_sparse_dense_cpu only supports the CPU tensors. But it only checks whether the tensor is on CUDA device which is not enough.
+
+## Solution
+Change the tensor device type checkging from is_cuda to !is_cpu to protect other backends than the CUDA.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/77018
+Approved by: https://github.com/IvanYashchuk
 ---
  .../ATen/native/sparse/SparseTensorMath.cpp   | 20 +++++++++++++++----
  1 file changed, 16 insertions(+), 4 deletions(-)

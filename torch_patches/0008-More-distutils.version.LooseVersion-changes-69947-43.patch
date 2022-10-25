@@ -1,7 +1,7 @@
-From cb9f926ad257791545466cc6be1774df19828ef3 Mon Sep 17 00:00:00 2001
+From 377e0459f6fe5a455ccefb635d250a40445f01dc Mon Sep 17 00:00:00 2001
 From: Kim <kimyangbaochen@vip.qq.com>
 Date: Mon, 18 Apr 2022 16:30:24 +0800
-Subject: [PATCH 12/35] More distutils.version.LooseVersion changes (#69947)
+Subject: [PATCH 08/28] More distutils.version.LooseVersion changes (#69947)
  (#43)
 
 Summary: Pull Request resolved: https://github.com/pytorch/pytorch/pull/69947

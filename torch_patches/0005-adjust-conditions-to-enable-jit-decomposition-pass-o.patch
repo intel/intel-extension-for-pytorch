@@ -1,15 +1,28 @@
-From fac1bb693309722b047abf8c13efc81548927fbf Mon Sep 17 00:00:00 2001
+From e3e3a887f1e2fe1a2c5ceb1530b1c79b2a5e9beb Mon Sep 17 00:00:00 2001
 From: Feng Yuan <feng1.yuan@intel.com>
-Date: Thu, 24 Feb 2022 15:23:23 +0800
-Subject: [PATCH 04/35] JIT: disable decomposition of BN/LN for XPU (#31)
+Date: Mon, 21 Mar 2022 14:23:28 -0700
+Subject: [PATCH 05/28] adjust conditions to enable jit decomposition pass only
+ for GPU device (#73637)
 
+Summary:
 Signed-off-by: Feng Yuan <feng1.yuan@intel.com>
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/73637
+
+Reviewed By: cpuhrsch
+
+Differential Revision: D34931641
+
+Pulled By: davidberard98
+
+fbshipit-source-id: 849ace475eb9038912e902462f0eb2cdebc14ada
+(cherry picked from commit ae61c4fba20345c0122f24e02c661b0da29f0ee4)
 ---
  torch/csrc/jit/passes/decompose_ops.cpp | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/torch/csrc/jit/passes/decompose_ops.cpp b/torch/csrc/jit/passes/decompose_ops.cpp
-index 0706c9c14a..e2db04b0aa 100644
+index 0706c9c14a..4223c72658 100644
 --- a/torch/csrc/jit/passes/decompose_ops.cpp
 +++ b/torch/csrc/jit/passes/decompose_ops.cpp
 @@ -42,7 +42,7 @@ bool isDecomposableNorm(Node* normalize_op) {
@@ -17,7 +30,7 @@ index 0706c9c14a..e2db04b0aa 100644
    // As of now, we do the decomposition for batchnorm/layernorm on GPU device
    // only
 -  if (!device || (*device).is_cpu()) {
-+  if (!device || (*device).is_cpu() || (*device).is_xpu()) {
++  if (!device || !(*device).is_cuda()) {
      return false;
    }
  

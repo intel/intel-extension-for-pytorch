@@ -1,8 +1,16 @@
-From 38d4b0415adf94676878059b4622c1d6bc1a9b56 Mon Sep 17 00:00:00 2001
-From: ch <hao3.chen@intel.com>
-Date: Thu, 26 May 2022 14:28:42 +0800
-Subject: [PATCH 17/35] Add SYCL half type support to c10::Half (#40)
+From dc22b5074545f1eee081e531cc996660e83c0652 Mon Sep 17 00:00:00 2001
+From: cchheennhhaaoo <hao3.chen@intel.com>
+Date: Wed, 4 May 2022 00:57:03 +0000
+Subject: [PATCH 12/28] Optimize half conversion for SYCL kernel
 
+## Motivation:
+Add support for SYCL half implicit/explicit conversion in SYCL kernels.
+
+## Additional Context:
+Macro `SYCL_LANGUAGE_VERSION` is suggested by SYCL compiler to instead of `__SYCL_DEVICE_ONLY__` in current version unless device and host specific implementation of the same function is necessary.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/76515
+Approved by: https://github.com/ezyang
 ---
  c10/util/Half-inl.h | 13 ++++++++++++-
  c10/util/Half.h     |  8 ++++++++
