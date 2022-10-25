@@ -6,7 +6,6 @@ import warnings
 from .nn import utils
 from .optim._optimizer_utils import optimizer_fusion, IPEX_FUSED_OPTIMIZER_LIST
 
-
 def _copy_model_and_optimizer(model, optimizer):
     new_model = copy.deepcopy(model)
     if optimizer is None:
@@ -136,7 +135,7 @@ def optimize(
         weights_prepack (bool): Whether to perform weight prepack for convolution
             and linear to avoid oneDNN weights reorder. The default value is
             ``None``. Explicitly setting this knob overwrites the configuration
-            set by ``level`` knob.
+            set by ``level`` knob. For now, XPU doesn't support weights prepack.
         replace_dropout_with_identity (bool): Whether to replace ``nn.Dropout``
             with ``nn.Identity``. If replaced, the ``aten::dropout`` won't be
             included in the JIT graph. This may provide more fusion opportunites
@@ -242,6 +241,11 @@ def optimize(
         raise RuntimeError("for now, no implementation for split master weight")
     if fuse_update_step is not None:
         opt_properties.fuse_update_step = fuse_update_step
+
+    # for XPU, weight prepack is unsupported, so sample input is useless
+    if opt_properties.weights_prepack is not None:
+        opt_properties.weights_prepack = False
+        sample_input = None
 
     if inplace:
         optimized_model = model

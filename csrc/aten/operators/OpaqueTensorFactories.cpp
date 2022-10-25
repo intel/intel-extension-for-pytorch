@@ -94,9 +94,6 @@ Tensor empty_opaque_qtensor(
 }
 
 inline bool need_to_plain(const Tensor& tensor) {
-  if (!Settings::I().is_onednn_layout_enabled())
-    return false;
-
   if (!tensor.defined())
     return false;
 
@@ -106,6 +103,10 @@ inline bool need_to_plain(const Tensor& tensor) {
     return false;
 
   if (tensor.is_sparse())
+    return false;
+
+  auto tensor_ctx = DPCPPTensorContext::get_tensor_ctx(tensor);
+  if (tensor_ctx.is_plain())
     return false;
 
   return true;
@@ -133,9 +134,6 @@ Tensor to_plain_if_needed_(const Tensor& tensor) {
 }
 
 std::vector<Tensor> to_plain_if_needed(TensorList tensors) {
-  if (!Settings::I().is_onednn_layout_enabled())
-    return tensors.vec();
-
   std::vector<Tensor> _tensors;
   for (auto tensor : tensors) {
     _tensors.push_back(to_plain_if_needed(tensor));
