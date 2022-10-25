@@ -596,17 +596,6 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
       Tensor(const Tensor&, const Scalar&, const Scalar&),
       fp32)
   KERNEL_XPU(
-      ADD_NS(layer_norm),
-      "layer_norm",
-      Tensor(
-          const Tensor&,
-          IntArrayRef,
-          const c10::optional<Tensor>&,
-          const c10::optional<Tensor>&,
-          double,
-          bool),
-      fp32)
-  KERNEL_XPU(
       ADD_NS(group_norm),
       "group_norm",
       Tensor(
@@ -848,27 +837,6 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           int64_t,
           c10::optional<c10::string_view>),
       fp32)
-  // The macro doesn't like these (I think it chokes on commas inside <>) so
-  // write them manually
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::native_layer_norm"),
-      TORCH_FN((&WrapFunction<
-                CastPolicy::fp32,
-                DeviceType::XPU,
-                std::tuple<Tensor, Tensor, Tensor>(
-                    const Tensor&,
-                    IntArrayRef,
-                    const c10::optional<Tensor>&,
-                    const c10::optional<Tensor>&,
-                    double),
-                std::tuple<Tensor, Tensor, Tensor>(
-                    const Tensor&,
-                    IntArrayRef,
-                    const c10::optional<Tensor>&,
-                    const c10::optional<Tensor>&,
-                    double),
-                &ADD_NS(native_layer_norm)>::type::call)));
-
   // promote
   KERNEL_XPU(ADD_NS(cat), "cat", Tensor(TensorList, int64_t), promote)
   KERNEL_XPU(ADD_NS(stack), "stack", Tensor(TensorList, int64_t), promote)
