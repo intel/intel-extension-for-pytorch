@@ -243,6 +243,9 @@ class RegisterDispatchKey:
     # non-SymInt codegen
     symint: bool
 
+    # simple trace
+    simple_trace: bool
+
     # The class that all unstructured native functions live under. This is used to improve
     # compiler error messages when a kernel writer adds a native function with the wrong signature.
     # This is only used in unstructured kernels, since structured kernels already live in a class.
@@ -656,6 +659,10 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
                         if device_of is not None:
                             device_guard = f"const OptionalDeviceGuard device_guard(device_of({device_of}));"
 
+                simple_trace_code = ''
+                if self.simple_trace:
+                    simple_trace_code = f'xpu::dpcpp::SimpleTrace trace(\"{name} -> {impl_name}\");'
+
                 # lazy_reorder
                 lazy_reorder = "  // no lazy reorder"
                 lazy_reorder_info = [self.get_lazy_reorder(metadata.kernel, arg, exprs_symint) for arg, exprs_symint in zip(args, args_exprs_list_symint)]
@@ -678,6 +685,8 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
 namespace {{
 
 {returns_type} {name}({args_str}) {{
+  {simple_trace_code}
+
   {device_check}
 
   {device_guard}
