@@ -1,18 +1,26 @@
-From 3702f05af71e723ad3d235f95919f5ba133859a8 Mon Sep 17 00:00:00 2001
-From: ch <hao3.chen@intel.com>
-Date: Fri, 16 Sep 2022 11:53:39 +0800
-Subject: [PATCH 30/36] Dispatch for xpu in adaptive_avg_pooling (#62)
+From c9bfd5639c59176a4aaeff88f18c3fdb8a54bc58 Mon Sep 17 00:00:00 2001
+From: cchheennhhaaoo <hao3.chen@intel.com>
+Date: Thu, 8 Sep 2022 13:48:16 +0000
+Subject: [PATCH 21/28] Dispatch for xpu in adaptive_avg_pooling (#84541)
 
-* Dispatch adaptive_avg_pool2d for XPU
+Motivation:
 
-* Dispatch adaptive_avg_pool3d for XPU
+- See native_functions.yaml, operators adaptive_avg_pool2d/adaptive_avg_pool3d are not recommended to register for backends.
+
+- When adaptive_avg_pool2d/adaptive_avg_pool3d have a input of xpu tensor, they can't step into xpu implementation.
+
+Solution:
+
+- Dispatch to _adaptive_avg_pool2d/_adaptive_avg_pool3d for xpu backend in adaptive_avg_pool2d/adaptive_avg_pool3d implementation.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/84541
+Approved by: https://github.com/ezyang
 ---
  aten/src/ATen/native/AdaptiveAveragePooling.cpp   | 2 +-
  aten/src/ATen/native/AdaptiveAveragePooling3d.cpp | 2 +-
  2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/aten/src/ATen/native/AdaptiveAveragePooling.cpp b/aten/src/ATen/native/AdaptiveAveragePooling.cpp
-index 2324b958b3..fc6c0792be 100644
+index 2324b958b3..9b4f514410 100644
 --- a/aten/src/ATen/native/AdaptiveAveragePooling.cpp
 +++ b/aten/src/ATen/native/AdaptiveAveragePooling.cpp
 @@ -101,7 +101,7 @@ namespace {
@@ -20,12 +28,12 @@ index 2324b958b3..fc6c0792be 100644
      }
  
 -    if (!input.is_quantized() && output_size[0] == 1 && output_size[1] == 1) {
-+    if (!input.is_xpu() && !input.is_quantized() && output_size[0] == 1 && output_size[1] == 1) {
++    if (!input.is_quantized() && output_size[0] == 1 && output_size[1] == 1 && !input.is_xpu()) {
        // in this case, adaptive pooling is just computing mean over hw
        // dimensions, which can be done more efficiently
        #if defined(C10_MOBILE) && defined(USE_XNNPACK)
 diff --git a/aten/src/ATen/native/AdaptiveAveragePooling3d.cpp b/aten/src/ATen/native/AdaptiveAveragePooling3d.cpp
-index f7565b554d..b0e2bb22f9 100644
+index f7565b554d..ed5a27613a 100644
 --- a/aten/src/ATen/native/AdaptiveAveragePooling3d.cpp
 +++ b/aten/src/ATen/native/AdaptiveAveragePooling3d.cpp
 @@ -301,7 +301,7 @@ Tensor adaptive_avg_pool3d_cpu(Tensor const& input, IntArrayRef output_size) {
@@ -33,7 +41,7 @@ index f7565b554d..b0e2bb22f9 100644
    TORCH_CHECK(output_size.size() == 3, "adaptive_avg_pool3d: output_size must be 3");
  
 -  if (output_size[0] == 1 && output_size[1] == 1 && output_size[2] == 1) {
-+  if (!input.is_xpu() && output_size[0] == 1 && output_size[1] == 1 && output_size[2] == 1) {
++  if (output_size[0] == 1 && output_size[1] == 1 && output_size[2] == 1 && !input.is_xpu()) {
      // in this case, adaptive pooling is just computing mean over hw
      // dimensions, which can be done more efficiently
      Tensor out = input.mean({-1, -2, -3}, /* keepdim = */ true);

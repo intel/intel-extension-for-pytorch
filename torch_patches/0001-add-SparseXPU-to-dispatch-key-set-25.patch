@@ -1,7 +1,7 @@
-From c01f049d638a48e2ac01ded9baaca3fb8589107c Mon Sep 17 00:00:00 2001
+From b27bdfe9139a84c762aab173f29991cd1b2aa9ab Mon Sep 17 00:00:00 2001
 From: majing921201 <jing1.ma@intel.com>
 Date: Fri, 11 Feb 2022 10:16:42 +0800
-Subject: [PATCH 01/36] add SparseXPU to dispatch key set (#25)
+Subject: [PATCH 01/28] add SparseXPU to dispatch key set (#25)
 
 Signed-off-by: Ma, Jing1 <jing1.ma@intel.com>
 ---

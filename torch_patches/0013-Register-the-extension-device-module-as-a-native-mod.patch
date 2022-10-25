@@ -1,0 +1,33 @@
+From cb74c4cd746dbb00bea80d76a57bf9599eb67caf Mon Sep 17 00:00:00 2001
+From: johnlu <chengjun.lu@intel.com>
+Date: Tue, 31 May 2022 17:39:18 +0000
+Subject: [PATCH 13/28] Register the extension device module as a native module
+ under torch namespace (#78329)
+
+## Motivation
+Enhance the _register_device_module to register the extension device module as a native module under torch namespace. The user can use the extension device module as a native module in torch namespace.
+e.g:
+```
+import torch.xpu as gpu
+from torch.xpu import Event
+
+```
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/78329
+Approved by: https://github.com/albanD
+---
+ torch/__init__.py | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/torch/__init__.py b/torch/__init__.py
+index abd8c1f918..150ce8f1f8 100644
+--- a/torch/__init__.py
++++ b/torch/__init__.py
+@@ -779,3 +779,5 @@ def _register_device_module(device_type, module):
+         raise RuntimeError("The runtime module of '{}' has already "
+                            "been registered with '{}'".format(device_type, getattr(m, device_type)))
+     setattr(m, device_type, module)
++    torch_module_name = '.'.join([__name__, device_type])
++    sys.modules[torch_module_name] = module
+-- 
+2.25.1
+

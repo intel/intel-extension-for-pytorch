@@ -1,7 +1,7 @@
-From 878b181bce5648570c3c09283767a99bb8767486 Mon Sep 17 00:00:00 2001
+From 0110cf11e48503d451b7ea442e502b784a647e63 Mon Sep 17 00:00:00 2001
 From: leizhenyuan <110007460+leizhenyuan@users.noreply.github.com>
 Date: Sun, 9 Oct 2022 14:57:07 +0800
-Subject: [PATCH 34/36] port from pytorch and add xpu device (#71)
+Subject: [PATCH 22/28] Add pin_memory support for xpu device (#71)
 
 ---
  torch/utils/data/_utils/pin_memory.py | 43 ++++++++++++++++++--------
@@ -89,7 +89,7 @@ index f17aae9223..7f82cc0f89 100644
          return data.pin_memory()
      else:
 diff --git a/torch/utils/data/dataloader.py b/torch/utils/data/dataloader.py
-index 0f46ad283e..d5486d2a04 100644
+index 0f46ad283e..c69b5bb80b 100644
 --- a/torch/utils/data/dataloader.py
 +++ b/torch/utils/data/dataloader.py
 @@ -120,6 +120,8 @@ class DataLoader(Generic[T_co]):
@@ -170,9 +170,9 @@ index 0f46ad283e..d5486d2a04 100644
              # Queue is not type-annotated
              self._data_queue = queue.Queue()  # type: ignore[var-annotated]
 +            if self._pin_memory_device == "xpu":
-+                current_device = torch.xpu.current_device() # type: ignore[attr-defined]
-+            elif self._pin_memory_device == "cuda":
-+                current_device = torch.cuda.current_device()
++                current_device = torch.xpu.current_device()  # type: ignore[attr-defined]
++            else:
++                current_device = torch.cuda.current_device()  # choose cuda for default
              pin_memory_thread = threading.Thread(
                  target=_utils.pin_memory._pin_memory_loop,
                  args=(self._worker_result_queue, self._data_queue,
@@ -183,11 +183,10 @@ index 0f46ad283e..d5486d2a04 100644
              pin_memory_thread.daemon = True
              pin_memory_thread.start()
              # Similar to workers (see comment above), we only register
-@@ -936,6 +958,18 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
-             self._pin_memory_thread = pin_memory_thread
+@@ -937,6 +959,18 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
          else:
              self._data_queue = self._worker_result_queue
-+        
+ 
 +        # In some rare cases, persistent workers (daemonic processes)
 +        # would be terminated before `__del__` of iterator is invoked
 +        # when main process exits
@@ -199,9 +198,10 @@ index 0f46ad283e..d5486d2a04 100644
 +            import atexit
 +            for w in self._workers:
 +                atexit.register(_MultiProcessingDataLoaderIter._clean_up_worker, w)
- 
++
          # .pid can be None only before process is spawned (not the case, so ignore)
          _utils.signal_handling._set_worker_pids(id(self), tuple(w.pid for w in self._workers))  # type: ignore[misc]
+         _utils.signal_handling._set_SIGCHLD_handler()
 -- 
 2.25.1
 

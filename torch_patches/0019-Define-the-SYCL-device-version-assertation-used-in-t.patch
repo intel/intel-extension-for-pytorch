@@ -1,13 +1,23 @@
-From 725fe5774d0cc9e7cf2d9d21b8d75c5c28b8aefc Mon Sep 17 00:00:00 2001
-From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
-Date: Thu, 1 Sep 2022 00:47:07 +0800
-Subject: [PATCH 28/36] add a SYCL device version assertation (#63)
+From 25375ad8d6ac880b3bfc280db55093513718f1a9 Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <guangye.yu@intel.com>
+Date: Thu, 1 Sep 2022 22:22:25 +0000
+Subject: [PATCH 19/28] Define the SYCL device version assertation used in the
+ other backend, like XPU (#84106)
 
-* add a SYCL device version assertation
+# Motivation:
+We need a device version assertation that can be used in SYCL kernel. SYCL_KERNEL_ASSERT will be used in the kernel launched on device XPU.
 
-* format code
+# Solution:
+We add a macro SYCL_KERNEL_ASSERT via __assert_fail declaration for Linux and _wassert declaration for Windows even though  NDEBUG is enabled.
 
-* format code
+# Additional context:
+`__assert_fail` in SYCL kernel
+`extern SYCL_EXTERNAL void __assert_fail(const char *expr, const char *file, unsigned int line, const char *func);`
+`_wassert` in SYCL kernel
+`extern SYCL_EXTERNAL void _wassert(const wchar_t *wexpr, const wchar_t *wfile, unsigned line);`
+No additional unit test because this change could not affect PyTorch's functionality. It only affects assertation in kernel on XPU backend. So it is difficult to add ut to test it.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/84106
+Approved by: https://github.com/malfet
 ---
  c10/macros/Macros.h | 17 ++++++++++++++++-
  1 file changed, 16 insertions(+), 1 deletion(-)

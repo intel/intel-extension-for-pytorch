@@ -1,7 +1,7 @@
-From 206c68c039d43655648a0f8cf3c07025355a3fdf Mon Sep 17 00:00:00 2001
+From a7b5ef1005cbed1ebe74a411386b7bb1dd31b65e Mon Sep 17 00:00:00 2001
 From: KevinYuk <kevin.yu@intel.com>
 Date: Wed, 2 Mar 2022 10:45:52 +0800
-Subject: [PATCH 06/36] enable channels last for xpu group norm (#32)
+Subject: [PATCH 03/28] enable channels last for xpu group norm (#32)
 
 ---
  aten/src/ATen/native/group_norm.cpp | 2 +-

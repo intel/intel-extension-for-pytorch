@@ -1,8 +1,12 @@
-From 2e33d5167dce2ec80cd84483eba7e473eda1ce52 Mon Sep 17 00:00:00 2001
-From: ch <hao3.chen@intel.com>
-Date: Thu, 2 Jun 2022 21:05:32 +0800
-Subject: [PATCH 21/36] Use sycl::bit_cast for negative half conversion (#52)
+From 15f6266ed17163137cde82fe3251895b5c4f69e6 Mon Sep 17 00:00:00 2001
+From: cchheennhhaaoo <hao3.chen@intel.com>
+Date: Tue, 21 Jun 2022 18:16:02 +0000
+Subject: [PATCH 17/28] Enhance negative operator for SYCL half conversion
+ (#79850)
 
+Enhance negative operator for SYCL half conversion with sycl::bit_cast implementation.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/79850
+Approved by: https://github.com/ngimel
 ---
  c10/util/Half-inl.h | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

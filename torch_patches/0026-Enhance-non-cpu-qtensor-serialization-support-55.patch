@@ -1,25 +1,28 @@
-From da85e004916dbb25de29f990ebb342333616650e Mon Sep 17 00:00:00 2001
+From 9fe3df49765b9f2c369ae71e2f59be37ac1267b7 Mon Sep 17 00:00:00 2001
 From: Zhiwei <532707544@qq.com>
 Date: Fri, 30 Sep 2022 17:30:59 +0800
-Subject: [PATCH 31/36] Enhance non-cpu qtensor serialization support (#55)
+Subject: [PATCH 26/28] Enhance non-cpu qtensor serialization support (#55)
 
 * Use empty_quantized for pickling int8 tensor
 * Add fake size setting when unpickling qtensor
 * Make linear prepack TORCH_API
 * Add building marco to control int8 jit save
 * INT8 jit save build default on
+* Fix Windows build, __declspec(dllexport) should
+  be present in the declaration as well,
+  if it's present in the definition
 
 Co-authored-by: Jinghui <jinghui.gu@intel.com>
 ---
  CMakeLists.txt                                    |  5 +++++
  aten/src/ATen/native/native_functions.yaml        |  2 +-
  aten/src/ATen/native/quantized/QTensor.cpp        |  6 +++++-
- .../ATen/native/quantized/cpu/fbgemm_utils.cpp    |  4 ++++
+ .../ATen/native/quantized/cpu/fbgemm_utils.cpp    |  8 ++++++++
  aten/src/ATen/native/quantized/cpu/fbgemm_utils.h |  4 ++++
  cmake/Summary.cmake                               |  1 +
  torch/csrc/jit/serialization/pickler.cpp          | 15 ++++++++++++++-
  torch/csrc/jit/serialization/unpickler.cpp        |  3 +--
- 8 files changed, 35 insertions(+), 5 deletions(-)
+ 8 files changed, 39 insertions(+), 5 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
 index 0c11507838..2085f27d51 100644
@@ -75,10 +78,22 @@ index 8220fc1fab..c41943c5a7 100644
  }
  
 diff --git a/aten/src/ATen/native/quantized/cpu/fbgemm_utils.cpp b/aten/src/ATen/native/quantized/cpu/fbgemm_utils.cpp
-index 1d933741c7..60a105c624 100644
+index 1d933741c7..aa2d57c1aa 100644
 --- a/aten/src/ATen/native/quantized/cpu/fbgemm_utils.cpp
 +++ b/aten/src/ATen/native/quantized/cpu/fbgemm_utils.cpp
-@@ -405,7 +405,11 @@ TORCH_API torch::class_<ConvPackedParamsBase<2>> register_conv_params<2>();
+@@ -13,7 +13,11 @@
+ #include <c10/util/accumulate.h>
+ #include <torch/custom_class.h>
+ 
++#ifdef BUILD_JIT_QUANTIZATION_SAVE
++TORCH_API torch::class_<LinearPackedParamsBase> register_linear_params();
++#else
+ torch::class_<LinearPackedParamsBase> register_linear_params();
++#endif
+ torch::class_<EmbeddingPackedParamsBase> register_embedding_params();
+ 
+ #ifdef USE_FBGEMM
+@@ -405,7 +409,11 @@ TORCH_API torch::class_<ConvPackedParamsBase<2>> register_conv_params<2>();
  template
  TORCH_API torch::class_<ConvPackedParamsBase<3>> register_conv_params<3>();
  

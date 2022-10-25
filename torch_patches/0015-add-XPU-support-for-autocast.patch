@@ -1,17 +1,19 @@
-From d02a1bf33505cbf4d5b150590e8943eb39cc1674 Mon Sep 17 00:00:00 2001
+From aec56017e82751974621a50a86b2daa4b2069c80 Mon Sep 17 00:00:00 2001
 From: Guo Yejun <yejun.guo@intel.com>
-Date: Thu, 26 May 2022 14:32:24 +0800
-Subject: [PATCH 18/36] add XPU support for autocast (#35)
+Date: Tue, 19 Apr 2022 21:18:23 +0000
+Subject: [PATCH 15/28] add XPU support for autocast
 
-Co-authored-by: xiaolil1 <xiaoli.liu@intel.com>
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/75250
+Approved by: https://github.com/bdhirsh
 ---
  aten/src/ATen/autocast_mode.cpp | 19 +++++++++++++++++++
  aten/src/ATen/autocast_mode.h   | 21 ++++++++++++++++++---
+ c10/core/DispatchKey.cpp        |  1 +
  c10/core/DispatchKey.h          |  1 +
  c10/core/DispatchKeySet.cpp     |  2 ++
  c10/core/DispatchKeySet.h       |  2 ++
  torch/autocast_mode.py          | 20 ++++++++++++++++++++
- 6 files changed, 62 insertions(+), 3 deletions(-)
+ 7 files changed, 63 insertions(+), 3 deletions(-)
 
 diff --git a/aten/src/ATen/autocast_mode.cpp b/aten/src/ATen/autocast_mode.cpp
 index 4770d174d1..3fbbd6edcd 100644
@@ -116,6 +118,18 @@ index bede6cd597..2831c2633d 100644
      default:
        throw std::runtime_error(
            "unknown device type for autocast in get_lower_precision_fp_from_device_type");
+diff --git a/c10/core/DispatchKey.cpp b/c10/core/DispatchKey.cpp
+index 6cefb0c0df..ddf8762797 100644
+--- a/c10/core/DispatchKey.cpp
++++ b/c10/core/DispatchKey.cpp
+@@ -260,6 +260,7 @@ c10::DispatchKey parseDispatchKey(const std::string& k) {
+       {"AutogradPrivateUse3", c10::DispatchKey::AutogradPrivateUse3},
+       {"Tracer", c10::DispatchKey::Tracer},
+       {"AutocastCPU", c10::DispatchKey::AutocastCPU},
++      {"AutocastXPU", c10::DispatchKey::AutocastXPU},
+       {"AutocastCUDA", c10::DispatchKey::AutocastCUDA},
+       {"FuncTorchBatched", c10::DispatchKey::FuncTorchBatched},
+       {"FuncTorchVmapMode", c10::DispatchKey::FuncTorchVmapMode},
 diff --git a/c10/core/DispatchKey.h b/c10/core/DispatchKey.h
 index 5117326f3a..d5563a9959 100644
 --- a/c10/core/DispatchKey.h

@@ -1,8 +1,24 @@
-From 4bd47d798c959fe975dae4aa42584d67b45f01ff Mon Sep 17 00:00:00 2001
-From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
-Date: Wed, 7 Sep 2022 09:09:01 +0800
-Subject: [PATCH 29/36] fix dispatch declaration bug about quantized op (#64)
+From 56e5c2e5b1f52d88b8bdd62a543c3bbe98488311 Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <guangye.yu@intel.com>
+Date: Thu, 1 Sep 2022 11:53:32 +0000
+Subject: [PATCH 20/28] fix dispatch declaration bug about quantized op
+ (#83649)
 
+# Motivation:
+Fixes issue #83051.
+_fake_quantize_learnable_per_tensor_affine_backward and _fake_quantize_learnable_per_channel_affine_backward are implemented for CPU and CUDA. Currently, these two are in the CompositeImplicitAutograd category.
+If this issue is not fixed. We need to provide their autograd function when we want to register a new backend. It doesn't make sense to implement autograd function for them since they are all backward operators implemented directly with TensorIterators.
+
+# Solution:
+Add a dispatch keyword in aten/src/ATen/native/native_functions.yaml and explicitly dispatch operators to CPU and CUDA.
+like this:
+`   dispatch:`
+`    CPU, CUDA: _fake_quantize_learnable_per_tensor_affine_backward`
+
+# Additional context:
+No additional unit test because this change could not affect PyTorch's functionality. It only affects registration on other backends, like XPU. So it is difficult to add ut to test it.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/83649
+Approved by: https://github.com/jerryzh168
 ---
  aten/src/ATen/native/native_functions.yaml | 4 ++++
  1 file changed, 4 insertions(+)
