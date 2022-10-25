@@ -27,7 +27,7 @@ class _mode_autocast(torch.amp.autocast_mode.autocast):
         else:
             raise RuntimeError('User specified autocast device_type must be \'cuda\' or \'cpu\'')
         self._cache_enabled = torch.is_autocast_cache_enabled()
-        if torch.cuda.amp.common.amp_definitely_not_available() and self.device == 'cuda':
+        if enabled and self.device == 'cuda' and torch.cuda.amp.common.amp_definitely_not_available():
             warnings.warn('User provided device_type of \'cuda\', but CUDA is not available. Disabling')
             enabled = False
         if dtype is not None:
