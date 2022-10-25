@@ -831,6 +831,62 @@ RegisterOperators op(
             },
             aliasAnalysisFromSchema()),
 
+        Operator(
+            "xpu::_convolution_mish(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool benchmark, bool deterministic, bool cudnn_enabled, bool allow_tf32, Scalar beta, Scalar threshold) -> Tensor",
+            [](const Node* node) -> Operation {
+              return [](Stack& stack) {
+                at::Tensor input = std::move(peek(stack, 0, 15)).toTensor();
+                auto result = torch::jit::xpu::_convolution_mish(
+                    input,
+                    (std::move(peek(stack, 1, 15))).toTensor(),
+                    toOptionalTensor(std::move(peek(stack, 2, 15))),
+                    (std::move(peek(stack, 3, 15))).toIntVector(),
+                    (std::move(peek(stack, 4, 15))).toIntVector(),
+                    (std::move(peek(stack, 5, 15))).toIntVector(),
+                    (std::move(peek(stack, 6, 15))).toBool(),
+                    (std::move(peek(stack, 7, 15))).toIntVector(),
+                    (std::move(peek(stack, 8, 15))).toInt(),
+                    (std::move(peek(stack, 9, 15))).toBool(),
+                    (std::move(peek(stack, 10, 15))).toBool(),
+                    (std::move(peek(stack, 11, 15))).toBool(),
+                    (std::move(peek(stack, 12, 15))).toBool(),
+                    (std::move(peek(stack, 13, 15))).toScalar(),
+                    (std::move(peek(stack, 14, 15))).toScalar());
+                drop(stack, 15);
+                pack(stack, std::move(result));
+              };
+            },
+            aliasAnalysisFromSchema()),
+
+        Operator(
+            "xpu::_convolution_mish_add(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool benchmark, bool deterministic, bool cudnn_enabled, bool allow_tf32, Scalar beta, Scalar threshold, Tensor(a!) accumu, *, Scalar alpha) -> Tensor",
+            [](const Node* node) -> Operation {
+              return [](Stack& stack) {
+                at::Tensor input = std::move(peek(stack, 0, 17)).toTensor();
+                auto result = torch::jit::xpu::_convolution_mish_add(
+                    input,
+                    (std::move(peek(stack, 1, 17))).toTensor(),
+                    toOptionalTensor(std::move(peek(stack, 2, 17))),
+                    (std::move(peek(stack, 3, 17))).toIntVector(),
+                    (std::move(peek(stack, 4, 17))).toIntVector(),
+                    (std::move(peek(stack, 5, 17))).toIntVector(),
+                    (std::move(peek(stack, 6, 17))).toBool(),
+                    (std::move(peek(stack, 7, 17))).toIntVector(),
+                    (std::move(peek(stack, 8, 17))).toInt(),
+                    (std::move(peek(stack, 9, 17))).toBool(),
+                    (std::move(peek(stack, 10, 17))).toBool(),
+                    (std::move(peek(stack, 11, 17))).toBool(),
+                    (std::move(peek(stack, 12, 17))).toBool(),
+                    (std::move(peek(stack, 13, 17))).toScalar(),
+                    (std::move(peek(stack, 14, 17))).toScalar(),
+                    (std::move(peek(stack, 15, 17))).toTensor(),
+                    (std::move(peek(stack, 16, 17))).toScalar());
+                drop(stack, 17);
+                pack(stack, std::move(result));
+              };
+            },
+            aliasAnalysisFromSchema()),
+
     });
 } // namespace jit
 } // namespace torch

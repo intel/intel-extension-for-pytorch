@@ -1126,6 +1126,77 @@ at::Tensor _convolution_silu(
       0.0);
 }
 
+at::Tensor _convolution_mish(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar beta,
+    Scalar threshold) {
+  RECORD_FUNCTION(
+      "_convolution_mish", std::vector<c10::IValue>({input, weight, bias}));
+  const OptionalDeviceGuard device_guard(device_of(input));
+  return at::AtenIpexTypeXPU::convolution_mish(
+      input,
+      weight,
+      bias,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      1.0,
+      1.0,
+      0.0);
+}
+
+at::Tensor _convolution_mish_add(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar beta,
+    Scalar threshold,
+    Tensor accumu,
+    Scalar scale) {
+  RECORD_FUNCTION(
+      "_convolution_silu", std::vector<c10::IValue>({input, weight, bias}));
+  const OptionalDeviceGuard device_guard(device_of(input));
+  return at::AtenIpexTypeXPU::convolution_mish_add(
+      input,
+      weight,
+      bias,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      accumu,
+      scale,
+      1.0,
+      0.0);
+}
+
 } // namespace xpu
 } // namespace jit
 } // namespace torch

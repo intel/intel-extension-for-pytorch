@@ -324,6 +324,42 @@ at::Tensor _convolution_silu(
     bool cudnn_enabled,
     bool allow_tf32);
 
+at::Tensor _convolution_mish(
+    const at::Tensor& input_r,
+    const at::Tensor& weight_r,
+    const at::Tensor& bias_r,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar beta,
+    Scalar threshold);
+
+at::Tensor _convolution_mish_add(
+    const at::Tensor& input_r,
+    const at::Tensor& weight_r,
+    const at::Tensor& bias_r,
+    at::IntArrayRef stride_,
+    at::IntArrayRef padding_,
+    at::IntArrayRef dilation_,
+    bool transposed_,
+    at::IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar beta,
+    Scalar threshold,
+    Tensor accumu,
+    Scalar alpha);
+
 } // namespace xpu
 } // namespace jit
 } // namespace torch

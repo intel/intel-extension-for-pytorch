@@ -506,7 +506,10 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
      xpu::_convolution_sum_relu_sym},
     {{Symbol::fromQualString("aten::_convolution"),
       Symbol::fromQualString("aten::silu_")},
-     xpu::convolution_silu_sym}};
+     xpu::convolution_silu_sym},
+    {{Symbol::fromQualString("aten::_convolution"), xpu::softplus_tanh_mul_sym},
+     xpu::_convolution_mish_sym},
+    {{xpu::_convolution_mish_sym, aten::add_}, xpu::_convolution_mish_add_sym}};
 
 void FusionPass(std::shared_ptr<Graph>& graph) {
   // Pattern based fusion was lack of alias analysis

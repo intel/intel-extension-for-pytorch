@@ -86,6 +86,31 @@ class Conv2dRelu(torch.nn.Module):
     def forward(self, x, a):
         return F.relu(self.conv(x) + a, inplace=True)
 
+class Mish(torch.nn.Module):
+    def __init__(self):
+        super(Mish, self).__init__()
+
+    def forward(self, x):
+        x = x * (torch.tanh(torch.nn.functional.softplus(x)))
+        return x
+
+class Conv2dMish(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dMish, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.mish = Mish()
+
+    def forward(self, x):
+        return self.mish(self.conv(x))
+
+class Conv2dMishAdd(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dMishAdd, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+        self.mish = Mish()
+
+    def forward(self, x, a):
+        return a.add_(self.mish(self.conv(x)))
 
 class Conv2dSigmoid(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -396,6 +421,54 @@ class TestNNMethod(TestCase):
             y_dpcpp = modelJit(x, a3)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_conv_mish_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dMish(2, 2, kernel_size=3, stride=1, bias=True)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu").half()
+        model.to("xpu").half()
+        modelJit = torch.jit.trace(model, x)
+        with torch.no_grad():
+            y_dpcpp = modelJit(x)
+            print(modelJit.graph_for(x))
+            # print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device).float(), atol=1e-4, rtol=1e4)
+        del modelJit
+
+
+    def test_conv_mish_add_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dMishAdd(2, 2, kernel_size=3, stride=1, bias=True)
+        y = model(x, a1)
+        print("raw: ", y)
+
+        x = x.to("xpu").half()
+        model = model.to("xpu").half()
+        a3_xpu = a3.to("xpu").half()
+        modelJit = torch.jit.trace(model, (x, a3_xpu))
+        with torch.no_grad():
+            y_dpcpp = modelJit(x, a3.to("xpu").half())
+            print(modelJit.graph_for(x, a3_xpu))
+            # print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device).float(), atol=5e-4, rtol=5e-4)
         del modelJit
 
     def test_pad_conv_fusion(self, dtype=torch.float):

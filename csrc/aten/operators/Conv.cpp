@@ -856,6 +856,81 @@ Tensor convolution_silu(
       attr);
 }
 
+Tensor convolution_mish(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_,
+    Scalar scale,
+    Scalar alpha,
+    Scalar beta) {
+  // only support scale = 1.0f in oneDNN for non-quantized case.
+  TORCH_CHECK(
+      scale.to<float>() == 1.f && alpha.to<float>() == 1.f,
+      "only support convolution silu fusion with silu scale equals to 1, alpha equal to 1");
+  Attr attr;
+  attr.append_post_eltwise(
+      /* relu_scale */ 1.0,
+      /* alpha */ 1.f,
+      /* beta */ 0.f,
+      attr.kind_with_mish);
+  return _convolution(
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      attr);
+}
+
+Tensor convolution_mish_add(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_,
+    Tensor& accumu,
+    Scalar scale,
+    Scalar alpha,
+    Scalar beta) {
+  // only support scale = 1.0f in oneDNN for non-quantized case.
+  TORCH_CHECK(
+      scale.to<float>() == 1.f && alpha.to<float>() == 1.f,
+      "only support convolution silu fusion with silu scale equals to 1, alpha equal to 1");
+  Attr attr;
+  attr.append_post_eltwise(
+          /* relu_scale */ 1.0,
+          /* alpha */ 1.f,
+          /* beta */ 0.f,
+          attr.kind_with_mish)
+      .append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
+  return _convolution_out(
+      accumu,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      attr);
+}
+
 Tensor convolution_sigmoid(
     const Tensor& input_r,
     const Tensor& weight_r,

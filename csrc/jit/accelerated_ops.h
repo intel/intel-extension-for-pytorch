@@ -75,7 +75,10 @@ static auto permute_contiguous_sym =
     Symbol::fromQualString("xpu::permute_contiguous");
 static auto convolution_silu_sym =
     Symbol::fromQualString("xpu::_convolution_silu");
-
+static auto _convolution_mish_sym =
+    Symbol::fromQualString("xpu::_convolution_mish");
+static auto _convolution_mish_add_sym =
+    Symbol::fromQualString("xpu::_convolution_mish_add");
 // Fold weights of batch_norm with conv2d's
 static auto fold_weight_sym = Symbol::fromQualString("xpu::fold_weight");
 static auto fold_bias_sym = Symbol::fromQualString("xpu::fold_bias");
