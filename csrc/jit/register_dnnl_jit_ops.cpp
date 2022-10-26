@@ -299,7 +299,7 @@ __torch__.torch.nn.modules.conv.Conv2d = prim::GetAttr[name="conv"](%self)
       },                                                               \
       aliasAnalysisFromSchema())
 
-#define IPEX_CONV_SUFFIX ") -> Tensor"
+#define IPEX_SUFFIX ") -> Tensor"
 #define QCONV2D_PREFIX "xpu::q_conv2d_"
 #define CONV2D_PREFIX "xpu::conv2d_"
 #define _CONV_PREFIX "xpu::_convolution_"
@@ -312,23 +312,33 @@ __torch__.torch.nn.modules.conv.Conv2d = prim::GetAttr[name="conv"](%self)
 #define _CONV_SUFFIX ""
 #define EXTRA_SCHEMA(str) ", " str
 
-#define IPEX_QCONV2D_JIT_OP_REGISTER(func, ...)                              \
-  IPEX_JIT_OP_REGISTER(                                                      \
-      QCONV2D_PREFIX #func QCONV2D_MAIN_SCHEMA __VA_ARGS__ IPEX_CONV_SUFFIX, \
-      "q_conv2d_" #func,                                                     \
+#define IPEX_QCONV2D_JIT_OP_REGISTER(func, ...)                         \
+  IPEX_JIT_OP_REGISTER(                                                 \
+      QCONV2D_PREFIX #func QCONV2D_MAIN_SCHEMA __VA_ARGS__ IPEX_SUFFIX, \
+      "q_conv2d_" #func,                                                \
       at::AtenIpexTypeXPU::q_conv2d_##func)
 
-#define IPEX_CONV2D_JIT_OP_REGISTER(func, ...)                             \
-  IPEX_JIT_OP_REGISTER(                                                    \
-      CONV2D_PREFIX #func CONV2D_MAIN_SCHEMA __VA_ARGS__ IPEX_CONV_SUFFIX, \
-      "convolution_" #func,                                                \
+#define IPEX_CONV2D_JIT_OP_REGISTER(func, ...)                        \
+  IPEX_JIT_OP_REGISTER(                                               \
+      CONV2D_PREFIX #func CONV2D_MAIN_SCHEMA __VA_ARGS__ IPEX_SUFFIX, \
+      "convolution_" #func,                                           \
       at::AtenIpexTypeXPU::convolution_##func)
 
-#define IPEX__CONV_JIT_OP_REGISTER(func, ...)                            \
-  IPEX_JIT_OP_REGISTER(                                                  \
-      _CONV_PREFIX #func _CONV_MAIN_SCHEMA __VA_ARGS__ IPEX_CONV_SUFFIX, \
-      "_convolution_" #func,                                             \
+#define IPEX__CONV_JIT_OP_REGISTER(func, ...)                       \
+  IPEX_JIT_OP_REGISTER(                                             \
+      _CONV_PREFIX #func _CONV_MAIN_SCHEMA __VA_ARGS__ IPEX_SUFFIX, \
+      "_convolution_" #func,                                        \
       at::AtenIpexTypeXPU::_convolution_##func)
+
+#define IPEX_LINEAR_PREFIX "xpu::linear_"
+#define IPEX_LINEAR_MAIN_SCHEMA "(Tensor input, Tensor weight, Tensor? bias"
+
+#define IPEX_LINEAR_JIT_OP_REGISTER(func, ...)                     \
+  IPEX_JIT_OP_REGISTER(                                            \
+      IPEX_LINEAR_PREFIX #func IPEX_LINEAR_MAIN_SCHEMA __VA_ARGS__ \
+          IPEX_SUFFIX,                                             \
+      "linear_" #func,                                             \
+      at::AtenIpexTypeXPU::linear_##func)
 
 /* IPEX_GENERAL_CONV2D_JIT_OP_REGISTER usage:
 We decalre this macro to enable a more simple way to register the fusion pattern
@@ -538,6 +548,10 @@ RegisterOperators op({
     //      aliasAnalysisFromSchema()
     //      ),
 
+    // --------------------------------------------------
+    // register convolution related fusion pattern
+    // --------------------------------------------------
+
     IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(sigmoid),
     IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(relu),
     IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(sqrt),
@@ -587,6 +601,52 @@ RegisterOperators op({
         sum_relu,
         EXTRA_SCHEMA(
             "Tensor(a!) accumu, *, Scalar sum_scale, Scalar sum_zpoint")),
+
+    // -------------------------------------------------
+    // register convolution related fusion pattern
+    // -------------------------------------------------
+
+    // -------------------------------------------------
+    // register linear related fusion pattern
+    // -------------------------------------------------
+
+    IPEX_LINEAR_JIT_OP_REGISTER(sigmoid),
+    IPEX_LINEAR_JIT_OP_REGISTER(relu),
+    IPEX_LINEAR_JIT_OP_REGISTER(sqrt),
+    IPEX_LINEAR_JIT_OP_REGISTER(abs),
+    IPEX_LINEAR_JIT_OP_REGISTER(tanh),
+    IPEX_LINEAR_JIT_OP_REGISTER(square),
+    IPEX_LINEAR_JIT_OP_REGISTER(exp),
+    IPEX_LINEAR_JIT_OP_REGISTER(log),
+    IPEX_LINEAR_JIT_OP_REGISTER(round),
+    IPEX_LINEAR_JIT_OP_REGISTER(log_sigmoid),
+    IPEX_LINEAR_JIT_OP_REGISTER(hardswish),
+    IPEX_LINEAR_JIT_OP_REGISTER(mish),
+    IPEX_LINEAR_JIT_OP_REGISTER(silu),
+    // IPEX_LINEAR_JIT_OP_REGISTER(gelu),
+    IPEX_LINEAR_JIT_OP_REGISTER(hardsigmoid),
+
+    IPEX_LINEAR_JIT_OP_REGISTER(
+        leaky_relu,
+        EXTRA_SCHEMA("Scalar negative_slope")),
+
+    IPEX_LINEAR_JIT_OP_REGISTER(pow, EXTRA_SCHEMA("Scalar exponent")),
+
+    IPEX_LINEAR_JIT_OP_REGISTER(
+        hardtanh,
+        EXTRA_SCHEMA("Scalar minval, Scalar maxval")),
+
+    IPEX_LINEAR_JIT_OP_REGISTER(
+        elu,
+        EXTRA_SCHEMA("Scalar alpha=1, Scalar scale=1, Scalar input_scale=1")),
+
+    IPEX_LINEAR_JIT_OP_REGISTER(
+        sum,
+        EXTRA_SCHEMA("Tensor(a!) accumu, *, Scalar alpha")),
+
+    // -------------------------------------------------
+    // register linear related fusion pattern
+    // -------------------------------------------------
 
     IPEX_JIT_OP_REGISTER(
         "xpu::conv2d_binary_mul(Tensor input, Tensor weight, Tensor? bias, int[2] stride, int[2] padding, int[2] dilation, int groups, Tensor binary) -> Tensor",
@@ -675,24 +735,9 @@ RegisterOperators op({
         AtenIpexTypeXPU::trans_matmul_div),
 
     IPEX_JIT_OP_REGISTER(
-        "xpu::linear_relu(Tensor input, Tensor weight, Tensor? bias=None) -> Tensor",
-        "xpu::linear_relu",
-        AtenIpexTypeXPU::linear_relu),
-
-    IPEX_JIT_OP_REGISTER(
-        "xpu::linear_sigmoid(Tensor input, Tensor weight, Tensor? bias=None) -> Tensor",
-        "xpu::linear_sigmoid",
-        AtenIpexTypeXPU::linear_sigmoid),
-
-    IPEX_JIT_OP_REGISTER(
-        "xpu::linear_gelu(Tensor input, Tensor weight, Tensor? bias=None) -> Tensor",
+        "xpu::linear_gelu(Tensor input, Tensor weight, Tensor? bias=None) -> Tensor ",
         "xpu::linear_gelu",
         AtenIpexTypeXPU::linear_gelu),
-
-    IPEX_JIT_OP_REGISTER(
-        "xpu::linear_add(Tensor input, Tensor weight, Tensor? bias, Tensor other, *, Scalar alpha) -> Tensor",
-        "xpu::linear_add",
-        AtenIpexTypeXPU::linear_add),
 
     IPEX_JIT_OP_REGISTER(
         "xpu::batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps, bool dummy) -> Tensor",

@@ -81,6 +81,14 @@ kind of cases which will automatically fuse the aten::dequantize.
   //       xpu::q_conv2d_##func##_sym                                     \
   // }
 
+#define IPEX_DEFINE_LINEAR_FUSION(func)                         \
+  {{aten::linear, Symbol::fromQualString("aten::" #func)},      \
+   xpu::linear_##func##_sym},                                   \
+  {                                                             \
+    {aten::linear, Symbol::fromQualString("aten::" #func "_")}, \
+        xpu::linear_##func##_sym                                \
+  }
+
 } // namespace
 
 namespace torch {
@@ -514,20 +522,8 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_sym,
       Symbol::fromQualString("quantized::add")},
      xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_add_sym},
-    // DLRM: linear with bias + sigmoid
-    {{aten::linear, aten::sigmoid}, xpu::linear_sigmoid_sym},
-    {{aten::linear, Symbol::fromQualString("aten::sigmoid_")},
-     xpu::linear_sigmoid_sym},
-    // DLRM: linear with bias + relu
-    {{aten::linear, aten::relu}, xpu::linear_relu_sym},
-    {{aten::linear, Symbol::fromQualString("aten::relu_")},
-     xpu::linear_relu_sym},
-    // BERT: linear with bias + gelu
-    {{aten::linear, aten::gelu}, xpu::linear_gelu_sym},
-    {{aten::linear, Symbol::fromQualString("aten::gelu_")},
-     xpu::linear_gelu_sym},
     // BERT: linear with bias + add
-    {{aten::linear, aten::add}, xpu::linear_add_sym},
+    {{aten::linear, aten::add}, xpu::linear_sum_sym},
     // BERT: linear no bias + add standalone bias + add
     {{aten::t, aten::matmul}, xpu::t_matmul_sym},
     {{xpu::t_matmul_sym, aten::add}, xpu::t_matmul_add_sym},
@@ -565,26 +561,52 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
       Symbol::fromQualString("aten::mul")},
      xpu::conv2d_binary_mul_sym},
 
-    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(sqrt),
-    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(square),
-    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(abs),
-    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(exp),
-    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(log),
-    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(round),
-    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(silu),
-    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(gelu),
-    IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(log_sigmoid),
+    IPEX_DEFINE_CONV_FUSION(sqrt),
+    IPEX_DEFINE_CONV_FUSION(square),
+    IPEX_DEFINE_CONV_FUSION(abs),
+    IPEX_DEFINE_CONV_FUSION(exp),
+    IPEX_DEFINE_CONV_FUSION(log),
+    IPEX_DEFINE_CONV_FUSION(round),
+    IPEX_DEFINE_CONV_FUSION(silu),
+    IPEX_DEFINE_CONV_FUSION(gelu),
+    IPEX_DEFINE_CONV_FUSION(log_sigmoid),
     IPEX_DEFINE_CONV_FUSION(hardswish),
     IPEX_DEFINE_CONV_FUSION(mish),
     IPEX_DEFINE_CONV_FUSION(hardsigmoid),
     IPEX_DEFINE_CONV_FUSION(tanh),
+    IPEX_DEFINE_CONV_FUSION(leaky_relu),
+    IPEX_DEFINE_CONV_FUSION(pow),
     IPEX_DEFINE_CONV_FUSION(elu),
     IPEX_DEFINE_CONV_FUSION(hardtanh),
     IPEX_DEFINE_CONV_FUSION(sigmoid),
     IPEX_DEFINE_CONV_FUSION(leaky_relu),
     IPEX_DEFINE_CONV_FUSION(pow),
     IPEX_DEFINE_CONV_FUSION(relu),
-    // IPEX_DEFINE_CONV_FUSION(soft_relu)
+    // IPEX_DEFINE_CONV_FUSION(soft_relu),
+
+    // define linear related fusion pattern
+    IPEX_DEFINE_LINEAR_FUSION(sigmoid),
+    IPEX_DEFINE_LINEAR_FUSION(relu),
+    IPEX_DEFINE_LINEAR_FUSION(sqrt),
+    IPEX_DEFINE_LINEAR_FUSION(square),
+    IPEX_DEFINE_LINEAR_FUSION(abs),
+    IPEX_DEFINE_LINEAR_FUSION(exp),
+    IPEX_DEFINE_LINEAR_FUSION(log),
+    IPEX_DEFINE_LINEAR_FUSION(round),
+    IPEX_DEFINE_LINEAR_FUSION(silu),
+    IPEX_DEFINE_LINEAR_FUSION(gelu),
+    IPEX_DEFINE_LINEAR_FUSION(log_sigmoid),
+    IPEX_DEFINE_LINEAR_FUSION(hardswish),
+    IPEX_DEFINE_LINEAR_FUSION(hardsigmoid),
+    // Note: linear + mish and linear + tanh fusion will be enabled after oneDNN
+    // fix its accuracy issue.
+    // IPEX_DEFINE_LINEAR_FUSION(mish),
+    // IPEX_DEFINE_LINEAR_FUSION(tanh),
+    IPEX_DEFINE_LINEAR_FUSION(leaky_relu),
+    IPEX_DEFINE_LINEAR_FUSION(pow),
+    IPEX_DEFINE_LINEAR_FUSION(elu),
+    IPEX_DEFINE_LINEAR_FUSION(hardtanh),
+
 };
 
 void FusionPass(std::shared_ptr<Graph>& graph) {

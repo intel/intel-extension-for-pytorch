@@ -402,6 +402,151 @@ class LinearSigmoid(torch.nn.Module):
         x = self.sigmoid(self.linear(x))
         return x
 
+class LinearSqrt(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearSqrt, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = torch.sqrt(self.linear(x))
+        return x
+
+class LinearSquare(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearSquare, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = torch.square(self.linear(x))
+        return x
+
+class LinearAbs(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearAbs, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = torch.abs(self.linear(x))
+        return x
+
+class LinearExp(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearExp, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = torch.exp(self.linear(x))
+        return x
+
+class LinearLog(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearLog, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = torch.log(self.linear(x))
+        return x
+
+class LinearRound(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearRound, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = torch.round(self.linear(x))
+        return x
+
+class LinearSilu(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearSilu, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = F.silu(self.linear(x))
+        return x
+
+class LinearLogSigmoid(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearLogSigmoid, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = F.logsigmoid(self.linear(x))
+        return x
+
+class LinearHardswish(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearHardswish, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = F.hardswish(self.linear(x))
+        return x
+
+class LinearMish(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearMish, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.activation = torch.nn.Mish()
+
+    def forward(self, x):
+        x = self.activation(self.linear(x))
+        return x
+
+class LinearHardSigmoid(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearHardSigmoid, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = F.hardsigmoid(self.linear(x))
+        return x
+
+class LinearTanh(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearTanh, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = torch.tanh(self.linear(x))
+        return x
+
+class LinearLeakyRelu(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearLeakyRelu, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = F.leaky_relu(self.linear(x), 0.01)
+        return x
+
+class LinearPow(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearPow, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = torch.pow(self.linear(x), 2)
+        return x
+
+class LinearHardtanh(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearHardtanh, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.activation = nn.ReLU6()
+
+    def forward(self, x):
+        x = self.activation(self.linear(x))
+        return x
+
+class LinearElu(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearElu, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+
+    def forward(self, x):
+        x = F.elu(self.linear(x), 1.2)
+        return x
 
 class TestNNMethod(TestCase):
     def test_matmul_sum_fusion(self, dtype=torch.float):
@@ -1013,7 +1158,7 @@ class TestNNMethod(TestCase):
             torch.xpu.synchronize()
         self.assertEqual(output.cpu(), output_cpu)
 
-    def test_linear_relu(self, dtype=torch.float):
+    def test_linear_relu_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
         model = LinearReLU(4, 4)
         y = model(x)
@@ -1024,13 +1169,14 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            # print(modelJit.graph_for(x))
+            if print_graph:
+                print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
 
-    def test_linear_gelu(self, dtype=torch.float):
+    def test_linear_gelu_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
         model = LinearGELU(4, 4)
         y = model(x)
@@ -1041,13 +1187,14 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            # print(modelJit.graph_for(x))
+            if print_graph:
+                print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device), atol=1e-3, rtol=1.3e-6)
         del modelJit
 
-    def test_linear_add(self, dtype=torch.float):
+    def test_linear_add_fusion(self, dtype=torch.float):
         x = torch.randn([1, 384, 1024], device=cpu_device)
         model = LinearAdd(1024, 1024)
         y = model(x)
@@ -1058,13 +1205,14 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            print(modelJit.graph_for(x))
+            if print_graph:
+                print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device), atol=1e-3, rtol=1.3e-6)
         del modelJit
 
-    def test_linear_sigmoid(self, dtype=torch.float):
+    def test_linear_sigmoid_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
         model = LinearSigmoid(4, 4)
         y = model(x)
@@ -1075,7 +1223,300 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            # print(modelJit.graph_for(x))
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_sqrt_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearSqrt(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_square_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearSquare(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_abs_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearAbs(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_exp_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearExp(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_log_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearLog(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_round_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearRound(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_silu_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearSilu(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_logsigmoid_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearLogSigmoid(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_hardswish_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearHardswish(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    @pytest.mark.skip("oneDNN's post-op implementation will get incorrect result on this case. need skip")
+    def test_linear_mish_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearMish(4, 4)
+        print("raw model input: ", x)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.script(model)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            print("jit model input: ", x)
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_hardsigmoid_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearHardSigmoid(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    @pytest.mark.skip("oneDNN's post-op implementation will get incorrect result on this case. need skip")
+    def test_linear_tanh_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearTanh(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x, check_trace=True)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_leakyrelu_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearLeakyRelu(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_pow_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearPow(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+
+
+    def test_linear_elu_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearElu(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_linear_hardtanh(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearHardtanh(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))

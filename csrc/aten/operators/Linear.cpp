@@ -82,6 +82,63 @@ struct LinearConverter {
   bool is_fused_;
 };
 
+#define IPEX_LINEAR_DEFINATION(func)                                       \
+  Tensor linear_##func(                                                    \
+      const Tensor& input, const Tensor& weight, const Tensor& bias) {     \
+    RECORD_FUNCTION(                                                       \
+        "linear_" #func, std::vector<c10::IValue>({input, weight, bias})); \
+    auto linear_wrapper = LinearConverter();                               \
+    auto post_op = [=]() {                                                 \
+      Attr attr;                                                           \
+      attr.append_post_eltwise(                                            \
+          /* scale */ 1.f,                                                 \
+          /* alpha */ 0.f,                                                 \
+          /* beta */ 0.f,                                                  \
+          attr.kind_with_##func);                                          \
+      return attr;                                                         \
+    };                                                                     \
+    Tensor output = linear_wrapper.call(input, weight, bias, post_op);     \
+    if (!linear_wrapper.is_fused()) {                                      \
+      output = at::func(output);                                           \
+    }                                                                      \
+    return output;                                                         \
+  }
+
+IPEX_LINEAR_DEFINATION(sqrt)
+IPEX_LINEAR_DEFINATION(abs)
+IPEX_LINEAR_DEFINATION(tanh)
+IPEX_LINEAR_DEFINATION(square)
+IPEX_LINEAR_DEFINATION(exp)
+IPEX_LINEAR_DEFINATION(log)
+IPEX_LINEAR_DEFINATION(round)
+IPEX_LINEAR_DEFINATION(sigmoid)
+IPEX_LINEAR_DEFINATION(relu)
+IPEX_LINEAR_DEFINATION(hardswish)
+IPEX_LINEAR_DEFINATION(mish)
+
+Tensor linear_silu(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias) {
+  RECORD_FUNCTION(
+      "linear_silu", std::vector<c10::IValue>({input, weight, bias}));
+  auto linear_wrapper = LinearConverter();
+  auto post_op = [=]() {
+    Attr attr;
+    attr.append_post_eltwise(
+        /* gelu_scale */ 1.f,
+        /* alpha */ 1.f,
+        /* beta */ 0.f,
+        attr.kind_with_swish);
+    return attr;
+  };
+  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  if (!linear_wrapper.is_fused()) {
+    output = at::silu(output);
+  }
+  return output;
+}
+
 Tensor linear_gelu(
     const Tensor& input,
     const Tensor& weight,
@@ -100,66 +157,165 @@ Tensor linear_gelu(
   };
   Tensor output = linear_wrapper.call(input, weight, bias, post_op);
   if (!linear_wrapper.is_fused()) {
-    output = at::AtenIpexTypeXPU::gelu(output);
+    output = at::AtenIpexTypeXPU::gelu_out(output, output);
   }
   return output;
 }
 
-Tensor linear_relu(
+Tensor linear_log_sigmoid(
     const Tensor& input,
     const Tensor& weight,
     const Tensor& bias) {
   RECORD_FUNCTION(
-      "linear_relu", std::vector<c10::IValue>({input, weight, bias}));
+      "linear_logsigmoid", std::vector<c10::IValue>({input, weight, bias}));
   auto linear_wrapper = LinearConverter();
   auto post_op = [=]() {
     Attr attr;
     attr.append_post_eltwise(
         /* gelu_scale */ 1.f,
-        /* alpha */ 0.f,
+        /* alpha */ 1.f,
+        /* beta */ 0.f,
+        attr.kind_with_logsigmoid);
+    return attr;
+  };
+  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  if (!linear_wrapper.is_fused()) {
+    output = at::log_sigmoid(output);
+  }
+  return output;
+}
+
+Tensor linear_hardsigmoid(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias) {
+  RECORD_FUNCTION(
+      "linear_hardsigmoid", std::vector<c10::IValue>({input, weight, bias}));
+  auto linear_wrapper = LinearConverter();
+  auto post_op = [=]() {
+    Attr attr;
+    attr.append_post_eltwise(
+        /* gelu_scale */ 1.f,
+        /* alpha */ 1.f / 6.,
+        /* beta */ 1.f / 2.,
+        attr.kind_with_hardsigmoid);
+    return attr;
+  };
+  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  if (!linear_wrapper.is_fused()) {
+    output = at::hardsigmoid(output);
+  }
+  return output;
+}
+
+Tensor linear_pow(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    Scalar exponent) {
+  RECORD_FUNCTION(
+      "linear_pow", std::vector<c10::IValue>({input, weight, bias}));
+  auto linear_wrapper = LinearConverter();
+  auto post_op = [=]() {
+    Attr attr;
+    attr.append_post_eltwise(
+        /* gelu_scale */ 1.f,
+        /* alpha */ 1.f,
+        /* beta */ exponent.toFloat(),
+        attr.kind_with_pow);
+    return attr;
+  };
+  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  if (!linear_wrapper.is_fused()) {
+    output = at::pow(output, exponent);
+  }
+  return output;
+}
+
+Tensor linear_leaky_relu(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    Scalar negative_slope) {
+  RECORD_FUNCTION(
+      "linear_leaky_relu", std::vector<c10::IValue>({input, weight, bias}));
+  auto linear_wrapper = LinearConverter();
+  auto post_op = [=]() {
+    Attr attr;
+    attr.append_post_eltwise(
+        /* gelu_scale */ 1.f,
+        /* alpha */ negative_slope.toFloat(),
         /* beta */ 0.f,
         attr.kind_with_relu);
     return attr;
   };
   Tensor output = linear_wrapper.call(input, weight, bias, post_op);
   if (!linear_wrapper.is_fused()) {
-    output = at::AtenIpexTypeXPU::relu(output);
+    output = at::leaky_relu(output, negative_slope);
   }
   return output;
 }
 
-Tensor linear_sigmoid(
+Tensor linear_hardtanh(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias) {
+    const Tensor& bias,
+    Scalar minval,
+    Scalar maxval) {
   RECORD_FUNCTION(
-      "linear_sigmoid", std::vector<c10::IValue>({input, weight, bias}));
+      "linear_hardtanh", std::vector<c10::IValue>({input, weight, bias}));
   auto linear_wrapper = LinearConverter();
   auto post_op = [=]() {
     Attr attr;
     attr.append_post_eltwise(
         /* gelu_scale */ 1.f,
-        /* alpha */ 0.f,
-        /* beta */ 0.f,
-        attr.kind_with_sigmoid);
+        /* alpha */ minval.toFloat(),
+        /* beta */ maxval.toFloat(),
+        attr.kind_with_clip);
     return attr;
   };
   Tensor output = linear_wrapper.call(input, weight, bias, post_op);
   if (!linear_wrapper.is_fused()) {
-    at::AtenIpexTypeXPU::sigmoid_out(output, output);
+    output = at::hardtanh(output);
+  }
+  return output;
+}
+
+Tensor linear_elu(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    Scalar alpha,
+    Scalar scale,
+    Scalar input_scale) {
+  RECORD_FUNCTION(
+      "linear_elu", std::vector<c10::IValue>({input, weight, bias}));
+  auto linear_wrapper = LinearConverter();
+  auto post_op = [=]() {
+    Attr attr;
+    attr.append_post_eltwise(
+        /* gelu_scale */ 1.f,
+        /* alpha */ alpha.toFloat(),
+        /* beta */ 1.f,
+        attr.kind_with_elu);
+    return attr;
+  };
+  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  if (!linear_wrapper.is_fused()) {
+    output = at::elu(output, alpha, scale, input_scale);
   }
   return output;
 }
 
 // result = (input * weight + bias + alpha * accumul)
-Tensor linear_add(
+Tensor linear_sum(
     const Tensor& input,
     const Tensor& weight,
     const Tensor& bias,
     const Tensor& accumul,
     Scalar alpha) {
   RECORD_FUNCTION(
-      "linear_add", std::vector<c10::IValue>({input, weight, bias}));
+      "linear_sum", std::vector<c10::IValue>({input, weight, bias}));
   const auto input_sizes = input.sizes();
   const auto weight_sizes = weight.sizes();
   std::vector<int64_t> output_sizes = {

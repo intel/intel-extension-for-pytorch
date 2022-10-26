@@ -109,22 +109,7 @@ at::Tensor trans_matmul_div(
     const at::Tensor& tensor1,
     Scalar oscale);
 
-at::Tensor linear_gelu(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias);
-
-at::Tensor linear_relu(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias);
-
-at::Tensor linear_sigmoid(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias);
-
-at::Tensor linear_add(
+at::Tensor linear_sum(
     const at::Tensor& input,
     const at::Tensor& weight,
     const at::Tensor& bias,
@@ -288,6 +273,10 @@ no extra parameters are brought in.
       bool deterministic,                                               \
       bool cudnn_enabled,                                               \
       bool allow_tf32);
+
+#define DECLARE_LINEAR(op) \
+  at::Tensor linear_##op(  \
+      const Tensor& input, const Tensor& weight, const Tensor& bias);
 
 DECLARE_CONV(sqrt)
 DECLARE_CONV(abs)
@@ -520,17 +509,6 @@ at::Tensor q_conv2d_sum_relu(
     float sum_scale,
     int sum_zero_point);
 
-Tensor convolution_sum_relu(
-    const Tensor& input_r,
-    const Tensor& weight_r,
-    const Tensor& bias_r,
-    IntArrayRef stride_,
-    IntArrayRef padding_,
-    IntArrayRef dilation_,
-    int64_t groups_,
-    Tensor& accumu,
-    Scalar scale);
-
 at::Tensor convolution_binary_mul(
     const Tensor& input_r,
     const Tensor& weight_r,
@@ -540,6 +518,49 @@ at::Tensor convolution_binary_mul(
     IntArrayRef dilation_,
     int64_t groups_,
     const Tensor& binary);
+
+DECLARE_LINEAR(sqrt)
+DECLARE_LINEAR(abs)
+DECLARE_LINEAR(tanh)
+DECLARE_LINEAR(square)
+DECLARE_LINEAR(exp)
+DECLARE_LINEAR(log)
+DECLARE_LINEAR(round)
+DECLARE_LINEAR(log_sigmoid)
+DECLARE_LINEAR(hardswish)
+DECLARE_LINEAR(mish)
+DECLARE_LINEAR(silu)
+DECLARE_LINEAR(gelu)
+DECLARE_LINEAR(hardsigmoid)
+DECLARE_LINEAR(sigmoid)
+DECLARE_LINEAR(relu)
+
+Tensor linear_pow(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    Scalar exponent);
+
+Tensor linear_leaky_relu(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    Scalar negative_slope);
+
+Tensor linear_hardtanh(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    Scalar minval,
+    Scalar maxval);
+
+Tensor linear_elu(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    Scalar alpha,
+    Scalar scale,
+    Scalar input_scale);
 
 } // namespace AtenIpexTypeXPU
 // namespace AtenIpexTypeXPU

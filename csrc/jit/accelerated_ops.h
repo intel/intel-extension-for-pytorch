@@ -33,12 +33,16 @@ generate the rule of pots-op fusion.
   static auto _convolution_##func##_sym =   \
       Symbol::fromQualString("xpu::_convolution_" #func)
 
+#define IPEX_LINEAR_SYMBOL_DECLARATION(func) \
+  static auto linear_##func##_sym = Symbol::fromQualString("xpu::linear_" #func)
+
 #define IPEX_GENERAL_CONV_SYMBOL_DECLARATION(func) \
   IPEX_QCONV_SYMBOL_DECLARATION(func);             \
   IPEX_CONV_SYMBOL_DECLARATION(func);              \
   IPEX__CONV_SYMBOL_DECLARATION(func);
 } // namespace
 
+// convolution related symbol declaration
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(sqrt);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(tanh);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(square);
@@ -58,6 +62,27 @@ IPEX_GENERAL_CONV_SYMBOL_DECLARATION(hardtanh);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(sigmoid);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(leaky_relu);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(relu);
+
+// linear related symbol declaration
+IPEX_LINEAR_SYMBOL_DECLARATION(sigmoid);
+IPEX_LINEAR_SYMBOL_DECLARATION(relu);
+IPEX_LINEAR_SYMBOL_DECLARATION(sqrt);
+IPEX_LINEAR_SYMBOL_DECLARATION(tanh);
+IPEX_LINEAR_SYMBOL_DECLARATION(square);
+IPEX_LINEAR_SYMBOL_DECLARATION(abs);
+IPEX_LINEAR_SYMBOL_DECLARATION(exp);
+IPEX_LINEAR_SYMBOL_DECLARATION(log);
+IPEX_LINEAR_SYMBOL_DECLARATION(round);
+IPEX_LINEAR_SYMBOL_DECLARATION(log_sigmoid);
+IPEX_LINEAR_SYMBOL_DECLARATION(hardswish);
+IPEX_LINEAR_SYMBOL_DECLARATION(mish);
+IPEX_LINEAR_SYMBOL_DECLARATION(silu);
+IPEX_LINEAR_SYMBOL_DECLARATION(gelu);
+IPEX_LINEAR_SYMBOL_DECLARATION(hardsigmoid);
+IPEX_LINEAR_SYMBOL_DECLARATION(elu);
+IPEX_LINEAR_SYMBOL_DECLARATION(pow);
+IPEX_LINEAR_SYMBOL_DECLARATION(hardtanh);
+IPEX_LINEAR_SYMBOL_DECLARATION(leaky_relu);
 
 static auto _conv_sym = Symbol::fromQualString("aten::_convolution");
 static auto reorder_sym = Symbol::fromQualString("xpu::reorder");
@@ -99,10 +124,7 @@ static auto q_conv2d_dequantize_softplus_tanh_mul_quantize_sym =
 static auto q_conv2d_dequantize_softplus_tanh_mul_quantize_add_sym =
     Symbol::fromQualString(
         "xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_add");
-static auto linear_gelu_sym = Symbol::fromQualString("xpu::linear_gelu");
-static auto linear_relu_sym = Symbol::fromQualString("xpu::linear_relu");
-static auto linear_sigmoid_sym = Symbol::fromQualString("xpu::linear_sigmoid");
-static auto linear_add_sym = Symbol::fromQualString("xpu::linear_add");
+static auto linear_sum_sym = Symbol::fromQualString("xpu::linear_sum");
 static auto dequant_pixelshuffle_sym =
     Symbol::fromQualString("xpu::dequant_pixelshuffle");
 static auto dequant_pixelshuffle_quant_sym =
