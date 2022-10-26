@@ -2,6 +2,7 @@ import sys
 import subprocess
 import copy
 import time
+from . import default_static_qconfig, prepare
 
 
 def autotune(prepared_model, calib_dataloader, eval_func, sampling_sizes=[100], accuracy_criterion={'relative': 0.01}, tuning_time=0):
@@ -33,6 +34,8 @@ def autotune(prepared_model, calib_dataloader, eval_func, sampling_sizes=[100], 
             assert False, "Unable to import neural_compressor from the local environment."
     from neural_compressor import config
     from neural_compressor.experimental import Quantization, common
+    from neural_compressor.adaptor.torch_utils.util import auto_copy
+    from neural_compressor.adaptor.pytorch import get_example_inputs
 
     config.quantization.backend = 'pytorch_ipex'
     config.quantization.approach = 'post_training_static_quant'
@@ -45,12 +48,17 @@ def autotune(prepared_model, calib_dataloader, eval_func, sampling_sizes=[100], 
         config.quantization.accuracy_criterion.absolute = accuracy_criterion.get('absolute')
     config.quantization.timeout = tuning_time
     quantizer = Quantization(config)
-    quantizer.model = common.Model(copy.deepcopy(prepared_model))
+    fp32_model = auto_copy(prepared_model)
+    quantizer.model = common.Model(fp32_model)
     quantizer.calib_dataloader = calib_dataloader
     quantizer.eval_func = eval_func
     q_model = quantizer.fit()
     dirname_str = './saved_tuning_results_'+time.strftime("%Y%m%d_%H%M%S")
     q_model.save(dirname_str)
-    prepared_model.load_qconf_summary(qconf_summary=dirname_str+'/best_configure.json')
 
-    return prepared_model
+    # This is a workaround for the bug that the auto_copy function will change its input prepared_model.
+    qconfig = default_static_qconfig
+    new_prepared_model = prepare(fp32_model, qconfig, example_inputs=get_example_inputs(calib_dataloader), inplace=True)
+    new_prepared_model.load_qconf_summary(qconf_summary=dirname_str+'/best_configure.json')
+
+    return new_prepared_model
