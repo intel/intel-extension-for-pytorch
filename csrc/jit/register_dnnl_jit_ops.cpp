@@ -589,6 +589,11 @@ RegisterOperators op({
             "Tensor(a!) accumu, *, Scalar sum_scale, Scalar sum_zpoint")),
 
     IPEX_JIT_OP_REGISTER(
+        "xpu::conv2d_binary_mul(Tensor input, Tensor weight, Tensor? bias, int[2] stride, int[2] padding, int[2] dilation, int groups, Tensor binary) -> Tensor",
+        "xpu::conv2d_binary_mul",
+        at::AtenIpexTypeXPU::convolution_binary_mul),
+
+    IPEX_JIT_OP_REGISTER(
         "xpu::permute_contiguous(Tensor self, int[] dims, MemoryFormat memory_format=contiguous_format) -> Tensor(a)",
         "xpu::permute_contiguous",
         AtenIpexTypeXPU::permute_contiguous),

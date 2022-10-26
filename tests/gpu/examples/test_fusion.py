@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
 import copy
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 from torch.quantization.quantize_jit import (convert_jit, prepare_jit)
 from torch.jit._recursive import wrap_cpp_module
@@ -19,6 +19,7 @@ torch._C._jit_set_profiling_executor(False)
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 print_graph = True
+
 
 def conv2d_fusion(input1, input2, model, print_graph=False, dtype=torch.float):
     y = model(input1, input2)
@@ -37,6 +38,7 @@ def conv2d_fusion(input1, input2, model, print_graph=False, dtype=torch.float):
     del modelJit
     return y, y_script
 
+
 def _conv_fusion(input1, input2, model, print_graph=False, dtype=torch.float):
     y = model(input1, input2)
     # print("half raw: ", y)
@@ -53,6 +55,7 @@ def _conv_fusion(input1, input2, model, print_graph=False, dtype=torch.float):
     del jit_model
     return y, y_script.to(torch.float32)
 
+
 class MatmulSum(torch.nn.Module):
     def __init__(self):
         super(MatmulSum, self).__init__()
@@ -61,6 +64,7 @@ class MatmulSum(torch.nn.Module):
         y = torch.matmul(m1, m2)
         y += a
         return y
+
 
 class TransMatmul(torch.nn.Module):
     def __init__(self):
@@ -112,6 +116,7 @@ class Conv2dRelu(torch.nn.Module):
     def forward(self, x, a):
         return F.relu(self.conv(x))
 
+
 class Conv2dSum(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dSum, self).__init__()
@@ -121,6 +126,7 @@ class Conv2dSum(torch.nn.Module):
         x = self.conv(x).add_(a)
         return x
 
+
 class Conv2dSumRelu(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dSumRelu, self).__init__()
@@ -129,6 +135,7 @@ class Conv2dSumRelu(torch.nn.Module):
     def forward(self, x, a):
         return F.relu(self.conv(x).add_(a))
 
+
 class Conv2dAbs(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dAbs, self).__init__()
@@ -136,6 +143,7 @@ class Conv2dAbs(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.abs(self.conv(x))
+
 
 class Conv2dLeakyrelu(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -155,6 +163,7 @@ class Conv2dSigmoid(torch.nn.Module):
     def forward(self, x, a):
         return torch.sigmoid(self.conv(x))
 
+
 class Conv2dSqrt(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
         super(Conv2dSqrt, self).__init__()
@@ -163,6 +172,7 @@ class Conv2dSqrt(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.sqrt(self.conv(x))
+
 
 class Conv2dTanh(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
@@ -173,6 +183,7 @@ class Conv2dTanh(torch.nn.Module):
     def forward(self, x, a):
         return torch.tanh(self.conv(x))
 
+
 class Conv2dSquare(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
         super(Conv2dSquare, self).__init__()
@@ -181,6 +192,7 @@ class Conv2dSquare(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.square(self.conv(x))
+
 
 class Conv2dExp(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
@@ -191,6 +203,7 @@ class Conv2dExp(torch.nn.Module):
     def forward(self, x, a):
         return torch.exp(self.conv(x))
 
+
 class Conv2dLog(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
         super(Conv2dLog, self).__init__()
@@ -200,6 +213,7 @@ class Conv2dLog(torch.nn.Module):
     def forward(self, x, a):
         return torch.log(self.conv(x))
 
+
 class Conv2dRound(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
         super(Conv2dRound, self).__init__()
@@ -208,6 +222,7 @@ class Conv2dRound(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.round(self.conv(x))
+
 
 class Conv2dLogSigmoid(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
@@ -219,6 +234,7 @@ class Conv2dLogSigmoid(torch.nn.Module):
     def forward(self, x, a):
         return self.activation(self.conv(x))
 
+
 class Conv2dHardswish(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
         super(Conv2dHardswish, self).__init__()
@@ -228,6 +244,7 @@ class Conv2dHardswish(torch.nn.Module):
 
     def forward(self, x, a):
         return self.activation(self.conv(x))
+
 
 class Conv2dMish(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
@@ -239,6 +256,7 @@ class Conv2dMish(torch.nn.Module):
     def forward(self, x, a):
         return self.activation(self.conv(x))
 
+
 class Conv2dSilu(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
         super(Conv2dSilu, self).__init__()
@@ -248,6 +266,7 @@ class Conv2dSilu(torch.nn.Module):
 
     def forward(self, x, a):
         return self.activation(self.conv(x))
+
 
 class Conv2dGelu(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
@@ -259,6 +278,7 @@ class Conv2dGelu(torch.nn.Module):
     def forward(self, x, a):
         return self.activation(self.conv(x))
 
+
 class Conv2dHardsigmoid(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
         super(Conv2dHardsigmoid, self).__init__()
@@ -268,6 +288,7 @@ class Conv2dHardsigmoid(torch.nn.Module):
 
     def forward(self, x, a):
         return self.activation(self.conv(x))
+
 
 class Conv2dPow(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
@@ -281,6 +302,7 @@ class Conv2dPow(torch.nn.Module):
         # print("x:res: ", x)
         return torch.pow(x, self.exponent)
 
+
 class Conv2dRelu6(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
         super(Conv2dRelu6, self).__init__()
@@ -291,6 +313,7 @@ class Conv2dRelu6(torch.nn.Module):
     def forward(self, x, a):
         return self.activation(self.conv(x))
 
+
 class Conv2dElu(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
         super(Conv2dElu, self).__init__()
@@ -300,6 +323,16 @@ class Conv2dElu(torch.nn.Module):
 
     def forward(self, x, a):
         return self.activation(self.conv(x))
+
+
+class Conv2dBinaryMul(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryMul, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.mul(self.conv(x), a)
+
 
 class PadConv2d(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -324,6 +357,7 @@ class PermuteContiguous(torch.nn.Module):
         x = torch.permute(x, [0, 2, 3, 1])
         return x.contiguous()
 
+
 class LinearGELU(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearGELU, self).__init__()
@@ -334,16 +368,18 @@ class LinearGELU(torch.nn.Module):
         x = self.gelu(self.linear(x))
         return x
 
+
 class LinearAdd(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearAdd, self).__init__()
         self.linear = nn.Linear(in_channels, out_channels, bias=True)
 
     def forward(self, x):
-        x1 = torch.ones(x.shape).to(x.device) 
+        x1 = torch.ones(x.shape).to(x.device)
         x = self.linear(x)
         y = x + x1
         return y
+
 
 class LinearReLU(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -582,7 +618,6 @@ class TestNNMethod(TestCase):
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
         self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
 
-
     def test_conv_sum_relu_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
@@ -598,7 +633,6 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_script)
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
         self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
-
 
     def test_conv_sigmoid_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
@@ -712,7 +746,6 @@ class TestNNMethod(TestCase):
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
         self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
 
-
     def test_conv_logsigmoid_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
@@ -751,7 +784,6 @@ class TestNNMethod(TestCase):
         a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
         a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
 
-
         a1.fill_(2)
         a3.fill_(2)
 
@@ -768,7 +800,6 @@ class TestNNMethod(TestCase):
         a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
         a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
 
-
         a1.fill_(2)
         a3.fill_(2)
 
@@ -784,7 +815,6 @@ class TestNNMethod(TestCase):
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
         a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
         a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
-
 
         a1.fill_(2)
         a3.fill_(2)
@@ -818,7 +848,6 @@ class TestNNMethod(TestCase):
         a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
         a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
 
-
         a1.fill_(2)
         a3.fill_(2)
 
@@ -834,7 +863,6 @@ class TestNNMethod(TestCase):
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
         a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
         a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
-
 
         a1.fill_(2)
         a3.fill_(2)
@@ -852,7 +880,6 @@ class TestNNMethod(TestCase):
         a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
         a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
 
-
         a1.fill_(2)
         a3.fill_(2)
 
@@ -862,6 +889,27 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_script)
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
         self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_binary_mul(self, dtype=torch.float):
+        x = torch.randn([1, 64, 512, 512], device=cpu_device)
+        a1 = torch.randn([1, 64, 512, 512], device=cpu_device)
+        a2 = torch.randn([1, 64, 1, 1], device=cpu_device)
+        a3 = torch.randn([1, 1, 1, 1], device=cpu_device)
+        model = Conv2dBinaryMul(64, 64, kernel_size=3, stride=1, padding=(1, 1), bias=True)
+        other = [a1, a2, a3]
+        for a in other:
+            y = model(x, a)
+
+            x_xpu = x.clone().to("xpu")
+            a_xpu = a.clone().to("xpu")
+            model_xpu = copy.deepcopy(model).to("xpu")
+            modelJit = torch.jit.script(model_xpu)
+            with torch.no_grad():
+                y_dpcpp = modelJit(x_xpu, a_xpu)
+                # print(modelJit.graph_for(x, a))
+                # print("fusion:", y_dpcpp.cpu())
+            self.assertEqual(y, y_dpcpp.to(cpu_device))
+            del modelJit
 
     def test_pad_conv_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)

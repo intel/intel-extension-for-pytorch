@@ -194,6 +194,7 @@ static inline void matmul(
         {static_cast<int>(dst.is_quantized() ? dst.q_zero_point() : 0)});
   }
 
+  std::unordered_map<int, memory> args;
   post_ops po;
   attr.extract_post_ops(po, dst);
   pattr.set_post_ops(po);
@@ -331,36 +332,21 @@ static inline void matmul(
     if (attr.with_sum())
       xpu::oneDNN::reorder(dst, dst_);
   }
+  if (attr.with_binary())
+    attr.construct_post_binary(matmul_pd, po, expected_dst_md, args);
 
+  args.insert({DNNL_ARG_SRC, m1_m});
+  args.insert({DNNL_ARG_WEIGHTS, m2_m});
+  args.insert({DNNL_ARG_DST, dst_m});
   if (b.defined() && (!m1.is_quantized()) && (!m2.is_quantized())) {
     auto b_m = dpcpp_onednn_memory(b_md, engine, b.data_ptr());
-
-    DPCPP_ONEDNN_EXEC(
-        matmul_p,
-        strm,
-        {
-            {DNNL_ARG_SRC, m1_m},
-            {DNNL_ARG_WEIGHTS, m2_m},
-            {DNNL_ARG_BIAS, b_m},
-            {DNNL_ARG_DST, dst_m},
-#ifdef USE_SCRATCHPAD_MODE
-            {DNNL_ARG_SCRATCHPAD, scratchpad_memory},
-#endif
-        });
-  } else {
-    DPCPP_ONEDNN_EXEC(
-        matmul_p,
-        strm,
-        {
-            {DNNL_ARG_SRC, m1_m},
-            {DNNL_ARG_WEIGHTS, m2_m},
-            {DNNL_ARG_DST, dst_m},
-#ifdef USE_SCRATCHPAD_MODE
-            {DNNL_ARG_SCRATCHPAD, scratchpad_memory},
-#endif
-        });
+    args.insert({DNNL_ARG_BIAS, b_m});
   }
+#ifdef USE_SCRATCHPAD_MODE
+  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_memory});
+#endif
 
+  DPCPP_ONEDNN_EXEC(matmul_p, strm, args);
   if (is_onednn_layout_suggested && dst_m != dst_usr_m && dims == 2) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));

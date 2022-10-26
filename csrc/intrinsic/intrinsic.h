@@ -520,6 +520,27 @@ at::Tensor q_conv2d_sum_relu(
     float sum_scale,
     int sum_zero_point);
 
+Tensor convolution_sum_relu(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    int64_t groups_,
+    Tensor& accumu,
+    Scalar scale);
+
+at::Tensor convolution_binary_mul(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    int64_t groups_,
+    const Tensor& binary);
+
 } // namespace AtenIpexTypeXPU
 // namespace AtenIpexTypeXPU
 } // namespace at

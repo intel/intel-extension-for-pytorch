@@ -357,6 +357,7 @@ static at::Tensor convolution(
     pattr.set_zero_points(DNNL_ARG_DST, mask_ac, {conv_zero_point});
   }
 
+  std::unordered_map<int, memory> args;
   post_ops po;
   attr.extract_post_ops(po, dst);
   pattr.set_post_ops(po);
@@ -514,6 +515,9 @@ static at::Tensor convolution(
       xpu::oneDNN::reorder(dst, dst_);
   }
 
+  if (attr.with_binary())
+    attr.construct_post_binary(conv_fwd_pd, po, expected_dst_md, args);
+
   memory bia_m = memory({{}, bia_data_t, fmt_bia}, engine);
   if (bia.defined()) {
     auto bia_ctx = DPCPPTensorContext::get_tensor_ctx(bia);
@@ -557,30 +561,21 @@ static at::Tensor convolution(
   auto conv_forward = convolution_forward(conv_fwd_pd);
 #endif
 
+  args.insert({DNNL_ARG_SRC, src_m});
+  args.insert({DNNL_ARG_WEIGHTS, wgh_m});
+  args.insert({DNNL_ARG_BIAS, bia_m});
+  args.insert({DNNL_ARG_DST, dst_m});
+
 #ifdef USE_SCRATCHPAD_MODE
   int scratchpad_size = conv_fwd_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
       {scratchpad_size}, src.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_m = dpcpp_onednn_memory(
       conv_fwd_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
-  DPCPP_ONEDNN_EXEC(
-      conv_forward,
-      strm,
-      {{DNNL_ARG_SRC, src_m},
-       {DNNL_ARG_WEIGHTS, wgh_m},
-       {DNNL_ARG_BIAS, bia_m},
-       {DNNL_ARG_DST, dst_m},
-       {DNNL_ARG_SCRATCHPAD, scratchpad_m}});
-#else
-  DPCPP_ONEDNN_EXEC(
-      conv_forward,
-      strm,
-      {{DNNL_ARG_SRC, src_m},
-       {DNNL_ARG_WEIGHTS, wgh_m},
-       {DNNL_ARG_BIAS, bia_m},
-       {DNNL_ARG_DST, dst_m}});
+  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_m});
 #endif
 
+  DPCPP_ONEDNN_EXEC(conv_forward, strm, args);
   if (is_onednn_layout_suggested && dst_.data_ptr() != dst.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));
@@ -840,5 +835,6 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
 
   return std::tuple<at::Tensor, at::Tensor>{diff_wgh, diff_bia};
 }
+
 } // namespace oneDNN
 } // namespace xpu

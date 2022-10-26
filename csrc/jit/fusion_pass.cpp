@@ -558,6 +558,12 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
      xpu::_convolution_sum_sym},
     {{xpu::_convolution_sum_sym, Symbol::fromQualString("aten::relu_")},
      xpu::_convolution_sum_relu_sym},
+    {{Symbol::fromQualString("aten::_convolution"),
+      Symbol::fromQualString("aten::silu_")},
+     xpu::convolution_silu_sym},
+    {{Symbol::fromQualString("aten::conv2d"),
+      Symbol::fromQualString("aten::mul")},
+     xpu::conv2d_binary_mul_sym},
 
     IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(sqrt),
     IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(square),

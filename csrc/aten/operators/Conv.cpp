@@ -1326,8 +1326,6 @@ Tensor convolution_sum(
     int64_t groups_,
     Tensor& accumu,
     Scalar scale) {
-  std::cout << "input1: " << input_r << std::endl;
-  std::cout << "input2: " << accumu << std::endl;
   // only support scale = 1.0f in oneDNN for non-quantized case.
   TORCH_CHECK(
       scale.to<float>() == 1.f,
@@ -1347,7 +1345,6 @@ Tensor convolution_sum(
       {{0, 0}},
       groups_,
       attr);
-  std::cout << "result Tensor: " << res << std::endl;
   return res;
 }
 
@@ -1464,6 +1461,32 @@ Tensor _convolution_sum_relu(
       dilation_,
       transposed_,
       output_padding_,
+      groups_,
+      attr);
+}
+
+Tensor convolution_binary_mul(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    int64_t groups_,
+    const Tensor& binary) {
+  Attr attr;
+  attr.append_post_binary(attr.kind_with_binary_mul, binary);
+  Tensor output_r;
+  return _convolution_out(
+      output_r,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
       groups_,
       attr);
 }
