@@ -1,9 +1,9 @@
-# Intel® Extension for PyTorch Container
+# Intel® Extension for PyTorch\* Container
 
 ## Description
 
-This document has instruction for running Intel® Extension for PyTorch (IPEX) for
-GPU in container.
+This document has instruction for running Intel® Extension for PyTorch\* for
+GPU in a container.
 
 Assumptions:
 * Host machine has the Intel® Data Center GPU Flex Series.
@@ -22,8 +22,8 @@ Assumptions:
 
 ### Running container:
 
-Run following commands to start IPEX GPU tools container. You can use `-v` option to mount your
-local directory into container. The `-v` argument can be omitted if you do not need
+Run the following commands to start Intel® Extension for PyTorch\* GPU tools container. You can use `-v` option to mount your
+local directory into the container. The `-v` argument can be omitted if you do not need
 access to a local directory in the container. Pass the video and render groups to your
 docker container so that the GPU is accessible.
 
@@ -48,7 +48,7 @@ docker run --rm \
 ```
 
 #### Verify if XPU is accessible from PyTorch:
-You are inside container now. Run following command to verify XPU is visible to PyTorch:
+You are inside the container now. Run the following command to verify XPU is visible to PyTorch:
 ```bash
 python -c "import torch;print(torch.device('xpu'))"
 ```
@@ -56,7 +56,7 @@ Sample output looks like below:
 ```
 xpu
 ```
-Then, verify that the XPU device is available to IPEX:
+Then, verify that the XPU device is available to Intel® Extension for PyTorch\*:
 ```bash
 python -c "import intel_extension_for_pytorch as ipex;print(ipex.xpu.is_available())"
 ```
@@ -75,5 +75,5 @@ True
 
 #### Running your own script
 
-Now you are inside container with Python 3.9, PyTorch and IPEX preinstalled. You can run your own script
+Now you are inside container with Python 3.9, PyTorch, and Intel® Extension for PyTorch\* preinstalled. You can run your own script
 to run on Intel GPU.
