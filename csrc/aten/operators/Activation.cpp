@@ -20,7 +20,6 @@
 #include "Loops.h"
 #include "RandomEngine.h"
 
-#include <iostream>
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
 

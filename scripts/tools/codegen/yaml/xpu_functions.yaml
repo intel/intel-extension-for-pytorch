@@ -539,7 +539,7 @@ supported:
   - soft_margin_loss_backward.grad_input
   - softplus
   - softplus.out
-  # - softplus_backward.grad_input
+  - softplus_backward.grad_input
   - softshrink.out
   - softshrink_backward.grad_input
   - sort
