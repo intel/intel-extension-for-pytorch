@@ -19,7 +19,6 @@
 #include "Loops.h"
 #include "Random.h"
 
-#include <iostream>
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
 
