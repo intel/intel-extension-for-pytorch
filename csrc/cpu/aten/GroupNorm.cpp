@@ -5,6 +5,7 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/Parallel.h>
+#include <ATen/native/cpu/mixed_data_type.h>
 #include <ATen/record_function.h>
 #include <c10/util/accumulate.h>
 #include "utils/library.h"
@@ -21,6 +22,40 @@ namespace cpu {
 
 DEFINE_DISPATCH(GroupNormKernel);
 DEFINE_DISPATCH(GroupNormBackwardKernel);
+
+void check_group_norm_inputs(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    int64_t C,
+    int64_t num_groups) {
+  TORCH_CHECK(
+      num_groups > 0,
+      "Expected num groups to be greater than 0, got ",
+      num_groups);
+  TORCH_CHECK(
+      C % num_groups == 0,
+      "Expected number of channels in input to be divisible by ",
+      "num_groups, but got input of shape ",
+      input.sizes(),
+      " and "
+      "num_groups=",
+      num_groups);
+  TORCH_CHECK(
+      !weight.defined() || (weight.dim() == 1 && weight.numel() == C),
+      "Expected weight to be a vector of size equal to the number of ",
+      "channels in input, but got weight of shape ",
+      weight.sizes(),
+      " and input of shape ",
+      input.sizes());
+  TORCH_CHECK(
+      !bias.defined() || (bias.dim() == 1 && bias.numel() == C),
+      "Expected bias to be a vector of size equal to the number of ",
+      "channels in input, but got bias of shape ",
+      weight.sizes(),
+      " and input of shape ",
+      input.sizes());
+}
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> native_group_norm(
     const at::Tensor& X,
@@ -44,8 +79,16 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_group_norm(
   const at::Tensor& beta =
       c10::value_or_else(beta_opt, [] { return at::Tensor(); });
 
+  // repeated check so expanded weights can call native_group_norm directly but
+  // save mean and variance from forward
+  check_group_norm_inputs(X, gamma, beta, C, group);
   auto memory_format = X.device().is_cpu() ? X.suggest_memory_format()
                                            : at::MemoryFormat::Contiguous;
+
+  bool mixed_type = at::native::is_mixed_type(X, gamma, beta);
+  if (mixed_type) {
+    at::native::check_mixed_data_type(X, gamma, beta);
+  }
 
   at::Tensor Y;
   // Add channels last 1d input support
@@ -60,8 +103,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_group_norm(
         c10::nullopt /* pin_memory */,
         memory_format);
   }
-  at::Tensor mean = at::empty({N, group}, X.options());
-  at::Tensor rstd = at::empty({N, group}, X.options());
+
+  const auto dtype = at::native::param_scalar_type(X, mixed_type);
+  at::Tensor mean = at::empty({N, group}, X.options().dtype(dtype));
+  at::Tensor rstd = at::empty({N, group}, X.options().dtype(dtype));
   GroupNormKernel(
       X.device().type(), X, gamma, beta, N, C, HxW, group, eps, Y, mean, rstd);
   return std::make_tuple(Y, mean, rstd);
@@ -157,28 +202,7 @@ at::Tensor group_norm(
 
   const int64_t N = input.size(0);
   const int64_t C = input.size(1);
-  TORCH_CHECK(
-      C % num_groups == 0,
-      "Expected number of channels in input to be divisible by ",
-      "num_groups, but got input of shape ",
-      input.sizes(),
-      " and "
-      "num_groups=",
-      num_groups);
-  TORCH_CHECK(
-      !weight.defined() || (weight.dim() == 1 && weight.numel() == C),
-      "Expected weight to be a vector of size equal to the number of ",
-      "channels in input, but got weight of shape ",
-      weight.sizes(),
-      " and input of shape ",
-      input.sizes());
-  TORCH_CHECK(
-      !bias.defined() || (bias.dim() == 1 && bias.numel() == C),
-      "Expected bias to be a vector of size equal to the number of ",
-      "channels in input, but got bias of shape ",
-      weight.sizes(),
-      " and input of shape ",
-      input.sizes());
+  check_group_norm_inputs(input, weight, bias, C, num_groups);
 
   const auto input_shape = input.sizes();
   const int64_t HxW =
