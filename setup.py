@@ -286,7 +286,7 @@ def get_git_head_sha(base_dir):
         print("Unable to import torch from the local environment.")
         raise e
 
-    torch_git_sha = torch.__version__
+    torch_git_sha = torch.version.git_version
 
     return ipex_git_sha, torch_git_sha
 
