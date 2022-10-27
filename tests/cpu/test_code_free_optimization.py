@@ -33,7 +33,8 @@ class TestCodeFreeOptimization(TestCase):
                     if line.__contains__("_ipex_optimize_hit_count"):
                         _ipex_optimize_hit_count = _ipex_optimize_hit_count + 1
                     if line.__contains__("torch_ipex::convolution_forward_impl" \
-                        if disable_ipex_graph_mode else "ipex_prepack::convolution_run"):
+                        if disable_ipex_graph_mode else "ipex_prepack::convolution_run") \
+                            or line.__contains__("fused_to"):
                         _ipex_convolution = True
                     if line.__contains__("batch_norm"):
                         _has_batchnorm = True
@@ -61,7 +62,8 @@ class TestCodeFreeOptimization(TestCase):
                     if line.__contains__("_ipex_optimize_hit_count"):
                         _ipex_optimize_hit_count = _ipex_optimize_hit_count + 1
                     if line.__contains__("torch_ipex::convolution_forward_impl" \
-                        if disable_ipex_graph_mode else "ipex_prepack::convolution_run"):
+                        if disable_ipex_graph_mode else "ipex_prepack::convolution_run") \
+                            or line.__contains__("fused_to"):
                         _ipex_convolution = True
             assert _ipex_optimize_hit_count == 1 , 'Expect hit once of ipex.optimize globally'
             assert _ipex_convolution , 'Expect use ipex convolution by ipex.optimize'
@@ -87,7 +89,8 @@ class TestCodeFreeOptimization(TestCase):
                     if line.__contains__("_ipex_optimize_hit_count"):
                         _ipex_optimize_hit_count = _ipex_optimize_hit_count + 1
                     if line.__contains__("torch_ipex::convolution_forward_impl" \
-                        if disable_ipex_graph_mode else "ipex_prepack::convolution_run"):
+                        if disable_ipex_graph_mode else "ipex_prepack::convolution_run") \
+                            or line.__contains__("fused_to"):
                         _ipex_convolution = True
                     if line.__contains__("batch_norm"):
                         _has_batchnorm = True

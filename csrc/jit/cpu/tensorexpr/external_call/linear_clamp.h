@@ -3,7 +3,7 @@
 #include <ideep.hpp>
 #include <ideep/utils.hpp>
 
-#include "conv_common.h"
+#include "linear_common.h"
 
 namespace torch_ipex {
 namespace jit {
@@ -11,19 +11,19 @@ namespace cpu {
 namespace tensorexpr {
 
 template <>
-struct LoweringFuncTrait<ConvFusedOp::kConvClamp>
-    : public ConvCommonOperations {
-  DECLARE_CONV_FUNC_AND_RES(clamp)
+struct LoweringFuncTrait<LinearFusedOp::kLinearClamp>
+    : public LinearCommonOperations {
+  DECLARE_LINEAR_FUNC_AND_RES(clamp)
 
   /**
-   * @note This operator fuses conv and clamp.
+   * @note This operator fuses linear and clamp.
    *
-   * Its schema is  "ipex_prepack::convolution_hardtanh_run(
+   * Its schema is  "ipex_prepack::linear_hardtanh_run(
    *  Tensor input,
    *  *,
    *  Scalar lower_bound,
    *  Scalar upper_bound,
-   *  __torch__.torch.classes.ipex_prepack.ConvolutionOpContext W_prepack) ->
+   *  __torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) ->
    * Tensor"
    *
    */
@@ -36,9 +36,9 @@ struct LoweringFuncTrait<ConvFusedOp::kConvClamp>
     //     0: activator tensor
     //     1: lower_bound
     //     2: upper_bound
-    //     3: conv op context
+    //     3: linear op context
     constexpr int input_idx = 0; // input tensor
-    constexpr int ctx_idx = 3; // Conv context
+    constexpr int ctx_idx = 3; // Linear context
     res.push_back(c10::get<pytnnc::BufHandle>(inputs[input_idx]));
     res.push_back(c10::get<pytnnc::BufHandle>(inputs[ctx_idx]));
     return res;

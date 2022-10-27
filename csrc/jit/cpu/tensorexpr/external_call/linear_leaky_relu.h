@@ -3,7 +3,7 @@
 #include <ideep.hpp>
 #include <ideep/utils.hpp>
 
-#include "conv_common.h"
+#include "linear_common.h"
 
 namespace torch_ipex {
 namespace jit {
@@ -11,18 +11,18 @@ namespace cpu {
 namespace tensorexpr {
 
 template <>
-struct LoweringFuncTrait<ConvFusedOp::kConvLeakyRelu>
-    : public ConvCommonOperations {
-  DECLARE_CONV_FUNC_AND_RES(leaky_relu)
+struct LoweringFuncTrait<LinearFusedOp::kLinearLeakyRelu>
+    : public LinearCommonOperations {
+  DECLARE_LINEAR_FUNC_AND_RES(leaky_relu)
 
   /**
-   * @note This operator fuses conv and leaky relu.
+   * @note This operator fuses linear and leaky relu.
    *
-   * Its schema is  "ipex_prepack::convolution_leaky_relu_run(
+   * Its schema is  "ipex_prepack::linear_leaky_relu_run(
    *  Tensor input,
    *  *,
    *  Scalar alpha,
-   *  __torch__.torch.classes.ipex_prepack.ConvolutionOpContext W_prepack) ->
+   *  __torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) ->
    * Tensor"
    *
    */
@@ -34,9 +34,9 @@ struct LoweringFuncTrait<ConvFusedOp::kConvLeakyRelu>
     // The order is:
     //     0: activator tensor
     //     1: alpha
-    //     2: conv op context
+    //     2: linear op context
     constexpr int input_idx = 0; // input tensor
-    constexpr int ctx_idx = 2; // Conv context
+    constexpr int ctx_idx = 2; // Linear context
     res.push_back(c10::get<pytnnc::BufHandle>(inputs[input_idx]));
     res.push_back(c10::get<pytnnc::BufHandle>(inputs[ctx_idx]));
     return res;

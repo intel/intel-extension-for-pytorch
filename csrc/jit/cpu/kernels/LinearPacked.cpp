@@ -239,6 +239,36 @@ at::Tensor& run(
   return accumu;
 }
 
+void run_core(
+    const ContextLinear& context,
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const ideep::attr_t attr) {
+  const ideep::tensor mkldnn_input = itensor_view_from_dense(input);
+  ideep::tensor mkldnn_output = itensor_view_from_dense(accumu);
+  ideep::inner_product_forward_params param;
+  TORCH_CHECK(
+      input.size(input.dim() - 1) == context.weight_packed_.get_dims()[1],
+      "Check the shapes of mat1 and mat2, they cannot be multiplied!");
+  if (context.bias_) {
+    auto mkl_bias = itensor_view_from_dense(*context.bias_);
+    ideep::inner_product_forward::prepare(
+        param,
+        mkldnn_input,
+        context.weight_packed_,
+        mkl_bias,
+        mkldnn_output,
+        attr);
+    ideep::inner_product_forward::compute<true, false>(
+        param, mkldnn_input, context.weight_packed_, mkl_bias, mkldnn_output);
+  } else {
+    ideep::inner_product_forward::prepare(
+        param, mkldnn_input, context.weight_packed_, mkldnn_output, attr);
+    ideep::inner_product_forward::compute<true, false>(
+        param, mkldnn_input, context.weight_packed_, mkldnn_output);
+  }
+}
+
 std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
     ContextLinear& context,
     const at::Tensor& input,

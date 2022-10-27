@@ -7,6 +7,7 @@ namespace jit {
 namespace cpu {
 namespace tensorexpr {
 
+TORCH_API void clearCustomOp2NncFuser();
 TORCH_API void registerCustomOp2NncFuser();
 
 } // namespace tensorexpr

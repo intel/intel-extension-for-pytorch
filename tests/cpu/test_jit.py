@@ -1213,7 +1213,7 @@ class Tester(TestCase):
                 self.assertEqual(result, fused_tresult, prec=prec)
                 #check if the fused node exists in the graph
                 if kind_in_graph is not None:
-                    self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+                    self.assertTrue(any("prim::If" in n.kind() or n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
                 #check if certain node does not exist in the graph
                 if kind_not_in_graph is not None:
@@ -1246,7 +1246,7 @@ class Tester(TestCase):
             self.assertEqual(res_ref, res_jit)
 
             if kind_in_graph is not None:
-                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+                self.assertTrue(any("prim::If" in n.kind() or n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
     def _test_output_bf16(self, base_model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0', 'O1'], use_channels_last=[True, False], use_te=[True, False]):
         modelName = base_model.__class__.__name__
@@ -1284,11 +1284,12 @@ class Tester(TestCase):
                     fused_tresult = trace_fused_model(x3)
 
                 self.assertEqual(fused_tresult, result, prec=prec)
-                self.assertEqual(fused_tresult.dtype, torch.bfloat16)
+                if not torch._C._jit_texpr_fuser_enabled():
+                    self.assertEqual(fused_tresult.dtype, torch.bfloat16)
 
                 #check if the fused node exists in the graph
                 if kind_in_graph is not None:
-                    self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+                    self.assertTrue(any("prim::If" in n.kind() or n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
                 #check if certain node does not exist in the graph
                 if kind_not_in_graph is not None:
@@ -3005,7 +3006,7 @@ class Tester(TestCase):
                 trace_graph = traced_model.graph_for(x)
 
                 #for bfloat16 path, we will use ipex linear for 'O0' and 'O1'
-                self.assertTrue(any(n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
+                self.assertTrue(any("prim::If" in n.kind() or n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
 
     def test_output_linear_scalar_binary(self):
         for bias in [True, False]:

@@ -20,90 +20,50 @@ namespace tensorexpr {
 #define _CONCAT(a, b) a##b
 #define CONCAT(a, b) _CONCAT(a, b)
 
-#define NNC_CONV_NS conv
+#define NNC_LINEAR_NS linear
 #define _EXT_FUNC(ns, func) \
   CONCAT(CONCAT(nnc_ipex, _), CONCAT(CONCAT(ns, _), func))
 #define EXT_FUNC(ns, func) STRINGIZE(_EXT_FUNC(ns, func))
 #define RES_VAR(ns, func) STRINGIZE(CONCAT(_EXT_FUNC(ns, func), _res))
 
-#define DECLARE_CONV_FUNC_AND_RES(func)              \
+#define DECLARE_LINEAR_FUNC_AND_RES(func)            \
   static constexpr const char* get_external_func() { \
-    return EXT_FUNC(NNC_CONV_NS, func);              \
+    return EXT_FUNC(NNC_LINEAR_NS, func);            \
   }                                                  \
   static constexpr const char* get_res_var() {       \
-    return RES_VAR(NNC_CONV_NS, func);               \
+    return RES_VAR(NNC_LINEAR_NS, func);             \
   }
 
-typedef enum _ConvFusedOp {
-  kConvNone,
-  kConvReLU,
-  kConvAddReLU,
-  /**
-   * @code {.python}
-   * class Bottleneck_v1(nn.Module):
-   *     def __init__(self):
-   *         super(Bottleneck_v1, self).__init__()
-   *         self.conv = nn.Conv2d(...)
-   *         self.conv1 = nn.Conv2d(...)
-   *         self.conv2 = nn.Conv2d(...)
-   *         self.conv3 = nn.Conv2d(...)
-   *
-   *     def forward(self, x):
-   *         x = self.conv(x)
-   *         y1 = self.conv1(x).relu_()
-   *         y2 = self.conv2(y1).relu_()
-   *         y3 = self.conv3(y2)
-   *         y3 += x
-   *         return y3.relu_()
-   * @endcode
-   */
-  kConvBottleneckV1,
-
-  /**
-   * @code {.python}
-   * class Bottleneck_v1(nn.Module):
-   *     def __init__(self):
-   *         super(Bottleneck_v1, self).__init__()
-   *         self.conv1 = nn.Conv2d(...)
-   *         self.conv2 = nn.Conv2d(...)
-   *         self.conv3 = nn.Conv2d(...)
-   *         self.downsample = nn.Conv2d(...)
-   *
-   *     def forward(self, x):
-   *         y1 = self.conv1(x).relu_()
-   *         y2 = self.conv2(y1).relu_()
-   *         y3 = self.conv3(y2)
-   *         y3 += self.downsample(x)
-   *         return y3.relu_()
-   * @endcode
-   */
-  kConvBottleneckV2,
-  kConvAbs,
-  kConvClamp,
-  kConvElu,
-  kConvExp,
-  kConvGelu,
-  kConvHardswish,
-  kConvLog,
-  kConvMish,
-  kConvSigmoid,
-  kConvPow,
-  kConvRound,
-  kConvSqrt,
-  kConvSquare,
-  kConvTanh,
-  kConvLeakyRelu,
-  kConvSilu,
-  kConvAdd,
-  kConvHardsigmoid,
-} ConvFusedOp;
+typedef enum _LinearFusedOp {
+  kLinearNone,
+  kLinearAbs,
+  kLinearExp,
+  kLinearHardswish,
+  kLinearMish,
+  kLinearSigmoid,
+  kLinearRelu,
+  kLinearSqrt,
+  kLinearSquare,
+  kLinearTanh,
+  kLinearSilu,
+  kLinearLog,
+  kLinearRound,
+  kLinearClamp,
+  kLinearElu,
+  kLinearGelu,
+  kLinearPow,
+  kLinearLeakyRelu,
+  kLinearAdd,
+  kLinearHardsigmoid,
+  kLinearAddRelu,
+} LinearFusedOp;
 
 static ideep::attr_t empty_attr;
 
-struct ConvCommonOperations {
+struct LinearCommonOperations {
   /**
    * @brief Return the external function name literal to search its
-   * correspond external function. All the conv traits should implement this
+   * correspond external function. All the linear traits should implement this
    * function.
    *
    * @return const char*
@@ -114,8 +74,8 @@ struct ConvCommonOperations {
   }
 
   /**
-   * @brief Get the result var object. All the conv traits should implement this
-   * function.
+   * @brief Get the result var object. All the linear traits should implement
+   * this function.
    *
    * @return const char*
    */
@@ -127,8 +87,8 @@ struct ConvCommonOperations {
   /**
    * @brief Get the buf handles object
    *
-   * @details Most fused conv operators only requires one activation and
-   * a serialized convolution context. Both the activation and the context
+   * @details Most fused linear operators only requires one activation and
+   * a serialized linear context. Both the activation and the context
    * are representd as BufHandle. The first item of the inputs is
    * activatation while the second one is the context.
    *
@@ -149,7 +109,7 @@ struct ConvCommonOperations {
   /**
    * @brief Get the extra args object
    *
-   * @details Most fused conv operators do not require extra parameters.
+   * @details Most fused linear operators do not require extra parameters.
    *
    * @param inputs
    * @return std::vector<PytTeExprHandle>
@@ -168,7 +128,7 @@ struct ConvCommonOperations {
       const pytnnc::ArgValue& arg_data,
       std::vector<pytnnc::ExprHandle>& extra_args) {
     if (auto i = c10::get_if<int64_t>(&arg_data)) {
-      extra_args.push_back(static_cast<int64_t>(*i));
+      extra_args.push_back(static_cast<double>(*i));
     } else if (auto i = c10::get_if<double>(&arg_data)) {
       extra_args.push_back(static_cast<double>(*i));
     } else {
@@ -189,18 +149,18 @@ struct ConvCommonOperations {
   }
 
   /**
-   * @brief Get the conv op context object
+   * @brief Get the lina=ear op context object
    *
-   * @return torch_ipex::cpu::ConvolutionOpContext*
+   * @return torch_ipex::cpu::LinearOpContext*
    */
-  static torch_ipex::cpu::ConvolutionOpContext* get_conv_op_context(
+  static torch_ipex::cpu::LinearOpContext* get_linear_op_context(
       void** buf_data) {
     // The default order is:
     //     0: output tensor
     //     1: activation tensor
-    //     2: conv op context
+    //     2: linear op context
     constexpr int ctx_idx = 2;
-    return reinterpret_cast<torch_ipex::cpu::ConvolutionOpContext*>(
+    return reinterpret_cast<torch_ipex::cpu::LinearOpContext*>(
         buf_data[ctx_idx]);
   }
 
@@ -216,7 +176,7 @@ struct ConvCommonOperations {
   }
 };
 
-template <ConvFusedOp T>
+template <LinearFusedOp T>
 struct LoweringFuncTrait;
 
 } // namespace tensorexpr

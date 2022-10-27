@@ -16,15 +16,14 @@ namespace cpu {
 namespace tensorexpr {
 
 template <>
-struct LoweringFuncTrait<ConvFusedOp::kConvAddReLU>
-    : public ConvCommonOperations {
-  DECLARE_CONV_FUNC_AND_RES(add_relu)
+struct LoweringFuncTrait<ConvFusedOp::kConvAdd> : public ConvCommonOperations {
+  DECLARE_CONV_FUNC_AND_RES(add)
 
   /**
-   * @note This fused conv operator is inplaced operator. It fuses conv, add and
-   * relu.
+   * @note This fused conv operator is inplaced operator. It fuses conv and
+   * add.
    *
-   * Its schema is  "ipex_prepack::convolution_add_relu_run(
+   * Its schema is  "ipex_prepack::convolution_add_run(
    *  Tensor input,
    *  Tensor(a!) accumu,
    *  *,
@@ -77,7 +76,7 @@ struct LoweringFuncTrait<ConvFusedOp::kConvAddReLU>
   static ideep::attr_t get_attr(int64_t* extra_args) {
     constexpr int alpha_idx = 0;
     const float alpha = static_cast<float>(((double*)extra_args)[alpha_idx]);
-    return ideep::attr_t::residual(alpha);
+    return ideep::attr_t::fuse_sum(alpha);
   }
 
   static torch_ipex::cpu::ConvolutionOpContext* get_conv_op_context(

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "conv_common.h"
+#include "linear_common.h"
 
 #include <ideep.hpp>
 #include <ideep/utils.hpp>
@@ -16,20 +16,20 @@ namespace cpu {
 namespace tensorexpr {
 
 template <>
-struct LoweringFuncTrait<ConvFusedOp::kConvAddReLU>
-    : public ConvCommonOperations {
-  DECLARE_CONV_FUNC_AND_RES(add_relu)
+struct LoweringFuncTrait<LinearFusedOp::kLinearAddRelu>
+    : public LinearCommonOperations {
+  DECLARE_LINEAR_FUNC_AND_RES(add_relu)
 
   /**
-   * @note This fused conv operator is inplaced operator. It fuses conv, add and
-   * relu.
+   * @note This fused linear operator is inplaced operator. It fuses linear, add
+   * and relu.
    *
-   * Its schema is  "ipex_prepack::convolution_add_relu_run(
+   * Its schema is  "ipex_prepack::linear_add_relu_run(
    *  Tensor input,
    *  Tensor(a!) accumu,
    *  *,
    *  Scalar? alpha,
-   *  __torch__.torch.classes.ipex_prepack.ConvolutionOpContext W_prepack) ->
+   *  __torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) ->
    * Tensor"
    *
    */
@@ -41,10 +41,10 @@ struct LoweringFuncTrait<ConvFusedOp::kConvAddReLU>
     //     0: activator(in) tensor
     //     1: accum(in/out) tensor
     //     2: alpha
-    //     3: conv op context
+    //     3: linear op context
     constexpr int act_idx = 0; // Activation tensor
     constexpr int accumu_idx = 1; // Accumulation tensor
-    constexpr int ctx_idx = 3; // Conv context
+    constexpr int ctx_idx = 3; // Linear context
     res.push_back(c10::get<pytnnc::BufHandle>(inputs[act_idx]));
     res.push_back(c10::get<pytnnc::BufHandle>(inputs[accumu_idx]));
     res.push_back(c10::get<pytnnc::BufHandle>(inputs[ctx_idx]));
@@ -69,7 +69,7 @@ struct LoweringFuncTrait<ConvFusedOp::kConvAddReLU>
     //     0: activator(in) tensor
     //     1: accum(in/out) tensor
     //     2: alpha
-    //     3: conv op context
+    //     3: linear op context
     constexpr int res_idx = 1;
     return c10::get<pytnnc::BufHandle>(inputs[res_idx]);
   }
@@ -80,15 +80,15 @@ struct LoweringFuncTrait<ConvFusedOp::kConvAddReLU>
     return ideep::attr_t::residual(alpha);
   }
 
-  static torch_ipex::cpu::ConvolutionOpContext* get_conv_op_context(
+  static torch_ipex::cpu::LinearOpContext* get_linear_op_context(
       void** buf_data) {
     // The order is:
     //     0: output tensor
     //     1: activator tensor
     //     2: accum tensor
-    //     3: conv op context
+    //     3: linear op context
     constexpr int ctx_idx = 3;
-    return reinterpret_cast<torch_ipex::cpu::ConvolutionOpContext*>(
+    return reinterpret_cast<torch_ipex::cpu::LinearOpContext*>(
         buf_data[ctx_idx]);
   }
 };

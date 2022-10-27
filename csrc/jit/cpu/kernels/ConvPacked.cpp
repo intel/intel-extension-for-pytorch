@@ -763,7 +763,7 @@ at::Tensor& run(
   return accumu;
 }
 
-void run_core_nhwc(
+void run_core_fast_path_nhwc(
     const ContextConvolution& context,
     void* input,
     void* output) {
@@ -788,14 +788,13 @@ void run_core_nhwc(
   }
 }
 
-void run_core(
+void run_core_fast_path(
     const ContextConvolution& context,
     const at::Tensor& input,
     at::Tensor& accumu) {
   auto input_layout = input.suggest_memory_format();
   bool use_channels_last = input_layout == at::MemoryFormat::ChannelsLast ||
-      input_layout == at::MemoryFormat::ChannelsLast3d ||
-      context.weight_is_channels_last_;
+      input_layout == at::MemoryFormat::ChannelsLast3d;
 
   const ideep::tensor mkldnn_input = itensor_view_from_dense(input);
   ideep::tensor mkldnn_output = itensor_view_from_dense(accumu);
@@ -831,6 +830,23 @@ void run_core(
           mkldnn_output);
     }
   }
+}
+
+void run_core_fallback(
+    const ContextConvolution& context,
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const ideep::attr_t& attr) {
+  convolution_kernel_output(
+      input,
+      context.weight_packed_,
+      context.bias_,
+      accumu,
+      context.stride_,
+      context.padding_,
+      context.dilation_,
+      context.groups_,
+      attr);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
