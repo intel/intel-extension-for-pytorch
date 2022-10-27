@@ -92,7 +92,8 @@ at::Tensor t_matmul_add_gelu(
     const at::Tensor& tensor2,
     const at::Tensor& tensor1,
     at::Tensor& accumul1,
-    Scalar beta1);
+    Scalar beta1,
+    c10::string_view approximate);
 
 at::Tensor t_matmul_add_add(
     const at::Tensor& tensor2,
