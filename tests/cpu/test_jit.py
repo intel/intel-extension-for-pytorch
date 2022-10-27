@@ -1,6 +1,5 @@
 from __future__ import division
 from __future__ import print_function
-from logging import exception
 import logging
 
 '''
@@ -52,7 +51,6 @@ All rights reserved.
 """Tests for rn50."""
 
 import math
-import random
 import unittest
 import time
 import sys
@@ -65,7 +63,6 @@ import torch.fx.experimental.optimization as optimization
 import copy
 
 import intel_extension_for_pytorch as ipex
-import intel_extension_for_pytorch._C as core
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -878,53 +875,116 @@ class MHAScoresCalculation(nn.Module):
         qk = torch.matmul(mat1, mat2.transpose(2, 3))
         scores = qk + bias
         return self.softmax(scores)
+    
+class MHAScoresCalculation_v2(nn.Module):
+    def __init__(self, dim_per_head, softmax_dim=-1):
+        super(MHAScoresCalculation_v2, self).__init__()
+        self.softmax = nn.Softmax(dim=softmax_dim)
+        self.scale = 1 / math.sqrt(dim_per_head)
+
+    def forward(self, mat1, mat2, bias):
+        qk = torch.matmul(mat1, mat2.transpose(2, 3))
+        qk = qk* self.scale
+        scores = qk + bias
+        return self.softmax(scores)
+
+class MHAScoresCalculation_v3(nn.Module):
+    def __init__(self, dim_per_head, softmax_dim=-1):
+        super(MHAScoresCalculation_v3, self).__init__()
+        self.softmax = nn.Softmax(dim=softmax_dim)
+        self.scale = 1 / math.sqrt(dim_per_head)
+
+    def forward(self, mat1, mat2, bias):
+        mat1 = mat1 * self.scale
+        qk = torch.matmul(mat1, mat2.transpose(2, 3))
+        scores = qk + bias
+        return self.softmax(scores)
+
+class MHAScoresCalculation_v1(nn.Module):
+    def __init__(self, dim_per_head, softmax_dim=-1):
+        super(MHAScoresCalculation_v1, self).__init__()
+        self.softmax = nn.Softmax(dim=softmax_dim)
+        self.dim_per_head = dim_per_head
+
+    def forward(self, mat1, mat2, bias):
+        qk = torch.matmul(mat1, mat2.transpose(2, 3))
+        qk = qk / math.sqrt(self.dim_per_head)
+        scores = qk + bias
+        return self.softmax(scores)
 
 class DistilMHAScoresCalculation_v1(nn.Module):
-    def __init__(self, dim_per_head, softmax_dim=-1):
+    def __init__(self, dim_per_head, fill_value, softmax_dim=-1):
         super(DistilMHAScoresCalculation_v1, self).__init__()
         self.softmax = nn.Softmax(dim=softmax_dim)
         self.dim_per_head = dim_per_head
+        self.fill = fill_value
 
     def forward(self, mat1, mat2, mask):
         mask_shape=[mat1.shape[0],1,1,mat1.shape[3]]
         mat1 = mat1 / math.sqrt(self.dim_per_head)
         qk = torch.matmul(mat1, mat2.transpose(2, 3))
         mask = (mask == 0).view(mask_shape).expand_as(qk)
-        qk.masked_fill_(mask, -float("inf"))
+        qk.masked_fill_(mask, self.fill)
         return self.softmax(qk)
 
 class DistilMHAScoresCalculation_v2(nn.Module):
-    def __init__(self, dim_per_head):
+    def __init__(self, dim_per_head, fill_value, softmax_dim=-1):
         super(DistilMHAScoresCalculation_v2, self).__init__()
+        self.softmax = nn.Softmax(dim=softmax_dim)
         self.dim_per_head = dim_per_head
+        self.fill = fill_value
 
     def forward(self, mat1, mat2, mask):
         mask_shape=[mat1.shape[0],1,1,mat1.shape[3]]
         mat1 = mat1 / math.sqrt(self.dim_per_head)
         qk = torch.matmul(mat1, mat2.transpose(2, 3))
         mask = (mask == 0).view(mask_shape).expand_as(qk)
-        qk = qk.masked_fill(mask, -float("inf"))
+        qk.masked_fill_(mask, self.fill)
+        return self.softmax(qk)
+
+class VitMHAScoresCalculation_v1(nn.Module):
+    def __init__(self, dim_per_head):
+        super(VitMHAScoresCalculation_v1, self).__init__()
+        self.scale = dim_per_head ** -0.5
+
+    def forward(self, mat1, mat2, mask):
+        qk = torch.matmul(mat1, mat2.transpose(-1, 2)) * self.scale
+        mask_value = -torch.finfo(qk.dtype).max
+        qk = qk.masked_fill(mask, mask_value)
+        return nn.functional.softmax(qk, dim=-1)
+
+class VitMHAScoresCalculation_v2(nn.Module):
+    def __init__(self, dim_per_head):
+        super(VitMHAScoresCalculation_v2, self).__init__()
+        self.scale = dim_per_head ** -0.5
+
+    def forward(self, mat1, mat2, mask):
+        q = mat1 * self.scale
+        qk = torch.matmul(q, mat2.transpose(-1, 2))
+        mask_value = -torch.finfo(qk.dtype).max
+        qk = qk.masked_fill(mask, mask_value)
         return nn.functional.softmax(qk, dim=-1)
 
 class Maskedfill__softmax(nn.Module):
-    def __init__(self, softmax_dim=-1):
+    def __init__(self, fill_value, softmax_dim=-1):
         super(Maskedfill__softmax, self).__init__()
         self.softmax = nn.Softmax(dim=softmax_dim)
-
+        self.fill = fill_value
     def forward(self, qk, mask):
         mask_shape=[qk.shape[0],1,1,qk.shape[3]]
         mask = (mask == 0).view(mask_shape).expand_as(qk)
-        qk.masked_fill_(mask, -float("inf"))
+        qk.masked_fill_(mask, self.fill)
         return self.softmax(qk)
 
 class Maskedfill_softmax(nn.Module):
-    def __init__(self):
+    def __init__(self, fill_value):
         super(Maskedfill_softmax, self).__init__()
+        self.fill = fill_value
 
     def forward(self, qk, mask):
         mask_shape=[qk.shape[0],1,1,qk.shape[3]]
         mask = (mask == 0).view(mask_shape).expand_as(qk)
-        qk = qk.masked_fill(mask, -float("inf"))
+        qk = qk.masked_fill(mask, self.fill)
         return nn.functional.softmax(qk, dim=-1)
 
 class AtenSoftmaxRepalce(nn.Module):
@@ -978,6 +1038,30 @@ class ConcatBnRelu(torch.nn.Module):
         x = torch.cat((x1, x2, x3), dim = self.cat_dim)
         x = self.bn(x)
         return self.relu(x)
+
+class ConcatBnReluV2(torch.nn.Module):
+    def __init__(self, dim, cat_dim, in_channels, **kwargs):
+        super(ConcatBnReluV2, self).__init__()
+        self.bn = bn_module[dim](in_channels)
+        self.relu = torch.nn.ReLU(inplace=True)
+        self.cat_dim = cat_dim
+    def forward(self, x1, x2, x3):
+        x = torch.cat((x1, x2, x3), dim = self.cat_dim)
+        x = self.bn(x)
+        return self.relu(x)
+
+class ConcatBnReluV3(torch.nn.Module):
+    def __init__(self, dim, cat_dim, in_channels, **kwargs):
+        super(ConcatBnReluV3, self).__init__()
+        self.bn = bn_module[dim](in_channels)
+        self.relu = torch.nn.ReLU(inplace=True)
+        self.cat_dim = cat_dim
+    def forward(self, x1, x2, x3):
+        x = torch.cat((x1, x2, x3), dim = self.cat_dim)
+        x = self.bn(x)
+        y = self.relu(x)
+        x += 2
+        return y + x
 
 class ModMultLinear(nn.Module):
     def __init__(self, w1_dim, w2_dim):
@@ -1088,7 +1172,7 @@ class Tester(TestCase):
             with self._texpr_enable(use_te):
                 ipex.enable_onednn_fusion(False)
                 model = copy.deepcopy(base_model).eval()
-#It will be removed after jit support conv_bn folding
+                #It will be removed after jit support conv_bn folding
                 if level == 'O0':
                     try:
                         model = optimization.fuse(model)
@@ -1104,7 +1188,7 @@ class Tester(TestCase):
 
                 oresult = model(x)
 
-                model = ipex.optimize(model, dtype=torch.float32, level=level)
+                model = ipex.optimize(model, dtype=torch.float32, level=level, weights_prepack=False)
 
                 with torch.no_grad():
                     result = model(x)
@@ -1121,21 +1205,35 @@ class Tester(TestCase):
                     trace_fused_model = torch.jit.freeze(trace_fused_model)
                     y = trace_fused_model(x)
 
-#enable fusiong in ipex.
+                    #enable fusiong in ipex.
                     fused_tresult = trace_fused_model(x)
-#conv relu fusion, conv sum fusion or conv sum relu fusion
+                    #conv relu fusion, conv sum fusion or conv sum relu fusion
                     trace_graph = trace_fused_model.graph_for(x)
                     fused_tresult = trace_fused_model(x)
                 self.assertEqual(result, fused_tresult, prec=prec)
-#check if the fused node exists in the graph
+                #check if the fused node exists in the graph
                 if kind_in_graph is not None:
-                    self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+                    self.assertTrue(any("prim::If" in n.kind() or n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
-#check if certain node does not exist in the graph
+                #check if certain node does not exist in the graph
                 if kind_not_in_graph is not None:
                     self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
     def _test_mkl_fp32(self, model, input, kind_in_graph=None, prec=5e-3):
+        model = model.eval()
+        model = ipex.optimize(model, dtype=torch.float32)
+        with torch.no_grad():
+            res_ref = model(input)
+            tr_model = torch.jit.trace(model, (input))
+            tr_model = torch.jit.freeze(tr_model)
+            tr_model(input)
+            trace_graph = tr_model.graph_for(input)
+            res_jit = tr_model(input)
+            self.assertEqual(res_ref, res_jit)
+            if kind_in_graph is not None:
+                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+
+    def _test_dnnl_fp32(self, model, input, kind_in_graph=None, prec=5e-3):
         model = model.eval()
         model = ipex.optimize(model, dtype=torch.float32, auto_kernel_selection=True)
         with torch.no_grad():
@@ -1146,9 +1244,9 @@ class Tester(TestCase):
             trace_graph = tr_model.graph_for(input)
             res_jit = tr_model(input)
             self.assertEqual(res_ref, res_jit)
-            
+
             if kind_in_graph is not None:
-                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+                self.assertTrue(any("prim::If" in n.kind() or n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
     def _test_output_bf16(self, base_model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0', 'O1'], use_channels_last=[True, False], use_te=[True, False]):
         modelName = base_model.__class__.__name__
@@ -1157,7 +1255,7 @@ class Tester(TestCase):
             with self._texpr_enable(use_te):
                 ipex.enable_onednn_fusion(True)
                 model = copy.deepcopy(base_model).eval()
-#It will be removed after jit support conv_bn folding
+                #It will be removed after jit support conv_bn folding
                 if level == 'O0':
                     try:
                         model = optimization.fuse(model)
@@ -1175,24 +1273,25 @@ class Tester(TestCase):
                 x3 = x.clone()
 
                 with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
-#bf16, native path
+                    #bf16, native path
                     result = model(x)
                     trace_fused_model = torch.jit.trace(copy.deepcopy(model), x3)
                     trace_fused_model = torch.jit.freeze(trace_fused_model)
-#enable fusion path.
+                    #enable fusion path.
                     fused_tresult = trace_fused_model(x3)
-#bf16, jit trace path
+                    #bf16, jit trace path
                     trace_graph = trace_fused_model.graph_for(x3)
                     fused_tresult = trace_fused_model(x3)
 
                 self.assertEqual(fused_tresult, result, prec=prec)
-                self.assertEqual(fused_tresult.dtype, torch.bfloat16)
+                if not torch._C._jit_texpr_fuser_enabled():
+                    self.assertEqual(fused_tresult.dtype, torch.bfloat16)
 
-#check if the fused node exists in the graph
+                #check if the fused node exists in the graph
                 if kind_in_graph is not None:
-                    self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+                    self.assertTrue(any("prim::If" in n.kind() or n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
-#check if certain node does not exist in the graph
+                #check if certain node does not exist in the graph
                 if kind_not_in_graph is not None:
                     self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
@@ -1223,20 +1322,20 @@ class Tester(TestCase):
 
         freeze_model = torch.jit.freeze(trace_model)
         with torch.no_grad():
-#enable fusiong in ipex.
+            #enable fusiong in ipex.
             result1 = trace_model(x)
             result2 = freeze_model(x)
-#conv relu fusion, conv sum fusion or conv sum relu fusion
+            #conv relu fusion, conv sum fusion or conv sum relu fusion
             trace_graph = trace_model.graph_for(x)
             freeze_graph = freeze_model.graph_for(x)
 
         jit_node = "ipex_prepack::convolution_run"
         pack_node = "ipex_prepack::convolution_prepack"
         imperative_node = "torch_ipex::convolution_forward"
-# for freeze model, there will be only convolution_run in the graph
+        # for freeze model, there will be only convolution_run in the graph
         self.assertTrue(any(n.kind() == jit_node for n in freeze_graph.nodes()))
         self.assertTrue(all(n.kind() != pack_node for n in freeze_graph.nodes()))
-# for non-freeze model, since op-ctx dose not have value, cannot re-pack for this path
+        # for non-freeze model, since op-ctx dose not have value, cannot re-pack for this path
         self.assertTrue(any(n.kind() == imperative_node for n in trace_graph.nodes()))
         
 
@@ -1252,8 +1351,8 @@ class Tester(TestCase):
         origin_model = ModMultLinear(50, 60).eval()
 
         test_val1 = torch.rand([50, 5])
-#call mkl path(fp32)
-        model = ipex.optimize(origin_model, dtype=torch.float32)
+        #call mkl path(fp32)
+        model = ipex.optimize(origin_model, dtype=torch.float32, weights_prepack=False)
         ori_res = model(test_val1)
         with torch.no_grad():
             model_jit = torch.jit.trace(model,(test_val1))
@@ -1266,8 +1365,8 @@ class Tester(TestCase):
             graph_opt = str(model_jit.graph_for(test_val1))
             linear_count_ori = check_op_count(graph_opt, ["aten::linear"])
             self.assertEqual(linear_count_ori, 2)
-#call prepack mkl path(fp32)
-        model = ipex.optimize(origin_model, dtype=torch.float32, auto_kernel_selection=True)
+        #call prepack mkl path(fp32)
+        model = ipex.optimize(origin_model, dtype=torch.float32)
         ori_res = model(test_val1)
         with torch.no_grad():
             model_jit = torch.jit.trace(model,(test_val1))
@@ -1279,6 +1378,21 @@ class Tester(TestCase):
             self.assertEqual(ori_res, jit_res)
             graph_opt = str(model_jit.graph_for(test_val1))
             linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::mkl_sgemm_run"])
+            self.assertEqual(linear_count_ori, 2)
+
+        #call onednn path(fp32)
+        model = ipex.optimize(origin_model, dtype=torch.float32, auto_kernel_selection=True)
+        ori_res = model(test_val1)
+        with torch.no_grad():
+            model_jit = torch.jit.trace(model,(test_val1))
+            graph_ori = str(model_jit.graph_for(test_val1))
+            linear_count_ori = check_op_count(graph_ori, ["torch_ipex::ipex_linear"])
+            self.assertEqual(linear_count_ori, 4)
+            model_jit = torch.jit.freeze(model_jit)
+            jit_res = model_jit(test_val1)
+            self.assertEqual(ori_res, jit_res)
+            graph_opt = str(model_jit.graph_for(test_val1))
+            linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::linear_run"])
             self.assertEqual(linear_count_ori, 2)
 
         model = ipex.optimize(origin_model, dtype=torch.bfloat16)
@@ -1402,129 +1516,165 @@ class Tester(TestCase):
             a = [a1, a2, a3]
 
             in_channels = sum(channels)
-            model = ConcatBnRelu(dim, 1, in_channels).eval()
+            model1 = ConcatBnRelu(dim, 1, in_channels).eval()
+            model2 = ConcatBnReluV2(dim, 1, in_channels).eval()
+            model3 = ConcatBnReluV3(dim, 1, in_channels).eval()
 
-            if use_channels_last:
-                suggest_memory_format = torch.channels_last if dim == 2 else torch.channels_last_3d
-                for i in range(3):
-                    a[i] = a[i].to(memory_format=suggest_memory_format)
-                model = model.to(memory_format=suggest_memory_format)
-
-            model = ipex.optimize(model, dtype=dtype, level=level)
-
-            with torch.cpu.amp.autocast(enabled=True if dtype == torch.bfloat16 else False), torch.no_grad():
-                result = model(a[0], a[1], a[2])
-                trace_model = torch.jit.trace(model, (a[0], a[1], a[2])).eval()
-                trace_model = torch.jit.freeze(trace_model)
-
-                tresult = trace_model(a[0], a[1], a[2])
-                trace_graph = trace_model.graph_for(a[0], a[1], a[2])
-
-                self.assertEqual(result, tresult)
-                self.assertEqual(tresult.dtype, dtype)
+            for model in [model1, model2]:
                 if use_channels_last:
-                    self.assertTrue(tresult.is_contiguous(memory_format=suggest_memory_format))
-                if use_channels_last and a1.size(1) % 16 == 0 and a2.size(1) % 16 == 0 and a3.size(1) % 16 == 0 :
-                    self.assertTrue(any(n.kind() == "ipex::concat_bn_relu" for n in trace_graph.nodes()))
-                else:
-                    self.assertTrue(all(n.kind() != "ipex::concat_bn_relu" for n in trace_graph.nodes()))
+                    suggest_memory_format = torch.channels_last if dim == 2 else torch.channels_last_3d
+                    for i in range(3):
+                        a[i] = a[i].to(memory_format=suggest_memory_format)
+                    model = model.to(memory_format=suggest_memory_format)
+
+                model = ipex.optimize(model, dtype=dtype, level=level)
+
+                with torch.cpu.amp.autocast(enabled=True if dtype == torch.bfloat16 else False), torch.no_grad():
+                    result = model(a[0], a[1], a[2])
+                    trace_model = torch.jit.trace(model, (a[0], a[1], a[2])).eval()
+                    trace_model = torch.jit.freeze(trace_model)
+
+                    tresult = trace_model(a[0], a[1], a[2])
+                    trace_graph = trace_model.graph_for(a[0], a[1], a[2])
+
+                    self.assertEqual(result, tresult)
+                    self.assertEqual(tresult.dtype, dtype)
+                    if use_channels_last:
+                        self.assertTrue(tresult.is_contiguous(memory_format=suggest_memory_format))
+                    if use_channels_last and a1.size(1) % 16 == 0 and a2.size(1) % 16 == 0 and a3.size(1) % 16 == 0:
+                        self.assertTrue(any(n.kind() == "ipex::concat_bn_relu" for n in trace_graph.nodes()))
+                    else:
+                        self.assertTrue(all(n.kind() != "ipex::concat_bn_relu" for n in trace_graph.nodes()))
+
+            model = ipex.optimize(model3, dtype=dtype, level = level)
+            trace_model = torch.jit.trace(model, (a[0], a[1], a[2])).eval()
+            trace_model = torch.jit.freeze(trace_model)
+            trace_graph = trace_model.graph_for(a[0], a[1], a[2])
+            self.assertTrue(any(n.kind() != "ipex::concat_bn_relu" for n in trace_graph.nodes()))
 
     def test_mha_scores_calculation(self):
         def _check_match_mha(trace_model, mat1, mat2, bias, node = "ipex::mha_scores_calc"):
             graph = trace_model.graph_for((mat1, mat2, bias))
             self.assertTrue(any(n.kind() == node for n in graph.nodes()))
 
-        def _test_pure_bf16(model, trace_model, mat1, mat2, bias, prec=3e-2):
+        def _test_pure_bf16(model, trace_model, mat1, mat2, bias, prec=3e-2, node = "ipex::mha_scores_calc"):
             mat1_bf16 = mat1.to(torch.bfloat16)
             mat2_bf16 = mat2.to(torch.bfloat16)
             bias_bf16 = bias.to(torch.bfloat16)
             res_ref = model(mat1_bf16, mat2_bf16, bias_bf16)
             res_jit = trace_model(mat1_bf16, mat2_bf16, bias_bf16)
             self.assertEqual(res_ref, res_jit, prec=prec)
-            _check_match_mha(trace_model, mat1, mat2, bias)
+            _check_match_mha(trace_model, mat1, mat2, bias, node)
 
-        mat1 = torch.randn(56, 16, 384, 384)
-        mat2 = torch.randn(56, 16, 384, 384)
+        # shape case from bert-large
+        mat1 = torch.randn(56, 16, 384, 64)
+        mat2 = torch.randn(56, 16, 384, 64)
         bias = torch.randn(56, 16, 384, 384)
+        mha = MHAScoresCalculation(64, -1)
+        with torch.no_grad():
+            mha_jit = torch.jit.trace(mha, (mat1, mat2, bias))
+            mha_jit.eval()
+            res_ref = mha(mat1, mat2, bias)
+            res_jit = mha_jit(mat1, mat2, bias)
+            self.assertEqual(res_ref, res_jit)
+            _check_match_mha(mha_jit, mat1, mat2, bias)
+            _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+
+        # other shape cases for mha
         for softmax_dim in [0, 1, 2, -1]:
-            mha = MHAScoresCalculation(4, softmax_dim)
-            with torch.no_grad():
-                mha_jit = torch.jit.trace(mha, (mat1, mat2, bias))
-                mha_jit.eval()
 
-                res_ref = mha(mat1, mat2, bias)
-                res_jit = mha_jit(mat1, mat2, bias)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+            for v in [0, 1, 2, 3]:
+                if v == 0:
+                    mha = MHAScoresCalculation(4, softmax_dim)
+                    node = "ipex::mha_scores_calc"
+                if v == 1 :
+                    mha = MHAScoresCalculation_v1(4, softmax_dim)
+                    node = "ipex::mha_scores_calc"
+                elif v == 2:
+                    mha = MHAScoresCalculation_v2(4, softmax_dim)
+                    node = "ipex::mha_scores_calc_v2"
+                else:
+                    mha = MHAScoresCalculation_v3(4, softmax_dim)
+                    node = "ipex::mha_scores_calc_v2"
 
-                mat1 = torch.randn(1, 1, 2, 3)
-                mat2 = torch.randn(1, 1, 16, 3)
-                bias = torch.randn(1, 1, 2, 16)
-                res_ref = mha(mat1, mat2, bias)
-                res_jit = mha_jit(mat1, mat2, bias)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+                with torch.no_grad():
+                    mha_jit = torch.jit.trace(mha, (mat1, mat2, bias))
+                    mha_jit.eval()
 
-                mat1 = torch.randn(1, 1, 2, 3)
-                mat2 = torch.randn(1, 1, 32, 3)
-                bias = torch.randn(1, 1, 2, 32)
-                res_ref = mha(mat1, mat2, bias)
-                res_jit = mha_jit(mat1, mat2, bias)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+                    res_ref = mha(mat1, mat2, bias)
+                    res_jit = mha_jit(mat1, mat2, bias)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
 
-                mat1 = torch.randn(1, 1, 2, 3)
-                mat2 = torch.randn(1, 1, 33, 3)
-                bias = torch.randn(1, 1, 2, 33)
-                res_ref = mha(mat1, mat2, bias)
-                res_jit = mha_jit(mat1, mat2, bias)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+                    mat1 = torch.randn(1, 1, 2, 3)
+                    mat2 = torch.randn(1, 1, 16, 3)
+                    bias = torch.randn(1, 1, 2, 16)
+                    res_ref = mha(mat1, mat2, bias)
+                    res_jit = mha_jit(mat1, mat2, bias)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
 
-                mat1 = torch.randn(2, 3, 4, 6)
-                mat2 = torch.randn(2, 3, 6, 6)
-                bias = torch.randn(2, 3, 4, 6)
-                res_ref = mha(mat1, mat2, bias)
-                res_jit = mha_jit(mat1, mat2, bias)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+                    mat1 = torch.randn(1, 1, 2, 3)
+                    mat2 = torch.randn(1, 1, 32, 3)
+                    bias = torch.randn(1, 1, 2, 32)
+                    res_ref = mha(mat1, mat2, bias)
+                    res_jit = mha_jit(mat1, mat2, bias)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
 
-#Test broadcast
-                mat1 = torch.randn(2, 3, 4, 10)
-                mat2 = torch.randn(2, 3, 16, 10)
-                bias = torch.randn(1, 1, 1, 16)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
-                bias = torch.randn(4, 16)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
-                bias = torch.randn(3, 1, 1)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
-                bias = torch.randn(2, 1, 1, 1)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
-                bias = torch.randn(3, 4, 16)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
-                bias = torch.randn(2, 1, 1, 16)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
-                bias = torch.randn(2, 1, 4, 16)
-                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
-                _check_match_mha(mha_jit, mat1, mat2, bias)
-                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+                    mat1 = torch.randn(1, 1, 2, 3)
+                    mat2 = torch.randn(1, 1, 33, 3)
+                    bias = torch.randn(1, 1, 2, 33)
+                    res_ref = mha(mat1, mat2, bias)
+                    res_jit = mha_jit(mat1, mat2, bias)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+
+                    mat1 = torch.randn(2, 3, 4, 6)
+                    mat2 = torch.randn(2, 3, 6, 6)
+                    bias = torch.randn(2, 3, 4, 6)
+                    res_ref = mha(mat1, mat2, bias)
+                    res_jit = mha_jit(mat1, mat2, bias)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+
+                    #Test broadcast
+                    mat1 = torch.randn(2, 3, 4, 10)
+                    mat2 = torch.randn(2, 3, 16, 10)
+                    bias = torch.randn(1, 1, 1, 16)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+                    bias = torch.randn(4, 16)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+                    bias = torch.randn(3, 1, 1)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+                    bias = torch.randn(2, 1, 1, 1)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+                    bias = torch.randn(3, 4, 16)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+                    bias = torch.randn(2, 1, 1, 16)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+                    bias = torch.randn(2, 1, 4, 16)
+                    self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                    _check_match_mha(mha_jit, mat1, mat2, bias, node=node)
+                    _test_pure_bf16(mha, mha_jit, mat1, mat2, bias, node=node)
+
 
     def test_linear_swish(self):
         mat1 = torch.randn(10000, 5)
@@ -1596,56 +1746,90 @@ class Tester(TestCase):
             self.assertEqual(res_ref, res_jit, prec=prec)
             _check_match_mha_parts(trace_model, qk_bf16, mask)
         
-        for sequance_length in [128, 100]:
-            mat1 = torch.randn(56, 12, sequance_length, sequance_length)
-            mat2 = torch.randn(56, 12, sequance_length, sequance_length)
-            mask = torch.randn(56, sequance_length)
+        for sequence_length in [128, 100]:
+            mat1 = torch.randn(56, 12, sequence_length, sequence_length)
+            mat2 = torch.randn(56, 12, sequence_length, sequence_length)
+            mask = torch.randn(56, sequence_length)
             qk = torch.matmul(mat1,mat2)
             mask = (mask > 0.5)
 
-            mha_v1 = DistilMHAScoresCalculation_v1(4, -1)
+            for fill_value in [-float("inf"), torch.tensor(torch.finfo(float).min)]:
+                model_v1 = DistilMHAScoresCalculation_v1(64, fill_value)
+                with torch.no_grad():
+                    mha_jit = torch.jit.trace(model_v1, (mat1, mat2, mask))
+                    mha_jit.eval()
+                    res_ref = model_v1(mat1, mat2, mask)
+                    res_jit = mha_jit(mat1, mat2, mask)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, mask)
+                    _test_pure_bf16(model_v1, mha_jit, mat1, mat2, mask)
+
+                model_v2 = DistilMHAScoresCalculation_v2(64, fill_value)
+                with torch.no_grad():
+                    mha_jit = torch.jit.trace(model_v2, (mat1, mat2, mask))
+                    mha_jit.eval()
+                    res_ref = model_v2(mat1, mat2, mask)
+                    res_jit = mha_jit(mat1, mat2, mask)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha(mha_jit, mat1, mat2, mask)
+                    _test_pure_bf16(model_v2, mha_jit, mat1, mat2, mask)
+
+                model_v3 = Maskedfill__softmax(fill_value)
+                with torch.no_grad():
+                    mha_jit = torch.jit.trace(model_v3, (qk, mask))
+                    mha_jit.eval()
+                    res_ref = model_v3(qk, mask)
+                    res_jit = mha_jit(qk, mask)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha_parts(mha_jit, qk, mask)
+                    _test_pure_bf16_parts(model_v3, mha_jit, qk, mask)
+
+                model_v4 = Maskedfill_softmax(fill_value)
+                with torch.no_grad():
+                    mha_jit = torch.jit.trace(model_v4, (qk, mask))
+                    mha_jit.eval()
+                    res_ref = model_v4(qk, mask)
+                    res_jit = mha_jit(qk, mask)
+                    self.assertEqual(res_ref, res_jit)
+                    _check_match_mha_parts(mha_jit, qk, mask)
+                    _test_pure_bf16_parts(model_v4, mha_jit, qk, mask)
+
+
+    def test_vit_mha_scores_calculation(self):
+        def _check_match_mha(trace_model, mat1, mat2, mask, node = "ipex::vit_mha_scores_calc"):
+            graph = trace_model.graph_for(mat1, mat2, mask)
+            self.assertTrue(any(n.kind() == node for n in graph.nodes()))
+
+        def _test_amp_bf16(model, mat1, mat2, mask, prec=3e-2, node ="ipex::vit_mha_scores_calc"):
+            with torch.cpu.amp.autocast():
+                trace_model = torch.jit.trace(model, (mat1, mat2, mask))
+                trace_model = torch.jit.freeze(trace_model)
+                res_ref = model(mat1, mat2, mask)
+                res_jit = trace_model(mat1, mat2, mask)
+                self.assertEqual(res_ref, res_jit, prec=prec)
+                _check_match_mha(trace_model, mat1, mat2, mask, node)
+
+        for patch in [128, 257]:
+            mat1 = torch.randn(56, 12, patch, patch)
+            mat2 = torch.randn(56, 12, patch, patch)
+            mask_1 = torch.randn(56, 1, patch, patch)
+            mask = ~(mask_1 > 0.5)
+            mha_v1 = VitMHAScoresCalculation_v1(64).eval()
             with torch.no_grad():
                 mha_jit = torch.jit.trace(mha_v1, (mat1, mat2, mask))
-                mha_jit.eval()
-
                 res_ref = mha_v1(mat1, mat2, mask)
                 res_jit = mha_jit(mat1, mat2, mask)
                 self.assertEqual(res_ref, res_jit)
                 _check_match_mha(mha_jit, mat1, mat2, mask)
-                _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
+                _test_amp_bf16(mha_v1, mat1, mat2, mask)
 
-            mha_v2 = DistilMHAScoresCalculation_v2(4)
+            mha_v2 = VitMHAScoresCalculation_v2(64).eval()
             with torch.no_grad():
                 mha_jit = torch.jit.trace(mha_v2, (mat1, mat2, mask))
-                mha_jit.eval()
-
                 res_ref = mha_v2(mat1, mat2, mask)
                 res_jit = mha_jit(mat1, mat2, mask)
                 self.assertEqual(res_ref, res_jit)
                 _check_match_mha(mha_jit, mat1, mat2, mask)
-                _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
-
-            mha_v3 = Maskedfill__softmax()
-            with torch.no_grad():
-                mha_jit = torch.jit.trace(mha_v3, (qk, mask))
-                mha_jit.eval()
-
-                res_ref = mha_v3(qk, mask)
-                res_jit = mha_jit(qk, mask)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha_parts(mha_jit, qk, mask)
-                _test_pure_bf16_parts(mha_v3, mha_jit, qk, mask)
-
-            mha_v4 = Maskedfill_softmax()
-            with torch.no_grad():
-                mha_jit = torch.jit.trace(mha_v4, (qk, mask))
-                mha_jit.eval()
-
-                res_ref = mha_v4(qk, mask)
-                res_jit = mha_jit(qk, mask)
-                self.assertEqual(res_ref, res_jit)
-                _check_match_mha_parts(mha_jit, qk, mask)
-                _test_pure_bf16_parts(mha_v4, mha_jit, qk, mask)
 
     def _test_conv_unary_fusion(self, op_list, seed=None):
         batch_size = 8
@@ -2417,7 +2601,7 @@ class Tester(TestCase):
                 kind_not_in_graph="ipex_prepack::convolution_add_prepack",
                 prec=0.1)
 
-#add outputs' have different data format
+            #add outputs' have different data format
             m = ConvSum(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1).eval()
             if dim == 2:
                 m.conv = m.conv.to(memory_format=torch.torch.channels_last)
@@ -2747,6 +2931,46 @@ class Tester(TestCase):
                     kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
                     prec=prec)        
 
+    def test_linear_fp32_with_dynamic_input(self):
+        x1 = torch.rand(512, 64)
+        x2 = torch.rand(15, 64)
+
+        model = LinearRelu(64, 241, bias=True).eval()
+        model1 = ipex.optimize(model, dtype=torch.float32, level="O1")
+        model2 = ipex.optimize(model, dtype=torch.float32, level="O1", sample_input=x2)
+
+        y1_ref = model(x1)
+        y2_ref = model(x2)
+
+        y11 = model1(x1)
+        y12 = model2(x1)
+        y21 = model1(x2)
+        y22 = model2(x2)
+
+        self.assertEqual(y1_ref, y11, prec=1e-5)
+        self.assertEqual(y1_ref, y12, prec=1e-5)
+        self.assertEqual(y2_ref, y21, prec=1e-5)
+        self.assertEqual(y2_ref, y22, prec=1e-5)
+        
+        with torch.no_grad():
+            traced_model11 = torch.jit.trace(model1, x1).eval()
+            traced_model11 = torch.jit.freeze(traced_model11)
+            traced_model12 = torch.jit.trace(model2, x1).eval()
+            traced_model12 = torch.jit.freeze(traced_model12)
+                
+            for i in range(4):
+                if i%2 == 0:
+                    z11 = traced_model11(x1)
+                    z12 = traced_model12(x1)
+                else:
+                    z21 = traced_model11(x2)
+                    z22 = traced_model12(x2)
+            
+        self.assertEqual(y1_ref, z11, prec=1e-5)
+        self.assertEqual(y1_ref, z12, prec=1e-5)
+        self.assertEqual(y2_ref, z21, prec=1e-5)
+        self.assertEqual(y2_ref, z22, prec=1e-5)
+
     def test_linear_auto_kernel_selection_fp32(self):
         x = torch.rand(32, 3)
         options = itertools.product(['O0', 'O1'], [True, False])
@@ -2759,11 +2983,14 @@ class Tester(TestCase):
                 y = traced_model(x)
                 trace_graph = traced_model.graph_for(x)
 
-                if auto_select_kernel and level == 'O1':
-# for auto_select_kernel is True and level is O1, we will use ipex prepacked MKL linear
+                if not auto_select_kernel and level == 'O1':
+                    # for auto_select_kernel is False and level is O1 (weights_prepack is True), we will use ipex prepacked MKL linear
                     self.assertTrue(any(n.kind() == 'ipex_prepack::mkl_sgemm_run' for n in trace_graph.nodes()))
+                elif auto_select_kernel and level == 'O1':
+                    # for auto_select_kernel is True and level is O1 (weights_prepack is True), we will use onednn prepacked linear
+                    self.assertTrue(any(n.kind() == "ipex_prepack::linear_relu_run" for n in trace_graph.nodes()))
                 else:
-# auto_select_kernel is false, we will use mkl linear
+                    # level is O0 (weights_prepack is False), we will use mkl linear
                     self.assertTrue(any(n.kind() == 'aten::linear' for n in trace_graph.nodes()))
 
     def test_linear_auto_kernel_selection_bf16(self):
@@ -2778,8 +3005,8 @@ class Tester(TestCase):
                 y = traced_model(x)
                 trace_graph = traced_model.graph_for(x)
 
-#for bfloat16 path, we will use ipex linear for 'O0' and 'O1'
-                self.assertTrue(any(n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
+                #for bfloat16 path, we will use ipex linear for 'O0' and 'O1'
+                self.assertTrue(any("prim::If" in n.kind() or n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
 
     def test_output_linear_scalar_binary(self):
         for bias in [True, False]:
@@ -2939,6 +3166,10 @@ class Tester(TestCase):
                     m,
                     x,
                     kind_in_graph="ipex_prepack::mkl_sgemm_run")
+                self._test_dnnl_fp32(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op)
                 if bf16_supported:
                     self._test_output_bf16(
                         m,
@@ -2987,6 +3218,10 @@ class Tester(TestCase):
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::mkl_sgemm_run")
+        self._test_dnnl_fp32(
+            LinearAdd(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_add_run")
         self._test_output_bf16(
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
@@ -3006,6 +3241,10 @@ class Tester(TestCase):
                 m,
                 x,
                 kind_in_graph="ipex_prepack::mkl_sgemm_run")
+            self._test_dnnl_fp32(
+                m,
+                x,
+                kind_in_graph="ipex_prepack::linear_add_relu_run")
             self._test_output_bf16(
                 m,
                 x,
@@ -3040,6 +3279,14 @@ class Tester(TestCase):
             LinearSigmoidMul(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::mkl_sgemm_run")
+        self._test_dnnl_fp32(
+            LinearSigmoidMul(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_swish_run")
+        self._test_dnnl_fp32(
+            LinearSigmoidMul(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_swish_run")
         self._test_output_bf16(
             LinearSigmoidMul(3, 32, bias=True),
             torch.rand(32, 3),
@@ -3067,7 +3314,7 @@ class Tester(TestCase):
 
 
     def test_jit_function(self):
-#test hool trace and script can works for function
+        #test hool trace and script can works for function
         def fn(input, weight, bias):
             return F.linear(input, weight, bias)
 
@@ -3553,14 +3800,14 @@ class Tester(TestCase):
         for eltwise in ['sigmoid', 'tanh', 'celu', 'elu', 'hardsigmoid', 'hardswish', 'hardtanh', 'leaky_relu', 'relu6', 'relu', 'rrelu', 'selu', 'silu', 'clamp']:
             eltwise_fn_name = eltwise + '_'
             if eltwise in ['sigmoid', 'tanh', 'celu', 'relu', 'rrelu', 'selu']:
-#use torch.sigmoid_(x)
+                #use torch.sigmoid_(x)
                 eltwise_fn = getattr(torch, eltwise_fn_name)
                 m = M(eltwise_fn)
             elif eltwise == 'clamp':
                 eltwise_fn = getattr(torch, eltwise_fn_name)
                 m = M(eltwise_fn, {"min": 0, "max": 2})
             else:
-#use F.elu(x, inplace = True)
+                #use F.elu(x, inplace = True)
                 eltwise_fn = getattr(F, eltwise)
                 m = M(eltwise_fn, {"inplace": True})
 
@@ -3568,14 +3815,18 @@ class Tester(TestCase):
                 m.eval()
                 x = torch.randn(1, 3, 16, 16)
 
-#test restore inplace
-                traced = torch.jit.trace(m, x)
-                trace_graph = traced.graph_for(x)
-                self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph.nodes()))
+                #test restore inplace
+                # Since TE is with priority and it has not supported inplace op yet, we make inplace optimization after TE.
+                # Some in place ops replaced by replaceInplaceOpsWithOutplaceOps will be optimized by TE and won't resume by ApplyInplaceOptimization.
+                # Thus we need to disable TE here.
+                with self._texpr_enable(False):
+                    traced = torch.jit.trace(m, x)
+                    trace_graph = traced.graph_for(x)
+                    self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph.nodes()))
 
-                y = m(x)
-                traced_y = traced(x)
-                self.assertEqual(y, traced_y)
+                    y = m(x)
+                    traced_y = traced(x)
+                    self.assertEqual(y, traced_y)
 
 
     def test_enable_inplace(self):

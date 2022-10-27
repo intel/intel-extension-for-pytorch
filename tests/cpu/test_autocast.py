@@ -3,6 +3,7 @@ import copy
 import torch
 import torch.nn as nn
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 from common_utils import TestCase
 from torch.testing._internal.common_utils import TestCase as TorchTestCase
 import time
@@ -32,6 +33,23 @@ def get_rand_seed():
     return int(time.time() * 1000000000)
 
 class TestFunction(TestCase):
+    def setUp(self):
+        super(TestFunction, self).setUp()
+        self.models = [
+            Conv_Bn_Relu(2, 3, 32, kernel_size=3, stride=1),
+            LinearBn(2, 32, 32, bias=True),
+            Linear_Reshape_Bn(2, 32, 32, (1, 1, 64, 16), bias=True)]
+        self.inputs = [
+            torch.randn(32, 3, 64, 64),
+            torch.rand(1, 1, 32, 32), 
+            torch.rand(1, 1, 32, 32)]
+
+    def test_set_autocast_dtype(self):
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+            self.assertEqual(core.get_autocast_dtype(), torch.bfloat16)
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.float16):
+            self.assertEqual(core.get_autocast_dtype(), torch.float16)
+
     def test_forward_dtype(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
@@ -41,6 +59,27 @@ class TestFunction(TestCase):
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
             out_autocast = _conv(_in_cpu)
         self.assertEqual(out_autocast.dtype, torch.bfloat16)
+
+    @unittest.skipIf(not core.onednn_has_fp16_support(), "ipex fp16 is not supported on this CPU device")
+    def test_gradscaler(self):
+        scaler = torch.cpu.amp.GradScaler()
+        niters = 100
+        criterion = torch.nn.L1Loss()
+        for i in range(self.models.__len__()):
+            model = self.models[i]
+            out = model(self.inputs[i])
+            target = torch.rand_like(out)
+            optimizer = torch.optim.SGD(model.parameters(), lr=0.05, momentum=0.95)
+            model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.half, auto_kernel_selection=True, weights_prepack=True)
+            optimizer.zero_grad()
+            for _ in range(niters):
+                optimizer.zero_grad()
+                with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
+                    output = model(self.inputs[i])
+                    loss = criterion(output, target)
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
 
     def test_nested_useage(self):
         rand_seed = int(get_rand_seed())
@@ -147,6 +186,23 @@ class TestAutocastWithJit(TestCase):
                 # NHWC 3D case not support yet
                 continue
             test_nhwc_autocast_jit_trace_model(self.models[i], self.inputs[i])
+
+class TestPyTorchOps(TestCase):
+    def test_bernoulli(self):
+        input = torch.rand(8, 8)
+        input_bf16 = input.to(dtype=torch.bfloat16)
+        input_fp16 = input.to(dtype=torch.float16)
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+            out1 = torch.bernoulli(input_bf16)
+            out2 = torch.bernoulli(input_bf16, 0.5)
+        self.assertEqual(out1.dtype, torch.bfloat16)
+        self.assertEqual(out2.dtype, torch.bfloat16)
+        # Does not support fp16 yet
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.float16):
+            out1 = torch.bernoulli(input_fp16)
+            out2 = torch.bernoulli(input_fp16, 0.5)
+        self.assertEqual(out1.dtype, torch.float32)
+        self.assertEqual(out2.dtype, torch.float32)
 
 class TestCustomerOps(TestCase):
     def test_interaction_op(self):
@@ -429,7 +485,7 @@ class TestLSTM(TorchTestCase):
             c_ipex = c.clone().requires_grad_(training)
             model_ipex = copy.deepcopy(model_cpu)
             model_ipex.train() if training else model_ipex.eval()
-            ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model_ipex)
+            ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model_ipex, None)
 
             with torch.cpu.amp.autocast(enabled=bf16, dtype=torch.bfloat16):
                 if empty_state:
@@ -493,7 +549,7 @@ class TestLSTM(TorchTestCase):
         model = M(embedding_dim, hidden_dim, num_layers=num_layers, bidirectional=bidirectional, batch_first=True, bias=True, dropout=0.2)
 
         model_ipex = copy.deepcopy(model)
-        ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model_ipex)
+        ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model_ipex, None)
 
         lstm_out, hidden_out = model(embeds, (hidden_0, hidden_1))
         lstm_out, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_out, batch_first=True)
@@ -526,7 +582,7 @@ class TestAutocastOperations(TestCase):
         del self.autocast_lists
         super(TestAutocastOperations, self).tearDown()
 
-    def _run_autocast_outofplace(self, op, args, run_as_type, out_type=None, module=torch, add_kwargs=None):
+    def _run_autocast_outofplace(self, op, args, run_as_type, out_type=None, autocast_type=torch.bfloat16, module=torch, add_kwargs=None):
         # helper to cast args
         def cast(val, to_type):
             if isinstance(val, torch.Tensor):
@@ -540,7 +596,7 @@ class TestAutocastOperations(TestCase):
             add_kwargs = {}
 
         self.assertFalse(torch.is_autocast_cpu_enabled())
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+        with torch.cpu.amp.autocast(enabled=True, dtype=autocast_type):
             self.assertTrue(torch.is_autocast_cpu_enabled())
             out_type = out_type if out_type is not None else run_as_type
             output = output_method = None
@@ -583,7 +639,7 @@ class TestAutocastOperations(TestCase):
             # Compare numerics to Python-side "autocasting" that (we expect) does the same thing
             # as the C++-side autocasting, and should be bitwise accurate.
             output_to_compare = output if output is not None else output_method
-            with torch.cpu.amp.autocast(enabled=False, dtype=torch.bfloat16):
+            with torch.cpu.amp.autocast(enabled=False, dtype=autocast_type):
                 self.assertFalse(torch.is_autocast_cpu_enabled())
 
                 if module is not None and hasattr(module, op):
@@ -596,7 +652,7 @@ class TestAutocastOperations(TestCase):
             self.assertTrue(torch.is_autocast_cpu_enabled())
         self.assertFalse(torch.is_autocast_cpu_enabled())
 
-    def _run_autocast_pass_test(self, op, args, run_as_type, out_type=None, module=torch, add_kwargs=None):
+    def _run_autocast_pass_test(self, op, args, run_as_type, out_type=None, autocast_type=torch.bfloat16, module=torch, add_kwargs=None):
         # helper to cast args
         def cast(val, to_type):
             if isinstance(val, torch.Tensor):
@@ -610,7 +666,7 @@ class TestAutocastOperations(TestCase):
             add_kwargs = {}
 
         self.assertFalse(torch.is_autocast_cpu_enabled())
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+        with torch.cpu.amp.autocast(enabled=True, dtype=autocast_type):
             self.assertTrue(torch.is_autocast_cpu_enabled())
             out_type = out_type if out_type is not None else run_as_type
 
@@ -628,12 +684,16 @@ class TestAutocastOperations(TestCase):
             return op_with_args[0], op_with_args[1], op_with_args[2]
 
     def test_autocast_torch_expect_builtin_promote(self):
-        for op, args, out_type in self.autocast_lists.torch_expect_builtin_promote:
+        for op, args, out_type in self.autocast_lists.torch_expect_builtin_promote_bf16:
             self._run_autocast_outofplace(op, args, torch.float32, out_type=out_type)
+        for op, args, out_type in self.autocast_lists.torch_expect_builtin_promote_fp16:
+            self._run_autocast_outofplace(op, args, torch.float32, out_type=out_type, autocast_type=torch.float16)
 
     def test_autocast_methods_expect_builtin_promote(self):
-        for op, args, out_type in self.autocast_lists.methods_expect_builtin_promote:
+        for op, args, out_type in self.autocast_lists.methods_expect_builtin_promote_bf16:
             self._run_autocast_outofplace(op, args, torch.float32, module=None, out_type=out_type)
+        for op, args, out_type in self.autocast_lists.methods_expect_builtin_promote_bf16:
+            self._run_autocast_outofplace(op, args, torch.float32, module=None, out_type=out_type, autocast_type=torch.float16)
 
     def test_autocast_torch_bf16(self):
         for op_with_args in self.autocast_lists.torch_bf16:
@@ -644,13 +704,13 @@ class TestAutocastOperations(TestCase):
         for op, args in self.autocast_lists.nn_bf16:
             self._run_autocast_outofplace(op, args, torch.bfloat16, module=torch._C._nn)
 
-    def test_autocast_torch_fp32(self):
-        for op_with_args in self.autocast_lists.torch_fp32:
+    def test_autocast_torch_bf16_fp32(self):
+        for op_with_args in self.autocast_lists.torch_bf16_fp32:
             op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
             self._run_autocast_outofplace(op, args, torch.float32, add_kwargs=maybe_kwargs)
 
-    def test_autocast_nn_fp32(self):
-        for op_with_args in self.autocast_lists.nn_fp32:
+    def test_autocast_nn_bf16_fp32(self):
+        for op_with_args in self.autocast_lists.nn_bf16_fp32:
             op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
             self._run_autocast_outofplace(op, args, torch.float32, module=torch._C._nn, add_kwargs=maybe_kwargs)
 
@@ -670,8 +730,10 @@ class TestAutocastOperations(TestCase):
             self._run_autocast_pass_test(op, args, torch.float32, module=torch._C._linalg, add_kwargs=maybe_kwargs)
 
     def test_autocast_torch_need_autocast_promote(self):
-        for op, args in self.autocast_lists.torch_need_autocast_promote:
+        for op, args in self.autocast_lists.torch_need_autocast_promote_bf16:
             self._run_autocast_outofplace(op, args, torch.float32)
+        for op, args in self.autocast_lists.torch_need_autocast_promote_fp16:
+            self._run_autocast_outofplace(op, args, torch.float32, autocast_type=torch.float16)
 
     def test_autocast_blacklist_non_float_output(self):
         for op, args in self.autocast_lists.blacklist_non_float_output_pass_test:
@@ -682,15 +744,39 @@ class TestAutocastOperations(TestCase):
             op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
             self._run_autocast_pass_test(op, args, torch.bfloat16, add_kwargs=maybe_kwargs)
 
-    def test_autocast_torch_fp32_multi_output(self):
-        for op_with_args in self.autocast_lists.torch_fp32_multi_output:
+    def test_autocast_torch_bf16_fp32_multi_output(self):
+        for op_with_args in self.autocast_lists.torch_bf16_fp32_multi_output:
             op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
             self._run_autocast_pass_test(op, args, torch.float32, add_kwargs=maybe_kwargs)
 
-    def test_autocast_nn_fp32_multi_output(self):
-        for op_with_args in self.autocast_lists.nn_fp32_multi_output:
+    def test_autocast_nn_bf16_fp32_multi_output(self):
+        for op_with_args in self.autocast_lists.nn_bf16_fp32_multi_output:
             op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
-            self._run_autocast_outofplace(op, args, torch.float32, module=torch._C._nn, add_kwargs=maybe_kwargs)
+            self._run_autocast_pass_test(op, args, torch.float32, module=torch._C._nn, add_kwargs=maybe_kwargs)
+
+    def test_autocast_torch_fp16(self):
+        for op_with_args in self.autocast_lists.torch_fp16:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_outofplace(op, args, torch.float16, autocast_type=torch.float16, add_kwargs=maybe_kwargs)
+
+    def test_autocast_nn_fp16(self):
+        for op, args in self.autocast_lists.nn_fp16:
+            self._run_autocast_outofplace(op, args, torch.float16, autocast_type=torch.float16, module=torch._C._nn)
+
+    def test_autocast_torch_fp16_fp32(self):
+        for op_with_args in self.autocast_lists.torch_fp16_fp32:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_outofplace(op, args, torch.float32, autocast_type=torch.float16, add_kwargs=maybe_kwargs)
+
+    def test_autocast_nn_fp16_fp32(self):
+        for op_with_args in self.autocast_lists.nn_fp16_fp32:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_outofplace(op, args, torch.float32, autocast_type=torch.float16, module=torch._C._nn, add_kwargs=maybe_kwargs)
+
+    def test_autocast_torch_fp16_fp32_multi_output(self):
+        for op_with_args in self.autocast_lists.torch_fp16_fp32_multi_output:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_pass_test(op, args, torch.float32, autocast_type=torch.float16, add_kwargs=maybe_kwargs)
 
 if __name__ == '__main__':
     test = unittest.main()

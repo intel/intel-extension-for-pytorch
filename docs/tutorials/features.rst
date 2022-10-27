@@ -44,6 +44,18 @@ For more detailed information, check `Channels Last <features/nhwc.md>`_.
 
    features/nhwc
 
+Auto Channels Last
+------------------
+
+Intel® Extension for PyTorch* automatically converts the model to channels last memory format by default when users optimize their model with ``ipex.optimize(model)``. 
+
+For more detailed information, check `Auto Channels Last <features/auto_channels_last.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/auto_channels_last
 
 Auto Mixed Precision (AMP)
 --------------------------

@@ -1,8 +1,8 @@
 #include <stdio.h>
+#include "csrc/cpu/dyndisp/DispatchStub.h"
+#include "csrc/cpu/isa/cpu_feature.hpp"
+#include "csrc/cpu/isa/embedded_function.h"
 #include "gtest/gtest.h"
-#include "intel_extension_for_pytorch/csrc/cpu/isa/cpu_feature.hpp"
-#include "intel_extension_for_pytorch/csrc/cpu/isa/embedded_function.h"
-#include "intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h"
 
 #define ASSERT_VARIABLE_EQ(a, b) ASSERT_TRUE(torch::allclose((a), (b)))
 #define EXPECT_VARIABLE_EQ(a, b) EXPECT_TRUE(torch::allclose((a), (b)))

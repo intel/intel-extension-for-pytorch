@@ -33,13 +33,14 @@ Available option settings (knobs) are listed below:
 | ```--use_logical_core``` | - | False | Whether only use physical cores |
 | ```--disable_numactl``` | - | False | Disable numactl |
 | ```--disable_taskset``` | - | False | Disable taskset |
-| ```--core_list``` | str | None | Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used. |
+| ```--core_list``` | str | None | Specify the core list as 'core_id, core_id, ...' or 'core_id-core_id, ...', otherwise, all the cores will be used. |
 | ```--log_path``` | str | '' | The log file path. Default path is '', which means disable logging to files. |
 | ```--log_file_prefix``` | str | 'run' | log file prefix |
 | ```--disable_iomp``` | - | False | By default, we use Intel OpenMP and libiomp5.so will be add to LD_PRELOAD |
 | ```--enable_tcmalloc``` | - | False | Enable tcmalloc allocator |
 | ```--enable_jemalloc``` | - | False | Enable jemalloc allocator |
 | ```--use_default_allocator``` | - |  False | Use default memory allocator |
+| ```--benchmark``` | - |  False | Enable benchmark config. JeMalloc's MALLOC_CONF has been tuned for low latency. Recommend to use this for benchmarking purpose; for other use cases, this MALLOC_CONF may cause Out-of-Memory crash. |
 
 **Note:** ```--latency_mode``` and ```--throughput_mode``` are exclusive knobs to ```--ninstances```, ```--ncore_per_instance```, ```--node_id``` and ```--use_logical_core```. I.e., setting either of ```--latency_mode``` or ```--throughput_mode``` overwrites settings of ```--ninstances```, ```--ncore_per_instance```, ```--node_id``` and ```--use_logical_core``` if they are explicitly set in command line. ```--latency_mode``` and ```--throughput_mode``` are mutually exclusive.
 
@@ -212,6 +213,33 @@ $ cat logs/run_20210712220928_instances.log
 2021-07-12 22:09:28,356 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-12 22:09:28,356 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
 2021-07-12 22:09:28,356 - __main__ - INFO - numactl -C 0-9 -m 0 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712220928_instance_0_cores_0-9.log
+```
+
+You can also specify the cores to be utilized using ```--core_list``` argument. For example, if core_id 11-20 are desired instead of the first 10 cores, the launch command would be as below.
+```
+ipexrun --ncore_per_instance 10 --core_list "11-20" --log_path ./logs resnet50.py
+```
+Please notice that when specifying ```--core_list```, a correspondant ```--ncore_per_instance``` argument is required for instance number deduction.
+
+In this case the log directory should be like
+```
+.
+├── resnet50.py
+└── logs
+    ├── run_20210712221615_instances.log
+    └── run_20210712221615_instance_0_cores_11-20.log
+```
+
+The ```run_20210712221615_instances.log``` contains information and command that were used for this execution launch.
+```
+$ cat logs/run_20210712221615_instances.log
+2021-07-12 22:16:15,591 - __main__ - WARNING - Both TCMalloc and JeMalloc are not found in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or /home/<user>/.local/lib/ so the LD_PRELOAD environment variable will not be set. This may drop the performance
+2021-07-12 22:16:15,591 - __main__ - INFO - OMP_NUM_THREADS=10
+2021-07-12 22:16:15,591 - __main__ - INFO - Using Intel OpenMP
+2021-07-12 22:16:15,591 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
+2021-07-12 22:16:15,591 - __main__ - INFO - KMP_BLOCKTIME=1
+2021-07-12 22:16:15,591 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
+2021-07-12 22:16:15,591 - __main__ - INFO - numactl -C 11-20 -m 0 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221615_instance_0_cores_11-20.log
 ```
 
 ### Multiple instances for inference

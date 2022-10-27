@@ -91,7 +91,7 @@ torch/test/
 torch/version.py
 
 intel_extension_for_pytorch/version.py
-intel_extension_for_pytorch/csrc/version.cpp
+csrc/utils/version.h
 
 cscope.*
      	

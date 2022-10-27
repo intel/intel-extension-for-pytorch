@@ -1,5 +1,0 @@
-FILE(GLOB _CPU_SRCS version.cpp initialization.cpp)
-LIST(APPEND DPCPP_COMMON_SRCS ${_CPU_SRCS})
-
-# Pass to parent
-set(DPCPP_COMMON_SRCS ${DPCPP_COMMON_SRCS} PARENT_SCOPE)

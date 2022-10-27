@@ -10,8 +10,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 14)
 
-set(TEST_NAME ipex_cpp_test)
-set(THIRD_PARTY_ROOT "${PROJECT_DIR}/third_party")
+set(CPU_CPP_TEST_NAME ipex_cpp_test)
+
+# Setup project top directory.
+set(IPEX_PROJECT_TOP_DIR "${PROJECT_SOURCE_DIR}/../../../")
+
+set(THIRD_PARTY_ROOT "${IPEX_PROJECT_TOP_DIR}/third_party")
 
 set(_CXX11_ABI_FLAG 0)
 if(DEFINED GLIBCXX_USE_CXX11_ABI)
@@ -28,7 +32,7 @@ include_directories(${MKL_INSTALL_DIR}/include)
 include_directories(${PYTORCH_INSTALL_DIR}/include)
 include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include/)
 include_directories(${THIRD_PARTY_ROOT}/googletest/googletest/include)
-include_directories(${PROJECT_DIR})
+include_directories(${IPEX_PROJECT_TOP_DIR})
 
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 # search the lib directory for gtest
@@ -40,15 +44,15 @@ add_subdirectory(${THIRD_PARTY_ROOT}/googletest ${CPP_TEST_BUILD_DIR}/third_part
 # Add the Test Files
 set(IPEX_CPP_TEST_SOURCES test_runtime_api.cpp test_dyndisp_and_isa_api.cpp)
 
-add_executable(${TEST_NAME} ${IPEX_CPP_TEST_SOURCES})
+add_executable(${CPU_CPP_TEST_NAME} ${IPEX_CPP_TEST_SOURCES})
 
 # Link GTest
-target_link_libraries(${TEST_NAME} PUBLIC gtest_main)
-target_link_libraries(${TEST_NAME} PUBLIC gtest)
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest_main)
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest)
 
 # Link Pytorch
-target_link_libraries(${TEST_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
-target_link_libraries(${TEST_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
 # Link IPEX
-target_link_libraries(${TEST_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/libintel-ext-pt-cpu.so)
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/libintel-ext-pt-cpu.so)

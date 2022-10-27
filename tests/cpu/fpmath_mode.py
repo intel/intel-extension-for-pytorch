@@ -38,7 +38,7 @@ def run_model(args):
         model = TestModel(112, 10, False).eval()
     model2 = TestLSTM().train()
     model = ipex.optimize(model, dtype=torch.float32, level='O1', auto_kernel_selection=True)
-    ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model2)
+    ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model2, None)
     if mode == "jit":
         model = torch.jit.trace(model, inputs).eval()
         model = torch.jit.freeze(model)

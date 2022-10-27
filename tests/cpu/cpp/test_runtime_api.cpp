@@ -1,8 +1,8 @@
 #include <torch/torch.h>
+#include "csrc/cpu/runtime/CPUPool.h"
+#include "csrc/cpu/runtime/Task.h"
+#include "csrc/cpu/runtime/TaskExecutor.h"
 #include "gtest/gtest.h"
-#include "intel_extension_for_pytorch/csrc/cpu/runtime/CPUPool.h"
-#include "intel_extension_for_pytorch/csrc/cpu/runtime/Task.h"
-#include "intel_extension_for_pytorch/csrc/cpu/runtime/TaskExecutor.h"
 
 #define ASSERT_VARIABLE_EQ(a, b) ASSERT_TRUE(torch::allclose((a), (b)))
 #define EXPECT_VARIABLE_EQ(a, b) EXPECT_TRUE(torch::allclose((a), (b)))

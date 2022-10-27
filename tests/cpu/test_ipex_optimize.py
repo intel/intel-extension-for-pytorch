@@ -52,22 +52,77 @@ class ConvTranspose2d(torch.nn.Module):
         x = self.conv_transpose2d(x)
         return x
 
+class LinearBatchNormNd(torch.nn.Module):
+    def __init__(self, dim):
+        super(LinearBatchNormNd, self).__init__()
+        self.linear = torch.nn.Linear(32, 32)
+        if dim == 1:
+            self.input1 = torch.randn(1, 32)
+            self.bn = torch.nn.BatchNorm1d(32)
+        elif dim == 2:
+            self.input1 = torch.randn(1, 32, 32, 32)
+            self.bn = torch.nn.BatchNorm2d(32)
+        elif dim == 3:
+            self.input1 = torch.randn(1, 32, 32, 32, 32)
+            self.bn = torch.nn.BatchNorm3d(32)
+        
+    def forward(self, x):
+        return self.bn(self.linear(x))
+
+class ConvBatchNormLinearBatchNorm(torch.nn.Module):
+    def __init__(self, ):
+        super(ConvBatchNormLinearBatchNorm, self).__init__()
+        self.input1 = torch.randn(1, 32, 32, 32)
+        self.conv = torch.nn.Conv2d(32, 32, 1)
+        self.bn1 = torch.nn.BatchNorm2d(32)
+        self.linear = torch.nn.Linear(32, 32)
+        self.bn2 = torch.nn.BatchNorm2d(32)
+        
+    def forward(self, x):
+        return self.bn2(self.linear(self.bn1(self.conv(x))))
+
 class TestOptimizeCases(TestCase):
-    def test_optimize_parameters_behavior(self):
+
+    def test_optimize_conv_bn_parameters_behavior(self):
         model = ConvBatchNorm().eval()
         pre_te_enable_status = torch._C._jit_texpr_fuser_enabled()
         torch._C._jit_set_texpr_fuser_enabled(False)
         for level in ["O0", "O1"]:
-            # disbale conv_bn folding
-            opt_M = ipex.optimize(model, level=level, dtype=torch.float, conv_bn_folding=False)
-            with torch.no_grad():
-                x = model.input1
-                traced_model = torch.jit.trace(opt_M, x)
-                trace_graph = traced_model.graph_for(x)
-            self.assertTrue(any(n.kind() == "ipex::batch_norm" for n in trace_graph.nodes()))
+            for conv_bn_folding in [True, False]:
+                opt_M = ipex.optimize(model, level=level, dtype=torch.float, conv_bn_folding=conv_bn_folding)
+                with torch.no_grad():
+                    x = model.input1
+                    traced_model = torch.jit.trace(opt_M, x)
+                    trace_graph = traced_model.graph_for(x)
+                self.assertEqual(any(n.kind() == "ipex::batch_norm" for n in trace_graph.nodes()), not(conv_bn_folding))
             # TODO check weight_prepack.
         torch._C._jit_set_texpr_fuser_enabled(pre_te_enable_status)
-
+    
+    def test_optimize_linear_bn_parameters_behavior(self):
+        for dim in [1, 2, 3]:
+            model = LinearBatchNormNd(dim=dim).eval()
+            for level in ["O0", "O1"]:
+                for linear_bn_folding in [True, False]:
+                    opt_M = ipex.optimize(model, level=level, dtype=torch.float, linear_bn_folding=linear_bn_folding)
+                    with torch.no_grad():
+                        x = model.input1
+                        traced_model = torch.jit.trace(opt_M, x)
+                        trace_graph = traced_model.graph_for(x)
+                    self.assertEqual(any(n.kind() == "ipex::batch_norm" for n in trace_graph.nodes()), not(linear_bn_folding))
+                    
+    def test_optimize_conv_bn_linear_bn_parameters_behavior(self):
+        model = ConvBatchNormLinearBatchNorm().eval()
+        max_num_folding = 2
+        for level in ["O0", "O1"]:
+            for conv_bn_folding in [True, False]:
+                for linear_bn_folding in [True, False]:
+                    opt_M = ipex.optimize(model, level=level, dtype=torch.float, conv_bn_folding=conv_bn_folding, linear_bn_folding=linear_bn_folding)
+                    with torch.no_grad():
+                        x = model.input1
+                        traced_model = torch.jit.trace(opt_M, x)
+                        trace_graph = traced_model.graph_for(x)
+                    self.assertEqual(len([n for n in trace_graph.nodes() if n.kind() == "ipex::batch_norm"]), max_num_folding-(conv_bn_folding+linear_bn_folding))
+    
     def test_optimize_bf16_model(self):
         model = ConvBatchNorm()
         optimized_model = ipex.optimize(model.eval(), dtype=torch.bfloat16)
@@ -121,10 +176,10 @@ class TestOptimizeCases(TestCase):
                 super(Conv, self).__init__()
                 self.conv = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
 
-        def forward(self, x):
-            return self.conv(x)
+            def forward(self, x):
+                return self.conv(x)
 
-        model = Conv().half()
+        model = Conv().double()
         with self.assertWarnsRegex(UserWarning,
                                    "WARNING: Can't convert model's parameters dtype"):
             optimized_model = ipex.optimize(model.eval(), dtype=torch.bfloat16)
@@ -242,12 +297,9 @@ class TestOptimizeCases(TestCase):
             if level == "O0":
                 self.assertTrue(isinstance(opt_M.linear, torch.nn.Linear))
                 self.assertTrue(isinstance(opt_M.conv, torch.nn.Conv2d))
-            elif dtype is torch.float32 and not auto_kernel_selection:
-              self.assertTrue(isinstance(opt_M.linear, torch.nn.Linear))
-              self.assertTrue(isinstance(opt_M.conv, _IPEXConv2d))
             else:
-              self.assertTrue(isinstance(opt_M.linear, _IPEXLinear))
-              self.assertTrue(isinstance(opt_M.conv, _IPEXConv2d))
+                self.assertTrue(isinstance(opt_M.linear, _IPEXLinear))
+                self.assertTrue(isinstance(opt_M.conv, _IPEXConv2d))
 
     def test_record_shape(self):
         options = itertools.product([OneLayerMLP, TwoLayerMLP], [True, False])
@@ -308,7 +360,6 @@ class TestOptimizeCases(TestCase):
             ipex_model_state = ipex_model.state_dict()
             for var_name in origin_model_state:
                 self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
-
-
+    
 if __name__ == '__main__':
     test = unittest.main()

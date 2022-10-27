@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import warnings
 import copy
 import logging
 
@@ -262,7 +261,7 @@ IPEX_WEIGHT_PREPACK_MODULE = {
     torch.nn.ConvTranspose3d: _IPEXConvTranspose3d,
 }
 
-def _should_prepack(module, auto_kernel_selection):
+def _should_prepack(module):
     if type(module) not in IPEX_WEIGHT_PREPACK_MODULE:
         return False
     # If hook is on `weight` or `bias`, will not prepack.
@@ -278,10 +277,6 @@ def _should_prepack(module, auto_kernel_selection):
         for _, hook in module._backward_hooks.items():
             if hasattr(hook, 'name') and (hook.name == 'weight' or hook.name == 'bias'):
                 return False
-    # When the auto_kernel_selection is on, dtype is float, IPEX will use the prepack MKL backend
-    # for FP32 Linear in the inference mode.
-    if isinstance(module, torch.nn.Linear) and not auto_kernel_selection and module.weight.dtype is torch.float:
-        return False
     if isinstance(module, torch.nn.ConvTranspose2d):
         if module.padding[0] - module.output_padding[0] + module.stride[0] <= 0:
             return False
@@ -294,18 +289,24 @@ def _should_prepack(module, auto_kernel_selection):
             return False
         if module.padding[2] - module.output_padding[2] + module.stride[2] <= 0:
             return False
+    # Conv1d backward is not implemented, will not prepack.
+    if isinstance(module, torch.nn.Conv1d) and module.training:
+        return False
     return True
 
-def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selection):
-    def convert(m, optimizer, params_attr, auto_kernel_selection):
-        if _should_prepack(m, auto_kernel_selection) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16):
+def weight_prepack_with_ipex(module, optimizer, params_attr):
+    def convert(m, optimizer, params_attr):
+        if _should_prepack(m) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16 or m.weight.dtype == torch.half):
             weight = m.master_weight if hasattr(m, "master_weight") else m.weight
             if weight not in params_attr:
                 params_attr[weight] = {}
             if type(m) is torch.nn.Linear:
-                if m.weight.dtype == torch.float32 and optimizer is None and frontend.get_fp32_math_mode(device="cpu") == frontend.FP32MathMode.FP32 and not _using_dnnl():
+                if m.weight.dtype == torch.half:
+                    new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = True)
+                elif m.weight.dtype == torch.float32 and optimizer is None and frontend.get_fp32_math_mode(device="cpu") == frontend.FP32MathMode.FP32 and not _using_dnnl():
                     new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = False)
                 else:
+                    assert m.weight.dtype in [torch.float32, torch.bfloat16], "Only float, bf16 and fp16 are supported"
                     new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = True)
             else:
                 new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m)
@@ -318,6 +319,8 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
                 params_attr[weight]['bf16_param'] = new_m.weight
             elif 'trail' in params_attr[weight]:
                 params_attr[weight]['trail'] = new_m.weight_trail
+            if 'fp16_param' in params_attr[weight]:
+                params_attr[weight]['fp16_param'] = new_m.weight
             # update entry from origin weight to packed weight, from origin bias to cloned bias
             new_weight = new_m.master_weight if hasattr(m, "master_weight") else new_m.weight
             params_attr[new_weight] = params_attr.pop(weight)
@@ -331,6 +334,8 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
                         params_attr[bias]['bf16_param'] = new_m.bias
                     elif 'trail' in params_attr[bias]:
                         params_attr[bias]['trail'] = new_m.bias_trail
+                    if 'fp16_param' in params_attr[bias]:
+                        params_attr[bias]['fp16_param'] = new_m.bias
                     if bias in params_attr:
                         params_attr[new_bias] = params_attr.pop(bias)
             # replace optimizer's param with prepacked param, also prepack its state.
@@ -340,13 +345,13 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
         else:
             return m
 
-    def convert_rec(m, optimizer, params_attr, auto_kernel_selection):
-        new_m = convert(m, optimizer, params_attr, auto_kernel_selection)
+    def convert_rec(m, optimizer, params_attr):
+        new_m = convert(m, optimizer, params_attr)
         for name, sub_m in m.named_children():
-            setattr(new_m, name, convert_rec(sub_m, optimizer, params_attr, auto_kernel_selection)[0])
+            setattr(new_m, name, convert_rec(sub_m, optimizer, params_attr)[0])
         return new_m, optimizer, params_attr
 
-    opt_model, opt_optmizer, params_attr = convert_rec(module, optimizer, params_attr, auto_kernel_selection)
+    opt_model, opt_optmizer, params_attr = convert_rec(module, optimizer, params_attr)
     if opt_optmizer is not None:
         setattr(opt_optmizer, 'params_attr', params_attr)
         optim._optimizer_utils.patch_load_state_dict(opt_optmizer)

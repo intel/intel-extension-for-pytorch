@@ -23,46 +23,78 @@ OPTIMIZER_FUSED_STEP_MAPPING = {
 def patch_zero_grad_for_master_weight_training(optimizer):
     r"""
     Patch "zero_grad" method of optimizer to support BFloat16 master weight training
-    Under master weight training case, the grad is actually on 'bf16_params'. So the 'zero_grad'
-    should work on the 'bf16_params' too.
+    Under master weight training case, the grad is actually on 'bf16_params' or 'fp16_params'.
+    So the 'zero_grad' should work on the 'bf16_params' or 'fp16_params' too.
     """
     def zero_grad(self, set_to_none: bool = False):
         for p in self.params_attr:
             if 'bf16_param' in self.params_attr[p]:
-                bf16_param = self.params_attr[p]['bf16_param']
-            if bf16_param.grad is not None:
+                _param = self.params_attr[p]['bf16_param']
+            elif 'fp16_param' in self.params_attr[p]:
+                _param = self.params_attr[p]['fp16_param']
+            if _param.grad is not None:
                 if set_to_none:
-                    bf16_param.grad = None
+                    _param.grad = None
                 else:
-                    if bf16_param.grad.grad_fn is not None:
-                        bf16_param.grad.detach_()
+                    if _param.grad.grad_fn is not None:
+                        _param.grad.detach_()
                     else:
-                        bf16_param.grad.requires_grad_(False)
-                    bf16_param.grad.zero_()
+                        _param.grad.requires_grad_(False)
+                    _param.grad.zero_()
         self._original_zero_grad(set_to_none)
     setattr(optimizer, '_original_zero_grad', optimizer.zero_grad)
     setattr(optimizer, 'zero_grad', types.MethodType(zero_grad, optimizer))
 
 def patch_step_for_master_weight_training(optimizer):
     r"""
-    Patch "step" method of optimizer to support BFloat16 master weight training
-    1.Convert BF16 grad to FP32
+    Patch "step" method of optimizer to support master weight training
+    1.Convert BF16 or FP16 grad to FP32
     2.Call original "step" to update parameters
-    3.Sync FP32 master weight back to BF16 weight
+    3.Sync FP32 master weight back to BF16 or FP16 weight
     """
     def master_param_non_fused_step(self, closure=None):
-        # convert bf16 weight'grad to float.
+        # convert bf16 or fp16 weight'grad to float.
         for k, value in self.params_attr.items():
-           if value['bf16_param'].requires_grad:
-                k.grad = value['bf16_param'].grad.detach().float()
+            if 'bf16_param' in value.keys():
+                if value['bf16_param'].requires_grad:
+                    k.grad = value['bf16_param'].grad.detach().float()
+            if 'fp16_param' in value.keys():
+                if value['fp16_param'].requires_grad:
+                    k.grad = value['fp16_param'].grad.detach().float()
 
         loss = self._original_step(closure)
         # sync mater weight to model's paramerter
         for k, value in self.params_attr.items():
-            torch.ops.torch_ipex.sync_master_weight_to_bf16(k, value['bf16_param'])
+            if 'bf16_param' in value.keys():
+                torch.ops.torch_ipex.sync_master_weight_to_bf16(k, value['bf16_param'])
+            if 'fp16_param' in value.keys():
+                torch.ops.torch_ipex.sync_master_weight_to_fp16(k, value['fp16_param'])
+        return loss
+    # Split master_param_non_fused_step into 2 steps:
+    # 1.Sync_grad: Convert grad to FP32
+    # 2.step_sync_weight: Call original "step" to update parameters and
+    #   Sync FP32 master weight back to weight
+    # This is because gradscaler will unscale grad and
+    # it needs to sync grad to the FP32's grad first. After that gradscaler
+    # will update weight and it also needs to sync FP32 master weight back to weight.
+    def sync_grad(self):
+        for k, value in self.params_attr.items():
+            assert 'bf16_param' not in value.keys(), "GradScaler is not recommended for bf16 training"
+            if 'fp16_param' in value.keys():
+                if value['fp16_param'].requires_grad:
+                    k.grad = value['fp16_param'].grad.detach().float()
+    def step_sync_weight(self, closure=None):
+        loss = self._original_step(closure)
+        # sync mater weight to model's paramerter
+        for k, value in self.params_attr.items():
+            assert 'bf16_param' not in value.keys(), "GradScaler is not recommended for bf16 training"
+            if 'fp16_param' in value.keys():
+                torch.ops.torch_ipex.sync_master_weight_to_fp16(k, value['fp16_param'])
         return loss
     setattr(optimizer, '_original_step', optimizer.step)
     setattr(optimizer, 'step', types.MethodType(master_param_non_fused_step, optimizer))
+    setattr(optimizer, 'sync_grad', types.MethodType(sync_grad, optimizer))
+    setattr(optimizer, 'step_sync_weight', types.MethodType(step_sync_weight, optimizer))
 
 def patch_load_state_dict(optimizer):
     r"""

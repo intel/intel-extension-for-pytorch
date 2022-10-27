@@ -49,7 +49,18 @@ class _LSTM(torch.nn.LSTM):
 
         return output, self.permute_hidden(hidden, unsorted_indices)
 
-def replace_lstm_with_ipex_lstm(model):
+def replace_params_in_optimizer(optimizer, param_dict):
+    if optimizer is None:
+        return
+    for group in optimizer.param_groups:
+        for i, p in enumerate(group['params']):
+            if p in param_dict:
+                new_param = param_dict[p]
+                group['params'][i] = new_param
+                if p in optimizer.state:
+                    optimizer.state[new_param] = optimizer.state.pop(p)
+
+def replace_lstm_with_ipex_lstm(model, optimizer):
     # replace lstm with ipex lstm during inference
     # does not support the case where model itself is torch.nn.LSTM
     for child_name, child in model.named_children():
@@ -61,8 +72,13 @@ def replace_lstm_with_ipex_lstm(model):
                 child.weight_ih_l0.device, child.weight_ih_l0.dtype)
             ipex_lstm.__dict__ = copy.deepcopy(child.__dict__)
             setattr(model, child_name, ipex_lstm)
+            param_dict = {}
+            original_params = dict(child.named_parameters())
+            for name, para in ipex_lstm.named_parameters():
+                param_dict.update({original_params[name] : para})
+            replace_params_in_optimizer(optimizer, param_dict)
         else:
-            replace_lstm_with_ipex_lstm(child)
+            replace_lstm_with_ipex_lstm(child, optimizer)
 
 def replace_dropout_with_identity(model):
     # replace dropout with identity during inference, so that aten::dropout won't be on the JIT graph.
@@ -91,7 +107,7 @@ def convert_module_data_type(module, dtype):
                 for name, param in module.named_parameters():
                     ori_data = getattr(getattr(module, name), "data")
                     ori_data_dtype = ori_data.dtype
-                    if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16:
+                    if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16 or ori_data_dtype == torch.half:
                         casted_data = ori_data.detach().clone().to(dtype)
                         setattr(getattr(module, name), "data", casted_data)
                     else:
@@ -100,7 +116,7 @@ def convert_module_data_type(module, dtype):
             else:
                 ori_data_dtype = module.weight.dtype
                 # Assume weight and bias have same dtype, only need check weight dtype here.
-                if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16:
+                if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16 or ori_data_dtype == torch.half:
                     weight_data = module.weight.detach().clone().to(dtype)
                     module.weight.data = weight_data
                     if hasattr(module, 'bias') and module.bias is not None:
@@ -112,4 +128,3 @@ def convert_module_data_type(module, dtype):
     for child in module.children():
         convert_module_data_type(child, dtype)
     return module
-

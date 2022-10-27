@@ -216,6 +216,22 @@ def _add_recipe(node):
     Case2: add doesn't have pre conv/gemm node.
     For this case, if one add input has one none-quantizable op, we will don't insert fake quant before it.
     '''
+    def reset_input_inf_dtype_to_orig_dtype(node, input_idx):
+        if node.input_tensor_infos[input_idx] is not None:
+            if node.input_tensor_infos[input_idx] in node.pre_nodes[0].output_tensor_infos:
+                pre_node = node.pre_nodes[input_idx]
+            elif len(node.pre_nodes) == 2 and node.input_tensor_infos[input_idx] in node.pre_nodes[1].output_tensor_infos:
+                pre_node = node.pre_nodes[1]
+            else:
+                pre_node = None
+            if pre_node is not None:
+                add_quantize_add_input_idx = _check_has_quantizable_node_before_node(pre_node)
+            else:
+                add_quantize_add_input_idx = False
+            if not add_quantize_add_input_idx:
+                node.input_tensor_infos[input_idx].inf_dtype = node.input_tensor_infos[input_idx].orig_dtype
+                node.input_tensor_force_inf_dtype[input_idx] = node.input_tensor_infos[input_idx].inf_dtype
+
     conv_gemm_node = _find_fused_node_with_cur_add(node, conv_gemm_ops)
     if conv_gemm_node is None:
         #  If pre_nodes don't have gemm node, need to check whether have quantizable node before it,
@@ -239,45 +255,13 @@ def _add_recipe(node):
         if node.input_tensor_infos[0] is not None and node.input_tensor_infos[0] in conv_gemm_node.output_tensor_infos:
             node.input_tensor_infos[0].inf_dtype = node.input_tensor_infos[0].orig_dtype
             node.input_tensor_force_inf_dtype[0] = node.input_tensor_infos[0].inf_dtype
-            '''
-            # TODO: set another input's dtype, if another's input is from non-quantizable op, we can remove the fake quant.
-            # now if for quantized conv/gemm_add, the input's should be all INT8.
-            if node.input_tensor_infos[1] is not None:
-                if node.input_tensor_infos[1] in node.pre_nodes[0].output_tensor_infos:
-                    pre_node = node.pre_nodes[0]
-                elif len(node.pre_nodes) == 2 and node.input_tensor_infos[1] in node.pre_nodes[1].output_tensor_infos:
-                    pre_node = node.pre_nodes[1]
-                else:
-                    pre_node = None
-                if pre_node is not None:
-                    add_quantize_add_2 = _check_has_quantizable_node_before_node(pre_node)
-                else:
-                    add_quantize_add_2 = False
-                if not add_quantize_add_2:
-                    node.input_tensor_infos[1].inf_dtype = node.input_tensor_infos[1].orig_dtype
-                    node.input_tensor_force_inf_dtype[1] = node.input_tensor_infos[1].inf_dtype
-              '''
+            # set another input's dtype, if another's input is from non-quantizable op, we can remove the fake quant.
+            reset_input_inf_dtype_to_orig_dtype(node, 1)
         elif node.input_tensor_infos[1] is not None and node.input_tensor_infos[1] in conv_gemm_node.output_tensor_infos:
             node.input_tensor_infos[1].inf_dtype = node.input_tensor_infos[1].orig_dtype
             node.input_tensor_force_inf_dtype[1] = node.input_tensor_infos[1].inf_dtype
-            '''
-            # TODO: set another input's dtype, if another's input is from non-quantizable op, we can remove the fake quant.
-            # now if for quantized conv/gemm_add, the input's should be all INT8.
-            if node.input_tensor_infos[0] is not None:
-                if node.input_tensor_infos[0] in node.pre_nodes[0].output_tensor_infos:
-                    pre_node = node.pre_nodes[0]
-                elif len(node.pre_nodes) == 2 and node.input_tensor_infos[0] in node.pre_nodes[1].output_tensor_infos:
-                    pre_node = node.pre_nodes[1]
-                else:
-                    pre_node = None
-                if pre_node is not None:
-                    add_quantize_add_1 = _check_has_quantizable_node_before_node(pre_node)
-                else:
-                    add_quantize_add_1 = False
-                if not add_quantize_add_1:
-                    node.input_tensor_infos[0].inf_dtype = node.input_tensor_infos[0].orig_dtype
-                    node.input_tensor_force_inf_dtype[0] = node.input_tensor_infos[0].inf_dtype
-            '''
+            # set another input's dtype, if another's input is from non-quantizable op, we can remove the fake quant.
+            reset_input_inf_dtype_to_orig_dtype(node, 0)
 
 # get a default recipe
 def get_default_recipe(nodes):

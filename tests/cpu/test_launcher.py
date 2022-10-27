@@ -28,6 +28,10 @@ class TestLauncher(TestCase):
                 lib_find = True
                 break
         return lib_find
+    
+    def del_env(self, env_name):
+        if env_name in os.environ:
+            del os.environ[env_name]
 
     def test_memory_allocator_setup(self):
        launcher = Launcher()
@@ -45,8 +49,15 @@ class TestLauncher(TestCase):
        jemalloc_enabled = "libjemalloc.so" in os.environ["LD_PRELOAD"] if ld_preload_in_os else False
        self.assertEqual(find_jemalloc, jemalloc_enabled)
        if jemalloc_enabled:
-           self.assertEqual(jemalloc_enabled, "MALLOC_CONF" in os.environ)
-
+           self.assertTrue("MALLOC_CONF" in os.environ)
+           self.assertTrue(os.environ["MALLOC_CONF"] == "oversize_threshold:1,background_thread:true,metadata_thp:auto")
+       
+       self.del_env("MALLOC_CONF")
+       launcher.set_memory_allocator(enable_tcmalloc=False, enable_jemalloc=True, benchmark=True)
+       if jemalloc_enabled:
+           self.assertTrue("MALLOC_CONF" in os.environ)
+           self.assertTrue(os.environ["MALLOC_CONF"] == "oversize_threshold:1,background_thread:false,metadata_thp:always,dirty_decay_ms:-1,muzzy_decay_ms:-1")
+           
     def test_mpi_pin_domain_and_ccl_worker_affinity(self):
        launcher = DistributedTrainingLauncher()
        total_cores = 56
@@ -185,5 +196,38 @@ class TestLauncher(TestCase):
                 assert r.returncode == 0
                 assert expected_msg in str(r.stdout, "utf-8")
 
+    def test_specified_core_list(self):
+        # Test for basic use
+        expected_cores = " -C 0-2,4-4"
+        for launch_script in self.launch_scripts:
+            cmd = launch_script + ["--core_list 0-2,4",         \
+                                   "--ninstances 1",            \
+                                   "--ncore_per_instance 4",    \
+                                   "--no_python",               \
+                                   "pwd"]
+            cmd = ' '.join(cmd)
+            r = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            assert r.returncode == 0
+            assert expected_cores in str(r.stdout, "utf-8")
+        # Test for mixed usage of core_id numbers and ranges, out-of-order handling, space char tolerance,
+        #  and dispatching cores to multiple instances
+        # It is needed to generate the subprocess.run() cmd args with another separator (using '#')
+        #  to keep the integrity of core_list argument value which has space characters in it.
+        expected_cores_proc1 = " -C 0-2,4-4"
+        expected_cores_proc2 = " -C 6-7,9-10"
+        for launch_script in self.launch_scripts:
+            cmd = launch_script + ["--core_list",               \
+                                   "4, 6 - 6, 0-2, 7, 10-9",    \
+                                   "--ninstances",              \
+                                   "2",                         \
+                                   "--ncore_per_instance",      \
+                                   "4",                         \
+                                   "--no_python",               \
+                                   "pwd"]
+            cmd = '#'.join(cmd)
+            r = subprocess.run(cmd.split('#'), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            assert r.returncode == 0
+            assert expected_cores_proc1 in str(r.stdout, "utf-8")
+            assert expected_cores_proc2 in str(r.stdout, "utf-8")
 if __name__ == '__main__':
     test = unittest.main()

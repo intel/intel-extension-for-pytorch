@@ -12,6 +12,7 @@ from argparse import RawTextHelpFormatter
 import logging
 import psutil
 from datetime import datetime
+import intel_extension_for_pytorch.cpu.auto_ipex as auto_ipex
 
 format_str = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 logging.basicConfig(level=logging.INFO, format=format_str)
@@ -98,7 +99,7 @@ for well-improved multi-node distributed training performance as well.
 2. Multi-Node multi-process distributed training: (e.g. two nodes)
 
 
-rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*
+rank 0: *(IP: 192.168.10.10, and has a free port: 29500)*
 
 ::
 
@@ -130,7 +131,13 @@ class CPUinfo():
             raise RuntimeError("Windows platform is not supported!!!")
         elif platform.system() == "Linux":
             args = ["lscpu", "--parse=CPU,Core,Socket,Node"]
-            lscpu_info = subprocess.check_output(args, universal_newlines=True).split("\n")
+            env_lang = os.getenv('LANG', 'UNSET')
+            os.environ['LANG'] = 'C'
+            lscpu_info = subprocess.check_output(args, env=os.environ, universal_newlines=True).split("\n")
+            if env_lang == 'UNSET':
+                del os.environ['LANG']
+            else:
+                os.environ['LANG'] = env_lang
 
             # Get information about  cpu, core, socket and node
             for line in lscpu_info:
@@ -258,7 +265,7 @@ class Launcher():
             numactl_available = True
         return numactl_available
 
-    def set_memory_allocator(self, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False):
+    def set_memory_allocator(self, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False, benchmark=False):
         '''
         Enable TCMalloc/JeMalloc with LD_PRELOAD and set configuration for JeMalloc.
         By default, PTMalloc will be used for PyTorch, but TCMalloc and JeMalloc can get better
@@ -289,7 +296,10 @@ class Launcher():
                                .format("JeMalloc", "jemalloc", expanduser("~")))
             else:
                 logger.info("Use JeMalloc memory allocator")
-                self.set_env('MALLOC_CONF', "oversize_threshold:1,background_thread:true,metadata_thp:auto")
+                if benchmark:
+                    self.set_env('MALLOC_CONF', "oversize_threshold:1,background_thread:false,metadata_thp:always,dirty_decay_ms:-1,muzzy_decay_ms:-1")
+                else:
+                    self.set_env('MALLOC_CONF', "oversize_threshold:1,background_thread:true,metadata_thp:auto")
 
         elif use_default_allocator:
             pass
@@ -322,13 +332,13 @@ class Launcher():
         self.logger_env(env_name)
 
     # set_kmp_affinity is used to control whether to set KMP_AFFINITY or not. In scenario that use all cores on all nodes, including logical cores, setting KMP_AFFINITY disables logical cores. In this case, KMP_AFFINITY should not be set.
-    def set_multi_thread_and_allocator(self, ncore_per_instance, disable_iomp=False, set_kmp_affinity=True, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False):
+    def set_multi_thread_and_allocator(self, ncore_per_instance, disable_iomp=False, set_kmp_affinity=True, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False, benchmark=False):
         '''
         Set multi-thread configuration and enable Intel openMP and TCMalloc/JeMalloc.
         By default, GNU openMP and PTMalloc are used in PyTorch. but Intel openMP and TCMalloc/JeMalloc are better alternatives
         to get performance benifit.
         '''
-        self.set_memory_allocator(enable_tcmalloc, enable_jemalloc, use_default_allocator)
+        self.set_memory_allocator(enable_tcmalloc, enable_jemalloc, use_default_allocator, benchmark)
         self.set_env("OMP_NUM_THREADS", str(ncore_per_instance))
         if not disable_iomp:
             find_iomp = self.add_lib_preload(lib_type="iomp5")
@@ -355,7 +365,22 @@ class MultiInstanceLauncher(Launcher):
         set_kmp_affinity = True
         enable_taskset = False
         if args.core_list:  # user specify what cores will be used by params
-            cores = [int(x) for x in args.core_list.split(",")]
+            for core_list_elem in args.core_list.split(","):
+                spec_core = core_list_elem.strip()
+                if spec_core.isdigit():
+                    cores.append(int(spec_core))
+                else:
+                    core_range = [int(x.strip()) for x in spec_core.split("-")]
+                    assert len(core_range) == 2, "Invalid core_list argument format"
+                    beg, end = core_range
+                    if beg > end:
+                        beg, end = end, beg
+                    cores.extend(list(range(beg, end + 1)))
+            cores = list(set(cores))
+            valid_cores = self.cpuinfo.get_all_physical_cores() + self.cpuinfo.get_all_logical_cores()
+            for c in cores:
+                assert c in valid_cores, "Invalid core ID {} in core_list argument".format(c)
+
             if args.ncore_per_instance == -1:
                 logger.error("please specify the '--ncore_per_instance' if you have pass the --core_list params")
                 exit(-1)
@@ -453,8 +478,13 @@ class MultiInstanceLauncher(Launcher):
                                             set_kmp_affinity,
                                             args.enable_tcmalloc,
                                             args.enable_jemalloc,
-                                            args.use_default_allocator)
+                                            args.use_default_allocator,
+                                            args.benchmark)
         os.environ["LAUNCH_CMD"] = "#"
+
+        if args.auto_ipex:
+            args.program = auto_ipex.apply_monkey_patch(args.program, args.dtype, args.auto_ipex_verbose, args.disable_ipex_graph_mode)
+
         for i in range(args.ninstances):
             cmd = []
             cur_process_cores = ""
@@ -521,10 +551,16 @@ class MultiInstanceLauncher(Launcher):
                 break
 
         os.environ["LAUNCH_CMD"] = os.environ["LAUNCH_CMD"][:-2]
-        for process in processes:
-            process.wait()
-            if process.returncode != 0:
-                raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd_s)
+        try:
+            for process in processes:
+                process.wait()
+                if process.returncode != 0:
+                    raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd_s)
+        finally:
+            if args.auto_ipex:
+                # Clean the temp file
+                if os.path.exists(args.program) and args.program.endswith("_auto_ipex"):
+                    os.remove(args.program)
 
 class DistributedTrainingLauncher(Launcher):
     r"""
@@ -732,7 +768,9 @@ def add_multi_instance_params(parser):
     group.add_argument("--disable_taskset", action='store_true', default=False,
                        help="Disable taskset")
     group.add_argument("--core_list", metavar='\b', default=None, type=str,
-                       help="Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used.")
+                       help="Specify the core list as 'core_id, core_id, ...' or 'core_id-core_id, ...', otherwise, all the cores will be used.")
+    group.add_argument("--benchmark", action='store_true', default=False,
+                   help="Enable benchmark config. JeMalloc's MALLOC_CONF has been tuned for low latency. Recommend to use this for benchmarking purpose; for other use cases, this MALLOC_CONF may cause Out-of-Memory crash.")
     group.add_argument("--log_path", metavar='\b', default="", type=str,
                        help="The log file directory. Default path is '', which means disable logging to files.")
     group.add_argument("--log_file_prefix", metavar='\b', default="run", type=str,
@@ -743,7 +781,6 @@ def add_kmp_iomp_params(parser):
     group = parser.add_argument_group("IOMP Parameters")
     group.add_argument("--disable_iomp", action='store_true', default=False,
                        help="By default, we use Intel OpenMP and libiomp5.so will be add to LD_PRELOAD")
-
 
 def parse_args():
     """
@@ -790,6 +827,9 @@ def parse_args():
 
     add_distributed_training_params(parser)
     add_multi_instance_params(parser)
+
+    auto_ipex.add_auto_ipex_params(parser)
+
     # positional
     parser.add_argument("program", type=str,
                         help="The full path to the proram/script to be launched. "

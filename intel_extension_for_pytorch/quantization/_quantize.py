@@ -7,6 +7,7 @@ from torch.ao.quantization import PlaceholderObserver
 import torch.fx.experimental.optimization as optimization
 
 import intel_extension_for_pytorch._C as core
+from intel_extension_for_pytorch.utils.linear_bn_folding import linear_bn_fuse
 from ._quantize_utils import auto_prepare, auto_convert, copy_prepared_model
 from .. import nn
 
@@ -31,6 +32,7 @@ def prepare(
     assert isinstance(model, torch.nn.Module), "Only support nn.Module prepare for quantization path"
     try:
         prepare_model = optimization.fuse(model, inplace=inplace)
+        prepare_model = linear_bn_fuse(prepare_model, inplace=inplace)
     except:  # noqa E722
         if inplace:
             prepare_model = model
