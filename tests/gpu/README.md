@@ -2,13 +2,11 @@
 
 ## Notice
 
-* These tests are powered by [Pytest](https://docspytest.org/en/stable/).
-
-* Please refer to [Pytest Documents](https://docspytest.org/en/stable/) for more helps.
+* These tests are powered by [pytest](https://docs.pytest.org/).
 
 ## Pre-requirements
 
-* PyTorch and Intel GPU Extension for PyTorch have been installed and verified.
+* PyTorch\* and Intel® Extension for PyTorch\* have been installed and verified.
 
 * Install Pytest
 
@@ -18,7 +16,7 @@ python3 -m pip install pytest
 
 ## Find and Run tests
 
-* All tests are found under the ${PATH_To_Your_Extension_Source_Code}/tests/gpu/ path.
+* All tests are found under the ${PATH_To_Your_Extension_Source_Code}/tests/gpu/.
 * Please use pytest to run one test, or all of them if ${Test_Name} is empty.
 
 ```bash
@@ -132,7 +130,7 @@ class TestTorchMethod(TestCase):
 
 
 
-## How to RUN and DEBUG Test Cases of Pytorch Test Suite
+## How to RUN and DEBUG Test Cases of PyTorch\* Test Suite
 
 ### RUN the Whole Test Suite
 
