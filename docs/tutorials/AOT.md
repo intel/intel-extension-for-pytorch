@@ -6,7 +6,7 @@
 
 ## Use case
 
-Intel® Extension for PyTorch\* provides build option `USE_AOT_DEVLIST` for users who install Intel® Extension for PyTorch\* via source compilation to configure device list for AOT compilation. The target device in device list is specified by DEVICE type of the target. Multi-target AOT compilation is supported by using a comma (,) as a delimiter in device list. See below table for the AOT setting targeting [Intel® Data Center GPU Flex Series 170](https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html).
+Intel® Extension for PyTorch\* provides build option `USE_AOT_DEVLIST` for users who install Intel® Extension for PyTorch\* via source compilation to configure device list for AOT compilation. The target device in device list is specified by DEVICE type of the target. Multi-target AOT compilation is supported by using a comma (,) as a delimiter in device list. See below table for the AOT setting targeting [Intel® Data Center GPU Flex Series 170](https://www.intel.com/content/www/us/en/products/sku/230019/intel-data-center-gpu-flex-170/specifications.html).
 
 | Supported HW | AOT Setting |
 | ------------ |---------------------|
