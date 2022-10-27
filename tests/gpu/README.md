@@ -19,16 +19,10 @@ python3 -m pip install pytest
 ## Find and Run tests
 
 * All tests are found under the ${PATH_To_Your_Extension_Source_Code}/tests/gpu/ path.
-* Or download from the repo with below command.
-
-```bash
-git clone https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu.git
-```
-
 * Please use pytest to run one test, or all of them if ${Test_Name} is empty.
 
 ```bash
-pytest ${PATH_To_Your_Extension_Source_Code}/tests/gpu/${Test_Name}
+python3 -m pytest ${PATH_To_Your_Extension_Source_Code}/tests/gpu/${Test_Name}
 ```
 
 ## Contribute
