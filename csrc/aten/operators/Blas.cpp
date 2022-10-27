@@ -568,7 +568,8 @@ at::Tensor t_matmul_add_gelu(
     const at::Tensor& tensor2,
     const at::Tensor& tensor1,
     at::Tensor& accumul1,
-    Scalar beta1) {
+    Scalar beta1,
+    c10::string_view approximate) {
   RECORD_FUNCTION(
       "t_matmul_add_gelu",
       std::vector<c10::IValue>({tensor1, tensor2, accumul1}));
@@ -594,7 +595,7 @@ at::Tensor t_matmul_add_gelu(
       result, tensor1, tensor2, bias, accumul, trans, fallback, attr);
   if (fallback) {
     result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
-    // result = at::gelu(result + at::mul(accumul1, beta1)); NOTE:gelu
+    result = at::gelu((result + at::mul(accumul1, beta1)), approximate);
   }
   return result;
 }
