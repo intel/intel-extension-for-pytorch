@@ -11,7 +11,7 @@ Check the `API Documentation <api_doc.html>`_ for details of API functions and `
 DPC++ Extension
 ---------------
 
-Intel® Extension for PyTorch\* provides C++ APIs to get DPCPP queue and configure floating-point math mode.
+Intel® Extension for PyTorch\* provides C++ APIs to get SYCL queue and configure floating-point math mode.
 
 Check the `API Documentation`_ for the details of API functions. `DPC++ Extension <features/DPC++_Extension.md>`_ describes how to write customized DPC++ kernels with a practical example and build it with setuptools and CMake.
 
