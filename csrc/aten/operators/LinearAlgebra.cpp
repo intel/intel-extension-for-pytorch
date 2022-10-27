@@ -212,64 +212,58 @@ Tensor chain_matmul_recursion(
         chain_matmul_recursion(matrices, order, order[i][j] + 1, j));
 }
 
-template <typename scalar_t>
-void addr_kernel_out(
-    Tensor& out,
-    const Tensor& self,
-    const Tensor& vec1,
-    const Tensor& vec2,
-    const int64_t vec1_numel,
-    const int64_t vec2_numel,
+void addr_kernel(
+    TensorIterator& iter,
     const Scalar& beta,
-    const Scalar& alpha,
-    const bool& self_ignore,
-    const int64_t& broadcast_dim) {
-  auto& queue = dpcppGetCurrentQueue();
-  using accscalar_t = acc_type<scalar_t>;
-  int64_t total_items = vec2_numel;
+    const Scalar& alpha) {
+  if (iter.dtype() == at::ScalarType::Bool) {
+    using scalar_t = bool;
+    auto beta_val = beta.to<scalar_t>();
+    auto alpha_val = alpha.to<scalar_t>();
 
-  auto alpha_scalar = alpha.to<scalar_t>();
-  auto beta_scalar = beta.to<scalar_t>();
+    // when beta is false, values in self should be ignored,
+    // nans and infs in self should not propagate.
+    if (beta_val == false) {
+      dpcpp_kernel_for_tensor_iter(
+          iter,
+          [=](scalar_t self_val, scalar_t vec1_val, scalar_t vec2_val)
+              -> scalar_t { return alpha_val && vec1_val && vec2_val; });
+    } else {
+      dpcpp_kernel_for_tensor_iter(
+          iter,
+          [=](scalar_t self_val,
+              scalar_t vec1_val,
+              scalar_t vec2_val) -> scalar_t {
+            return (beta_val && self_val) ||
+                (alpha_val && vec1_val && vec2_val);
+          });
+    }
+    return;
+  }
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto out_ptr = out.data_ptr<scalar_t>();
-    auto input_ptr = self.data_ptr<scalar_t>();
-    auto vec1_ptr = vec1.data_ptr<scalar_t>();
-    auto vec2_ptr = vec2.data_ptr<scalar_t>();
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
-      auto item_id = item.get_id(0);
-      auto vec2_elem = static_cast<accscalar_t>(alpha_scalar) *
-          static_cast<accscalar_t>(vec2_ptr[item_id]);
-      for (auto id = 0; id < vec1_numel; ++id) {
-        // out = beta * self + alpha * (vec1 ⊗ vec2)
-        auto vec1_elem = static_cast<accscalar_t>(vec1_ptr[id]);
-        auto out_index = id * vec2_numel + item_id;
-        if (self_ignore) {
-          out_ptr[out_index] = static_cast<scalar_t>(vec1_elem * vec2_elem);
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+      kBFloat16, kHalf, iter.dtype(), "addr", [&] {
+        auto beta_val = beta.to<scalar_t>();
+        auto alpha_val = alpha.to<scalar_t>();
+
+        scalar_t zero_val(0);
+        // when beta==0, values in self should be ignored,
+        // nans and infs in self should not propagate.
+        if (beta_val == zero_val) {
+          dpcpp_kernel_for_tensor_iter(
+              iter,
+              [=](scalar_t self_val, scalar_t vec1_val, scalar_t vec2_val)
+                  -> scalar_t { return alpha_val * vec1_val * vec2_val; });
         } else {
-          accscalar_t self_elem;
-          if (broadcast_dim == 0) {
-            self_elem = static_cast<accscalar_t>(beta_scalar) *
-                static_cast<accscalar_t>(input_ptr[id]);
-          } else if (broadcast_dim == 1) {
-            self_elem = static_cast<accscalar_t>(beta_scalar) *
-                static_cast<accscalar_t>(input_ptr[item_id]);
-          } else if (broadcast_dim == -1) {
-            self_elem = static_cast<accscalar_t>(beta_scalar) *
-                static_cast<accscalar_t>(input_ptr[0]);
-          } else {
-            // no broadcast
-            self_elem = static_cast<accscalar_t>(beta_scalar) *
-                static_cast<accscalar_t>(input_ptr[out_index]);
-          }
-          out_ptr[out_index] =
-              static_cast<scalar_t>(vec1_elem * vec2_elem + self_elem);
+          dpcpp_kernel_for_tensor_iter(
+              iter,
+              [=](scalar_t self_val,
+                  scalar_t vec1_val,
+                  scalar_t vec2_val) -> scalar_t {
+                return beta_val * self_val + alpha_val * vec1_val * vec2_val;
+              });
         }
-      }
-    };
-    cgh.parallel_for(sycl::range<1>(total_items), kfn);
-  };
-  DPCPP_Q_SUBMIT(queue, cgf);
+      });
 }
 
 } // namespace impl
@@ -565,27 +559,20 @@ Tensor addr(
           "The expanded self size cannot match the out size");
     }
   }
-
-  auto out = at::empty({vec1_numel, vec2_numel}, self_contiguous.options());
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
-      at::ScalarType::BFloat16,
-      at::ScalarType::Half,
-      vec1_contiguous.scalar_type(),
-      "addr_kernel_out",
-      [&]() {
-        impl::addr_kernel_out<scalar_t>(
-            out,
-            self_contiguous,
-            vec1_contiguous,
-            vec2_contiguous,
-            vec1_numel,
-            vec2_numel,
-            beta,
-            alpha,
-            self_ignore,
-            broadcast_dim);
-      });
-  return out;
+  Tensor out;
+  auto iter = TensorIteratorConfig()
+                  .set_check_mem_overlap(true)
+                  .add_output(out)
+                  .add_owned_input(self_contiguous)
+                  .add_owned_input(vec1_contiguous.reshape({vec1_numel, 1}))
+                  .add_input(vec2_contiguous)
+                  .allow_cpu_scalars(true)
+                  .promote_inputs_to_common_dtype(true)
+                  .cast_common_dtype_to_outputs(true)
+                  .enforce_safe_casting_to_output(true)
+                  .build();
+  impl::addr_kernel(iter, beta, alpha);
+  return iter.output();
 }
 
 Tensor& addr_out(
