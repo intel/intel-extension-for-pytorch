@@ -269,6 +269,11 @@ struct aligned_element<8> {
   using element_type = uint64_t;
 };
 
+template <>
+struct aligned_element<16> {
+  using element_type = struct alignas(16) { char data[16]; };
+};
+
 template <typename scalar_t, int vec_size>
 struct aligned_vector {
   using element_type = typename aligned_element<sizeof(scalar_t)>::element_type;

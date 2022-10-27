@@ -2,7 +2,9 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/WrapDimUtilsMulti.h>
 #include <ATen/native/TensorTransformations.h>
+#include <core/detail/OffsetCalculator.h>
 #include "Loops.h"
+#include "MemoryAccess.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
@@ -21,6 +23,77 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
+
+template <typename func_t>
+void _elementwise_kernel(int total_n_elems, func_t f) {
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
+  const auto target_global_size = dpcppMaxWorkItemsPerTile(dev_id);
+  int work_group_size =
+      total_n_elems > max_wg_size ? max_wg_size : total_n_elems;
+  const int max_work_group_num = target_global_size / work_group_size;
+  int total_group_num = (total_n_elems + work_group_size - 1) / work_group_size;
+  int work_group_num = total_group_num < max_work_group_num
+      ? total_group_num
+      : max_work_group_num;
+  // work item in each work group calculates loops' elements
+  int loops = total_group_num / work_group_num + 1;
+
+  int total_work_items = work_group_size * work_group_num;
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    cgh.parallel_for(
+        sycl::nd_range<1>(
+            sycl::range<1>(total_work_items), sycl::range<1>(work_group_size)),
+        [=](sycl::nd_item<1> itemId) {
+          int idx = itemId.get_global_linear_id();
+
+          for (int i = 0; i < loops; ++i) {
+            if (idx < total_n_elems) {
+              f(idx);
+              idx += total_work_items;
+            }
+          }
+        });
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+template <typename func_t>
+static void _launch_kernel(int total_n_elems, func_t f) {
+  TORCH_INTERNAL_ASSERT(
+      total_n_elems >= 0 &&
+      total_n_elems <= std::numeric_limits<int32_t>::max());
+  _elementwise_kernel<func_t>(total_n_elems, f);
+}
+
+template <typename scalar_t>
+void flip_kernel_impl(TensorIterator& iter) {
+  if (!iter.can_use_32bit_indexing()) {
+    for (auto& sub_iter : iter.with_32bit_indexing()) {
+      flip_kernel_impl<scalar_t>(sub_iter);
+    }
+    return;
+  }
+
+  char* const __restrict__ out_ptr = reinterpret_cast<char*>(iter.data_ptr(0));
+  const char* const __restrict__ in_ptr =
+      reinterpret_cast<const char*>(iter.data_ptr(1));
+
+  const auto offset_calc =
+      make_offset_calculator<2, /*signed_strides=*/true>(iter);
+
+  auto loop = [=](const int i) {
+    const auto offsets = offset_calc.get(i);
+    // offsets can be negative here, but it's fine
+    scalar_t* const __restrict__ out_data =
+        reinterpret_cast<scalar_t*>(out_ptr + offsets[0]);
+    const scalar_t* const __restrict__ in_data =
+        reinterpret_cast<const scalar_t*>(in_ptr + offsets[1]);
+    *out_data = *in_data;
+  };
+  _launch_kernel(iter.numel(), loop);
+}
 
 Tensor flip_dpcpp(const Tensor& self, IntArrayRef& dims) {
   const int64_t total_dims = self.dim();
@@ -72,12 +145,11 @@ Tensor flip_dpcpp(const Tensor& self, IntArrayRef& dims) {
   // To flip a dimension:
   //   - We move the pointer to the opposite vertex of the cube
   //   - We iterate in the opposite direction (invert the strides)
-
   for (int i = 0; i < iter.ndim(); i++) {
     // We know that an dimension has a zero stride and self[i] does not, as we
-    // defined above Note that it may be the case that strides_dummy[i] = 0 not
-    // because we set it, but because strides_self[i] == 0. We do not want to do
-    // anything there
+    // defined above Note that it may be the case that strides_dummy[i] = 0
+    // not because we set it, but because strides_self[i] == 0. We do not want
+    // to do anything there
     if (strides_dummy[i] == 0 && strides_self[i] != 0) {
       data += strides_bytes[i] * (sizes[i] - 1);
       strides_bytes[i] *= -1;
@@ -92,11 +164,10 @@ Tensor flip_dpcpp(const Tensor& self, IntArrayRef& dims) {
       at::ScalarType::BFloat16,
       iter.dtype(),
       "flip_xpu",
-      [&]() {
-        auto functor = [](scalar_t a) { return a; };
-        dpcpp_kernel_for_tensor_iter<
-            decltype(functor),
-            /*signed_strides=*/true>(iter, functor);
+      [&] {
+        using dtype = typename native::Memory::aligned_element<sizeof(
+            scalar_t)>::element_type;
+        flip_kernel_impl<dtype>(iter);
       });
 
   return out_tensor;
