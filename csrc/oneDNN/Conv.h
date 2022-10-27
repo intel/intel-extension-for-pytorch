@@ -205,6 +205,10 @@ static at::Tensor convolution(
     IntArrayRef dilation,
     int64_t groups,
     Attr& attr) {
+  if (src.is_quantized()) {
+    TORCH_CHECK(
+        !bia.defined(), "QConv only supports binary_add post-op for bias");
+  }
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -241,12 +245,8 @@ static at::Tensor convolution(
   auto dst_data_t =
       dst.defined() ? get_onednn_dtype_include_double(dst) : src_data_t;
 
-  // if src is quant, set bia data type to f32
-  // if src is not quant, get user demanded data type
-  auto bia_data_t = bia.defined() && src.is_quantized()
-      ? memory::data_type::f32
-      : bia.defined() ? get_onednn_dtype_include_double(bia)
-                      : memory::data_type::undef;
+  auto bia_data_t = bia.defined() ? get_onednn_dtype_include_double(bia)
+                                  : memory::data_type::undef;
 
   if (memory::data_type::bf16 == src_data_t && bia.defined()) {
     // if src data type is bf16 and bia is defined, bia data type must be bf16
@@ -526,32 +526,6 @@ static at::Tensor convolution(
         ? dpcpp_onednn_memory(
               {bia_tz, bia_data_t, fmt_bia}, engine, bia.data_ptr())
         : dpcpp_onednn_memory({bia_ctx.meta()}, engine, bia.data_ptr());
-
-    if (bia_ctx.is_plain() && src.is_quantized()) {
-      std::vector<float> bia_scale;
-      for (int i = 0; i < wgh_scales.size(); i++) {
-        bia_scale.push_back(1.f / (src_scale * wgh_scales[i] / 1.f));
-      }
-
-      int mask = wgh_scales.size() > 1 ? ONEDNN_SCALES_MASK_BY_CHANNEL(0) : 0;
-      auto reorder_attr = xpu::oneDNN::ReorderAttr();
-      reorder_attr.set_dst_sc_and_zp(mask, bia_scale, 0, {0});
-
-      bia_ = empty_opaque_tensor(bia_md, bia.options(), c10::nullopt);
-      bia_m = dpcpp_onednn_memory(bia_md, engine, bia_.data_ptr());
-      xpu::oneDNN::reorder(bia, bia_, reorder_attr);
-
-// Following is for saving bias correctly.
-// TODO: Need a general solution for bias caching
-#ifndef BUILD_JIT_QUANTIZATION_SAVE
-      if (weight_cache_optimization) {
-        strm.wait();
-        // FIXME: thread safty
-        auto bia_opt_ctx = DPCPPTensorContext::release_tensor_ctx(bia_);
-        DPCPPTensorContext::set_tensor_ctx(bia, std::move(bia_opt_ctx));
-      }
-#endif
-    }
   }
 
 #ifdef USE_PRIMITIVE_CACHE

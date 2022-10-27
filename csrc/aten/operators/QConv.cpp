@@ -44,9 +44,6 @@ struct QuantizeConvConverter {
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<N>*>(packed_weight.get());
     weight_ = pack_ptr->weight;
-    if (pack_ptr->bias.has_value()) {
-      bias_ = pack_ptr->bias.value();
-    }
     padding_ = pack_ptr->padding();
     stride_ = pack_ptr->stride();
     groups_ = pack_ptr->groups();
@@ -64,7 +61,7 @@ struct QuantizeConvConverter {
         output,
         input,
         weight_,
-        bias_,
+        Tensor(),
         padding_.vec(),
         padding_.vec(),
         stride_.vec(),
@@ -81,7 +78,7 @@ struct QuantizeConvConverter {
         output,
         input,
         weight_,
-        bias_,
+        Tensor(),
         padding_.vec(),
         padding_.vec(),
         stride_.vec(),
@@ -130,7 +127,6 @@ struct QuantizeConvConverter {
         mfmt_);
   }
   at::Tensor weight_;
-  at::Tensor bias_;
   at::Tensor output_;
   torch::List<int64_t> padding_;
   torch::List<int64_t> stride_;
@@ -159,6 +155,22 @@ struct QuantizeConvConverter {
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 
+// In QConv op, we use binary_add post-op to implement the functionality of bias
+// add. To add bias into QConv op, oneDNN requires to adjust bias value from
+// FP32 range to S32 range by multiplying src_scale * weight_scale. Considering
+// the performance, we cache the S32 bias value in device memory, which may
+// result in in-correct accuracy when users query the bias value in inference
+// time, or the bias tensor is also needed by other operator (like int8 JIT save
+// case). To achieve peak performance and keep accuracy at the same time, we use
+// binary_add post-op to add bias tensor to QConv result. In this case, oneDNN
+// performs binary_add post op in FP32 range, no value change is needed for bias
+// tensor. Using binary_add to implement bias add is only implemented for QConv,
+// QLinear. For the other datatype, we still use bias add and there's no
+// performance and accuracy issue. Notice: bias in Conv should be in shape of
+// [OC] binary_add post-op in oneDNN needs the binary tensor in shape of
+// [1,1,1,1], or [1,OC,1,1], or [N,OC,OH,OW]
+// so we need to view bias from [OC] to [1,OC,1,1]
+
 Tensor q_conv2d(
     Tensor input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
@@ -168,6 +180,13 @@ Tensor q_conv2d(
       packed_weight, output_scale, output_zero_point, kQInt8);
   auto post_op = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr;
   };
   return qconv_wrapper.call(input, post_op);
@@ -182,6 +201,13 @@ at::Tensor q_conv2d_relu(
       packed_weight, output_scale, output_zero_point, kQUInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -200,6 +226,13 @@ Tensor q_conv3d(
       packed_weight, output_scale, output_zero_point, kQInt8);
   auto post_op = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<3>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr;
   };
   return qconv_wrapper.call(input, post_op);
@@ -214,6 +247,13 @@ Tensor q_conv3d_relu(
       packed_weight, output_scale, output_zero_point, kQUInt8);
   auto post_op = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<3>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -246,6 +286,13 @@ at::Tensor q_conv2d_sum(
       packed_weight, sum_scale, sum_zero_point, kQInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(sum_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_sum(1.f, accumu.q_scale());
   };
   return qconv_wrapper.call(input, accumu, att);
@@ -263,6 +310,13 @@ at::Tensor q_conv2d_sum_relu(
       packed_weight, sum_scale, sum_zero_point, kQUInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(sum_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_sum(1.f, accumu.q_scale())
         .append_post_eltwise(1.f, 0.f, 0.f, attr.kind_with_relu);
   };
@@ -278,6 +332,13 @@ at::Tensor q_conv2d_sigmoid(
       QuantizeConvConverter<2>(packed_weight, 0.00392157, 0, kQUInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -296,6 +357,13 @@ at::Tensor q_conv2d_relu(
       packed_weight, output_scale, output_zero_point, ScalarType::QUInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -317,6 +385,13 @@ at::Tensor q_conv2d_leaky_relu(
       packed_weight, output_scale, output_zero_point, dtype);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ alpha,
@@ -340,6 +415,13 @@ at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize(
       QuantizeConvConverter<2>(packed_weight, q_scale, q_zpoint, kQInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(q_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* mish_scale */ 1.f,
         /* alpha */ 0.f,
@@ -366,6 +448,13 @@ at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
       packed_weight, add_scale, add_zero_point, accumu.scalar_type());
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(add_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr
         .append_post_eltwise(
             /* mish_scale */ 1.f,
@@ -429,6 +518,13 @@ at::Tensor q_conv2d_sqrt(
       QuantizeConvConverter<2>(packed_weight, 0.00392157, 0, kQUInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -447,6 +543,13 @@ at::Tensor q_conv2d_abs(
       QuantizeConvConverter<2>(packed_weight, 0.00392157, 0, kQUInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -465,6 +568,13 @@ at::Tensor q_conv2d_tanh(
       packed_weight, output_scale, output_zero_point, kQUInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -483,6 +593,13 @@ at::Tensor q_conv2d_square(
       QuantizeConvConverter<2>(packed_weight, 0.00392157, 0, kQUInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -501,6 +618,13 @@ at::Tensor q_conv2d_exp(
       QuantizeConvConverter<2>(packed_weight, 0.00392157, 0, kQUInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -519,6 +643,13 @@ at::Tensor q_conv2d_log(
       packed_weight, output_scale, output_zero_point, kQInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -537,6 +668,13 @@ at::Tensor q_conv2d_round(
       packed_weight, output_scale, output_zero_point, kQInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -555,6 +693,13 @@ at::Tensor q_conv2d_log_sigmoid(
       packed_weight, output_scale, output_zero_point, kQInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -573,6 +718,13 @@ at::Tensor q_conv2d_hardswish(
       packed_weight, output_scale, output_zero_point, kQInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -591,6 +743,13 @@ at::Tensor q_conv2d_mish(
       packed_weight, output_scale, output_zero_point, kQInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -609,6 +768,13 @@ at::Tensor q_conv2d_silu(
       packed_weight, output_scale, output_zero_point, kQInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 1.f,
@@ -627,6 +793,13 @@ at::Tensor q_conv2d_gelu(
       packed_weight, output_scale, output_zero_point, kQInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
@@ -645,6 +818,13 @@ at::Tensor q_conv2d_hardsigmoid(
       QuantizeConvConverter<2>(packed_weight, 0.00392157, 0, kQUInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 1. / 6.,
@@ -664,6 +844,13 @@ at::Tensor q_conv2d_pow(
       packed_weight, output_scale, output_zero_point, kQInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 1.f,
@@ -688,6 +875,13 @@ at::Tensor q_conv2d_hardtanh(
     int32_t max_q = quantize_value<int32_t>(
         output_scale, output_zero_point, maxval.toFloat());
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ static_cast<float>(min_q),
@@ -709,6 +903,13 @@ at::Tensor q_conv2d_elu(
       packed_weight, output_scale, output_zero_point, kQInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      bias = bias.view({1, bias.size(0), 1, 1});
+      attr.append_post_binary(attr.kind_with_binary_add, bias);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ alpha.toFloat(),
