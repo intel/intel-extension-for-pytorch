@@ -11,9 +11,9 @@ docker build --build-arg http_proxy=$http_proxy \
              --build-arg LEVEL_ZERO_VER=1.8.1+i755~u20.04 \
              --build-arg DPCPP_VER=2022.2.0-8734 \
              --build-arg MKL_VER=2022.2.0-8748 \
-             --build-arg TORCH_VERSION==1.10.0a0+git6c1c578 \
-             --build-arg IPEX_VERSION=1.10.200+24d96014e \
-             --build-arg TORCH_WHL_URL=https://software.intel.com/ipex-whl-stable \
-             --build-arg IPEX_WHEEL_URL=https://software.intel.com/ipex-whl-stable \
+             --build-arg TORCH_VERSION==1.10.0a0 \
+             --build-arg IPEX_VERSION=1.10.200+gpu \
+             --build-arg TORCH_WHL_URL=https://developer.intel.com/ipex-whl-stable-xpu \
+             --build-arg IPEX_WHEEL_URL=https://developer.intel.com/ipex-whl-stable-xpu \
              -t $IMAGE_NAME \
              -f Dockerfile.ipex-gpu .
