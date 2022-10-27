@@ -331,16 +331,17 @@ RegisterOperators
                 },
                 aliasAnalysisFromSchema()),
             Operator(
-                "xpu::t_matmul_add_gelu(Tensor m2, Tensor m1, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
+                "xpu::t_matmul_add_gelu(Tensor m2, Tensor m1, Tensor(a!) accumu, *, Scalar alpha, str approximate='none') -> Tensor(a!)",
                 [](const Node* node) -> Operation {
                   return [](Stack& stack) {
-                    auto accumu = (std::move(peek(stack, 2, 4))).toTensor();
+                    auto accumu = (std::move(peek(stack, 2, 5))).toTensor();
                     auto result = torch::jit::xpu::t_matmul_add_gelu(
-                        (std::move(peek(stack, 0, 4))).toTensor(),
-                        (std::move(peek(stack, 1, 4))).toTensor(),
+                        (std::move(peek(stack, 0, 5))).toTensor(),
+                        (std::move(peek(stack, 1, 5))).toTensor(),
                         accumu,
-                        (std::move(peek(stack, 3, 4))).toScalar());
-                    drop(stack, 4);
+                        (std::move(peek(stack, 3, 5))).toScalar(),
+                        (std::move(peek(stack, 4, 5))).toStringView());
+                    drop(stack, 5);
                     pack(stack, std::move(result));
                   };
                 },
@@ -566,14 +567,15 @@ RegisterOperators
                 },
                 aliasAnalysisFromSchema()),
             Operator(
-                "xpu::linear_gelu(Tensor input, Tensor weight, Tensor? bias=None) -> Tensor",
+                "xpu::linear_gelu(Tensor input, Tensor weight, Tensor? bias=None, str approximate='none') -> Tensor",
                 [](const Node* node) -> Operation {
                   return [](Stack& stack) {
                     auto result = torch::jit::xpu::linear_gelu(
-                        (std::move(peek(stack, 0, 3))).toTensor(),
-                        (std::move(peek(stack, 1, 3))).toTensor(),
-                        toOptionalTensor(std::move(peek(stack, 2, 3))));
-                    drop(stack, 3);
+                        (std::move(peek(stack, 0, 4))).toTensor(),
+                        (std::move(peek(stack, 1, 4))).toTensor(),
+                        toOptionalTensor(std::move(peek(stack, 2, 4))),
+                        (std::move(peek(stack, 3, 4))).toStringView());
+                    drop(stack, 4);
                     pack(stack, std::move(result));
                   };
                 },

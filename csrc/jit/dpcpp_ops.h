@@ -271,7 +271,8 @@ at::Tensor t_matmul_add_gelu(
     const at::Tensor& tensor2,
     const at::Tensor& tensor1,
     at::Tensor& accumul1,
-    at::Scalar beta1);
+    at::Scalar beta1,
+    c10::string_view approximate);
 
 at::Tensor t_matmul_add_add(
     const at::Tensor& tensor2,
@@ -291,7 +292,8 @@ at::Tensor trans_matmul_div(
 at::Tensor linear_gelu(
     const at::Tensor& input,
     const at::Tensor& weight,
-    const at::Tensor& bias);
+    const at::Tensor& bias,
+    c10::string_view approximate);
 
 at::Tensor linear_relu(
     const at::Tensor& input,

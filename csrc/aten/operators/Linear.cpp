@@ -85,7 +85,8 @@ struct LinearConverter {
 Tensor linear_gelu(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias) {
+    const Tensor& bias,
+    c10::string_view approximate) {
   RECORD_FUNCTION(
       "linear_gelu", std::vector<c10::IValue>({input, weight, bias}));
   auto linear_wrapper = LinearConverter();
@@ -100,7 +101,7 @@ Tensor linear_gelu(
   };
   Tensor output = linear_wrapper.call(input, weight, bias, post_op);
   if (!linear_wrapper.is_fused()) {
-    // output = at::AtenIpexTypeXPU::gelu(output); NOTE:gelu
+    output = at::AtenIpexTypeXPU::gelu(output, approximate);
   }
   return output;
 }

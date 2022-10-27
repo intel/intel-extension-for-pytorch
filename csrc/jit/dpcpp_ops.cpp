@@ -442,10 +442,11 @@ at::Tensor t_matmul_add_gelu(
     const at::Tensor& tensor2,
     const at::Tensor& tensor1,
     at::Tensor& accumul1,
-    Scalar beta1) {
+    Scalar beta1,
+    c10::string_view approximate) {
   const OptionalDeviceGuard device_guard(device_of(accumul1));
   return at::AtenIpexTypeXPU::t_matmul_add_gelu(
-      tensor2, tensor1, accumul1, beta1);
+      tensor2, tensor1, accumul1, beta1, approximate);
 }
 
 at::Tensor t_matmul_add_add(
@@ -473,9 +474,10 @@ at::Tensor trans_matmul_div(
 at::Tensor linear_gelu(
     const at::Tensor& input,
     const at::Tensor& weight,
-    const at::Tensor& bias) {
+    const at::Tensor& bias,
+    c10::string_view approximate) {
   const OptionalDeviceGuard device_guard(device_of(input));
-  return at::AtenIpexTypeXPU::linear_gelu(input, weight, bias);
+  return at::AtenIpexTypeXPU::linear_gelu(input, weight, bias, approximate);
 }
 
 at::Tensor linear_relu(
