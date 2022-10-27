@@ -5,5 +5,5 @@ Intel® Extension for PyTorch\* is licensed under [Apache License Version 2.0](h
 
 Apache License Version 2.0:
 
-[Intel® Extension for PyTorch\* LICENSE](https://github.com/intel/intel-extension-for-pytorch/blob/master/LICENSE.txt)
+[Intel® Extension for PyTorch\* LICENSE](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master/LICENSE)
 
