@@ -191,15 +191,56 @@ def attach_scale_zp_values_to_model(
             if observer.dtype in quantized_dtype:
                 scale, zp = observer.calculate_qparams()
                 qstate.tensor_id_to_scale_zp[int(tensor_id)] = (scale, zp)
+            else:
+                assert False, "The observer's dtype only can be torch.quint8 or torch.qint8"
         for tensor_id, observer in qstate.weight_tensor_id_to_observer.items():
             if observer.dtype in quantized_dtype:
                 scale, zp = observer.calculate_qparams()
                 qstate.weight_tensor_id_to_scale_zp[tensor_id] = (scale, zp)
+            else:
+                assert False, "The observer's dtype only can be torch.quint8 or torch.qint8"
         qstate.tensor_id_to_observer.clear()
         qstate.weight_tensor_id_to_observer.clear()
 
     for _, child in module.named_children():
         attach_scale_zp_values_to_model(child)
+
+
+def _check_observer_has_run(observer):
+    if observer.min_val.numel() == 0 or observer.max_val.numel() == 0:
+        return False
+    if (observer.min_val.dim() == 0 or observer.max_val.dim() == 0) and \
+            observer.min_val == float("inf") and observer.max_val == float("-inf"):
+        return False
+    return True
+
+
+def check_model_obsever_has_run(
+    module: torch.nn.Module,
+) -> None:
+    """
+    This function is about check whether the module's observer has been run by checking the
+    observer's min_value and max_max_value is the init value or not.
+    """
+    if hasattr(module, '_auto_quant_state'):
+        qstate: AutoQuantizationState = module._auto_quant_state  # type: ignore[assignment]
+        quantized_dtype =  [torch.quint8, torch.qint8]
+        for tensor_id, observer in qstate.tensor_id_to_observer.items():
+            if observer.dtype in quantized_dtype:
+                return _check_observer_has_run(observer)
+            else:
+                assert False, "The observer's dtype only can be torch.quint8 or torch.qint8"
+        for tensor_id, observer in qstate.weight_tensor_id_to_observer.items():
+            if observer.dtype in quantized_dtype:
+                return _check_observer_has_run(observer)
+            else:
+                assert False, "The observer's dtype only can be torch.quint8 or torch.qint8"
+
+    for _, child in module.named_children():
+        check_model_obsever_has_run(child)
+
+    return True
+
 
 def attach_op_convert_info_to_model(
     module: torch.nn.Module,

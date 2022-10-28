@@ -10,7 +10,7 @@ from torch.quantization.qconfig import QConfig
 from ._utils import get_torch_function_hook_type, HookType, get_module_hook_type, OpQuantizeabilityType, \
     attach_op_convert_info_to_model, save_quant_state, attach_scale_zp_values_to_model, convert_quant_state_map_to_nodes, \
         sync_pool_and_lstm_input_output_scale_zp, module_call_to_function_call, quantized_modules_has_weights, \
-        load_qconf_summary_to_model, get_fqn_valid_for_module_dict_key
+        load_qconf_summary_to_model, get_fqn_valid_for_module_dict_key, check_model_obsever_has_run
 from ._quantization_state import AutoQuantizationState, AutoQuantizationStateModuleDict, init_model_quant_state
 from ._recipe import get_default_recipe
 from ._module_swap_utils import swap_child_modules
@@ -322,6 +322,13 @@ def auto_prepare(
                 # pooling and lstm's input and output should have same scale_zp.
                 sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes)
                 get_default_recipe(nodes)
+            else:
+                if check_model_obsever_has_run(model):
+                    # re-compute the scales and zp if user load a json file and re-do the calibration step.
+                    attach_scale_zp_values_to_model(model)
+                else:
+                    # do nothing if user just loaded a json file and not re-do the calibration step
+                    pass
             # Setting model qconf_summary attr which can be easily to check the whether the scale/zp has been computed.
             self._qconf_summary = qconf_summary
             save_quant_state(quant_state_map, qconf_summary)
@@ -550,8 +557,8 @@ def auto_convert(
                 torch.nn.Module.__call__ = orig_module_call
                 torch.nn.Sequential.forward = orig_nn_sequential_forward  # type: ignore[assignment]
  
-    # If module doesn't have a configure_file attr, we can say that user has run save_qconf_summary method which have
-    # computed the scales and zp, or use the user's setting from a given json file(load_qconf_summary), we need to compute
+    # If module doesn't have a configure_file attr, we can say that user didn't run save_qconf_summary method which have
+    # computed the scales and zp, or didn't use the user's setting from a given json file(load_qconf_summary), we need to compute
     # the scale and zp here.
     if not hasattr(module, '_qconf_summary'):
         quant_state_map = module._fqn_to_auto_quant_state_map
@@ -562,10 +569,16 @@ def auto_convert(
         sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes)
         get_default_recipe(nodes)
     else:
-        # Clear observer if module have, this will works when the user's json setting is loaded.
-        for _, v in module._fqn_to_auto_quant_state_map.items():
-            v.tensor_id_to_observer.clear()
-            v.weight_tensor_id_to_observer.clear()
+        if check_model_obsever_has_run(module):
+            # re-compute the scales and zp if user load a json file and re-do the calibration step.
+            attach_scale_zp_values_to_model(module)
+        else:
+            # clear observer if module have, this will works when the user's json setting is loaded
+            # and not re-do the calibration step.
+            for _, v in module._fqn_to_auto_quant_state_map.items():
+                v.tensor_id_to_observer.clear()
+                v.weight_tensor_id_to_observer.clear()
+
     # Attach quant_info to parent each module
     attach_op_convert_info_to_model(module)
     swap_child_modules(module)
