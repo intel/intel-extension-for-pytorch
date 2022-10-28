@@ -8,7 +8,7 @@ Examples
 #### Code Changes Highlight
 
 There are only a few lines of code change required to use Intel® Extension for PyTorch\* on training, as shown:
-1. `torch.xpu.optimize` function applies optimizations against the model object, as well as an optimizer object.
+1. `ipex.optimize` function applies optimizations against the model object, as well as an optimizer object.
 2.  Use Auto Mixed Precision (AMP) with BFloat16 data type.
 3.  Convert both tensors and models to XPU.
 
@@ -17,16 +17,16 @@ The complete examples for Float32 and BFloat16 training on single-instance are i
 ```
 ...
 import torch
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch as ipex
 ...
 model = Model()
 criterion = ...
 optimizer = ...
 model.train()
 # For Float32
-model, optimizer = torch.xpu.optimize(model, optimizer=optimizer, dtype=torch.float32)
+model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.float32)
 # For BFloat16
-model, optimizer = torch.xpu.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
+model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
 ...
 # For Float32
 output = model(data)
@@ -42,9 +42,9 @@ with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
 ```
 import torch
 import torchvision
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 LR = 0.001
 DOWNLOAD = True
@@ -70,10 +70,10 @@ model = torchvision.models.resnet50()
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
 model.train()
-#################################### code changes ####################################
+#################################### code changes ################################
 model = model.to("xpu")
-model, optimizer = torch.xpu.optimize(model, optimizer=optimizer, dtype=torch.float32)
-#################################### code changes ####################################
+model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.float32)
+#################################### code changes ################################
 
 for batch_idx, (data, target) in enumerate(train_loader):
     ########## code changes ##########
@@ -97,9 +97,9 @@ torch.save({
 ```
 import torch
 import torchvision
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 LR = 0.001
 DOWNLOAD = True
@@ -125,10 +125,10 @@ model = torchvision.models.resnet50()
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
 model.train()
-##################################### code changes ####################################
+##################################### code changes ################################
 model = model.to("xpu")
-model, optimizer = torch.xpu.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
-##################################### code changes ####################################
+model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
+##################################### code changes ################################
 
 for batch_idx, (data, target) in enumerate(train_loader):
     optimizer.zero_grad()
@@ -165,9 +165,9 @@ The `optimize` function of Intel® Extension for PyTorch\* applies optimizations
 ```
 import torch
 import torchvision.models as models
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 model = models.resnet50(pretrained=True)
 model.eval()
@@ -176,11 +176,11 @@ data = torch.rand(1, 3, 224, 224)
 model = model.to(memory_format=torch.channels_last)
 data = data.to(memory_format=torch.channels_last)
 
-#################### code changes ####################
+#################### code changes ################
 model = model.to("xpu")
 data = data.to("xpu")
-model = torch.xpu.optimize(model, dtype=torch.float32)
-#################### code changes ####################
+model = ipex.optimize(model, dtype=torch.float32)
+#################### code changes ################
 
 with torch.no_grad():
   model(data)
@@ -191,9 +191,9 @@ with torch.no_grad():
 ```
 import torch
 from transformers import BertModel
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 model = BertModel.from_pretrained(args.model_name)
 model.eval()
@@ -203,11 +203,11 @@ batch_size = 1
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
-#################### code changes ####################
+#################### code changes ################
 model = model.to("xpu")
 data = data.to("xpu")
-model = torch.xpu.optimize(model, dtype=torch.float32)
-#################### code changes ####################
+model = ipex.optimize(model, dtype=torch.float32)
+#################### code changes ################
 
 with torch.no_grad():
   model(data)
@@ -222,9 +222,9 @@ We recommend you take advantage of Intel® Extension for PyTorch\* with [TorchSc
 ```
 import torch
 import torchvision.models as models
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 model = models.resnet50(pretrained=True)
 model.eval()
@@ -233,11 +233,11 @@ data = torch.rand(1, 3, 224, 224)
 model = model.to(memory_format=torch.channels_last)
 data = data.to(memory_format=torch.channels_last)
 
-#################### code changes ####################
+#################### code changes ################
 model = model.to("xpu")
 data = data.to("xpu")
-model = torch.xpu.optimize(model, dtype=torch.float32)
-#################### code changes ####################
+model = ipex.optimize(model, dtype=torch.float32)
+#################### code changes ################
 
 with torch.no_grad():
   d = torch.rand(1, 3, 224, 224)
@@ -255,9 +255,9 @@ with torch.no_grad():
 ```
 import torch
 from transformers import BertModel
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 model = BertModel.from_pretrained(args.model_name)
 model.eval()
@@ -267,11 +267,11 @@ batch_size = 1
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
-#################### code changes ####################
+#################### code changes ################
 model = model.to("xpu")
 data = data.to("xpu")
-model = torch.xpu.optimize(model, dtype=torch.float32)
-#################### code changes ####################
+model = ipex.optimize(model, dtype=torch.float32)
+#################### code changes ################
 
 with torch.no_grad():
   d = torch.randint(vocab_size, size=[batch_size, seq_length])
@@ -296,9 +296,9 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.
 ```
 import torch
 import torchvision.models as models
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 model = models.resnet50(pretrained=True)
 model.eval()
@@ -307,11 +307,11 @@ data = torch.rand(1, 3, 224, 224)
 model = model.to(memory_format=torch.channels_last)
 data = data.to(memory_format=torch.channels_last)
 
-#################### code changes ####################
+#################### code changes #################
 model = model.to("xpu")
 data = data.to("xpu")
-model = torch.xpu.optimize(model, dtype=torch.bfloat16)
-#################### code changes ####################
+model = ipex.optimize(model, dtype=torch.bfloat16)
+#################### code changes #################
 
 with torch.no_grad():
   ################################# code changes ######################################
@@ -325,9 +325,9 @@ with torch.no_grad():
 ```
 import torch
 from transformers import BertModel
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 model = BertModel.from_pretrained(args.model_name)
 model.eval()
@@ -337,11 +337,11 @@ batch_size = 1
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
-#################### code changes ####################
+#################### code changes #################
 model = model.to("xpu")
 data = data.to("xpu")
-model = torch.xpu.optimize(model, dtype=torch.bfloat16)
-#################### code changes ####################
+model = ipex.optimize(model, dtype=torch.bfloat16)
+#################### code changes #################
 
 with torch.no_grad():
   ################################# code changes ######################################
@@ -359,9 +359,9 @@ We recommend you take advantage of Intel® Extension for PyTorch\* with [TorchSc
 ```
 import torch
 import torchvision.models as models
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 model = models.resnet50(pretrained=True)
 model.eval()
@@ -370,11 +370,11 @@ data = torch.rand(1, 3, 224, 224)
 model = model.to(memory_format=torch.channels_last)
 data = data.to(memory_format=torch.channels_last)
 
-#################### code changes ####################
+#################### code changes #################
 model = model.to("xpu")
 data = data.to("xpu")
-model = torch.xpu.optimize(model, dtype=torch.bfloat16)
-#################### code changes ####################
+model = ipex.optimize(model, dtype=torch.bfloat16)
+#################### code changes #################
 
 with torch.no_grad():
   d = torch.rand(1, 3, 224, 224)
@@ -392,9 +392,9 @@ with torch.no_grad():
 ```
 import torch
 from transformers import BertModel
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 model = BertModel.from_pretrained(args.model_name)
 model.eval()
@@ -404,11 +404,11 @@ batch_size = 1
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
-#################### code changes ####################
+#################### code changes #################
 model = model.to("xpu")
 data = data.to("xpu")
-model = torch.xpu.optimize(model, dtype=torch.bfloat16)
-#################### code changes ####################
+model = ipex.optimize(model, dtype=torch.bfloat16)
+#################### code changes #################
 
 with torch.no_grad():
   d = torch.randint(vocab_size, size=[batch_size, seq_length])
@@ -433,9 +433,9 @@ We recommend using Auto Mixed Precision (AMP) with Float16 data type.
 ```
 import torch
 import torchvision.models as models
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 model = models.resnet50(pretrained=True)
 model.eval()
@@ -444,11 +444,11 @@ data = torch.rand(1, 3, 224, 224)
 model = model.to(memory_format=torch.channels_last)
 data = data.to(memory_format=torch.channels_last)
 
-#################### code changes ####################
+#################### code changes ################
 model = model.to("xpu")
 data = data.to("xpu")
-model = torch.xpu.optimize(model, dtype=torch.float16)
-#################### code changes ####################
+model = ipex.optimize(model, dtype=torch.float16)
+#################### code changes ################
 
 with torch.no_grad():
   ################################# code changes ######################################
@@ -462,9 +462,9 @@ with torch.no_grad():
 ```
 import torch
 from transformers import BertModel
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 model = BertModel.from_pretrained(args.model_name)
 model.eval()
@@ -474,11 +474,11 @@ batch_size = 1
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
-#################### code changes ####################
+#################### code changes ################
 model = model.to("xpu")
 data = data.to("xpu")
-model = torch.xpu.optimize(model, dtype=torch.float16)
-#################### code changes ####################
+model = ipex.optimize(model, dtype=torch.float16)
+#################### code changes ################
 
 with torch.no_grad():
   ################################# code changes ######################################
@@ -496,9 +496,9 @@ We recommend you take advantage of Intel® Extension for PyTorch\* with [TorchSc
 ```
 import torch
 import torchvision.models as models
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 model = models.resnet50(pretrained=True)
 model.eval()
@@ -507,11 +507,11 @@ data = torch.rand(1, 3, 224, 224)
 model = model.to(memory_format=torch.channels_last)
 data = data.to(memory_format=torch.channels_last)
 
-#################### code changes ####################
+#################### code changes ################
 model = model.to("xpu")
 data = data.to("xpu")
-model = torch.xpu.optimize(model, dtype=torch.float16)
-#################### code changes ####################
+model = ipex.optimize(model, dtype=torch.float16)
+#################### code changes ################
 
 with torch.no_grad():
   d = torch.rand(1, 3, 224, 224)
@@ -529,9 +529,9 @@ with torch.no_grad():
 ```
 import torch
 from transformers import BertModel
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
+############# code changes ###############
+import intel_extension_for_pytorch as ipex
+############# code changes ###############
 
 model = BertModel.from_pretrained(args.model_name)
 model.eval()
@@ -541,11 +541,11 @@ batch_size = 1
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
-#################### code changes ####################
+#################### code changes ################
 model = model.to("xpu")
 data = data.to("xpu")
-model = torch.xpu.optimize(model, dtype=torch.float16)
-#################### code changes ####################
+model = ipex.optimize(model, dtype=torch.float16)
+#################### code changes ################
 
 with torch.no_grad():
   d = torch.randint(vocab_size, size=[batch_size, seq_length])
@@ -559,8 +559,39 @@ with torch.no_grad():
     model(data)
 ```
 
+### `torch.xpu.optimize`
+
+`torch.xpu.optimize` is an alternative of `ipex.optimize` in Intel® Extension for PyTorch*, to provide identical usage for XPU device only. The motivation of adding this alias is to unify the coding style in user scripts base on torch.xpu modular. Refer to below example for usage.
+
+#### ResNet50 FP32 imperative inference
+
+```
+import torch
+import torchvision.models as models
+############# code changes #########
+import intel_extension_for_pytorch
+############# code changes #########
+
+model = models.resnet50(pretrained=True)
+model.eval()
+data = torch.rand(1, 3, 224, 224)
+
+model = model.to(memory_format=torch.channels_last)
+data = data.to(memory_format=torch.channels_last)
+
+#################### code changes ################
+model = model.to("xpu")
+data = data.to("xpu")
+model = torch.xpu.optimize(model, dtype=torch.float32)
+#################### code changes ################
+
+with torch.no_grad():
+  model(data)
+```
+
 ## C++
-Intel® Extension for PyTorch\* provides its C++ dynamic library to allow users to implement custom DPC++ kernels to run on the XPU backend. Refer to the [DPC++ extension](./features/DPC++_Extension.md) for the details.
+
+Intel® Extension for PyTorch\* provides its C++ dynamic library to allow users to implement custom DPC++ kernels to run on the XPU device. Refer to the [DPC++ extension](./features/DPC++_Extension.md) for the details.
 
 ## Model Zoo
 

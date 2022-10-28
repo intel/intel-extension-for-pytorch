@@ -21,10 +21,10 @@
 
 namespace xpu {
 
-/// Get a sycl queue from a c10 stream. Generate a dpcpp stream from c10 stream,
-/// and get dpcpp queue.
+/// Get a sycl queue from a c10 stream. Generate a sycl stream from c10 stream,
+/// and get sycl queue.
 /// @param stream: c10 stream.
-/// @returns: dpcpp queue.
+/// @returns: sycl queue.
 IPEX_API sycl::queue& get_queue_from_stream(c10::Stream stream);
 
 } // namespace xpu

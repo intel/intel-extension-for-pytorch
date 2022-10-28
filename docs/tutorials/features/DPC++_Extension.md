@@ -2,11 +2,11 @@
 
 ## Introduction
 
-C++ extension is a mechanism developed by PyTorch that lets you to create customized and highly efficient PyTorch operators defined out-of-source, i.e. separate from the PyTorch backend. (For more details, see https://pytorch.org/tutorials/advanced/cpp_extension.html). Based on the PyTorch C++ extension mechanism, Intel® Extension for PyTorch\* lets you to create PyTorch operators with custom DPC++ kernels to run on the XPU backend.
+C++ extension is a mechanism developed by PyTorch that lets you to create customized and highly efficient PyTorch operators defined out-of-source, i.e. separate from the PyTorch backend. (For more details, see https://pytorch.org/tutorials/advanced/cpp_extension.html). Based on the PyTorch C++ extension mechanism, Intel® Extension for PyTorch\* lets you to create PyTorch operators with custom DPC++ kernels to run on the XPU device.
 
 ## Motivation and Example
 
-This tutorial walks through a practical example of writing and using a DPC++ extension on the XPU backend with Intel® Extension for PyTorch\*.
+This tutorial walks through a practical example of writing and using a DPC++ extension on the XPU device with Intel® Extension for PyTorch\*.
 
 ## Writing a DPC++ Extension
 
@@ -191,7 +191,7 @@ scalar_t sigmoid(scalar_t z) {
 }
 ```
 
-At the beginning of the code, we include `<torch/extension.h>` that will introduce all the torch definitions into the code. After that, the `<ipex.h>` line includes the SYCL header in DPC++. With the `<torch/extension.h>` and `<ipex.h>`, all the essential declarations have been included for writing the DPC++ kernel to run on the XPU backend device. The helper function `sigmoid` does the math calculation with the more efficient C++ language. Next are some more helper functions for LLTM:
+At the beginning of the code, we include `<torch/extension.h>` that will introduce all the torch definitions into the code. After that, the `<ipex.h>` line includes the SYCL header in DPC++. With the `<torch/extension.h>` and `<ipex.h>`, all the essential declarations have been included for writing the DPC++ kernel to run on the XPU device. The helper function `sigmoid` does the math calculation with the more efficient C++ language. Next are some more helper functions for LLTM:
 
 ```
 template <typename scalar_t>

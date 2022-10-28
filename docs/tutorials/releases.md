@@ -7,7 +7,7 @@ Intel® Extension for PyTorch\* v1.10.200+gpu extends PyTorch\* 1.10 with up-to-
 
 ### Highlights
 
-This release introduces specific XPU solution optimizations on Intel Graphics cards. Optimized operators and kernels are implemented and registered through PyTorch\* dispatching mechanism for the XPU device and XPU backend. These operators and kernels are accelerated on Intel GPU hardware from the corresponding native vectorization and matrix calculation features. In graph mode, additional operator fusions are supported to reduce operator/kernel invocation overheads, and thus increase performance.
+This release introduces specific XPU solution optimizations on Intel® Data Center GPU Flex Series 170. Optimized operators and kernels are implemented and registered through PyTorch\* dispatching mechanism for the XPU device. These operators and kernels are accelerated on Intel GPU hardware from the corresponding native vectorization and matrix calculation features. In graph mode, additional operator fusions are supported to reduce operator/kernel invocation overheads, and thus increase performance.
 
 This release provides the following features:
 - Auto Mixed Precision (AMP)
@@ -15,7 +15,7 @@ This release provides the following features:
 - Channels Last
   - support of channels_last (NHWC) memory format for most key GPU operators
 - DPC++ Extension
-  - mechanism to create PyTorch\* operators with custom DPC++ kernels running on the XPU backend
+  - mechanism to create PyTorch\* operators with custom DPC++ kernels running on the XPU device
 - Optimized Fusion
   - support of SGD/AdamW fusion for both FP32 and BF16 precision
 

@@ -197,12 +197,12 @@ def optimize(
         >>> model = ...
         >>> model.load_state_dict(torch.load(PATH))
         >>> model.eval()
-        >>> optimized_model = torch.xpu.optimize(model, dtype=torch.bfloat16)
+        >>> optimized_model = ipex.optimize(model, dtype=torch.bfloat16)
         >>> # running evaluation step.
         >>> # bfloat16 training case.
         >>> optimizer = ...
         >>> model.train()
-        >>> optimized_model, optimized_optimizer = torch.xpu.optimize(model, dtype=torch.bfloat16, optimizer=optimizer)
+        >>> optimized_model, optimized_optimizer = ipex.optimize(model, dtype=torch.bfloat16, optimizer=optimizer)
         >>> # running training step.
 
     """

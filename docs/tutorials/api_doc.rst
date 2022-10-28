@@ -6,6 +6,27 @@ General
 
 .. currentmodule:: intel_extension_for_pytorch
 .. autofunction:: optimize
+
+
+
+    `torch.xpu.optimize` is an alternative of optimize API in Intel® Extension for PyTorch*, to provide identical usage for XPU device only.
+    The motivation of adding this alias is to unify the coding style in user scripts base on torch.xpu modular.
+
+    .. code-block:: python
+        >>> # bfloat16 inference case.
+        >>> model = ...
+        >>> model.load_state_dict(torch.load(PATH))
+        >>> model.eval()
+        >>> optimized_model = torch.xpu.optimize(model, dtype=torch.bfloat16)
+        >>> # running evaluation step.
+        >>> # bfloat16 training case.
+        >>> optimizer = ...
+        >>> model.train()
+        >>> optimized_model, optimized_optimizer = torch.xpu.optimize(model, dtype=torch.bfloat16, optimizer=optimizer)
+        >>> # running training step.
+
+
+
 .. currentmodule:: intel_extension_for_pytorch.xpu
 .. StreamContext
 .. can_device_access_peer
