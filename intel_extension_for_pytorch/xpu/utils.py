@@ -1,3 +1,4 @@
+# coding: utf-8
 import torch
 from .. import _C
 from enum import Enum
@@ -54,6 +55,7 @@ def has_onemkl():
 
 def has_channels_last_1d():
     return _C._is_channels_last_1d_enabled()
+
 
 def has_fp64_dtype(device: int = -1) -> bool:
     r"""Returns a bool indicating if the current XPU device supports dtype float64"""
@@ -175,6 +177,31 @@ def optimize(model, dtype=None, optimizer=None, level="O1",
              replace_dropout_with_identity=None, optimize_lstm=None,
              split_master_weight_for_bf16=None, fuse_update_step=None,
              sample_input=None):
+    r"""
+    torch.xpu.optimize is an alternative of optimize API in Intel® Extension for
+    PyTorch*, to provide identical usage for XPU device only. The motivation of
+    adding this alias is to unify the coding style in user scripts base on torch.xpu
+    modular.
+
+    TODO: When finish merge frontend code, add other aurgments describtion here.
+    Args (Specific default values for XPU device):
+        inplace (bool): Default set false to save valuable XPU device memory.
+        weights_prepack (bool): Disabled for XPU device.
+        sample_input (tuple or torch.Tensor): Disabled for XPU device.
+
+    Examples:
+        >>> # bfloat16 inference case.
+        >>> model = ...
+        >>> model.load_state_dict(torch.load(PATH))
+        >>> model.eval()
+        >>> optimized_model = torch.xpu.optimize(model, dtype=torch.bfloat16)
+        >>> # running evaluation step.
+        >>> # bfloat16 training case.
+        >>> optimizer = ...
+        >>> model.train()
+        >>> optimized_model, optimized_optimizer = torch.xpu.optimize(model, dtype=torch.bfloat16, optimizer=optimizer)
+        >>> # running training step.
+    """
     return frontend.optimize(model, dtype, optimizer, level,
                              inplace, conv_bn_folding, weights_prepack,
                              replace_dropout_with_identity, optimize_lstm,
@@ -275,6 +302,8 @@ def using_tile_as_device():
     return _C._is_tile_as_device_enabled()
 
 # Only work before lazy init
+
+
 def enable_tile_as_device():
     _C._enable_tile_as_device()
 
