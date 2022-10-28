@@ -4,12 +4,16 @@
 
 #include "../cpu/isa/cpu_feature.hpp"
 
+#include <dnnl.hpp>
+
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
 
 namespace torch_ipex {
 namespace cpu {
+
+using namespace dnnl;
 
 const char* CPUCapabilityToString(CPUCapability isa) {
   switch (isa) {
@@ -79,6 +83,62 @@ CPUCapability _get_highest_binary_support_isa_level() {
   return CPUCapability::DEFAULT;
 }
 
+static bool _load_sync_onednn_isa_setting() {
+  // _IPEX_NOT_SYNC_ONEDNN_ISA is debug only env.
+  auto envar = std::getenv("_IPEX_NOT_SYNC_ONEDNN_ISA");
+  if (envar) {
+    if (strcmp(envar, "1") == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool check_not_sync_onednn_isa_level() {
+  static bool b_not_sync = _load_sync_onednn_isa_setting();
+
+  return b_not_sync;
+}
+
+status set_current_cpu_isa_level_to_onednn(cpu_isa isa) {
+  if (check_not_sync_onednn_isa_level()) {
+    return status::unimplemented;
+  }
+
+  return set_max_cpu_isa(isa);
+}
+
+cpu_isa ipex_isa_to_onednn_isa(CPUCapability ipex_isa) {
+  switch (ipex_isa) {
+    case CPUCapability::DEFAULT:
+      return cpu_isa::all;
+    case CPUCapability::AVX2:
+      return cpu_isa::avx2;
+    case CPUCapability::AVX2_VNNI:
+      return cpu_isa::avx2_vnni;
+    case CPUCapability::AVX512:
+      return cpu_isa::avx512_core;
+    case CPUCapability::AVX512_VNNI:
+      return cpu_isa::avx512_core_vnni;
+    case CPUCapability::AVX512_BF16:
+      return cpu_isa::avx512_core_bf16;
+    case CPUCapability::AMX:
+      return cpu_isa::avx512_core_amx;
+    case CPUCapability::NUM_OPTIONS:
+      TORCH_WARN("DispatchStub: OutOfBoundaryISALevel for IPEX");
+      return cpu_isa::all;
+
+    default:
+      auto ipex_isa_str = CPUCapabilityToString(ipex_isa);
+      auto msg = c10::str(
+          "DispatchStub: No corresponding onednn isa for ",
+          ipex_isa_str,
+          "Please consider check whether this ISA is supported by oneDNN");
+      TORCH_WARN(msg);
+      return cpu_isa::all;
+  }
+}
+
 static CPUCapability compute_cpu_capability() {
   CPUCapability highest_cpu_supported_isa_level =
       _get_highest_cpu_support_isa_level();
@@ -119,6 +179,9 @@ static CPUCapability compute_cpu_capability() {
   CPUCapability max_support_isa_level = std::min(
       highest_cpu_supported_isa_level, highest_binary_supported_isa_level);
   if (b_manual_setup) {
+    cpu_isa manual_onednn_isa = ipex_isa_to_onednn_isa(manual_setup_isa_level);
+    set_current_cpu_isa_level_to_onednn(manual_onednn_isa);
+
     if (manual_setup_isa_level <= max_support_isa_level) {
       return manual_setup_isa_level;
     }

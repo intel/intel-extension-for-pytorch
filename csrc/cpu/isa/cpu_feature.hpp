@@ -113,6 +113,8 @@ class CPUFeature {
   MICRO_CLASS_MEMBER_DECL(amx_bf16);
   MICRO_CLASS_MEMBER_DECL(amx_tile);
   MICRO_CLASS_MEMBER_DECL(amx_int8);
+  bool init_amx();
+  bool _do_check_and_init_amx();
 
  public:
   MICRO_CLASS_CHECK_FUNC(amx_bf16);

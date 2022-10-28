@@ -63,6 +63,8 @@ const char* CPUCapabilityToString(CPUCapability isa);
 CPUCapability _get_highest_cpu_support_isa_level();
 CPUCapability _get_highest_binary_support_isa_level();
 
+bool check_not_sync_onednn_isa_level();
+
 CPUCapability get_cpu_capability();
 
 template <typename FnPtr, typename T>
