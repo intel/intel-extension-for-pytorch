@@ -1,4 +1,5 @@
 import torch
+from torch._six import inf
 from torch.distributions import Geometric
 from torch.testing._internal.common_utils import TestCase
 from torch.testing._internal.common_dtype import all_types_and
@@ -62,3 +63,20 @@ class TestTorchMethod(TestCase):
         a = torch.tensor([10], dtype=dtype, device=device).geometric_(0.5)
         self.assertEqual(a.dtype, dtype)
         self.assertEqual(a.size(), torch.Size([1]))
+
+    @repeat_test_for_types([*all_types_and(torch.half, torch.bfloat16)])
+    def test_geometric_kstest(self,  dtype):
+        device = sycl_device
+        print("Dtype is ", dtype, flush=True)
+
+        from scipy import stats
+        size = 1000
+        for p in [0.2, 0.5, 0.8]:
+            t = torch.empty(size, dtype=dtype, device=device).geometric_(p=p)
+            actual = np.histogram(t.cpu().to(torch.double), np.arange(1, 100))[0]
+            expected = stats.geom(p).pmf(np.arange(1, 99)) * size
+
+            print(actual.size)
+            print(expected.size)
+            res = stats.chisquare(actual, expected)
+            self.assertEqual(res.pvalue, 1.0, atol=0.1, rtol=0)
