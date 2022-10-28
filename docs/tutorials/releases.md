@@ -64,11 +64,11 @@ This release supports the following fusion patterns in PyTorch\* JIT mode:
 
 ### Known Issues
 
--  #### [CRITICAL ERROR] Kernel 'XXX' removed due to usage of FP64 instructions unsupported by the targeted hardware
+#### [CRITICAL ERROR] Kernel 'XXX' removed due to usage of FP64 instructions unsupported by the targeted hardware
 
    FP64 is not natively supported by the [Intel® Data Center GPU Flex Series](https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html) platform. If you run any AI workload on that platform and receive this error message, it means a kernel requiring FP64 instructions is removed and not executed, hence the accuracy of the whole workload is wrong.
 
-- #### symbol undefined caused by _GLIBCXX_USE_CXX11_ABI:
+#### symbol undefined caused by \_GLIBCXX_USE_CXX11_ABI
 
    Error info: <br>
 
@@ -80,7 +80,7 @@ This release supports the following fusion patterns in PyTorch\* JIT mode:
 
   DPC++ does not support \_GLIBCXX_USE_CXX11_ABI=0, Intel® Extension for PyTorch\* is always compiled with \_GLIBCXX_USE_CXX11_ABI=1. This symbol undefined issue appears when PyTorch\* is compiled with \_GLIBCXX_USE_CXX11_ABI=0. Update PyTorch\* CMAKE file to set \_GLIBCXX_USE_CXX11_ABI=1 and compile PyTorch\* with particular compiler which supports \_GLIBCXX_USE_CXX11_ABI=1. We recommend to use gcc version 9.4.0 on ubuntu 20.04. <br>
 
-- #### Can't find oneMKL library when build Intel® Extension for PyTorch\* without oneMKL
+#### Can't find oneMKL library when build Intel® Extension for PyTorch\* without oneMKL
 
     Error info: <br>
 
@@ -101,7 +101,7 @@ This release supports the following fusion patterns in PyTorch\* JIT mode:
 
     Then clean build Intel® Extension for PyTorch\*.
 
-- #### undefined symbol: mkl_lapack_dspevd. Intel MKL FATAL ERROR: cannot load libmkl_vml_avx512.so.2 or libmkl_vml_def.so.2
+#### undefined symbol: mkl_lapack_dspevd. Intel MKL FATAL ERROR: cannot load libmkl_vml_avx512.so.2 or libmkl_vml_def.so.2
 
     This issue may occur when Intel® Extension for PyTorch\* is built with oneMKL library and PyTorch\* is not build with any MKL library. The oneMKL kernel may run into CPU backend incorrectly and trigger this issue. Resolve it by installing MKL library from conda:
 
@@ -112,7 +112,7 @@ This release supports the following fusion patterns in PyTorch\* JIT mode:
 
     then clean build PyTorch\*.
 
-- #### OSError: libmkl_intel_lp64.so.1: cannot open shared object file: No such file or directory
+#### OSError: libmkl_intel_lp64.so.1: cannot open shared object file: No such file or directory
 
     Wrong MKL library is used when multiple MKL libraries exist in system. Preload oneMKL by:
 

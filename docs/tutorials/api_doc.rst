@@ -13,6 +13,7 @@ General
     The motivation of adding this alias is to unify the coding style in user scripts base on torch.xpu modular.
 
     .. code-block:: python
+    
         >>> # bfloat16 inference case.
         >>> model = ...
         >>> model.load_state_dict(torch.load(PATH))
