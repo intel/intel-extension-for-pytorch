@@ -516,61 +516,45 @@ Tensor addr(
     const Tensor& vec2,
     const Scalar& beta,
     const Scalar& alpha) {
-  check_addr_scalar(self.scalar_type(), beta, "beta");
-  check_addr_scalar(self.scalar_type(), alpha, "alpha");
-
   check_1d(vec1, "vec1", "addr");
   check_1d(vec2, "vec2", "addr");
 
-  int64_t vec1_numel = vec1.numel();
-  int64_t vec2_numel = vec2.numel();
+  Tensor result;
 
-  auto self_contiguous = self.contiguous();
-  auto vec1_contiguous = vec1.contiguous();
-  auto vec2_contiguous = vec2.contiguous();
+  const auto vec1_size0 = vec1.sizes()[0];
+  const auto vec2_size0 = vec2.sizes()[0];
+  auto self_ = &result == &self
+      ? c10::MaybeOwned<Tensor>::borrowed(self)
+      : expand_size(self, {vec1_size0, vec2_size0}, "addr");
+  TORCH_CHECK(
+      self_->dim() == 2,
+      "2D tensor expected, got ",
+      self_->dim(),
+      "D tensor for input");
+  TORCH_CHECK(
+      self_->sizes()[0] == vec1_size0 && self_->sizes()[1] == vec2_size0,
+      "size mismatch, input: ",
+      self_->sizes(),
+      ", v1: ",
+      vec1.sizes(),
+      ", v2: ",
+      vec2.sizes());
 
-  // when beta is not zero, self is needed to add on vec1 * vec2, additionally
-  // it supports broadcast on dim0 or dim1
-  bool self_ignore = bool(0.0 == beta.toComplexDouble());
-
-  // which dim needs to broadcast, -2 means no need broadcast, -1 means
-  // broadcast on all dims
-  int64_t broadcast_dim = -2;
-  if (!self_ignore) {
-    if ((self_contiguous.dim() == 2) &&
-        (self_contiguous.sizes()[0] == vec1_numel) &&
-        (self_contiguous.sizes()[1] == 1)) {
-      broadcast_dim = 0;
-    } else if (
-        (self_contiguous.dim() == 2) && (self_contiguous.sizes()[0] == 1) &&
-        (self_contiguous.sizes()[1] == vec2_numel)) {
-      broadcast_dim = 1;
-    } else if (
-        (self_contiguous.dim() == 1) &&
-        (self_contiguous.sizes()[0] == vec1_numel)) {
-      broadcast_dim = 0;
-    } else if (self_contiguous.numel() == 1) {
-      broadcast_dim = -1;
-    } else {
-      TORCH_CHECK(
-          (self_contiguous.dim() == 2) &&
-              (self_contiguous.sizes()[0] == vec1_numel) &&
-              (self_contiguous.sizes()[1] == vec2_numel),
-          "The expanded self size cannot match the out size");
-    }
-  }
-  Tensor out;
   auto iter = TensorIteratorConfig()
                   .set_check_mem_overlap(true)
-                  .add_output(out)
-                  .add_owned_input(self_contiguous)
-                  .add_owned_input(vec1_contiguous.reshape({vec1_numel, 1}))
-                  .add_input(vec2_contiguous)
+                  .add_output(result)
+                  .add_owned_input(*self_)
+                  .add_owned_input(vec1.reshape({vec1_size0, 1}))
+                  .add_input(vec2)
                   .allow_cpu_scalars(true)
                   .promote_inputs_to_common_dtype(true)
                   .cast_common_dtype_to_outputs(true)
                   .enforce_safe_casting_to_output(true)
                   .build();
+
+  check_addr_scalar(iter.dtype(), beta, "beta");
+  check_addr_scalar(iter.dtype(), alpha, "alpha");
+
   impl::addr_kernel(iter, beta, alpha);
   return iter.output();
 }
