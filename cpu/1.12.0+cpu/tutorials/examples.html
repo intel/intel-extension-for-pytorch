@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Examples &mdash; intel_extension_for_pytorch 1.12.0+cpu documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Performance" href="performance.html" />
+    <link rel="prev" title="Installation Guide" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../versions.html">1.12.0+cpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation Guide</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#training">Training</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#single-instance-training">Single-instance Training</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#code-changes-highlight">Code Changes Highlight</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#complete-float32">Complete - Float32</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#complete-bfloat16">Complete - BFloat16</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#distributed-training">Distributed Training</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#inference">Inference</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#float32">Float32</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#imperative-mode">Imperative Mode</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#resnet50">Resnet50</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#bert">BERT</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#torchscript-mode">TorchScript Mode</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#id1">Resnet50</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#id2">BERT</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#bfloat16">BFloat16</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#id3">Imperative Mode</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#id4">Resnet50</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#id5">BERT</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#id6">TorchScript Mode</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#id7">Resnet50</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#id8">BERT</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#int8">INT8</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#calibration">Calibration</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#static-quantization">Static Quantization</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#dynamic-quantization">Dynamic Quantization</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#deployment">Deployment</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#c">C++</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#model-zoo">Model Zoo</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Examples</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/examples.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="examples">
+<h1>Examples<a class="headerlink" href="#examples" title="Permalink to this headline"></a></h1>
+<section id="training">
+<h2>Training<a class="headerlink" href="#training" title="Permalink to this headline"></a></h2>
+<section id="single-instance-training">
+<h3>Single-instance Training<a class="headerlink" href="#single-instance-training" title="Permalink to this headline"></a></h3>
+<section id="code-changes-highlight">
+<h4>Code Changes Highlight<a class="headerlink" href="#code-changes-highlight" title="Permalink to this headline"></a></h4>
+<p>There are only a few lines of code change required to use Intel® Extension for PyTorch* on training, as shown:</p>
+<ol class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">torch.channels_last</span></code> should be applied to both of the model object and data to raise CPU resource usage efficiency.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> function applies optimizations against the model object, as well as an optimizer object.</p></li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">...</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="o">...</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+<span class="n">criterion</span> <span class="o">=</span> <span class="o">...</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="o">...</span>
+<span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="c1"># For Float32</span>
+<span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
+<span class="c1"># For BFloat16</span>
+<span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="o">...</span>
+<span class="c1"># Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+<span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+</section>
+<section id="complete-float32">
+<h4>Complete - Float32<a class="headerlink" href="#complete-float32" title="Permalink to this headline"></a></h4>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torchvision</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+
+<span class="n">LR</span> <span class="o">=</span> <span class="mf">0.001</span>
+<span class="n">DOWNLOAD</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="n">DATA</span> <span class="o">=</span> <span class="s1">&#39;datasets/cifar10/&#39;</span>
+
+<span class="n">transform</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">Compose</span><span class="p">([</span>
+    <span class="n">torchvision</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">Resize</span><span class="p">((</span><span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)),</span>
+    <span class="n">torchvision</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">ToTensor</span><span class="p">(),</span>
+    <span class="n">torchvision</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">Normalize</span><span class="p">((</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">))</span>
+<span class="p">])</span>
+<span class="n">train_dataset</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">CIFAR10</span><span class="p">(</span>
+        <span class="n">root</span><span class="o">=</span><span class="n">DATA</span><span class="p">,</span>
+        <span class="n">train</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">transform</span><span class="o">=</span><span class="n">transform</span><span class="p">,</span>
+        <span class="n">download</span><span class="o">=</span><span class="n">DOWNLOAD</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">train_loader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span>
+        <span class="n">dataset</span><span class="o">=</span><span class="n">train_dataset</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="mi">128</span>
+<span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">resnet50</span><span class="p">()</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+<span class="n">criterion</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">CrossEntropyLoss</span><span class="p">()</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span> <span class="o">=</span> <span class="n">LR</span><span class="p">,</span> <span class="n">momentum</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">batch_idx</span><span class="p">,</span> <span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">train_loader</span><span class="p">):</span>
+    <span class="c1"># Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">loss</span> <span class="o">=</span> <span class="n">criterion</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+    <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">batch_idx</span><span class="p">)</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">({</span>
+     <span class="s1">&#39;model_state_dict&#39;</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+     <span class="s1">&#39;optimizer_state_dict&#39;</span><span class="p">:</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+     <span class="p">},</span> <span class="s1">&#39;checkpoint.pth&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="complete-bfloat16">
+<h4>Complete - BFloat16<a class="headerlink" href="#complete-bfloat16" title="Permalink to this headline"></a></h4>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torchvision</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+
+<span class="n">LR</span> <span class="o">=</span> <span class="mf">0.001</span>
+<span class="n">DOWNLOAD</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="n">DATA</span> <span class="o">=</span> <span class="s1">&#39;datasets/cifar10/&#39;</span>
+
+<span class="n">transform</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">Compose</span><span class="p">([</span>
+    <span class="n">torchvision</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">Resize</span><span class="p">((</span><span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)),</span>
+    <span class="n">torchvision</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">ToTensor</span><span class="p">(),</span>
+    <span class="n">torchvision</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">Normalize</span><span class="p">((</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">))</span>
+<span class="p">])</span>
+<span class="n">train_dataset</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">CIFAR10</span><span class="p">(</span>
+        <span class="n">root</span><span class="o">=</span><span class="n">DATA</span><span class="p">,</span>
+        <span class="n">train</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">transform</span><span class="o">=</span><span class="n">transform</span><span class="p">,</span>
+        <span class="n">download</span><span class="o">=</span><span class="n">DOWNLOAD</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">train_loader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span>
+        <span class="n">dataset</span><span class="o">=</span><span class="n">train_dataset</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="mi">128</span>
+<span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">resnet50</span><span class="p">()</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+<span class="n">criterion</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">CrossEntropyLoss</span><span class="p">()</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span> <span class="o">=</span> <span class="n">LR</span><span class="p">,</span> <span class="n">momentum</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">batch_idx</span><span class="p">,</span> <span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">train_loader</span><span class="p">):</span>
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">autocast</span><span class="p">():</span>
+        <span class="c1"># Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">criterion</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+        <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">batch_idx</span><span class="p">)</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">({</span>
+     <span class="s1">&#39;model_state_dict&#39;</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+     <span class="s1">&#39;optimizer_state_dict&#39;</span><span class="p">:</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+     <span class="p">},</span> <span class="s1">&#39;checkpoint.pth&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="distributed-training">
+<h3>Distributed Training<a class="headerlink" href="#distributed-training" title="Permalink to this headline"></a></h3>
+<p>Distributed training with PyTorch DDP is accelerated by oneAPI Collective Communications Library Bindings for Pytorch* (oneCCL Bindings for Pytorch*). The extension supports FP32 and BF16 data types. More detailed information and examples are available at its <a class="reference external" href="https://github.com/intel/torch-ccl">Github repo</a>.</p>
+<p><strong>Note:</strong> When performing distributed training with BF16 data type, use oneCCL Bindings for Pytorch*. Due to a PyTorch limitation, distributed training with BF16 data type with Intel® Extension for PyTorch* is not supported.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.distributed</span> <span class="k">as</span> <span class="nn">dist</span>
+<span class="kn">import</span> <span class="nn">torchvision</span>
+<span class="kn">import</span> <span class="nn">oneccl_bindings_for_pytorch</span> <span class="k">as</span> <span class="nn">torch_ccl</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+
+<span class="n">LR</span> <span class="o">=</span> <span class="mf">0.001</span>
+<span class="n">DOWNLOAD</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="n">DATA</span> <span class="o">=</span> <span class="s1">&#39;datasets/cifar10/&#39;</span>
+
+<span class="n">transform</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">Compose</span><span class="p">([</span>
+    <span class="n">torchvision</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">Resize</span><span class="p">((</span><span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)),</span>
+    <span class="n">torchvision</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">ToTensor</span><span class="p">(),</span>
+    <span class="n">torchvision</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">Normalize</span><span class="p">((</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">))</span>
+<span class="p">])</span>
+<span class="n">train_dataset</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">CIFAR10</span><span class="p">(</span>
+        <span class="n">root</span><span class="o">=</span><span class="n">DATA</span><span class="p">,</span>
+        <span class="n">train</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">transform</span><span class="o">=</span><span class="n">transform</span><span class="p">,</span>
+        <span class="n">download</span><span class="o">=</span><span class="n">DOWNLOAD</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">train_loader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span>
+        <span class="n">dataset</span><span class="o">=</span><span class="n">train_dataset</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="mi">128</span>
+<span class="p">)</span>
+
+<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;MASTER_ADDR&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;127.0.0.1&#39;</span>
+<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;MASTER_PORT&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;29500&#39;</span>
+<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;RANK&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;PMI_RANK&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;WORLD_SIZE&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;PMI_SIZE&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">dist</span><span class="o">.</span><span class="n">init_process_group</span><span class="p">(</span>
+<span class="n">backend</span><span class="o">=</span><span class="s1">&#39;ccl&#39;</span><span class="p">,</span>
+<span class="n">init_method</span><span class="o">=</span><span class="s1">&#39;env://&#39;</span>
+<span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">resnet50</span><span class="p">()</span>
+<span class="n">criterion</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">CrossEntropyLoss</span><span class="p">()</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span> <span class="o">=</span> <span class="n">LR</span><span class="p">,</span> <span class="n">momentum</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">parallel</span><span class="o">.</span><span class="n">DistributedDataParallel</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">batch_idx</span><span class="p">,</span> <span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">train_loader</span><span class="p">):</span>
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+    <span class="c1"># Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">loss</span> <span class="o">=</span> <span class="n">criterion</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+    <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;batch_id: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">batch_idx</span><span class="p">))</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">({</span>
+     <span class="s1">&#39;model_state_dict&#39;</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+     <span class="s1">&#39;optimizer_state_dict&#39;</span><span class="p">:</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+     <span class="p">},</span> <span class="s1">&#39;checkpoint.pth&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="inference">
+<h2>Inference<a class="headerlink" href="#inference" title="Permalink to this headline"></a></h2>
+<p>Channels last is a memory layout format that is more friendly to Intel Architecture. We recommend using this memory layout format for computer vision workloads by invoking <code class="docutils literal notranslate"><span class="pre">to(memory_format=torch.channels_last)</span></code> function against the model object and input data.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function of Intel® Extension for PyTorch* applies optimizations to the model, bringing additional performance boosts. For both computer vision workloads and NLP workloads, we recommend applying the <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function against the model object.</p>
+<section id="float32">
+<h3>Float32<a class="headerlink" href="#float32" title="Permalink to this headline"></a></h3>
+<section id="imperative-mode">
+<h4>Imperative Mode<a class="headerlink" href="#imperative-mode" title="Permalink to this headline"></a></h4>
+<section id="resnet50">
+<h5>Resnet50<a class="headerlink" href="#resnet50" title="Permalink to this headline"></a></h5>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet50</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+
+<span class="c1">#################### code changes ####################</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="c1">######################################################</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+  <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="bert">
+<h5>BERT<a class="headerlink" href="#bert" title="Permalink to this headline"></a></h5>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">BertModel</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model_name</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+
+<span class="n">vocab_size</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">vocab_size</span>
+<span class="n">batch_size</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">seq_length</span> <span class="o">=</span> <span class="mi">512</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">vocab_size</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">[</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">seq_length</span><span class="p">])</span>
+
+<span class="c1">#################### code changes ####################</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="c1">######################################################</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+  <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="torchscript-mode">
+<h4>TorchScript Mode<a class="headerlink" href="#torchscript-mode" title="Permalink to this headline"></a></h4>
+<p>We recommend you take advantage of Intel® Extension for PyTorch* with <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">TorchScript</a> for further optimizations.</p>
+<section id="id1">
+<h5>Resnet50<a class="headerlink" href="#id1" title="Permalink to this headline"></a></h5>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet50</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+
+<span class="c1">#################### code changes ####################</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="c1">######################################################</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+  <span class="n">d</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span>
+  <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+  <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+  <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="id2">
+<h5>BERT<a class="headerlink" href="#id2" title="Permalink to this headline"></a></h5>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">BertModel</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model_name</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+
+<span class="n">vocab_size</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">vocab_size</span>
+<span class="n">batch_size</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">seq_length</span> <span class="o">=</span> <span class="mi">512</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">vocab_size</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">[</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">seq_length</span><span class="p">])</span>
+
+<span class="c1">#################### code changes ####################</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="c1">######################################################</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+  <span class="n">d</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">vocab_size</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">[</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">seq_length</span><span class="p">])</span>
+  <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">d</span><span class="p">,),</span> <span class="n">check_trace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+  <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+  <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="bfloat16">
+<h3>BFloat16<a class="headerlink" href="#bfloat16" title="Permalink to this headline"></a></h3>
+<p>Similar to running with FP32, the <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function also works for BFloat16 data type. The only difference is setting <code class="docutils literal notranslate"><span class="pre">dtype</span></code> parameter to <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code>.
+We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
+<section id="id3">
+<h4>Imperative Mode<a class="headerlink" href="#id3" title="Permalink to this headline"></a></h4>
+<section id="id4">
+<h5>Resnet50<a class="headerlink" href="#id4" title="Permalink to this headline"></a></h5>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet50</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+
+<span class="c1">#################### code changes ####################</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="c1">######################################################</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+  <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">autocast</span><span class="p">():</span>
+    <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="id5">
+<h5>BERT<a class="headerlink" href="#id5" title="Permalink to this headline"></a></h5>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">BertModel</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model_name</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+
+<span class="n">vocab_size</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">vocab_size</span>
+<span class="n">batch_size</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">seq_length</span> <span class="o">=</span> <span class="mi">512</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">vocab_size</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">[</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">seq_length</span><span class="p">])</span>
+
+<span class="c1">#################### code changes ####################</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="c1">######################################################</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+  <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">autocast</span><span class="p">():</span>
+    <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="id6">
+<h4>TorchScript Mode<a class="headerlink" href="#id6" title="Permalink to this headline"></a></h4>
+<p>We recommend you take advantage of Intel® Extension for PyTorch* with <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">TorchScript</a> for further optimizations.</p>
+<section id="id7">
+<h5>Resnet50<a class="headerlink" href="#id7" title="Permalink to this headline"></a></h5>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet50</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+
+<span class="c1">#################### code changes ####################</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="c1">######################################################</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+  <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">autocast</span><span class="p">():</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+    <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="id8">
+<h5>BERT<a class="headerlink" href="#id8" title="Permalink to this headline"></a></h5>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">BertModel</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model_name</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+
+<span class="n">vocab_size</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">vocab_size</span>
+<span class="n">batch_size</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">seq_length</span> <span class="o">=</span> <span class="mi">512</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">vocab_size</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">[</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">seq_length</span><span class="p">])</span>
+
+<span class="c1">#################### code changes ####################</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="c1">######################################################</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+  <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">autocast</span><span class="p">():</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">vocab_size</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">[</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">seq_length</span><span class="p">])</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">d</span><span class="p">,),</span> <span class="n">check_trace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+    <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="int8">
+<h3>INT8<a class="headerlink" href="#int8" title="Permalink to this headline"></a></h3>
+<p>Starting from Intel® Extension for PyTorch* 1.12.0, quantization feature supports both static and dynamic modes.</p>
+<section id="calibration">
+<h4>Calibration<a class="headerlink" href="#calibration" title="Permalink to this headline"></a></h4>
+<section id="static-quantization">
+<h5>Static Quantization<a class="headerlink" href="#static-quantization" title="Permalink to this headline"></a></h5>
+<p>Please follow the steps below to perform static calibration:</p>
+<ol class="simple">
+<li><p>Import <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code> as <code class="docutils literal notranslate"><span class="pre">ipex</span></code>.</p></li>
+<li><p>Import <code class="docutils literal notranslate"><span class="pre">prepare</span></code> and <code class="docutils literal notranslate"><span class="pre">convert</span></code> from <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch.quantization</span></code>.</p></li>
+<li><p>Instantiate a config object from <code class="docutils literal notranslate"><span class="pre">torch.ao.quantization.QConfig</span></code> to save configuration data during calibration.</p></li>
+<li><p>Prepare model for calibration.</p></li>
+<li><p>Perform calibration against dataset.</p></li>
+<li><p>Invoke <code class="docutils literal notranslate"><span class="pre">ipex.quantization.convert</span></code> function to apply the calibration configure object to the fp32 model object to get an INT8 model.</p></li>
+<li><p>Save the INT8 model into a <code class="docutils literal notranslate"><span class="pre">pt</span></code> file.</p></li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="c1">#################### code changes ####################</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">from</span> <span class="nn">intel_extension_for_pytorch.quantization</span> <span class="kn">import</span> <span class="n">prepare</span><span class="p">,</span> <span class="n">convert</span>
+<span class="c1">######################################################</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">&lt;</span><span class="n">shape</span><span class="o">&gt;</span><span class="p">)</span>
+
+<span class="n">qconfig</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">default_static_qconfig</span>
+<span class="c1"># Alternatively, define your own qconfig:</span>
+<span class="c1">#from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, QConfig</span>
+<span class="c1">#qconfig = QConfig(activation=MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8),</span>
+<span class="c1">#        weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))</span>
+<span class="n">prepared_model</span> <span class="o">=</span> <span class="n">prepare</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">qconfig</span><span class="p">,</span> <span class="n">example_inputs</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">calibration_data_loader</span><span class="p">():</span>
+  <span class="n">prepared_model</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+
+<span class="n">converted_model</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">prepared_model</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+  <span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">converted_model</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+  <span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">traced_model</span><span class="p">)</span>
+
+<span class="n">traced_model</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;quantized_model.pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="dynamic-quantization">
+<h5>Dynamic Quantization<a class="headerlink" href="#dynamic-quantization" title="Permalink to this headline"></a></h5>
+<p>Please follow the steps below to perform static calibration:</p>
+<ol class="simple">
+<li><p>Import <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code> as <code class="docutils literal notranslate"><span class="pre">ipex</span></code>.</p></li>
+<li><p>Import <code class="docutils literal notranslate"><span class="pre">prepare</span></code> and <code class="docutils literal notranslate"><span class="pre">convert</span></code> from <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch.quantization</span></code>.</p></li>
+<li><p>Instantiate a config object from <code class="docutils literal notranslate"><span class="pre">torch.ao.quantization.QConfig</span></code> to save configuration data during calibration.</p></li>
+<li><p>Prepare model for quantization.</p></li>
+<li><p>Convert the model.</p></li>
+<li><p>Run inference to perform dynamic quantization.</p></li>
+<li><p>Save the INT8 model into a <code class="docutils literal notranslate"><span class="pre">pt</span></code> file.</p></li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="c1">#################### code changes ####################</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">from</span> <span class="nn">intel_extension_for_pytorch.quantization</span> <span class="kn">import</span> <span class="n">prepare</span><span class="p">,</span> <span class="n">convert</span>
+<span class="c1">######################################################</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">&lt;</span><span class="n">shape</span><span class="o">&gt;</span><span class="p">)</span>
+
+<span class="n">dynamic_qconfig</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">default_dynamic_qconfig</span>
+<span class="c1"># Alternatively, define your own qconfig:</span>
+<span class="c1">#from torch.ao.quantization import MinMaxObserver, PlaceholderObserver, QConfig</span>
+<span class="c1">#qconfig = QConfig(</span>
+<span class="c1">#        activation = PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),</span>
+<span class="c1">#        weight = PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))</span>
+<span class="n">prepared_model</span> <span class="o">=</span> <span class="n">prepare</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">qconfig</span><span class="p">,</span> <span class="n">example_inputs</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+
+<span class="n">converted_model</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">prepared_model</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+  <span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">converted_model</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+  <span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">traced_model</span><span class="p">)</span>
+
+<span class="n">traced_model</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;quantized_model.pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="deployment">
+<h4>Deployment<a class="headerlink" href="#deployment" title="Permalink to this headline"></a></h4>
+<p>For deployment, the INT8 model is loaded from the local file and can be used directly on the inference.</p>
+<p>Follow the steps below:</p>
+<ol class="simple">
+<li><p>Import <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code> as <code class="docutils literal notranslate"><span class="pre">ipex</span></code>.</p></li>
+<li><p>Load the INT8 model from the saved file.</p></li>
+<li><p>Run inference.</p></li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="c1">#################### code changes ####################</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="c1">######################################################</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;quantization_model.pt&#39;</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">&lt;</span><span class="n">shape</span><span class="o">&gt;</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+  <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>oneDNN provides <a class="reference external" href="https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler">oneDNN Graph Compiler</a> as a prototype feature that could boost performance for selective topologies. No code change is required. Install <a class="reference external" href="installation.html#installation_onednn_graph_compiler">a binary</a> with this feature enabled. We verified this feature with <code class="docutils literal notranslate"><span class="pre">Bert-large</span></code>, <code class="docutils literal notranslate"><span class="pre">bert-base-cased</span></code>, <code class="docutils literal notranslate"><span class="pre">roberta-base</span></code>, <code class="docutils literal notranslate"><span class="pre">xlm-roberta-base</span></code>, <code class="docutils literal notranslate"><span class="pre">google-electra-base-generator</span></code> and <code class="docutils literal notranslate"><span class="pre">google-electra-base-discriminator</span></code>.</p>
+</section>
+</section>
+</section>
+<section id="c">
+<h2>C++<a class="headerlink" href="#c" title="Permalink to this headline"></a></h2>
+<p>To work with libtorch, C++ library of PyTorch, Intel® Extension for PyTorch* provides its C++ dynamic library as well. The C++ library is supposed to handle inference workload only, such as service deployment. For regular development, use the Python interface. Unlike using libtorch, no specific code changes are required, except for converting input data into channels last data format. Compilation follows the recommended methodology with CMake. Detailed instructions can be found in <a class="reference external" href="https://pytorch.org/tutorials/advanced/cpp_export.html#depending-on-libtorch-and-building-the-application">PyTorch tutorial</a>.</p>
+<p>During compilation, Intel optimizations will be activated automatically once C++ dynamic library of Intel® Extension for PyTorch* is linked.</p>
+<p>The example code below works for all data types.</p>
+<p><strong>example-app.cpp</strong></p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;torch/script.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;memory&gt;</span><span class="cp"></span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">argv</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">script</span><span class="o">::</span><span class="n">Module</span><span class="w"> </span><span class="k">module</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">]);</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">c10</span><span class="o">::</span><span class="n">Error</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;error loading the model</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">IValue</span><span class="o">&gt;</span><span class="w"> </span><span class="n">inputs</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// make sure input data are converted to channels last format</span>
+<span class="w">    </span><span class="n">inputs</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">ones</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">}).</span><span class="n">to</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">MemoryFormat</span><span class="o">::</span><span class="n">ChannelsLast</span><span class="p">));</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">at</span><span class="o">::</span><span class="n">Tensor</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">module</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">inputs</span><span class="p">).</span><span class="n">toTensor</span><span class="p">();</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p><strong>CMakeLists.txt</strong></p>
+<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nb">cmake_minimum_required</span><span class="p">(</span><span class="s">VERSION</span> <span class="s">3.0</span> <span class="s">FATAL_ERROR</span><span class="p">)</span>
+<span class="nb">project</span><span class="p">(</span><span class="s">example-app</span><span class="p">)</span>
+
+<span class="nb">find_package</span><span class="p">(</span><span class="s">intel_ext_pt_cpu</span> <span class="s">REQUIRED</span><span class="p">)</span>
+
+<span class="nb">add_executable</span><span class="p">(</span><span class="s">example-app</span> <span class="s">example-app.cpp</span><span class="p">)</span>
+<span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">example-app</span> <span class="s2">&quot;${TORCH_LIBRARIES}&quot;</span><span class="p">)</span>
+
+<span class="nb">set_property</span><span class="p">(</span><span class="s">TARGET</span> <span class="s">example-app</span> <span class="s">PROPERTY</span> <span class="s">CXX_STANDARD</span> <span class="s">14</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Command for compilation</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ cmake -DCMAKE_PREFIX_PATH<span class="o">=</span>&lt;LIBPYTORCH_PATH&gt; ..
+$ make
+</pre></div>
+</div>
+<p>If <em>Found INTEL_EXT_PT_CPU</em> is shown as <em>TRUE</em>, the extension had been linked into the binary. This can be verified with Linux command <em>ldd</em>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ cmake -DCMAKE_PREFIX_PATH<span class="o">=</span>/workspace/libtorch ..
+-- The C compiler identification is GNU <span class="m">9</span>.3.0
+-- The CXX compiler identification is GNU <span class="m">9</span>.3.0
+-- Check <span class="k">for</span> working C compiler: /usr/bin/cc
+-- Check <span class="k">for</span> working C compiler: /usr/bin/cc -- works
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - <span class="k">done</span>
+-- Detecting C compile features
+-- Detecting C compile features - <span class="k">done</span>
+-- Check <span class="k">for</span> working CXX compiler: /usr/bin/c++
+-- Check <span class="k">for</span> working CXX compiler: /usr/bin/c++ -- works
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - <span class="k">done</span>
+-- Detecting CXX compile features
+-- Detecting CXX compile features - <span class="k">done</span>
+-- Looking <span class="k">for</span> pthread.h
+-- Looking <span class="k">for</span> pthread.h - found
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking <span class="k">for</span> pthread_create <span class="k">in</span> pthreads
+-- Looking <span class="k">for</span> pthread_create <span class="k">in</span> pthreads - not found
+-- Looking <span class="k">for</span> pthread_create <span class="k">in</span> pthread
+-- Looking <span class="k">for</span> pthread_create <span class="k">in</span> pthread - found
+-- Found Threads: TRUE
+-- Found Torch: /workspace/libtorch/lib/libtorch.so
+-- Found INTEL_EXT_PT_CPU: TRUE
+-- Configuring <span class="k">done</span>
+-- Generating <span class="k">done</span>
+-- Build files have been written to: /workspace/build
+
+$ ldd example-app
+        ...
+        libtorch.so <span class="o">=</span>&gt; /workspace/libtorch/lib/libtorch.so <span class="o">(</span>0x00007f3cf98e0000<span class="o">)</span>
+        libc10.so <span class="o">=</span>&gt; /workspace/libtorch/lib/libc10.so <span class="o">(</span>0x00007f3cf985a000<span class="o">)</span>
+        libintel-ext-pt-cpu.so <span class="o">=</span>&gt; /workspace/libtorch/lib/libintel-ext-pt-cpu.so <span class="o">(</span>0x00007f3cf70fc000<span class="o">)</span>
+        libtorch_cpu.so <span class="o">=</span>&gt; /workspace/libtorch/lib/libtorch_cpu.so <span class="o">(</span>0x00007f3ce16ac000<span class="o">)</span>
+        ...
+        libdnnl_graph.so.0 <span class="o">=</span>&gt; /workspace/libtorch/lib/libdnnl_graph.so.0 <span class="o">(</span>0x00007f3cde954000<span class="o">)</span>
+        ...
+</pre></div>
+</div>
+</section>
+<section id="model-zoo">
+<h2>Model Zoo<a class="headerlink" href="#model-zoo" title="Permalink to this headline"></a></h2>
+<p>Use cases that had already been optimized by Intel engineers are available at <a class="reference external" href="https://github.com/IntelAI/models/tree/pytorch-r1.12-models">Model Zoo for Intel® Architecture</a>. A bunch of PyTorch use cases for benchmarking are also available on the <a class="reference external" href="https://github.com/IntelAI/models/tree/pytorch-r1.12-models/benchmarks#pytorch-use-cases">GitHub page</a>. You can get performance benefits out-of-box by simply running scipts in the Model Zoo.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-left" title="Installation Guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="performance.html" class="btn btn-neutral float-right" title="Performance" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

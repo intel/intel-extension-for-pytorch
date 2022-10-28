@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Runtime Extension (Experimental) &mdash; intel_extension_for_pytorch 1.11.200+cpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Intel® Extension for PyTorch* optimizations for quantization (Experimental)" href="int8.html" />
+    <link rel="prev" title="Optimizer Fusion" href="optimizer_fusion.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../../versions.html">1.11.200+cpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ease-of-use-python-api">Ease-of-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-optimization">Graph Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#operator-optimization">Operator Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#runtime-extension-experimental">Runtime Extension (Experimental)</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Runtime Extension (Experimental)</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#requirements">Requirements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#use-cases">Use Cases</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#example-of-multi-stream-module">Example of multi Stream Module</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#example-of-python-api-without-task">Example of Python API without Task</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#use-the-decorator">Use the decorator</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#use-the-with-context">Use the <code class="docutils literal notranslate"><span class="pre">with</span></code> context</a></li>
+</ul>
+</li>
+<li class="toctree-l5"><a class="reference internal" href="#example-of-python-api-with-task">Example of Python API with Task</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#native-implementation-without-runtime-api">Native Implementation without runtime API</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#implementation-with-runtime-api">Implementation with runtime API</a></li>
+</ul>
+</li>
+<li class="toctree-l5"><a class="reference internal" href="#example-of-c-api-without-task">Example of C++ API without Task</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#example-of-c-api-with-task">Example of C++ API with Task</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#detail-design">Detail Design</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#how-the-core-binding-is-implemented">How the core binding is implemented</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#design-of-task">Design of Task</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#iomp-preload-or-load-during-the-runtime">IOMP preload or load during the runtime</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#int8-quantization-experimental">INT8 Quantization (Experimental)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../features.html">Features</a> &raquo;</li>
+      <li>Runtime Extension (Experimental)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/runtime_extension.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="runtime-extension-experimental">
+<h1>Runtime Extension (Experimental)<a class="headerlink" href="#runtime-extension-experimental" title="Permalink to this headline"></a></h1>
+<p>Intel® Extension for PyTorch* Runtime Extension provides a couple of PyTorch frontend APIs for users to get finer-grained control of the thread runtime. It provides</p>
+<ol class="simple">
+<li><p>Multi-stream inference via the Python frontend module MultiStreamModule.</p></li>
+<li><p>Spawn asynchronous tasks from both Python and C++ frontend.</p></li>
+<li><p>Configure core bindings for OpenMP threads from both Python and C++ frontend.</p></li>
+</ol>
+<p>Please <strong>note</strong>: Intel® Extension for PyTorch* Runtime extension is still in the <strong>POC</strong> stage. The API is subject to change. More detailed descriptions are available at <a class="reference external" href="../api_doc.html">API Documentation page</a>.</p>
+<section id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Permalink to this headline"></a></h2>
+<p>Intel® Extension for PyTorch* Runtime Extension relies on <code class="docutils literal notranslate"><span class="pre">iomp</span></code> to bind threads to cores. If you want to use it in your application, please run models with extra flag: <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD=$LD_PRELOAD:$PATH/libiomp5.so</span>&#160; <span class="pre">python</span> <span class="pre">model_script.py</span></code>.</p>
+</section>
+<section id="use-cases">
+<h2>Use Cases<a class="headerlink" href="#use-cases" title="Permalink to this headline"></a></h2>
+<section id="example-of-multi-stream-module">
+<h3>Example of multi Stream Module<a class="headerlink" href="#example-of-multi-stream-module" title="Permalink to this headline"></a></h3>
+<p>Runtime extension support weight-sharing multi-stream inference on CPU. You just need to convert the original model into multi stream object and run the new multi stream object as normal.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> creates streams with numbers based on input parameter <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>. If the number of cores inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code> is divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>, the CPU cores in <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code> will be allocated equally to each stream. If the number of cores inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code> is not divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> with remainder N, one extra core will be allocated to the first N streams. Similarly, the input tensor with batch size B will be allocated equally to each stream if divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>, otherwise the first N streams will be allocated with extra input.</p>
+<p>There are 2 motivations to use the <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code>:</p>
+<ol class="simple">
+<li><p>Better Cache locality: With <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code>, the activations will be limited in the CPU cores allocated to this stream instead of the whole cpu_pool.</p></li>
+<li><p>Reduce the OMP sync overhead: if one CPU core allocated to one stream, the whole execution needs to do OMP sync once after all streams finish execution instead of sync per layer. Thus, <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> may benefit performance for inference of throughput mode.</p></li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">SimpleNet</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">SimpleNet</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">stride</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">start_dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">y</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">SimpleNet</span><span class="p">()</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+<span class="c1"># Convert the model into multi_Stream_model</span>
+<span class="n">cpu_pool</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">CPUPool</span><span class="p">(</span><span class="n">node_id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">multi_Stream_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">MultiStreamModule</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">num_streams</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">cpu_pool</span><span class="o">=</span><span class="n">cpu_pool</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">multi_Stream_model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="example-of-python-api-without-task">
+<h3>Example of Python API without Task<a class="headerlink" href="#example-of-python-api-without-task" title="Permalink to this headline"></a></h3>
+<p>Runtime Extension provides API of <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch.cpu.runtime.pin</span></code> to a CPU Pool for binding physical cores. We can use it without the async task feature. There are 2 different ways to use <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch.cpu.runtime.pin</span></code>: use <code class="docutils literal notranslate"><span class="pre">decorator</span></code> or use <code class="docutils literal notranslate"><span class="pre">with</span></code> context.</p>
+<section id="use-the-decorator">
+<h4>Use the decorator<a class="headerlink" href="#use-the-decorator" title="Permalink to this headline"></a></h4>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">SimpleNet</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">SimpleNet</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">stride</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">start_dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">y</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">SimpleNet</span><span class="p">()</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+<span class="n">cpu_pool</span> <span class="o">=</span> <span class="n">intel_extension_for_pytorch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">CPUPool</span><span class="p">(</span><span class="n">node_id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="nd">@intel_extension_for_pytorch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">pin</span><span class="p">(</span><span class="n">cpu_pool</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">test</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="n">y_runtime</span> <span class="o">=</span> <span class="n">test</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+
+<span class="n">y</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">y_runtime</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="use-the-with-context">
+<h4>Use the <code class="docutils literal notranslate"><span class="pre">with</span></code> context<a class="headerlink" href="#use-the-with-context" title="Permalink to this headline"></a></h4>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">SimpleNet</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">SimpleNet</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">stride</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">start_dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">y</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">SimpleNet</span><span class="p">()</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+<span class="n">cpu_pool</span> <span class="o">=</span> <span class="n">intel_extension_for_pytorch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">CPUPool</span><span class="p">(</span><span class="n">node_id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">intel_extension_for_pytorch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">pin</span><span class="p">(</span><span class="n">cpu_pool</span><span class="p">):</span>
+    <span class="n">y_runtime</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="n">y</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">y_runtime</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="example-of-python-api-with-task">
+<h3>Example of Python API with Task<a class="headerlink" href="#example-of-python-api-with-task" title="Permalink to this headline"></a></h3>
+<p>Here is an example about how to use the Python API, suppose you have 2 modules to run.</p>
+<ul class="simple">
+<li><p>In native implementation, you will run these 2 modules one by one in sequence.</p></li>
+<li><p>With the support of runtime API, you can run these 2 modules simultaneously. Each modules runs on the corresponding cpu pool.</p></li>
+</ul>
+<section id="native-implementation-without-runtime-api">
+<h4>Native Implementation without runtime API<a class="headerlink" href="#native-implementation-without-runtime-api" title="Permalink to this headline"></a></h4>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="k">class</span> <span class="nc">SimpleNet</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">SimpleNet</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">stride</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">start_dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">y</span>
+
+<span class="n">x1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+<span class="n">x2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">SimpleNet</span><span class="p">()</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">y1</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">x1</span><span class="p">)</span>
+<span class="n">y2</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">x2</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="implementation-with-runtime-api">
+<h4>Implementation with runtime API<a class="headerlink" href="#implementation-with-runtime-api" title="Permalink to this headline"></a></h4>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+
+<span class="k">class</span> <span class="nc">SimpleNet</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">SimpleNet</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">stride</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">start_dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">y</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">SimpleNet</span><span class="p">()</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+
+<span class="c1"># Create the cpu pool and numa aware memory allocator</span>
+<span class="n">cpu_pool1</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">CPUPool</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+<span class="n">cpu_pool2</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">CPUPool</span><span class="p">([</span><span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">])</span>
+
+<span class="n">task1</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">Task</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">cpu_pool1</span><span class="p">)</span>
+<span class="n">task2</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">Task</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">cpu_pool2</span><span class="p">)</span>
+
+<span class="n">y1_future</span> <span class="o">=</span> <span class="n">task1</span><span class="p">(</span><span class="n">x1</span><span class="p">)</span>
+<span class="n">y2_future</span> <span class="o">=</span> <span class="n">task2</span><span class="p">(</span><span class="n">x2</span><span class="p">)</span>
+
+<span class="n">y1</span> <span class="o">=</span> <span class="n">y1_future</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+<span class="n">y2</span> <span class="o">=</span> <span class="n">y2_future</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>You will need to run the script with command <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD=$LD_PRELOAD:$PATH/libiomp5.so</span> <span class="pre">python</span> <span class="pre">test.py</span></code>.</p>
+<p><strong>Note</strong>: you need to preload <code class="docutils literal notranslate"><span class="pre">Intel</span> <span class="pre">OMP</span> <span class="pre">library</span></code> if you build Intel® Extension for PyTorch* with Runtime API support. <code class="docutils literal notranslate"><span class="pre">Intel</span> <span class="pre">OMP</span> <span class="pre">library</span></code> generally will be installed with anaconda. So, you can preload <code class="docutils literal notranslate"><span class="pre">libiomp5.so</span></code> in your conda environment.</p>
+</section>
+</section>
+<section id="example-of-c-api-without-task">
+<h3>Example of C++ API without Task<a class="headerlink" href="#example-of-c-api-without-task" title="Permalink to this headline"></a></h3>
+<p>The runtime extension provides purely C++ API without async Task.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#include &lt;torch/torch.h&gt;</span>
+<span class="c1">#include &quot;torch_ipex/csrc/cpu/runtime/CPUPool.h&quot;</span>
+
+<span class="n">at</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">input_tensor</span> <span class="o">=</span> <span class="n">at</span><span class="p">::</span><span class="n">rand</span><span class="p">({</span><span class="mi">100</span><span class="p">,</span> <span class="mi">8276</span><span class="p">});</span>
+<span class="n">std</span><span class="p">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">int32_t</span><span class="o">&gt;</span> <span class="n">cpu_core_list</span><span class="p">({</span><span class="mi">0</span><span class="p">});</span>
+<span class="n">torch_ipex</span><span class="p">::</span><span class="n">runtime</span><span class="p">::</span><span class="n">CPUPool</span> <span class="n">cpu_pool</span><span class="p">(</span><span class="n">cpu_core_list</span><span class="p">);</span>
+<span class="p">{</span>
+    <span class="n">torch_ipex</span><span class="p">::</span><span class="n">runtime</span><span class="p">::</span><span class="n">WithCPUPool</span> <span class="n">with_cpu_pool</span><span class="p">(</span><span class="n">std</span><span class="p">::</span><span class="n">move</span><span class="p">(</span><span class="n">cpu_pool</span><span class="p">));</span>
+    <span class="n">auto</span> <span class="n">res</span> <span class="o">=</span> <span class="n">at</span><span class="p">::</span><span class="n">softmax</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="example-of-c-api-with-task">
+<h3>Example of C++ API with Task<a class="headerlink" href="#example-of-c-api-with-task" title="Permalink to this headline"></a></h3>
+<p>The runtime extension also provides purely C++ API with async Task.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#include &lt;torch/torch.h&gt;</span>
+<span class="c1">#include &quot;TaskExecutor.h&quot;</span>
+<span class="c1">#include &quot;Task.h&quot;</span>
+
+<span class="o">//</span> <span class="n">Encapulate</span> <span class="n">your</span> <span class="n">application</span> <span class="n">into</span> <span class="n">a</span> <span class="n">task</span> <span class="n">function</span>
+<span class="n">at</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">taskfunction</span><span class="p">(</span><span class="n">at</span><span class="p">::</span><span class="n">Tensor</span> <span class="nb">input</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">at</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">output</span><span class="p">;</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">at</span><span class="p">::</span><span class="n">softmax</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">);</span>
+    <span class="k">return</span> <span class="nb">input</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">//</span> <span class="n">Create</span> <span class="n">TaskExecutor</span>
+<span class="n">std</span><span class="p">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">int32_t</span><span class="o">&gt;</span> <span class="n">cpu_core_list</span><span class="p">({</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">});</span>
+<span class="n">std</span><span class="p">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">TaskExecutor</span><span class="o">&gt;</span> <span class="n">task_executor</span> <span class="o">=</span> <span class="n">std</span><span class="p">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">TaskExecutor</span><span class="o">&gt;</span><span class="p">(</span><span class="n">cpu_core_list</span><span class="p">);</span>
+<span class="o">//</span> <span class="n">Create</span> <span class="n">Task</span>
+<span class="n">Task</span><span class="o">&lt;</span><span class="n">at</span><span class="p">::</span><span class="n">Tensor</span> <span class="p">(</span><span class="o">*</span><span class="p">)(</span><span class="n">at</span><span class="p">::</span><span class="n">Tensor</span><span class="p">),</span> <span class="n">at</span><span class="p">::</span><span class="n">Tensor</span><span class="o">&gt;</span> <span class="n">task</span><span class="p">(</span><span class="n">taskfunction</span><span class="p">,</span> <span class="n">task_executor</span><span class="p">);</span>
+
+<span class="o">//</span> <span class="n">Create</span> <span class="nb">input</span>
+<span class="n">at</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">input_tensor</span> <span class="o">=</span> <span class="n">at</span><span class="p">::</span><span class="n">rand</span><span class="p">({</span><span class="mi">100</span><span class="p">,</span> <span class="mi">8276</span><span class="p">});</span>
+
+<span class="o">//</span> <span class="n">Submit</span> <span class="n">task</span> <span class="n">into</span> <span class="n">TaskExecutor</span>
+<span class="n">auto</span> <span class="n">res_future</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">std</span><span class="p">::</span><span class="n">move</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">));</span>
+
+<span class="o">//</span> <span class="n">Block</span> <span class="n">until</span> <span class="n">finish</span> <span class="n">executation</span> <span class="ow">and</span> <span class="n">get</span> <span class="n">the</span> <span class="n">result</span>
+<span class="n">auto</span> <span class="n">res</span> <span class="o">=</span> <span class="n">res_future</span><span class="o">.</span><span class="n">get</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="detail-design">
+<h2>Detail Design<a class="headerlink" href="#detail-design" title="Permalink to this headline"></a></h2>
+<section id="how-the-core-binding-is-implemented">
+<h3>How the core binding is implemented<a class="headerlink" href="#how-the-core-binding-is-implemented" title="Permalink to this headline"></a></h3>
+<p>The Runtime Extension relies on the <code class="docutils literal notranslate"><span class="pre">kmp_*</span></code> API inside <code class="docutils literal notranslate"><span class="pre">iomp</span></code> share library to fulfill the core binding. The idea is that during the initialization of async threads, <code class="docutils literal notranslate"><span class="pre">kmp_*</span></code> API functions are invoked internally to start up an openmp group with specified number of worker threads. Each worker thread is then bound to the designated physical core(s) inside this openmp group. After initialization, any time you submit a task, the openmp group will serve the requested task.</p>
+</section>
+<section id="design-of-task">
+<h3>Design of Task<a class="headerlink" href="#design-of-task" title="Permalink to this headline"></a></h3>
+<p>Task is an abstraction of computation based on PyTorch module and is scheduled asynchronously. When a task with specific <code class="docutils literal notranslate"><span class="pre">nn.Module</span></code>, <code class="docutils literal notranslate"><span class="pre">jit</span> <span class="pre">module</span></code> or <code class="docutils literal notranslate"><span class="pre">C++</span> <span class="pre">function</span></code> is created, a sub-thread which is bound to this task initialized. During the initialization, an openmp worker group is created and bound to this sub-thread. After initialization, the sub-thread spins to wait input. When the main thread submits an input to this task, the sub-thread will wake up and execute the input. The main thread returns a <code class="docutils literal notranslate"><span class="pre">FutureTensor</span></code> and not block until an explicit <code class="docutils literal notranslate"><span class="pre">FutureTensor.get()</span></code> invoking to get the results executed in sub-thread.</p>
+</section>
+<section id="iomp-preload-or-load-during-the-runtime">
+<h3>IOMP preload or load during the runtime<a class="headerlink" href="#iomp-preload-or-load-during-the-runtime" title="Permalink to this headline"></a></h3>
+<p>Since Runtime Extension rely on the APIs from IOMP, we need to preload IOMP before executing the application. And we want Intel® Extension for PyTorch* default build with Runtime API enabled, which means it should work fine w/o loading IOMP if user didn’t use the runtime API.</p>
+<p>Here we choose to <code class="docutils literal notranslate"><span class="pre">dlopen</span></code> IOMP library during runtime. And we ensure the IOMP symbols initialized once globally.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="optimizer_fusion.html" class="btn btn-neutral float-left" title="Optimizer Fusion" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="int8.html" class="btn btn-neutral float-right" title="Intel® Extension for PyTorch* optimizations for quantization (Experimental)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

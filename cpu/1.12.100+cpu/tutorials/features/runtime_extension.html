@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Runtime Extension &mdash; intel_extension_for_pytorch 1.12.100 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Intel® Extension for PyTorch* optimizations for quantization" href="int8.html" />
+    <link rel="prev" title="Split SGD" href="split_sgd.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../../versions.html">1.12.100+cpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ease-of-use-python-api">Ease-of-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#isa-dynamic-dispatching">ISA Dynamic Dispatching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-optimization">Graph Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#operator-optimization">Operator Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#runtime-extension">Runtime Extension</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Runtime Extension</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#requirements">Requirements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#use-cases">Use Cases</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#example-of-multistream-module">Example of MultiStream Module</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#examples1-basic-usage">Examples1: Basic Usage</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#examples2-usage-with-auto-setting">Examples2: Usage with “AUTO” setting</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#examples3-usage-for-models-with-structure-inputs-outputs">Examples3: Usage for models with structure inputs/outputs</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#performance-recipes">Performance recipes</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#known-issues">Known issues</a></li>
+</ul>
+</li>
+<li class="toctree-l5"><a class="reference internal" href="#example-of-asynchronous-task">Example of asynchronous task</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#example-of-configuring-core-binding">Example of configuring core binding</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#detail-design">Detail Design</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#how-the-core-binding-is-implemented">How the core binding is implemented</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#design-of-task">Design of Task</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#iomp-preload-or-load-during-the-runtime">IOMP preload or load during the runtime</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#int8-quantization">INT8 Quantization</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../features.html">Features</a> &raquo;</li>
+      <li>Runtime Extension</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/runtime_extension.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="runtime-extension">
+<h1>Runtime Extension<a class="headerlink" href="#runtime-extension" title="Permalink to this headline"></a></h1>
+<p>Intel® Extension for PyTorch* Runtime Extension provides a couple of PyTorch frontend APIs for users to get finer-grained control of the thread runtime. It provides:</p>
+<ol class="simple">
+<li><p>Multi-stream inference via the Python frontend module <code class="docutils literal notranslate"><span class="pre">ipex.cpu.runtime.MultiStreamModule</span></code>.</p></li>
+<li><p>Spawn asynchronous tasks via the Python frontend module <code class="docutils literal notranslate"><span class="pre">ipex.cpu.runtime.Task</span></code>.</p></li>
+<li><p>Program core bindings for OpenMP threads via the Python frontend <code class="docutils literal notranslate"><span class="pre">ipex.cpu.runtime.pin</span></code>.</p></li>
+</ol>
+<p><strong>note</strong>: Intel® Extension for PyTorch* Runtime extension is in the <strong>experimental</strong> stage. The API is subject to change. More detailed descriptions are available at <a class="reference internal" href="../api_doc.html">API Documentation page</a>.</p>
+<section id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Permalink to this headline"></a></h2>
+<p>Intel® Extension for PyTorch* Runtime Extension relies on <code class="docutils literal notranslate"><span class="pre">intel</span> <span class="pre">omp</span></code> to bind threads to cores. If you want to use it in your application, start model script with an extra flag: <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD=$LD_PRELOAD:$PATH/libiomp5.so</span> <span class="pre">python</span> <span class="pre">model_script.py</span></code>.</p>
+</section>
+<section id="use-cases">
+<h2>Use Cases<a class="headerlink" href="#use-cases" title="Permalink to this headline"></a></h2>
+<section id="example-of-multistream-module">
+<h3>Example of MultiStream Module<a class="headerlink" href="#example-of-multistream-module" title="Permalink to this headline"></a></h3>
+<p>Runtime extension supports weight-sharing multi-stream inference for throughput mode on CPU. You need to convert the original model into multi-stream model and run the new multi-stream model as normal. The detailed description of parameters to create <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> is available at <a class="reference internal" href="../api_doc.html">API Documentation page</a>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> can improve performance for inference in throughput mode. We suggest creating <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> with <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> of “AUTO”, which heuristically decides the number of streams. Usually, it provides a reasonable performance. However, it may not be optimal for some cases (refer to the section <a class="reference external" href="#performance-recipes">Performance recipes</a> for details). Manual tuning for number of streams is needed.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> creates number of streams based on input parameter <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> and bind cores to stream based on input parameter <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code>. If the number of cores inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code> is divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>, the cores will be allocated equally to each stream. If the number of cores inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code> is not divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> with remainder N, one extra core will be allocated to the first N streams. We suggest to set the <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> as divisor of core number inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code>.</p>
+<p>If the inputs’ batchsize is larger than and divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>, the batchsize will be allocated equally to each stream. If batchsize is not divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> with remainder N, one extra piece will be allocated to the first N streams. If the inputs’ batchsize is less than <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>, only the first batchsize’s streams are used with mini batch as one. We suggest to set inputs’ batchsize larger than and divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>. When creating <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code>, if you leave num of streams as “AUTO”, we suggest to set inputs’ batchsize larger than and divisible by number of cores.</p>
+<p>Let’s create some ExampleNets that will be used by further examples:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+
+<span class="k">class</span> <span class="nc">ExampleNet1</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">ExampleNet1</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">stride</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">start_dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">y</span>
+
+<span class="k">class</span> <span class="nc">ExampleNet2</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">ExampleNet2</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">stride</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">stride</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">):</span>
+        <span class="n">y1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x1</span><span class="p">)</span>
+        <span class="n">y2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv2</span><span class="p">(</span><span class="n">x2</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">y1</span><span class="p">,</span> <span class="n">start_dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">y1</span><span class="p">,</span> <span class="n">y</span>
+
+<span class="n">model1</span> <span class="o">=</span> <span class="n">ExampleNet1</span><span class="p">()</span>
+<span class="n">model1</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">traced_model1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model1</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+    <span class="n">traced_model1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">traced_model1</span><span class="p">)</span>
+
+<span class="n">model2</span> <span class="o">=</span> <span class="n">ExampleNet2</span><span class="p">()</span>
+<span class="n">model2</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">x2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">traced_model2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model2</span><span class="p">,</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x2</span><span class="p">))</span>
+    <span class="n">traced_model2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">traced_model2</span><span class="p">)</span>
+</pre></div>
+</div>
+<section id="examples1-basic-usage">
+<h4>Examples1: Basic Usage<a class="headerlink" href="#examples1-basic-usage" title="Permalink to this headline"></a></h4>
+<p>Here is the example of a model with single tensor input/output. We create a CPUPool with all the cores available on numa node 0. And creating a <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> with stream number of 2 to do inference.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Convert the model into multi_Stream_model</span>
+<span class="n">cpu_pool</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">CPUPool</span><span class="p">(</span><span class="n">node_id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">multi_Stream_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">MultiStreamModule</span><span class="p">(</span><span class="n">traced_model1</span><span class="p">,</span> <span class="n">num_streams</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">cpu_pool</span><span class="o">=</span><span class="n">cpu_pool</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">multi_Stream_model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="examples2-usage-with-auto-setting">
+<h4>Examples2: Usage with “AUTO” setting<a class="headerlink" href="#examples2-usage-with-auto-setting" title="Permalink to this headline"></a></h4>
+<p>When creating a <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code>, we have default settings for <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> (”AUTO”) and <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code> (with all the cores available on numa node 0). For the <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> of “AUTO”, there are limitations to use with int8 datatype as we mentioned in below performance receipts section.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Convert the model into multi_Stream_model</span>
+<span class="n">multi_Stream_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">MultiStreamModule</span><span class="p">(</span><span class="n">traced_model1</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">multi_Stream_model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="examples3-usage-for-models-with-structure-inputs-outputs">
+<h4>Examples3: Usage for models with structure inputs/outputs<a class="headerlink" href="#examples3-usage-for-models-with-structure-inputs-outputs" title="Permalink to this headline"></a></h4>
+<p>For module such as ExampleNet2 with structure input/output tensors, user needs to create <code class="docutils literal notranslate"><span class="pre">MultiStreamModuleHint</span></code> as input hint and output hint. <code class="docutils literal notranslate"><span class="pre">MultiStreamModuleHint</span></code> tells <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> how to auto split the input into streams and concat the output from each steam.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Convert the model into multi_Stream_model</span>
+<span class="n">cpu_pool</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">CPUPool</span><span class="p">(</span><span class="n">node_id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="c1"># Create the input hint object</span>
+<span class="n">input_hint</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">MultiStreamModuleHint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="c1"># Create the output hint object</span>
+<span class="c1"># When Python module has multi output tensors, it will be auto pack into a tuple, So we pass a tuple(0, 0) to create the output_hint</span>
+<span class="n">output_hint</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">MultiStreamModuleHint</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+<span class="n">multi_Stream_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">MultiStreamModule</span><span class="p">(</span><span class="n">traced_model2</span><span class="p">,</span>
+                                                        <span class="n">num_streams</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                                                        <span class="n">cpu_pool</span><span class="o">=</span><span class="n">cpu_pool</span><span class="p">,</span>
+                                                        <span class="n">input_split_hint</span><span class="o">=</span><span class="n">input_hint</span><span class="p">,</span>
+                                                        <span class="n">output_concat_hint</span><span class="o">=</span><span class="n">output_hint</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">multi_Stream_model</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x2</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="performance-recipes">
+<h4>Performance recipes<a class="headerlink" href="#performance-recipes" title="Permalink to this headline"></a></h4>
+<p>There are two motivations to use the <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code>:</p>
+<ol class="simple">
+<li><p>Better cache locality: With <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code>, the activations will be limited in the CPU cores allocated to this stream instead of the whole cpu_pool.</p></li>
+<li><p>Reduce the OMP sync overhead: if one CPU core allocated to one stream, the whole execution needs to do OMP sync once after all streams finish execution instead of sync per layer.</p></li>
+</ol>
+<p>Thus, <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> may benefit performance for inference in throughput mode. However, the end-to-end performance is impacted by these issues:</p>
+<ol class="simple">
+<li><p>The kernels’ efficiency, which are different under different OMP threads’ number.</p></li>
+<li><p>The overhead of inputs’ auto split and outputs’ auto concat for each stream.</p></li>
+<li><p>The overhead of pthread (stream async execution) wakes up and threads’ synchronization after stream execution.</p></li>
+</ol>
+<p>Here are some performance receipes that we recommend for better multi-stream performance.</p>
+<ul class="simple">
+<li><p>When creating <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> with <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code> as imperative path module, each stream inside <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> suffers the GIL issue when doing inference together. This hurts end-to-end performance. We recommend creating <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> with the <code class="docutils literal notranslate"><span class="pre">torch.jit.ScriptModule</span></code>.</p></li>
+<li><p>For convolution network, <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code> has the quick path getting convolution primitive to mitigate overhead when <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span></code> is the same between the <code class="docutils literal notranslate"><span class="pre">torch.jit.trace</span></code> and model execution phases. To use this quick path for better performance, we recommend setting the <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span></code> environment before launching the model script. The recommended value of <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span></code> should equal the threads number used by each stream. For example, creating <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> as stream number <code class="docutils literal notranslate"><span class="pre">s1</span></code> and CPUPool with core number <code class="docutils literal notranslate"><span class="pre">c1</span></code>, each stream will allocate threads number as <code class="docutils literal notranslate"><span class="pre">c1/s1</span></code>. We recommend setting <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span></code> as this value.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Numactl</span></code> and the threads management in <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> work at different levels. <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> has the thread affinity setting for each stream, which works in the thread level. However, for the Python modules outside the stream, such as the dataloader, are out of view for <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code>. As the result, we recommend using <code class="docutils literal notranslate"><span class="pre">numactl</span> <span class="pre">-C</span> <span class="pre">core_ids</span> <span class="pre">-m</span> <span class="pre">node_id</span></code> for the process level core and memory resource management. For the core resource setting by <code class="docutils literal notranslate"><span class="pre">numactl</span></code>, set it the same or superset of the core resource to create <code class="docutils literal notranslate"><span class="pre">CPUPool</span></code>. Otherwise, the behavior is undefined in current implementation.</p></li>
+</ul>
+</section>
+<section id="known-issues">
+<h4>Known issues<a class="headerlink" href="#known-issues" title="Permalink to this headline"></a></h4>
+<ul class="simple">
+<li><p>Intel® Extension for PyTorch* runtime extension feature with Int8 data type does not support dynamic shape well. To avoid performance issues, we recommend setting the batchsize to do <code class="docutils literal notranslate"><span class="pre">jit.trace</span></code> with same mini batchsize used by each stream. For example, creating <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> as stream number of <code class="docutils literal notranslate"><span class="pre">s1</span></code> and input global batchsize as <code class="docutils literal notranslate"><span class="pre">gb</span></code>, each stream will inference with mini-batchsize of <code class="docutils literal notranslate"><span class="pre">gb/s1</span></code>. We should use this mini-batchsize value to do <code class="docutils literal notranslate"><span class="pre">jit.trace</span></code>. To be aware of the <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> value, we recommend creating <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> with <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> setting explicitly instead of “AUTO”. Due to the same limitation, the behavior that each stream inference with different mini batchsize of int8 data type is undefined and not supported.</p></li>
+</ul>
+</section>
+</section>
+<section id="example-of-asynchronous-task">
+<h3>Example of asynchronous task<a class="headerlink" href="#example-of-asynchronous-task" title="Permalink to this headline"></a></h3>
+<p>Here is an example for using asynchronous tasks. With the support of a runtime API, you can run 2 modules simultaneously. Each module runs on the corresponding cpu pool.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cpu_pool1</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">CPUPool</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+<span class="n">cpu_pool2</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">CPUPool</span><span class="p">([</span><span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">])</span>
+
+<span class="n">task1</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">Task</span><span class="p">(</span><span class="n">traced_model1</span><span class="p">,</span> <span class="n">cpu_pool1</span><span class="p">)</span>
+<span class="n">task2</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">Task</span><span class="p">(</span><span class="n">traced_model1</span><span class="p">,</span> <span class="n">cpu_pool2</span><span class="p">)</span>
+
+<span class="n">y1_future</span> <span class="o">=</span> <span class="n">task1</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="n">y2_future</span> <span class="o">=</span> <span class="n">task2</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="n">y1</span> <span class="o">=</span> <span class="n">y1_future</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+<span class="n">y2</span> <span class="o">=</span> <span class="n">y2_future</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="example-of-configuring-core-binding">
+<h3>Example of configuring core binding<a class="headerlink" href="#example-of-configuring-core-binding" title="Permalink to this headline"></a></h3>
+<p>Runtime Extension provides API of <code class="docutils literal notranslate"><span class="pre">ipex.cpu.runtime.pin</span></code> to a CPU Pool for binding physical cores. We can use it without the async task feature. Here is the example to use <code class="docutils literal notranslate"><span class="pre">ipex.cpu.runtime.pin</span></code> in the <code class="docutils literal notranslate"><span class="pre">with</span></code> context.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cpu_pool</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">CPUPool</span><span class="p">(</span><span class="n">node_id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">ipex</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">pin</span><span class="p">(</span><span class="n">cpu_pool</span><span class="p">):</span>
+    <span class="n">y_runtime</span> <span class="o">=</span> <span class="n">traced_model1</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="detail-design">
+<h2>Detail Design<a class="headerlink" href="#detail-design" title="Permalink to this headline"></a></h2>
+<section id="how-the-core-binding-is-implemented">
+<h3>How the core binding is implemented<a class="headerlink" href="#how-the-core-binding-is-implemented" title="Permalink to this headline"></a></h3>
+<p>The Runtime Extension relies on the <code class="docutils literal notranslate"><span class="pre">kmp_*</span></code> API inside <code class="docutils literal notranslate"><span class="pre">iomp</span></code> share library to fulfill the core binding. During the initialization of async threads, <code class="docutils literal notranslate"><span class="pre">kmp_*</span></code> API functions are invoked internally to start up an OpenMP group with specified number of worker threads. Each worker thread is then bound to the designated physical core(s) inside this OpenMP group. After initialization, when you submit a task, the OpenMP group will serve the requested task.</p>
+</section>
+<section id="design-of-task">
+<h3>Design of Task<a class="headerlink" href="#design-of-task" title="Permalink to this headline"></a></h3>
+<p>Task is an abstraction of computation based on PyTorch module and is scheduled asynchronously. When a task is created with specific <code class="docutils literal notranslate"><span class="pre">nn.Module</span></code> or <code class="docutils literal notranslate"><span class="pre">jit</span> <span class="pre">module</span></code>, a sub-thread is initialized and bound to this task. During the initialization, an OpenMP worker group is created and bound to this sub-thread. After initialization, the sub-thread waits for input. When the main thread submits an input to this task, the sub-thread will wake up and execute the input. The main thread returns a <code class="docutils literal notranslate"><span class="pre">FutureTensor</span></code> and is not block until an explicit <code class="docutils literal notranslate"><span class="pre">FutureTensor.get()</span></code> is invoked to get the results executed in the sub-thread.</p>
+</section>
+<section id="iomp-preload-or-load-during-the-runtime">
+<h3>IOMP preload or load during the runtime<a class="headerlink" href="#iomp-preload-or-load-during-the-runtime" title="Permalink to this headline"></a></h3>
+<p>Since Runtime Extension relies on the APIs from IOMP, we need to preload IOMP before executing the application. We want Intel® Extension for PyTorch* built with Runtime API enabled. This means it should work fine without loading IOMP if the user didn’t use the runtime API. Here we choose to <code class="docutils literal notranslate"><span class="pre">dlopen</span></code> IOMP library during runtime and we ensure the IOMP symbols are initialized once globally.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="split_sgd.html" class="btn btn-neutral float-left" title="Split SGD" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="int8.html" class="btn btn-neutral float-right" title="Intel® Extension for PyTorch* optimizations for quantization" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

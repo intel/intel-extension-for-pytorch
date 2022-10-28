@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Graph Optimization &mdash; intel_extension_for_pytorch 1.10.100+cpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Split SGD" href="split_sgd.html" />
+    <link rel="prev" title="Auto Mixed Precision (AMP)" href="amp.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../../versions.html">1.10.100+cpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ease-of-use-python-api">Ease-of-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#graph-optimization">Graph Optimization</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Graph Optimization</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#fusion">Fusion</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#fp32-and-bf16-fusion-patterns">FP32 and BF16 fusion patterns</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#int8-fusion-patterns">INT8 fusion patterns</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#folding">Folding</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ease-of-use-graph-optimization-api">Ease-of-use graph optimization API</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#fp32-and-bf16-models">FP32 and BF16 models</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#int8-models">INT8 models</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#operator-optimization">Operator Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#runtime-extension-experimental">Runtime Extension (Experimental)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#int8-quantization-experimental">INT8 Quantization (Experimental)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../features.html">Features</a> &raquo;</li>
+      <li>Graph Optimization</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/graph_optimization.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="graph-optimization">
+<h1>Graph Optimization<a class="headerlink" href="#graph-optimization" title="Permalink to this headline"></a></h1>
+<p>Most Deep Learning models could be described as DAG(directed acyclic graph). Therefore, how to optimize a deep learning model from graph perspective is a nature thinking. Compared to the operator optimization and algorithm optimization, the graph optimization is at more high level. It convers not only the graph self but also the runtime. From the operator perspective, the graph optimization contains the operator fusing, the constant folding. From the runtime perspective, the graph optimization contains the operator scheduling, the computation resources management, the memory mangement.</p>
+<p>Currently, the Intel Extension for PyTorch focuses on the operator related graph optimizations. Regarding the runtime related optimization, the extension also provides some experiment features. Please refer to the runtime extension for more details about runtime optimization.</p>
+<section id="fusion">
+<h2>Fusion<a class="headerlink" href="#fusion" title="Permalink to this headline"></a></h2>
+<section id="fp32-and-bf16-fusion-patterns">
+<h3>FP32 and BF16 fusion patterns<a class="headerlink" href="#fp32-and-bf16-fusion-patterns" title="Permalink to this headline"></a></h3>
+<ul class="simple">
+<li><p>Conv2D + ReLU</p></li>
+<li><p>Conv2D + SUM</p></li>
+<li><p>Conv2D + SUM + ReLU</p></li>
+<li><p>Conv2D + Sigmoid</p></li>
+<li><p>Conv2D + Sigmoid + MUL</p></li>
+<li><p>Conv2D + HardTanh</p></li>
+<li><p>Conv2D + SiLU</p></li>
+<li><p>Conv2D + ELU</p></li>
+<li><p>Conv3D + ReLU</p></li>
+<li><p>Conv3D + SUM</p></li>
+<li><p>Conv3D + SUM + ReLU</p></li>
+<li><p>Conv3D + SiLU</p></li>
+<li><p>Linear + ReLU</p></li>
+<li><p>Linear + GELU</p></li>
+<li><p>Add + LayerNorm</p></li>
+<li><p>Div + Add + Softmax</p></li>
+<li><p>Linear + Linear + Linear</p></li>
+<li><p>View + Transpose + Contiguous + View</p></li>
+</ul>
+</section>
+<section id="int8-fusion-patterns">
+<h3>INT8 fusion patterns<a class="headerlink" href="#int8-fusion-patterns" title="Permalink to this headline"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">ipex.quantization.convert(model,</span> <span class="pre">conf,</span> <span class="pre">inputs)</span></code> API will convert an FP32 <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code> to a quantized JIT ScriptModule according to the given quantization recipes.</p>
+<p>For example, for a FP32 model of one single convolution, the graph before and after conversion will be:
+<img alt="image" src="../../_images/int8_pattern.png" /></p>
+<p>The oneDNN graph backend will select <code class="docutils literal notranslate"><span class="pre">dequantize</span></code> and <code class="docutils literal notranslate"><span class="pre">convolution</span></code> into one partition. During execution, this partition will execute a convolution with int8 as input and fp32 as output.</p>
+<p>Here listed all the currently supported int8 patterns in Intel® Extension for PyTorch* using oneDNN graph backend:</p>
+<ol class="simple">
+<li><p>Patterns with int8 as input and fp32 as output:</p></li>
+</ol>
+<ul class="simple">
+<li><p>dequant -&gt; conv</p></li>
+<li><p>dequant -&gt; linear</p></li>
+<li><p>dequant -&gt; conv -&gt; relu</p></li>
+<li><p>dequant -&gt; conv -&gt; sum</p></li>
+<li><p>dequant -&gt; conv -&gt; sum -&gt; relu</p></li>
+<li><p>dequant -&gt; linear -&gt; relu</p></li>
+<li><p>dequant -&gt; linear -&gt; gelu</p></li>
+<li><p>dequant -&gt; linear -&gt; sigmoid</p></li>
+<li><p>dequant -&gt; linear -&gt; sum</p></li>
+<li><p>dequant -&gt; bmm</p></li>
+<li><p>dequant -&gt; bmm -&gt; div</p></li>
+</ul>
+<ol class="simple">
+<li><p>Patterns with int8 as input and int8 as output:</p></li>
+</ol>
+<ul class="simple">
+<li><p>dequant -&gt; conv -&gt; quant</p></li>
+<li><p>dequant -&gt; linear -&gt; quant</p></li>
+<li><p>dequant -&gt; conv -&gt; relu -&gt; quant</p></li>
+<li><p>dequant -&gt; conv -&gt; sum -&gt; dequant</p></li>
+<li><p>dequant -&gt; conv -&gt; sum -&gt; relu -&gt; quant</p></li>
+<li><p>dequant -&gt; linear -&gt; relu -&gt; quant</p></li>
+<li><p>dequant -&gt; linear -&gt; gelu -&gt; quant</p></li>
+<li><p>dequant -&gt; linear -&gt; sigmoid -&gt; quant</p></li>
+<li><p>dequant -&gt; linear -&gt; sum -&gt; quant</p></li>
+<li><p>dequant -&gt; bmm -&gt; quant</p></li>
+<li><p>dequant -&gt; bmm -&gt; div -&gt; quant</p></li>
+<li><p>dequant -&gt; max_pool2d -&gt; quant</p></li>
+</ul>
+</section>
+</section>
+<section id="folding">
+<h2>Folding<a class="headerlink" href="#folding" title="Permalink to this headline"></a></h2>
+<p>Stock PyTorch has provided the constant propagation and BatchNormalization folding. And these optimizations will be automatically applied to the jit model by invoking <code class="docutils literal notranslate"><span class="pre">torch.jit.freeze</span></code>. Take the Resnet50 as the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="s2">&quot;resnet50 &quot;</span><span class="p">](</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">check_trace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+    <span class="c1"># Fold the BatchNormalization and propagate constant</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+    <span class="c1"># Print the graph</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">graph_for</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>If the model owner does not invoke the <code class="docutils literal notranslate"><span class="pre">torch.jit.freeze</span></code>, the <code class="docutils literal notranslate"><span class="pre">BatchNormalization</span></code> still exists on the graph. Otheriwse, the <code class="docutils literal notranslate"><span class="pre">BatchNormalization</span></code> will be folded on the graph to save the compuation and then improve the performance. Please refer to the https://en.wikipedia.org/wiki/Constant_folding for more details.</p>
+</section>
+<section id="ease-of-use-graph-optimization-api">
+<h2>Ease-of-use graph optimization API<a class="headerlink" href="#ease-of-use-graph-optimization-api" title="Permalink to this headline"></a></h2>
+<p>The graph optimizations of Intel® Extension for PyTorch* are enabled by default. Users could disable it by calling:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipex</span><span class="o">.</span><span class="n">enable_onednn_fusion</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<section id="fp32-and-bf16-models">
+<h3>FP32 and BF16 models<a class="headerlink" href="#fp32-and-bf16-models" title="Permalink to this headline"></a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+
+<span class="c1"># Import the Intel Extension for PyTorch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="s2">&quot;resnet50 &quot;</span><span class="p">](</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+
+<span class="c1"># Apply some fusions at the front end</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">check_trace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+    <span class="c1"># Fold the BatchNormalization and propagate constant</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+    <span class="c1"># Print the graph</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">graph_for</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Compared the original code, the model launcher just needs to add few lines of code, the extension will automatically acceletate the  model. Regarding the RN50, the extension will automatically fuse the Conv + ReLU and Conv + Sum + ReLU as ConvReLU and ConvSumReLU. If you check the output of <code class="docutils literal notranslate"><span class="pre">graph_for</span></code>, you will observe the fused operators.</p>
+</section>
+<section id="int8-models">
+<h3>INT8 models<a class="headerlink" href="#int8-models" title="Permalink to this headline"></a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>import torch
+import intel_extension_for_pytorch as ipex
+
+
+# First-time quantization flow 
+# define the model 
+def MyModel(torch.nn.Module): 
+  … 
+
+# construct the model 
+model = MyModel(…) 
+conf = ipex.QuantConf(dtype=torch.int8) 
+model, conf = ipex.quantization.prepare(model, conf) 
+for images in calibration_data_loader(): 
+  with ipex.quantization.calibrate(conf): # here, conf is in/out, populated with observed statistics 
+    model(images) 
+conf.save(‘int8_conf.json’, default_recipe=True) # optional: save the configuration for later use 
+model = ipex.quantization.convert(model, conf, sample_image) 
+
+# run the model 
+output = model(images) 
+
+# Deployment 
+import intel_pytorch_extension as ipex 
+conf = ipex.QuantConf(‘int8_conf.json’) 
+model = ipex.quantization.convert(model, conf, sample_image) 
+output = model(images) 
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="amp.html" class="btn btn-neutral float-left" title="Auto Mixed Precision (AMP)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="split_sgd.html" class="btn btn-neutral float-right" title="Split SGD" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
