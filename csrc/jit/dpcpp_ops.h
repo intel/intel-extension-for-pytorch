@@ -18,7 +18,7 @@ struct TypeSelector {
   }
 
   template <typename... Args>
-  void extract_type(T type, Args... args) {
+  void extract_type(T& type, Args... args) {
     container_.push_back(type);
     extract_type(args...);
   }
@@ -44,11 +44,19 @@ struct JitFusionProxy {
     RECORD_FUNCTION(str, std::vector<c10::IValue>({args...}));
     TypeSelector<at::Tensor, sizeof...(args)> selector;
     selector.extract_type(args...);
-    // std::vector<at::Tensor> guard_vars;
-    // tensor_extractor(guard_vars, args...);
+    auto iter = std::find(to_plain_list_.begin(), to_plain_list_.end(), str);
+    if (iter != to_plain_list_.end()) {
+      std::for_each(
+          selector.retrive_types().begin(),
+          selector.retrive_types().end(),
+          AtenIpexTypeXPU::to_plain_if_needed_);
+    }
     const OptionalDeviceGuard device_guard(device_of(selector.retrive_types()));
     return func(args...);
   }
+  const std::vector<std::string> to_plain_list_ = {
+      "xpu::softplus_tanh",
+      "xpu::softplus_tanh_mul"};
 };
 
 at::Tensor dequant_pixelshuffle(const at::Tensor& self, int64_t upscale_factor);
