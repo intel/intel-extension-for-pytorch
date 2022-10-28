@@ -53,7 +53,7 @@ class TestTorchMethod(TestCase):
         a = torch.tensor([10], dtype=dtype, device=device).geometric_(0.5)
         self.assertEqual(a.dtype, dtype)
         self.assertEqual(a.size(), torch.Size([1]))
-
+    
     @pytest.mark.skip()
     @repeat_test_for_types([*all_types_and(torch.half, torch.bfloat16)])
     def test_geometric_kstest(self, dtype):
