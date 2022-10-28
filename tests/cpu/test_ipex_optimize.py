@@ -298,7 +298,10 @@ class TestOptimizeCases(TestCase):
                 self.assertTrue(isinstance(opt_M.linear, torch.nn.Linear))
                 self.assertTrue(isinstance(opt_M.conv, torch.nn.Conv2d))
             else:
-                self.assertTrue(isinstance(opt_M.linear, _IPEXLinear))
+                if not auto_kernel_selection and dtype == torch.float32:
+                    self.assertTrue(isinstance(opt_M.linear, torch.nn.Linear))
+                else:
+                    self.assertTrue(isinstance(opt_M.linear, _IPEXLinear))
                 self.assertTrue(isinstance(opt_M.conv, _IPEXConv2d))
 
     def test_record_shape(self):
