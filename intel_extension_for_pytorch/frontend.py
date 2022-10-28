@@ -1,6 +1,7 @@
 import copy
 
 import torch
+import torch._dynamo
 import torch.fx.experimental.optimization as optimization
 from torch.jit._trace import TracerWarning
 import warnings
@@ -161,10 +162,9 @@ class GraphCapture(object):
                             except:
                                 try:
                                     # JIT trace failed, try torchdynamo with JIT trace backend.
-                                    import torchdynamo
-                                    torchdynamo.reset()
-                                    torchdynamo.config.dynamic_shapes = True
-                                    dynamo_model = torchdynamo.optimize(compiler)(self.model)
+                                    torch._dynamo.reset()
+                                    torch._dynamo.config.dynamic_shapes = True
+                                    dynamo_model = torch._dynamo.optimize(compiler)(self.model)
                                     output = dynamo_model(*input, **kwargs)
                                     self.model = dynamo_model
                                     self.method = RunMethods.TorchDynamo
