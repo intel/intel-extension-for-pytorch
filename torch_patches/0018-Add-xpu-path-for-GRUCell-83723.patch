@@ -1,7 +1,7 @@
-From a5e977e098aa8540bd38c8f98a9d219c38d4c578 Mon Sep 17 00:00:00 2001
+From 8cb9ef591b00cde9e3b86c69f6885b3dc2aa6257 Mon Sep 17 00:00:00 2001
 From: zhuyuhua-v <yuhua.zhu@intel.com>
 Date: Thu, 15 Sep 2022 06:01:14 +0000
-Subject: [PATCH 18/28] Add xpu path for GRUCell (#83723)
+Subject: [PATCH 18/29] Add xpu path for GRUCell (#83723)
 
 Add xpu path for GRUCell.
 We supported a new kernel named _thnn_fused_gru_cell to fuse the small ops of GRU.

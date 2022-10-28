@@ -1,7 +1,7 @@
-From cf1d0d7fbb0123db56ca6f327913fc26175da0b2 Mon Sep 17 00:00:00 2001
+From bacc541a8e3b5e76bb9d199ad5053fbfad371627 Mon Sep 17 00:00:00 2001
 From: Feng Yuan <feng1.yuan@intel.com>
 Date: Tue, 14 Jun 2022 04:34:19 +0000
-Subject: [PATCH 11/28] hook XPU device in _get_available_device_type (#76167)
+Subject: [PATCH 11/29] hook XPU device in _get_available_device_type (#76167)
 
 Signed-off-by: Feng Yuan <feng1.yuan@intel.com>
 

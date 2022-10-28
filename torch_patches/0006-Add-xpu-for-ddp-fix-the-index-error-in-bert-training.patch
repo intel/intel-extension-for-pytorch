@@ -1,7 +1,7 @@
-From 9a60b998821f8f5ea8547ea28a80c2be1f74c875 Mon Sep 17 00:00:00 2001
+From 6dfa23760cf6ea94496d73f9f25bddd90b5a5e3c Mon Sep 17 00:00:00 2001
 From: zhuhong61 <95205772+zhuhong61@users.noreply.github.com>
 Date: Tue, 1 Mar 2022 14:24:08 +0800
-Subject: [PATCH 06/28] Add xpu for ddp (fix the index error in bert training)
+Subject: [PATCH 06/29] Add xpu for ddp (fix the index error in bert training)
  (#27)
 
 ---

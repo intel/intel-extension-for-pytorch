@@ -1,7 +1,7 @@
-From 15f6266ed17163137cde82fe3251895b5c4f69e6 Mon Sep 17 00:00:00 2001
+From 0d3a8f0099f0d4b89714c3dc5c6a8daa1ff97be1 Mon Sep 17 00:00:00 2001
 From: cchheennhhaaoo <hao3.chen@intel.com>
 Date: Tue, 21 Jun 2022 18:16:02 +0000
-Subject: [PATCH 17/28] Enhance negative operator for SYCL half conversion
+Subject: [PATCH 17/29] Enhance negative operator for SYCL half conversion
  (#79850)
 
 Enhance negative operator for SYCL half conversion with sycl::bit_cast implementation.

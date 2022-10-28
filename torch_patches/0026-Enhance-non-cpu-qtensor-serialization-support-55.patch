@@ -1,7 +1,7 @@
-From 9fe3df49765b9f2c369ae71e2f59be37ac1267b7 Mon Sep 17 00:00:00 2001
+From d10eb61985c9933ac6d7f33c69f324a21d55fb8b Mon Sep 17 00:00:00 2001
 From: Zhiwei <532707544@qq.com>
 Date: Fri, 30 Sep 2022 17:30:59 +0800
-Subject: [PATCH 26/28] Enhance non-cpu qtensor serialization support (#55)
+Subject: [PATCH 26/29] Enhance non-cpu qtensor serialization support (#55)
 
 * Use empty_quantized for pickling int8 tensor
 * Add fake size setting when unpickling qtensor

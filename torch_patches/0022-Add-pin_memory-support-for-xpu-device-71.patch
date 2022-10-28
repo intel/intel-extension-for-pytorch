@@ -1,7 +1,7 @@
-From 0110cf11e48503d451b7ea442e502b784a647e63 Mon Sep 17 00:00:00 2001
+From d161e1f48b83e50b3b17f6507983027b81eca425 Mon Sep 17 00:00:00 2001
 From: leizhenyuan <110007460+leizhenyuan@users.noreply.github.com>
 Date: Sun, 9 Oct 2022 14:57:07 +0800
-Subject: [PATCH 22/28] Add pin_memory support for xpu device (#71)
+Subject: [PATCH 22/29] Add pin_memory support for xpu device (#71)
 
 ---
  torch/utils/data/_utils/pin_memory.py | 43 ++++++++++++++++++--------

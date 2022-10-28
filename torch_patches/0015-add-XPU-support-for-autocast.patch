@@ -1,7 +1,7 @@
-From aec56017e82751974621a50a86b2daa4b2069c80 Mon Sep 17 00:00:00 2001
+From cb7dff4081efa473bc01a289528b0a76b13b3e0a Mon Sep 17 00:00:00 2001
 From: Guo Yejun <yejun.guo@intel.com>
 Date: Tue, 19 Apr 2022 21:18:23 +0000
-Subject: [PATCH 15/28] add XPU support for autocast
+Subject: [PATCH 15/29] add XPU support for autocast
 
 Pull Request resolved: https://github.com/pytorch/pytorch/pull/75250
 Approved by: https://github.com/bdhirsh

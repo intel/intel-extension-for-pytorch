@@ -1,7 +1,7 @@
-From e3e3a887f1e2fe1a2c5ceb1530b1c79b2a5e9beb Mon Sep 17 00:00:00 2001
+From 7748266f4f48490e3699bafe2c016c4cae5fc8a4 Mon Sep 17 00:00:00 2001
 From: Feng Yuan <feng1.yuan@intel.com>
 Date: Mon, 21 Mar 2022 14:23:28 -0700
-Subject: [PATCH 05/28] adjust conditions to enable jit decomposition pass only
+Subject: [PATCH 05/29] adjust conditions to enable jit decomposition pass only
  for GPU device (#73637)
 
 Summary:

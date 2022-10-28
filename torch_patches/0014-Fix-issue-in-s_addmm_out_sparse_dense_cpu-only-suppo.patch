@@ -1,7 +1,7 @@
-From f2d1c428fc3253258efc19eb113c5fee0340881c Mon Sep 17 00:00:00 2001
+From c18edebfcc61c619eddebcef3585ac3118e2d6ff Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Sat, 7 May 2022 10:35:29 +0000
-Subject: [PATCH 14/28] Fix issue in s_addmm_out_sparse_dense_cpu only
+Subject: [PATCH 14/29] Fix issue in s_addmm_out_sparse_dense_cpu only
  supporting CUDA device checking (#77018)
 
 ## Motivation

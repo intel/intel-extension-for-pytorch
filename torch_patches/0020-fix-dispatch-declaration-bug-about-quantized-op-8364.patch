@@ -1,7 +1,7 @@
-From 56e5c2e5b1f52d88b8bdd62a543c3bbe98488311 Mon Sep 17 00:00:00 2001
+From 7eef126e4b9dfa928c7e6d07226fcbc5b7f61887 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Thu, 1 Sep 2022 11:53:32 +0000
-Subject: [PATCH 20/28] fix dispatch declaration bug about quantized op
+Subject: [PATCH 20/29] fix dispatch declaration bug about quantized op
  (#83649)
 
 # Motivation:

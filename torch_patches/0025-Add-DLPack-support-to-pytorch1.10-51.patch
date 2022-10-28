@@ -1,7 +1,7 @@
-From 22ed90006bff32ed1ef8953dd31142accbf5a662 Mon Sep 17 00:00:00 2001
+From e4c1b86c67e50321a4a337314cd1766fd35489a3 Mon Sep 17 00:00:00 2001
 From: chengjunlu <chengjun.lu@intel.com>
 Date: Thu, 2 Jun 2022 15:15:21 +0800
-Subject: [PATCH 25/28] Add DLPack support to pytorch1.10 (#51)
+Subject: [PATCH 25/29] Add DLPack support to pytorch1.10 (#51)
 
 ---
  aten/src/ATen/Context.h                    |  8 ++

@@ -1,7 +1,7 @@
-From 25375ad8d6ac880b3bfc280db55093513718f1a9 Mon Sep 17 00:00:00 2001
+From 41e64554afb24fe9a640c2ccaeb60a486fb575d1 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Thu, 1 Sep 2022 22:22:25 +0000
-Subject: [PATCH 19/28] Define the SYCL device version assertation used in the
+Subject: [PATCH 19/29] Define the SYCL device version assertation used in the
  other backend, like XPU (#84106)
 
 # Motivation:

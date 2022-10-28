@@ -1,7 +1,7 @@
-From 105791248a2371919eb97185d9dc2bdd4c4b9ea3 Mon Sep 17 00:00:00 2001
+From fe56d332005ee91d53d1bc4637230a8871c8e1b3 Mon Sep 17 00:00:00 2001
 From: Ye Ting <ting.ye@intel.com>
 Date: Mon, 25 Jul 2022 12:01:33 +0800
-Subject: [PATCH 28/28] Add caveat for build failure in README (#54)
+Subject: [PATCH 28/29] Add caveat for build failure in README (#54)
 
 * Add cavert for build failure
 

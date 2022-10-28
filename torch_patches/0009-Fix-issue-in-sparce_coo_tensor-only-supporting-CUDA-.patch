@@ -1,7 +1,7 @@
-From 09a779feae2c14ef309e5057229cce4ed7bbf5df Mon Sep 17 00:00:00 2001
+From b9e72d6682aa24d5d6cc9dccda6f594ca1ead0fc Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Tue, 26 Apr 2022 00:56:10 +0000
-Subject: [PATCH 09/28] Fix issue in sparce_coo_tensor only supporting CUDA
+Subject: [PATCH 09/29] Fix issue in sparce_coo_tensor only supporting CUDA
  device.
 
 ## Motivation

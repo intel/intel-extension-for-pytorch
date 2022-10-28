@@ -1,7 +1,7 @@
-From 5ebd3b668f51c06bff0a4ef13a1981fb74ff4023 Mon Sep 17 00:00:00 2001
+From db0dc278a6146784de98c4f2be55fff6129e2dad Mon Sep 17 00:00:00 2001
 From: Guo Yejun <yejun.guo@intel.com>
 Date: Mon, 14 Mar 2022 12:01:37 +0800
-Subject: [PATCH 23/28] Properly import LooseVersion (#69904) (#33)
+Subject: [PATCH 23/29] Properly import LooseVersion (#69904) (#33)
 
 cherry-pick 07767569c964552702bf374da753212eb9cde327, with conflict
 fixed in test, to fix issue with higher version of setuptools 60.9.3

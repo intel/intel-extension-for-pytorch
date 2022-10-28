@@ -1,7 +1,7 @@
-From cb74c4cd746dbb00bea80d76a57bf9599eb67caf Mon Sep 17 00:00:00 2001
+From 766d076aa6eac62685ef3e7b57758203f67130d8 Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Tue, 31 May 2022 17:39:18 +0000
-Subject: [PATCH 13/28] Register the extension device module as a native module
+Subject: [PATCH 13/29] Register the extension device module as a native module
  under torch namespace (#78329)
 
 ## Motivation

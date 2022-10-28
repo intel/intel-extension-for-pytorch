@@ -1,7 +1,7 @@
-From 15ed3e894b3d11f67d4ee7d3e6d94696674d40fb Mon Sep 17 00:00:00 2001
+From 63d675b1f5ac3112ef3a0445e4376abfcbb95ea5 Mon Sep 17 00:00:00 2001
 From: Jinghui <jinghui.gu@intel.com>
 Date: Mon, 25 Jul 2022 12:01:01 +0800
-Subject: [PATCH 16/28] Add fused addmm path in linear for contiguous 3D input
+Subject: [PATCH 16/29] Add fused addmm path in linear for contiguous 3D input
  (#72728) (#57)
 
 Summary:
