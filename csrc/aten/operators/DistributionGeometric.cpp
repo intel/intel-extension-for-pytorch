@@ -18,7 +18,7 @@ void geometric_scalar_dpcpp(
     c10::optional<Generator> gen_) {
   auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
       gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
