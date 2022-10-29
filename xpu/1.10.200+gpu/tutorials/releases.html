@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Releases &mdash; intel_extension_for_pytorch 1.10.200+gpu documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Installation Guide" href="installation.html" />
+    <link rel="prev" title="Simple Trace Tool [EXPERIMENTAL]" href="features/simple_trace.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../versions.html">1.10.200+gpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Releases</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#gpu">1.10.200+gpu</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#highlights">Highlights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#known-issues">Known Issues</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Releases</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/releases.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="releases">
+<h1>Releases<a class="headerlink" href="#releases" title="Permalink to this heading"></a></h1>
+<section id="gpu">
+<h2>1.10.200+gpu<a class="headerlink" href="#gpu" title="Permalink to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* v1.10.200+gpu extends PyTorch* 1.10 with up-to-date features and optimizations on XPU for an extra performance boost on Intel Graphics cards. XPU is a user visible device that is a counterpart of the well-known CPU and CUDA in the PyTorch* community. XPU represents an Intel-specific kernel and graph optimizations for various “concrete” devices. The XPU runtime will choose the actual device when executing AI workloads on the XPU device. The default selected device is Intel GPU. XPU kernels from Intel® Extension for PyTorch* are written in <a class="reference external" href="https://github.com/intel/llvm#oneapi-dpc-compiler">DPC++</a> that supports <a class="reference external" href="https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html">SYCL language</a> and also a number of <a class="reference external" href="https://github.com/intel/llvm/tree/sycl/sycl/doc/extensions">DPC++ extensions</a>.</p>
+<section id="highlights">
+<h3>Highlights<a class="headerlink" href="#highlights" title="Permalink to this heading"></a></h3>
+<p>This release introduces specific XPU solution optimizations on Intel® Data Center GPU Flex Series 170. Optimized operators and kernels are implemented and registered through PyTorch* dispatching mechanism for the XPU device. These operators and kernels are accelerated on Intel GPU hardware from the corresponding native vectorization and matrix calculation features. In graph mode, additional operator fusions are supported to reduce operator/kernel invocation overheads, and thus increase performance.</p>
+<p>This release provides the following features:</p>
+<ul class="simple">
+<li><p>Auto Mixed Precision (AMP)</p>
+<ul>
+<li><p>support of AMP with BFloat16 and Float16 optimization of GPU operators</p></li>
+</ul>
+</li>
+<li><p>Channels Last</p>
+<ul>
+<li><p>support of channels_last (NHWC) memory format for most key GPU operators</p></li>
+</ul>
+</li>
+<li><p>DPC++ Extension</p>
+<ul>
+<li><p>mechanism to create PyTorch* operators with custom DPC++ kernels running on the XPU device</p></li>
+</ul>
+</li>
+<li><p>Optimized Fusion</p>
+<ul>
+<li><p>support of SGD/AdamW fusion for both FP32 and BF16 precision</p></li>
+</ul>
+</li>
+</ul>
+<p>This release supports the following fusion patterns in PyTorch* JIT mode:</p>
+<ul class="simple">
+<li><p>Conv2D + ReLU</p></li>
+<li><p>Conv2D + Sum</p></li>
+<li><p>Conv2D + Sum + ReLU</p></li>
+<li><p>Pad + Conv2d</p></li>
+<li><p>Conv2D + SiLu</p></li>
+<li><p>Permute + Contiguous</p></li>
+<li><p>Conv3D + ReLU</p></li>
+<li><p>Conv3D + Sum</p></li>
+<li><p>Conv3D + Sum + ReLU</p></li>
+<li><p>Linear + ReLU</p></li>
+<li><p>Linear + Sigmoid</p></li>
+<li><p>Linear + Div(scalar)</p></li>
+<li><p>Linear + GeLu</p></li>
+<li><p>Linear + GeLu_</p></li>
+<li><p>T + Addmm</p></li>
+<li><p>T + Addmm + ReLu</p></li>
+<li><p>T + Addmm + Sigmoid</p></li>
+<li><p>T + Addmm + Dropout</p></li>
+<li><p>T + Matmul</p></li>
+<li><p>T + Matmul + Add</p></li>
+<li><p>T + Matmul + Add + GeLu</p></li>
+<li><p>T + Matmul + Add + Dropout</p></li>
+<li><p>Transpose + Matmul</p></li>
+<li><p>Transpose + Matmul + Div</p></li>
+<li><p>Transpose + Matmul + Div + Add</p></li>
+<li><p>MatMul + Add</p></li>
+<li><p>MatMul + Div</p></li>
+<li><p>Dequantize + PixelShuffle</p></li>
+<li><p>Dequantize + PixelShuffle + Quantize</p></li>
+<li><p>Mul + Add</p></li>
+<li><p>Add + ReLU</p></li>
+<li><p>Conv2D + Leaky_relu</p></li>
+<li><p>Conv2D + Leaky_relu_</p></li>
+<li><p>Conv2D + Sigmoid</p></li>
+<li><p>Conv2D + Dequantize</p></li>
+<li><p>Softplus + Tanh</p></li>
+<li><p>Softplus + Tanh + Mul</p></li>
+<li><p>Conv2D + Dequantize + Softplus + Tanh + Mul</p></li>
+<li><p>Conv2D + Dequantize + Softplus + Tanh + Mul + Quantize</p></li>
+<li><p>Conv2D + Dequantize + Softplus + Tanh + Mul + Quantize + Add</p></li>
+</ul>
+</section>
+<section id="known-issues">
+<h3>Known Issues<a class="headerlink" href="#known-issues" title="Permalink to this heading"></a></h3>
+<ul>
+<li><p>[CRITICAL ERROR] Kernel ‘XXX’ removed due to usage of FP64 instructions unsupported by the targeted hardware</p>
+<p>FP64 is not natively supported by the <a class="reference external" href="https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html">Intel® Data Center GPU Flex Series</a> platform. If you run any AI workload on that platform and receive this error message, it means a kernel requiring FP64 instructions is removed and not executed, hence the accuracy of the whole workload is wrong.</p>
+</li>
+<li><p>symbol undefined caused by _GLIBCXX_USE_CXX11_ABI</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ImportError: undefined symbol: _ZNK5torch8autograd4Node4nameB5cxx11Ev
+</pre></div>
+</div>
+<p>DPC++ does not support _GLIBCXX_USE_CXX11_ABI=0, Intel® Extension for PyTorch* is always compiled with _GLIBCXX_USE_CXX11_ABI=1. This symbol undefined issue appears when PyTorch* is compiled with _GLIBCXX_USE_CXX11_ABI=0. Update PyTorch* CMAKE file to set _GLIBCXX_USE_CXX11_ABI=1 and compile PyTorch* with particular compiler which supports _GLIBCXX_USE_CXX11_ABI=1. We recommend to use gcc version 9.4.0 on ubuntu 20.04.</p>
+</li>
+<li><p>Can’t find oneMKL library when build Intel® Extension for PyTorch* without oneMKL</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>/usr/bin/ld: cannot find -lmkl_sycl
+/usr/bin/ld: cannot find -lmkl_intel_ilp64
+/usr/bin/ld: cannot find -lmkl_core
+/usr/bin/ld: cannot find -lmkl_tbb_thread
+dpcpp: error: linker <span class="nb">command</span> failed with <span class="nb">exit</span> code <span class="m">1</span> <span class="o">(</span>use -v to see invocation<span class="o">)</span>
+</pre></div>
+</div>
+<p>When PyTorch* is built with oneMKL library and Intel® Extension for PyTorch* is built without oneMKL library, this linker issue may occur. Resolve it by setting:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span> <span class="nv">USE_ONEMKL</span><span class="o">=</span>OFF
+<span class="nb">export</span> <span class="nv">MKL_DPCPP_ROOT</span><span class="o">=</span><span class="si">${</span><span class="nv">PATH_To_Your_oneMKL</span><span class="si">}</span>/__release_lnx/mkl
+</pre></div>
+</div>
+<p>Then clean build Intel® Extension for PyTorch*.</p>
+</li>
+<li><p>undefined symbol: mkl_lapack_dspevd. Intel MKL FATAL ERROR: cannot load libmkl_vml_avx512.so.2 or libmkl_vml_def.so.2</p>
+<p>This issue may occur when Intel® Extension for PyTorch* is built with oneMKL library and PyTorch* is not build with any MKL library. The oneMKL kernel may run into CPU backend incorrectly and trigger this issue. Resolve it by installing MKL library from conda:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda install mkl
+conda install mkl-include
+</pre></div>
+</div>
+<p>then clean build PyTorch*.</p>
+</li>
+<li><p>OSError: libmkl_intel_lp64.so.1: cannot open shared object file: No such file or directory</p>
+<p>Wrong MKL library is used when multiple MKL libraries exist in system. Preload oneMKL by:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span> <span class="nv">LD_PRELOAD</span><span class="o">=</span><span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_intel_lp64.so.1:<span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_intel_ilp64.so.1:<span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_sequential.so.1:<span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_core.so.1:<span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_sycl.so.1
+</pre></div>
+</div>
+<p>If you continue seeing similar issues for other shared object files, add the corresponding files under ${MKL_DPCPP_ROOT}/lib/intel64/ by <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code>. Note that the suffix of the libraries may change (e.g. from .1 to .2), if more than one oneMKL library is installed on the system.</p>
+</li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="features/simple_trace.html" class="btn btn-neutral float-left" title="Simple Trace Tool [EXPERIMENTAL]" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="installation.html" class="btn btn-neutral float-right" title="Installation Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

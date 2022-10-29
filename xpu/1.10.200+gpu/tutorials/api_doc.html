@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Documentation &mdash; intel_extension_for_pytorch 1.10.200+gpu documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Contribution" href="contribution.html" />
+    <link rel="prev" title="Examples" href="examples.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../versions.html">1.10.200+gpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general">General</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#random-number-generator">Random Number Generator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#streams-and-events">Streams and events</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#memory-management">Memory management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#other">Other</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#c-api">C++ API</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>API Documentation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/api_doc.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-documentation">
+<h1>API Documentation<a class="headerlink" href="#api-documentation" title="Permalink to this heading"></a></h1>
+<section id="general">
+<h2>General<a class="headerlink" href="#general" title="Permalink to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.optimize">
+<span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">optimize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'O1'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_bn_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights_prepack</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replace_dropout_with_identity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimize_lstm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">split_master_weight_for_bf16</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fuse_update_step</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_input</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.optimize" title="Permalink to this definition"></a></dt>
+<dd><p>Apply optimizations at Python frontend to the given model (nn.Module), as
+well as the given optimizer (optional). If the optimizer is given,
+optimizations will be applied for training. Otherwise, optimization will be
+applied for inference. Optimizations include <code class="docutils literal notranslate"><span class="pre">conv+bn</span></code> folding (for
+inference only), weight prepacking and so on.</p>
+<p>Weight prepacking is a technique to accelerate performance of oneDNN
+operators. In order to achieve better vectorization and cache reuse, onednn
+uses a specific memory layout called <code class="docutils literal notranslate"><span class="pre">blocked</span> <span class="pre">layout</span></code>. Although the
+calculation itself with <code class="docutils literal notranslate"><span class="pre">blocked</span> <span class="pre">layout</span></code> is fast enough, from memory usage
+perspective it has drawbacks. Running with the <code class="docutils literal notranslate"><span class="pre">blocked</span> <span class="pre">layout</span></code>, oneDNN
+splits one or several dimensions of data into blocks with fixed size each
+time the operator is executed. More details information about oneDNN data
+mermory format is available at <a class="reference external" href="https://oneapi-src.github.io/oneDNN/dev_guide_understanding_memory_formats.html">oneDNN manual</a>.
+To reduce this overhead, data will be converted to predefined block shapes
+prior to the execution of oneDNN operator execution. In runtime, if the data
+shape matches oneDNN operator execution requirements, oneDNN won’t perform
+memory layout conversion but directly go to calculation. Through this
+methodology, called <code class="docutils literal notranslate"><span class="pre">weight</span> <span class="pre">prepacking</span></code>, it is possible to avoid runtime
+weight data format convertion and thus increase performance. It is only for
+inference on XPU.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – User model to apply optimizations on.</p></li>
+<li><p><strong>dtype</strong> (<em>torch.dtype</em>) – Only works for <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code>.
+Model parameters will be casted to <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code> if dtype is set to
+<code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code>. The default value is None, meaning do nothing.
+Note: Data type conversion is only applied to <code class="docutils literal notranslate"><span class="pre">nn.Conv2d</span></code>, <code class="docutils literal notranslate"><span class="pre">nn.Linear</span></code>
+and <code class="docutils literal notranslate"><span class="pre">nn.ConvTranspose2d</span></code> for both training and inference cases. For
+inference mode, additional data type conversion is applied to the weights
+of <code class="docutils literal notranslate"><span class="pre">nn.Embedding</span></code> and <code class="docutils literal notranslate"><span class="pre">nn.LSTM</span></code>.</p></li>
+<li><p><strong>optimizer</strong> (<em>torch.optim.Optimizer</em>) – User optimizer to apply optimizations
+on, such as SGD. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>, meaning inference case.</p></li>
+<li><p><strong>level</strong> (<em>string</em>) – <code class="docutils literal notranslate"><span class="pre">&quot;O0&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;O1&quot;</span></code>. No optimizations are applied with
+<code class="docutils literal notranslate"><span class="pre">&quot;O0&quot;</span></code>. The optimizer function just returns the original model and
+optimizer. With <code class="docutils literal notranslate"><span class="pre">&quot;O1&quot;</span></code>, the following optimizations are applied:
+conv+bn folding, weights prepack, dropout removal (inferenc model),
+master weight split and fused optimizer update step (training model).
+The optimization options can be further overridden by setting the
+following options explicitly. The default value is <code class="docutils literal notranslate"><span class="pre">&quot;O1&quot;</span></code>.</p></li>
+<li><p><strong>TODO</strong> – temp default true for xpu because copy model will add memory pressure</p></li>
+<li><p><strong>inplace</strong> (<em>bool</em>) – Whether to perform inplace optimization. Default value is
+<code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
+<li><p><strong>conv_bn_folding</strong> (<em>bool</em>) – Whether to perform <code class="docutils literal notranslate"><span class="pre">conv_bn</span></code> folding. It only
+works for inference model. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly
+setting this knob overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>weights_prepack</strong> (<em>bool</em>) – Whether to perform weight prepack for convolution
+and linear to avoid oneDNN weights reorder. The default value is
+<code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites the configuration
+set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>replace_dropout_with_identity</strong> (<em>bool</em>) – Whether to replace <code class="docutils literal notranslate"><span class="pre">nn.Dropout</span></code>
+with <code class="docutils literal notranslate"><span class="pre">nn.Identity</span></code>. If replaced, the <code class="docutils literal notranslate"><span class="pre">aten::dropout</span></code> won’t be
+included in the JIT graph. This may provide more fusion opportunites
+on the graph. This only works for inference model. The default value
+is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites the configuration
+set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>TODO</strong> – optimize LSTM is pending</p></li>
+<li><p><strong>optimize_lstm</strong> (<em>bool</em>) – Whether to replace <code class="docutils literal notranslate"><span class="pre">nn.LSTM</span></code> with <code class="docutils literal notranslate"><span class="pre">IPEX</span> <span class="pre">LSTM</span></code>
+which takes advantage of oneDNN kernels to get better performance.
+The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob
+overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>TODO</strong> – split SGD is pending</p></li>
+<li><p><strong>split_master_weight_for_bf16</strong> (<em>bool</em>) – Whether to split master weights
+update for BF16 training. This saves memory comparing to master
+weight update solution. Split master weights update methodology
+doesn’t support all optimizers. The default value is None. The
+default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites
+the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>fuse_update_step</strong> (<em>bool</em>) – Whether to use fused params update for training
+which have better performance. It doesn’t support all optimizers.
+The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob
+overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>sample_input</strong> (<em>tuple</em><em> or </em><em>torch.Tensor</em>) – Whether to feed sample input data
+to ipex.optimize. The shape of input data will impact the block format
+of packed weight. If not feed a sample input, Intel® Extension for PyTorch*
+will pack the weight per some predefined heuristics. If feed a sample
+input with real input shape, Intel® Extension for PyTorch* can get best
+block format.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Model and optimizer (if given) modified according to the <code class="docutils literal notranslate"><span class="pre">level</span></code> knob
+or other user settings. <code class="docutils literal notranslate"><span class="pre">conv+bn</span></code> folding may take place and
+<code class="docutils literal notranslate"><span class="pre">dropout</span></code> may be replaced by <code class="docutils literal notranslate"><span class="pre">identity</span></code>. In inference scenarios,
+convolutuon, linear and lstm will be replaced with the optimized
+counterparts in Intel® Extension for PyTorch* (weight prepack for
+convolution and linear) for good performance. In bfloat16 and float16 scenarios,
+parameters of convolution and linear will be casted to associated dtype.</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Please invoke <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function AFTER loading weights to model via
+<code class="docutils literal notranslate"><span class="pre">model.load_state_dict(torch.load(PATH))</span></code>.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Please invoke <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function BEFORE invoking DDP in distributed
+training scenario.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function deepcopys the original model. If DDP is invoked
+before <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function, DDP is applied on the origin model, rather
+than the one returned from <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function. In this case, some
+operators in DDP, like allreduce, will not be invoked and thus may cause
+unpredictable accuracy loss.</p>
+</div>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 inference case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">PATH</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running evaluation step.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 training case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimizer</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span><span class="p">,</span> <span class="n">optimized_optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running training step.</span>
+</pre></div>
+</div>
+<p><cite>torch.xpu.optimize</cite> is an alternative of optimize API in Intel® Extension for PyTorch*, to provide identical usage for XPU device only.
+The motivation of adding this alias is to unify the coding style in user scripts base on torch.xpu modular.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 inference case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">PATH</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running evaluation step.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 training case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimizer</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span><span class="p">,</span> <span class="n">optimized_optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running training step.</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.current_device">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">current_device</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#torch.xpu.current_device" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the index of a currently selected device.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.current_stream">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">current_stream</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#torch.xpu.Stream" title="torch.xpu.streams.Stream"><span class="pre">Stream</span></a></span></span><a class="headerlink" href="#torch.xpu.current_stream" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the currently selected <a class="reference internal" href="#torch.xpu.Stream" title="torch.xpu.Stream"><code class="xref py py-class docutils literal notranslate"><span class="pre">Stream</span></code></a> for a given device.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+the currently selected <a class="reference internal" href="#torch.xpu.Stream" title="torch.xpu.Stream"><code class="xref py py-class docutils literal notranslate"><span class="pre">Stream</span></code></a> for the current device, given
+by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>, if <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.device"><code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code></a> is <code class="docutils literal notranslate"><span class="pre">None</span></code>
+(default).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch.xpu.device">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">device</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.device" title="Permalink to this definition"></a></dt>
+<dd><p>Context-manager that changes the selected device.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em>) – device index to select. It’s a no-op if
+this argument is a negative integer or <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.device_count">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">device_count</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#torch.xpu.device_count" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the number of XPUs device available.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch.xpu.device_of">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">device_of</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">obj</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.device_of" title="Permalink to this definition"></a></dt>
+<dd><p>Context-manager that changes the current device to that of given object.</p>
+<p>You can use both tensors and storages as arguments. If a given object is
+not allocated on a GPU, this is a no-op.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>obj</strong> (<em>Tensor</em><em> or </em><em>Storage</em>) – object allocated on the selected device.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.getDeviceIdListForCard">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">getDeviceIdListForCard</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">card_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="headerlink" href="#torch.xpu.getDeviceIdListForCard" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the device list of card_id.
+By default, return device list of the card which contains max number of devices.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.get_device_name">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">get_device_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#torch.xpu.get_device_name" title="Permalink to this definition"></a></dt>
+<dd><p>Gets the name of a device.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – device for which to return the
+name. This function is a no-op if this argument is a negative
+integer. It uses the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.device"><code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code></a> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.get_device_properties">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">get_device_properties</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.get_device_properties" title="Permalink to this definition"></a></dt>
+<dd><p>Gets the xpu properties of a device.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – device for which to return the
+device properties. It uses the current device, given by
+<code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>, if <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.device"><code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code></a> is <code class="docutils literal notranslate"><span class="pre">None</span></code>
+(default).</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>the properties of the device</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>_DeviceProperties</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.init">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">init</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.init" title="Permalink to this definition"></a></dt>
+<dd><p>Initialize the XPU’s state. This is a Python API about lazy initialization
+that avoids initializing XPU until the first time it is accessed. You may need
+to call this function explicitly in very rare cases, since IPEX could call
+this initialization automatically when XPU functionality is on-demand.</p>
+<p>Does nothing if call this function repeatedly.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.is_available">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">is_available</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#torch.xpu.is_available" title="Permalink to this definition"></a></dt>
+<dd><p>Returns a bool indicating if XPU is currently available.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.is_initialized">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">is_initialized</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.is_initialized" title="Permalink to this definition"></a></dt>
+<dd><p>Returns whether XPU state has been initialized.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.set_device">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">set_device</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.set_device" title="Permalink to this definition"></a></dt>
+<dd><p>Sets the current device.</p>
+<p>Usage of this function is discouraged in favor of <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.device"><code class="xref any py py-class docutils literal notranslate"><span class="pre">device</span></code></a>. In most
+cases it’s better to use <code class="docutils literal notranslate"><span class="pre">xpu_VISIBLE_DEVICES</span></code> environmental variable.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em>) – selected device. This function is a no-op
+if this argument is negative.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.stream">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">stream</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stream</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.stream" title="Permalink to this definition"></a></dt>
+<dd><p>Context-manager that selects a given stream.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>stream</strong> (<a class="reference internal" href="#torch.xpu.Stream" title="torch.xpu.Stream"><em>Stream</em></a>) – selected stream. This manager is a no-op if it’s
+<code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Streams are per-device. If the selected stream is not on the
+current device, this function will also change the current device to
+match the stream.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.synchronize">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">synchronize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.synchronize" title="Permalink to this definition"></a></dt>
+<dd><p>Waits for all kernels in all streams on a XPU device to complete.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – device for which to synchronize.
+It uses the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.device"><code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code></a> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="random-number-generator">
+<h2>Random Number Generator<a class="headerlink" href="#random-number-generator" title="Permalink to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.get_rng_state">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">get_rng_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">device</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'xpu'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="headerlink" href="#torch.xpu.get_rng_state" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the random number generator state of the specified GPU as a ByteTensor.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – The device to return the RNG state of.
+Default: <code class="docutils literal notranslate"><span class="pre">'xpu'</span></code> (i.e., <code class="docutils literal notranslate"><span class="pre">torch.device('xpu')</span></code>, the current XPU device).</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This function eagerly initializes XPU.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.get_rng_state_all">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">get_rng_state_all</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#torch.xpu.get_rng_state_all" title="Permalink to this definition"></a></dt>
+<dd><p>Returns a list of ByteTensor representing the random number states of all devices.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.set_rng_state">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">set_rng_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">new_state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">device</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'xpu'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.set_rng_state" title="Permalink to this definition"></a></dt>
+<dd><p>Sets the random number generator state of the specified GPU.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>new_state</strong> (<em>torch.ByteTensor</em>) – The desired state</p></li>
+<li><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – The device to set the RNG state.
+Default: <code class="docutils literal notranslate"><span class="pre">'xpu'</span></code> (i.e., <code class="docutils literal notranslate"><span class="pre">torch.device('xpu')</span></code>, the current XPU device).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.set_rng_state_all">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">set_rng_state_all</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">new_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.set_rng_state_all" title="Permalink to this definition"></a></dt>
+<dd><p>Sets the random number generator state of all devices.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>new_states</strong> (<em>Iterable of torch.ByteTensor</em>) – The desired state for each device</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.manual_seed">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">manual_seed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.manual_seed" title="Permalink to this definition"></a></dt>
+<dd><p>Sets the seed for generating random numbers for the current GPU.
+It’s safe to call this function if XPU is not available; in that
+case, it is silently ignored.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>seed</strong> (<em>int</em>) – The desired seed.</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If you are working with a multi-GPU model, this function is insufficient
+to get determinism.  To seed all GPUs, use <a class="reference internal" href="#torch.xpu.manual_seed_all" title="torch.xpu.manual_seed_all"><code class="xref py py-func docutils literal notranslate"><span class="pre">manual_seed_all()</span></code></a>.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.manual_seed_all">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">manual_seed_all</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.manual_seed_all" title="Permalink to this definition"></a></dt>
+<dd><p>Sets the seed for generating random numbers on all GPUs.
+It’s safe to call this function if XPU is not available; in that
+case, it is silently ignored.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>seed</strong> (<em>int</em>) – The desired seed.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.seed">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">seed</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.seed" title="Permalink to this definition"></a></dt>
+<dd><p>Sets the seed for generating random numbers to a random number for the current GPU.
+It’s safe to call this function if XPU is not available; in that
+case, it is silently ignored.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If you are working with a multi-GPU model, this function will only initialize
+the seed on one GPU.  To initialize all GPUs, use <a class="reference internal" href="#torch.xpu.seed_all" title="torch.xpu.seed_all"><code class="xref py py-func docutils literal notranslate"><span class="pre">seed_all()</span></code></a>.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.seed_all">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">seed_all</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.seed_all" title="Permalink to this definition"></a></dt>
+<dd><p>Sets the seed for generating random numbers to a random number on all GPUs.
+It’s safe to call this function if XPU is not available; in that
+case, it is silently ignored.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.initial_seed">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">initial_seed</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#torch.xpu.initial_seed" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the current random seed of the current GPU.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This function eagerly initializes XPU.</p>
+</div>
+</dd></dl>
+
+</section>
+<section id="streams-and-events">
+<h2>Streams and events<a class="headerlink" href="#streams-and-events" title="Permalink to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="torch.xpu.Stream">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">Stream</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">priority</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.Stream" title="Permalink to this definition"></a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="torch.xpu.Stream.record_event">
+<span class="sig-name descname"><span class="pre">record_event</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.Stream.record_event" title="Permalink to this definition"></a></dt>
+<dd><p>Records an event.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>event</strong> (<a class="reference internal" href="#torch.xpu.Event" title="torch.xpu.Event"><em>Event</em></a><em>, </em><em>optional</em>) – event to record. If not given, a new one
+will be allocated.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Recorded event.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch.xpu.Stream.synchronize">
+<span class="sig-name descname"><span class="pre">synchronize</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.Stream.synchronize" title="Permalink to this definition"></a></dt>
+<dd><p>Wait for all the kernels in this stream to complete.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch.xpu.Stream.wait_event">
+<span class="sig-name descname"><span class="pre">wait_event</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.Stream.wait_event" title="Permalink to this definition"></a></dt>
+<dd><p>Makes all future work submitted to the stream wait for an event.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>event</strong> (<a class="reference internal" href="#torch.xpu.Event" title="torch.xpu.Event"><em>Event</em></a>) – an event to wait for.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch.xpu.Stream.wait_stream">
+<span class="sig-name descname"><span class="pre">wait_stream</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stream</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.Stream.wait_stream" title="Permalink to this definition"></a></dt>
+<dd><p>Synchronizes with another stream.</p>
+<p>All future work submitted to this stream will wait until all kernels
+submitted to a given stream at the time of call complete.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>stream</strong> (<a class="reference internal" href="#torch.xpu.Stream" title="torch.xpu.Stream"><em>Stream</em></a>) – a stream to synchronize.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This function returns without waiting for currently enqueued
+kernels in <a class="reference internal" href="#torch.xpu.stream" title="torch.xpu.stream"><code class="xref py py-attr docutils literal notranslate"><span class="pre">stream</span></code></a>: only future operations are affected.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch.xpu.Event">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">Event</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.Event" title="Permalink to this definition"></a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="torch.xpu.Event.elapsed_time">
+<span class="sig-name descname"><span class="pre">elapsed_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">end_event</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.Event.elapsed_time" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the time elapsed in milliseconds after the event was
+recorded and before the end_event was recorded.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch.xpu.Event.query">
+<span class="sig-name descname"><span class="pre">query</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.Event.query" title="Permalink to this definition"></a></dt>
+<dd><p>Checks if all work currently captured by event has completed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>A boolean indicating if all work currently captured by event has
+completed.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch.xpu.Event.record">
+<span class="sig-name descname"><span class="pre">record</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stream</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.Event.record" title="Permalink to this definition"></a></dt>
+<dd><p>Records the event in a given stream.</p>
+<p>Uses <code class="docutils literal notranslate"><span class="pre">torch.xpu.current_stream()</span></code> if no stream is specified.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch.xpu.Event.synchronize">
+<span class="sig-name descname"><span class="pre">synchronize</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.Event.synchronize" title="Permalink to this definition"></a></dt>
+<dd><p>Waits for the event to complete.</p>
+<p>Waits until the completion of all work currently captured in this event.
+This prevents the CPU thread from proceeding until the event completes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch.xpu.Event.wait">
+<span class="sig-name descname"><span class="pre">wait</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stream</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.Event.wait" title="Permalink to this definition"></a></dt>
+<dd><p>Makes all future work submitted to the given stream wait for this
+event.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">torch.xpu.current_stream()</span></code> if no stream is specified.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="memory-management">
+<h2>Memory management<a class="headerlink" href="#memory-management" title="Permalink to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.empty_cache">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">empty_cache</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.empty_cache" title="Permalink to this definition"></a></dt>
+<dd><p>Releases all unoccupied cached memory currently held by the caching
+allocator so that those can be used in other GPU application and visible in
+sysman toolkit.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="xref py py-func docutils literal notranslate"><span class="pre">empty_cache()</span></code> doesn’t increase the amount of GPU
+memory available for PyTorch. However, it may help reduce fragmentation
+of GPU memory in certain cases. See <span class="xref std std-ref">xpu-memory-management</span> for
+more details about GPU memory management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.memory_stats">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">memory_stats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#torch.xpu.memory_stats" title="Permalink to this definition"></a></dt>
+<dd><p>Returns a dictionary of XPU memory allocator statistics for a
+given device.</p>
+<p>The return value of this function is a dictionary of statistics, each of
+which is a non-negative integer.</p>
+<p>Core statistics:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;allocated.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+number of allocation requests received by the memory allocator.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;allocated_bytes.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+amount of allocated memory.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;segment.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+number of reserved segments from <code class="docutils literal notranslate"><span class="pre">xpuMalloc()</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;reserved_bytes.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+amount of reserved memory.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;active.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+number of active memory blocks.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;active_bytes.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+amount of active memory.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;inactive_split.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+number of inactive, non-releasable memory blocks.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;inactive_split_bytes.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+amount of inactive, non-releasable memory.</p></li>
+</ul>
+<p>For these core statistics, values are broken down as follows.</p>
+<p>Pool type:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">all</span></code>: combined statistics across all memory pools.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">large_pool</span></code>: statistics for the large allocation pool
+(as of October 2019, for size &gt;= 1MB allocations).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">small_pool</span></code>: statistics for the small allocation pool
+(as of October 2019, for size &lt; 1MB allocations).</p></li>
+</ul>
+<p>Metric type:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">current</span></code>: current value of this metric.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">peak</span></code>: maximum value of this metric.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">allocated</span></code>: historical total increase in this metric.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">freed</span></code>: historical total decrease in this metric.</p></li>
+</ul>
+<p>In addition to the core statistics, we also provide some simple event
+counters:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;num_alloc_retries&quot;</span></code>: number of failed <code class="docutils literal notranslate"><span class="pre">xpuMalloc</span></code> calls that
+result in a cache flush and retry.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;num_ooms&quot;</span></code>: number of out-of-memory errors thrown.</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistics for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.device"><code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code></a> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <span class="xref std std-ref">xpu-memory-management</span> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.memory_summary">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">memory_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">abbreviated</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#torch.xpu.memory_summary" title="Permalink to this definition"></a></dt>
+<dd><p>Returns a human-readable printout of the current memory allocator
+statistics for a given device.</p>
+<p>This can be useful to display periodically during training, or when
+handling out-of-memory exceptions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+printout for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.device"><code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code></a> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p></li>
+<li><p><strong>abbreviated</strong> (<em>bool</em><em>, </em><em>optional</em>) – whether to return an abbreviated summary
+(default: False).</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <span class="xref std std-ref">xpu-memory-management</span> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.memory_snapshot">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">memory_snapshot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.memory_snapshot" title="Permalink to this definition"></a></dt>
+<dd><p>Returns a snapshot of the XPU memory allocator state across all devices.</p>
+<p>Interpreting the output of this function requires familiarity with the
+memory allocator internals.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <span class="xref std std-ref">xpu-memory-management</span> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.memory_allocated">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">memory_allocated</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#torch.xpu.memory_allocated" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the current GPU memory occupied by tensors in bytes for a given
+device.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistic for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.device"><code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code></a> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is likely less than the amount shown in sysman toolkit since some
+unused memory can be held by the caching allocator and some context
+needs to be created on GPU. See <span class="xref std std-ref">xpu-memory-management</span> for more
+details about GPU memory management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.max_memory_allocated">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">max_memory_allocated</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#torch.xpu.max_memory_allocated" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the maximum GPU memory occupied by tensors in bytes for a given
+device.</p>
+<p>By default, this returns the peak allocated memory since the beginning of
+this program. <code class="xref py py-func docutils literal notranslate"><span class="pre">reset_peak_stats()</span></code> can be used to
+reset the starting point in tracking this metric. For example, these two
+functions can measure the peak allocated memory usage of each iteration in a
+training loop.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistic for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.device"><code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code></a> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <span class="xref std std-ref">xpu-memory-management</span> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.memory_reserved">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">memory_reserved</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#torch.xpu.memory_reserved" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the current GPU memory managed by the caching allocator in bytes
+for a given device.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistic for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.device"><code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code></a> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <span class="xref std std-ref">xpu-memory-management</span> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.max_memory_reserved">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">max_memory_reserved</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#torch.xpu.max_memory_reserved" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the maximum GPU memory managed by the caching allocator in bytes
+for a given device.</p>
+<p>By default, this returns the peak cached memory since the beginning of this
+program. <code class="xref py py-func docutils literal notranslate"><span class="pre">reset_peak_stats()</span></code> can be used to reset
+the starting point in tracking this metric. For example, these two functions
+can measure the peak cached memory amount of each iteration in a training
+loop.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistic for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.device"><code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code></a> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <span class="xref std std-ref">xpu-memory-management</span> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.reset_peak_memory_stats">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">reset_peak_memory_stats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.reset_peak_memory_stats" title="Permalink to this definition"></a></dt>
+<dd><p>Resets the “peak” stats tracked by the XPU memory allocator.</p>
+<p>See <code class="xref py py-func docutils literal notranslate"><span class="pre">memory_stats()</span></code> for details. Peak stats correspond to the
+<cite>“peak”</cite> key in each individual stat dict.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistic for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.device"><code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code></a> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <span class="xref std std-ref">xpu-memory-management</span> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.memory_stats_as_nested_dict">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">memory_stats_as_nested_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#torch.xpu.memory_stats_as_nested_dict" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the result of <code class="xref py py-func docutils literal notranslate"><span class="pre">memory_stats()</span></code> as a nested dictionary.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.reset_accumulated_memory_stats">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">reset_accumulated_memory_stats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">device</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.reset_accumulated_memory_stats" title="Permalink to this definition"></a></dt>
+<dd><p>Resets the “accumulated” (historical) stats tracked by the XPU memory allocator.</p>
+<p>See <code class="xref py py-func docutils literal notranslate"><span class="pre">memory_stats()</span></code> for details. Accumulated stats correspond to
+the <cite>“allocated”</cite> and <cite>“freed”</cite> keys in each individual stat dict, as well as
+<cite>“num_alloc_retries”</cite> and <cite>“num_ooms”</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistic for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.device"><code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code></a> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <span class="xref std std-ref">xpu-memory-management</span> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+</section>
+<section id="other">
+<h2>Other<a class="headerlink" href="#other" title="Permalink to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.get_fp32_math_mode">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">get_fp32_math_mode</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.get_fp32_math_mode" title="Permalink to this definition"></a></dt>
+<dd><p>Get the current fpmath_mode setting.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Fpmath mode
+The value will be <code class="docutils literal notranslate"><span class="pre">FP32MathMode.FP32</span></code> or <code class="docutils literal notranslate"><span class="pre">FP32MathMode.TF32</span></code> or <code class="docutils literal notranslate"><span class="pre">FP32MathMode.BF32</span></code>.
+<code class="docutils literal notranslate"><span class="pre">FP32MathMode.FP32:</span> <span class="pre">0</span></code> means implicit down-conversion is disabled;
+<code class="docutils literal notranslate"><span class="pre">FP32MathMode.TF32:</span> <span class="pre">1</span></code> means implicit down-conversions from f32 to tf32;
+<code class="docutils literal notranslate"><span class="pre">FP32MathMode.BF32:</span> <span class="pre">2</span></code> means implicit down-conversions from f32 to bf16.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to get the current fpmath mode</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">get_fp32_math_mode</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.set_fp32_math_mode">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">set_fp32_math_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mode</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.set_fp32_math_mode" title="Permalink to this definition"></a></dt>
+<dd><p>Enable or disable implicit data type conversion.
+If mode is FP32MathMode.FP32 which means to disable the oneDNN fpmath mode.
+If mode is FP32MathMode.TF32 which means to enable the oneDNN fpmath mode by down converting to tf32 implicitly.
+If mode is FP32MathMode.BF32 which means to enable the oneDNN fpmath mode by down converting to bfloat16 implicitly.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>mode</strong> (<em>FP32MathMode</em>) – Only works for <code class="docutils literal notranslate"><span class="pre">FP32MathMode.FP32</span></code>, <code class="docutils literal notranslate"><span class="pre">FP32MathMode.TF32</span></code> and <code class="docutils literal notranslate"><span class="pre">FP32MathMode.BF32</span></code>.
+oneDNN fpmath mode will be disabled by default if dtype is set to <code class="docutils literal notranslate"><span class="pre">FP32MathMode.FP32</span></code>.
+The implicit FP32 to TF32 data type conversion will be enabled if dtype is set to <a href="#id1"><span class="problematic" id="id2">``</span></a>FP32MathMode.TF32`.
+The implicit FP32 to BF16 data type conversion will be enabled if dtype is set to <a href="#id3"><span class="problematic" id="id4">``</span></a>FP32MathMode.BF32`.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to enable the implicit data type conversion to tf32</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">set_fp32_math_mode</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">FP32MathMode</span><span class="o">.</span><span class="n">TF32</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to enable the implicit data type conversion to bfloat16</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">set_fp32_math_mode</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">FP32MathMode</span><span class="o">.</span><span class="n">BF32</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to disable the implicit data type conversion</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">set_fp32_math_mode</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">FP32MathMode</span><span class="o">.</span><span class="n">FP32</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="c-api">
+<h2>C++ API<a class="headerlink" href="#c-api" title="Permalink to this heading"></a></h2>
+<dl class="cpp enum">
+<dt class="sig sig-object cpp" id="_CPPv4N3xpu14FP32_MATH_MODEE">
+<span id="_CPPv3N3xpu14FP32_MATH_MODEE"></span><span id="_CPPv2N3xpu14FP32_MATH_MODEE"></span><span class="target" id="Settings_8h_1a56c4815fc689c4fd441dc8163a205ac5"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">xpu</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">FP32_MATH_MODE</span></span></span><a class="headerlink" href="#_CPPv4N3xpu14FP32_MATH_MODEE" title="Permalink to this definition"></a><br /></dt>
+<dd><p>specifies the available DPCCP packet types </p>
+<p><em>Values:</em></p>
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N3xpu14FP32_MATH_MODE4FP32E">
+<span id="_CPPv3N3xpu14FP32_MATH_MODE4FP32E"></span><span id="_CPPv2N3xpu14FP32_MATH_MODE4FP32E"></span><span class="target" id="Settings_8h_1a56c4815fc689c4fd441dc8163a205ac5ad6e372effde8b6e32b3ac17a3fcc4f39"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FP32</span></span></span><a class="headerlink" href="#_CPPv4N3xpu14FP32_MATH_MODE4FP32E" title="Permalink to this definition"></a><br /></dt>
+<dd><p>set floating-point math mode to FP32. </p>
+</dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N3xpu14FP32_MATH_MODE4TF32E">
+<span id="_CPPv3N3xpu14FP32_MATH_MODE4TF32E"></span><span id="_CPPv2N3xpu14FP32_MATH_MODE4TF32E"></span><span class="target" id="Settings_8h_1a56c4815fc689c4fd441dc8163a205ac5a4000f86b3bad70838d2b3b5d415098d6"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TF32</span></span></span><a class="headerlink" href="#_CPPv4N3xpu14FP32_MATH_MODE4TF32E" title="Permalink to this definition"></a><br /></dt>
+<dd><p>set floating-point math mode to TF32. </p>
+</dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N3xpu14FP32_MATH_MODE4BF32E">
+<span id="_CPPv3N3xpu14FP32_MATH_MODE4BF32E"></span><span id="_CPPv2N3xpu14FP32_MATH_MODE4BF32E"></span><span class="target" id="Settings_8h_1a56c4815fc689c4fd441dc8163a205ac5a60bdc72428c36c51c8c2c02ae4ef75fe"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">BF32</span></span></span><a class="headerlink" href="#_CPPv4N3xpu14FP32_MATH_MODE4BF32E" title="Permalink to this definition"></a><br /></dt>
+<dd><p>set floating-point math mode to BF32. </p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3xpu18set_fp32_math_modeE14FP32_MATH_MODE">
+<span id="_CPPv3N3xpu18set_fp32_math_modeE14FP32_MATH_MODE"></span><span id="_CPPv2N3xpu18set_fp32_math_modeE14FP32_MATH_MODE"></span><span id="xpu::set_fp32_math_mode__FP32_MATH_MODE"></span><span class="target" id="Settings_8h_1ada56116869e33ddde701ec8754d5b12d"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">xpu</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">set_fp32_math_mode</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N3xpu14FP32_MATH_MODEE" title="xpu::FP32_MATH_MODE"><span class="n"><span class="pre">FP32_MATH_MODE</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">mode</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N3xpu18set_fp32_math_modeE14FP32_MATH_MODE" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Enable or disable implicit data type conversion. If mode is FP32MathMode.FP32 which means to disable the oneDNN fpmath mode. If mode is FP32MathMode.TF32 which means to enable the oneDNN fpmath mode by down converting to tf32 implicitly If mode is FP32MathMode.BF32 which means to enable the oneDNN fpmath mode by down converting to bfloat16 implicitly. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>mode</strong> – (FP32MathMode): Only works for <code class="docutils literal notranslate"><span class="pre">FP32MathMode.FP32</span></code>, <code class="docutils literal notranslate"><span class="pre">FP32MathMode.TF32</span></code> and <code class="docutils literal notranslate"><span class="pre">FP32MathMode.BF32</span></code>. oneDNN fpmath mode will be disabled by default if dtype is set to <code class="docutils literal notranslate"><span class="pre">FP32MathMode.FP32</span></code>. The implicit FP32 to TF32 data type conversion will be enabled if dtype is set to `<code class="docutils literal notranslate"><span class="pre">FP32MathMode.TF32</span></code>. The implicit FP32 to BF16 data type conversion will be enabled if dtype is set to `<code class="docutils literal notranslate"><span class="pre">FP32MathMode.BF32</span></code>. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3xpu21get_queue_from_streamEN3c106StreamE">
+<span id="_CPPv3N3xpu21get_queue_from_streamEN3c106StreamE"></span><span id="_CPPv2N3xpu21get_queue_from_streamEN3c106StreamE"></span><span id="xpu::get_queue_from_stream__c10::Stream"></span><span class="target" id="Stream_8h_1adfe423291e838adf8950b916a12a7dcf"></span><span class="n"><span class="pre">sycl</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">queue</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-prename descclassname"><span class="n"><span class="pre">xpu</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">get_queue_from_stream</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Stream</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N3xpu21get_queue_from_streamEN3c106StreamE" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Get a sycl queue from a c10 stream. Generate a sycl stream from c10 stream, and get sycl queue. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>stream</strong> – c10 stream. </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>sycl queue</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="examples.html" class="btn btn-neutral float-left" title="Examples" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="contribution.html" class="btn btn-neutral float-right" title="Contribution" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

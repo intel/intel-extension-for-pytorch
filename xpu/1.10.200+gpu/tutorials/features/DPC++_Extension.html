@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DPC++ Extension &mdash; intel_extension_for_pytorch 1.10.200+gpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Channels Last" href="nhwc.html" />
+    <link rel="prev" title="Features" href="../features.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../../versions.html">1.10.200+gpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ease-of-use-python-api">Ease-of-use Python API</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">DPC++ Extension</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#motivation-and-example">Motivation and Example</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#writing-a-dpc-extension">Writing a DPC++ Extension</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#building-with-setuptools">Building with setuptools</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#building-with-cmake">Building with CMake</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#writing-the-dpc-op">Writing the DPC++ Op</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#using-accessors">Using accessors</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#simple-trace-tool">Simple Trace Tool</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../features.html">Features</a> &raquo;</li>
+      <li>DPC++ Extension</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/DPC++_Extension.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dpc-extension">
+<h1>DPC++ Extension<a class="headerlink" href="#dpc-extension" title="Permalink to this heading"></a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading"></a></h2>
+<p>C++ extension is a mechanism developed by PyTorch that lets you to create customized and highly efficient PyTorch operators defined out-of-source, i.e. separate from the PyTorch backend. (For more details, see https://pytorch.org/tutorials/advanced/cpp_extension.html). Based on the PyTorch C++ extension mechanism, Intel® Extension for PyTorch* lets you to create PyTorch operators with custom DPC++ kernels to run on the XPU device.</p>
+</section>
+<section id="motivation-and-example">
+<h2>Motivation and Example<a class="headerlink" href="#motivation-and-example" title="Permalink to this heading"></a></h2>
+<p>This tutorial walks through a practical example of writing and using a DPC++ extension on the XPU device with Intel® Extension for PyTorch*.</p>
+</section>
+<section id="writing-a-dpc-extension">
+<h2>Writing a DPC++ Extension<a class="headerlink" href="#writing-a-dpc-extension" title="Permalink to this heading"></a></h2>
+<p>You can build a DPC++ extension with <code class="docutils literal notranslate"><span class="pre">setuptools</span></code> or <code class="docutils literal notranslate"><span class="pre">CMake</span></code>. We’ll begin with the first approach and discuss the CMake extension later.</p>
+<section id="building-with-setuptools">
+<h3>Building with setuptools<a class="headerlink" href="#building-with-setuptools" title="Permalink to this heading"></a></h3>
+<p>For building with <code class="docutils literal notranslate"><span class="pre">setuptools</span></code>, we build our DPC++ extension by writing a <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> script that uses <code class="docutils literal notranslate"><span class="pre">setuptools</span></code> to compile our C++ code. For the Long-Long-Term-Memory unit (LLTM), it looks like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">setuptools</span> <span class="kn">import</span> <span class="n">setup</span>
+<span class="kn">from</span> <span class="nn">intel_extension_for_pytorch.xpu.cpp_extension</span> <span class="kn">import</span> <span class="n">DPCPPExtension</span><span class="p">,</span> <span class="n">DpcppBuildExtension</span>
+
+<span class="n">setup</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s1">&#39;lltm&#39;</span><span class="p">,</span>
+    <span class="n">ext_modules</span><span class="o">=</span><span class="p">[</span>
+        <span class="n">DPCPPExtension</span><span class="p">(</span><span class="s1">&#39;lltm_xpu&#39;</span><span class="p">,</span> <span class="p">[</span>
+            <span class="s1">&#39;lltm_xpu.cpp&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;lltm_xpu_kernel.cpp&#39;</span><span class="p">,</span>
+        <span class="p">])</span>
+    <span class="p">],</span>
+    <span class="n">cmdclass</span><span class="o">=</span><span class="p">{</span>
+        <span class="s1">&#39;build_ext&#39;</span><span class="p">:</span> <span class="n">DpcppBuildExtension</span>
+    <span class="p">})</span>
+</pre></div>
+</div>
+<p>In this code, <code class="docutils literal notranslate"><span class="pre">DPCPPExtension</span></code> is a convenience wrapper around <code class="docutils literal notranslate"><span class="pre">setuptools.Extension</span></code> that passes the correct include paths and sets the language of the extension to C++. The equivalent vanilla <code class="docutils literal notranslate"><span class="pre">setuptools</span></code> code would simply be:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Extension</span><span class="p">(</span>
+   <span class="n">name</span><span class="o">=</span><span class="s1">&#39;lltm_xpu&#39;</span><span class="p">,</span>
+   <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;lltm_xpu.cpp&#39;</span><span class="p">,</span> <span class="s1">&#39;lltm_xpu_kernel.cpp&#39;</span><span class="p">,],</span>
+   <span class="n">include_dirs</span><span class="o">=</span><span class="n">cpp_extension</span><span class="o">.</span><span class="n">include_paths</span><span class="p">(),</span>
+   <span class="n">language</span><span class="o">=</span><span class="s1">&#39;c++&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">DpcppBuildExtension</span></code> performs a number of required configuration steps and checks and also manages compilation in the case of DPC++ extensions. And that’s all we really need to know about building DPC++ extensions for now.</p>
+<p>Let’s take a look at the implementation of our DPC++ extension, which goes into <code class="docutils literal notranslate"><span class="pre">lltm_xpu.cpp</span></code> and <code class="docutils literal notranslate"><span class="pre">lltm_xpu_kernel.cpp</span></code>.
+After building the Python module with DPC++ extension, the <code class="docutils literal notranslate"><span class="pre">lltm_xpu</span></code> is available for importing as an extension plug-in.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">lltm_xpu</span>
+</pre></div>
+</div>
+<blockquote>
+<div><p><strong>Note:</strong></p>
+<p>We still need to setup complier manually, example: <code class="docutils literal notranslate"><span class="pre">CC=icx</span> <span class="pre">CXX=dpcpp</span> <span class="pre">python</span> <span class="pre">setup.py</span> <span class="pre">install</span></code></p>
+</div></blockquote>
+</section>
+<section id="building-with-cmake">
+<h3>Building with CMake<a class="headerlink" href="#building-with-cmake" title="Permalink to this heading"></a></h3>
+<p>For building with <code class="docutils literal notranslate"><span class="pre">CMake</span></code>, we build our DPC++ extension by writing a <code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code> file that uses CMake to build our C++ code. For the same example we showed using <code class="docutils literal notranslate"><span class="pre">setuptools</span></code>, the <code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code> looks like this:
+CMakeLists.txt</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cmake_minimum_required</span><span class="p">(</span><span class="n">VERSION</span> <span class="mf">3.18</span> <span class="n">FATAL_ERROR</span><span class="p">)</span>
+<span class="n">project</span><span class="p">(</span><span class="n">lltm_xpu</span><span class="p">)</span>
+
+<span class="n">find_package</span><span class="p">(</span><span class="n">Python</span> <span class="n">COMPONENTS</span> <span class="n">Interpreter</span> <span class="n">Development</span><span class="p">)</span>
+<span class="n">find_package</span><span class="p">(</span><span class="n">Torch</span> <span class="n">REQUIRED</span><span class="p">)</span>
+<span class="n">find_package</span><span class="p">(</span><span class="n">IntelExtensionPytorch</span> <span class="n">REQUIRED</span><span class="p">)</span>
+
+<span class="c1">#The SYCL kernel should be compiled with &quot;-fsycl&quot;</span>
+<span class="n">set_source_files_properties</span><span class="p">(</span><span class="n">lltm_xpu_kernel</span><span class="o">.</span><span class="n">cpp</span> <span class="n">PROPERTIES</span> <span class="n">COMPILE_FLAGS</span> <span class="s2">&quot;-fsycl&quot;</span><span class="p">)</span>
+
+<span class="n">add_library</span><span class="p">(</span><span class="n">lltm_xpu</span> <span class="n">SHARED</span> <span class="n">lltm_xpu</span><span class="o">.</span><span class="n">cpp</span> <span class="n">lltm_xpu_kernel</span><span class="o">.</span><span class="n">cpp</span><span class="p">)</span>
+<span class="n">target_link_libraries</span><span class="p">(</span><span class="n">lltm_xpu</span> <span class="s2">&quot;$</span><span class="si">{TORCH_LIBRARIES}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">target_link_libraries</span><span class="p">(</span><span class="n">lltm_xpu</span> <span class="s2">&quot;$</span><span class="si">{TORCH_IPEX_LIBRARIES}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">target_include_directories</span><span class="p">(</span><span class="n">lltm_xpu</span> <span class="n">PUBLIC</span> <span class="s2">&quot;$</span><span class="si">{Python_INCLUDE_DIRS}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">target_include_directories</span><span class="p">(</span><span class="n">lltm_xpu</span> <span class="n">PUBLIC</span> <span class="s2">&quot;$</span><span class="si">{TORCH_IPEX_INCLUDE_DIRS}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="n">set_property</span><span class="p">(</span><span class="n">TARGET</span> <span class="n">lltm_xpu</span> <span class="n">PROPERTY</span> <span class="n">CXX_STANDARD</span> <span class="mi">17</span><span class="p">)</span>
+<span class="c1">#DPCPP need 17</span>
+</pre></div>
+</div>
+<p>Commands for compilation:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cmake -DCMAKE_PREFIX_PATH=&lt;torch/ipex cmake path in your env&gt; -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=dpcpp ..
+$ make
+</pre></div>
+</div>
+<p>After build the python module with CMake, the <code class="docutils literal notranslate"><span class="pre">lltm_xpu</span></code> is also avalible for importing as a extension plug-in like setuptools method.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ python
+&gt;&gt;&gt; import torch
+&gt;&gt;&gt; import intel_extension_for_pytorch
+&gt;&gt;&gt; import lltm_xpu
+</pre></div>
+</div>
+</section>
+<section id="writing-the-dpc-op">
+<h3>Writing the DPC++ Op<a class="headerlink" href="#writing-the-dpc-op" title="Permalink to this heading"></a></h3>
+<p>The general strategy for writing a DPC++ extension is to write a C++ file that defines the functions that are called from Python, and binds those functions to Python with pybind11. The C++ functions do some checks and ultimately forward the calls to submit SYCL kernels. The <code class="docutils literal notranslate"><span class="pre">ipex.cpp_extension</span></code> package then takes care of compiling the C++ sources with a DPC++ compiler.</p>
+<p>Let’s consider the PyTorch CUDA examples https://pytorch.org/tutorials/advanced/cpp_extension.html#writing-a-mixed-c-cuda-extension. Here is how we implement it in DPC++ style:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#include &lt;torch/extension.h&gt;</span>
+
+<span class="c1">#include &lt;vector&gt;</span>
+
+<span class="o">//</span> <span class="n">XPU</span> <span class="n">forward</span> <span class="n">declarations</span>
+
+<span class="n">std</span><span class="p">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span><span class="o">&gt;</span> <span class="n">lltm_xpu_forward</span><span class="p">(</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="nb">input</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">weights</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">bias</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">old_h</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">old_cell</span><span class="p">);</span>
+
+<span class="n">std</span><span class="p">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span><span class="o">&gt;</span> <span class="n">lltm_xpu_backward</span><span class="p">(</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">grad_h</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">grad_cell</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">new_cell</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">input_gate</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">output_gate</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">candidate_cell</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">X</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">gate_weights</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">weights</span><span class="p">);</span>
+    
+<span class="o">//</span> <span class="n">C</span><span class="o">++</span> <span class="n">interface</span>
+
+<span class="c1">#define CHECK_XPU(x) TORCH_CHECK(x.device().is_xpu(), #x &quot; must be a XPU tensor&quot;)</span>
+<span class="c1">#define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x &quot; must be contiguous&quot;)</span>
+<span class="c1">#define CHECK_INPUT(x) CHECK_XPU(x); CHECK_CONTIGUOUS(x)</span>
+
+<span class="n">std</span><span class="p">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span><span class="o">&gt;</span> <span class="n">lltm_forward</span><span class="p">(</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="nb">input</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">weights</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">bias</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">old_h</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">old_cell</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">CHECK_INPUT</span><span class="p">(</span><span class="nb">input</span><span class="p">);</span>
+  <span class="n">CHECK_INPUT</span><span class="p">(</span><span class="n">weights</span><span class="p">);</span>
+  <span class="n">CHECK_INPUT</span><span class="p">(</span><span class="n">bias</span><span class="p">);</span>
+  <span class="n">CHECK_INPUT</span><span class="p">(</span><span class="n">old_h</span><span class="p">);</span>
+  <span class="n">CHECK_INPUT</span><span class="p">(</span><span class="n">old_cell</span><span class="p">);</span>
+
+  <span class="k">return</span> <span class="n">lltm_xpu_forward</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">bias</span><span class="p">,</span> <span class="n">old_h</span><span class="p">,</span> <span class="n">old_cell</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="n">std</span><span class="p">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span><span class="o">&gt;</span> <span class="n">lltm_backward</span><span class="p">(</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">grad_h</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">grad_cell</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">new_cell</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">input_gate</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">output_gate</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">candidate_cell</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">X</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">gate_weights</span><span class="p">,</span>
+    <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">weights</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">CHECK_INPUT</span><span class="p">(</span><span class="n">grad_h</span><span class="p">);</span>
+  <span class="n">CHECK_INPUT</span><span class="p">(</span><span class="n">grad_cell</span><span class="p">);</span>
+  <span class="n">CHECK_INPUT</span><span class="p">(</span><span class="n">input_gate</span><span class="p">);</span>
+  <span class="n">CHECK_INPUT</span><span class="p">(</span><span class="n">output_gate</span><span class="p">);</span>
+  <span class="n">CHECK_INPUT</span><span class="p">(</span><span class="n">candidate_cell</span><span class="p">);</span>
+  <span class="n">CHECK_INPUT</span><span class="p">(</span><span class="n">X</span><span class="p">);</span>
+  <span class="n">CHECK_INPUT</span><span class="p">(</span><span class="n">gate_weights</span><span class="p">);</span>
+  <span class="n">CHECK_INPUT</span><span class="p">(</span><span class="n">weights</span><span class="p">);</span>
+
+  <span class="k">return</span> <span class="n">lltm_xpu_backward</span><span class="p">(</span>
+      <span class="n">grad_h</span><span class="p">,</span>
+      <span class="n">grad_cell</span><span class="p">,</span>
+      <span class="n">new_cell</span><span class="p">,</span>
+      <span class="n">input_gate</span><span class="p">,</span>
+      <span class="n">output_gate</span><span class="p">,</span>
+      <span class="n">candidate_cell</span><span class="p">,</span>
+      <span class="n">X</span><span class="p">,</span>
+      <span class="n">gate_weights</span><span class="p">,</span>
+      <span class="n">weights</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="n">PYBIND11_MODULE</span><span class="p">(</span><span class="n">TORCH_EXTENSION_NAME</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">m</span><span class="o">.</span><span class="n">def</span><span class="p">(</span><span class="s2">&quot;forward&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">lltm_forward</span><span class="p">,</span> <span class="s2">&quot;LLTM forward (XPU)&quot;</span><span class="p">);</span>
+  <span class="n">m</span><span class="o">.</span><span class="n">def</span><span class="p">(</span><span class="s2">&quot;backward&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">lltm_backward</span><span class="p">,</span> <span class="s2">&quot;LLTM backward (XPU)&quot;</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The bridge code checks and forwards the calls to functions that we’ll define in the DPC++ code file <code class="docutils literal notranslate"><span class="pre">lltm_xpu_kernel.cpp</span></code>. DPC++ supports compiling C++ naturally, thus we still have ATen and the C++ standard library available to us.</p>
+<p>Let’s go through the DPC++ code step by step:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#include &lt;torch/extension.h&gt;</span>
+
+<span class="c1">#include &lt;ipex.h&gt;</span>
+
+<span class="c1">#include &lt;vector&gt;</span>
+
+<span class="n">template</span> <span class="o">&lt;</span><span class="n">typename</span> <span class="n">scalar_t</span><span class="o">&gt;</span>
+<span class="n">scalar_t</span> <span class="n">sigmoid</span><span class="p">(</span><span class="n">scalar_t</span> <span class="n">z</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">z</span><span class="p">));</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>At the beginning of the code, we include <code class="docutils literal notranslate"><span class="pre">&lt;torch/extension.h&gt;</span></code> that will introduce all the torch definitions into the code. After that, the <code class="docutils literal notranslate"><span class="pre">&lt;ipex.h&gt;</span></code> line includes the SYCL header in DPC++. With the <code class="docutils literal notranslate"><span class="pre">&lt;torch/extension.h&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;ipex.h&gt;</span></code>, all the essential declarations have been included for writing the DPC++ kernel to run on the XPU device. The helper function <code class="docutils literal notranslate"><span class="pre">sigmoid</span></code> does the math calculation with the more efficient C++ language. Next are some more helper functions for LLTM:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>template &lt;typename scalar_t&gt;
+scalar_t d_sigmoid(scalar_t z) {
+  const auto s = sigmoid(z);
+  return (1.0 - s) * s;
+}
+
+template &lt;typename scalar_t&gt;
+scalar_t d_tanh(scalar_t z) {
+  const auto t = tanh(z);
+  return 1 - (t * t);
+}
+
+template &lt;typename scalar_t&gt;
+scalar_t elu(scalar_t z, scalar_t alpha = 1.0) {
+  return fmax(0.0, z) + fmin(0.0, alpha * (exp(z) - 1.0));
+}
+
+template &lt;typename scalar_t&gt;
+scalar_t d_elu(scalar_t z, scalar_t alpha = 1.0) {
+  const auto e = exp(z);
+  const auto d_relu = z &lt; 0.0 ? 0.0 : 1.0;
+  return d_relu + (((alpha * (e - 1.0)) &lt; 0.0) ? (alpha * e) : 0.0);
+}
+</pre></div>
+</div>
+<p>Now we can implement the actual code for our extension with two functions in DPC++:</p>
+<ul class="simple">
+<li><p>a function that performs operations we don’t wish to explicitly write by hand and calls into the function to submit the SYCL kernel,</p></li>
+<li><p>a function that actual submits the SYCL kernel to the XPU device for the parts we want to speed up.</p></li>
+</ul>
+<p>For the forward pass, the first function looks like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>
+<span class="n">std</span><span class="p">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span><span class="o">&gt;</span> <span class="n">lltm_xpu_forward</span><span class="p">(</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="nb">input</span><span class="p">,</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">weights</span><span class="p">,</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">bias</span><span class="p">,</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">old_h</span><span class="p">,</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">old_cell</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">auto</span> <span class="n">X</span> <span class="o">=</span> <span class="n">torch</span><span class="p">::</span><span class="n">cat</span><span class="p">({</span><span class="n">old_h</span><span class="p">,</span> <span class="nb">input</span><span class="p">},</span> <span class="o">/*</span><span class="n">dim</span><span class="o">=*/</span><span class="mi">1</span><span class="p">);</span>
+  <span class="n">auto</span> <span class="n">gates</span> <span class="o">=</span> <span class="n">torch</span><span class="p">::</span><span class="n">addmm</span><span class="p">(</span><span class="n">bias</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">weights</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">));</span>
+
+  <span class="n">const</span> <span class="n">auto</span> <span class="n">batch_size</span> <span class="o">=</span> <span class="n">old_cell</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+  <span class="n">const</span> <span class="n">auto</span> <span class="n">state_size</span> <span class="o">=</span> <span class="n">old_cell</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+
+  <span class="n">auto</span> <span class="n">new_h</span> <span class="o">=</span> <span class="n">torch</span><span class="p">::</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">old_cell</span><span class="p">);</span>
+  <span class="n">auto</span> <span class="n">new_cell</span> <span class="o">=</span> <span class="n">torch</span><span class="p">::</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">old_cell</span><span class="p">);</span>
+  <span class="n">auto</span> <span class="n">input_gate</span> <span class="o">=</span> <span class="n">torch</span><span class="p">::</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">old_cell</span><span class="p">);</span>
+  <span class="n">auto</span> <span class="n">output_gate</span> <span class="o">=</span> <span class="n">torch</span><span class="p">::</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">old_cell</span><span class="p">);</span>
+  <span class="n">auto</span> <span class="n">candidate_cell</span> <span class="o">=</span> <span class="n">torch</span><span class="p">::</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">old_cell</span><span class="p">);</span>
+
+  <span class="n">AT_DISPATCH_FLOATING_TYPES</span><span class="p">(</span><span class="n">gates</span><span class="o">.</span><span class="n">type</span><span class="p">(),</span> <span class="s2">&quot;lltm_forward_xpu&quot;</span><span class="p">,</span> <span class="p">([</span><span class="o">&amp;</span><span class="p">]</span> <span class="p">{</span>
+    <span class="n">lltm_xpu_forward_kernel</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="o">&gt;</span><span class="p">(</span>
+          <span class="n">gates</span><span class="o">.</span><span class="n">data</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">old_cell</span><span class="o">.</span><span class="n">data</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">new_h</span><span class="o">.</span><span class="n">data</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">new_cell</span><span class="o">.</span><span class="n">data</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">input_gate</span><span class="o">.</span><span class="n">data</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">output_gate</span><span class="o">.</span><span class="n">data</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">candidate_cell</span><span class="o">.</span><span class="n">data</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">state_size</span><span class="p">,</span>
+                  <span class="n">batch_size</span><span class="p">);</span>
+  <span class="p">}));</span>
+
+  <span class="k">return</span> <span class="p">{</span><span class="n">new_h</span><span class="p">,</span> <span class="n">new_cell</span><span class="p">,</span> <span class="n">input_gate</span><span class="p">,</span> <span class="n">output_gate</span><span class="p">,</span> <span class="n">candidate_cell</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">gates</span><span class="p">};</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The purpose of <code class="docutils literal notranslate"><span class="pre">AT_DISPATCH_FLOATING_TYPES</span></code> is to take care of this dispatch for us. It takes a type (<code class="docutils literal notranslate"><span class="pre">gates.type()</span></code> in our case), a name (for error messages) and a lambda function. Inside this lambda function, the type alias <code class="docutils literal notranslate"><span class="pre">scalar_t</span></code> is available and is defined as the type that the tensor actually is at runtime in that context. As such, if we have a template function (which will submit the actual SYCL kernel), we can instantiate it with this <code class="docutils literal notranslate"><span class="pre">scalar_t</span></code> alias, and the correct function will be called. In this case, we also want to retrieve the data pointers of the tensors as pointers of that <code class="docutils literal notranslate"><span class="pre">scalar_t</span></code> type. If you wanted to dispatch over all types and not just floating point types (<code class="docutils literal notranslate"><span class="pre">Float</span></code> and <code class="docutils literal notranslate"><span class="pre">Double</span></code>), you can use <code class="docutils literal notranslate"><span class="pre">AT_DISPATCH_ALL_TYPES</span></code>.</p>
+<p>Here’s how to submit the actual kernel to the XPU device:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">template</span> <span class="o">&lt;</span><span class="n">typename</span> <span class="n">scalar_t</span><span class="o">&gt;</span>
+<span class="n">void</span> <span class="n">lltm_xpu_forward_kernel</span><span class="p">(</span>
+        <span class="n">const</span> <span class="n">scalar_t</span><span class="o">*</span> <span class="n">gates</span><span class="p">,</span>
+        <span class="n">const</span> <span class="n">scalar_t</span><span class="o">*</span> <span class="n">old_cell</span><span class="p">,</span>
+        <span class="n">scalar_t</span><span class="o">*</span> <span class="n">new_h</span><span class="p">,</span>
+        <span class="n">scalar_t</span><span class="o">*</span> <span class="n">new_cell</span><span class="p">,</span>
+        <span class="n">scalar_t</span><span class="o">*</span> <span class="n">input_gate</span><span class="p">,</span>
+        <span class="n">scalar_t</span><span class="o">*</span> <span class="n">output_gate</span><span class="p">,</span>
+        <span class="n">scalar_t</span><span class="o">*</span> <span class="n">candidate_cell</span><span class="p">,</span>
+        <span class="n">size_t</span> <span class="n">state_size</span><span class="p">,</span>
+        <span class="n">size_t</span> <span class="n">batch_size</span><span class="p">)</span> <span class="p">{</span>
+
+  <span class="n">const</span> <span class="nb">int</span> <span class="n">threads</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">;</span>
+  <span class="n">const</span> <span class="nb">int</span> <span class="n">work_groups</span> <span class="o">=</span> <span class="p">(</span><span class="n">state_size</span> <span class="o">+</span> <span class="n">threads</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="n">threads</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">define</span> <span class="n">the</span> <span class="n">kernel</span>
+  <span class="n">auto</span> <span class="n">cgf</span> <span class="o">=</span> <span class="p">[</span><span class="o">&amp;</span><span class="p">](</span><span class="n">sycl</span><span class="p">::</span><span class="n">handler</span><span class="o">&amp;</span> <span class="n">cgh</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">auto</span> <span class="n">kfn</span> <span class="o">=</span> <span class="p">[</span><span class="o">=</span><span class="p">](</span><span class="n">sycl</span><span class="p">::</span><span class="n">nd_item</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span> <span class="n">item</span><span class="p">)</span> <span class="p">{</span>
+
+      <span class="n">const</span> <span class="nb">int</span> <span class="n">column</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get_group</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">item</span><span class="o">.</span><span class="n">get_group_range</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">item</span><span class="o">.</span><span class="n">get_local_id</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+      <span class="n">const</span> <span class="nb">int</span> <span class="n">index</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get_group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">state_size</span> <span class="o">+</span> <span class="n">column</span><span class="p">;</span>
+      <span class="n">const</span> <span class="nb">int</span> <span class="n">gates_row</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get_group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">state_size</span> <span class="o">*</span> <span class="mi">3</span><span class="p">);</span>
+
+      <span class="k">if</span> <span class="p">(</span><span class="n">column</span> <span class="o">&lt;</span> <span class="n">state_size</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">input_gate</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">sigmoid</span><span class="p">(</span><span class="n">gates</span><span class="p">[</span><span class="n">gates_row</span> <span class="o">+</span> <span class="n">column</span><span class="p">]);</span>
+        <span class="n">output_gate</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">sigmoid</span><span class="p">(</span><span class="n">gates</span><span class="p">[</span><span class="n">gates_row</span> <span class="o">+</span> <span class="n">state_size</span> <span class="o">+</span> <span class="n">column</span><span class="p">]);</span>
+        <span class="n">candidate_cell</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">elu</span><span class="p">(</span><span class="n">gates</span><span class="p">[</span><span class="n">gates_row</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">state_size</span> <span class="o">+</span> <span class="n">column</span><span class="p">]);</span>
+        <span class="n">new_cell</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span>
+                <span class="n">old_cell</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">+</span> <span class="n">candidate_cell</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">*</span> <span class="n">input_gate</span><span class="p">[</span><span class="n">index</span><span class="p">];</span>
+        <span class="n">new_h</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">tanh</span><span class="p">(</span><span class="n">new_cell</span><span class="p">[</span><span class="n">index</span><span class="p">])</span> <span class="o">*</span> <span class="n">output_gate</span><span class="p">[</span><span class="n">index</span><span class="p">];</span>
+      <span class="p">}</span>
+
+    <span class="p">};</span>
+
+    <span class="n">cgh</span><span class="o">.</span><span class="n">parallel_for</span><span class="p">(</span>
+            <span class="n">sycl</span><span class="p">::</span><span class="n">nd_range</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(</span>
+                    <span class="n">sycl</span><span class="p">::</span><span class="nb">range</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(</span><span class="n">work_groups</span> <span class="o">*</span> <span class="n">threads</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">),</span>
+                    <span class="n">sycl</span><span class="p">::</span><span class="nb">range</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(</span><span class="n">threads</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+            <span class="n">kfn</span><span class="p">);</span>
+  <span class="p">};</span>
+
+  <span class="o">//</span> <span class="n">submit</span> <span class="n">kernel</span>
+  <span class="n">auto</span> <span class="n">device_type</span> <span class="o">=</span> <span class="n">c10</span><span class="p">::</span><span class="n">DeviceType</span><span class="p">::</span><span class="n">XPU</span><span class="p">;</span>
+  <span class="n">c10</span><span class="p">::</span><span class="n">impl</span><span class="p">::</span><span class="n">VirtualGuardImpl</span> <span class="n">impl</span><span class="p">(</span><span class="n">device_type</span><span class="p">);</span>
+  <span class="n">c10</span><span class="p">::</span><span class="n">Stream</span> <span class="n">dpcpp_stream</span> <span class="o">=</span> <span class="n">impl</span><span class="o">.</span><span class="n">getStream</span><span class="p">(</span><span class="n">c10</span><span class="p">::</span><span class="n">Device</span><span class="p">(</span><span class="n">device_type</span><span class="p">));</span>
+  <span class="n">auto</span> <span class="n">queue</span> <span class="o">=</span> <span class="n">xpu</span><span class="p">::</span><span class="n">get_queue_from_stream</span><span class="p">(</span><span class="n">dpcpp_stream</span><span class="p">);</span>
+
+  <span class="n">queue</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">cgf</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>We’re specifying that each work group has 1024 threads and that the entire GPU grid is split into as many work groups of 1 x 1024 threads as are required to fill our matrices with one thread per component. For example, if our state size was 2048 and our batch size 4, we’d launch a total of 4 x 2 = 8 work groups with 1024 threads each. If you are not familiar with the SYCL “work groups”, an introductory read about SYCL may help.</p>
+<p>Note that the <code class="docutils literal notranslate"><span class="pre">c10::impl::VirtualGuardImpl</span></code> must get the current stream of the current XPU device and use the XPU API to get the corresponding SYCL underlaying queue. It can then submit the kernel to the queue for execution.</p>
+<section id="using-accessors">
+<h4>Using accessors<a class="headerlink" href="#using-accessors" title="Permalink to this heading"></a></h4>
+<p>You can see in the SYCL kernel that we work directly on pointers with the right type. Indeed, working directly with high level type agnostic tensors inside SYCL kernels would be very inefficient.</p>
+<p>However, this comes at a cost of ease of use and readability, especially for highly dimensional data. We can use torch’s C++ utils to abstract access to high dimension data in the SYCL kernel directly.</p>
+<p>The backwards pass follows much the same pattern but with the <code class="docutils literal notranslate"><span class="pre">torch::PackedTensorAccessor32</span></code>. You can get more information about these utils in torch documents:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">template</span> <span class="o">&lt;</span><span class="n">typename</span> <span class="n">scalar_t</span><span class="o">&gt;</span>
+<span class="n">void</span> <span class="n">lltm_xpu_backward_kernel</span><span class="p">(</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">PackedTensorAccessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span> <span class="n">d_old_cell</span><span class="p">,</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">PackedTensorAccessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">3</span><span class="o">&gt;</span> <span class="n">d_gates</span><span class="p">,</span>
+        <span class="n">const</span> <span class="n">torch</span><span class="p">::</span><span class="n">PackedTensorAccessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span> <span class="n">grad_h</span><span class="p">,</span>
+        <span class="n">const</span> <span class="n">torch</span><span class="p">::</span><span class="n">PackedTensorAccessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span> <span class="n">grad_cell</span><span class="p">,</span>
+        <span class="n">const</span> <span class="n">torch</span><span class="p">::</span><span class="n">PackedTensorAccessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span> <span class="n">new_cell</span><span class="p">,</span>
+        <span class="n">const</span> <span class="n">torch</span><span class="p">::</span><span class="n">PackedTensorAccessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span> <span class="n">input_gate</span><span class="p">,</span>
+        <span class="n">const</span> <span class="n">torch</span><span class="p">::</span><span class="n">PackedTensorAccessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span> <span class="n">output_gate</span><span class="p">,</span>
+        <span class="n">const</span> <span class="n">torch</span><span class="p">::</span><span class="n">PackedTensorAccessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span> <span class="n">candidate_cell</span><span class="p">,</span>
+        <span class="n">const</span> <span class="n">torch</span><span class="p">::</span><span class="n">PackedTensorAccessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">3</span><span class="o">&gt;</span> <span class="n">gate_weights</span><span class="p">,</span>
+        <span class="n">size_t</span> <span class="n">state_size</span><span class="p">,</span>
+        <span class="n">size_t</span> <span class="n">batch_size</span><span class="p">)</span> <span class="p">{</span>
+
+  <span class="n">const</span> <span class="nb">int</span> <span class="n">threads</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">;</span>
+  <span class="n">const</span> <span class="nb">int</span> <span class="n">work_groups</span> <span class="o">=</span> <span class="p">(</span><span class="n">state_size</span> <span class="o">+</span> <span class="n">threads</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="n">threads</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">define</span> <span class="n">the</span> <span class="n">kernel</span>
+  <span class="n">auto</span> <span class="n">cgf</span> <span class="o">=</span> <span class="p">[</span><span class="o">&amp;</span><span class="p">](</span><span class="n">sycl</span><span class="p">::</span><span class="n">handler</span><span class="o">&amp;</span> <span class="n">cgh</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">auto</span> <span class="n">kfn</span> <span class="o">=</span> <span class="p">[</span><span class="o">=</span><span class="p">](</span><span class="n">sycl</span><span class="p">::</span><span class="n">nd_item</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span> <span class="n">item</span><span class="p">)</span> <span class="p">{</span>
+      <span class="o">//</span><span class="n">batch</span> <span class="n">index</span>
+      <span class="n">const</span> <span class="nb">int</span> <span class="n">n</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get_group</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+      <span class="o">//</span> <span class="n">column</span> <span class="n">index</span>
+      <span class="n">const</span> <span class="nb">int</span> <span class="n">c</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get_group</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">item</span><span class="o">.</span><span class="n">get_group_range</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">item</span><span class="o">.</span><span class="n">get_local_id</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+      <span class="n">auto</span> <span class="n">d_gates_</span> <span class="o">=</span> <span class="n">d_gates</span><span class="p">;</span>
+      <span class="n">auto</span> <span class="n">d_old_cell_</span> <span class="o">=</span> <span class="n">d_old_cell</span><span class="p">;</span>
+      <span class="k">if</span> <span class="p">(</span><span class="n">c</span> <span class="o">&lt;</span> <span class="n">d_gates</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">2</span><span class="p">)){</span>
+        <span class="n">const</span> <span class="n">auto</span> <span class="n">d_output_gate</span> <span class="o">=</span> <span class="n">tanh</span><span class="p">(</span><span class="n">new_cell</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">c</span><span class="p">])</span> <span class="o">*</span> <span class="n">grad_h</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">c</span><span class="p">];</span>
+        <span class="n">const</span> <span class="n">auto</span> <span class="n">d_tanh_new_cell</span> <span class="o">=</span> <span class="n">output_gate</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">c</span><span class="p">]</span> <span class="o">*</span> <span class="n">grad_h</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">c</span><span class="p">];</span>
+        <span class="n">const</span> <span class="n">auto</span> <span class="n">d_new_cell</span> <span class="o">=</span>
+                <span class="n">d_tanh</span><span class="p">(</span><span class="n">new_cell</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">c</span><span class="p">])</span> <span class="o">*</span> <span class="n">d_tanh_new_cell</span> <span class="o">+</span> <span class="n">grad_cell</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">c</span><span class="p">];</span>
+
+
+        <span class="n">d_old_cell_</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">c</span><span class="p">]</span> <span class="o">=</span> <span class="n">d_new_cell</span><span class="p">;</span>
+        <span class="n">const</span> <span class="n">auto</span> <span class="n">d_candidate_cell</span> <span class="o">=</span> <span class="n">input_gate</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">c</span><span class="p">]</span> <span class="o">*</span> <span class="n">d_new_cell</span><span class="p">;</span>
+        <span class="n">const</span> <span class="n">auto</span> <span class="n">d_input_gate</span> <span class="o">=</span> <span class="n">candidate_cell</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">c</span><span class="p">]</span> <span class="o">*</span> <span class="n">d_new_cell</span><span class="p">;</span>
+
+        <span class="n">d_gates_</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="n">c</span><span class="p">]</span> <span class="o">=</span>
+                <span class="n">d_input_gate</span> <span class="o">*</span> <span class="n">d_sigmoid</span><span class="p">(</span><span class="n">gate_weights</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="n">c</span><span class="p">]);</span>
+        <span class="n">d_gates_</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="n">c</span><span class="p">]</span> <span class="o">=</span>
+                <span class="n">d_output_gate</span> <span class="o">*</span> <span class="n">d_sigmoid</span><span class="p">(</span><span class="n">gate_weights</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="n">c</span><span class="p">]);</span>
+        <span class="n">d_gates_</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">2</span><span class="p">][</span><span class="n">c</span><span class="p">]</span> <span class="o">=</span>
+                <span class="n">d_candidate_cell</span> <span class="o">*</span> <span class="n">d_elu</span><span class="p">(</span><span class="n">gate_weights</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">2</span><span class="p">][</span><span class="n">c</span><span class="p">]);</span>
+      <span class="p">}</span>
+    <span class="p">};</span>
+
+    <span class="n">cgh</span><span class="o">.</span><span class="n">parallel_for</span><span class="p">(</span>
+            <span class="n">sycl</span><span class="p">::</span><span class="n">nd_range</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(</span>
+                    <span class="n">sycl</span><span class="p">::</span><span class="nb">range</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(</span><span class="n">work_groups</span> <span class="o">*</span> <span class="n">threads</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">),</span>
+                    <span class="n">sycl</span><span class="p">::</span><span class="nb">range</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(</span><span class="n">threads</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+            <span class="n">kfn</span><span class="p">);</span>
+  <span class="p">};</span>
+
+  <span class="o">//</span> <span class="n">submit</span> <span class="n">kernel</span>
+  <span class="n">auto</span> <span class="n">device_type</span> <span class="o">=</span> <span class="n">c10</span><span class="p">::</span><span class="n">DeviceType</span><span class="p">::</span><span class="n">XPU</span><span class="p">;</span>
+  <span class="n">c10</span><span class="p">::</span><span class="n">impl</span><span class="p">::</span><span class="n">VirtualGuardImpl</span> <span class="n">impl</span><span class="p">(</span><span class="n">device_type</span><span class="p">);</span>
+  <span class="n">c10</span><span class="p">::</span><span class="n">Stream</span> <span class="n">dpcpp_stream</span> <span class="o">=</span> <span class="n">impl</span><span class="o">.</span><span class="n">getStream</span><span class="p">(</span><span class="n">c10</span><span class="p">::</span><span class="n">Device</span><span class="p">(</span><span class="n">device_type</span><span class="p">));</span>
+  <span class="n">auto</span> <span class="n">queue</span> <span class="o">=</span> <span class="n">xpu</span><span class="p">::</span><span class="n">get_queue_from_stream</span><span class="p">(</span><span class="n">dpcpp_stream</span><span class="p">);</span>
+
+  <span class="n">queue</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">cgf</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="n">std</span><span class="p">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span><span class="o">&gt;</span> <span class="n">lltm_xpu_backward</span><span class="p">(</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">grad_h</span><span class="p">,</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">grad_cell</span><span class="p">,</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">new_cell</span><span class="p">,</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">input_gate</span><span class="p">,</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">output_gate</span><span class="p">,</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">candidate_cell</span><span class="p">,</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">X</span><span class="p">,</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">gates</span><span class="p">,</span>
+        <span class="n">torch</span><span class="p">::</span><span class="n">Tensor</span> <span class="n">weights</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">auto</span> <span class="n">d_old_cell</span> <span class="o">=</span> <span class="n">torch</span><span class="p">::</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">new_cell</span><span class="p">);</span>
+  <span class="n">auto</span> <span class="n">d_gates</span> <span class="o">=</span> <span class="n">torch</span><span class="p">::</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">gates</span><span class="p">);</span>
+
+  <span class="n">const</span> <span class="n">auto</span> <span class="n">batch_size</span> <span class="o">=</span> <span class="n">new_cell</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+  <span class="n">const</span> <span class="n">auto</span> <span class="n">state_size</span> <span class="o">=</span> <span class="n">new_cell</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+
+  <span class="n">AT_DISPATCH_FLOATING_TYPES</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">type</span><span class="p">(),</span> <span class="s2">&quot;lltm_backward_xpu&quot;</span><span class="p">,</span> <span class="p">([</span><span class="o">&amp;</span><span class="p">]</span> <span class="p">{</span>
+    <span class="n">lltm_xpu_backward_kernel</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="o">&gt;</span><span class="p">(</span>
+          <span class="n">d_old_cell</span><span class="o">.</span><span class="n">packed_accessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">d_gates</span><span class="o">.</span><span class="n">packed_accessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">3</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">grad_h</span><span class="o">.</span><span class="n">packed_accessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">grad_cell</span><span class="o">.</span><span class="n">packed_accessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">new_cell</span><span class="o">.</span><span class="n">packed_accessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">input_gate</span><span class="o">.</span><span class="n">packed_accessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">output_gate</span><span class="o">.</span><span class="n">packed_accessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">candidate_cell</span><span class="o">.</span><span class="n">packed_accessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">gates</span><span class="o">.</span><span class="n">packed_accessor32</span><span class="o">&lt;</span><span class="n">scalar_t</span><span class="p">,</span><span class="mi">3</span><span class="o">&gt;</span><span class="p">(),</span>
+                  <span class="n">state_size</span><span class="p">,</span>
+                  <span class="n">batch_size</span><span class="p">);</span>
+  <span class="p">}));</span>
+
+  <span class="n">auto</span> <span class="n">d_gate_weights</span> <span class="o">=</span> <span class="n">d_gates</span><span class="o">.</span><span class="n">reshape</span><span class="p">({</span><span class="n">batch_size</span><span class="p">,</span> <span class="mi">3</span><span class="o">*</span><span class="n">state_size</span><span class="p">});</span>
+  <span class="n">auto</span> <span class="n">d_weights</span> <span class="o">=</span> <span class="n">d_gate_weights</span><span class="o">.</span><span class="n">t</span><span class="p">()</span><span class="o">.</span><span class="n">mm</span><span class="p">(</span><span class="n">X</span><span class="p">);</span>
+  <span class="n">auto</span> <span class="n">d_bias</span> <span class="o">=</span> <span class="n">d_gate_weights</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">/*</span><span class="n">dim</span><span class="o">=*/</span><span class="mi">0</span><span class="p">,</span> <span class="o">/*</span><span class="n">keepdim</span><span class="o">=*/</span><span class="n">true</span><span class="p">);</span>
+
+  <span class="n">auto</span> <span class="n">d_X</span> <span class="o">=</span> <span class="n">d_gate_weights</span><span class="o">.</span><span class="n">mm</span><span class="p">(</span><span class="n">weights</span><span class="p">);</span>
+  <span class="n">auto</span> <span class="n">d_old_h</span> <span class="o">=</span> <span class="n">d_X</span><span class="o">.</span><span class="n">slice</span><span class="p">(</span><span class="o">/*</span><span class="n">dim</span><span class="o">=*/</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">state_size</span><span class="p">);</span>
+  <span class="n">auto</span> <span class="n">d_input</span> <span class="o">=</span> <span class="n">d_X</span><span class="o">.</span><span class="n">slice</span><span class="p">(</span><span class="o">/*</span><span class="n">dim</span><span class="o">=*/</span><span class="mi">1</span><span class="p">,</span> <span class="n">state_size</span><span class="p">);</span>
+
+  <span class="k">return</span> <span class="p">{</span><span class="n">d_old_h</span><span class="p">,</span> <span class="n">d_input</span><span class="p">,</span> <span class="n">d_weights</span><span class="p">,</span> <span class="n">d_bias</span><span class="p">,</span> <span class="n">d_old_cell</span><span class="p">,</span> <span class="n">d_gates</span><span class="p">};</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../features.html" class="btn btn-neutral float-left" title="Features" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="nhwc.html" class="btn btn-neutral float-right" title="Channels Last" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

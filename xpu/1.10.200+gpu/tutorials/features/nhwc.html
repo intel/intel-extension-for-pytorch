@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Channels Last &mdash; intel_extension_for_pytorch 1.10.200+gpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Auto Mixed Precision (AMP)" href="amp.html" />
+    <link rel="prev" title="DPC++ Extension" href="DPC%2B%2B_Extension.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../../versions.html">1.10.200+gpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ease-of-use-python-api">Ease-of-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#channels-last">Channels Last</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Channels Last</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#what-is-channels-last">What is Channels Last</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#memory-format-is-all-that-matters">Memory Format Is All That Matters</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#a-nchw-default">a. NCHW (default)</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#b-nhwc">b. NHWC</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#pytorch-strided-layout">PyTorch Strided Layout</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#channels-last-memory-format-python-apis-on-xpu">Channels Last Memory Format python APIs on XPU</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#a-tensor-creation">a. tensor creation</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#b-tensor-conversion">b. tensor conversion</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#c-model-conversion">c. model conversion</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#channels-last-1d-support-on-xpu">Channels Last 1D support on XPU</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#a-tensor-conversion-with-channels-last-1d">a. tensor conversion with Channels Last 1D</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#b-model-conversion-with-channels-last-1d">b. model conversion with Channels Last 1D</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#c-determine-if-in-channels-last-1d-memory-format">c. determine if in Channels Last 1D memory format</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#simple-trace-tool">Simple Trace Tool</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../features.html">Features</a> &raquo;</li>
+      <li>Channels Last</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/nhwc.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="channels-last">
+<h1>Channels Last<a class="headerlink" href="#channels-last" title="Permalink to this heading"></a></h1>
+<section id="what-is-channels-last">
+<h2>What is Channels Last<a class="headerlink" href="#what-is-channels-last" title="Permalink to this heading"></a></h2>
+<p><strong>Note</strong>: In PyTorch, <strong>memory format</strong> refers to data representation that describes how multidimensional arrays (nD) are stored in linear (1D) memory address space.</p>
+<p>On CNN models, the canonical order of tensor dimensions is assigned with semantic meaning. For example the input tensor of 2D convolution is of NCHW by default on PyTorch - &lt;batch_size, channels, height, width&gt;. NHWC is an alternative way of describing the tensor dimensions - &lt;batch_size, height, width, channels&gt;.</p>
+<p>Look at the following image of illustrating NCHW and NHWC when N=1. Actually when N=1, NHWC has the same format with BMP file image.
+<img alt="fig-1-memory-layout" src="../../_images/figure1_memory_layout.png" /></p>
+<p>PyTorch refers to NCHW as <code class="docutils literal notranslate"><span class="pre">torch.contiguous_format</span></code> (the default memory format) and to NHWC as <code class="docutils literal notranslate"><span class="pre">torch.channels_last</span></code>, which is a new feature as of the 1.5 release.</p>
+<p>TensorFlow uses NHWC as the default memory format because NHWC has a performance advantage over NCHW. On XPU platforms, we propose to optimize Channels Last memory path for the following reasons:</p>
+<ul class="simple">
+<li><p><strong>Performance</strong> - NHWC performance is not as good as blocked memory format (nChw16c), but it is close, and much better performance than NCHW.</p></li>
+<li><p><strong>User Experience</strong> - Operator coverage of NHWC would be higher than blocked memory format, so user experience is better. To be specific, it is difficult to enable operators that manipulates <code class="docutils literal notranslate"><span class="pre">dim</span></code> on blocked format such as <code class="docutils literal notranslate"><span class="pre">sum(dim=?)</span></code>. You would need to convert tensor from blocked memory format back to NHWC, before feeding it into <code class="docutils literal notranslate"><span class="pre">sum()</span></code>. This is naturally supported on Channels Last memory format already.</p></li>
+</ul>
+</section>
+<section id="memory-format-is-all-that-matters">
+<h2>Memory Format Is All That Matters<a class="headerlink" href="#memory-format-is-all-that-matters" title="Permalink to this heading"></a></h2>
+<p>On CNN models, memory format is almost the foundation of any upper level design. One important fact is that converting memory format could be very expensive. Thus, in case that multiple CNN operators are performed in sequence, e.g. <code class="docutils literal notranslate"><span class="pre">Conv2d</span> <span class="pre">-&gt;</span> <span class="pre">ReLU</span> <span class="pre">-&gt;</span> <span class="pre">Conv2d</span></code>, it’s beneficial to transform them from different memory formats once, do computation, and reorder them back.</p>
+<p>On XPU, you can use 2 types of memory formats on CNN models:</p>
+<section id="a-nchw-default">
+<h3>a. NCHW (default)<a class="headerlink" href="#a-nchw-default" title="Permalink to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+
+<span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="b-nhwc">
+<h3>b. NHWC<a class="headerlink" href="#b-nhwc" title="Permalink to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+
+<span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+<span class="c1">## NB: convert to Channels Last memory format.</span>
+<span class="c1">##   oneDNN supports NHWC for feature maps (input, output),</span>
+<span class="c1">##   but weight still needs to be of blocked format.</span>
+<span class="c1">##   Still we can save reorders for feature maps.</span>
+<span class="nb">input</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="pytorch-strided-layout">
+<h2>PyTorch Strided Layout<a class="headerlink" href="#pytorch-strided-layout" title="Permalink to this heading"></a></h2>
+<p>Before moving on, let’s explain how PyTorch organizes tensors in memory - the <strong>layout</strong>. Here we only focus on <strong>dense</strong> tensors, skipping ‘coo’ layout of <strong>sparse</strong> tensor.</p>
+<p>The question itself can be reinterpreted as, for a tensor of size &lt;N, C, H, W&gt;, how does PyTorch access the element with index &lt;n, c, h, w&gt; from memory? The answer is <strong>stride</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">tensor</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">N</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">W</span><span class="o">&gt;</span>
+<span class="n">index</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">n</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="o">&gt;</span>
+<span class="n">strides</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">CHW</span><span class="p">,</span> <span class="n">HW</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="mi">1</span><span class="o">&gt;</span>
+<span class="n">offset</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="n">c</span><span class="p">,</span><span class="n">h</span><span class="p">,</span><span class="n">w</span><span class="p">)</span> <span class="o">=</span> <span class="n">stride_n</span> <span class="o">*</span> <span class="n">n</span> <span class="o">+</span> <span class="n">stride_c</span> <span class="o">*</span> <span class="n">c</span> <span class="o">+</span> <span class="n">stride_h</span> <span class="o">*</span> <span class="n">h</span> <span class="o">+</span> <span class="n">stride_w</span> <span class="o">*</span> <span class="n">w</span>
+                <span class="o">=</span> <span class="n">CHW</span> <span class="o">*</span> <span class="n">n</span> <span class="o">+</span> <span class="n">HW</span> <span class="o">*</span> <span class="n">c</span> <span class="o">+</span> <span class="n">W</span> <span class="o">*</span> <span class="n">h</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">*</span> <span class="n">w</span>
+</pre></div>
+</div>
+<p>One merit of introducing <strong>stride</strong> is that it can express noncontiguous tensors, e.g. a slice of a big tensor. For example, the ‘Xs’ in the following image have a stride of &lt;n1+n2, 1&gt;.</p>
+<p><img alt="fig-3-pytorch-strided-layout" src="../../_images/figure3_strided_layout.png" /></p>
+<p>Keep in mind that PyTorch Tensor does not have an attribute called ‘memory_format’ or something else. The memory format expression completely relies on <strong>size</strong> and <strong>stride</strong>. The design principle can be found at reference: <a class="reference external" href="https://github.com/pytorch/pytorch/issues/19092">RFC: Memory format (aka layout aka NHWC) support</a>. No matter what the tensor’s memory format is, we need a logical canonical order for the dimensions - that is <strong>NCHW</strong> on PyTorch. Thus, <strong>size</strong> and <strong>stride</strong> are ALWAYS described in the order of <strong>NCHW</strong>. Let’s now look at the Channels Last case of the previous question:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">tensor</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">N</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">W</span><span class="o">&gt;</span>
+<span class="n">index</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">n</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="o">&gt;</span>
+<span class="n">strides</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">HWC</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">WC</span><span class="p">,</span> <span class="n">C</span><span class="o">&gt;</span>
+<span class="n">offset</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="n">c</span><span class="p">,</span><span class="n">h</span><span class="p">,</span><span class="n">w</span><span class="p">)</span> <span class="o">=</span> <span class="n">stride_n</span> <span class="o">*</span> <span class="n">n</span> <span class="o">+</span> <span class="n">stride_c</span> <span class="o">*</span> <span class="n">c</span> <span class="o">+</span> <span class="n">stride_h</span> <span class="o">*</span> <span class="n">h</span> <span class="o">+</span> <span class="n">stride_w</span> <span class="o">*</span> <span class="n">w</span>
+                <span class="o">=</span> <span class="n">HWC</span> <span class="o">*</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">*</span> <span class="n">c</span> <span class="o">+</span> <span class="n">WC</span> <span class="o">*</span> <span class="n">h</span> <span class="o">+</span> <span class="n">C</span> <span class="o">*</span> <span class="n">w</span>
+</pre></div>
+</div>
+<p>Actually, this pattern applies to ALL other memory formats as long as it is 4-dim, e.g. strides for CHWN would be &lt;1, HWN, WN, N&gt;.</p>
+</section>
+<section id="channels-last-memory-format-python-apis-on-xpu">
+<h2>Channels Last Memory Format python APIs on XPU<a class="headerlink" href="#channels-last-memory-format-python-apis-on-xpu" title="Permalink to this heading"></a></h2>
+<section id="a-tensor-creation">
+<h3>a. tensor creation<a class="headerlink" href="#a-tensor-creation" title="Permalink to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="b-tensor-conversion">
+<h3>b. tensor conversion<a class="headerlink" href="#b-tensor-conversion" title="Permalink to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1">## .contiguous() transforms NHWC noncontiguous to NHWC contiguous.</span>
+<span class="c1">## .to() converts NCHW tensor to NHWC one, it is outplace.</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">contiguous</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+
+<span class="c1">## contiguous check</span>
+<span class="n">x</span><span class="o">.</span><span class="n">is_contiguous</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="c-model-conversion">
+<h3>c. model conversion<a class="headerlink" href="#c-model-conversion" title="Permalink to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1">## NB: tensor.to() is an outplace operation</span>
+<span class="c1">##   model.to() is inplace. It calls _apply() which is inplace.</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+<span class="nb">input</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Some spontaneous questions:</p>
+<ul class="simple">
+<li><p><strong>How to tell whether this model or operator support Channels Last?</strong> - This requires manual memory format check, aka. ‘torch.channels_last’ input and weight shall NOT generate ‘torch.contiguous_format’ output.</p></li>
+<li><p><strong>What if the model comprises of operator not supporting Channels Last?</strong> - No errors messages will be shown, the NHWC tensor will be handled by the operator as a non-contiguous NCHW tensor, so result might not be correct depending on the algorithm of this operator.</p></li>
+</ul>
+</section>
+</section>
+<section id="channels-last-1d-support-on-xpu">
+<h2>Channels Last 1D support on XPU<a class="headerlink" href="#channels-last-1d-support-on-xpu" title="Permalink to this heading"></a></h2>
+<p>Both stock PyTorch and Intel® Extension for PyTorch* support Channels Last(2D) and Channels Last 3D, however, regarding Channels Last 1D, they are different. Stock PyTorch doesn’t support Channels Last 1D, while XPU could supply limited support for Channels Last 1D.
+We only support Channels Last 1D memory format in these operators: Conv1D, BatchNorm1D, MaxPool1D, Concat, binary add, binary div, upsample linear and upsample nearest.</p>
+<p>The usage of Channels Last 1D on XPU is different from stock PyTorch Channels Last(2D) or Channels Last 3D. We use torch.xpu.to_channels_last_1d() to do conversation for both input tensor and model. See below:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+
+<span class="n">sycl_device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">Model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Model</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">block</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">block</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span>
+<span class="n">test_input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">([</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">])</span>
+<span class="n">test_input_xpu</span> <span class="o">=</span> <span class="n">test_input</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">sycl_device</span><span class="p">)</span>
+<span class="n">test_input_xpu</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">to_channels_last_1d</span><span class="p">(</span><span class="n">test_input_xpu</span><span class="p">)</span> <span class="c1"># Channels Last 1D conversation for tenor</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">sycl_device</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">to_channels_last_1d</span><span class="p">(</span><span class="n">model</span><span class="p">)</span> <span class="c1"># Channels Last 1D conversation for mode</span>
+<span class="n">xpu_res</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">test_input_xpu</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">is_contiguous_channels_last_1d</span><span class="p">(</span><span class="n">xpu_res</span><span class="p">))</span>
+</pre></div>
+</div>
+<section id="a-tensor-conversion-with-channels-last-1d">
+<h3>a. tensor conversion with Channels Last 1D<a class="headerlink" href="#a-tensor-conversion-with-channels-last-1d" title="Permalink to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">input_xpu</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">to_channels_last_1d</span><span class="p">(</span><span class="n">input_xpu</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="b-model-conversion-with-channels-last-1d">
+<h3>b. model conversion with Channels Last 1D<a class="headerlink" href="#b-model-conversion-with-channels-last-1d" title="Permalink to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">to_channels_last_1d</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="c-determine-if-in-channels-last-1d-memory-format">
+<h3>c. determine if in Channels Last 1D memory format<a class="headerlink" href="#c-determine-if-in-channels-last-1d-memory-format" title="Permalink to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">is_contiguous_channels_last_1d</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Note that because Meta doesn’t support Channels Last 1D feature now: <a class="reference external" href="https://github.com/pytorch/pytorch/issues/74935">RFC: A suggestion of channels last memory format implementation for 3D tensor</a>, expect Channels Last 1D APIs above, other APIs from stock PyTorch may be invalid. E.g.: If you want to use memory format corrsponding API for Channels Last 1D, it cannot work as you wish.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="DPC%2B%2B_Extension.html" class="btn btn-neutral float-left" title="DPC++ Extension" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="amp.html" class="btn btn-neutral float-right" title="Auto Mixed Precision (AMP)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

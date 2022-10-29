@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simple Trace Tool [EXPERIMENTAL] &mdash; intel_extension_for_pytorch 1.10.200+gpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Releases" href="../releases.html" />
+    <link rel="prev" title="Optimizer Fusion" href="optimizer_fusion.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../../versions.html">1.10.200+gpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ease-of-use-python-api">Ease-of-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#simple-trace-tool">Simple Trace Tool</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Simple Trace Tool [EXPERIMENTAL]</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#use-case">Use Case</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#build-tool">Build Tool</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#enable-and-disable-tool">Enable and Disable Tool</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#results">Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../features.html">Features</a> &raquo;</li>
+      <li>Simple Trace Tool [EXPERIMENTAL]</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/simple_trace.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="simple-trace-tool-experimental">
+<h1>Simple Trace Tool [EXPERIMENTAL]<a class="headerlink" href="#simple-trace-tool-experimental" title="Permalink to this heading"></a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading"></a></h2>
+<p>Simple Trace is a built-in debugging tool that lets you control printing out the call stack for a piece of code. You can enable this tool and have it automatically print out verbose messages of called operators in a stack format with indenting to distinguish the context. You can enable and disable this tool using a simple method.</p>
+</section>
+<section id="use-case">
+<h2>Use Case<a class="headerlink" href="#use-case" title="Permalink to this heading"></a></h2>
+<p>To use the simple trace tool, you need to build Intel® Extension for PyTorch* from source and add explicit calls to enable and disable tracing in your model script. When enabled, the trace messages will be printed to the console screen by default, along with verbose log messages.</p>
+<section id="build-tool">
+<h3>Build Tool<a class="headerlink" href="#build-tool" title="Permalink to this heading"></a></h3>
+<p>Add the Simple Trace tool by turning on the build option <code class="docutils literal notranslate"><span class="pre">BUILD_SIMPLE_TRACE=ON</span></code> and then build Intel® Extension for PyTorch* from source.</p>
+<div class="highlight-unix notranslate"><div class="highlight"><pre><span></span>BUILD_SIMPLE_TRACE=ON python setup.py install
+</pre></div>
+</div>
+</section>
+<section id="enable-and-disable-tool">
+<h3>Enable and Disable Tool<a class="headerlink" href="#enable-and-disable-tool" title="Permalink to this heading"></a></h3>
+<p>In your model script, bracket code in your model script with calls to <code class="docutils literal notranslate"><span class="pre">torch.xpu.enable_simple_trace()</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.xpu.disable_simple_trace()</span></code>, as shown in the following example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># import all necessary libraries</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">using_simple_trace</span><span class="p">())</span>   <span class="c1"># False</span>
+<span class="n">a</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">xpu</span><span class="p">()</span>              <span class="c1"># this line won&#39;t be traced</span>
+
+<span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">enable_simple_trace</span><span class="p">()</span>         <span class="c1"># to enable simple trace tool</span>
+
+<span class="c1"># test code (with tracing enabled) begins here</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">xpu</span><span class="p">()</span>
+<span class="n">c</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+<span class="c1"># test code ends here</span>
+
+<span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">disable_simple_trace</span><span class="p">()</span>        <span class="c1"># to disable simple trace tool</span>
+</pre></div>
+</div>
+<p>The simple trace output will start after being enabled, and will continue until
+the call to disable it, so be careful with your model script logic so the disable call is
+not unintentionally skipped.</p>
+</section>
+<section id="results">
+<h3>Results<a class="headerlink" href="#results" title="Permalink to this heading"></a></h3>
+<p>Using the script shown above as the exmaple, you’ll see these messages printed out to the console:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[262618.262618]  Call  into  OP: wrapper__empty_strided -&gt; at::AtenIpexTypeXPU::empty_strided (#0)
+[262618.262618]  Step out of OP: wrapper__empty_strided -&gt; at::AtenIpexTypeXPU::empty_strided (#0)
+[262618.262618]  Call  into  OP: wrapper__copy_ -&gt; at::AtenIpexTypeXPU::copy_ (#1)
+[262618.262618]  Step out of OP: wrapper__copy_ -&gt; at::AtenIpexTypeXPU::copy_ (#1)
+[262618.262618]  Call  into  OP: wrapper___unique2 -&gt; at::AtenIpexTypeXPU::_unique2 (#2)
+[262618.262618]    Call  into  OP: wrapper__clone -&gt; at::AtenIpexTypeXPU::clone (#3)
+[262618.262618]      Call  into  OP: wrapper__empty_strided -&gt; at::AtenIpexTypeXPU::empty_strided (#4)
+[262618.262618]      Step out of OP: wrapper__empty_strided -&gt; at::AtenIpexTypeXPU::empty_strided (#4)
+[262618.262618]      Call  into  OP: wrapper__copy_ -&gt; at::AtenIpexTypeXPU::copy_ (#5)
+[262618.262618]      Step out of OP: wrapper__copy_ -&gt; at::AtenIpexTypeXPU::copy_ (#5)
+[262618.262618]    Step out of OP: wrapper__clone -&gt; at::AtenIpexTypeXPU::clone (#3)
+[262618.262618]    Call  into  OP: wrapper___reshape_alias -&gt; at::AtenIpexTypeXPU::_reshape_alias (#6)
+[262618.262618]    Step out of OP: wrapper___reshape_alias -&gt; at::AtenIpexTypeXPU::_reshape_alias (#6)
+[262618.262618]    Call  into  OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#7)
+[262618.262618]    Step out of OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#7)
+[262618.262618]    Call  into  OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#8)
+[262618.262618]    Step out of OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#8)
+[262618.262618]    Call  into  OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#9)
+[262618.262618]    Step out of OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#9)
+[262618.262618]    Call  into  OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#10)
+[262618.262618]    Step out of OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#10)
+[262618.262618]    Call  into  OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#11)
+[262618.262618]    Step out of OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#11)
+[262618.262618]    Call  into  OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#12)
+[262618.262618]    Step out of OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#12)
+[262618.262618]    Call  into  OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#13)
+[262618.262618]    Step out of OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#13)
+[262618.262618]    Call  into  OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#14)
+[262618.262618]    Step out of OP: wrapper_memory_format_empty -&gt; at::AtenIpexTypeXPU::empty (#14)
+[262618.262618]    Call  into  OP: wrapper__as_strided -&gt; at::AtenIpexTypeXPU::as_strided (#15)
+[262618.262618]    Step out of OP: wrapper__as_strided -&gt; at::AtenIpexTypeXPU::as_strided (#15)
+[262618.262618]    Call  into  OP: wrapper___local_scalar_dense -&gt; at::AtenIpexTypeXPU::_local_scalar_dense (#16)
+[262618.262618]    Step out of OP: wrapper___local_scalar_dense -&gt; at::AtenIpexTypeXPU::_local_scalar_dense (#16)
+[262618.262618]    Call  into  OP: wrapper__as_strided -&gt; at::AtenIpexTypeXPU::as_strided (#17)
+[262618.262618]    Step out of OP: wrapper__as_strided -&gt; at::AtenIpexTypeXPU::as_strided (#17)
+[262618.262618]    Call  into  OP: wrapper___local_scalar_dense -&gt; at::AtenIpexTypeXPU::_local_scalar_dense (#18)
+[262618.262618]    Step out of OP: wrapper___local_scalar_dense -&gt; at::AtenIpexTypeXPU::_local_scalar_dense (#18)
+[262618.262618]    Call  into  OP: wrapper__resize_ -&gt; at::AtenIpexTypeXPU::resize_ (#19)
+[262618.262618]    Step out of OP: wrapper__resize_ -&gt; at::AtenIpexTypeXPU::resize_ (#19)
+[262618.262618]  Step out of OP: wrapper___unique2 -&gt; at::AtenIpexTypeXPU::_unique2 (#2)
+[262618.262618]  Call  into  OP: wrapper__copy_ -&gt; at::AtenIpexTypeXPU::copy_ (#20)
+[262618.262618]  Step out of OP: wrapper__copy_ -&gt; at::AtenIpexTypeXPU::copy_ (#20)
+</pre></div>
+</div>
+<p>The meanings of each field are shown as below:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">pid.tid</span></code>, <code class="docutils literal notranslate"><span class="pre">[262618.262618]</span></code>: the process id and the thread id responsible to the printed-out line.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">behavior</span></code>, <code class="docutils literal notranslate"><span class="pre">Call</span> <span class="pre">into</span> <span class="pre">OP</span></code>, <code class="docutils literal notranslate"><span class="pre">Step</span> <span class="pre">out</span> <span class="pre">of</span> <span class="pre">OP</span></code>: call-in or step-out behavior of the operators in a run.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">name1</span> <span class="pre">-&gt;</span> <span class="pre">name2</span></code>, <code class="docutils literal notranslate"><span class="pre">wrapper__empty_strided</span> <span class="pre">-&gt;</span> <span class="pre">at::AtenIpexTypeXPU::empty_strided</span></code>: the calling operator for the current step. The name1 before the arrow shows the wrapper from PyTorch. The name2 after the arrow shows the function name of which was called in or stepped out in Intel® Extension for PyTorch* at the current step.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(#No.)</span></code>, <code class="docutils literal notranslate"><span class="pre">(#0)</span></code>: index of the called operators. This index was numbered from 0 in the order of each operator to be called.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">indent</span></code>: the indent ahead of every behavior shows the nested relationship between operators. The operator call-in line with more indent should be a child of what was called above it.</p></li>
+</ul>
+<p>With this output, you can see the calling stack of the traced script without using complicated debug tools such as gdb.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="optimizer_fusion.html" class="btn btn-neutral float-left" title="Optimizer Fusion" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../releases.html" class="btn btn-neutral float-right" title="Releases" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
