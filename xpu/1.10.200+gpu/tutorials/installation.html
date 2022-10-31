@@ -60,6 +60,8 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#install-via-wheel-files">Install via wheel files</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#install-pytorch">Install PyTorch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#install-numpy">Install Numpy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#install-torchvision-and-torchaudio-optional">Install torchvision and torchaudio (Optional)</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#install-intel-extension-for-pytorch">Install Intel® Extension for PyTorch*</a></li>
 </ul>
 </li>
@@ -168,18 +170,22 @@
 </table></section>
 <section id="install-oneapi-base-toolkit">
 <h3>Install oneAPI Base Toolkit<a class="headerlink" href="#install-oneapi-base-toolkit" title="Permalink to this heading"></a></h3>
-<p>Please refer to <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit">Install oneAPI Base Toolkit Packages</a></p>
+<p>Please refer to <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit">Install oneAPI Base Toolkit Packages</a>.</p>
 <p>Need to install components of Intel® oneAPI Base Toolkit:</p>
 <ul class="simple">
 <li><p>Intel® oneAPI DPC++ Compiler</p></li>
 <li><p>Intel® oneAPI Math Kernel Library (oneMKL)</p></li>
 </ul>
-<p>Default installation location is /opt/intel/oneapi for root account, ${HOME}/intel/oneapi for other accounts.</p>
+<p>Default installation location <em>{ONEAPI_ROOT}</em> is <code class="docutils literal notranslate"><span class="pre">/opt/intel/oneapi</span></code> for root account, <code class="docutils literal notranslate"><span class="pre">${HOME}/intel/oneapi</span></code> for other accounts.</p>
+<p><strong><em>NOTE:</em></strong> You need to activate oneAPI environment when using Intel® Extension for PyTorch* on Intel GPU.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span> <span class="o">{</span>ONEAPI_ROOT<span class="o">}</span>/setvars.sh
+</pre></div>
+</div>
 </section>
 </section>
 <section id="install-via-wheel-files">
 <h2>Install via wheel files<a class="headerlink" href="#install-via-wheel-files" title="Permalink to this heading"></a></h2>
-<p>Prebuilt wheel files availability matrix for Python versions</p>
+<p>Prebuilt wheel files availability matrix for Python versions:</p>
 <table border="1" class="docutils">
 <thead>
 <tr>
@@ -206,6 +212,24 @@
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python -m pip install <span class="nv">torch</span><span class="o">==</span><span class="m">1</span>.10.0a0 -f https://developer.intel.com/ipex-whl-stable-xpu
 </pre></div>
 </div>
+</section>
+<section id="install-numpy">
+<h3>Install Numpy<a class="headerlink" href="#install-numpy" title="Permalink to this heading"></a></h3>
+<p>Numpy is required to work with PyTorch*. Verified numpy versions differ according to python versions.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python -m pip install <span class="nv">numpy</span><span class="o">==</span><span class="m">1</span>.19.5  <span class="c1"># for Python 3.6</span>
+python -m pip install <span class="nv">numpy</span><span class="o">==</span><span class="m">1</span>.21.6  <span class="c1"># for Python 3.7</span>
+python -m pip install <span class="nv">numpy</span><span class="o">==</span><span class="m">1</span>.23.4  <span class="c1"># for Python 3.8 and 3.9</span>
+</pre></div>
+</div>
+</section>
+<section id="install-torchvision-and-torchaudio-optional">
+<h3>Install torchvision and torchaudio (Optional)<a class="headerlink" href="#install-torchvision-and-torchaudio-optional" title="Permalink to this heading"></a></h3>
+<p>Intel® Extension for PyTorch* doesn’t depend on torchvision or torchaudio.</p>
+<p>You can install torchvision via the following command.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python -m pip install <span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.11.0+cpu --no-deps -f https://download.pytorch.org/whl/torch_stable.html
+</pre></div>
+</div>
+<p>For torchaudio installation, please follow the <a class="reference external" href="https://github.com/pytorch/audio/tree/v0.10.0#from-source">instructions</a> to compile it from source. According to torchaudio-pytorch dependency table, torchaudio 0.10.0 is recommended.</p>
 </section>
 <section id="install-intel-extension-for-pytorch">
 <h3>Install Intel® Extension for PyTorch*<a class="headerlink" href="#install-intel-extension-for-pytorch" title="Permalink to this heading"></a></h3>
@@ -235,7 +259,7 @@ $ git apply <span class="si">${</span><span class="nv">intel_extension_for_pytor
 $ git submodule sync
 $ git submodule update --init --recursive
 $ pip install -r requirements.txt
-$ <span class="nb">source</span> <span class="si">${</span><span class="nv">oneAPI_HOME</span><span class="si">}</span>/mkl/latest/env/vars.sh
+$ <span class="nb">source</span> <span class="o">{</span>ONEAPI_ROOT<span class="o">}</span>/setvars.sh
 $ python setup.py bdist_wheel
 $ pip install dist/*.whl
 </pre></div>
@@ -254,8 +278,7 @@ $ pip install dist/*.whl
 $ git submodule sync
 $ git submodule update --init --recursive
 $ pip install -r requirements.txt
-$ <span class="nb">source</span> <span class="si">${</span><span class="nv">oneAPI_HOME</span><span class="si">}</span>/compiler/latest/env/vars.sh
-$ <span class="nb">source</span> <span class="si">${</span><span class="nv">oneAPI_HOME</span><span class="si">}</span>/mkl/latest/env/vars.sh
+$ <span class="nb">source</span> <span class="o">{</span>ONEAPI_ROOT<span class="o">}</span>/setvars.sh <span class="c1"># If you have sourced the oneAPI environment when compiling PyTorch, please skip this step.</span>
 $ python setup.py bdist_wheel
 $ pip install dist/*.whl
 </pre></div>

@@ -34,17 +34,23 @@ Intel® Extension for PyTorch\* has to work with a corresponding version of PyTo
 
 ### Install oneAPI Base Toolkit
 
-Please refer to [Install oneAPI Base Toolkit Packages](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit)
+Please refer to [Install oneAPI Base Toolkit Packages](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit).
 
 Need to install components of Intel® oneAPI Base Toolkit:
  - Intel® oneAPI DPC++ Compiler
  - Intel® oneAPI Math Kernel Library (oneMKL)
 
-Default installation location is /opt/intel/oneapi for root account, ${HOME}/intel/oneapi for other accounts.
+Default installation location *{ONEAPI_ROOT}* is `/opt/intel/oneapi` for root account, `${HOME}/intel/oneapi` for other accounts.
+
+**_NOTE:_** You need to activate oneAPI environment when using Intel® Extension for PyTorch\* on Intel GPU.
+
+```bash
+source {ONEAPI_ROOT}/setvars.sh
+```
 
 ## Install via wheel files
 
-Prebuilt wheel files availability matrix for Python versions
+Prebuilt wheel files availability matrix for Python versions:
 
 | Extension Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 | Python 3.10 |
 | :--: | :--: | :--: | :--: | :--: | :--: |
@@ -55,6 +61,28 @@ Prebuilt wheel files availability matrix for Python versions
 ```bash
 python -m pip install torch==1.10.0a0 -f https://developer.intel.com/ipex-whl-stable-xpu
 ```
+
+### Install Numpy
+
+Numpy is required to work with PyTorch\*. Verified numpy versions differ according to python versions.
+
+```bash
+python -m pip install numpy==1.19.5  # for Python 3.6
+python -m pip install numpy==1.21.6  # for Python 3.7
+python -m pip install numpy==1.23.4  # for Python 3.8 and 3.9
+```
+
+### Install torchvision and torchaudio (Optional)
+
+Intel® Extension for PyTorch\* doesn't depend on torchvision or torchaudio.
+
+You can install torchvision via the following command.
+
+```bash
+python -m pip install torchvision==0.11.0+cpu --no-deps -f https://download.pytorch.org/whl/torch_stable.html
+```
+
+For torchaudio installation, please follow the [instructions](https://github.com/pytorch/audio/tree/v0.10.0#from-source) to compile it from source. According to torchaudio-pytorch dependency table, torchaudio 0.10.0 is recommended.
 
 ### Install Intel® Extension for PyTorch\*
 
@@ -84,7 +112,7 @@ $ git apply ${intel_extension_for_pytorch_directory}/torch_patches/*.patch
 $ git submodule sync
 $ git submodule update --init --recursive
 $ pip install -r requirements.txt
-$ source ${oneAPI_HOME}/mkl/latest/env/vars.sh
+$ source {ONEAPI_ROOT}/setvars.sh
 $ python setup.py bdist_wheel
 $ pip install dist/*.whl
 ```
@@ -104,8 +132,7 @@ $ cd intel-extension-for-pytorch
 $ git submodule sync
 $ git submodule update --init --recursive
 $ pip install -r requirements.txt
-$ source ${oneAPI_HOME}/compiler/latest/env/vars.sh
-$ source ${oneAPI_HOME}/mkl/latest/env/vars.sh
+$ source {ONEAPI_ROOT}/setvars.sh # If you have sourced the oneAPI environment when compiling PyTorch, please skip this step.
 $ python setup.py bdist_wheel
 $ pip install dist/*.whl
 ```
