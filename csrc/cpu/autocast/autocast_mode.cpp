@@ -127,8 +127,7 @@ struct CPU_WrapFunction_<
         return (*F)(cpu_cached_cast(at::kFloat, args)...);
       case DtypeCastPolicy::promote:
         return (*F)(cpu_cached_cast(
-            promote_type(get_autocast_dtype(), DeviceType::CPU, args...),
-            args)...);
+            promote_type(get_autocast_dtype(), args...), args)...);
       default:
         return (*F)(args...);
     }
