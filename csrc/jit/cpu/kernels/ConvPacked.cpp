@@ -305,6 +305,22 @@ at::Tensor convolution_add_relu_run(
       ideep::attr_t::residual(scale).set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
+at::Tensor convolution_swish_add_run(
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const c10::optional<at::Scalar>& alpha,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
+  RECORD_FUNCTION(
+      "ipex_prepack::convolution_swish_add_run",
+      c10::ArrayRef<c10::IValue>({}));
+  auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
+  return op_context->run(
+      input,
+      accumu,
+      ideep::attr_t::fuse_swish_sum(scale).set_fpmath_mode(
+          torch_ipex::fpmath_mode));
+}
+
 at::Tensor& convolution_bottleneck_run(
     at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context1,

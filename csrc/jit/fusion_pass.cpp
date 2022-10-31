@@ -107,9 +107,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::insertPrePackedConvOp(graph);
 
   // convolution fusion
-  GRAPH_DUMP("After insertPrePackedConvOp.Before fuseConvWithEltwise", graph);
-  graph_rewrite::fuseConvWithEltwise(graph);
-  GRAPH_DUMP("After fuseConvWithEltwise.Before fuseConvAddRelu", graph);
+  GRAPH_DUMP(
+      "After insertPrePackedConvOp.Before fuseConvWithEltwiseAdd", graph);
+  graph_rewrite::fuseConvWithEltwiseAdd(graph);
+  GRAPH_DUMP("After fuseConvWithEltwiseAdd.Before fuseConvAddRelu", graph);
   graph_rewrite::fuseConvAddRelu(graph);
   GRAPH_DUMP("After fuseConvAddRelu.Before fuseBottleneck", graph);
   graph_rewrite::fuseBottleneck(graph);
