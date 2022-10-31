@@ -32,17 +32,6 @@ class TestTorchMethod(TestCase):
     def test_geometric(self):
         p = torch.tensor([0.7, 0.2, 0.4], requires_grad=True, device=sycl_device)
         r = torch.tensor(0.3, requires_grad=True, device=sycl_device)
-        self.assertEqual(Geometric(p).sample((8,)).size(), (8, 3))
-        self.assertFalse(Geometric(p).sample().requires_grad)
-        self.assertEqual(Geometric(r).sample((8,)).size(), (8,))
-        self.assertEqual(Geometric(r).sample().size(), ())
-        self.assertEqual(Geometric(r).sample((3, 2)).size(), (3, 2))
-        self.assertRaises(NotImplementedError, Geometric(r).rsample)
-
-
-    def test_geometric_113(self):
-        p = torch.tensor([0.7, 0.2, 0.4], requires_grad=True, device=sycl_device)
-        r = torch.tensor(0.3, requires_grad=True, device=sycl_device)
         s = 0.3
         self.assertEqual(Geometric(p).sample((8,)).size(), (8, 3))
         self.assertEqual(Geometric(1).sample(), 0)
@@ -58,7 +47,7 @@ class TestTorchMethod(TestCase):
         self.assertRaises(NotImplementedError, Geometric(r).rsample)
 
     @repeat_test_for_types([*all_types_and(torch.half, torch.bfloat16)])
-    def test_geometric(self, dtype=torch.float):
+    def test_basic_geometric(self, dtype=torch.float):
         device = sycl_device
         # This function is directly ported from 1.13 test_torch.py
         a = torch.tensor([10], dtype=dtype, device=device).geometric_(0.5)
