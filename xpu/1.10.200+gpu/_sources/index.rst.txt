@@ -17,7 +17,7 @@ PyTorch components are depicted with white boxes and Intel extensions are with b
 
 Intel® Extension for PyTorch* utilizes the `DPC++ <https://github.com/intel/llvm#oneapi-dpc-compiler>`_ compiler that supports the latest `SYCL* <https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html>`_ standard and also a number of extensions to the SYCL* standard, which can be found in the `sycl/doc/extensions <https://github.com/intel/llvm/tree/sycl/sycl/doc/extensions>`_ directory. Intel® Extension for PyTorch* also integrates `oneDNN <https://github.com/oneapi-src/oneDNN>`_ and `oneMKL <https://github.com/oneapi-src/oneMKL>`_ libraries and provides kernels based on that. The oneDNN library is used for computation intensive operations. The oneMKL library is used for fundamental mathematical operations.
 
-Intel® Extension for PyTorch* has been released as an open–source project on `GitHub <https://github.com/intel/intel-extension-for-pytorch>`_.
+Intel® Extension for PyTorch* has been released as an open–source project on `GitHub <https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master>`_.
 
 .. toctree::
    :hidden:
