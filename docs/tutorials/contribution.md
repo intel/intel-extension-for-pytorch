@@ -95,7 +95,7 @@ All Python test suites are located in the `tests/gpu` folder and start with `tes
 
 We don't officially support `pytest`, but it works well with our unit tests and offers a number of useful features for local developing. Install it via `pip install pytest`.
 
-For more information about unit tests, please read [README.md](../../tests/gpu/README.md) in the `tests/gpu` folder. 
+For more information about unit tests, please read [README.md](https://github.com/intel/intel-extension-for-pytorch/blob/xpu-master/tests/gpu/README.md) in the `tests/gpu` folder. 
 
 ## Writing documentation
 
