@@ -150,16 +150,9 @@ class TestNNMethod(TestCase):
             x_dpcpp = x_cpu.to("xpu")
             x_cpu.requires_grad_(True)
             x_dpcpp.requires_grad_(True)
-<<<<<<< HEAD
             y_cpu = GELU(to_block_cpu(x_cpu))
             y_dpcpp = GELU_dpcpp(to_block_dpcpp(x_dpcpp))
 
-=======
-            y_cpu = GELU(x_cpu)
-            y_dpcpp = GELU_dpcpp(x_dpcpp)
-            print("cpu gelu ", y_cpu)
-            print("dpcpp gelu ", y_dpcpp.cpu())
->>>>>>> bf7831b6c13be4f2e296118f4557e201237e8b69
             self.assertEqual(y_cpu, y_dpcpp.cpu())
 
             # y_cpu = torch.tensor([[1, 1],[1, 1],[1, 1],[1, 1]]);
@@ -167,11 +160,6 @@ class TestNNMethod(TestCase):
             y_cpu.backward(x_cpu)
             y_dpcpp.backward(x_dpcpp)
 
-<<<<<<< HEAD
-=======
-            print("cpu gelu bwd", x_cpu.grad)
-            print("dpcpp gelu bwd", x_dpcpp.grad.cpu())
->>>>>>> bf7831b6c13be4f2e296118f4557e201237e8b69
             self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_activation_gelu_block(self, dtype=torch.float):
