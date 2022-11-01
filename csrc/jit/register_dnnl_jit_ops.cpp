@@ -19,13 +19,13 @@
 #include "dpcpp_ops.h"
 
 namespace {
-  // using namespace torch;
-  using namespace at::native;
-  using namespace torch::jit;
-  template <typename T>
-  struct IvalueConvert {
-    T operator()(c10::IValue&) {}
-  };
+// using namespace torch;
+using namespace at::native;
+using namespace torch::jit;
+template <typename T>
+struct IvalueConvert {
+  T operator()(c10::IValue&) {}
+};
 
 /* DEFINE CONVERTER
 DEFINE CONVERTER is used to generate template specialization of
@@ -167,121 +167,124 @@ const T& specialization.
     }                                             \
   };
 
-  DEFINE_CONVERTER(at::Tensor, toTensor())
-  DEFINE_CONVERTER(std::vector<int64_t>, toIntVector())
-  // DEFINE_CONVERTER(c10::ArrayRef<long>, toIntVector())
-  DEFINE_CONVERTER(at::Scalar, toScalar())
-  DEFINE_CONVERTER(at::ScalarType, toScalarType())
-  DEFINE_CONVERTER(at::MemoryFormat, toMemoryFormat())
-  DEFINE_CONVERTER(at::QScheme, toQScheme())
-  DEFINE_CONVERTER(c10::Device, toDevice())
-  DEFINE_CONVERTER(c10::intrusive_ptr<ivalue::Object>, toObject())
-  DEFINE_CONVERTER(c10::Stream, toStream())
-  DEFINE_CONVERTER(c10::Layout, toLayout())
-  DEFINE_CONVERTER(int, toInt())
-  DEFINE_CONVERTER(long, toInt())
-  DEFINE_CONVERTER(float, toDouble())
-  DEFINE_CONVERTER(double, toDouble())
-  DEFINE_CONVERTER(bool, toBool())
-  DEFINE_CONVERTER(c10::complex<double>, toComplexDouble())
-  DEFINE_CONVERTER(at::Dimname, toDimname())
-  DEFINE_CUSTOMTYPE_CONVERT(ConvPackedParamsBase<2>)
+DEFINE_CONVERTER(c10::basic_string_view<char>, toStringView())
+DEFINE_CONVERTER(at::Tensor, toTensor())
+DEFINE_CONVERTER(std::vector<int64_t>, toIntVector())
+// DEFINE_CONVERTER(c10::ArrayRef<long>, toIntVector())
+DEFINE_CONVERTER(at::Scalar, toScalar())
+DEFINE_CONVERTER(at::ScalarType, toScalarType())
+DEFINE_CONVERTER(at::MemoryFormat, toMemoryFormat())
+DEFINE_CONVERTER(at::QScheme, toQScheme())
+DEFINE_CONVERTER(c10::Device, toDevice())
+DEFINE_CONVERTER(c10::intrusive_ptr<ivalue::Object>, toObject())
+DEFINE_CONVERTER(c10::Stream, toStream())
+DEFINE_CONVERTER(c10::Layout, toLayout())
+DEFINE_CONVERTER(int, toInt())
+DEFINE_CONVERTER(long, toInt())
+DEFINE_CONVERTER(float, toDouble())
+DEFINE_CONVERTER(double, toDouble())
+DEFINE_CONVERTER(bool, toBool())
+DEFINE_CONVERTER(c10::complex<double>, toComplexDouble())
+DEFINE_CONVERTER(at::Dimname, toDimname())
+DEFINE_CUSTOMTYPE_CONVERT(ConvPackedParamsBase<2>)
 
-  DEFINE_OPTIONAL_CONVERTER(at::Tensor, toTensor())
+DEFINE_OPTIONAL_CONVERTER(at::Tensor, toTensor())
 
-  template <>
-  struct IvalueConvert<const c10::intrusive_ptr<ConvPackedParamsBase<2>>&> {
-    c10::intrusive_ptr<ConvPackedParamsBase<2>> operator()(IValue& i_value) {
-      return i_value.toCustomClass<ConvPackedParamsBase<2>>();
-    }
-    c10::intrusive_ptr<ConvPackedParamsBase<2>> operator()(IValue&& i_value) {
-      return i_value.toCustomClass<ConvPackedParamsBase<2>>();
-    }
-  };
-
-  template <>
-  struct IvalueConvert<at::IntArrayRef> {
-    std::vector<int64_t> operator()(IValue& i_value) {
-      std::vector<int64_t> ref = i_value.toIntVector();
-      return ref;
-    }
-    std::vector<int64_t> operator()(IValue&& i_value) {
-      std::vector<int64_t> ref = i_value.toIntVector();
-      return ref;
-    }
-  };
-
-  template <typename... Args>
-  constexpr int typeCounter() {
-    return sizeof...(Args);
+template <>
+struct IvalueConvert<const c10::intrusive_ptr<ConvPackedParamsBase<2>>&> {
+  c10::intrusive_ptr<ConvPackedParamsBase<2>> operator()(IValue& i_value) {
+    return i_value.toCustomClass<ConvPackedParamsBase<2>>();
   }
-
-  template <int n, typename Func, typename TypeList, size_t... N>
-  torch::jit::Operation generateJitOperation(
-      Func func, std::string str, std::index_sequence<N...> seq) {
-    return [=](Stack& stack) {
-      auto result = torch::jit::xpu::JitFusionProxy<Func>()(
-          func,
-          str,
-          IvalueConvert<c10::guts::typelist::element_t<N, TypeList>>()(
-              std::move(peek(stack, N, n)))...);
-      drop(stack, n);
-      pack(stack, std::move(result));
-    };
+  c10::intrusive_ptr<ConvPackedParamsBase<2>> operator()(IValue&& i_value) {
+    return i_value.toCustomClass<ConvPackedParamsBase<2>>();
   }
+};
 
-  /* IPEX_JIT_OP_REGISTER useage:
-  This macro is wroten as a basic fusion op registeration method, which will
-  bound the schema and implementation function together as an Operator. The
-  fused one will be called at jit runtime as single operator rather than two. Op
-  fusion can bring effective improvement to jit runtime by reduce the read and
-  write to global memory
+template <>
+struct IvalueConvert<at::IntArrayRef> {
+  std::vector<int64_t> operator()(IValue& i_value) {
+    std::vector<int64_t> ref = i_value.toIntVector();
+    return ref;
+  }
+  std::vector<int64_t> operator()(IValue&& i_value) {
+    std::vector<int64_t> ref = i_value.toIntVector();
+    return ref;
+  }
+};
 
-  A standard usege looks like:
+template <typename... Args>
+constexpr int typeCounter() {
+  return sizeof...(Args);
+}
 
-        IPEX_JIT_OP_REGISTER(fusion-schema, function-name, function-pointer)
+template <int n, typename Func, typename TypeList, size_t... N>
+torch::jit::Operation generateJitOperation(
+    Func func,
+    std::string str,
+    std::index_sequence<N...> seq) {
+  return [=](Stack& stack) {
+    auto result = torch::jit::xpu::JitFusionProxy<Func>()(
+        func,
+        str,
+        IvalueConvert<c10::guts::typelist::element_t<N, TypeList>>()(
+            std::move(peek(stack, N, n)))...);
+    drop(stack, n);
+    pack(stack, std::move(result));
+  };
+}
 
-  Parameters:
-  -----------
-      1. fusion-schema: the schema string after op fusion.
+/* IPEX_JIT_OP_REGISTER useage:
+This macro is wroten as a basic fusion op registeration method, which will
+bound the schema and implementation function together as an Operator. The
+fused one will be called at jit runtime as single operator rather than two. Op
+fusion can bring effective improvement to jit runtime by reduce the read and
+write to global memory
 
-      2. function-name: function name of the fusion implementation.
+A standard usege looks like:
 
-      3. function-pointer: the implementation function pointer of op fusion.
-  This function pointer should have exactly same signiture against
-  fusion-schema. It is worth to note that all the input parameter type should be
-  specialized by IvalueConvert.
+      IPEX_JIT_OP_REGISTER(fusion-schema, function-name, function-pointer)
 
-  for example, if we have convolution and relu adjacent at the jit graph like
-  below:
+Parameters:
+-----------
+    1. fusion-schema: the schema string after op fusion.
 
-        graph(%self : __torch__.test_fusion.Conv2dRelu, %x.1 : Tensor, %a :
-  Tensor): %14 : int[] = prim::Constant[value=[0, 0]]() %13 : int[] =
-  prim::Constant[value=[1, 1]]() %3 : int = prim::Constant[value=1]() %conv :
-  __torch__.torch.nn.modules.conv.Conv2d = prim::GetAttr[name="conv"](%self)
-  %weight : Tensor = prim::GetAttr[name="weight"](%conv) %bias : Tensor =
-        prim::GetAttr[name="bias"](%conv) %11 : Tensor = aten::conv2d(%x.1,
-  %weight, %bias, %13, %14, %13, %3) %result.3 : Tensor = aten::relu(%11) return
-        (%result.3)
+    2. function-name: function name of the fusion implementation.
 
-  we can register convolution and relu as one operator to reduce the unnecessary
-  global memory access. And the registeration can write as:
+    3. function-pointer: the implementation function pointer of op fusion.
+This function pointer should have exactly same signiture against
+fusion-schema. It is worth to note that all the input parameter type should be
+specialized by IvalueConvert.
 
-    IPEX_JIT_OP_REGISTER(
-      "xpu::conv2d_relu(Tensor input, Tensor weight, Tensor? bias, int[2]
-  stride, int[2] padding, int[2] dilation, int groups) -> Tensor",
-  "convolution_relu", at::AtenIpexTypeXPU::convolution_relu)
+for example, if we have convolution and relu adjacent at the jit graph like
+below:
 
-  after registeration, the jit ir graph will be like:
+      graph(%self : __torch__.test_fusion.Conv2dRelu, %x.1 : Tensor, %a :
+Tensor): %14 : int[] = prim::Constant[value=[0, 0]]() %13 : int[] =
+prim::Constant[value=[1, 1]]() %3 : int = prim::Constant[value=1]() %conv :
+__torch__.torch.nn.modules.conv.Conv2d = prim::GetAttr[name="conv"](%self)
+%weight : Tensor = prim::GetAttr[name="weight"](%conv) %bias : Tensor =
+      prim::GetAttr[name="bias"](%conv) %11 : Tensor = aten::conv2d(%x.1,
+%weight, %bias, %13, %14, %13, %3) %result.3 : Tensor = aten::relu(%11) return
+      (%result.3)
 
-        graph(%self : __torch__.test_fusion.Conv2dRelu, %x.1 : Tensor, %a :
-  Tensor): %14 : int[] = prim::Constant[value=[0, 0]]() %13 : int[] =
-  prim::Constant[value=[1, 1]]() %3 : int = prim::Constant[value=1]() %conv :
-  __torch__.torch.nn.modules.conv.Conv2d = prim::GetAttr[name="conv"](%self)
-  %weight : Tensor = prim::GetAttr[name="weight"](%conv) %bias : Tensor =
-          prim::GetAttr[name="bias"](%conv) %16 : Tensor =
-  xpu::conv2d_relu(%x.1, %weight, %bias, %13, %14, %13, %3) return (%16)
-  */
+we can register convolution and relu as one operator to reduce the unnecessary
+global memory access. And the registeration can write as:
+
+  IPEX_JIT_OP_REGISTER(
+    "xpu::conv2d_relu(Tensor input, Tensor weight, Tensor? bias, int[2]
+stride, int[2] padding, int[2] dilation, int groups) -> Tensor",
+"convolution_relu", at::AtenIpexTypeXPU::convolution_relu)
+
+after registeration, the jit ir graph will be like:
+
+      graph(%self : __torch__.test_fusion.Conv2dRelu, %x.1 : Tensor, %a :
+Tensor): %14 : int[] = prim::Constant[value=[0, 0]]() %13 : int[] =
+prim::Constant[value=[1, 1]]() %3 : int = prim::Constant[value=1]() %conv :
+__torch__.torch.nn.modules.conv.Conv2d = prim::GetAttr[name="conv"](%self)
+%weight : Tensor = prim::GetAttr[name="weight"](%conv) %bias : Tensor =
+        prim::GetAttr[name="bias"](%conv) %16 : Tensor =
+xpu::conv2d_relu(%x.1, %weight, %bias, %13, %14, %13, %3) return (%16)
+*/
 
 #define IPEX_JIT_OP_REGISTER(schema, name, func)                       \
   Operator(                                                            \
@@ -339,96 +342,96 @@ const T& specialization.
       "linear_" #func,                                             \
       at::AtenIpexTypeXPU::linear_##func)
 
-  /* IPEX_GENERAL_CONV2D_JIT_OP_REGISTER usage:
-  We decalre this macro to enable a more simple way to register the fusion
-  pattern of Convolution + Post-ops in jit script. The macro can receive varadic
-  number of input, which will automatically generate a bunch of conv + post-op
-  fusion registeration code. The standard useage of this macro is:
-  IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(PostOpName, ExtraParametersOfPostOps)
+/* IPEX_GENERAL_CONV2D_JIT_OP_REGISTER usage:
+We decalre this macro to enable a more simple way to register the fusion
+pattern of Convolution + Post-ops in jit script. The macro can receive varadic
+number of input, which will automatically generate a bunch of conv + post-op
+fusion registeration code. The standard useage of this macro is:
+IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(PostOpName, ExtraParametersOfPostOps)
 
-  If your post op dose not bring any extra parameter to the schema, you can just
-  omit the part of the  ExtraParamterofPostOps, for exmaple, when we have Relu
-  as post-op of convolution, the registeration can write as follow:
+If your post op dose not bring any extra parameter to the schema, you can just
+omit the part of the  ExtraParamterofPostOps, for exmaple, when we have Relu
+as post-op of convolution, the registeration can write as follow:
 
-  IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(relu)
+IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(relu)
 
-  And the above macro will extend to the below expression:
+And the above macro will extend to the below expression:
 
-      IPEX_JIT_OP_REGISTER(
-        "xpu::q_conv2d_relu(Tensor input,
-      __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight,
-  float output_scale, int output_zpoint) -> Tensor", "q_conv2d_relu",
-        at::AtenIpexTypeXPU::q_conv2d_relu),
+    IPEX_JIT_OP_REGISTER(
+      "xpu::q_conv2d_relu(Tensor input,
+    __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight,
+float output_scale, int output_zpoint) -> Tensor", "q_conv2d_relu",
+      at::AtenIpexTypeXPU::q_conv2d_relu),
 
-      IPEX_JIT_OP_REGISTER(
-        "xpu::conv2d_relu(Tensor input, Tensor weight, Tensor? bias, int[2]
-  stride, int[2] padding, int[2] dilation, int groups) -> Tensor",
-  "convolution_relu", at::AtenIpexTypeXPU::convolution_relu),
+    IPEX_JIT_OP_REGISTER(
+      "xpu::conv2d_relu(Tensor input, Tensor weight, Tensor? bias, int[2]
+stride, int[2] padding, int[2] dilation, int groups) -> Tensor",
+"convolution_relu", at::AtenIpexTypeXPU::convolution_relu),
 
-      IPEX_JIT_OP_REGISTER(
-        "xpu::_convolution_relu(Tensor input, Tensor weight, Tensor? bias, int[]
-      stride, int[] padding, int[] dilation, bool transpose, int[]
-  output_padding, int groups, bool benchmark, bool deterministic, bool
-  cudnn_enabled, bool allow_tf32)
-      -> Tensor"
-        "_convolution_relu",
-        at::AtenIpexTypeXPU::_convolution_relu),
+    IPEX_JIT_OP_REGISTER(
+      "xpu::_convolution_relu(Tensor input, Tensor weight, Tensor? bias, int[]
+    stride, int[] padding, int[] dilation, bool transpose, int[]
+output_padding, int groups, bool benchmark, bool deterministic, bool
+cudnn_enabled, bool allow_tf32)
+    -> Tensor"
+      "_convolution_relu",
+      at::AtenIpexTypeXPU::_convolution_relu),
 
-  when we have post-ops that will bing extra parameter to the fusion schema, we
-  can wrap the extra parameter in macro EXTRA_SCHEMA() as second parameter. for
-  example, the leaky relu will bring "Scalar negative_slope" as extra parameter
-  to all the convolution fusions, and we are suppose to register it as:
+when we have post-ops that will bing extra parameter to the fusion schema, we
+can wrap the extra parameter in macro EXTRA_SCHEMA() as second parameter. for
+example, the leaky relu will bring "Scalar negative_slope" as extra parameter
+to all the convolution fusions, and we are suppose to register it as:
 
-      IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(leaky_relu, EXTRA_SCHEMA("Scalar
-      negative_slope"))
+    IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(leaky_relu, EXTRA_SCHEMA("Scalar
+    negative_slope"))
 
-  And the above macro will add the extra parameter at the end of all the
-  convolution-post-ops's schema, it will extend like:
+And the above macro will add the extra parameter at the end of all the
+convolution-post-ops's schema, it will extend like:
 
-      IPEX_JIT_OP_REGISTER(
-        "xpu::q_conv2d_leaky_relu(Tensor input,
-      __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight,
-  float output_scale, int output_zpoint, Scalar negative_slope) -> Tensor",
-        "q_conv2d_leaky_relu",
-        at::AtenIpexTypeXPU::q_conv2d_leaky_relu),
+    IPEX_JIT_OP_REGISTER(
+      "xpu::q_conv2d_leaky_relu(Tensor input,
+    __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight,
+float output_scale, int output_zpoint, Scalar negative_slope) -> Tensor",
+      "q_conv2d_leaky_relu",
+      at::AtenIpexTypeXPU::q_conv2d_leaky_relu),
 
-      IPEX_JIT_OP_REGISTER(
-        "xpu::conv2d_leaky_relu(Tensor input, Tensor weight, Tensor? bias,
-  int[2] stride, int[2] padding, int[2] dilation, int groups, Scalar
-  negative_slope)
-  -> Tensor", "convolution_leaky_relu",
-  at::AtenIpexTypeXPU::convolution_leaky_relu),
+    IPEX_JIT_OP_REGISTER(
+      "xpu::conv2d_leaky_relu(Tensor input, Tensor weight, Tensor? bias,
+int[2] stride, int[2] padding, int[2] dilation, int groups, Scalar
+negative_slope)
+-> Tensor", "convolution_leaky_relu",
+at::AtenIpexTypeXPU::convolution_leaky_relu),
 
-      IPEX_JIT_OP_REGISTER(
-        "xpu::_convolution_leaky_relu(Tensor input, Tensor weight, Tensor? bias,
-  int[] stride, int[] padding, int[] dilation, bool transpose, int[]
-  output_padding, int groups, bool benchmark, bool deterministic, bool
-  cudnn_enabled, bool allow_tf32, Scalar negative_slope) -> Tensor"
-        "_convolution_leaky_relu",
-        at::AtenIpexTypeXPU::_convolution_leaky_relu),
+    IPEX_JIT_OP_REGISTER(
+      "xpu::_convolution_leaky_relu(Tensor input, Tensor weight, Tensor? bias,
+int[] stride, int[] padding, int[] dilation, bool transpose, int[]
+output_padding, int groups, bool benchmark, bool deterministic, bool
+cudnn_enabled, bool allow_tf32, Scalar negative_slope) -> Tensor"
+      "_convolution_leaky_relu",
+      at::AtenIpexTypeXPU::_convolution_leaky_relu),
 
 
-  However, there are some restrictions worth to note, the implementation
-  function of all the registerations, should always
-      1. exist in the at::AtenIpexTypeXPU namespace
-      2. have exactly same signiture against the extended schema
+However, there are some restrictions worth to note, the implementation
+function of all the registerations, should always
+    1. exist in the at::AtenIpexTypeXPU namespace
+    2. have exactly same signiture against the extended schema
 
-  */
+*/
 
-  // NOTE: in some cases, quantized pass can bring different schema change
-  // compared with non-quantized pass. For example of convolution + sum fusion,
-  // we have
-  //
-  //        IPEX_CONV_JIT_OP_REGISTER(sum,
-  //           EXTRA_SCHEMA("Tensor(a!) accumu, *, Scalar scale")),
+// NOTE: in some cases, quantized pass can bring different schema change
+// compared with non-quantized pass. For example of convolution + sum fusion,
+// we have
+//
+//        IPEX_CONV_JIT_OP_REGISTER(sum,
+//           EXTRA_SCHEMA("Tensor(a!) accumu, *, Scalar scale")),
 
-  // for non-quantized pass registration and
+// for non-quantized pass registration and
 
-  //        IPEX_QCONV2D_JIT_OP_REGISTER(sum,
-  //           EXTRA_SCHEMA( "Tensor(a!) accumu, *, Scalar sum_scale, Scalar
-  //           sum_zpoint")),
+//        IPEX_QCONV2D_JIT_OP_REGISTER(sum,
+//           EXTRA_SCHEMA( "Tensor(a!) accumu, *, Scalar sum_scale, Scalar
+//           sum_zpoint")),
 
-  // for quantized pass registration.
+// for quantized pass registration.
 
 #define IPEX_CONV_JIT_OP_REGISTER(func, ...)      \
   IPEX_CONV2D_JIT_OP_REGISTER(func, __VA_ARGS__), \
@@ -735,7 +738,7 @@ RegisterOperators op({
         AtenIpexTypeXPU::trans_matmul_div),
 
     IPEX_JIT_OP_REGISTER(
-        "xpu::linear_gelu(Tensor input, Tensor weight, Tensor? bias=None) -> Tensor ",
+        "xpu::linear_gelu(Tensor input, Tensor weight, Tensor? bias=None, str approximate='none') -> Tensor ",
         "xpu::linear_gelu",
         AtenIpexTypeXPU::linear_gelu),
 

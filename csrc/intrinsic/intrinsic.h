@@ -90,6 +90,18 @@ at::Tensor trans_matmul_div(
     const at::Tensor& tensor1,
     Scalar oscale);
 
+at::Tensor linear_silu(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    c10::string_view approximate);
+
+at::Tensor linear_gelu(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    c10::string_view approximate);
+
 at::Tensor linear_sum(
     const at::Tensor& input,
     const at::Tensor& weight,
@@ -471,8 +483,6 @@ DECLARE_LINEAR(round)
 DECLARE_LINEAR(log_sigmoid)
 DECLARE_LINEAR(hardswish)
 DECLARE_LINEAR(mish)
-DECLARE_LINEAR(silu)
-DECLARE_LINEAR(gelu)
 DECLARE_LINEAR(hardsigmoid)
 DECLARE_LINEAR(sigmoid)
 DECLARE_LINEAR(relu)
