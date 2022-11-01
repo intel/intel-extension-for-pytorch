@@ -6,8 +6,11 @@
 #include <utility>
 #include <vector>
 #include "ATen/core/ivalue.h"
+<<<<<<< HEAD
 #include "ATen/core/stack.h"
 #include <ATen/native/quantized/PackedParams.h>
+=======
+>>>>>>> bf7831b6c13be4f2e296118f4557e201237e8b69
 #include "accelerated_ops.h"
 #include "c10/core/Scalar.h"
 #include "c10/core/ScalarType.h"
