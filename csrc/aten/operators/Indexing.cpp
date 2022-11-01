@@ -124,9 +124,9 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
 
     auto num_nonzeros = std::distance(idx_flat_begin, idx_flat_end);
 
-    tensor = tensor.resize_({num_nonzeros, num_dim}).contiguous();
+    Tensor tensor_ = tensor.resize_({num_nonzeros, num_dim}).contiguous();
     if (num_nonzeros > 0 && num_dim > 0) {
-      int64_t* tensor_begin = tensor.data_ptr<int64_t>();
+      int64_t* tensor_begin = tensor_.data_ptr<int64_t>();
 
       // preload sizes tensor for index calculation
       int64_t sizes[MAX_TENSORINFO_DIMS];
@@ -161,9 +161,16 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
             sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
       };
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+
+      // Support non-contiguous/outplace cases
+      // TODO: Next step, we will give state of art algo/implementation.
+      // Non-contiguous/outplace cases performance will be covered there.
+      if (tensor.data_ptr() != tensor_.data_ptr()) {
+        tensor.copy_(tensor_);
+      }
     }
   } else {
-    tensor.resize_({N, num_dim}).contiguous();
+    tensor = tensor.resize_({N, num_dim}).contiguous();
   }
 }
 
