@@ -347,6 +347,24 @@ class TestOp(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul', 'aten::dequantize', 'aten::quantize_per_tensor'])
         self.checkPatterns(graph, patterns)
 
+    def test_chunk_bmm(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                z = torch.matmul(x, y)
+                return z
+        
+        m = M()        
+        x = torch.randn(2, 1, 5, 5)
+        
+        y = torch.randn(2, 1, 5, 9)
+        y_chunk, _, _ = y.chunk(3, dim=3)
+        graph = self.checkQuantizeTrace(m, [x, y_chunk], atol=2e-1)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertFused(graph, ['aten::matmul', 'aten::dequantize'])
+
     def test_mixed_precision_softmax(self):
         class M(torch.nn.Module):
             def __init__(self):
