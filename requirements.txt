@@ -5,3 +5,4 @@ wheel>=0.36
 setuptools>=50.0
 packaging
 psutil
+torchdynamo==1.13
