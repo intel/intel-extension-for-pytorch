@@ -141,13 +141,6 @@ void conv_transpose_out_kernel_impl(
     at::IntArrayRef dilation,
     at::IntArrayRef origin_weight_dims,
     const ideep::attr_t& attr) {
-  // ConvTranspose out kernel, assuming the output always has same format with
-  // input, so this function will not change input and output's format, making
-  // sure you has made pre-process for input and output to make them have same
-  // format before call this function.
-  TORCH_CHECK(
-      input.suggest_memory_format() == output.suggest_memory_format(),
-      "input and output need has same format for conv_transpose_out_kernel_impl");
   TORCH_CHECK(
       (IS_CONTIGUOUS_ANY(input)) && (IS_CONTIGUOUS_ANY(output)),
       "input and output should be contiguous tensor for "

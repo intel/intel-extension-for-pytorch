@@ -36,13 +36,6 @@ void convolution_kernel_output(
     at::IntArrayRef dilation,
     int64_t groups,
     const ideep::attr_t& attr) {
-  // Convolution output kernel, assuming the output always has same format with
-  // input, so this function will not change input and output's format, making
-  // sure you has made pre-process for input and output to make them have same
-  // format before call this function.
-  TORCH_CHECK(
-      input.suggest_memory_format() == output.suggest_memory_format(),
-      "input and output need has same format for convolution_kernel_output");
   TORCH_CHECK(
       (IS_CONTIGUOUS_ANY(input)) && (IS_CONTIGUOUS_ANY(output)),
       "input and output are need contiguous tensor for "
