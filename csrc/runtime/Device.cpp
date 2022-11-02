@@ -80,6 +80,8 @@ static void enumDevices(
               root_device.get_info<dpcpp_dev_name>());
         }
         devices.push_back(std::make_unique<sycl::device>(root_device));
+        deviceids_eachcard.push_back(devices.size() - 1);
+        deviceids_card.push_back(deviceids_eachcard);
       }
     }
   } else {
