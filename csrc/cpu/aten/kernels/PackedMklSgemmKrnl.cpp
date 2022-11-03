@@ -32,8 +32,8 @@ at::Tensor mkl_sgemm_packB_impl(
     const int64_t N,
     const int64_t K,
     const at::Tensor& ori_weight) {
-  int64_t pack_size =
-      (int64_t)(cblas_sgemm_pack_get_size(CblasBMatrix, M, N, K) / sizeof(float) + 1);
+  int64_t pack_size = (int64_t)(
+      cblas_sgemm_pack_get_size(CblasBMatrix, M, N, K) / sizeof(float) + 1);
   at::Tensor mkl_weight = at::empty(pack_size, at::kFloat);
   _mkl_sgemm_packB_impl(M, N, K, ori_weight, mkl_weight);
   return mkl_weight;
