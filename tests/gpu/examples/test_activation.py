@@ -175,6 +175,24 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
+        # 2-dim
+        PReLU = torch.nn.PReLU(num_parameters=3)
+        PReLU_dpcpp = copy.deepcopy(PReLU).to("xpu")
+        input_2_dim_cpu = torch.rand(2, 3)
+        input_2_dim_xpu = input_2_dim_cpu.xpu()
+        y_cpu = PReLU(input_2_dim_cpu)
+        y_xpu = PReLU_dpcpp(input_2_dim_xpu)
+        self.assertEqual(y_cpu, y_xpu.cpu())
+
+        # 4-dim
+        PReLU = torch.nn.PReLU(num_parameters=2)
+        PReLU_dpcpp = copy.deepcopy(PReLU).to("xpu")
+        input_4_dim_cpu = torch.rand(1, 2, 3, 4)
+        input_4_dim_xpu = input_4_dim_cpu.xpu()
+        y_cpu = PReLU(input_4_dim_cpu)
+        y_xpu = PReLU_dpcpp(input_4_dim_xpu)
+        self.assertEqual(y_cpu, y_xpu.cpu())
+
     def test_activation_prelu_multi_weight(self, dtype=torch.float):
         PReLU = torch.nn.PReLU(num_parameters=3)
         PReLU_dpcpp = copy.deepcopy(PReLU).to("xpu")
