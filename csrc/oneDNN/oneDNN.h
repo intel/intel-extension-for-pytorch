@@ -18,5 +18,6 @@
 #include "Pooling.h"
 #include "Reduce.h"
 #include "Reorder.h"
+#include "Resample.h"
 #include "SoftMax.h"
 #include "Sum.h"

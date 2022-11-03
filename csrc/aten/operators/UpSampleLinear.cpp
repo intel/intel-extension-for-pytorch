@@ -323,223 +323,6 @@ static void upsample_bilinear2d_backward_out_dpcpp_template(
       });
 }
 
-static void upsample_linear_out_dpcpp_kernel(
-    Tensor& output,
-    const Tensor& input_,
-    IntArrayRef output_size,
-    const double& scales_w = 0.0,
-    const double& scales_h = 0.0,
-    const double& scales_d = 0.0) {
-  auto strm = GpuStreamManager::Instance().get_stream();
-  Device curDevice = Device(kXPU, current_device());
-  auto eng = GpuEngineManager::Instance().get_engine(curDevice);
-
-  bool is_customer_scales =
-      scales_w != 0.0 || scales_h != 0.0 || scales_d != 0.0;
-
-  int64_t ndims = input_.ndimension();
-  IntArrayRef input_size = input_.sizes();
-  memory::dims src_dims, dst_dims;
-  std::vector<float> factors;
-  set_params(
-      input_size,
-      output_size,
-      src_dims,
-      dst_dims,
-      factors,
-      ndims,
-      scales_w,
-      scales_h,
-      scales_d);
-
-  Tensor input = input_;
-  if (is_smf_channels_last(input_)) {
-    auto cl_tag = get_cl_tag_by_ndim(ndims);
-    if (CHANNELSLAST1D_DPCPP == cl_tag) {
-      output.resize_(dst_dims);
-      convert_tensor_to_channels_last_1d(output);
-    } else {
-      output.resize_(dst_dims, get_cl_tag_by_ndim(ndims));
-    }
-  } else {
-    input = input_.contiguous(input_.suggest_memory_format());
-    output.resize_(dst_dims, input_.suggest_memory_format());
-  }
-
-  auto data_format =
-      get_dnnl_default_format(ndims, is_smf_channels_last(input_));
-
-  memory::format_tag format_any = memory::format_tag::any;
-  memory::data_type data_type = get_onednn_dtype(input);
-
-  std::shared_ptr<memory::desc> dst_md;
-  if (!is_customer_scales)
-    dst_md.reset(new memory::desc(dst_dims, data_type, format_any));
-
-  auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
-  auto src_md = src_ctx.is_plain()
-      ? memory::desc(src_dims, data_type, data_format)
-      : src_ctx.meta();
-
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  if (!is_customer_scales) {
-    create_key(key, algorithm::resampling_linear, factors, src_md, *dst_md);
-  } else {
-    create_key(key, algorithm::resampling_linear, factors, src_md);
-  }
-#endif
-
-  auto resampling_desc = resampling_forward::desc(
-      prop_kind::forward,
-      algorithm::resampling_linear,
-      factors,
-      src_md,
-      *dst_md);
-  auto resampling_pd = resampling_forward::primitive_desc(resampling_desc, eng);
-
-#ifdef USE_PRIMITIVE_CACHE
-  auto resample_forward =
-      fetch_or_create_m<resampling_forward>(key, resampling_pd);
-#else
-  auto resample_forward = resampling_forward(resampling_pd);
-#endif
-
-  if (!src_ctx.is_plain()) {
-    output = empty_opaque_tensor(
-        resampling_pd.dst_desc(), input.options(), c10::nullopt);
-  }
-  memory src_memory =
-      dpcpp_onednn_memory(resampling_pd.src_desc(), eng, input.data_ptr());
-  memory dst_memory =
-      dpcpp_onednn_memory(resampling_pd.dst_desc(), eng, output.data_ptr());
-
-  DPCPP_ONEDNN_EXEC(
-      resample_forward,
-      strm,
-      {{DNNL_ARG_SRC, src_memory}, {DNNL_ARG_DST, dst_memory}});
-}
-
-static void upsample_linear_backward_out_dpcpp_kernel(
-    Tensor& grad_input,
-    const Tensor& grad_output_,
-    IntArrayRef output_size,
-    IntArrayRef input_size,
-    const double& scales_w = 0.0,
-    const double& scales_h = 0.0,
-    const double& scales_d = 0.0) {
-  auto strm = GpuStreamManager::Instance().get_stream();
-  Device curDevice = Device(kXPU, current_device());
-  auto eng = GpuEngineManager::Instance().get_engine(curDevice);
-
-  bool is_customer_scales =
-      scales_w != 0.0 || scales_h != 0.0 || scales_d != 0.0;
-
-  int64_t ndims = grad_output_.ndimension();
-  memory::dims src_dims, dst_dims;
-  std::vector<float> factors;
-  set_params(
-      input_size,
-      output_size,
-      src_dims,
-      dst_dims,
-      factors,
-      ndims,
-      scales_w,
-      scales_h,
-      scales_d);
-
-  Tensor grad_output;
-  if (is_smf_channels_last(grad_output_)) {
-    auto cl_tag = get_cl_tag_by_ndim(ndims);
-    if (CHANNELSLAST1D_DPCPP == cl_tag) {
-      grad_input.resize_(src_dims);
-      convert_tensor_to_channels_last_1d(grad_input);
-      auto tmp = grad_output_.contiguous(at::MemoryFormat::Contiguous);
-      grad_output = convert_tensor_to_channels_last_1d(tmp);
-    } else {
-      grad_input.resize_(src_dims, get_cl_tag_by_ndim(ndims));
-      grad_output = grad_output_.contiguous(get_cl_tag_by_ndim(ndims));
-    }
-  } else {
-    grad_input.resize_(src_dims, grad_output_.suggest_memory_format());
-    grad_output = grad_output_.contiguous(grad_output_.suggest_memory_format());
-  }
-
-  auto data_format =
-      get_dnnl_default_format(ndims, is_smf_channels_last(grad_output_));
-
-  memory::format_tag format_any = memory::format_tag::any;
-  memory::data_type data_type = get_onednn_dtype(grad_output);
-
-  std::shared_ptr<memory::desc> dst_md;
-  auto src_md = memory::desc(src_dims, data_type, data_format);
-  auto diff_src_md = memory::desc(src_dims, data_type, format_any);
-  if (!is_customer_scales)
-    dst_md.reset(new memory::desc(dst_dims, data_type, data_format));
-
-  auto resampling_desc = resampling_forward::desc(
-      prop_kind::forward,
-      algorithm::resampling_linear,
-      factors,
-      src_md,
-      *dst_md);
-  auto resampling_pd = resampling_forward::primitive_desc(resampling_desc, eng);
-
-  auto diff_dst_ctx =
-      at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_output);
-  auto diff_dst_md =
-      diff_dst_ctx.is_plain() ? resampling_pd.dst_desc() : diff_dst_ctx.meta();
-
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  if (!is_customer_scales) {
-    create_key(
-        key,
-        algorithm::resampling_linear,
-        factors,
-        src_md,
-        *dst_md,
-        diff_src_md,
-        diff_dst_md);
-  } else {
-    create_key(
-        key,
-        algorithm::resampling_linear,
-        factors,
-        src_md,
-        diff_src_md,
-        diff_dst_md);
-  }
-#endif
-
-  auto resampling_bwd_desc = resampling_backward::desc(
-      algorithm::resampling_linear, factors, diff_src_md, diff_dst_md);
-  auto resampling_bwd_pd = resampling_backward::primitive_desc(
-      resampling_bwd_desc, eng, resampling_pd);
-#ifdef USE_PRIMITIVE_CACHE
-  auto resampling_bwd =
-      fetch_or_create_m<resampling_backward>(key, resampling_bwd_pd);
-#else
-  auto resampling_bwd = resampling_backward(resampling_bwd_pd);
-#endif
-
-  if (!diff_dst_ctx.is_plain()) {
-    grad_input = empty_opaque_tensor(
-        resampling_bwd_pd.diff_src_desc(), grad_output.options(), c10::nullopt);
-  }
-  memory diff_src_memory = dpcpp_onednn_memory(
-      resampling_bwd_pd.diff_src_desc(), eng, grad_input.data_ptr());
-  memory diff_dst_memory = dpcpp_onednn_memory(
-      resampling_bwd_pd.diff_dst_desc(), eng, grad_output.data_ptr());
-
-  DPCPP_ONEDNN_EXEC(
-      resampling_bwd,
-      strm,
-      {{DNNL_ARG_DIFF_SRC, diff_src_memory},
-       {DNNL_ARG_DIFF_DST, diff_dst_memory}});
-}
-
 } // namespace impl
 
 using namespace impl;
@@ -559,10 +342,11 @@ Tensor& upsample_trilinear3d_out(
         "we don't support this path by currently as oneDNN don't support this "
         "algorithm!\n");
   else
-    upsample_linear_out_dpcpp_kernel(
-        output,
+    xpu::oneDNN::resample(
         input,
+        output,
         output_size,
+        algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
         scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
@@ -582,10 +366,11 @@ Tensor upsample_trilinear3d(
         "we don't support this path by currently as oneDNN don't support this "
         "algorithm!\n");
   else
-    upsample_linear_out_dpcpp_kernel(
-        output,
+    xpu::oneDNN::resample(
         input,
+        output,
         output_size,
+        algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
         scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
@@ -607,10 +392,11 @@ Tensor upsample_trilinear3d(
         "we don't support this path by currently as oneDNN don't support this "
         "algorithm!\n");
   else
-    upsample_linear_out_dpcpp_kernel(
-        output,
+    xpu::oneDNN::resample(
         input,
+        output,
         osize,
+        algorithm::resampling_linear,
         scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
         scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
         scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
@@ -631,11 +417,12 @@ Tensor& upsample_trilinear3d_backward_out(
         "we don't support this path by currently as oneDNN don't support this "
         "algorithm!\n");
   else
-    upsample_linear_backward_out_dpcpp_kernel(
+    xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
-        output_size,
         input_size,
+        output_size,
+        algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
         scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
@@ -664,11 +451,12 @@ Tensor upsample_trilinear3d_backward(
         "we don't support this path by currently as oneDNN don't support this "
         "algorithm!\n");
   else
-    upsample_linear_backward_out_dpcpp_kernel(
+    xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
-        output_size,
         input_size,
+        output_size,
+        algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
         scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
@@ -701,11 +489,12 @@ Tensor upsample_trilinear3d_backward(
         "we don't support this path by currently as oneDNN don't support this "
         "algorithm!\n");
   else
-    upsample_linear_backward_out_dpcpp_kernel(
+    xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
-        osize,
         input_size,
+        osize,
+        algorithm::resampling_linear,
         scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
         scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
         scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
@@ -723,10 +512,11 @@ Tensor& upsample_bilinear2d_out(
     upsample_bilinear2d_out_dpcpp_template(
         output, input, output_size, true, scales_h, scales_w);
   else
-    upsample_linear_out_dpcpp_kernel(
-        output,
+    xpu::oneDNN::resample(
         input,
+        output,
         output_size,
+        algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
   return output;
@@ -743,10 +533,11 @@ Tensor upsample_bilinear2d(
     upsample_bilinear2d_out_dpcpp_template(
         output, input, output_size, true, scales_h, scales_w);
   else
-    upsample_linear_out_dpcpp_kernel(
-        output,
+    xpu::oneDNN::resample(
         input,
+        output,
         output_size,
+        algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
   return output;
@@ -765,10 +556,11 @@ Tensor upsample_bilinear2d(
     upsample_bilinear2d_out_dpcpp_template(
         output, input, osize, true, scales_h, scales_w);
   else
-    upsample_linear_out_dpcpp_kernel(
-        output,
+    xpu::oneDNN::resample(
         input,
+        output,
         osize,
+        algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
   return output;
@@ -792,11 +584,12 @@ Tensor& upsample_bilinear2d_backward_out(
         scales_h,
         scales_w);
   else
-    upsample_linear_backward_out_dpcpp_kernel(
+    xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
-        output_size,
         input_size,
+        output_size,
+        algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
   return grad_input;
@@ -828,11 +621,12 @@ Tensor upsample_bilinear2d_backward(
         scales_h,
         scales_w);
   else
-    upsample_linear_backward_out_dpcpp_kernel(
+    xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
-        output_size,
         input_size,
+        output_size,
+        algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
   return grad_input;
@@ -866,11 +660,12 @@ Tensor upsample_bilinear2d_backward(
         scales_h,
         scales_w);
   else
-    upsample_linear_backward_out_dpcpp_kernel(
+    xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
-        osize,
         input_size,
+        osize,
+        algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
   return grad_input;
@@ -887,10 +682,11 @@ Tensor& upsample_linear1d_out(
         "we don't support this path by currently as oneDNN don't support this "
         "algorithm!\n");
   else
-    upsample_linear_out_dpcpp_kernel(
-        output,
+    xpu::oneDNN::resample(
         input,
+        output,
         output_size,
+        algorithm::resampling_linear,
         scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
   return output;
 }
@@ -906,10 +702,11 @@ Tensor upsample_linear1d(
         "we don't support this path by currently as oneDNN don't support this "
         "algorithm!\n");
   else
-    impl::upsample_linear_out_dpcpp_kernel(
-        output,
+    xpu::oneDNN::resample(
         input,
+        output,
         output_size,
+        algorithm::resampling_linear,
         scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
   return output;
 }
@@ -927,10 +724,11 @@ Tensor upsample_linear1d(
         "we don't support this path by currently as oneDNN don't support this "
         "algorithm!\n");
   else
-    impl::upsample_linear_out_dpcpp_kernel(
-        output,
+    xpu::oneDNN::resample(
         input,
+        output,
         osize,
+        algorithm::resampling_linear,
         scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
   return output;
 }
@@ -947,11 +745,12 @@ Tensor& upsample_linear1d_backward_out(
         "we don't support this path by currently as oneDNN don't support this "
         "algorithm!\n");
   else
-    upsample_linear_backward_out_dpcpp_kernel(
+    xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
-        output_size,
         input_size,
+        output_size,
+        algorithm::resampling_linear,
         scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
   return grad_input;
 }
@@ -976,11 +775,12 @@ Tensor upsample_linear1d_backward(
         "we don't support this path by currently as oneDNN don't support this "
         "algorithm!\n");
   else
-    upsample_linear_backward_out_dpcpp_kernel(
+    xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
-        output_size,
         input_size,
+        output_size,
+        algorithm::resampling_linear,
         scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
   return grad_input;
 }
@@ -1007,11 +807,12 @@ Tensor upsample_linear1d_backward(
         "we don't support this path by currently as oneDNN don't support this "
         "algorithm!\n");
   else
-    upsample_linear_backward_out_dpcpp_kernel(
+    xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
-        osize,
         input_size,
+        osize,
+        algorithm::resampling_linear,
         scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
   return grad_input;
 }
