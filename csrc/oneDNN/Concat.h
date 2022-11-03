@@ -3,7 +3,7 @@
 #include <ATen/ATen.h>
 #include <oneDNN/Runtime.h>
 #include <runtime/Utils.h>
-#include <tensor/Context.h>
+#include <tensor/Tensor.h>
 #include <utils/LRUCache.h>
 #include "Utils.h"
 

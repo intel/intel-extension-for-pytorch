@@ -1,3 +1,4 @@
+#include <torch/library.h>
 #include "BlasImpl.h"
 
 namespace at {

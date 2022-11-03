@@ -2,7 +2,7 @@
 #pragma once
 
 #include <ATen/Tensor.h>
-#include <intrinsic/intrinsic.h>
+#include <tensor/Tensor.h>
 
 namespace at {
 

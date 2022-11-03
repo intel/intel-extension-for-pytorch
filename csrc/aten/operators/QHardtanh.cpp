@@ -5,7 +5,7 @@
 #include <ATen/native/TensorIterator.h>
 #include <torch/custom_class.h>
 
-#include <quantized/QUtil.h>
+#include <quantized/QUtils.h>
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 

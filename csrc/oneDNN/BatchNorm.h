@@ -10,7 +10,7 @@
 #include <operators/comm/ATDispatch.h>
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
-#include <tensor/Context.h>
+#include <tensor/Tensor.h>
 #include <utils/LRUCache.h>
 #include "Reorder.h"
 #include "Utils.h"

@@ -2,12 +2,11 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
+#include <vector>
 
 #include <oneDNN/oneDNN.h>
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
-
-#include <vector>
 
 using namespace dnnl;
 using namespace at::native;
@@ -447,7 +446,7 @@ Tensor avg_pool2d(
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
   Tensor output;
-  output = _empty_affine_quantized(
+  output = at::_empty_affine_quantized(
       {0},
       input.options(),
       input.q_scale(),

@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/quantized/QTensorImpl.h>
 #include <core/Allocator.h>
-#include <tensor/Context.h>
+#include <tensor/OpaqueTensorFactories.h>
 
 namespace at {
 namespace AtenIpexTypeXPU {

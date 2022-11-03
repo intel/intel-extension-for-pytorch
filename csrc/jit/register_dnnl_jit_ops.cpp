@@ -1,4 +1,5 @@
-#include <quantized/QUtil.h>
+#include <intrinsic/intrinsic.h>
+#include <quantized/QUtils.h>
 #include <torch/csrc/jit/runtime/custom_operator.h>
 #include <torch/csrc/jit/runtime/operator.h>
 #include <iostream>

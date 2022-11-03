@@ -9,7 +9,6 @@
 #include <utils/oneMKLUtils.h>
 #include <vector>
 
-#include <quantized/QUtil.h>
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
 

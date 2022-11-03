@@ -6,14 +6,10 @@
 #include <ATen/quantized/QTensorImpl.h>
 #include <ATen/quantized/Quantizer.h>
 #include <c10/util/Exception.h>
-#include <intrinsic/intrinsic.h>
 
 #include <core/TensorImplUtils.h>
 #include <oneDNN/oneDNN.h>
-#include "comm/Numerics.h"
-#include "comm/RegistrationDeclarations.h"
-
-#include "Loops.h"
+#include <quantized/DeQuantization.h>
 
 using namespace dnnl;
 using namespace at::native;

@@ -3,10 +3,9 @@
 #include <ATen/native/quantized/cpu/conv_packed_params.h>
 
 #include <oneDNN/oneDNN.h>
-#include <quantized/Quantizer.h>
+#include <quantized/QUtils.h>
 #include <runtime/Utils.h>
 
-#include <quantized/QUtil.h>
 #include "ReQuantization.h"
 #include "comm/ParamUtils.h"
 
@@ -34,7 +33,7 @@ Tensor q_cat(
     tensors_.push_back(dst);
   }
   TensorList tensors_cat_array(tensors_);
-  auto out = _empty_affine_quantized(
+  auto out = at::_empty_affine_quantized(
       {0},
       tensors.get(0).options().dtype(toQIntType(tensors.get(0).scalar_type())),
       scale_out,

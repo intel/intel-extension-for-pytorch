@@ -670,7 +670,7 @@ Tensor addmm(
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
   Tensor result;
   if (input.is_quantized()) {
-    result = _empty_affine_quantized(
+    result = at::_empty_affine_quantized(
         {0},
         device(kXPU).dtype(input.scalar_type()),
         1.f,

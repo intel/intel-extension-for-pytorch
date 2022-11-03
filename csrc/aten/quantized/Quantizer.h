@@ -1,7 +1,9 @@
 #pragma once
 
 #include <ATen/quantized/Quantizer.h>
-#include <intrinsic/intrinsic.h>
+#include <quantized/DeQuantization.h>
+#include <quantized/QTensor.h>
+#include <quantized/Quantization.h>
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {

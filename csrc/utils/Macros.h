@@ -25,6 +25,15 @@ void ipex_host_print(T& t, Ts&&... args) {
     std::cout << std::endl;       \
   }
 
+#define EXPORT_TO_XPU_ALIAS(AtOpFunc, XPUOpFunc)                               \
+  template <typename... Args>                                                  \
+  static inline auto XPUOpFunc(Args&&... args)                                 \
+      ->decltype(at::AtenIpexTypeXPU::AtOpFunc(std::forward<Args>(args)...)) { \
+    return at::AtenIpexTypeXPU::AtOpFunc(std::forward<Args>(args)...);         \
+  }
+
+#define EXPORT_TO_XPU(AtOpFunc) EXPORT_TO_XPU_ALIAS(AtOpFunc, AtOpFunc)
+
 #define IPEX_IDENTIFY_1(IDENTIFY_CONCAT, WHAT, X, ...) (WHAT(X))
 #define IPEX_IDENTIFY_2(IDENTIFY_CONCAT, WHAT, X, ...) \
   IDENTIFY_CONCAT(                                     \

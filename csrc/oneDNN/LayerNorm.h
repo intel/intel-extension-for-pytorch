@@ -6,7 +6,7 @@
 #include <oneDNN/Runtime.h>
 #include <operators/Utils.h>
 #include <runtime/Utils.h>
-#include <tensor/Context.h>
+#include <tensor/Tensor.h>
 #include <utils/LRUCache.h>
 #include "Reorder.h"
 #include "Utils.h"

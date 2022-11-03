@@ -3,12 +3,11 @@
 #include <ATen/Config.h>
 #include <ATen/record_function.h>
 
-#include <intrinsic/intrinsic.h>
 #include <oneDNN/Reorder.h>
 #include <oneDNN/Runtime.h>
 #include <oneDNN/Utils.h>
 #include <runtime/Utils.h>
-#include <tensor/Context.h>
+#include <tensor/Tensor.h>
 #include <utils/LRUCache.h>
 
 using namespace dnnl;

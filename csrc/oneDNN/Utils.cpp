@@ -1,5 +1,5 @@
 #include <oneapi/dnnl/dnnl.hpp>
-#include <tensor/Context.h>
+#include <tensor/Tensor.h>
 #include "oneDNN.h"
 
 namespace xpu {

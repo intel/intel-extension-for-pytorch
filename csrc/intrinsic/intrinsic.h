@@ -2,12 +2,12 @@
 
 #include <ATen/ATen.h>
 #include <ATen/native/quantized/cpu/conv_packed_params.h>
-#include <tensor/Context.h>
+#include <utils/Macros.h>
 
 namespace at {
 namespace AtenIpexTypeXPU {
 
-struct DPCPPTensorContext;
+at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking);
 
 at::Tensor interaction(at::Tensor& input_mlp, at::Tensor& input_emb);
 
@@ -47,26 +47,6 @@ at::Tensor pad_convolution(
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     int64_t groups);
-
-at::Tensor& fill_slice_with_index(at::Tensor& t, int dim);
-
-at::Tensor& std_var_out(
-    at::Tensor& result,
-    const at::Tensor& self,
-    at::IntArrayRef dim,
-    int64_t correction_opt,
-    bool keepdim,
-    bool take_sqrt);
-
-std::tuple<Tensor&, Tensor&> std_var_mean_out(
-    const char* fname,
-    Tensor& result1,
-    Tensor& result2,
-    const Tensor& self,
-    IntArrayRef dim,
-    int64_t correction_opt,
-    bool keepdim,
-    bool take_sqrt);
 
 at::Tensor matmul_add(
     const at::Tensor& m1,
@@ -128,26 +108,7 @@ at::Tensor packed_add(
     const at::Tensor& grad,
     float alpha);
 
-at::Tensor empty_opaque_tensor(
-    DPCPPTensorContext::Meta meta,
-    const TensorOptions& options,
-    c10::optional<MemoryFormat> optional_memory_format);
-
-at::Tensor empty_opaque_qtensor(
-    DPCPPTensorContext::Meta meta,
-    c10::optional<MemoryFormat> optional_memory_format,
-    QuantizerPtr quantizer);
-
 at::Tensor to_plain_if_needed(const Tensor& tensor);
-
-at::Tensor to_plain_if_needed_(const Tensor& tensor);
-
-std::vector<at::Tensor> to_plain_if_needed(TensorList tensor);
-
-at::Tensor new_qtensor(
-    IntArrayRef sizes,
-    const TensorOptions& options,
-    QuantizerPtr quantizer);
 
 at::Tensor dequant_pixelshuffle(const Tensor& self, int64_t upscale_factor);
 
@@ -160,6 +121,12 @@ at::Tensor dequant_pixelshuffle_quant(
 
 at::Tensor q_conv2d_dequantize(
     const at::Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point);
+
+at::Tensor q_conv2d_sigmoid(
+    const Tensor& input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double output_scale,
     int64_t output_zero_point);
@@ -207,32 +174,6 @@ at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
     Tensor qb,
     double add_scale,
     int64_t add_zero_point);
-
-at::Tensor quantize_tensor_per_tensor_affine(
-    at::Tensor& qtensor,
-    const at::Tensor& rtensor,
-    double scale,
-    int64_t zero_point);
-
-at::Tensor quantize_tensor_per_channel_affine(
-    at::Tensor& qtensor,
-    const at::Tensor& rtensor,
-    const at::Tensor& scales,
-    const at::Tensor& zero_points,
-    int64_t axis);
-
-at::Tensor dequantize_tensor_per_tensor_affine(
-    at::Tensor& rtensor,
-    const at::Tensor& qtensor,
-    double scale,
-    int64_t zero_point);
-
-at::Tensor dequantize_tensor_per_channel_affine(
-    at::Tensor& rtensor,
-    const at::Tensor& qtensor,
-    const at::Tensor& scales,
-    const at::Tensor& zero_points,
-    int64_t axis);
 
 at::Tensor permute_contiguous(
     const at::Tensor& self,
@@ -563,5 +504,27 @@ Tensor linear_elu(
     Scalar input_scale);
 
 } // namespace AtenIpexTypeXPU
-// namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace xpu {
+namespace dpcpp {
+
+/*
+ * The namespace at::AtenIpexTypeXPU only serves as operator/kernel
+ * implementation. We export operators here under xpu::dpcpp namespace for
+ * frontend usage.
+ */
+EXPORT_TO_XPU(interaction);
+EXPORT_TO_XPU(fused_ADAMW);
+EXPORT_TO_XPU(fused_SGD);
+EXPORT_TO_XPU(to_plain_if_needed);
+EXPORT_TO_XPU(packed_add);
+EXPORT_TO_XPU(mul_add);
+EXPORT_TO_XPU(linear_gelu);
+EXPORT_TO_XPU(linear_relu);
+EXPORT_TO_XPU(linear_sigmoid);
+
+EXPORT_TO_XPU_ALIAS(copy_, direct_copy);
+
+} // namespace dpcpp
+} // namespace xpu

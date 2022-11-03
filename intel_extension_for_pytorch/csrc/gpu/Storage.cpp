@@ -5,6 +5,7 @@
 #include <core/Allocator.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
+#include <intrinsic/intrinsic.h>
 #include <structmember.h>
 #include <torch/csrc/Device.h>
 #include <torch/csrc/DynamicTypes.h>
@@ -20,12 +21,6 @@ template <>
 struct THPUtils_typeTraits<c10::qint8> {
   static constexpr const char* python_type_str = "int";
 };
-
-namespace at {
-namespace AtenIpexTypeXPU {
-Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking);
-}
-} // namespace at
 
 template <typename scalar_t>
 scalar_t THPUtils_unpackReal(PyObject*) {
@@ -148,7 +143,7 @@ class THXPStorage_Bridge {
       return;
     at::Tensor dst_wrap = THTensor_wrap(dst);
     at::Tensor src_wrap = THTensor_wrap(src);
-    at::AtenIpexTypeXPU::copy_(dst_wrap, src_wrap, false);
+    xpu::dpcpp::direct_copy(dst_wrap, src_wrap, false);
   }
 
   template <at::ScalarType cpuType>

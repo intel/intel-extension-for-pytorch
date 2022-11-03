@@ -1,4 +1,5 @@
 #include "ReQuantization.h"
+#include <tensor/Tensor.h>
 
 using namespace dnnl;
 using namespace at::native;

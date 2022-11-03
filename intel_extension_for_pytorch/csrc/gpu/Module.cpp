@@ -518,7 +518,7 @@ void init_module(pybind11::module& m) {
       [](const at::Tensor& input,
          const at::Tensor& weight,
          const at::Tensor& bias) {
-        return at::AtenIpexTypeXPU::linear_gelu(input, weight, bias);
+        return xpu::dpcpp::linear_gelu(input, weight, bias);
       },
       "fused linear with gelu opt. on Intel device");
   m.def(
@@ -526,7 +526,7 @@ void init_module(pybind11::module& m) {
       [](const at::Tensor& input,
          const at::Tensor& weight,
          const at::Tensor& bias) {
-        return at::AtenIpexTypeXPU::linear_relu(input, weight, bias);
+        return xpu::dpcpp::linear_relu(input, weight, bias);
       },
       "fused linear with relu opt. on Intel device");
 
@@ -535,7 +535,7 @@ void init_module(pybind11::module& m) {
       [](const at::Tensor& input,
          const at::Tensor& weight,
          const at::Tensor& bias) {
-        return at::AtenIpexTypeXPU::linear_sigmoid(input, weight, bias);
+        return xpu::dpcpp::linear_sigmoid(input, weight, bias);
       },
       "fused linear with sigmoid opt. on Intel device");
 
@@ -550,7 +550,7 @@ void init_module(pybind11::module& m) {
          const at::Tensor& other,
          const at::Tensor& accumu,
          float alpha) {
-        return at::AtenIpexTypeXPU::mul_add(self, other, accumu, alpha);
+        return xpu::dpcpp::mul_add(self, other, accumu, alpha);
       },
       "fused mul with add opt. on Intel device");
 
@@ -560,14 +560,14 @@ void init_module(pybind11::module& m) {
          at::Tensor& bot_half,
          const at::Tensor& grad,
          float alpha) {
-        return at::AtenIpexTypeXPU::packed_add(top_half, bot_half, grad, alpha);
+        return xpu::dpcpp::packed_add(top_half, bot_half, grad, alpha);
       },
       "enable split SGD for BF16 weight update. on Intel device");
 
   m.def(
       "interaction",
       [](at::Tensor& input_mlp, at::Tensor& input_emb) {
-        return at::AtenIpexTypeXPU::interaction(input_mlp, input_emb);
+        return xpu::dpcpp::interaction(input_mlp, input_emb);
       },
       "interaction kernel implemtation on Intel device");
 
@@ -586,7 +586,7 @@ void init_module(pybind11::module& m) {
          const double learning_rate,
          const double weight_decay,
          const double eps) {
-        return at::AtenIpexTypeXPU::fused_ADAMW(
+        return xpu::dpcpp::fused_ADAMW(
             param_,
             exp_avg_,
             exp_avg_sq_,
@@ -614,7 +614,7 @@ void init_module(pybind11::module& m) {
          const double weight_decay,
          const double dampening,
          const bool nesterov) {
-        return at::AtenIpexTypeXPU::fused_SGD(
+        return xpu::dpcpp::fused_SGD(
             fp32_weight,
             grad,
             momentum_buffer_,
@@ -662,7 +662,7 @@ void init_module(pybind11::module& m) {
       "convert torch layer Linear weight layout");
 
   m.def("to_plain", [](const at::Tensor& input) {
-    return at::AtenIpexTypeXPU::to_plain_if_needed(input);
+    return xpu::dpcpp::to_plain_if_needed(input);
   });
 
   m.def("dump_memory_stat", [](const int& device_index) {

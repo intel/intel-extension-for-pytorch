@@ -30,7 +30,7 @@
 #include <c10/util/Optional.h>
 #include <torch/library.h>
 
-#include <intrinsic/intrinsic.h>
+#include <tensor/Tensor.h>
 #include <utils/SimpleTrace.h>
 
 #include <cstddef>

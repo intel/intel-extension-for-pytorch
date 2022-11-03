@@ -1,10 +1,9 @@
 #include <ATen/quantized/QTensorImpl.h>
 #include <ATen/quantized/Quantizer.h>
 #include <core/TensorImplUtils.h>
-#include <intrinsic/intrinsic.h>
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
-#include <tensor/Context.h>
+#include <tensor/Tensor.h>
 
 #include <oneDNN/oneDNN.h>
 #include "ATen/core/interned_strings.h"

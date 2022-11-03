@@ -7,7 +7,7 @@
 #include "comm/ParamUtils.h"
 
 #include <oneDNN/oneDNN.h>
-#include <quantized/QUtil.h>
+#include <quantized/QUtils.h>
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
 #include <unistd.h>

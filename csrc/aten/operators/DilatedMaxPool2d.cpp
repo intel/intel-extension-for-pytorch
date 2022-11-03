@@ -513,7 +513,7 @@ std::tuple<Tensor, Tensor> max_pool2d_with_indices(
     IntArrayRef dilation,
     bool ceil_mode) {
   Tensor output, indices;
-  output = _empty_affine_quantized(
+  output = at::_empty_affine_quantized(
       {0},
       input.options(),
       input.q_scale(),

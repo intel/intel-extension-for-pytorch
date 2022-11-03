@@ -2,7 +2,6 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
-#include <intrinsic/intrinsic.h>
 
 #include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>

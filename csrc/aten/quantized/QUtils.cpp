@@ -13,7 +13,7 @@
 #include <torch/custom_class.h>
 #include <torch/custom_class_detail.h>
 
-#include <quantized/QUtil.h>
+#include <quantized/QUtils.h>
 
 #ifdef BUILD_JIT_QUANTIZATION_SAVE
 // QConv prepack pickling method hacking

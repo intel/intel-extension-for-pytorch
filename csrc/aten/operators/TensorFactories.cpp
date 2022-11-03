@@ -112,7 +112,7 @@ Tensor empty_strided_dpcpp(
     IntArrayRef stride,
     const TensorOptions& options) {
   check_size_nonnegative(size);
-  auto t = at::AtenIpexTypeXPU::empty({0}, options, c10::nullopt);
+  auto t = empty_dpcpp({0}, options, c10::nullopt);
   TensorImpl_resizeImpl(t.unsafeGetTensorImpl(), size, stride);
   return t;
 }
@@ -343,8 +343,7 @@ Tensor triu_indices_dpcpp(
   check_args(row, col, options.layout());
 
   auto triu_size = row * col - get_tril_size(row, col, offset - 1);
-  auto tensor =
-      at::AtenIpexTypeXPU::empty({2, triu_size}, options, c10::nullopt);
+  auto tensor = empty_dpcpp({2, triu_size}, options, c10::nullopt);
 
   if (triu_size > 0) {
     // # of triu elements in the first row
@@ -381,8 +380,7 @@ Tensor tril_indices_dpcpp(
   check_args(row, col, options.layout());
 
   auto tril_size = get_tril_size(row, col, offset);
-  auto tensor =
-      at::AtenIpexTypeXPU::empty({2, tril_size}, options, c10::nullopt);
+  auto tensor = empty_dpcpp({2, tril_size}, options, c10::nullopt);
 
   if (tril_size > 0) {
     auto m_first_row = (offset > 0) ? std::min<int64_t>(col, 1 + offset)
@@ -414,12 +412,32 @@ Tensor tril_indices_dpcpp(
 } // namespace impl
 
 namespace AtenIpexTypeXPU {
+
+at::Tensor& std_var_out(
+    at::Tensor& result,
+    const at::Tensor& self,
+    at::IntArrayRef dim,
+    int64_t correction_opt,
+    bool keepdim,
+    bool take_sqrt);
+
+std::tuple<Tensor&, Tensor&> std_var_mean_out(
+    const char* fname,
+    Tensor& result1,
+    Tensor& result2,
+    const Tensor& self,
+    IntArrayRef dim,
+    int64_t correction_opt,
+    bool keepdim,
+    bool take_sqrt);
+
 Tensor empty(
     IntArrayRef size,
     const TensorOptions& options,
     c10::optional<MemoryFormat> optional_memory_format) {
   return at::impl::empty_dpcpp(size, options, optional_memory_format);
 }
+
 Tensor empty(
     IntArrayRef size,
     c10::optional<at::ScalarType> dtype,
@@ -636,7 +654,7 @@ Tensor empty_quantized(
     c10::optional<Device> device,
     c10::optional<bool> pin_memory,
     c10::optional<c10::MemoryFormat> memory_format) {
-  return impl::empty_quantized(
+  return at::impl::empty_quantized(
       size, qtensor, dtype, layout, device, pin_memory, memory_format);
 }
 } // namespace AtenIpexTypeQuantizedXPU

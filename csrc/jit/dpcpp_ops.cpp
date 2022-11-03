@@ -4,7 +4,6 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/record_function.h>
 #include <grp.h>
-#include <intrinsic/intrinsic.h>
 #include <oneapi/dnnl/dnnl.hpp>
 
 #include <oneDNN/oneDNN.h>

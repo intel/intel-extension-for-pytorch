@@ -1,8 +1,7 @@
 #pragma once
 
 #include <ATen/core/Tensor.h>
-#include <intrinsic/intrinsic.h>
-#include <tensor/Context.h>
+#include <tensor/Tensor.h>
 #include <utils/DPCPP.h>
 
 // Channels last 1D is only supported by IPEX GPU
