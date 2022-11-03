@@ -70,8 +70,27 @@ static bool maybe_enable_p2p_access(Device dst_device, Device src_device) {
   if (dst_device.is_cpu() || src_device.is_cpu()) {
     return false;
   }
-  // no p2p so far
+#ifdef USE_MULTI_CONTEXT
+  // TODO: Support multi-context tensor copy. JIRA:
+  // https://jira.devtools.intel.com/browse/PYTORCHDGQ-2045
   return false;
+#else
+  // TODO: Before P2P query API is ready, we always return false here,
+  // even with global default SYCL context.
+  // https://jira.devtools.intel.com/browse/CMPLRLLVM-35987
+  return false;
+#endif
+}
+
+inline void loops_memcpy(char* dst, char* src, size_t size) {
+  at::detail::Array<char*, 2> data;
+  data[0] = dst;
+  data[1] = src;
+  auto fn = [](char a) -> char { return a; };
+  int vec_size = at::native::Memory::can_vectorize_up_to_loop<decltype(fn)>(
+      getDeviceIdOfCurrentQueue(), data);
+  auto ic = TrivialOffsetCalculator<1>();
+  launch_vectorized_kernel(size, fn, data, ic, vec_size);
 }
 
 void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
@@ -110,11 +129,13 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   }
 
   if (memcpy_eligible) {
-    dpcppMemcpyAsync(
-        iter.data_ptr(0),
-        iter.data_ptr(1),
-        numel * iter.element_size(0),
-        DeviceToDevice);
+    // SYCL queue.memcpy performance is worse than SYCL copy kernel
+    // implementation. JIRA:
+    // https://jira.devtools.intel.com/browse/CMPLRLLVM-41292
+    loops_memcpy(
+        (char*)iter.data_ptr(0),
+        (char*)iter.data_ptr(1),
+        numel * iter.element_size(0));
   } else {
     auto dtype = iter.dtype(0);
     if (isQIntType(dtype)) {
