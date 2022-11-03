@@ -30,7 +30,8 @@ supported_non_unary_post_op_fusion_set();
 bool is_channelslast(c10::TensorType tensor);
 // Check if the memory format of the tensor is Contiguous
 bool is_contiguous(c10::TensorTypePtr tensor);
-
+// Check if the target IValue is a scalar or a 0-dim scalar tensor
+bool is_scalar(torch::jit::Value* target_value);
 } // namespace utils
 } // namespace graph_rewrite
 } // namespace jit

@@ -299,7 +299,7 @@ void FusedTransFreeMha(std::shared_ptr<Graph>& graph) {
         %key_ = aten::select(%qkv2, %select_dim, %key_select)
         %value = aten::select(%qkv2, %select_dim, %value_select)
         %key = aten::transpose(%key_, %trans_a, %trans_b)
-        %bmm1 = ipex::matmul_div(%query, %key, %scale)
+        %bmm1 = ipex::matmul_mul(%query, %key, %scale)
         %smx = ipex::softmax(%bmm1, %trans_b, %dtype)
         %bmm2 = aten::matmul(%smx, %value)
         %context_layer = aten::transpose(%bmm2, %key_select, %value_select)
