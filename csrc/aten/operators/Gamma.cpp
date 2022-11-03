@@ -93,47 +93,12 @@ static inline void lgamma_check(const Tensor& self) {
 }
 
 Tensor lgamma(const Tensor& self) {
-#ifdef USE_ONEMKL
-  lgamma_check(self);
-  int64_t n = self.numel();
   Tensor out = at::empty_like(self);
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lgamma", [&] {
-    DPCPP_ONEMKL_SUBMIT(
-        dpcpp_queue,
-        oneapi::mkl::vm::lgamma,
-        dpcpp_queue,
-        n,
-        (scalar_t*)self.data_ptr(),
-        (scalar_t*)out.data_ptr());
-  });
-  return out;
-#else
-  AT_ERROR("lgamma: oneMKL library not found in compilation");
-#endif
+  return at::AtenIpexTypeXPU::lgamma_out(self, out);
 }
 
 Tensor& lgamma_(Tensor& self) {
-#ifdef USE_ONEMKL
-  lgamma_check(self);
-  int64_t n = self.numel();
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lgamma_", [&] {
-    DPCPP_ONEMKL_SUBMIT(
-        dpcpp_queue,
-        oneapi::mkl::vm::lgamma,
-        dpcpp_queue,
-        n,
-        (scalar_t*)self.data_ptr(),
-        (scalar_t*)self.data_ptr());
-  });
-
-  return self;
-#else
-  AT_ERROR("lgamma: oneMKL library not found in compilation");
-#endif
+  return at::AtenIpexTypeXPU::lgamma_out(self, self);
 }
 
 Tensor& lgamma_out(const Tensor& self, Tensor& out) {
@@ -159,7 +124,6 @@ static inline void mvlgamma_check(const Tensor& self, int64_t p) {
 }
 
 Tensor mvlgamma(const Tensor& self, int64_t p) {
-#ifdef USE_ONEMKL
   mvlgamma_check(self, p);
   Tensor range = at::empty({0}, self.options());
   Tensor args = at::arange_out(range, -p / 2. + 0.5, 0.5, 0.5);
@@ -167,14 +131,9 @@ Tensor mvlgamma(const Tensor& self, int64_t p) {
 
   return args.lgamma_().sum(-1).add_(
       p * (p - 1) * std::log(Numerics<double>::pi()) / 4.);
-
-#else
-  AT_ERROR("lgamma: oneMKL library not found in compilation");
-#endif
 }
 
 Tensor& mvlgamma_(Tensor& self, int64_t p) {
-#ifdef USE_ONEMKL
   mvlgamma_check(self, p);
   Tensor range = at::empty({0}, self.options());
   Tensor args = at::arange_out(range, -p / 2. + 0.5, 0.5, 0.5);
@@ -182,13 +141,9 @@ Tensor& mvlgamma_(Tensor& self, int64_t p) {
 
   return self.copy_(args.lgamma_().sum(-1).add_(
       p * (p - 1) * std::log(Numerics<double>::pi()) / 4.));
-#else
-  AT_ERROR("lgamma: oneMKL library not found in compilation");
-#endif
 }
 
 Tensor& mvlgamma_out(const Tensor& self, int64_t p, Tensor& out) {
-#ifdef USE_ONEMKL
   auto output = self.mvlgamma(p);
   TORCH_CHECK(
       at::can_cast(output.scalar_type(), out.scalar_type()),
@@ -198,9 +153,6 @@ Tensor& mvlgamma_out(const Tensor& self, int64_t p, Tensor& out) {
       output.scalar_type());
   at::native::resize_output(out, output.sizes());
   return out.copy_(output);
-#else
-  AT_ERROR("lgamma: oneMKL library not found in compilation");
-#endif
 }
 
 Tensor digamma(const Tensor& self) {

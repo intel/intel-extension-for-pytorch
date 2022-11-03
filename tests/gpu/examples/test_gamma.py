@@ -8,8 +8,26 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_lgamma(self, dtype=torch.float):
+        a = np.array([[0.5, 1, 1.5],
+                      [2.5, 3, 3.5]])
+        data = torch.from_numpy(a)
+        x = data.clone().detach()
+        x_dpcpp = x.to("xpu")
+
+        y = torch.lgamma(x)
+        y_dpcpp = torch.lgamma(x_dpcpp)
+        y_dpcpp_lgamma = x_dpcpp.lgamma()
+
+        self.assertEqual(y, y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp_lgamma.cpu())
+
+        x.lgamma_()
+        x_dpcpp.lgamma_()
+
+        self.assertEqual(x, x_dpcpp.cpu())
+
+    def test_lgamma_bf16(self, dtype=torch.bfloat16):
         a = np.array([[0.5, 1, 1.5],
                       [2.5, 3, 3.5]])
         data = torch.from_numpy(a)
@@ -42,7 +60,6 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(y, y_dpcpp.cpu())
 
-    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_mvlgamma(self, dtype=torch.float):
         a = np.array([[1.6835, 1.8474, 1.1929],
