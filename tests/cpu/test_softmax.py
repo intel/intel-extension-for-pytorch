@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import intel_extension_for_pytorch as ipex
-from common_utils import TestCase
 from torch.testing._internal.jit_utils import JitTestCase
 import intel_extension_for_pytorch as ipex
 from intel_extension_for_pytorch.quantization import prepare, convert
@@ -40,10 +39,7 @@ class inplace_softmax_with_blocks(torch.nn.Module):
         super().__init__()
     def forward(self, x, flag):
         if flag:
-          if flag:
             x1 = x + 1
-          else:
-            x1 = x + 2
         else:
             x1 = x + 3
         x2 = torch.softmax(x1, dim=-1)

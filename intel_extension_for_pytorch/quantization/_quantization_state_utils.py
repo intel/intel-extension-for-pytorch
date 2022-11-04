@@ -1,7 +1,6 @@
 import dataclasses
 from typing import Callable, Tuple, Any, List, Optional, Dict
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.quantized.dynamic as nnqd
 from intel_extension_for_pytorch.nn.functional import interaction
@@ -344,7 +343,7 @@ def iterate_and_apply_convert(
                     args = args.to(torch.float32)
                     args = torch.quantize_per_channel(args, scale, zp, ch_axis, dtype)
                     args = args.dequantize()
-                    args = arg.to(torch.bfloat16)
+                    args = args.to(torch.bfloat16)
                 else:
                     args = torch.quantize_per_channel(args, scale, zp, ch_axis, dtype)
                     args = args.dequantize()

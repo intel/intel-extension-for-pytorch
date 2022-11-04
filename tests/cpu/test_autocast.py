@@ -557,7 +557,7 @@ class TestLSTM(TorchTestCase):
         batch_size = 24
         num_layers = 1
         bidirectional = True
-        num_direc = 2 if bidirectional else 1
+        num_direc = 2
         max_lens = 96
 
         sent = torch.randn(batch_size, max_lens, embedding_dim)
