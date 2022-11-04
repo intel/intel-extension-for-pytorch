@@ -21,7 +21,7 @@ dnnl_fpmath_mode_t fpmath_mode = []() {
 }();
 
 void setFP32MathModeCpu(FP32MathMode m) {
-  dnnl_fpmath_mode_t mode;
+  dnnl_fpmath_mode_t mode = dnnl_fpmath_mode_strict;
   if (m == FP32MathMode::FP32) {
     mode = dnnl_fpmath_mode_strict;
   } else if (m == FP32MathMode::BF32) {
