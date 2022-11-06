@@ -40,7 +40,7 @@
 #include <ATen/Tensor.h>
 #include <ATen/native/Resize.h>
 
-#include <intrinsic/intrinsic.h>
+#include <tensor/Tensor.h>
 #include <utils/SimpleTrace.h>
 
 #include <cstddef>

@@ -515,8 +515,7 @@ void init_module(pybind11::module& m) {
          const at::Tensor& weight,
          const at::Tensor& bias,
          c10::string_view approximate) {
-        return xpu::dpcpp::linear_gelu(
-            input, weight, bias, approximate);
+        return xpu::dpcpp::linear_gelu(input, weight, bias, approximate);
       },
       "fused linear with gelu opt. on Intel device");
   m.def(

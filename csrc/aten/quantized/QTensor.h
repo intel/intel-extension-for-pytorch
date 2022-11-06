@@ -29,8 +29,6 @@ Tensor q_per_channel_zero_points(const Tensor& self);
 
 int64_t q_per_channel_axis(const Tensor& self);
 
-Tensor& set_quantizer_(Tensor& self, ConstQuantizerPtr quantizer);
-
 Tensor& set_(
     Tensor& self,
     Storage storage,

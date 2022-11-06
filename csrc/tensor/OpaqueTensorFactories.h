@@ -25,6 +25,6 @@ std::vector<at::Tensor> to_plain_if_needed(TensorList tensor);
 
 MaterializedITensorListRef to_plain_if_needed(
     MaterializedITensorListRef tensors);
-    
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

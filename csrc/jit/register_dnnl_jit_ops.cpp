@@ -1,3 +1,4 @@
+#include <ATen/native/quantized/PackedParams.h>
 #include <intrinsic/intrinsic.h>
 #include <quantized/QUtils.h>
 #include <torch/csrc/jit/runtime/custom_operator.h>
@@ -7,7 +8,6 @@
 #include <vector>
 #include "ATen/core/ivalue.h"
 #include "ATen/core/stack.h"
-#include <ATen/native/quantized/PackedParams.h>
 #include "accelerated_ops.h"
 #include "c10/core/Scalar.h"
 #include "c10/core/ScalarType.h"
