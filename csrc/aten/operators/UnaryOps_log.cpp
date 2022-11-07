@@ -23,7 +23,7 @@ IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
     log10_out,
     Numerics<scalar_t>::log10,
     unary_float_op);
-IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL(
+IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMMON(
     log1p_out,
     Numerics<scalar_t>::log1p,
     unary_float_op);
