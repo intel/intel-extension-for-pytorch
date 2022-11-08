@@ -200,6 +200,7 @@ def _install_requirements():
 def _build_installation_dependency():
     install_requires = []
     install_requires.append('psutil')
+    install_requires.append('numpy')
     return install_requires
 
     # Disable PyTorch wheel binding temporarily
