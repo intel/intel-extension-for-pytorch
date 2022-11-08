@@ -195,7 +195,16 @@ static void mkl_baddbmm(
         self, {batch1.size(0), batch1.size(1), batch2.size(2)}, "mkl_matmul");
     result.resize_as_(*b_self).copy_(*b_self);
   } else {
-    result.resize_({batch1.size(0), batch1.size(1), batch2.size(2)});
+    // For mkl_baddbmm, have to convert it to contiguous format(only update meta
+    // data, and don't copy memory) for such kind of tensor below: E.g.: the
+    // tensor whose size is [10, 12, 50], and stride is [50, 500, 1], where
+    // oneMKL lib cannot handle this kind of stride. Because stridec from oneMKL
+    // strided style API means step size for each sample in the same batch.
+    // However, for mkl_matmul, the stridec is always c.numel(), because we only
+    // have 1 sample when we do addmm.
+    result.resize_(
+        {batch1.size(0), batch1.size(1), batch2.size(2)},
+        at::MemoryFormat::Contiguous);
   }
 
   TORCH_CHECK(
