@@ -442,7 +442,14 @@ static void mkl_matmul(
 
   const int64_t lda = a.strides()[(transpose_a == transpose_c) ? 1 : 0];
   const int64_t ldb = b.strides()[(transpose_b == transpose_c) ? 1 : 0];
-  const int64_t ldc = c.strides()[transpose_c ? 0 : 1];
+  // for the corner case: result tensor with size [m, 1], stride [1, 1]
+  // we cannot use stride to get its leading dimension, whose value should be m.
+  int64_t ldc;
+  if (1 == c.strides()[0] == c.strides()[1]) {
+    ldc = c.sizes()[transpose_c ? 1 : 0];
+  } else {
+    ldc = c.strides()[transpose_c ? 0 : 1];
+  }
 
   // Always ensure the conjugation for c is resolved since there's no way to
   // specify c's conjugation in the gemm call
