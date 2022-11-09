@@ -6,9 +6,8 @@ Intel® Extension for PyTorch\* provides optimizations for both eager mode and g
 
 The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts users can enable it dynamically by importing `intel_extension_for_pytorch`.
 
-More detailed tutorials are available at **Intel® Extension for PyTorch\* [online document website](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/)**.
-
-**Note**: Check [here](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) for detailed tutorials of Intel® Extension for PyTorch\* for Intel® GPUs. Source code are available at the [xpu-master branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master).
+* Check [CPU tutorial](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® CPUs. Source code is available at the [master branch](https://github.com/intel/intel-extension-for-pytorch/tree/master).
+* Check [GPU tutorial](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® GPUs. Source code is available at the [xpu-master branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master).
 
 ## Installation
 
@@ -28,9 +27,9 @@ python -m pip install intel_extension_for_pytorch -f https://software.intel.com/
 
 More installation methods can be found at [CPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/installation.html)
 
-### XPU/GPU version
+### GPU version
 
-You can install Intel® Extension for PyTorch\* for XPU/GPU via command below.
+You can install Intel® Extension for PyTorch\* for GPU via command below.
 
 ```python
 python -m pip install torch==1.10.0a0 -f https://developer.intel.com/ipex-whl-stable-xpu
@@ -39,13 +38,13 @@ python -m pip install intel_extension_for_pytorch==1.10.200+gpu -f https://softw
 
 **Note:** The patched PyTorch 1.10.0a0 is required to work with Intel® Extension for PyTorch\* on Intel® graphics card for now.
 
-More installation methods can be found at [XPU/GPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html)
+More installation methods can be found at [GPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html)
 
 ## Getting Started
 
 Minor code changes are required for users to get start with Intel® Extension for PyTorch\*. Both PyTorch imperative mode and TorchScript mode are supported. You just need to import Intel® Extension for PyTorch\* package and apply its optimize function against the model object. If it is a training workload, the optimize function also needs to be applied against the optimizer object.
 
-The following code snippet shows an inference code with FP32 data type. More examples on CPU, including training and C++ examples, are available at [CPU Example page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/examples.html). More examples on XPU/GPU are available at [XPU/GPU Example page](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/examples.html).
+The following code snippet shows an inference code with FP32 data type. More examples on CPU, including training and C++ examples, are available at [CPU Example page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/examples.html). More examples on GPU are available at [GPU Example page](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/examples.html).
 
 ### Inference on CPU
 
