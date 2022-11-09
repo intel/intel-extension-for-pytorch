@@ -44,6 +44,14 @@ std::vector<Tensor> merged_embeddingbag_forward_cpu_kernel_impl(
     const std::vector<Tensor>& weights,
     const std::vector<int64_t> pooling_modes);
 
+std::vector<Tensor> merged_embeddingbag_backward_cpu_kernel_impl(
+    const std::vector<Tensor>& grad_outs_,
+    const Tensor& offsets,
+    const std::vector<Tensor>& weights,
+    const Tensor& indices_with_row_offset,
+    const Tensor& row_offsets,
+    const std::vector<int64_t> pooling_modes);
+
 void merged_embeddingbag_backward_sgd_cpu_kernel_impl(
     const std::vector<Tensor>& grads_y_,
     const Tensor& indices,
@@ -66,6 +74,17 @@ using merged_embeddingbag_forward_cpu_kernel_fn = std::vector<Tensor> (*)(
 DECLARE_DISPATCH(
     merged_embeddingbag_forward_cpu_kernel_fn,
     merged_embeddingbag_forward_cpu_kernel_stub);
+
+using merged_embeddingbag_backward_cpu_kernel_fn = std::vector<Tensor> (*)(
+    const std::vector<Tensor>&,
+    const Tensor&,
+    const std::vector<Tensor>&,
+    const Tensor&,
+    const Tensor&,
+    const std::vector<int64_t>);
+DECLARE_DISPATCH(
+    merged_embeddingbag_backward_cpu_kernel_fn,
+    merged_embeddingbag_backward_cpu_kernel_stub);
 
 using merged_embeddingbag_backward_sgd_cpu_kernel_fn = void (*)(
     const std::vector<Tensor>&,
