@@ -7,8 +7,6 @@
 #include <unistd.h>
 #endif
 
-#include <ATen/ATen.h>
-
 namespace torch_ipex {
 namespace cpu {
 CPUFeature::CPUFeature() {
