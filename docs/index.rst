@@ -1,8 +1,3 @@
-.. Sphinx Test documentation master file, created by
-   sphinx-quickstart on Sun Sep 19 17:30:45 2021.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 .. meta::
    :description: This website introduces Intel® Extension for PyTorch*
    :keywords: Intel optimization, PyTorch, Intel® Extension for PyTorch*
@@ -10,13 +5,15 @@
 Welcome to Intel® Extension for PyTorch* Documentation
 ######################################################
 
-Intel® Extension for PyTorch* extends PyTorch with up-to-date features optimizations for an extra performance boost on Intel hardware. Example optimizations use AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX). Over time, most of these optimizations will be included directly into stock PyTorch releases.
+Intel® Extension for PyTorch* extends PyTorch* with up-to-date features optimizations for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel X\ :sup:`e`\  Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch* `xpu` device, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs with PyTorch*.
 
-Intel® Extension for PyTorch* provides optimizations for both eager mode and graph mode, however, compared to eager mode, graph mode in PyTorch normally yields better performance from optimization techniques such as operation fusion, and Intel® Extension for PyTorch* amplified them with more comprehensive graph optimizations. Therefore we recommended you to take advantage of Intel® Extension for PyTorch* with `TorchScript <https://pytorch.org/docs/stable/jit.html>`_ whenever your workload supports it. You could choose to run with `torch.jit.trace()` function or `torch.jit.script()` function, but based on our evaluation, `torch.jit.trace()` supports more workloads so we recommend you to use `torch.jit.trace()` as your first choice. More detailed information can be found at `pytorch.org website <https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html#tracing-modules>`_.
+Intel® Extension for PyTorch* provides optimizations for both eager mode and graph mode, however, compared to eager mode, graph mode in PyTorch* normally yields better performance from optimization techniques, such as operation fusion. Intel® Extension for PyTorch* amplifies them with more comprehensive graph optimizations. Therefore we recommend you to take advantage of Intel® Extension for PyTorch* with `TorchScript <https://pytorch.org/docs/stable/jit.html>`_ whenever your workload supports it. You could choose to run with `torch.jit.trace()` function or `torch.jit.script()` function, but based on our evaluation, `torch.jit.trace()` supports more workloads so we recommend you to use `torch.jit.trace()` as your first choice.
 
 The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts users can enable it dynamically by importing `intel_extension_for_pytorch`.
 
-Intel® Extension for PyTorch* is structured as shown in the following figure:
+**Note**: Check `here <https://intel.github.io/intel-extension-for-pytorch/xpu/latest/>`_ for detailed tutorials of Intel® Extension for PyTorch* for Intel® GPUs. Source code are available at the `xpu-master branch <https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master>`_.
+
+Intel® Extension for PyTorch* for CPU is structured as shown in the following figure:
 
 .. figure:: ../images/intel_extension_for_pytorch_structure.png
   :width: 800
