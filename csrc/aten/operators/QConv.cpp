@@ -176,8 +176,8 @@ Tensor q_conv2d(
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double output_scale,
     int64_t output_zero_point) {
-  auto qconv_wrapper = QuantizeConvConverter<2>(
-      packed_weight, output_scale, output_zero_point, kQInt8);
+  auto qconv_wrapper =
+      QuantizeConvConverter<2>(packed_weight, output_scale, 0, kQInt8);
   auto post_op = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
     auto pack_ptr =
@@ -197,8 +197,8 @@ at::Tensor q_conv2d_relu(
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double output_scale,
     int64_t output_zero_point) {
-  auto qconv_wrapper = QuantizeConvConverter<2>(
-      packed_weight, output_scale, output_zero_point, kQUInt8);
+  auto qconv_wrapper =
+      QuantizeConvConverter<2>(packed_weight, output_scale, 128, kQUInt8);
   auto att = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
     auto pack_ptr =
@@ -222,8 +222,8 @@ Tensor q_conv3d(
     const c10::intrusive_ptr<ConvPackedParamsBase<3>>& packed_weight,
     double output_scale,
     int64_t output_zero_point) {
-  auto qconv_wrapper = QuantizeConvConverter<3>(
-      packed_weight, output_scale, output_zero_point, kQInt8);
+  auto qconv_wrapper =
+      QuantizeConvConverter<3>(packed_weight, output_scale, 0, kQInt8);
   auto post_op = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
     auto pack_ptr =
@@ -243,8 +243,8 @@ Tensor q_conv3d_relu(
     const c10::intrusive_ptr<ConvPackedParamsBase<3>>& packed_weight,
     double output_scale,
     int64_t output_zero_point) {
-  auto qconv_wrapper = QuantizeConvConverter<3>(
-      packed_weight, output_scale, output_zero_point, kQUInt8);
+  auto qconv_wrapper =
+      QuantizeConvConverter<3>(packed_weight, output_scale, 128, kQUInt8);
   auto post_op = [=]() {
     Attr attr(/* q_scale */ static_cast<float>(output_scale));
     auto pack_ptr =

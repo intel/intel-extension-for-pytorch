@@ -40,6 +40,24 @@ Tensor quantize_tensor_per_channel_affine(
   return qtensor;
 }
 
+static inline memory::format_tag quant_dst_fmt(
+    const int64_t ndim,
+    const bool is_channels_last = false) {
+  if (!is_channels_last) {
+    return (ndim == 3)
+        ? memory::format_tag::ncw
+        : ((ndim == 4) ? memory::format_tag::nchw
+                       : ((ndim == 5) ? memory::format_tag::ncdhw
+                                      : memory::format_tag::undef));
+  } else {
+    return (ndim == 3)
+        ? memory::format_tag::nwc
+        : ((ndim == 4) ? memory::format_tag::nhwc
+                       : ((ndim == 5) ? memory::format_tag::ndhwc
+                                      : memory::format_tag::undef));
+  }
+}
+
 Tensor quantize_tensor_per_tensor_affine(
     Tensor& qtensor,
     const Tensor& rtensor,
@@ -83,11 +101,9 @@ Tensor quantize_tensor_per_tensor_affine(
                              : rtensor.dim() == 2
                 ? memory::dims({rtensor.size(0), rtensor.size(1)})
                 : memory::dims({rtensor.size(0)});
-    memory::format_tag q_fmt = rtensor.dim() == 5
-        ? memory::format_tag::ncdhw
-        : rtensor.dim() == 4 ? memory::format_tag::nchw
-                             : rtensor.dim() == 2 ? memory::format_tag::nc
-                                                  : memory::format_tag::x;
+
+    memory::format_tag q_fmt =
+        quant_dst_fmt(rtensor.dim(), is_smf_channels_last(rtensor));
 
     // We will force to specify s8 as quantization data type to meet the
     // requirement of pytorch calibration with unified data type.
