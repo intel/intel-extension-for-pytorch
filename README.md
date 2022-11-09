@@ -1,13 +1,16 @@
 # Intel® Extension for PyTorch\* GPU
 
-Intel® Extension for PyTorch\* extends [PyTorch\*](https://github.com/pytorch/pytorch) with optimizations for extra performance boost on Intel hardware. It is a heterogeneous, high performance deep learning implementation for Intel® XPU (GPU, CPU, etc.) devices. This repo introduces optimized GPU solution for PyTorch end-users to get up-to-date features and optimizations on Intel Graphics cards. Eventually, it will be merged with CPU solution and released in the same public repo: https://github.com/intel/intel-extension-for-pytorch/.
+Intel® Extension for PyTorch\* extends PyTorch\* with up-to-date features optimizations for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel X<sup>e</sup> Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch\* `xpu` device, Intel® Extension for PyTorch\* provides easy GPU acceleration for Intel discrete GPUs with PyTorch\*.
 
-Intel® Extension for PyTorch\* is loaded as a Python module for Python programs or linked as a C++ library for C++ programs. Users can enable it dynamically in script by importing intel_extension_for_pytorch. It covers optimizations for both imperative mode and graph mode. Optimized operators and kernels are registered to XPU backend through PyTorch dispatching mechanism. These operators and kernels are accelerated from native vectorization feature and matrix calculation feature of Intel hardware. In graph mode, further operator fusions are supported to reduce operator/kernel invocation overheads, and thus increase performance.
+Intel® Extension for PyTorch\* provides optimizations for both eager mode and graph mode, however, compared to eager mode, graph mode in PyTorch\* normally yields better performance from optimization techniques, such as operation fusion. Intel® Extension for PyTorch\* amplifies them with more comprehensive graph optimizations. Therefore we recommend you to take advantage of Intel® Extension for PyTorch\* with [TorchScript](https://pytorch.org/docs/stable/jit.html) whenever your workload supports it. You could choose to run with `torch.jit.trace()` function or `torch.jit.script()` function, but based on our evaluation, `torch.jit.trace()` supports more workloads so we recommend you to use `torch.jit.trace()` as your first choice.
 
-The latest release version for GPU solution of Intel® Extension for PyTorch\* is 1.10.100+gpu.
+The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts users can enable it dynamically by importing `intel_extension_for_pytorch`.
+
+* Check [CPU tutorial](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® CPUs. Source code is available at the [master branch](https://github.com/intel/intel-extension-for-pytorch/tree/master).
+* Check [GPU tutorial](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® GPUs. Source code is available at the [xpu-master branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master).
 
 # Table of Contents
-- [Intel® Extension for PyTorch* GPU](#intel-extension-for-pytorch-gpu)
+- [Intel® Extension for PyTorch\* GPU](#intel-extension-for-pytorch-gpu)
 - [Table of Contents](#table-of-contents)
 - [Pre-requirements](#pre-requirements)
   - [Dependencies](#dependencies)
@@ -18,7 +21,7 @@ The latest release version for GPU solution of Intel® Extension for PyTorch\* i
 - [Repo preparation](#repo-preparation)
   - [Validation of Compiler Installation](#validation-of-compiler-installation)
 - [Build and Install PyTorch](#build-and-install-pytorch)
-- [Build and Install Intel® Extension for PyTorch* GPU](#build-and-install-intel-extension-for-pytorch-gpu)
+- [Build and Install Intel® Extension for PyTorch\* GPU](#build-and-install-intel-extension-for-pytorch-gpu)
 - [Programming Model](#programming-model)
   - [How to get accurate End to End model execution time](#how-to-get-accurate-end-to-end-model-execution-time)
 - [Build Option List](#build-option-list)
@@ -134,9 +137,9 @@ If you are using different version of oneMKL, the MKL path might be different.
 
 ### MKL related issues:
 
-Story MKLD-13445 is not completed in verified oneMKL versions listed above, which makes different versions of MKL library in one system might conflict with each other. For now, we recommend to build PyTorch with mkl from conda channel and build Intel® Extension for PyTorch* with the verified oneMKL library, which is the typical usage scenario validated regularly. You may meet build error or runtime errors listed below in other usage scenarios:
+Story MKLD-13445 is not completed in verified oneMKL versions listed above, which makes different versions of MKL library in one system might conflict with each other. For now, we recommend to build PyTorch with mkl from conda channel and build Intel® Extension for PyTorch\* with the verified oneMKL library, which is the typical usage scenario validated regularly. You may meet build error or runtime errors listed below in other usage scenarios:
 
-#### Can't find oneMKL library when build Intel® Extension for PyTorch* without oneMKL <br>
+#### Can't find oneMKL library when build Intel® Extension for PyTorch\* without oneMKL <br>
 
 Error info: <br>
 
@@ -148,7 +151,7 @@ Error info: <br>
 dpcpp: error: linker command failed with exit code 1 (use -v to see invocation) <br>
 ```
 
-When PyTorch is built with oneMKL library while Intel® Extension for PyTorch* is built without oneMKL library, we need to set following configuration to solve the link issue:
+When PyTorch is built with oneMKL library while Intel® Extension for PyTorch\* is built without oneMKL library, we need to set following configuration to solve the link issue:
 
 ```bash
 export USE_ONEMKL=OFF
@@ -157,7 +160,7 @@ export MKL_DPCPP_ROOT=${PATH_To_Your_oneMKL}/__release_lnx/mkl
 
 #### undefined symbol: mkl_lapack_dspevd. Intel MKL FATAL ERROR: cannot load libmkl_vml_avx512.so.2 or libmkl_vml_def.so.2 <br>
 
-This issue may raise when Intel® Extension for PyTorch* is built with oneMKL library while PyTorch is not build with any MKL library. oneMKL kernel may run into CPU occasionally which causes this issue. Please install MKL library from conda as following:
+This issue may raise when Intel® Extension for PyTorch\* is built with oneMKL library while PyTorch is not build with any MKL library. oneMKL kernel may run into CPU occasionally which causes this issue. Please install MKL library from conda as following:
 
 ```bash
 conda install mkl
@@ -186,7 +189,7 @@ cd frameworks.ai.pytorch.private-gpu
 git submodule update --init --recursive
 ```
 
-2.  Download source code of Intel® Extension for PyTorch* GPU
+2.  Download source code of Intel® Extension for PyTorch\* GPU
 
 ```bash
 git clone https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/
@@ -207,7 +210,7 @@ python3 setup.py install --user
 
 **Note:** We recommend using **GCC** compiler for building PyTorch.
 
-## Build and Install Intel® Extension for PyTorch* GPU
+## Build and Install Intel® Extension for PyTorch\* GPU
 
 ```bash
 cd frameworks.ai.pytorch.ipex-gpu
@@ -216,7 +219,7 @@ python3 setup.py install --user
 
 ## Programming Model
 
-*  Must ```import intel_extension_for_pytorch``` before running any cases with Intel® Extension for PyTorch* GPU.
+*  Must ```import intel_extension_for_pytorch``` before running any cases with Intel® Extension for PyTorch\* GPU.
 *  Must convert tensors and models to xpu device before running. Example:
 
 ```bash
@@ -276,22 +279,22 @@ Intel® Extension for PyTorch\* GPU supports torchvision 0.8.2 for now. The supp
 
 ```bash
     Install Private PyTorch
-    Install Intel® Extension for PyTorch* GPU
+    Install Intel® Extension for PyTorch\* GPU
     python3 -m pip install pillow
     python3 -m pip install torchvision==0.8.2 --no-deps
 ```
-Please skip the first two steps if Private Pytorch is already installed (follow steps in [Build and Install PyTorch](#build-and-install-pytorch) or through binary) and Intel® Extension for PyTorch\* GPU is already installed (follow steps in [Build and Install Intel® Extension for PyTorch* GPU](#build-and-install-intel-extension-for-pytorch-gpu) or through binary).
+Please skip the first two steps if Private Pytorch is already installed (follow steps in [Build and Install PyTorch](#build-and-install-pytorch) or through binary) and Intel® Extension for PyTorch\* GPU is already installed (follow steps in [Build and Install Intel® Extension for PyTorch\* GPU](#build-and-install-intel-extension-for-pytorch-gpu) or through binary).
 
 ## Build Option List
 
-The following build options are supported in Intel® Extension for PyTorch* GPU.
+The following build options are supported in Intel® Extension for PyTorch\* GPU.
 
 | **Build Option** | **Default<br> Value** | **Description** |
 | ------ | ------ | ------ |
 | USE_ONEMKL | ON | Use oneMKL BLAS library if set to ON. |
 | USE_CHANNELS_LAST_1D | ON | Support channels last 1D memory format if set to ON. |
 | USE_PERSIST_STREAM | ON | Use persistent oneDNN stream if set to ON.|
-| USE_PRIMITIVE_CACHE | OFF | Use Intel® Extension for PyTorch* GPU solution to cache oneDNN primtives if set to ON. <br> Otherwise use oneDNN cache solution.|
+| USE_PRIMITIVE_CACHE | OFF | Use Intel® Extension for PyTorch\* GPU solution to cache oneDNN primtives if set to ON. <br> Otherwise use oneDNN cache solution.|
 | USE_QUEUE_BARRIER | ON | Default is ON. Use queue submit barrier if set to ON. Otherwise use dummy kernel. |
 | USE_SCRATCHPAD_MODE | ON | Default is ON. Use oneDNN scratchpad user mode.|
 | USE_MULTI_CONTEXT | ON | Create DPC++ runtime context per device. |
@@ -299,7 +302,7 @@ The following build options are supported in Intel® Extension for PyTorch* GPU.
 | USE_SYCL_ASSERT | OFF | Enable assert in sycl kernel if set to ON. |
 | BUILD_STATS | OFF | Count statistics for each component during build process if set to ON. |
 | BUILD_BY_PER_KERNEL | OFF | Build by DPC++ per_kernel option if set to ON. |
-| BUILD_STRIPPED_BIN | OFF | Strip all symbols when building Intel® Extension for PyTorch* GPU libraries. |
+| BUILD_STRIPPED_BIN | OFF | Strip all symbols when building Intel® Extension for PyTorch\* GPU libraries. |
 | BUILD_SEPARATE_OPS | OFF | Build each operator in separate library if set to ON. |
 | BUILD_SIMPLE_TRACE | OFF | Build simple trace for each registered operators
 | BUILD_OPT_LEVEL | OFF | Add build option -Ox, accept values: 0/1
@@ -308,11 +311,11 @@ The following build options are supported in Intel® Extension for PyTorch* GPU.
 
 ## Launch Option List
 
-The following lauch options are supported in Intel® Extension for PyTorch* GPU.
+The following lauch options are supported in Intel® Extension for PyTorch\* GPU.
 
 | **Launch Option** | **Default<br> Value** | **Description** |
 | ------ | ------ | ------ |
-| IPEX_VERBOSE | 0 | Verbose level in integer. Provide verbose output for Intel® Extension for PyTorch* GPU customized kernel. |
+| IPEX_VERBOSE | 0 | Verbose level in integer. Provide verbose output for Intel® Extension for PyTorch\* GPU customized kernel. |
 | IPEX_FP32_MATH_MODE | FP32 | FP32 math mode. Set to TF32 for using TF32 math mode,  BF32 for using BF32 math mode.|
 | IPEX_TILE_AS_DEVICE | 1 | Device partition. If set to 0, tile partition will be disabled and map device to physical device. |
 | IPEX_XPU_SYNC_MODE | 0 | Kernel Execution mode. If set to 1, use synchronized execution mode and perform blocking wait for the completion of submitted kernel. |
@@ -387,11 +390,11 @@ for images, label in train_loader():
 
 ### Coding Style Alignment:
 
-This release uses clang-format and flake8 to enhance the code in Intel® Extension for PyTorch* GPU and make sure the coding style align with PyTorch proper.
+This release uses clang-format and flake8 to enhance the code in Intel® Extension for PyTorch\* GPU and make sure the coding style align with PyTorch proper.
 
 ### Distributed Training with DistributedDataParallel (DDP):
 
-ResNet50, BERT, CosmicTagger training are verified with DDP on PVC B4. For supporting this scenario, oneCCL Bindings for Pytorch* based on oneCCL 2021.8-eng02 version shall be built and used. 
+ResNet50, BERT, CosmicTagger training are verified with DDP on PVC B4. For supporting this scenario, oneCCL Bindings for PyTorch\* based on oneCCL 2021.8-eng02 version shall be built and used.
 
 ```bash
 git clone -b torch-ccl-xpu-1.10-rc2 https://github.com/intel-innersource/frameworks.ai.pytorch.torch-ccl.git
@@ -569,7 +572,7 @@ This release supports TF32 math mode and provides launch option 'IPEX_FP32_MATH_
 
 ### torch.inference_mode():
 
-The inference_mode is recommended by PyTorch official to get better performance by disabling view tracking and version counter bumps. For Intel® Extension for PyTorch* GPU, we also strongly recommend it, as inference_mode is able to significantly enhance performance by removing redundant layout conversions when using oneDNN specific layouts.
+The inference_mode is recommended by PyTorch official to get better performance by disabling view tracking and version counter bumps. For Intel® Extension for PyTorch\* GPU, we also strongly recommend it, as inference_mode is able to significantly enhance performance by removing redundant layout conversions when using oneDNN specific layouts.
 
 ### User mode scratchpad:
 
@@ -581,7 +584,7 @@ To switch to library mode scratchpad, please set USE_SCRATCHPAD_MODE=OFF and reb
 
 ### 1. Build order of PyTorch and extension:
 
-Please build Intel® Extension for PyTorch* GPU after pytorch is built and installed, otherwise you will get an error “ModuleNotFoundError: No module named 'torch'”.
+Please build Intel® Extension for PyTorch\* GPU after pytorch is built and installed, otherwise you will get an error “ModuleNotFoundError: No module named 'torch'”.
 
 ### 2. symbol undefined caused by _GLIBCXX_USE_CXX11_ABI:
 
@@ -593,12 +596,12 @@ File "/root/.local/lib/python3.9/site-packages/ipex/__init__.py", line 4, in <mo
 ImportError: /root/.local/lib/python3.9/site-packages/ipex/lib/libipex_gpu_core.so: undefined symbol: _ZNK5torch8autograd4Node4nameB5cxx11Ev
 ```
 
-This issue appears when Intel® Extension for PyTorch* is compiled with \_GLIBCXX_USE_CXX11_ABI=1 and PyTorch is compiled with \_GLIBCXX_USE_CXX11_ABI=0, which causes inconsistent.
+This issue appears when Intel® Extension for PyTorch\* is compiled with \_GLIBCXX_USE_CXX11_ABI=1 and PyTorch is compiled with \_GLIBCXX_USE_CXX11_ABI=0, which causes inconsistent.
 <br>
 
 #### Background：
 
-1. DPC++ has no plan to support \_GLIBCXX_USE_CXX11_ABI=0 (CMPLRLLVM-34202), Intel® Extension for PyTorch* is always compiled with \_GLIBCXX_USE_CXX11_ABI=1. <br>
+1. DPC++ has no plan to support \_GLIBCXX_USE_CXX11_ABI=0 (CMPLRLLVM-34202), Intel® Extension for PyTorch\* is always compiled with \_GLIBCXX_USE_CXX11_ABI=1. <br>
 2. PyTorch detects the setting of \_GLIBCXX_USE_CXX11_ABI by checking user config and compiler capability. If compiler in use does not support \_GLIBCXX_USE_CXX11_ABI=1, PyTorch is compiled with \_GLIBCXX_USE_CXX11_ABI=0. PyTorch publishes official binary package with \_GLIBCXX_USE_CXX11_ABI=0. <br>
 
 #### Solution：
