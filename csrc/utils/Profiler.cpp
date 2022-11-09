@@ -2,6 +2,7 @@
 #include <include/xpu/Profiler.h>
 #include <runtime/Utils.h>
 #include <torch/csrc/autograd/profiler_legacy.h>
+#include <torch/csrc/profiler/api.h>
 #include <utils/DPCPP.h>
 #include <utils/Helpers.h>
 #include <utils/Profiler.h>
@@ -9,6 +10,7 @@
 #include <sstream>
 
 using namespace torch::autograd::profiler;
+using namespace torch::profiler::impl;
 
 namespace xpu {
 namespace dpcpp {
@@ -36,33 +38,46 @@ struct DPCPPEventStubImpl : public torch::profiler::impl::KernelEventBase {
   bool is_ext_mark; // True to mark the external lib kernels
 };
 
-struct DPCPPProfilerStubsImpl : public torch::profiler::impl::XPUStubs {
+struct DPCPPMethods : public torch::profiler::impl::ProfilerStubs {
   void record(
       int* device,
-      torch::profiler::impl::KernelEventStub* event,
+      torch::profiler::impl::ProfilerEventStub* event,
       int64_t* cpu_ns) const override {
     // event has been marked by markKernel, so this record need do nothing
     *device = -1;
   }
 
-  float timeDiff(
-      const torch::profiler::impl::KernelEventStub& event,
-      const torch::profiler::impl::KernelEventStub& event2) const override {
-    DPCPPEventStubImpl* dpcpp_event =
-        dynamic_cast<DPCPPEventStubImpl*>(event.get());
-    DPCPPEventStubImpl* dpcpp_event2 =
-        dynamic_cast<DPCPPEventStubImpl*>(event2.get());
-    return dpcpp_event->elapsed(*dpcpp_event2);
+  float elapsed(const ProfilerEventStub* event, const ProfilerEventStub* event2)
+      const override {
+    TORCH_CHECK(false, "Profiler cannot use this method on XPU backend.");
   }
 
   float elapsed(
-      const torch::profiler::impl::KernelEventStub& event) const override {
+      const torch::profiler::impl::ProfilerEventStub* event) const override {
     DPCPPEventStubImpl* dpcpp_event =
-        dynamic_cast<DPCPPEventStubImpl*>(event.get());
+        dynamic_cast<DPCPPEventStubImpl*>(event->get());
     return dpcpp_event->elapsed();
   }
+
+  void mark(const char* name) const override {
+    TORCH_CHECK(false, "Profiler cannot use this method on XPU backend.");
+  }
+
+  virtual void rangePush(const char* name) const override {
+    TORCH_CHECK(false, "Profiler cannot use this method on XPU backend.");
+  }
+  virtual void rangePop() const override {
+    TORCH_CHECK(false, "Profiler cannot use this method on XPU backend.");
+  }
+
   bool enabled() const override {
     return true;
+  }
+  virtual void onEachDevice(std::function<void(int)> op) const override {
+    TORCH_CHECK(false, "Profiler cannot use this method on XPU backend.");
+  }
+  virtual void synchronize() const override {
+    TORCH_CHECK(false, "Profiler cannot use this method on XPU backend.");
   }
 };
 
@@ -134,12 +149,11 @@ float DPCPPEventStubImpl::elapsed(DPCPPEventStubImpl& other) {
 
 struct RegisterDPCPPMethods {
   RegisterDPCPPMethods() {
-    static DPCPPProfilerStubsImpl methods;
+    static DPCPPMethods methods;
     registerXPUMethods(&methods);
   }
 };
-
-static RegisterDPCPPMethods reg;
+RegisterDPCPPMethods reg;
 #endif
 
 bool is_profiler_enabled() {
@@ -152,7 +166,7 @@ bool is_profiler_enabled() {
 
 void dpcpp_mark(std::string name, sycl::event& event) {
 #if defined(USE_PROFILER)
-  torch::profiler::impl::KernelEventStub dpcpp_evt_stub;
+  torch::profiler::impl::ProfilerEventStub dpcpp_evt_stub;
   dpcpp_evt_stub.reset(new DPCPPEventStubImpl(event));
   markKernel(std::move(name), dpcpp_evt_stub);
 #endif
@@ -163,7 +177,7 @@ void dpcpp_mark(
     sycl::event& start_event,
     sycl::event& end_event) {
 #if defined(USE_PROFILER)
-  torch::profiler::impl::KernelEventStub dpcpp_evt_stub;
+  torch::profiler::impl::ProfilerEventStub dpcpp_evt_stub;
   dpcpp_evt_stub.reset(new DPCPPEventStubImpl(start_event, end_event));
   markKernel(std::move(name), dpcpp_evt_stub);
 #endif
