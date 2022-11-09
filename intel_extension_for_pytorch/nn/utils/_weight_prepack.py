@@ -261,7 +261,7 @@ IPEX_WEIGHT_PREPACK_MODULE = {
     torch.nn.ConvTranspose3d: _IPEXConvTranspose3d,
 }
 
-def _should_prepack(module):
+def _should_prepack(module, is_training):
     if type(module) not in IPEX_WEIGHT_PREPACK_MODULE:
         return False
     # If hook is on `weight` or `bias`, will not prepack.
@@ -277,6 +277,10 @@ def _should_prepack(module):
         for _, hook in module._backward_hooks.items():
             if hasattr(hook, 'name') and (hook.name == 'weight' or hook.name == 'bias'):
                 return False
+
+    # for training, if auto_kernel_selection(onednn) is off, IPEX won't prepack FP32 linear. 
+    if isinstance(module, torch.nn.Linear) and not _using_dnnl() and is_training and module.weight.dtype is torch.float:
+        return False
     if isinstance(module, torch.nn.ConvTranspose2d):
         if module.padding[0] - module.output_padding[0] + module.stride[0] <= 0:
             return False
@@ -296,7 +300,7 @@ def _should_prepack(module):
 
 def weight_prepack_with_ipex(module, optimizer, params_attr):
     def convert(m, optimizer, params_attr):
-        if _should_prepack(m) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16 or m.weight.dtype == torch.half):
+        if _should_prepack(m, optimizer!=None) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16 or m.weight.dtype == torch.half):
             weight = m.master_weight if hasattr(m, "master_weight") else m.weight
             if weight not in params_attr:
                 params_attr[weight] = {}

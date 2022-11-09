@@ -56,6 +56,17 @@ inline c10::optional<Tensor> cpu_cached_cast(
 
 inline std::vector<Tensor> cpu_cached_cast(
     at::ScalarType to_type,
+    const at::ITensorListRef& arg) {
+  std::vector<Tensor> vec;
+  vec.reserve(arg.size());
+  for (const auto& t : arg) {
+    vec.push_back(cpu_cached_cast(to_type, t));
+  }
+  return vec;
+}
+
+inline std::vector<Tensor> cpu_cached_cast(
+    at::ScalarType to_type,
     const TensorList& arg) {
   std::vector<Tensor> vec;
   vec.reserve(arg.size());
@@ -131,6 +142,15 @@ inline at::ScalarType prioritize(
 inline at::ScalarType prioritize(
     at::ScalarType current,
     const std::vector<Tensor>& list) {
+  for (const auto& tensor : list) {
+    current = prioritize(current, tensor);
+  }
+  return current;
+}
+
+inline at::ScalarType prioritize(
+    at::ScalarType current,
+    const at::ITensorListRef& list) {
   for (const auto& tensor : list) {
     current = prioritize(current, tensor);
   }

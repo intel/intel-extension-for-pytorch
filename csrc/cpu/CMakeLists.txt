@@ -137,6 +137,14 @@ list(REMOVE_ITEM IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_ISA_SRCS_ORIGIN})
 
 add_library(${PLUGIN_NAME_CPU} SHARED ${IPEX_CPU_CPP_SRCS})
 
+include(${IPEX_PROJECT_TOP_DIR}/cmake/ClangFormat.cmake)
+if(CLANG_FORMAT)
+  file(GLOB_RECURSE ALL_NATIVE_CSRC_FILES ${IPEX_CPU_CPP_ROOT}/**.[ch] ${IPEX_CPU_CPP_ROOT}/**.[ch]pp 
+      ${IPEX_JIT_CPP_ROOT}/**.[ch] ${IPEX_JIT_CPP_ROOT}/**.[ch]pp ${IPEX_UTLIS_CPP_ROOT}/**.[ch] ${IPEX_UTLIS_CPP_ROOT}/**.[ch]pp)
+  add_custom_target(CL_FORMAT_CPU_NATIVE_CSRC COMMAND clang-format -i -style=file ${ALL_NATIVE_CSRC_FILES})
+  add_dependencies(${PLUGIN_NAME_CPU} CL_FORMAT_CPU_NATIVE_CSRC)
+endif()
+
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 add_dependencies(${PLUGIN_NAME_CPU} dnnl_graph)
 # If Graph Compiler is built, then it should link to its LLVM dependencies,
@@ -145,6 +153,11 @@ target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC dnnl_graph)
 if (DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
   get_target_property(DNNL_GRAPHCOMPILER_LLVM_LIB dnnl_graphcompiler_llvm_lib INTERFACE_LINK_LIBRARIES)
   target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC graphcompiler ${DNNL_GRAPHCOMPILER_LLVM_LIB})
+  if (NOT MSVC)
+    # Workaround to ensure that Graph Compiler would use LLVM symbols of libLLVM.
+    get_target_property(DNNL_GRAPHCOMPILER_LLVM_LIB_EXCLUDE dnnl_graphcompiler_llvm_lib_exclude_string INTERFACE_LINK_LIBRARIES)
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--exclude-libs=${DNNL_GRAPHCOMPILER_LLVM_LIB_EXCLUDE}")
+  endif()
 endif()
 
 find_library(MKL_LIBRARY libmkl_core.a PATHS "${MKL_INSTALL_DIR}/lib" "${MKL_INSTALL_DIR}/lib/intel64")

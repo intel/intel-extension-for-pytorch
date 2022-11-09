@@ -307,19 +307,21 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
         prepared_model = ipex.quantization.prepare(m, static_qconfig[0], example_inputs=x, inplace=False)
         prepared_model(x)
         with tempfile.TemporaryDirectory() as tmp:
+            # case1: save qconf and load qconf.
             path = os.path.join(tmp, "configure.json")
             prepared_model.save_qconf_summary(path)
             convert_model = ipex.quantization.convert(prepared_model)
-            traced_model = torch.jit.trace(convert_model, x).eval()
-            traced_model = torch.jit.freeze(traced_model)
-            y_before = traced_model(x)
+            traced_model_ref = torch.jit.trace(convert_model, x).eval()
+            traced_model_ref = torch.jit.freeze(traced_model_ref)
             # load the saved qconf
             prepared_model = ipex.quantization.prepare(m, static_qconfig[0], example_inputs=x, inplace=False)
             prepared_model.load_qconf_summary(path)
             convert_model = ipex.quantization.convert(prepared_model)
             traced_model = torch.jit.trace(convert_model, x).eval()
             traced_model = torch.jit.freeze(traced_model)
-            y_after = traced_model(x)
+            for i in range(2):
+                y_before = traced_model_ref(x)
+                y_after = traced_model(x)
             self.assertEqual(y_before, y_after)
             # save and load qconf again to make sure we didn't lost something
             path2 = os.path.join(tmp, "configure_new.json")
@@ -329,14 +331,45 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
             convert_model = ipex.quantization.convert(prepared_model)
             traced_model = torch.jit.trace(convert_model, x).eval()
             traced_model = torch.jit.freeze(traced_model)
-            y_after = traced_model(x)
+            for i in range(2):
+                y_after = traced_model(x)
             self.assertEqual(y_before, y_after)
             # make sure the new saved json is same as old one.
             with open(path, 'r') as f:
                 old_json = json.load(f)
             with open(path2, 'r') as f:
                 new_json = json.load(f)
-            self.assertTrue(old_json == new_json) 
+            self.assertTrue(old_json == new_json)
+
+            # case2: load qconf and re-do calibration, make sure the scales/zps is updated.
+            x_new = torch.rand(1, 3, 2, 2) * 10
+            # do ref quantization
+            prepared_model= ipex.quantization.prepare(m, static_qconfig[0], example_inputs=x_new, inplace=False)
+            prepared_model(x_new)
+            ref_path = os.path.join(tmp, "configure_ref.json")
+            prepared_model.save_qconf_summary(ref_path)
+            convert_model = ipex.quantization.convert(prepared_model)
+            traced_model_ref = torch.jit.trace(convert_model, x_new).eval()
+            traced_model_ref = torch.jit.freeze(traced_model_ref)
+            # load qconf, and re-do calibration
+            prepared_model = ipex.quantization.prepare(m, static_qconfig[0], example_inputs=x_new, inplace=False)
+            prepared_model.load_qconf_summary(path2)
+            prepared_model(x_new)
+            new_path = os.path.join(tmp, "configure_new.json")
+            prepared_model.save_qconf_summary(new_path)
+            traced_model_new = torch.jit.trace(convert_model, x_new).eval()
+            traced_model_new = torch.jit.freeze(traced_model_new)
+            for i in range(2):
+                y_ref = traced_model_ref(x_new)
+                y_new = traced_model_new(x_new)
+            self.assertEqual(y_ref, y_new)
+            # make sure the new saved json is same as ref one.
+            with open(ref_path, 'r') as f:
+                old_json = json.load(f)
+            with open(new_path, 'r') as f:
+                new_json = json.load(f)
+            self.assertTrue(old_json == new_json)
+
 
 class TestRemoveMutate(JitLlgaTestCase):
     def test_mutated_value_alive_after_inplace_op(self):

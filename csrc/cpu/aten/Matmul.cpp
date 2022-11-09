@@ -373,11 +373,11 @@ at::Tensor matmul_impl(
     // We are multiplying b1 x n x m1 by x2 x m2 x p (where b1 can be a list);
     // we track m1 vs m2 separately even though they must match for nicer error
     // messages
-    int64_t n = dim_tensor1 > 1 ? tensor1.size(-2) : 1;
+    int64_t n = tensor1.size(-2);
     int64_t m1 = tensor1.size(-1);
     c10::IntArrayRef batch_tensor1(
         tensor1.sizes().data(), std::max<int64_t>(dim_tensor1 - 2, 0));
-    int64_t m2 = dim_tensor2 > 1 ? tensor2.size(-2) : 1;
+    int64_t m2 = tensor2.size(-2);
     int64_t p = tensor2.size(-1);
     c10::IntArrayRef batch_tensor2(
         tensor2.sizes().data(), std::max<int64_t>(dim_tensor2 - 2, 0));

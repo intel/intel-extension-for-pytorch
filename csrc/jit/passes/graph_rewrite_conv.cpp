@@ -177,10 +177,12 @@ void insertPrePackedConvOp(std::shared_ptr<Graph>& graph) {
   insertPrePackedConvOp(graph->block());
 }
 
-void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_swish;
+void fuseConvWithEltwiseAdd(std::shared_ptr<Graph>& graph) {
+  SubgraphRewriter rewriter_swish, rewriter_swish_add_accumu_on_the_right,
+      rewriter_swish_add_accumu_on_the_left;
   std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
   std::array<std::string, 2> mul_operators = {"mul", "mul_"};
+  std::array<std::string, 2> add_operators = {"add", "add_"};
 
   // For unary post OPs:
   auto conv_op_rstring = at::jit::CodeTemplate(R"(
@@ -265,6 +267,33 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
         %res = ipex_prepack::convolution_swish_run(%input, %packed_weight)
         return (%res))";
 
+  // conv_swish      Y
+  //   \           /
+  //        add
+  // output = conv_swish_output + alpha*Y
+  auto conv_swish_add_accumu_on_the_right_rstring = CodeTemplate(R"(
+    graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last, %input_size:int[]):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_swish_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
+        %x = ipex_prepack::convolution_swish_run(%input, %packed_weight)
+        %res = aten::${add}(%x, %accumu, %alpha) return (%res))");
+
+  //  Y     conv_swish
+  //   \   /
+  //    add
+  // output = Y + alpha*conv_swish_output, alpha need to one or none.
+  auto conv_swish_add_accumu_on_the_left_rstring = CodeTemplate(R"(
+    graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_swish_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
+        %x = ipex_prepack::convolution_swish_run(%input, %packed_weight)
+        %res = aten::${add}(%accumu, %x, %alpha) return (%res))");
+
+  std::string conv_swish_add_fused = R"(
+    graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_swish_add_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size, %alpha)
+        %res = ipex_prepack::convolution_swish_add_run(%input, %accumu, %alpha, %packed_weight)
+        return (%res))";
+
+  // conv+sigmoid+mul
   for (const auto& sigmoid : sigmoid_operators) {
     TemplateEnv env;
     env.s("sigmoid", sigmoid);
@@ -275,7 +304,23 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
     }
   }
 
+  // conv_swish+add
+  for (const auto& add : add_operators) {
+    TemplateEnv env;
+    env.s("add", add);
+    rewriter_swish_add_accumu_on_the_right.RegisterRewritePattern(
+        conv_swish_add_accumu_on_the_right_rstring.format(env),
+        conv_swish_add_fused);
+    rewriter_swish_add_accumu_on_the_left.RegisterRewritePattern(
+        conv_swish_add_accumu_on_the_left_rstring.format(env),
+        conv_swish_add_fused);
+  }
+
   rewriter_swish.runOnGraph(graph);
+  rewriter_swish_add_accumu_on_the_right.runOnGraph(
+      graph, fuse_add_filter_accumu_on_the_right);
+  rewriter_swish_add_accumu_on_the_left.runOnGraph(
+      graph, fuse_add_filter_accumu_on_the_left);
 }
 
 void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {

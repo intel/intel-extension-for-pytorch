@@ -187,6 +187,34 @@ class TestAutocastWithJit(TestCase):
                 continue
             test_nhwc_autocast_jit_trace_model(self.models[i], self.inputs[i])
 
+    # Check whether cat has done the promotion in AMP with mixed dtype inputs
+    # since input type of cat is changed to ITensorListRef
+    def test_cat_promote(self):
+        class TestModel(torch.nn.Module):
+            def __init__(self):
+                super(TestModel, self).__init__()
+
+            def forward(self, a, b):
+                return torch.cat([a, b], 0)
+        with torch.jit.fuser("none"):
+            # In this testcase, we will check whether cat has done the promotion in AMP with mixed dtype inputs.
+            # To avoid the fusion group from TE, we will disable the fuser here.
+            for jit_freeze_or_not in [False, True]:
+                test_model = TestModel().eval()
+                with torch.cpu.amp.autocast(cache_enabled=False, dtype=torch.bfloat16), torch.no_grad():
+                    a = torch.rand(24, 128, 128)
+                    b = torch.rand(24, 128, 128, dtype=torch.bfloat16)
+                    c = test_model(a, b)
+                    traced = torch.jit.trace(test_model, (a, b))
+                if jit_freeze_or_not:
+                    traced = torch.jit.freeze(traced)
+                for _ in range(3):
+                    c2 = traced(a, b)
+                self.assertTrue(c.dtype, torch.float32)
+                self.assertTrue(c2.dtype, torch.float32)
+                traced_graph = traced.graph_for(a, b)
+                self.assertTrue(any(n.kind() == "aten::to" for n in traced_graph.nodes()))
+
 class TestPyTorchOps(TestCase):
     def test_bernoulli(self):
         input = torch.rand(8, 8)
@@ -529,7 +557,7 @@ class TestLSTM(TorchTestCase):
         batch_size = 24
         num_layers = 1
         bidirectional = True
-        num_direc = 2 if bidirectional else 1
+        num_direc = 2
         max_lens = 96
 
         sent = torch.randn(batch_size, max_lens, embedding_dim)

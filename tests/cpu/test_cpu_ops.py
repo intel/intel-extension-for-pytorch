@@ -543,6 +543,35 @@ class CPUOPsTester(TestCase):
             if (dtype == torch.float32):
                 self.assertEqual(gn.weight.grad, ref_gn.weight.grad, prec=1e-04)
                 self.assertEqual(gn.bias.grad, ref_gn.bias.grad, prec=1e-04)
+
+            # test mixed data type
+            if (dtype == torch.bfloat16):
+                # contiguous
+                ref_gn_fp32 = copy.deepcopy(ref_gn).to(torch.float32)
+                ref_input_bf16 = ref_input.clone().detach().requires_grad_()
+                ref_grad_bf16 = ref_grad.clone().detach()
+                ref_out_bf16 = ref_gn_fp32(ref_input_bf16)
+                ref_out_bf16.backward(ref_grad_bf16)
+
+                self.assertTrue(ref_out_bf16.is_contiguous())
+                self.assertTrue(ref_out_bf16.dtype == dtype)
+                self.assertEqual(ref_out_bf16, ref_out, prec = prec)
+                self.assertTrue(ref_input_bf16.grad.dtype == dtype)
+                self.assertEqual(ref_input_bf16.grad, ref_input.grad, prec = prec)
+
+                # channels last
+                gn_fp32 = copy.deepcopy(gn).to(torch.float32)
+                input_bf16 = input.clone().detach().requires_grad_()
+                grad_bf16 = grad.clone().detach()
+                out_bf16 = gn_fp32(input_bf16)
+                out_bf16.backward(grad_bf16)
+
+                self.assertTrue(out_bf16.is_contiguous(memory_format=memory_format))
+                self.assertTrue(out_bf16.dtype == dtype)
+                self.assertEqual(out_bf16, ref_out, prec = prec)
+                self.assertTrue(input_bf16.grad.dtype == dtype)
+                self.assertEqual(input_bf16.grad, ref_input.grad, prec = prec)
+
         helper(self, (4, 8, 10, 10), 4, torch.channels_last, torch.float32)
         helper(self, (2, 30, 9, 9), 3, torch.channels_last, torch.float32)
         helper(self, (2, 9, 7, 11, 15), 3, torch.channels_last_3d, torch.float32)
@@ -562,12 +591,12 @@ class CPUOPsTester(TestCase):
         m = nn.GroupNorm(groups, channels)
 
         # test nwc
-        x1 = x.clone().detach().requires_grad_().transpose(1, 2)
+        x1 = x.clone().detach().transpose(1, 2).requires_grad_()
         grad1 = grad.detach().clone()
         y1 = m(x1)
         y1.backward(grad1)
 
-        x2 = x1.clone().detach().contiguous()
+        x2 = x1.clone().detach().contiguous().requires_grad_()
         grad2 = grad.detach().clone()
         y2 = m(x2)
         y2.backward(grad2)
@@ -578,8 +607,8 @@ class CPUOPsTester(TestCase):
         for dtype in [torch.bfloat16, torch.double]:
             prec = None
             if dtype == torch.bfloat16:
-                prec = 0.02
-            x3 = x.clone().detach().requires_grad_().transpose(1, 2).to(dtype)
+                prec = 0.03
+            x3 = x.clone().detach().transpose(1, 2).to(dtype).requires_grad_()
             grad3 = grad.detach().clone()
             m_dtype = m.to(dtype)
             y3 = m_dtype(x3)
@@ -589,6 +618,18 @@ class CPUOPsTester(TestCase):
             self.assertEqual(x3.grad, x2.grad, prec=prec)
             self.assertEqual(m.weight.grad, m_dtype.weight.grad)
             self.assertEqual(m.bias.grad, m_dtype.bias.grad)
+
+        # test mixed data type
+        prec = 0.02
+        x_bf16 = x.clone().detach().transpose(1, 2).to(torch.bfloat16).requires_grad_()
+        grad_bf16 = grad.clone().detach().to(torch.bfloat16)
+        m_fp32 = copy.deepcopy(m).to(torch.float32)
+        y_bf16 = m_fp32(x_bf16)
+        y_bf16.backward(grad_bf16)
+        self.assertTrue(y_bf16.dtype == torch.bfloat16)
+        self.assertEqual(y_bf16, y2, prec=prec)
+        self.assertTrue(x_bf16.grad.dtype == torch.bfloat16)
+        self.assertEqual(x_bf16.grad, x2.grad, prec=prec)
 
     def test_avg_pool2d(self):
         def helper(self, m, x):

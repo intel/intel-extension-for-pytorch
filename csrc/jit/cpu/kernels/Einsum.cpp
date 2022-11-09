@@ -293,8 +293,7 @@ static Tensor sumproduct_pair(
   auto min_size = std::min(lo_count, ro_count);
   auto max_size = std::max(lo_count, ro_count);
   for (int i = dim - 1; i >= dim - max_size; i--) {
-    if (left_shape[i] == 1 && left_shape[i] == right_shape[i] &&
-        min_size >= 0) {
+    if (left_shape[i] == 1 && left_shape[i] == right_shape[i]) {
       right_shape.pop_back();
       left_shape.pop_back();
       min_size--;

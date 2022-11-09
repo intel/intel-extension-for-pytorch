@@ -3,6 +3,7 @@ import torch.nn as nn
 from intel_extension_for_pytorch.optim import _optimizer_utils, _lamb
 import types
 from ._model_convert import _LSTM
+from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBag as MergedEmbeddingBag
 
 # IPEX does not cast all module parameters for acc reason, such as BN
 IPEX_WEIGHT_CAST_MODULE = {
@@ -18,31 +19,33 @@ IPEX_WEIGHT_CAST_MODULE = {
     torch.nn.EmbeddingBag,
     torch.nn.Embedding,
     _LSTM,
+    MergedEmbeddingBag,
 }
 
 def _save_to_state_dict(self, destination, prefix, keep_vars):
     param_dict = {}
     for name, para in self.named_parameters():
+        if not hasattr(self, name):
+            continue
         temp = para
         param_dict.update({name: para})
-        if self.master_weight_split:
+        if hasattr(self, name + '_trail'):
             temp_para = torch.nn.Parameter(
                 torch.ops.torch_ipex.cat_bfloat16_float(para.data, getattr(self, name + '_trail')),
                 requires_grad=temp.requires_grad)
             setattr(self, name, temp_para)
-        else:
+        elif hasattr(self, 'master_' + name):
             temp_para = torch.nn.Parameter(
                 getattr(self, 'master_' + name),
                 requires_grad=temp.requires_grad)
             setattr(self, name, temp_para)
-
     super(type(self), self)._save_to_state_dict(destination, prefix, keep_vars)
     for p in param_dict:
         origin_param = param_dict[p]
         setattr(self, p, origin_param)
 
 def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight_split, convert_dtype=torch.bfloat16):
-
+    
     def cast_attr(m, attr, master_weight_split, params_attr, optimizer):
         # cast weight/bias for BF16 or FP16 dtype
         float_param = getattr(m, attr)
@@ -66,19 +69,26 @@ def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight
         # while master weight split, key is m.weight/bias, if not split, key is m.master_weight/master_bias
         attr_name = attr if master_weight_split else 'master_' + attr
         params_attr[getattr(m, attr_name)] = params_attr.pop(float_param)
-        _optimizer_utils.refresh_optimizer_params_after_cast(m, attr, float_param, master_weight_split, optimizer)
+        _optimizer_utils.refresh_optimizer_params_after_cast(m, attr, float_param, master_weight_split, optimizer) 
 
     def convert(m):
         if type(m) in IPEX_WEIGHT_CAST_MODULE:
             setattr(m, 'master_weight_split', master_weight_split)
             # replace weight/bias
             for name, para in m.named_parameters():
-                cast_attr(m, name, master_weight_split, params_attr, optimizer)
+                if hasattr(m, name):
+                    cast_attr(m, name, master_weight_split, params_attr, optimizer)
             # for resume training reason, we always save float tensors
             # replace module method to ensure return float params while call "state_dict()"
             setattr(m, '_save_to_state_dict', types.MethodType(_save_to_state_dict, m))
+            for name, sub_m in m.named_children():
+                if isinstance(sub_m, torch.nn.ParameterList):
+                    setattr(sub_m, 'master_weight_split', master_weight_split)
+                    setattr(sub_m, '_save_to_state_dict', types.MethodType(_save_to_state_dict, sub_m))
+                    for name, para in sub_m.named_parameters():
+                        cast_attr(sub_m, name, master_weight_split, params_attr, optimizer)
         return m
-
+      
     def convert_rec(m):
         new_m = convert(m)
         for name, sub_m in m.named_children():

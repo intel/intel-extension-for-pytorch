@@ -212,8 +212,10 @@ torch::jit::RegisterOperators op({
 
     CreateConvBinaryPostOpPrepack(add, fuse_sum),
     CreateConvBinaryPostOpPrepack(add_relu, residual),
+    CreateConvBinaryPostOpPrepack(swish_add, fuse_swish_sum),
     CreateConvBinaryPostOpRun(add_run),
     CreateConvBinaryPostOpRun(add_relu_run),
+    CreateConvBinaryPostOpRun(swish_add_run),
 
     Operator(
         "ipex_prepack::convolution_hardtanh_prepack(" CONV_PREPACK_ARGS

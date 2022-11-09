@@ -704,6 +704,36 @@ class ConvSwishInplace(nn.Module):
         res = a.mul_(b)
         return res
 
+class ConvSwishOutplaceSumOutplace(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size):
+        super(ConvSwishOutplaceSumOutplace, self).__init__()
+        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.conv1 = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
+
+    def forward(self, x):
+        a1 = self.conv(x)
+        b1 = torch.sigmoid(a1)
+        c1 = torch.mul(a1, b1)
+        a2 = self.conv1(x)
+        b2 = torch.sigmoid(a2)
+        c2 = torch.mul(a2, b2)
+        return c1+c2
+
+class ConvSwishInplaceSumInplace(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size):
+        super(ConvSwishInplaceSumInplace, self).__init__()
+        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.conv1 = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
+
+    def forward(self, x):
+        a1 = self.conv(x)
+        b1 = torch.sigmoid(a1)
+        c1 = a1.mul_(b1)
+        a2 = self.conv1(x)
+        b2 = torch.sigmoid(a2)
+        c2 = a2.mul_(b2)
+        return c1.add_(c2)
+
 class ConvTranspose(nn.Module):
     def __init__(self, dim, in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1):
         super(ConvTranspose, self).__init__()
@@ -2066,12 +2096,11 @@ class Tester(TestCase):
             if dim == 3:
                 input_size.append(image_size)
             x = torch.randn(input_size)
-            '''
             self._test_output(
-                ConvSwishOutplace(in_channels, out_channels, kernel_size, image_size),
-                torch.randn(batch_size, in_channels, image_size, image_size),
-                kind_in_graph="ipex_prepack::convolution_swish_run")
-            '''
+                ConvSwishOutplace(dim, in_channels, out_channels, kernel_size, image_size),
+                x,
+                kind_in_graph="ipex_prepack::convolution_swish_run",
+                kind_not_in_graph="ipex_prepack::convolution_swish_prepack")
             self._test_output_bf16(
                 ConvSwishOutplace(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
@@ -2088,6 +2117,28 @@ class Tester(TestCase):
                 x,
                 kind_in_graph="ipex_prepack::convolution_swish_run",
                 kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
+                prec=0.02)
+            self._test_output(
+                ConvSwishOutplaceSumOutplace(dim, in_channels, out_channels, kernel_size, image_size),
+                x,
+                kind_in_graph="ipex_prepack::convolution_swish_add_run",
+                kind_not_in_graph="ipex_prepack::convolution_swish_add_prepack")
+            self._test_output_bf16(
+                ConvSwishOutplaceSumOutplace(dim, in_channels, out_channels, kernel_size, image_size),
+                x,
+                kind_in_graph="ipex_prepack::convolution_swish_add_run",
+                kind_not_in_graph="ipex_prepack::convolution_swish_add_prepack",
+                prec=0.02)
+            self._test_output(
+                ConvSwishInplaceSumInplace(dim, in_channels, out_channels, kernel_size, image_size),
+                x,
+                kind_in_graph="ipex_prepack::convolution_swish_add_run",
+                kind_not_in_graph="ipex_prepack::convolution_swish_add_prepack")
+            self._test_output_bf16(
+                ConvSwishInplaceSumInplace(dim, in_channels, out_channels, kernel_size, image_size),
+                x,
+                kind_in_graph="ipex_prepack::convolution_swish_add_run",
+                kind_not_in_graph="ipex_prepack::convolution_swish_add_prepack",
                 prec=0.02)
 
     def test_output_conv_bn(self):
