@@ -600,6 +600,10 @@ def _write_ninja_file_and_build_library(
         verbose,
         error_prefix=f"Error building extension '{name}'")
 
+def get_one_api_help():
+    oneAPI = _one_api_help()
+    return oneAPI
+
 def include_paths() -> List[str]:
     '''
     Get the include paths required to build a DPC++ extension.
@@ -607,15 +611,19 @@ def include_paths() -> List[str]:
     Returns:
         A list of include path strings.
     '''
-    lib_include = os.path.join(_TORCH_PATH, 'include')
-    paths = [
-        lib_include,
-        # Remove this once torch/torch.h is officially no longer supported for C++ extensions.
-        os.path.join(lib_include, 'torch', 'csrc', 'api', 'include'),
-        # Some internal (old) Torch headers don't properly prefix their includes,
-        # so we need to pass -Itorch/lib/include/TH as well.
-        os.path.join(lib_include, 'TH')
-    ]
+    # add pytorch include directories
+    paths = []
+    paths += get_pytorch_include_dir()
+
+    # add oneAPI include directories
+    paths += get_one_api_help().get_include_dirs()
+
+    return paths
+
+def library_paths() -> List[str]:
+    paths = []
+    paths += get_pytorch_lib_dir()
+    paths += get_one_api_help().get_library_dirs()
 
     return paths
 
@@ -643,6 +651,24 @@ def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
 
         if is_standalone:
             extra_ldflags.append(f"-Wl,-rpath,{TORCH_LIB_PATH}")
+
+    library_dirs = library_paths()
+    # Append oneMKL link parameters, detailed please reference:
+    # https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-advisor.html
+    oneapi_link_args = []
+    oneapi_link_args += [f'-L{x}' for x in library_dirs]
+    # oneapi_link_args += ['-fsycl-device-code-split=per_kernel']
+    oneapi_link_args += ['-Wl,--start-group']
+    oneapi_link_args += [f'{x}' for x in get_one_api_help().get_onemkl_libraries()]
+    oneapi_link_args += ['-Wl,--end-group']
+    oneapi_link_args += ['-lsycl', '-lOpenCL', '-lpthread', '-lm', '-ldl']
+    oneapi_link_args += ['-ldnnl']
+
+    # Append IPEX link parameters.
+    oneapi_link_args += [f'-L{x}' for x in get_one_api_help().get_default_lib_dir()]
+    oneapi_link_args += ['-lintel-ext-pt-gpu']
+
+    extra_ldflags += oneapi_link_args
 
     return extra_ldflags
 
@@ -1226,11 +1252,8 @@ def DPCPPExtension(name, sources, *args, **kwargs):
                 })
     '''
 
-    oneAPI = _one_api_help()
-
     library_dirs = kwargs.get('library_dirs', [])
-    library_dirs += get_pytorch_lib_dir()
-    library_dirs += oneAPI.get_library_dirs()
+    library_dirs += library_paths()
     kwargs['library_dirs'] = library_dirs
 
     libraries = kwargs.get('libraries', [])
@@ -1244,27 +1267,15 @@ def DPCPPExtension(name, sources, *args, **kwargs):
     kwargs['libraries'] = libraries
 
     include_dirs = kwargs.get('include_dirs', [])
-    include_dirs += get_pytorch_include_dir()
-    include_dirs += oneAPI.get_include_dirs()
+    include_dirs += include_paths()
     kwargs['include_dirs'] = include_dirs
 
     kwargs['language'] = 'c++'
 
     extra_compile_args = kwargs.get('extra_compile_args', {})
     extra_link_args = kwargs.get('extra_link_args', [])
-
-    # Append oneMKL link parameters, detailed please reference:
-    # https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-advisor.html
-    extra_link_args += [f'-L{x}' for x in library_dirs]
-    # extra_link_args += ['-fsycl-device-code-split=per_kernel']
-    extra_link_args += ['-Wl,--start-group']
-    extra_link_args += [f'{x}' for x in oneAPI.get_onemkl_libraries()]
-    extra_link_args += ['-Wl,--end-group']
-    extra_link_args += ['-lsycl', '-lOpenCL', '-lpthread', '-lm', '-ldl']
-
-    # Append IPEX link parameters.
-    extra_link_args += [f'-L{x}' for x in oneAPI.get_default_lib_dir()]
-    extra_link_args += ['-lintel-ext-pt-gpu']
+    # add oneapi link parameters
+    extra_link_args = _prepare_ldflags(extra_link_args, False, False)
 
     # todo: add dpcpp parameter support.
     kwargs['extra_link_args'] = extra_link_args

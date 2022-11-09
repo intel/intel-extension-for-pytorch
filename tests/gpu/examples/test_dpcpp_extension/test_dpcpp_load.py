@@ -1,10 +1,13 @@
 from intel_extension_for_pytorch.xpu.cpp_extension import load
 import os
 
+dnnl_path = os.getenv('DNNLROOT')
 
-module = load(
-    name='operation_syclkernel', 
-    sources=[os.path.join(os.path.dirname(os.path.abspath(__file__)), each) 
-             for each in ['operation_syclkernel.cpp', 'device_memory.cpp']], 
-    extra_cflags=['-O2'], 
-    verbose=True)
+if dnnl_path is not None:
+    module = load(
+        name='operation_syclkernel',
+        sources=['operation_syclkernel.cpp', 'device_memory.cpp'],
+        extra_cflags=['-O2'],
+        verbose=True)
+else:
+    print("Please source <oneapi_dir>/dnnl/<version>/env/vars.sh, and re-run this test case.")
