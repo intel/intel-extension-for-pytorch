@@ -1,4 +1,5 @@
 import copy
+import importlib
 import os
 import setuptools
 import subprocess
@@ -6,10 +7,17 @@ import shutil
 import re
 import shlex
 import sys
-import torch
+import sysconfig
+
 import warnings
+
+import torch
 from torch.utils.cpp_extension import _TORCH_PATH
-from typing import List, Optional, Tuple
+from torch.utils.file_baton import FileBaton
+from torch.utils._cpp_extension_versioner import ExtensionVersioner
+from torch.utils.hipify.hipify_python import GeneratedFileCleaner
+
+from typing import List, Optional, Union, Tuple
 from torch.torch_version import TorchVersion
 
 from setuptools.command.build_ext import build_ext
@@ -26,8 +34,50 @@ SHARED_FLAG = '/DLL' if IS_WINDOWS else '-shared'
 MINIMUM_GCC_VERSION = (5, 0, 0)
 MINIMUM_MSVC_VERSION = (19, 0, 24215)
 
+COMMON_MSVC_FLAGS = ['/MD', '/wd4819', '/wd4251', '/wd4244', '/wd4267', '/wd4275', '/wd4018', '/wd4190', '/EHsc']
+
 COMMON_DPCPP_FLAGS = ['-fPIC']
 
+TORCH_LIB_PATH = os.path.join(_TORCH_PATH, 'lib')
+
+JIT_EXTENSION_VERSIONER = ExtensionVersioner()
+
+# Taken directly from python stdlib < 3.9
+# See https://github.com/pytorch/pytorch/issues/48617
+def _nt_quote_args(args: Optional[List[str]]) -> List[str]:
+    """Quote command-line arguments for DOS/Windows conventions.
+
+    Just wraps every argument which contains blanks in double quotes, and
+    returns a new argument list.
+    """
+    # Cover None-type
+    if not args:
+        return []
+    return [f'"{arg}"' if ' ' in arg else arg for arg in args]
+
+def get_default_build_root() -> str:
+    r'''
+    Returns the path to the root folder under which extensions will built.
+
+    For each extension module built, there will be one folder underneath the
+    folder returned by this function. For example, if ``p`` is the path
+    returned by this function and ``ext`` the name of an extension, the build
+    folder for the extension will be ``p/ext``.
+
+    This directory is **user-specific** so that multiple users on the same
+    machine won't meet permission issues.
+    '''
+    return os.path.realpath(torch._appdirs.user_cache_dir(appname='torch_extensions'))
+
+def _get_exec_path(module_name, path):
+    if IS_WINDOWS and TORCH_LIB_PATH not in os.getenv('PATH', '').split(';'):
+        torch_lib_in_path = any(
+            os.path.exists(p) and os.path.samefile(p, TORCH_LIB_PATH)
+            for p in os.getenv('PATH', '').split(';')
+        )
+        if not torch_lib_in_path:
+            os.environ['PATH'] = f"{TORCH_LIB_PATH};{os.getenv('PATH', '')}"
+    return os.path.join(path, f'{module_name}{EXEC_EXT}')
 
 def get_dpcpp_complier():
     # build cxx via dpcpp
@@ -39,7 +89,6 @@ def get_dpcpp_complier():
         dpcpp_cmp = _cxxbin
     return dpcpp_cmp
 
-
 def get_icx_complier():
     # build cc via icx
     icx_cmp = shutil.which('icx')
@@ -49,7 +98,6 @@ def get_icx_complier():
     if _ccbin is not None:
         dpcpp_cmp = _ccbin
     return icx_cmp
-
 
 def is_ninja_available():
     r'''
@@ -72,16 +120,13 @@ def verify_ninja_availability():
     if not is_ninja_available():
         raise RuntimeError("Ninja is required to load C++ extensions")
 
-
 def _is_cpp_file(path: str) -> bool:
     valid_ext = ['.cpp', '.hpp']
     return os.path.splitext(path)[1] in valid_ext
 
-
 def _is_c_file(path: str) -> bool:
     valid_ext = ['.c', '.h']
     return os.path.splitext(path)[1] in valid_ext
-
 
 class DpcppBuildExtension(build_ext, object):
     r'''
@@ -305,7 +350,6 @@ class DpcppBuildExtension(build_ext, object):
         # use the same CXX ABI as what PyTorch was compiled with
         self._add_compile_flag(extension, '-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)))
 
-
 SUBPROCESS_DECODE_ARGS = ('oem',) if IS_WINDOWS else ()
 
 ABI_INCOMPATIBILITY_WARNING = '''
@@ -335,7 +379,6 @@ with compiling PyTorch from source.
 
 BUILT_FROM_SOURCE_VERSION_PATTERN = re.compile(r'\d+\.\d+\.\d+\w+\+\w+')
 
-
 def _is_binary_build() -> bool:
     return not BUILT_FROM_SOURCE_VERSION_PATTERN.match(torch.version.__version__)
 
@@ -343,7 +386,6 @@ def _is_binary_build() -> bool:
 def _accepted_compilers_for_platform() -> List[str]:
     # gnu-c++ and gnu-cc are the conda gcc compilers
     return ['clang++', 'clang'] if IS_MACOS else ['dpcpp', 'icx']
-
 
 def check_compiler_ok_for_platform(compiler: str) -> bool:
     r'''
@@ -382,6 +424,56 @@ def check_compiler_ok_for_platform(compiler: str) -> bool:
         return version_string.startswith("Apple clang")
     return False
 
+def check_compiler_abi_compatibility(compiler) -> bool:
+    r'''
+    Verifies that the given compiler is ABI-compatible with PyTorch.
+
+    Args:
+        compiler (str): The compiler executable name to check (e.g. ``g++``).
+            Must be executable in a shell process.
+
+    Returns:
+        False if the compiler is (likely) ABI-incompatible with PyTorch,
+        else True.
+    '''
+    if not _is_binary_build():
+        return True
+    if os.environ.get('TORCH_DONT_CHECK_COMPILER_ABI') in ['ON', '1', 'YES', 'TRUE', 'Y']:
+        return True
+
+    # First check if the compiler is one of the expected ones for the particular platform.
+    if not check_compiler_ok_for_platform(compiler):
+        warnings.warn(WRONG_COMPILER_WARNING.format(
+            user_compiler=compiler,
+            pytorch_compiler=_accepted_compilers_for_platform()[0],
+            platform=sys.platform))
+        return False
+
+    if IS_MACOS:
+        # There is no particular minimum version we need for clang, so we're good here.
+        return True
+    try:
+        if IS_LINUX:
+            minimum_required_version = MINIMUM_GCC_VERSION
+            versionstr = subprocess.check_output([compiler, '-dumpfullversion', '-dumpversion'])
+            version = versionstr.decode(*SUBPROCESS_DECODE_ARGS).strip().split('.')
+        else:
+            minimum_required_version = MINIMUM_MSVC_VERSION
+            compiler_info = subprocess.check_output(compiler, stderr=subprocess.STDOUT)
+            match = re.search(r'(\d+)\.(\d+)\.(\d+)', compiler_info.decode(*SUBPROCESS_DECODE_ARGS).strip())
+            version = ['0', '0', '0'] if match is None else list(match.groups())
+    except Exception:
+        _, error, _ = sys.exc_info()
+        warnings.warn(f'Error checking compiler version for {compiler}: {error}')
+        return False
+
+    if tuple(map(int, version)) >= minimum_required_version:
+        return True
+
+    compiler = f'{compiler} {".".join(version)}'
+    warnings.warn(ABI_INCOMPATIBILITY_WARNING.format(compiler))
+
+    return False
 
 def get_compiler_abi_compatibility_and_version(compiler) -> Tuple[bool, TorchVersion]:
     r'''
@@ -433,7 +525,6 @@ def get_compiler_abi_compatibility_and_version(compiler) -> Tuple[bool, TorchVer
 
     return (False, TorchVersion('.'.join(version)))
 
-
 def _write_ninja_file_and_compile_objects(
         sources: List[str],
         objects,
@@ -468,12 +559,97 @@ def _write_ninja_file_and_compile_objects(
         # that failed to build but there isn't a good way to get it here.
         error_prefix='Error compiling objects for extension')
 
+def _write_ninja_file_and_build_library(
+        name,
+        sources: List[str],
+        extra_cflags,
+        extra_ldflags,
+        extra_include_paths,
+        build_directory: str,
+        verbose: bool,
+        is_standalone: bool = False) -> None:
+    verify_ninja_availability()
+    if IS_WINDOWS:
+        compiler = os.environ.get('CXX', 'cl')
+    else:
+        compiler = get_dpcpp_complier()
+    check_compiler_abi_compatibility(compiler)
+
+    extra_ldflags = _prepare_ldflags(
+        extra_ldflags or [],
+        verbose,
+        is_standalone)
+    build_file_path = os.path.join(build_directory, 'build.ninja')
+    if verbose:
+        print(f'Emitting ninja build file {build_file_path}...')
+    # NOTE: Emitting a new ninja build file does not cause re-compilation if
+    # the sources did not change, so it's ok to re-emit (and it's fast).
+    _write_ninja_file_to_build_library(
+        path=build_file_path,
+        name=name,
+        sources=sources,
+        extra_cflags=extra_cflags or [],
+        extra_ldflags=extra_ldflags or [],
+        extra_include_paths=extra_include_paths or [],
+        is_standalone=is_standalone)
+
+    if verbose:
+        print(f'Building extension module {name}...')
+    _run_ninja_build(
+        build_directory,
+        verbose,
+        error_prefix=f"Error building extension '{name}'")
+
+def include_paths() -> List[str]:
+    '''
+    Get the include paths required to build a DPC++ extension.
+
+    Returns:
+        A list of include path strings.
+    '''
+    lib_include = os.path.join(_TORCH_PATH, 'include')
+    paths = [
+        lib_include,
+        # Remove this once torch/torch.h is officially no longer supported for C++ extensions.
+        os.path.join(lib_include, 'torch', 'csrc', 'api', 'include'),
+        # Some internal (old) Torch headers don't properly prefix their includes,
+        # so we need to pass -Itorch/lib/include/TH as well.
+        os.path.join(lib_include, 'TH')
+    ]
+
+    return paths
+
+def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
+    if IS_WINDOWS:
+        python_path = os.path.dirname(sys.executable)
+        python_lib_path = os.path.join(python_path, 'libs')
+
+        extra_ldflags.append('c10.lib')
+        extra_ldflags.append('torch.lib')
+        extra_ldflags.append(f'/LIBPATH:{TORCH_LIB_PATH}')
+        if not is_standalone:
+            extra_ldflags.append('torch_python.lib')
+            extra_ldflags.append(f'/LIBPATH:{python_lib_path}')
+
+    else:
+        extra_ldflags.append(f'-L{TORCH_LIB_PATH}')
+        extra_ldflags.append('-lc10')
+        extra_ldflags.append('-ltorch')
+        if not is_standalone:
+            extra_ldflags.append('-ltorch_python')
+
+        if is_standalone and "TBB" in torch.__config__.parallel_info():
+            extra_ldflags.append('-ltbb')
+
+        if is_standalone:
+            extra_ldflags.append(f"-Wl,-rpath,{TORCH_LIB_PATH}")
+
+    return extra_ldflags
 
 PLAT_TO_VCVARS = {
     'win32': 'x86',
     'win-amd64': 'x86_amd64',
 }
-
 
 def _get_num_workers(verbose: bool) -> Optional[int]:
     max_jobs = os.environ.get('MAX_JOBS')
@@ -485,7 +661,6 @@ def _get_num_workers(verbose: bool) -> Optional[int]:
         print('Allowing ninja to set a default number of workers... '
               '(overridable by setting the environment variable MAX_JOBS=N)')
     return None
-
 
 def _run_ninja_build(build_directory: str, verbose: bool, error_prefix: str) -> None:
     command = ['ninja', '-v']
@@ -541,6 +716,275 @@ def _run_ninja_build(build_directory: str, verbose: bool, error_prefix: str) -> 
             message += f": {error.output.decode(*SUBPROCESS_DECODE_ARGS)}"  # type: ignore[union-attr]
         raise RuntimeError(message) from e
 
+def _get_build_directory(name: str, verbose: bool) -> str:
+    root_extensions_directory = os.environ.get('TORCH_EXTENSIONS_DIR')
+    if root_extensions_directory is None:
+        root_extensions_directory = get_default_build_root()
+
+        # TODO: hard code as xpu. will check xpu_available when it is ready.
+        xpu_str = ('xpu')  # type: ignore[attr-defined]
+        python_version = f'py{sys.version_info.major}{sys.version_info.minor}'
+        build_folder = f'{python_version}_{xpu_str}'
+
+        root_extensions_directory = os.path.join(
+            root_extensions_directory, build_folder)
+
+    if verbose:
+        print(f'Using {root_extensions_directory} as PyTorch extensions root...')
+
+    build_directory = os.path.join(root_extensions_directory, name)
+    if not os.path.exists(build_directory):
+        if verbose:
+            print(f'Creating extension directory {build_directory}...')
+        # This is like mkdir -p, i.e. will also create parent directories.
+        os.makedirs(build_directory, exist_ok=True)
+
+    return build_directory
+
+def _import_module_from_library(module_name, path, is_python_module):
+    filepath = os.path.join(path, f"{module_name}{LIB_EXT}")
+    if is_python_module:
+        # https://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path
+        spec = importlib.util.spec_from_file_location(module_name, filepath)
+        module = importlib.util.module_from_spec(spec)
+        assert isinstance(spec.loader, importlib.abc.Loader)
+        spec.loader.exec_module(module)
+        return module
+    else:
+        torch.ops.load_library(filepath)
+
+def _write_ninja_file_to_build_library(path,
+                                       name,
+                                       sources,
+                                       extra_cflags,
+                                       extra_ldflags,
+                                       extra_include_paths,
+                                       is_standalone) -> None:
+    extra_cflags = [flag.strip() for flag in extra_cflags]
+    extra_ldflags = [flag.strip() for flag in extra_ldflags]
+    extra_include_paths = [flag.strip() for flag in extra_include_paths]
+
+    # Turn into absolute paths so we can emit them into the ninja build
+    # file wherever it is.
+    user_includes = [os.path.abspath(file) for file in extra_include_paths]
+
+    # include_paths() gives us the location of torch/extension.h
+    system_includes = include_paths()
+    # sysconfig.get_path('include') gives us the location of Python.h
+    # Explicitly specify 'posix_prefix' scheme on non-Windows platforms to workaround error on some MacOS
+    # installations where default `get_path` points to non-existing `/Library/Python/M.m/include` folder
+    python_include_path = sysconfig.get_path('include', scheme='nt' if IS_WINDOWS else 'posix_prefix')
+    if python_include_path is not None:
+        system_includes.append(python_include_path)
+
+    # Windows does not understand `-isystem`.
+    if IS_WINDOWS:
+        user_includes += system_includes
+        system_includes.clear()
+
+    common_cflags = []
+    if not is_standalone:
+        common_cflags.append(f'-DTORCH_EXTENSION_NAME={name}')
+        common_cflags.append('-DTORCH_API_INCLUDE_EXTENSION_H')
+
+    # Note [Pybind11 ABI constants]
+    #
+    # Pybind11 before 2.4 used to build an ABI strings using the following pattern:
+    # f"__pybind11_internals_v{PYBIND11_INTERNALS_VERSION}{PYBIND11_INTERNALS_KIND}{PYBIND11_BUILD_TYPE}__"
+    # Since 2.4 compier type, stdlib and build abi parameters are also encoded like this:
+    # f"__pybind11_internals_v{PYBIND11_INTERNALS_VERSION}{PYBIND11_INTERNALS_KIND}{PYBIND11_COMPILER_TYPE}
+    # {PYBIND11_STDLIB}{PYBIND11_BUILD_ABI}{PYBIND11_BUILD_TYPE}__"
+    #
+    # This was done in order to further narrow down the chances of compiler ABI incompatibility
+    # that can cause a hard to debug segfaults.
+    # For PyTorch extensions we want to relax those restrictions and pass compiler, stdlib and abi properties
+    # captured during PyTorch native library compilation in torch/csrc/Module.cpp
+
+    for pname in ["COMPILER_TYPE", "STDLIB", "BUILD_ABI"]:
+        pval = getattr(torch._C, f"_PYBIND11_{pname}")
+        if pval is not None and not IS_WINDOWS:
+            common_cflags.append(f'-DPYBIND11_{pname}=\\"{pval}\\"')
+
+    common_cflags += [f'-I{include}' for include in user_includes]
+    common_cflags += [f'-isystem {include}' for include in system_includes]
+
+    common_cflags += ['-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI))]
+
+    if IS_WINDOWS:
+        cflags = common_cflags + COMMON_MSVC_FLAGS + extra_cflags
+        cflags = _nt_quote_args(cflags)
+    else:
+        cflags = common_cflags + ['-fPIC', '-std=c++17'] + extra_cflags
+
+    def object_file_path(source_file: str) -> str:
+        # '/path/to/file.cpp' -> 'file'
+        file_name = os.path.splitext(os.path.basename(source_file))[0]
+        target = f'{file_name}.o'
+        return target
+
+    objects = [object_file_path(src) for src in sources]
+    ldflags = ([] if is_standalone else [SHARED_FLAG]) + extra_ldflags
+
+    # The darwin linker needs explicit consent to ignore unresolved symbols.
+    if IS_MACOS:
+        ldflags.append('-undefined dynamic_lookup')
+    elif IS_WINDOWS:
+        ldflags = _nt_quote_args(ldflags)
+
+    ext = EXEC_EXT if is_standalone else LIB_EXT
+    library_target = f'{name}{ext}'
+
+    _write_ninja_file(
+        path=path,
+        cflags=cflags,
+        post_cflags=None,
+        sources=sources,
+        objects=objects,
+        ldflags=ldflags,
+        library_target=library_target)
+
+def _jit_compile(name,
+                 sources,
+                 extra_cflags,
+                 extra_ldflags,
+                 extra_include_paths,
+                 build_directory: str,
+                 verbose: bool,
+                 is_python_module,
+                 is_standalone,
+                 keep_intermediates=True) -> None:
+    if is_python_module and is_standalone:
+        raise ValueError("`is_python_module` and `is_standalone` are mutually exclusive.")
+
+    old_version = JIT_EXTENSION_VERSIONER.get_version(name)
+    version = JIT_EXTENSION_VERSIONER.bump_version_if_changed(
+        name,
+        sources,
+        build_arguments=[extra_cflags, extra_ldflags, extra_include_paths],
+        build_directory=build_directory,
+        with_cuda=False,
+        is_python_module=is_python_module,
+        is_standalone=is_standalone,
+    )
+    if version > 0:
+        if version != old_version and verbose:
+            print(f'The input conditions for extension module {name} have changed. ' +
+                  f'Bumping to version {version} and re-building as {name}_v{version}...')
+        name = f'{name}_v{version}'
+
+    if version != old_version:
+        baton = FileBaton(os.path.join(build_directory, 'lock'))
+        if baton.try_acquire():
+            try:
+                with GeneratedFileCleaner(keep_intermediates=keep_intermediates) as clean_ctx:
+                    _write_ninja_file_and_build_library(
+                        name=name,
+                        sources=sources,
+                        extra_cflags=extra_cflags or [],
+                        extra_ldflags=extra_ldflags or [],
+                        extra_include_paths=extra_include_paths or [],
+                        build_directory=build_directory,
+                        verbose=verbose,
+                        is_standalone=is_standalone)
+            finally:
+                baton.release()
+        else:
+            baton.wait()
+    elif verbose:
+        print('No modifications detected for re-loaded extension '
+              f'module {name}, skipping build step...')
+
+    if verbose:
+        print(f'Loading extension module {name}...')
+
+    if is_standalone:
+        return _get_exec_path(name, build_directory)
+
+    return _import_module_from_library(name, build_directory, is_python_module)
+
+def load(name,
+         sources: Union[str, List[str]],
+         extra_cflags=None,
+         extra_ldflags=None,
+         extra_include_paths=None,
+         build_directory=None,
+         verbose=False,
+         is_python_module=True,
+         is_standalone=False,
+         keep_intermediates=True):
+    r'''
+    Loads a PyTorch C++ extension just-in-time (JIT).
+
+    To load an extension, a Ninja build file is emitted, which is used to
+    compile the given sources into a dynamic library. This library is
+    subsequently loaded into the current Python process as a module and
+    returned from this function, ready for use.
+
+    By default, the directory to which the build file is emitted and the
+    resulting library compiled to is ``<tmp>/torch_extensions/<name>``, where
+    ``<tmp>`` is the temporary folder on the current platform and ``<name>``
+    the name of the extension. This location can be overridden in two ways.
+    First, if the ``TORCH_EXTENSIONS_DIR`` environment variable is set, it
+    replaces ``<tmp>/torch_extensions`` and all extensions will be compiled
+    into subfolders of this directory. Second, if the ``build_directory``
+    argument to this function is supplied, it overrides the entire path, i.e.
+    the library will be compiled into that folder directly.
+
+    To compile the sources, the default system compiler (``c++``) is used,
+    which can be overridden by setting the ``CXX`` environment variable. To pass
+    additional arguments to the compilation process, ``extra_cflags`` or
+    ``extra_ldflags`` can be provided. For example, to compile your extension
+    with optimizations, pass ``extra_cflags=['-O3']``. You can also use
+    ``extra_cflags`` to pass further include directories.
+
+    Args:
+        name: The name of the extension to build. This MUST be the same as the
+            name of the pybind11 module!
+        sources: A list of relative or absolute paths to C++ source files.
+        extra_cflags: optional list of compiler flags to forward to the build.
+        extra_ldflags: optional list of linker flags to forward to the build.
+        extra_include_paths: optional list of include directories to forward
+            to the build.
+        build_directory: optional path to use as build workspace.
+        verbose: If ``True``, turns on verbose logging of load steps.
+        is_python_module: If ``True`` (default), imports the produced shared
+            library as a Python module. If ``False``, behavior depends on
+            ``is_standalone``.
+        is_standalone: If ``False`` (default) loads the constructed extension
+            into the process as a plain dynamic library. If ``True``, build a
+            standalone executable.
+
+    Returns:
+        If ``is_python_module`` is ``True``:
+            Returns the loaded PyTorch extension as a Python module.
+
+        If ``is_python_module`` is ``False`` and ``is_standalone`` is ``False``:
+            Returns nothing. (The shared library is loaded into the process as
+            a side effect.)
+
+        If ``is_standalone`` is ``True``.
+            Return the path to the executable. (On Windows, TORCH_LIB_PATH is
+            added to the PATH environment variable as a side effect.)
+
+    Example:
+        >>> from intel_extension_for_pytorch.xpu.cpp_extension import load
+        >>> module = load(
+                name='extension',
+                sources=['extension.cpp', 'extension_kernel.cpp'],
+                extra_cflags=['-O2'],
+                verbose=True)
+    '''
+    return _jit_compile(
+        name,
+        [sources] if isinstance(sources, str) else sources,
+        extra_cflags,
+        extra_ldflags,
+        extra_include_paths,
+        build_directory or _get_build_directory(name, verbose),
+        verbose,
+        is_python_module,
+        is_standalone,
+        keep_intermediates=keep_intermediates)
 
 def _write_ninja_file(path,
                       cflags,
@@ -641,24 +1085,20 @@ def _write_ninja_file(path,
             lines = '\n'.join(block)
             build_file.write(f'{lines}\n\n')
 
-
 def _get_dpcpp_root():
     # TODO: Need to decouple with toolchain env scripts
     dpcpp_root = os.getenv('CMPLR_ROOT')
     return dpcpp_root
-
 
 def _get_onemkl_root():
     # TODO: Need to decouple with toolchain env scripts
     path = os.getenv('MKLROOT')
     return path
 
-
 def _get_onednn_root():
     # TODO: Need to decouple with toolchain env scripts
     path = os.getenv('DNNLROOT')
     return path
-
 
 class _one_api_help:
     __dpcpp_root = None
@@ -686,8 +1126,8 @@ class _one_api_help:
         if self.__onednn_root is None:
             raise 'Didn\'t detect dnnl root. Please source <oneapi_dir>/dnnl/<version>/env/vars.sh '
         else:
-            warnings.warn("This extension has static linked onednn library. Please attaction to that,\
-                          this path of onednn version maybe not match with the built-in version.")
+            warnings.warn("This extension has static linked onednn library. Please attaction to \
+                that, this path of onednn version maybe not match with the built-in version.")
 
     def check_dpcpp_cfg(self):
         if self.__dpcpp_root is None:
@@ -747,7 +1187,6 @@ class _one_api_help:
             f'{MKLROOT}/lib/intel64/libmkl_core.a',
         ]
 
-
 def get_pytorch_include_dir():
     lib_include = os.path.join(_TORCH_PATH, 'include')
     paths = [
@@ -759,7 +1198,6 @@ def get_pytorch_include_dir():
         os.path.join(lib_include, 'TH')
     ]
     return paths
-
 
 def get_pytorch_lib_dir():
     return [os.path.join(_TORCH_PATH, 'lib')]
