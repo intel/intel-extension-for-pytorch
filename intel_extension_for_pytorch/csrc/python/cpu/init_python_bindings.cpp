@@ -37,6 +37,7 @@
 #include "csrc/cpu/aten/EmbeddingBag.h"
 #include "csrc/cpu/runtime/CPUPool.h"
 #include "csrc/cpu/runtime/TaskExecutor.h"
+#include "csrc/cpu/toolkit/sklearn.h"
 
 namespace torch_ipex {
 namespace {
@@ -223,6 +224,8 @@ void InitIpexModuleBindings(py::module m) {
         torch_ipex::runtime::set_mask_affinity_from_cpu_pool((*cpu_pool));
         return;
       });
+  m.def("roc_auc_score", &toolkit::roc_auc_score);
+  m.def("roc_auc_score_all", &toolkit::roc_auc_score_all);
 }
 } // namespace
 
