@@ -286,7 +286,7 @@ Tensor& renorm_out(
   TORCH_CHECK(self.dim() > 1, "need at least 2 dimensions, got ", self.dim());
 
   auto norm_vec_sz = self.size(dim);
-  Tensor norm = at::empty(norm_vec_sz, self.options().dtype(kFloat));
+  Tensor norm = at::empty(norm_vec_sz, self.options());
   at::AtenIpexTypeXPU::norm_out(
       norm,
       self.transpose(0, dim).reshape({norm_vec_sz, -1}),
@@ -300,12 +300,20 @@ Tensor& renorm_out(
                   .add_input(norm)
                   .set_check_mem_overlap(true)
                   .build();
-  float maxnorm_ = maxnorm.toFloat();
-  dpcpp_kernel_for_tensor_iter(iter, [=](float norm) -> float {
-    if (norm > maxnorm_)
-      return maxnorm_ / (norm + 1e-7);
-    return 1;
-  });
+
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "renorm_out",
+      [&] {
+        auto maxnorm_elm = maxnorm.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t norm) -> scalar_t {
+          if (norm > maxnorm_elm)
+            return maxnorm_elm / (norm + 1e-7);
+          return 1;
+        });
+      });
 
   std::vector<int64_t> sizes_;
   sizes_.push_back(norm_vec_sz);
