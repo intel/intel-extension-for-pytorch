@@ -4,8 +4,7 @@
 #include <utils/DPCPP.h>
 #include "BitonicMergeSort.h"
 #include "Scan.h"
-#include "SortingDeviceRadixSort.h"
-#include "SortingGroupRadixSort.h"
+#include "SortingFastGroupSort.h"
 #include "comm/Atomics.h"
 #include "comm/KeyTraits.h"
 #include "comm/MathReduce.h"
@@ -991,35 +990,10 @@ void sort(
     const int64_t sort_sz,
     bool descending) {
   RECORD_FUNCTION("pstl::sort", {});
-  int stride = 1;
-  using offset_t = uint32_t;
-  SegmentedGroupRadixSortDesc desc(1, sort_sz, stride, descending, true);
 
-  if (desc.valid()) {
-    if (!desc.need_temp()) {
-      segmented_group_radix_sort_kernel<KeyType, ValueType, uint16_t, true>(
-          desc,
-          in_key,
-          out_key,
-          nullptr,
-          out_val,
-          [=](offset_t slice) -> offset_t { return slice * sort_sz; });
-    } else {
-      auto key_options = map_options<KeyType>();
-      auto val_options = map_options<ValueType>();
-      Tensor tmp_key = at::empty({sort_sz}, key_options);
-      Tensor tmp_val = at::empty({sort_sz}, val_options);
-
-      segmented_group_radix_sort_kernel<KeyType, ValueType, uint16_t, true>(
-          desc,
-          in_key,
-          out_key,
-          nullptr,
-          out_val,
-          [=](offset_t slice) -> offset_t { return slice * sort_sz; },
-          (KeyType*)tmp_key.data_ptr(),
-          (ValueType*)tmp_val.data_ptr());
-    }
+  if (sort_sz <= get_fast_group_sort_bound()) {
+    fast_group_sort_pairs<KeyType, ValueType, uint16_t, true>(
+        in_key, out_key, nullptr, out_val, 1, sort_sz, descending);
   } else {
     if (descending) {
       merge_sort<KeyType, ValueType>(

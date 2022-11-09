@@ -142,80 +142,93 @@ std::tuple<Tensor, Tensor, Tensor> lstm(
     bool train,
     bool bidirectional,
     bool batch_first) {
-  Variable input_v = input;
-  if (batch_first) {
-    input_v = input_v.transpose(0, 1).contiguous();
-  }
-  auto hx_list = hx[0].unbind(0);
-  auto cx_list = hx[1].unbind(0);
-  std::vector<Tensor> hy_arr, cy_arr;
+  if (Settings::I().is_force_onednn_primitive_enabled()) {
+    Variable input_v = input;
+    if (batch_first) {
+      input_v = input_v.transpose(0, 1).contiguous();
+    }
+    auto hx_list = hx[0].unbind(0);
+    auto cx_list = hx[1].unbind(0);
+    std::vector<Tensor> hy_arr, cy_arr;
 
-  int32_t num_gate = 4;
-  int32_t num_directions = bidirectional ? 2 : 1;
-  int32_t hidden_size = hx[0].size(-1);
+    int32_t num_gate = 4;
+    int32_t num_directions = bidirectional ? 2 : 1;
+    int32_t hidden_size = hx[0].size(-1);
 
-  for (int32_t i = 0; i < num_layers; i++) {
-    std::vector<Tensor> weight_i_arr, weight_h_arr, bias_arr;
-    for (int32_t j = 0; j < num_directions; j++) {
-      int32_t index = (i * num_directions + j) * (has_biases ? 4 : 2);
-      weight_i_arr.push_back(weights[index].t().contiguous());
-      weight_h_arr.push_back(weights[index + 1].t().contiguous());
-      if (has_biases) {
-        bias_arr.push_back((weights[index + 2] + weights[index + 3]));
-      } else {
-        bias_arr.push_back(
-            at::zeros({num_gate * hidden_size}, weights[0].options()));
+    for (int32_t i = 0; i < num_layers; i++) {
+      std::vector<Tensor> weight_i_arr, weight_h_arr, bias_arr;
+      for (int32_t j = 0; j < num_directions; j++) {
+        int32_t index = (i * num_directions + j) * (has_biases ? 4 : 2);
+        weight_i_arr.push_back(weights[index].t().contiguous());
+        weight_h_arr.push_back(weights[index + 1].t().contiguous());
+        if (has_biases) {
+          bias_arr.push_back((weights[index + 2] + weights[index + 3]));
+        } else {
+          bias_arr.push_back(
+              at::zeros({num_gate * hidden_size}, weights[0].options()));
+        }
+      }
+      Variable weight_i_v = at::cat(weight_i_arr, 0);
+      Variable weight_h_v = at::cat(weight_h_arr, 0);
+      Variable bias_v = at::cat(bias_arr, 0);
+
+      std::vector<Tensor> hx_arr_tmp, cx_arr_tmp;
+      for (int32_t j = 0; j < num_directions; j++) {
+        int index = i * num_directions + j;
+        auto tensor_h = at::empty_like(hx_list[0]);
+        auto tensor_c = at::empty_like(cx_list[0]);
+        tensor_h.copy_(hx_list[index]);
+        tensor_c.copy_(cx_list[index]);
+        hx_arr_tmp.push_back(tensor_h);
+        cx_arr_tmp.push_back(tensor_c);
+      }
+      Variable hx_v = at::cat(hx_arr_tmp);
+      Variable cx_v = at::cat(cx_arr_tmp);
+
+      variable_list output = LSTMFunction::apply(
+          input_v,
+          hx_v,
+          cx_v,
+          weight_i_v,
+          weight_h_v,
+          bias_v,
+          has_biases,
+          i,
+          num_layers,
+          dropout,
+          train,
+          bidirectional);
+      input_v = output[0];
+      hy_arr.push_back(output[1]);
+      cy_arr.push_back(output[2]);
+
+      if (dropout != 0 && train && i < num_layers - 1) {
+        input_v = at::dropout(input_v, dropout, /*train=*/true);
       }
     }
-    Variable weight_i_v = at::cat(weight_i_arr, 0);
-    Variable weight_h_v = at::cat(weight_h_arr, 0);
-    Variable bias_v = at::cat(bias_arr, 0);
-
-    std::vector<Tensor> hx_arr_tmp, cx_arr_tmp;
-    for (int32_t j = 0; j < num_directions; j++) {
-      int index = i * num_directions + j;
-      auto tensor_h = at::empty_like(hx_list[0]);
-      auto tensor_c = at::empty_like(cx_list[0]);
-      tensor_h.copy_(hx_list[index]);
-      tensor_c.copy_(cx_list[index]);
-      hx_arr_tmp.push_back(tensor_h);
-      cx_arr_tmp.push_back(tensor_c);
+    Tensor output = input_v;
+    Tensor hy, cy;
+    int32_t mini_batch = input_v.size(1);
+    hy = at::cat(hy_arr, 0).reshape(
+        {num_layers * num_directions, mini_batch, hidden_size});
+    cy = at::cat(cy_arr, 0).reshape(
+        {num_layers * num_directions, mini_batch, hidden_size});
+    if (batch_first) {
+      output = output.transpose(0, 1).contiguous();
     }
-    Variable hx_v = at::cat(hx_arr_tmp);
-    Variable cx_v = at::cat(cx_arr_tmp);
-
-    variable_list output = LSTMFunction::apply(
-        input_v,
-        hx_v,
-        cx_v,
-        weight_i_v,
-        weight_h_v,
-        bias_v,
+    return std::make_tuple(output, hy, cy);
+  } else {
+    return at::native::lstm(
+        input,
+        hx,
+        weights,
         has_biases,
-        i,
         num_layers,
         dropout,
         train,
-        bidirectional);
-    input_v = output[0];
-    hy_arr.push_back(output[1]);
-    cy_arr.push_back(output[2]);
-
-    if (dropout != 0 && train && i < num_layers - 1) {
-      input_v = at::dropout(input_v, dropout, /*train=*/true);
-    }
+        bidirectional,
+        batch_first);
   }
-  Tensor output = input_v;
-  Tensor hy, cy;
-  int32_t mini_batch = input_v.size(1);
-  hy = at::cat(hy_arr, 0).reshape(
-      {num_layers * num_directions, mini_batch, hidden_size});
-  cy = at::cat(cy_arr, 0).reshape(
-      {num_layers * num_directions, mini_batch, hidden_size});
-  if (batch_first) {
-    output = output.transpose(0, 1).contiguous();
-  }
-  return std::make_tuple(output, hy, cy);
 }
 
 } // namespace AtenIpexTypeXPU

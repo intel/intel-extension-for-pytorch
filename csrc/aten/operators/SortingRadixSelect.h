@@ -123,11 +123,15 @@ struct TopKTypeConfig<at::Half> {
   using RadixType = uint32_t;
 
   static inline RadixType convert(at::Half v) {
-    return 0u;
+    RadixType x = *((uint16_t*)&v);
+    RadixType mask = -((x >> 15)) | 0x8000;
+    return (x ^ mask);
   }
 
   static inline at::Half deconvert(RadixType v) {
-    return 0;
+    RadixType mask = ((v >> 15) - 1) | 0x8000;
+    auto v_de = v ^ mask;
+    return *((at::Half*)&v_de);
   }
 };
 
@@ -226,7 +230,6 @@ void countRadixUsingMask(
     bool hasVal = ((val & desiredMask) == desired);
     bitwise_t digitInRadix =
         Bitfield<bitwise_t>::getBitfield(val, radixDigitPos, RadixBits);
-
     if (hasVal)
       counts[digitInRadix]++;
   }

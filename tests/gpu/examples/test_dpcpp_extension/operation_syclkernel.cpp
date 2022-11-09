@@ -1,4 +1,5 @@
 #include <iostream>
+#include <torch/extension.h>
 #include "operation_syclkernel.h"
 
 TinyTensor run_syclkernel_operation_scaledown(const TinyTensor& inp, sycl::queue *q)
@@ -16,4 +17,9 @@ TinyTensor run_syclkernel_operation_scaledown(const TinyTensor& inp, sycl::queue
     });
 
     return outp;
+}
+
+PYBIND11_MODULE(operation_syclkernel, m)
+{
+    m.def("run_syclkernel_operation_scaledown", &run_syclkernel_operation_scaledown, "run_syclkernel_operation_scaledown");
 }

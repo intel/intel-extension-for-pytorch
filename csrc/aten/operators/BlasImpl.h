@@ -195,7 +195,16 @@ static void mkl_baddbmm(
         self, {batch1.size(0), batch1.size(1), batch2.size(2)}, "mkl_matmul");
     result.resize_as_(*b_self).copy_(*b_self);
   } else {
-    result.resize_({batch1.size(0), batch1.size(1), batch2.size(2)});
+    // For mkl_baddbmm, have to convert it to contiguous format(only update meta
+    // data, and don't copy memory) for such kind of tensor below: E.g.: the
+    // tensor whose size is [10, 12, 50], and stride is [50, 500, 1], where
+    // oneMKL lib cannot handle this kind of stride. Because stridec from oneMKL
+    // strided style API means step size for each sample in the same batch.
+    // However, for mkl_matmul, the stridec is always c.numel(), because we only
+    // have 1 sample when we do addmm.
+    result.resize_(
+        {batch1.size(0), batch1.size(1), batch2.size(2)},
+        at::MemoryFormat::Contiguous);
   }
 
   TORCH_CHECK(
@@ -433,7 +442,14 @@ static void mkl_matmul(
 
   const int64_t lda = a.strides()[(transpose_a == transpose_c) ? 1 : 0];
   const int64_t ldb = b.strides()[(transpose_b == transpose_c) ? 1 : 0];
-  const int64_t ldc = c.strides()[transpose_c ? 0 : 1];
+  // for the corner case: result tensor with size [m, 1], stride [1, 1]
+  // we cannot use stride to get its leading dimension, whose value should be m.
+  int64_t ldc;
+  if (1 == c.strides()[0] == c.strides()[1]) {
+    ldc = c.sizes()[transpose_c ? 1 : 0];
+  } else {
+    ldc = c.strides()[transpose_c ? 0 : 1];
+  }
 
   // Always ensure the conjugation for c is resolved since there's no way to
   // specify c's conjugation in the gemm call

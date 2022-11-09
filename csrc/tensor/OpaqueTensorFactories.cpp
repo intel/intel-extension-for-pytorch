@@ -115,6 +115,7 @@ inline bool need_to_plain(const Tensor& tensor) {
 Tensor to_plain_if_needed(const Tensor& tensor) {
   if (!need_to_plain(tensor))
     return tensor;
+  const OptionalDeviceGuard device_guard(device_of(tensor));
 
   return DPCPPTensorConvertor::to_plain(tensor);
 }

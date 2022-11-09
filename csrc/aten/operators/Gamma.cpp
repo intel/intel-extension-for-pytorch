@@ -112,37 +112,6 @@ Tensor& lgamma_out(const Tensor& self, Tensor& out) {
   return out;
 }
 
-static inline void mvlgamma_check(const Tensor& self, int64_t p) {
-  TORCH_CHECK(
-      at::isFloatingType(self.scalar_type()),
-      "mvlgamma is not implemented for ",
-      self.scalar_type());
-  TORCH_CHECK(
-      (self > 0.5f * (p - 1)).all().item<bool>(),
-      "All elements must be greater than (p-1)/2");
-  TORCH_CHECK(p >= 1, "p has to be greater than or equal to 1");
-}
-
-Tensor mvlgamma(const Tensor& self, int64_t p) {
-  mvlgamma_check(self, p);
-  Tensor range = at::empty({0}, self.options());
-  Tensor args = at::arange_out(range, -p / 2. + 0.5, 0.5, 0.5);
-  args = args.add(self.unsqueeze(-1));
-
-  return args.lgamma_().sum(-1).add_(
-      p * (p - 1) * std::log(Numerics<double>::pi()) / 4.);
-}
-
-Tensor& mvlgamma_(Tensor& self, int64_t p) {
-  mvlgamma_check(self, p);
-  Tensor range = at::empty({0}, self.options());
-  Tensor args = at::arange_out(range, -p / 2. + 0.5, 0.5, 0.5);
-  args = args.add(self.unsqueeze(-1));
-
-  return self.copy_(args.lgamma_().sum(-1).add_(
-      p * (p - 1) * std::log(Numerics<double>::pi()) / 4.));
-}
-
 Tensor& mvlgamma_out(const Tensor& self, int64_t p, Tensor& out) {
   auto output = self.mvlgamma(p);
   TORCH_CHECK(

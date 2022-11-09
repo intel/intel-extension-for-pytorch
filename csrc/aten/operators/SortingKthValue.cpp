@@ -200,7 +200,9 @@ void gatherMedian(
       for (index_t i = item.get_local_id(0); i < inputSliceSize;
            i += item.get_local_range(0)) {
         scalar_t val = inputSliceStart[i * inputWithinSliceStride];
-        if (Numerics<scalar_t>::eq(val, median)) {
+        if (Numerics<scalar_t>::eq(val, median) ||
+            (Numerics<scalar_t>::isnan(val) &&
+             Numerics<scalar_t>::isnan(median))) {
           indicesSliceStart[0] = i;
           break;
         }

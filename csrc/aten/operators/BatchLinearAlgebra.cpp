@@ -850,7 +850,10 @@ static void apply_lu_solve_dpcpp_(
   int64_t stride_b = native::matrixStride(b_);
 
   scalar_t* a = (scalar_t*)(lu_.data_ptr());
-  int64_t* ipiv = (int64_t*)(pivots_.data_ptr());
+  Tensor pivots = pivots_;
+  if (pivots_.scalar_type() == at::ScalarType::Int)
+    pivots = pivots_.to(kLong);
+  int64_t* ipiv = (int64_t*)(pivots.data_ptr());
   scalar_t* b = (scalar_t*)(b_.data_ptr());
 
   int64_t scratchpadsize = mkl_getrs_scratchpad<scalar_t>(
@@ -1967,7 +1970,7 @@ static Tensor& linalg_solve_out_info(
       IntArrayRef(input_broadcasted.sizes().data(), input_broadcasted.dim() - 2)
           .vec(); // input_broadcasted.shape[:-2]
   pivots_shape.push_back(std::min(input.size(-2), input.size(-1)));
-  Tensor pivots = at::empty(pivots_shape, input.options().dtype(kInt));
+  Tensor pivots = at::empty(pivots_shape, input.options().dtype(kLong));
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
       input_working_copy.scalar_type(), "linalg_solve_dpcpp", [&] {
         impl::apply_lu_dpcpp_<scalar_t>(

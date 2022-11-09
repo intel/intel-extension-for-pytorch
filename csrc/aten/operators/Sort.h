@@ -10,7 +10,7 @@
 #include "comm/Numerics.h"
 
 #include "SortingDeviceRadixSort.h"
-#include "SortingGroupRadixSort.h"
+#include "SortingFastGroupSort.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -195,40 +195,15 @@ std::tuple<Tensor&, Tensor&> sort_out_stable(
         int nsegments = numel / nsort;
         using offset_t = uint32_t;
 
-        SegmentedGroupRadixSortDesc desc(
-            nsegments, nsort, stride, descending, true);
-        if (desc.valid()) {
-          if (!desc.need_temp()) {
-            segmented_group_radix_sort_kernel<
-                scalar_t,
-                int64_t,
-                uint16_t,
-                true>(
-                desc,
-                self_ptr,
-                (scalar_t*)values_ptr_,
-                nullptr,
-                (int64_t*)indices_ptr,
-                [=](offset_t slice) -> offset_t { return slice * nsort; });
-          } else {
-            auto sorting_tmp_k = at::empty_strided(
-                self_.sizes(), self_.strides(), self_.options());
-            auto sorting_tmp_v = at::empty_strided(
-                self_.sizes(), self_.strides(), self_.options().dtype(kLong));
-            segmented_group_radix_sort_kernel<
-                scalar_t,
-                int64_t,
-                uint16_t,
-                true>(
-                desc,
-                self_ptr,
-                (scalar_t*)values_ptr_,
-                nullptr,
-                (int64_t*)indices_ptr,
-                [=](offset_t slice) -> offset_t { return slice * nsort; },
-                (scalar_t*)sorting_tmp_k.data_ptr(),
-                (int64_t*)sorting_tmp_v.data_ptr());
-          }
+        if (nsort <= get_fast_group_sort_bound()) {
+          fast_group_sort_pairs<scalar_t, int64_t, uint16_t, true>(
+              self_ptr,
+              (scalar_t*)values_ptr_,
+              nullptr,
+              (int64_t*)indices_ptr,
+              nsegments,
+              nsort,
+              descending);
         } else {
           SegmentedDeviceRadixSortDesc desc(
               nsegments, nsort, stride, descending, true);
