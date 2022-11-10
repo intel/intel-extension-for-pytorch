@@ -348,22 +348,19 @@ inline void launcher(
       });
 }
 
-} // namespace impl
-
-std::tuple<Tensor, Tensor> _fused_dropout(
+template <typename mask_t>
+std::tuple<Tensor, Tensor> dropout_dpcpp(
+    DPCPPGeneratorImpl* gen,
     const Tensor& self,
-    double p,
-    c10::optional<Generator> gen_) {
-  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
-      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
-  Tensor mask = at::empty(
-      self.sizes(), self.options().dtype(kByte), self.suggest_memory_format());
+    double p) {
+  Tensor mask = at::empty_like(
+      self, self.options().dtype(c10::CppTypeToScalarType<mask_t>::value));
   const int64_t nelem = self.numel();
   // empty tensors should not get here, but just in case, avoid FPE
   // non-training shot-cut
   if (nelem == 0)
     return std::tuple<Tensor, Tensor>(self.clone(), mask);
-  Tensor ret = at::empty_like(self, self.suggest_memory_format());
+  Tensor ret = at::empty_like(self);
   auto execution_policy = calc_execution_policy(nelem);
   auto counter_offset = std::get<0>(execution_policy);
   auto num_groups = std::get<1>(execution_policy);
@@ -377,36 +374,107 @@ std::tuple<Tensor, Tensor> _fused_dropout(
   }
   PhiloxState rng_engine_inputs(std::get<0>(seeds), std::get<1>(seeds));
   if (xpu::dpcpp::detail::canUse32BitIndexMath(self)) {
-    impl::launcher<unsigned int, uint8_t>(
+    launcher<unsigned int, mask_t>(
         self, ret, mask, p, nelem, rng_engine_inputs, num_groups, group_size);
   } else {
-    impl::launcher<uint64_t, uint8_t>(
+    launcher<uint64_t, mask_t>(
         self, ret, mask, p, nelem, rng_engine_inputs, num_groups, group_size);
   }
   return std::tuple<Tensor, Tensor>(ret, mask);
 }
 
-Tensor _masked_scale(const Tensor& self, const Tensor& mask, double scale) {
-  Tensor ret = at::empty_like(self, self.suggest_memory_format());
+template <typename mask_t, typename scalar_t, typename accscalar_t>
+void masked_scale_kernel(
+    at::Tensor& ret,
+    const at::Tensor& src,
+    const at::Tensor& mask,
+    accscalar_t scale) {
   auto iter = at::TensorIteratorConfig()
                   .check_all_same_dtype(false)
                   .add_output(ret)
-                  .add_input(self)
+                  .add_input(src)
                   .add_input(mask)
                   .build();
+
+  dpcpp_kernel_for_tensor_iter(
+      iter, [=](const scalar_t src_val, const mask_t mask_val) -> scalar_t {
+        return (float)mask_val * src_val * scale;
+      });
+}
+
+template <typename mask_t>
+Tensor dropout_backward_dpcpp(
+    const Tensor& grad,
+    const Tensor& mask,
+    double scale) {
+  Tensor ret = at::empty_like(grad, grad.suggest_memory_format());
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::BFloat16,
       at::ScalarType::Half,
+      at::ScalarType::BFloat16,
       ret.scalar_type(),
       "masked_scale",
-      [&]() {
+      [&] {
         using accscalar_t = acc_type<scalar_t>;
-        dpcpp_kernel_for_tensor_iter(
-            iter, [=](scalar_t src_val, uint8_t mask_val) -> scalar_t {
-              return (float)mask_val * src_val * scale;
-            });
+        masked_scale_kernel<mask_t, scalar_t>(
+            ret, grad, mask, (accscalar_t)scale);
       });
   return ret;
+}
+
+} // namespace impl
+
+std::tuple<Tensor, Tensor> native_dropout(
+    const Tensor& self,
+    double p,
+    c10::optional<bool> train) {
+  // short-cut for train == false
+  if (train.has_value() && !train.value()) {
+    return std::make_tuple(
+        self.clone(),
+        at::ones_like(
+            self, self.options().dtype(c10::CppTypeToScalarType<bool>::value)));
+  }
+  // short-cut
+  if (p == 1) {
+    // native_dropout_cuda is in derivatives.yaml, so we don't need to add data
+    // dependency from output to input for autograd
+    auto ret = at::zeros_like(self);
+    auto mask = at::zeros_like(
+        self, self.options().dtype(c10::CppTypeToScalarType<bool>::value));
+    return std::tuple<Tensor, Tensor>(ret, mask);
+  }
+
+  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
+      c10::nullopt, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+  double p1m = 1. - p;
+  return impl::dropout_dpcpp<bool>(gen, self, p1m);
+}
+
+// NOTE: _fused_dropout is to be removed in CUDA, see PR #63937
+std::tuple<Tensor, Tensor> _fused_dropout(
+    const Tensor& self,
+    double p,
+    c10::optional<Generator> gen_) {
+  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
+      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+  return impl::dropout_dpcpp<uint8_t>(gen, self, p);
+}
+
+Tensor native_dropout_backward(
+    const Tensor& grad,
+    const Tensor& mask,
+    double scale) {
+  TORCH_CHECK(
+      mask.scalar_type() == at::ScalarType::Bool,
+      "Mask should be Bool Scalar Type",
+      mask.scalar_type());
+  return impl::dropout_backward_dpcpp<bool>(grad, mask, scale);
+}
+
+// NOTE: _masked_scale is to be removed in CUDA, see PR #63937
+Tensor _masked_scale(const Tensor& self, const Tensor& mask, double scale) {
+  TORCH_CHECK(mask.scalar_type() == at::ScalarType::Byte, "mask should be torch.uint8 dtype");
+  return impl::dropout_backward_dpcpp<uint8_t>(self, mask, scale);
 }
 
 } // namespace AtenIpexTypeXPU
