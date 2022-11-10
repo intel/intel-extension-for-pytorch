@@ -369,6 +369,17 @@ static void cat(
 Tensor& cat_out(const ITensorListRef& container, int64_t dim, Tensor& out) {
   auto tensors = container.materialize();
   // Inputs cannot alias the output tensor
+  size_t i = 0;
+  for (const Tensor& t : tensors) {
+    TORCH_CHECK(
+        t.dim() > 0,
+        "zero-dimensional tensor (at position ",
+        i,
+        ") cannot be concatenated");
+    i++;
+  }
+  dim = at::legacy_cat_wrap_dim(dim, tensors);
+
   for (const auto i : c10::irange(tensors.size())) {
     auto lap = at::get_overlap_status(out, tensors[i]);
     TORCH_CHECK(
