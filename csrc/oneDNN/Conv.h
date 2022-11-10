@@ -130,17 +130,6 @@ static inline memory::dims compatible_wgh_dims(
   return {};
 }
 
-static inline bool onednn_conv_use_channels_last(
-    const at::Tensor& src,
-    const at::Tensor& weight) {
-  // Convolution modules, unlike binary p-wise operator, have
-  // channels last as the dominating memory format. If both
-  // src and weight are in contiguous memory format, the
-  // operator produces output in contiguous memory format.
-  // Otherwise, output will be in channels last memory format.
-  return (is_smf_channels_last(src) || is_smf_channels_last(weight));
-}
-
 static convolution_forward::primitive_desc get_convolution_pd(
     const at::Tensor& src,
     const at::Tensor& wgh,
@@ -205,14 +194,14 @@ static at::Tensor convolution(
     IntArrayRef dilation,
     int64_t groups,
     Attr& attr) {
-  if (src.is_quantized()) {
-    TORCH_CHECK(
-        !bia.defined(), "QConv only supports binary_add post-op for bias");
-  }
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
   auto ndim = src.ndimension();
+  if (src.is_quantized()) {
+    TORCH_CHECK(
+        !bia.defined(), "QConv only supports binary_add post-op for bias");
+  }
   auto dst_tz = conv_dst_tz(
       ndim,
       src.sizes(),
@@ -221,19 +210,18 @@ static at::Tensor convolution(
       padding_back_bottom_right,
       stride,
       dilation);
-  auto is_onednn_layout_suggested = using_onednn_layout_for_conv(src);
-  if (!is_onednn_layout_suggested && !dst.defined()) {
+  if (!dst.defined()) {
     auto dst_opt = src.options();
     if (src.is_quantized()) {
       dst_opt = attr.get_dst_dtype();
     }
-    if (onednn_conv_use_channels_last(src, wgh)) {
+    // ensure channels_last can be propagated from src to dst
+    if (is_smf_channels_last(src) || is_smf_channels_last(wgh)) {
       TORCH_CHECK(
           3 == ndim || 4 == ndim || 5 == ndim,
           "convolution only supports 3D, 4D, 5D tensor");
       dst_opt = dst_opt.memory_format(get_cl_tag_by_ndim(ndim));
     }
-
     dst = at::empty(dst_tz, dst_opt);
   }
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
@@ -259,16 +247,16 @@ static at::Tensor convolution(
   auto ic = src.size(1);
   auto oc = dst_tz[1];
 
+  bool is_channels_last_suggested = using_channels_last_for_conv(src, wgh);
   auto fmt_any = memory::format_tag::any;
   // 3D: n/c/w (n/w/c)
   // 4D: n/c/h/w (n/h/w/c)
   // 5D: n/c/d/h/w (n/d/h/w/c)
-  auto fmt_src = conv_src_fmt(ndim, onednn_conv_use_channels_last(src, wgh));
+  auto fmt_src = conv_src_fmt(ndim, is_channels_last_suggested);
   // 3D: (g)o/i/w ((g)o/w/i)
   // 4D: (g)o/i/h/w ((g)o/h/w/i)
   // 5D: (g)o/i/d/h/w ((g)o/d/h/w/i)
-  auto fmt_wgh =
-      conv_wgh_fmt(ndim, groups != 1, onednn_conv_use_channels_last(src, wgh));
+  auto fmt_wgh = conv_wgh_fmt(ndim, groups != 1, is_channels_last_suggested);
   auto fmt_bia = memory::format_tag::x;
 
   memory::dims src_tz = src.sizes().vec();
@@ -281,13 +269,14 @@ static at::Tensor convolution(
 
   // plain combination
   auto src_md = memory::desc(src_tz, src_data_t, fmt_src);
-  auto wgh_md = onednn_conv_use_channels_last(src, wgh)
+  auto wgh_md = is_channels_last_suggested
       ? memory::desc(wgh_tz, wei_data_t, fmt_any)
       : memory::desc(wgh_tz, wei_data_t, fmt_wgh);
   auto dst_md = memory::desc(dst_tz, dst_data_t, fmt_src);
   auto bia_md = bia.defined() ? memory::desc(bia_tz, bia_data_t, fmt_bia)
                               : memory::desc();
 
+  bool is_onednn_layout_suggested = using_onednn_layout_for_conv(src, wgh);
   // block combination
   if (is_onednn_layout_suggested) {
     // In blocked format scenario, oneDNN accept the src in plain format
@@ -415,7 +404,7 @@ static at::Tensor convolution(
       auto expected_dst_md = conv_fwd_pd.dst_desc();
       auto plain_dst_md = memory::desc({dst_tz}, dst_data_t, fmt_src);
       auto mem_fmt = get_cl_tag_by_ndim(ndim);
-      auto dst_opt = onednn_conv_use_channels_last(src, wgh)
+      auto dst_opt = is_smf_channels_last(src) || is_smf_channels_last(wgh)
           // src.options() is just used to fill dst_opt. can also be
           // any other tensor to do this
           ? src.options().memory_format(mem_fmt)
@@ -430,7 +419,6 @@ static at::Tensor convolution(
   }
 
   Tensor src_, wgh_, dst_ = dst, bia_;
-
   auto expected_src_md = conv_fwd_pd.src_desc();
   memory src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
   if (src_usr_md != expected_src_md) {
@@ -447,7 +435,7 @@ static at::Tensor convolution(
   auto weight_cache_optimization = [&]() {
     bool onoff = false;
     onoff |= is_onednn_layout_suggested;
-    onoff |= onednn_conv_use_channels_last(src, wgh);
+    onoff |= using_channels_last_for_conv(src, wgh);
     onoff &= !at::GradMode::is_enabled();
     return onoff;
   }();
@@ -576,9 +564,9 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   TORCH_CHECK(
       3 == ndim || 4 == ndim || 5 == ndim,
       "convolution bwd wgh only supports 3D, 4D, 5D tensor");
-  auto smf = onednn_conv_use_channels_last(src, diff_dst)
-      ? get_cl_tag_by_ndim(ndim)
-      : at::MemoryFormat::Contiguous;
+  bool is_channels_last_suggested = using_channels_last_for_conv(src, diff_dst);
+  auto smf = is_channels_last_suggested ? get_cl_tag_by_ndim(ndim)
+                                        : at::MemoryFormat::Contiguous;
 
   Tensor diff_bia;
   if (with_bias) {
@@ -603,10 +591,9 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   memory::data_type bia_dt = src_dt;
 
   memory::format_tag any_fmt = memory::format_tag::any;
-  memory::format_tag src_fmt =
-      conv_src_fmt(ndim, onednn_conv_use_channels_last(src, diff_dst));
-  memory::format_tag wgh_fmt = conv_wgh_fmt(
-      ndim, groups != 1, onednn_conv_use_channels_last(src, diff_dst));
+  memory::format_tag src_fmt = conv_src_fmt(ndim, is_channels_last_suggested);
+  memory::format_tag wgh_fmt =
+      conv_wgh_fmt(ndim, groups != 1, is_channels_last_suggested);
   memory::format_tag dst_fmt = src_fmt;
   memory::format_tag bia_fmt = memory::format_tag::x;
 
@@ -623,7 +610,7 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   memory::dims _dilation = compatible_dilation(dilation);
 
   auto src_md = memory::desc(src_tz, src_dt, src_fmt);
-  auto wgh_md = onednn_conv_use_channels_last(src, diff_dst)
+  auto wgh_md = is_channels_last_suggested
       ? memory::desc(wgh_tz, wgh_dt, any_fmt)
       : memory::desc(wgh_tz, wgh_dt, wgh_fmt);
   auto dst_md = memory::desc(dst_tz, dst_dt, dst_fmt);

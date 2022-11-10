@@ -109,7 +109,7 @@ struct QuantizeConvConverter {
         AT_ERROR(
             "QConv.cpp: IPEX dose not support quantized convolution have dimension more than 3.");
     }
-    mfmt_ = onednn_conv_use_channels_last(input, weight_)
+    mfmt_ = using_channels_last_for_conv(input, weight_)
         ? channel_last_fmt
         : at::MemoryFormat::Contiguous;
     return at::_empty_affine_quantized(

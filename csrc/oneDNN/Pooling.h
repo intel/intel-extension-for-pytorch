@@ -22,15 +22,6 @@ namespace oneDNN {
 
 using alg = dnnl::algorithm;
 
-static inline bool onednn_pool_use_channels_last(const at::Tensor& input) {
-  const auto ndim = input.ndimension();
-  if (2 == ndim) {
-    return false;
-  }
-
-  return is_smf_channels_last(input);
-}
-
 template <alg alg_kind>
 static at::Tensor pooling(
     at::Tensor& dst,
@@ -310,7 +301,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   auto expected_dst_md = pooling_fwd_pd.dst_desc();
 
   memory src_usr_m, dst_usr_m;
-  if (src_ctx.is_plain() || onednn_pool_use_channels_last(src)) {
+  if (src_ctx.is_plain() || using_channels_last_for_onednn_op(src)) {
     src_usr_m = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
     dst_usr_m = dpcpp_onednn_memory(dst_md, engine, dst.data_ptr());
   } else {
@@ -339,7 +330,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   if (prop_kind == dnnl::prop_kind::forward_training) {
     at::Tensor idx_;
     memory idx_m;
-    if (src_ctx.is_plain() || onednn_pool_use_channels_last(src)) {
+    if (src_ctx.is_plain() || using_channels_last_for_onednn_op(src)) {
       idx_ = at::empty({dst_tz}, at::TensorOptions(at::kXPU).dtype(at::kInt));
       idx_m = dpcpp_onednn_memory(idx_md, engine, idx_.data_ptr());
     } else {
@@ -364,7 +355,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
          {DNNL_ARG_DST, dst_m},
          {DNNL_ARG_WORKSPACE, idx_m}});
 
-    if (src_ctx.is_plain() || onednn_pool_use_channels_last(src)) {
+    if (src_ctx.is_plain() || using_channels_last_for_onednn_op(src)) {
       dtype_convert_by_scalar(
           idx.data_ptr<int64_t>(), idx_.data_ptr<int32_t>(), idx_.numel());
     } else {
@@ -703,8 +694,9 @@ static at::Tensor pooling_backward(
 
   auto expected_diff_src_md = pooling_bwd_pd.diff_src_desc();
   memory diff_src_usr_m, diff_dst_usr_m, idx_usr_m;
-  if (!Settings::I().is_onednn_layout_enabled() ||
-      onednn_pool_use_channels_last(diff_dst)) {
+  auto diff_dst_ctx =
+      at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(diff_dst);
+  if (diff_dst_ctx.is_plain() || using_channels_last_for_onednn_op(diff_dst)) {
     diff_dst_usr_m = dpcpp_onednn_memory(
         {diff_dst_tz, data_t, format}, engine, diff_dst.data_ptr());
 

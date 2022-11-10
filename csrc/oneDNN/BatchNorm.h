@@ -24,17 +24,8 @@ using namespace at::AtenIpexTypeXPU;
 namespace xpu {
 namespace oneDNN {
 
-static inline bool onednn_bn_use_channels_last(const at::Tensor& input) {
-  const auto ndim = input.ndimension();
-  if (2 == ndim) {
-    return false;
-  }
-
-  return is_smf_channels_last(input);
-}
-
 static inline memory::format_tag bn_src_format(const at::Tensor& t) {
-  auto is_channels_last = onednn_bn_use_channels_last(t);
+  auto is_channels_last = using_channels_last_for_onednn_op(t);
   auto ndim = t.ndimension();
   if (ndim == 2) {
     return memory::format_tag::nc;
@@ -127,12 +118,12 @@ static std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> batch_normalization(
   auto dst_md = bn_fwd_pd.dst_desc();
   if (!dst.defined()) {
     if (!src_ctx.is_plain()) {
-      dst = onednn_bn_use_channels_last(src)
+      dst = using_channels_last_for_onednn_op(src)
           ? xpu::dpcpp::empty_opaque_tensor_dpcpp(
                 dst_md, src.options(), src_cl_mfmt)
           : empty_opaque_tensor(dst_md, src.options(), c10::nullopt);
     } else {
-      dst = onednn_bn_use_channels_last(src)
+      dst = using_channels_last_for_onednn_op(src)
           ? xpu::dpcpp::empty_like_dpcpp(src, src.options(), src_cl_mfmt)
           : at::empty_like(src);
     }
