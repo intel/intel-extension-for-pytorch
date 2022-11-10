@@ -55,6 +55,16 @@ def _conv_fusion(input1, input2, model, print_graph=False, dtype=torch.float):
     del jit_model
     return y, y_script.to(torch.float32)
 
+class MulAdd(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MulAdd, self).__init__()
+        self.conv = nn.Conv2d(2, 2, 1, 1)
+
+    def forward(self, input, m1, m2):
+        input = F.relu(self.conv(input))
+        m2 += input * 3.0
+        return m2
+
 
 class MatmulSum(torch.nn.Module):
     def __init__(self):
@@ -611,6 +621,31 @@ class TestNNMethod(TestCase):
             print("real2:", real2.to(cpu_device))
         self.assertEqual(raw1, real1.to(cpu_device))
         self.assertEqual(raw2, real2.to(cpu_device))
+        del modelJit
+
+
+    def test_mul_add(self, dtype=torch.float):
+        m1 = torch.randn((4, 2, 2, 2), device=cpu_device)
+        m2 = torch.randn((4, 2, 2, 2), device=cpu_device)
+        add1 = torch.randn((4, 2, 2, 2), device=cpu_device)
+        add2 = add1.clone()
+
+        model = MulAdd()
+        model1 = copy.deepcopy(model)
+        raw = model(m1, m2, add1)
+        print("raw: ", raw)
+
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+        add1_dpcpp = add2.to(dpcpp_device)
+        model1 = model1.to("xpu")
+
+        modelJit = torch.jit.script(model1)
+        with torch.no_grad():
+            print(modelJit.graph_for(m1_dpcpp, m2_dpcpp, add1_dpcpp))
+            real = modelJit(m1_dpcpp, m2_dpcpp, add1_dpcpp)
+            print("real:", real.to(cpu_device))
+        self.assertEqual(raw, real.to(cpu_device))
         del modelJit
 
     def test_trans_matmul_add(self, dtype=torch.float):

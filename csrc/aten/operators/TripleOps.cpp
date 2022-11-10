@@ -59,6 +59,64 @@ static inline void dim_check(
 
 } // namespace impl
 
+Tensor mul_add_scalar(
+    const Tensor& self,
+    Scalar other,
+    const Tensor& accumu,
+    Scalar alpha) {
+  TORCH_CHECK(
+      self.ndimension() == accumu.ndimension(),
+      "The dimensions of two inputs tensor is not equal ");
+  Tensor _self, result, _accumu;
+  if (check_has_opaque_and_no_padding({self, accumu})) {
+    if (self.numel() != accumu.numel()) {
+      _accumu = accumu.expand_as(self).contiguous();
+    } else {
+      _accumu = accumu;
+    }
+    Tensor tar = DPCPPTensorConvertor::is_opaque_tensor(self) ? self : accumu;
+    auto ctx = AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(tar);
+    auto converter = [&](const Tensor& tensor) {
+      auto tensor_ctx =
+          AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(tensor);
+      if (tensor_ctx.meta() != ctx.meta()) {
+        Tensor tmp =
+            empty_opaque_tensor(ctx.meta(), tensor.options(), c10::nullopt);
+        xpu::oneDNN::reorder(tensor, tmp);
+        return tmp;
+      }
+      return tensor;
+    };
+    _self = converter(self);
+    _accumu = converter(_accumu);
+    result = empty_opaque_tensor(ctx.meta(), _self.options(), c10::nullopt);
+  } else {
+    _self = to_plain_if_needed(self);
+    _accumu = to_plain_if_needed(accumu);
+    result = empty_like(self);
+  }
+  auto iter = TensorIteratorConfig()
+                  .set_check_mem_overlap(true)
+                  .add_output(result)
+                  .add_input(_self)
+                  .add_input(_accumu)
+                  .build();
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "mul_add_scalar",
+      [&]() {
+        auto alpha_scalar = alpha.to<scalar_t>();
+        auto other_scalar = other.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter(
+            iter, [=](scalar_t a, scalar_t b) -> scalar_t {
+              return a * other_scalar + alpha_scalar * b;
+            });
+      });
+  return result;
+}
+
 Tensor mul_add(
     const Tensor& self,
     const Tensor& other,
