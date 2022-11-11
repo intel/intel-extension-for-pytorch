@@ -1617,7 +1617,7 @@ Tensor convolution_binary_mul(
       groups_,
       attr);
   if (!is_fused)
-    output_r = at::AtenIpexTypeXPU::mul_out(output_r, output_r, binary);
+    output_r = at::AtenIpexTypeXPU::mul_out(binary, output_r, output_r);
 
   return output_r;
 }

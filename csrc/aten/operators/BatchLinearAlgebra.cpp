@@ -2779,11 +2779,12 @@ std::tuple<Tensor, Tensor> triangular_solve(
       transpose,
       unitriangular);
 
-  if (self_broadcasted.dim() > 2) {
-    native::batchCheckErrors(infos, "triangular_solve");
-  } else {
-    native::singleCheckErrors(infos.item().toInt(), "triangular_solve");
-  }
+  // TODO: need to rebase 1.13
+  // if (self_broadcasted.dim() > 2) {
+  //   native::batchCheckErrors(infos, "triangular_solve");
+  // } else {
+  //   native::singleCheckErrors(infos.item().toInt(), "triangular_solve");
+  // }
 
   return std::tuple<Tensor, Tensor>(result, clone_A);
 }
