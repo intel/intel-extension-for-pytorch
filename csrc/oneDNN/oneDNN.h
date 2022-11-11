@@ -21,6 +21,3 @@
 #include "Resample.h"
 #include "SoftMax.h"
 #include "Sum.h"
-
-// Quant
-#include "QConv.h"

@@ -57,7 +57,7 @@ struct QuantizeConvConverter {
   at::Tensor call(const at::Tensor& input, Func func) {
     Attr att = func();
     at::Tensor output = quantizedEmptyTensorFromInput(input);
-    output = quantized_convolution(
+    output = convolution(
         output,
         input,
         weight_,
@@ -74,7 +74,7 @@ struct QuantizeConvConverter {
   template <typename Func>
   at::Tensor call(const at::Tensor& input, at::Tensor& output, Func func) {
     Attr att = func();
-    output = quantized_convolution(
+    output = convolution(
         output,
         input,
         weight_,
