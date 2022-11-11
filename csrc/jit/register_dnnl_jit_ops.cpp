@@ -702,6 +702,11 @@ RegisterOperators op({
         AtenIpexTypeXPU::mul_add),
 
     IPEX_JIT_OP_REGISTER(
+        "xpu::mul_add(Tensor self, Scalar other, Tensor accumu, Scalar alpha) -> Tensor",
+        "xpu::mul_add_scalar",
+        AtenIpexTypeXPU::mul_add_scalar),
+
+    IPEX_JIT_OP_REGISTER(
         "xpu::matmul_add(Tensor m1, Tensor m2, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
         "xpu::matmul_add",
         AtenIpexTypeXPU::matmul_add),

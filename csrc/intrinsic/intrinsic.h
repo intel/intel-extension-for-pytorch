@@ -115,6 +115,12 @@ at::Tensor mul_add(
     const Tensor& accumu,
     Scalar alpha);
 
+at::Tensor mul_add_scalar(
+    const Tensor& self,
+    Scalar other,
+    const Tensor& accumu,
+    Scalar alpha);
+
 at::Tensor packed_add(
     at::Tensor& top_half,
     at::Tensor& bot_half,

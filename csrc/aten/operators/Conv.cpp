@@ -104,10 +104,10 @@ Tensor dpcpp_convolution_backward_input(
   TORCH_CHECK(
       3 == ndim || 4 == ndim || 5 == ndim,
       "convolution bwd input only supports 3D, 4D, 5D tensor");
-  auto gy_cl_tag = get_cl_tag_by_ndim(ndim);
+
   // smf: suggest memory format
-  auto smf = onednn_conv_use_channels_last(grad_output, weight)
-      ? gy_cl_tag
+  auto smf = is_smf_channels_last(grad_output) || is_smf_channels_last(weight)
+      ? get_cl_tag_by_ndim(ndim)
       : at::MemoryFormat::Contiguous;
   auto grad_input = at::empty(input_size, grad_output.options(), smf);
 
@@ -124,11 +124,15 @@ Tensor dpcpp_convolution_backward_input(
   auto bias_t =
       conv_double ? dnnl::memory::data_type::f64 : dnnl::memory::data_type::f32;
   auto weight_usr_t = weight_t;
+
+  bool is_channels_last_suggested =
+      using_channels_last_for_conv(grad_output, weight);
+  bool is_onednn_layout_suggested =
+      using_onednn_layout_for_conv(grad_output, weight);
   auto format_any = memory::format_tag::any;
-  auto format_input =
-      conv_src_fmt(ndim, onednn_conv_use_channels_last(grad_output, weight));
-  auto format_weight = conv_wgh_fmt(
-      ndim, groups != 1, onednn_conv_use_channels_last(grad_output, weight));
+  auto format_input = conv_src_fmt(ndim, is_channels_last_suggested);
+  auto format_weight =
+      conv_wgh_fmt(ndim, groups != 1, is_channels_last_suggested);
 
   memory::dims input_tz = grad_input.sizes().vec();
   memory::dims weight_tz =
@@ -148,14 +152,13 @@ Tensor dpcpp_convolution_backward_input(
     bias_t = dnnl::memory::data_type::bf16;
   }
 
-  auto input_md = Settings::I().is_onednn_layout_enabled()
+  auto input_md = is_onednn_layout_suggested
       ? memory::desc(input_tz, data_grad, format_any)
       : memory::desc(input_tz, data_grad, format_input);
-  auto weight_md = (onednn_conv_use_channels_last(grad_output, weight) ||
-                    Settings::I().is_onednn_layout_enabled())
+  auto weight_md = (is_channels_last_suggested || is_onednn_layout_suggested)
       ? memory::desc(weight_tz, weight_t, format_any)
       : memory::desc(weight_tz, weight_t, format_weight);
-  auto output_md = Settings::I().is_onednn_layout_enabled()
+  auto output_md = is_onednn_layout_suggested
       ? memory::desc(output_tz, data_grad, format_any)
       : memory::desc(output_tz, data_grad, format_input);
   auto bias_md =
@@ -197,9 +200,8 @@ Tensor dpcpp_convolution_backward_input(
 
   auto conv_backward_data_pd = convolution_backward_data::primitive_desc(
       conv_backward_data_desc, pattr, engine, conv_forward_pd);
-
   memory grad_output_usr_memory, weight_usr_memory, grad_input_usr_memory;
-  if (!Settings::I().is_onednn_layout_enabled()) {
+  if (!is_onednn_layout_suggested) {
     grad_output_usr_memory = dpcpp_onednn_memory(
         {output_tz, data_grad, format_input}, engine, grad_output.data_ptr());
 
@@ -294,11 +296,11 @@ Tensor dpcpp_convolution_backward_input(
 #endif
       });
 
-  if (!Settings::I().is_onednn_layout_enabled() &&
+  if (!is_onednn_layout_suggested &&
       grad_input_memory != grad_input_usr_memory) {
     xpu::oneDNN::reorder(grad_input_, grad_input);
   } else if (
-      Settings::I().is_onednn_layout_enabled() &&
+      is_onednn_layout_suggested &&
       grad_input_memory != grad_input_usr_memory) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(grad_input_);
     DPCPPTensorContext::set_tensor_ctx(grad_input, std::move(blk_ctx));
@@ -597,6 +599,76 @@ static at::Tensor view3d(const at::Tensor& tensor) {
   return tensor.squeeze(2);
 }
 
+Attr get_onednn_conv_sum_attr(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    Tensor& accumu,
+    float scale,
+    Tensor& output,
+    bool& is_fused) {
+  is_fused = true;
+  Attr attr;
+  if (scale == 0.f)
+    return attr;
+
+  auto ndim = input_r.ndimension();
+  auto output_size = conv_dst_tz(
+      ndim,
+      input_r.sizes(),
+      weight_r.sizes(),
+      padding_,
+      padding_,
+      stride_,
+      dilation_);
+  MemoryFormat mem_fmt = at::MemoryFormat::Contiguous;
+  bool propagate_channels_last =
+      is_smf_channels_last(input_r) || is_smf_channels_last(weight_r);
+  if (propagate_channels_last)
+    mem_fmt = get_cl_tag_by_ndim(ndim);
+
+  Tensor out = at::empty(output_size, input_r.options().memory_format(mem_fmt));
+  if (!xpu::oneDNN::binary_valid(out, accumu)) {
+    is_fused = false;
+    return attr;
+  }
+
+  // For post-sum and post-binary-add, onednn needs sum/binary scale=1.f
+  // Thus we need the following transformation
+  // conv(src, wei) + scale * accumu
+  // scale * (1/scale * conv(src, wei) + sum (or binary))
+  if (scale != 1.f)
+    attr.append_post_eltwise(
+        /* scale */ 1.f,
+        /* alpha */ 1.f / scale,
+        /* beta */ 0.f,
+        attr.kind_with_linear);
+
+  auto accumu_ctx = DPCPPTensorContext::get_tensor_ctx(accumu);
+  if (accumu_ctx.is_plain())
+    accumu = accumu.contiguous(mem_fmt);
+
+  if (accumu.sizes() == output_size) {
+    // If sizes are the same, post sum is used.
+    output = accumu;
+    attr.append_post_sum(/* sum_scale */ 1.f);
+  } else {
+    // If sizes are different, post binary is used.
+    attr.append_post_binary(attr.kind_with_binary_add, accumu);
+  }
+
+  if (scale != 1.f)
+    attr.append_post_eltwise(
+        /* scale */ 1.f,
+        /* alpha */ scale,
+        /* beta */ 0.f,
+        attr.kind_with_linear);
+
+  return attr;
+}
+
 } // namespace impl
 
 using namespace impl;
@@ -614,25 +686,31 @@ Tensor _convolution_out(
     int64_t groups_,
     Attr attr,
     IntArrayRef pad_nd = IntArrayRef({})) {
-  auto output = output_r;
   auto ndim = input_r.ndimension();
   TORCH_CHECK(
       3 == ndim || 4 == ndim || 5 == ndim,
       "convolution only supports 3D, 4D, 5D tensor");
+
+  // decide whether we should propagate channels_last format or not
+  // if one of input and weight is in channels_last, then propagate it to dst
+  bool is_channels_last_suggested =
+      using_channels_last_for_conv(input_r, weight_r);
   auto mem_fmt = get_cl_tag_by_ndim(ndim);
-  auto input = onednn_conv_use_channels_last(input_r, weight_r)
-      ? input_r.contiguous(mem_fmt)
-      : input_r.contiguous();
-  auto weight = onednn_conv_use_channels_last(input_r, weight_r)
-      ? weight_r.contiguous(mem_fmt)
-      : weight_r.contiguous();
+  auto input = is_channels_last_suggested ? input_r.contiguous(mem_fmt)
+                                          : input_r.contiguous();
+  auto weight = is_channels_last_suggested ? weight_r.contiguous(mem_fmt)
+                                           : weight_r.contiguous();
   auto bias = bias_r.contiguous();
+  Tensor output;
+  if (output_r.defined())
+    output = is_channels_last_suggested ? output_r.contiguous(mem_fmt)
+                                        : output_r.contiguous();
+
   auto k = weight.ndimension();
   if (k == input.ndimension() + 1) {
     k = input.ndimension();
   }
   int64_t dim = k - 2;
-
   TORCH_CHECK(dim > 0, "weight should have at least three dimensions");
 
   ConvParams params;
@@ -825,15 +903,15 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
 
   auto cl_tag = get_cl_tag_by_ndim(input_ndim);
   // try best to make sure that suggest memory format is propagated
-  Tensor input_ = (grad_output.suggest_memory_format() == cl_tag ||
-                   input.suggest_memory_format() == cl_tag ||
-                   weight.suggest_memory_format() == cl_tag)
+  Tensor input_ = (suggest_memory_format_dpcpp(grad_output) == cl_tag ||
+                   suggest_memory_format_dpcpp(input) == cl_tag ||
+                   suggest_memory_format_dpcpp(weight) == cl_tag)
       ? input.contiguous(cl_tag)
       : input.contiguous();
 
-  Tensor grad_output_ = (grad_output.suggest_memory_format() == cl_tag ||
-                         input.suggest_memory_format() == cl_tag ||
-                         weight.suggest_memory_format() == cl_tag)
+  Tensor grad_output_ = (suggest_memory_format_dpcpp(grad_output) == cl_tag ||
+                         suggest_memory_format_dpcpp(input) == cl_tag ||
+                         suggest_memory_format_dpcpp(weight) == cl_tag)
       ? grad_output.contiguous(cl_tag)
       : grad_output.contiguous();
 
@@ -1325,15 +1403,20 @@ Tensor convolution_sum(
     int64_t groups_,
     Tensor& accumu,
     Scalar scale) {
-  // only support scale = 1.0f in oneDNN for non-quantized case.
-  TORCH_CHECK(
-      scale.to<float>() == 1.f,
-      "only support convolution sum fusion with sum scale equals to 1");
-  // output = conv_scale * (Conv(input, weight) + bias) + sum_scale * accumu;
-  Attr attr;
-  attr.append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
-  Tensor res = _convolution_out(
+  bool is_fused;
+  Tensor output;
+  Attr attr = get_onednn_conv_sum_attr(
+      input_r,
+      weight_r,
+      stride_,
+      padding_,
+      dilation_,
       accumu,
+      scale.to<float>(),
+      output,
+      is_fused);
+  Tensor res = _convolution_out(
+      output,
       input_r,
       weight_r,
       bias_r,
@@ -1344,6 +1427,8 @@ Tensor convolution_sum(
       {{0, 0}},
       groups_,
       attr);
+  if (!is_fused)
+    res = at::AtenIpexTypeXPU::add_out(res, accumu, 1.f, accumu);
   return res;
 }
 
@@ -1363,15 +1448,20 @@ Tensor _convolution_sum(
     bool allow_tf32,
     Tensor& accumu,
     Scalar scale) {
-  // only support scale = 1.0f in oneDNN for non-quantized case.
-  TORCH_CHECK(
-      scale.to<float>() == 1.f,
-      "only support convolution sum fusion with sum scale equals to 1");
-  // output = conv_scale * (Conv(input, weight) + bias) + sum_scale * accumu;
-  Attr attr;
-  attr.append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
-  return _convolution_out(
+  bool is_fused;
+  Tensor output;
+  Attr attr = get_onednn_conv_sum_attr(
+      input_r,
+      weight_r,
+      stride_,
+      padding_,
+      dilation_,
       accumu,
+      scale.to<float>(),
+      output,
+      is_fused);
+  Tensor res = _convolution_out(
+      output,
       input_r,
       weight_r,
       bias_r,
@@ -1382,6 +1472,9 @@ Tensor _convolution_sum(
       output_padding_,
       groups_,
       attr);
+  if (!is_fused)
+    res = at::AtenIpexTypeXPU::add_out(res, accumu, 1.f, accumu);
+  return res;
 }
 
 Tensor convolution_sum_relu(
@@ -1394,21 +1487,27 @@ Tensor convolution_sum_relu(
     int64_t groups_,
     Tensor& accumu,
     Scalar scale) {
-  // only support scale = 1.0f in oneDNN for non-quantized case.
-  TORCH_CHECK(
-      scale.to<float>() == 1.f,
-      "only support convolution sum fusion with sum scale equals to 1");
-  // output = relu_scale * Relu(conv_scale * (Conv(input, weight) + bias) +
-  // sum_scale * accumu);
-  Attr attr;
-  attr.append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
-  attr.append_post_eltwise( // append post relu
-      /* relu_scale */ 1.f,
-      /* alpha */ 0.f,
-      /* beta */ 0.f,
-      attr.kind_with_relu);
-  return _convolution_out(
+  bool is_fused;
+  Tensor output;
+  Attr attr = get_onednn_conv_sum_attr(
+      input_r,
+      weight_r,
+      stride_,
+      padding_,
+      dilation_,
       accumu,
+      scale.to<float>(),
+      output,
+      is_fused);
+  if (is_fused) {
+    attr.append_post_eltwise( // append post relu
+        /* relu_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_relu);
+  }
+  Tensor res = _convolution_out(
+      output,
       input_r,
       weight_r,
       bias_r,
@@ -1419,6 +1518,11 @@ Tensor convolution_sum_relu(
       {{0, 0}},
       groups_,
       attr);
+  if (!is_fused) {
+    res = at::AtenIpexTypeXPU::add_out(res, accumu, 1.f, accumu);
+    res = at::AtenIpexTypeXPU::relu_(res);
+  }
+  return res;
 }
 
 Tensor _convolution_sum_relu(
@@ -1437,20 +1541,26 @@ Tensor _convolution_sum_relu(
     bool allow_tf32,
     Tensor& accumu,
     Scalar scale) {
-  // only support scale = 1.0f in oneDNN for non-quantized case.
-  TORCH_CHECK(
-      scale.to<float>() == 1.f,
-      "only support convolution sum fusion with sum scale equals to 1");
-  // output = relu_scale * Relu(conv_scale * (Conv(input, weight) + bias) +
-  // sum_scale * accumu);
-  Attr attr;
-  attr.append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
-  attr.append_post_eltwise( // append post relu
-      /* relu_scale */ 1.f,
-      /* alpha */ 0.f,
-      /* beta */ 0.f,
-      attr.kind_with_relu);
-  return _convolution_out(
+  bool is_fused;
+  Tensor output;
+  Attr attr = get_onednn_conv_sum_attr(
+      input_r,
+      weight_r,
+      stride_,
+      padding_,
+      dilation_,
+      accumu,
+      scale.to<float>(),
+      output,
+      is_fused);
+  if (is_fused) {
+    attr.append_post_eltwise( // append post relu
+        /* relu_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_relu);
+  }
+  Tensor res = _convolution_out(
       accumu,
       input_r,
       weight_r,
@@ -1462,6 +1572,11 @@ Tensor _convolution_sum_relu(
       output_padding_,
       groups_,
       attr);
+  if (!is_fused) {
+    res = at::AtenIpexTypeXPU::add_out(res, accumu, 1.f, accumu);
+    res = at::AtenIpexTypeXPU::relu_(res);
+  }
+  return res;
 }
 
 Tensor convolution_binary_mul(
@@ -1473,10 +1588,23 @@ Tensor convolution_binary_mul(
     IntArrayRef dilation_,
     int64_t groups_,
     const Tensor& binary) {
+  auto ndim = input_r.ndimension();
+  auto output_size = conv_dst_tz(
+      ndim,
+      input_r.sizes(),
+      weight_r.sizes(),
+      padding_,
+      padding_,
+      stride_,
+      dilation_);
+  Tensor out = at::empty(output_size, input_r.options());
+  bool is_fused = xpu::oneDNN::binary_valid(out, binary) ? true : false;
   Attr attr;
-  attr.append_post_binary(attr.kind_with_binary_mul, binary);
+  if (is_fused)
+    attr.append_post_binary(attr.kind_with_binary_mul, binary);
+
   Tensor output_r;
-  return _convolution_out(
+  output_r = _convolution_out(
       output_r,
       input_r,
       weight_r,
@@ -1488,6 +1616,10 @@ Tensor convolution_binary_mul(
       {{0, 0}},
       groups_,
       attr);
+  if (!is_fused)
+    output_r = at::AtenIpexTypeXPU::mul_out(output_r, output_r, binary);
+
+  return output_r;
 }
 
 } // namespace AtenIpexTypeXPU

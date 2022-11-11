@@ -19,18 +19,6 @@ using namespace dnnl;
 namespace xpu {
 namespace oneDNN {
 
-enum post_attr {
-  with_relu = 0b01,
-  with_sum = 0b10,
-  with_sigmoid = 0b100,
-  with_bin_mul = 0b1000,
-  with_bin_add = 0b10000,
-  with_bin_sub = 0b100000,
-  with_gelu = 0b1000000,
-  with_mish = 0b10000000,
-  with_linear = 0b100000000,
-};
-
 static inline memory::format_tag get_dnnl_default_format(
     int ndims,
     bool is_channels_last = false,
@@ -472,7 +460,9 @@ static inline bool cat_valid(const TensorList& tensors) {
 }
 
 // judge to use block or plain for Conv
-static inline bool using_onednn_layout_for_conv(const at::Tensor& src) {
+static inline bool using_onednn_layout_for_conv(
+    const at::Tensor& src,
+    const at::Tensor& weight) {
   if (!src.defined() || src.is_sparse()) {
     // suggest plain
     return false;
@@ -488,7 +478,7 @@ static inline bool using_onednn_layout_for_conv(const at::Tensor& src) {
   auto is_auto_transpose = !dpcppSupportFP64();
   auto suggest_weight_block = is_auto_transpose &&
       (c10::InferenceMode::is_enabled() || !at::GradMode::is_enabled()) &&
-      !is_smf_channels_last(src);
+      !is_smf_channels_last(src) && !is_smf_channels_last(weight);
   if (suggest_weight_block) {
     // suggest block
     return true;
@@ -518,6 +508,39 @@ static inline bool using_onednn_layout_for_matmul(const at::Tensor& src) {
 
   // suggest plain
   return false;
+}
+
+static inline bool using_channels_last_for_conv(
+    const at::Tensor& src,
+    const at::Tensor& weight) {
+  if (using_onednn_layout_for_conv(src, weight)) {
+    // suggest block
+    return false;
+  }
+
+  // Convolution modules, unlike binary p-wise operator, have
+  // channels last as the dominating memory format. If both
+  // src and weight are in contiguous memory format, the
+  // operator produces output in contiguous memory format.
+  // Otherwise, output will be in channels last memory format.
+  return (is_smf_channels_last(src) || is_smf_channels_last(weight));
+}
+
+static inline bool using_channels_last_for_onednn_op(const at::Tensor& input) {
+  const auto ndim = input.ndimension();
+  if (ndim == 2) {
+    return false;
+  }
+
+  // if input is blocked format, then pooling will use blocked instead of plain
+  // format
+  auto input_ctx =
+      at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
+  if (!input_ctx.is_plain()) {
+    return false;
+  }
+
+  return is_smf_channels_last(input);
 }
 
 static inline std::vector<int64_t> gen_dummy_input_size_for(

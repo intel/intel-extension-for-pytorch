@@ -26,14 +26,13 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from) {
             /*is_channels_last*/ false,
             /*allow_undef*/ true)};
     if (opaque_md == plain_md) {
-      Tensor to = at::empty(ctx.dims(), from.options(), c10::nullopt);
+      // max_pooling3d bwd case 5D(oneDNN) -> 4D(PyTorch)
+      auto smf = is_smf_channels_last(from)
+          ? get_cl_tag_by_ndim(from.sizes().size())
+          : at::MemoryFormat::Contiguous;
+      Tensor to = at::empty(from.sizes(), from.options(), smf);
       dtype_convert_by_scalar(
           to.data_ptr<int64_t>(), (int32_t*)from.data_ptr(), from.numel());
-
-      // max_pooling3d bwd case 5D(oneDNN) -> 4D(PyTorch)
-      if (from.ndimension() != ctx.dims().size()) {
-        to = to.reshape(from.sizes());
-      }
       return to;
     }
   }
@@ -42,25 +41,29 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from) {
   if (from.scalar_type() == at::ScalarType::Long)
     options = options.dtype(kInt);
 
+  at::MemoryFormat smf = at::MemoryFormat::Contiguous;
+  if (is_smf_channels_last(from)) {
+    smf = get_cl_tag_by_ndim(from.ndimension());
+  }
   // reorder to plain based on current shape
   auto to = !from.is_quantized()
-      ? at::AtenIpexTypeXPU::empty(ctx.dims(), options, c10::nullopt)
+      ? at::AtenIpexTypeXPU::empty(ctx.dims(), options, smf)
       : at::AtenIpexTypeXPU::new_qtensor(ctx.dims(), options, from.quantizer());
   xpu::oneDNN::reorder(from, to);
 
   // permute shape to original shape
   if (!ctx.permution().empty())
-    to = at::native::permute(to, IntArrayRef(ctx.permution())).contiguous();
+    to = at::native::permute(to, IntArrayRef(ctx.permution())).contiguous(smf);
 
   // group convolution case 5D(oneDNN) -> 4D(PyTorch)
   if (from.ndimension() != ctx.dims().size()) {
-    to = to.reshape(from.sizes());
+    to = to.reshape(from.sizes()).contiguous(smf);
   }
 
   // case-2. int32 opaque tensor in block fmt
   // 1. convert to plain 2. copy to int64
   if (from.scalar_type() == at::ScalarType::Long) {
-    Tensor to_ = at::empty(ctx.dims(), from.options(), c10::nullopt);
+    Tensor to_ = at::empty(ctx.dims(), from.options(), smf);
     dtype_convert_by_scalar(
         to_.data_ptr<int64_t>(), to.data_ptr<int32_t>(), to.numel());
     to = to_;

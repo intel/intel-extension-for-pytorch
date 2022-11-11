@@ -1377,8 +1377,9 @@ static void apply_symeig(
 
 template <typename scalar_t>
 static void apply_triangular_solve(
-    Tensor& b,
     Tensor& A,
+    Tensor& B,
+    bool left,
     bool upper,
     bool transpose,
     bool unitriangular) {
@@ -1389,30 +1390,39 @@ static void apply_triangular_solve(
       transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
   oneapi::mkl::diag diag =
       unitriangular ? oneapi::mkl::diag::U : oneapi::mkl::diag::N;
+  oneapi::mkl::side side =
+      left ? oneapi::mkl::side::left : oneapi::mkl::side::right;
 
-  auto n = A.size(-2);
-  auto nrhs = b.size(-1);
+  auto A_data = A.data_ptr<scalar_t>();
+  auto B_data = B.data_ptr<scalar_t>();
+  auto A_mat_stride = native::matrixStride(A);
+  auto B_mat_stride = native::matrixStride(B);
+  auto batch_size = native::batchCount(A);
+
+  auto m = left ? A.size(-1) : B.size(-2);
+  auto n = B.size(-1);
   std::int64_t lda = A.size(-2);
-  std::int64_t ldb = b.size(-2);
-  std::int64_t scratchpadsize =
-      oneapi::mkl::lapack::trtrs_scratchpad_size<scalar_t>(
-          dpcpp_queue, uplo, trans, diag, n, nrhs, lda, ldb);
-  Tensor scratchpad_at = at::empty({scratchpadsize}, A.options());
-  DPCPP_ONEMKL_SUBMIT(
-      dpcpp_queue,
-      oneapi::mkl::lapack::trtrs,
-      dpcpp_queue,
-      uplo,
-      trans,
-      diag,
-      n,
-      nrhs,
-      (scalar_t*)(A.data_ptr()),
-      lda,
-      (scalar_t*)(b.data_ptr()),
-      ldb,
-      (scalar_t*)(scratchpad_at.data_ptr()),
-      scratchpadsize);
+  std::int64_t ldb = B.size(-2);
+  scalar_t alpha = 1.;
+  for (const auto i : c10::irange(batch_size)) {
+    scalar_t* A_working_ptr = &A_data[i * A_mat_stride];
+    scalar_t* B_working_ptr = &B_data[i * B_mat_stride];
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::blas::column_major::trsm,
+        dpcpp_queue,
+        side,
+        uplo,
+        trans,
+        diag,
+        m,
+        n,
+        alpha,
+        A_working_ptr,
+        lda,
+        B_working_ptr,
+        ldb);
+  }
 #else
   AT_ERROR("triangular_solve: oneMKL library not found in compilation");
 #endif
@@ -1420,8 +1430,9 @@ static void apply_triangular_solve(
 
 template <>
 void apply_triangular_solve<c10::complex<float>>(
-    Tensor& b,
     Tensor& A,
+    Tensor& B,
+    bool left,
     bool upper,
     bool transpose,
     bool unitriangular) {
@@ -1432,30 +1443,39 @@ void apply_triangular_solve<c10::complex<float>>(
       transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
   oneapi::mkl::diag diag =
       unitriangular ? oneapi::mkl::diag::U : oneapi::mkl::diag::N;
+  oneapi::mkl::side side =
+      left ? oneapi::mkl::side::left : oneapi::mkl::side::right;
 
-  auto n = A.size(-2);
-  auto nrhs = b.size(-1);
+  auto A_data = A.data_ptr<c10::complex<float>>();
+  auto B_data = B.data_ptr<c10::complex<float>>();
+  auto A_mat_stride = native::matrixStride(A);
+  auto B_mat_stride = native::matrixStride(B);
+  auto batch_size = native::batchCount(A);
+
+  auto m = left ? A.size(-1) : B.size(-2);
+  auto n = B.size(-1);
   std::int64_t lda = A.size(-2);
-  std::int64_t ldb = b.size(-2);
-  std::int64_t scratchpadsize =
-      oneapi::mkl::lapack::trtrs_scratchpad_size<std::complex<float>>(
-          dpcpp_queue, uplo, trans, diag, n, nrhs, lda, ldb);
-  Tensor scratchpad_at = at::empty({scratchpadsize}, A.options());
-  DPCPP_ONEMKL_SUBMIT(
-      dpcpp_queue,
-      oneapi::mkl::lapack::trtrs,
-      dpcpp_queue,
-      uplo,
-      trans,
-      diag,
-      n,
-      nrhs,
-      reinterpret_cast<std::complex<float>*>(A.data_ptr()),
-      lda,
-      reinterpret_cast<std::complex<float>*>(b.data_ptr()),
-      ldb,
-      reinterpret_cast<std::complex<float>*>(scratchpad_at.data_ptr()),
-      scratchpadsize);
+  std::int64_t ldb = B.size(-2);
+  std::complex<float> alpha = 1.f;
+  for (const auto i : c10::irange(batch_size)) {
+    c10::complex<float>* A_working_ptr = &A_data[i * A_mat_stride];
+    c10::complex<float>* B_working_ptr = &B_data[i * B_mat_stride];
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::blas::column_major::trsm,
+        dpcpp_queue,
+        side,
+        uplo,
+        trans,
+        diag,
+        m,
+        n,
+        alpha,
+        reinterpret_cast<std::complex<float>*>(A_working_ptr),
+        lda,
+        reinterpret_cast<std::complex<float>*>(B_working_ptr),
+        ldb);
+  }
 #else
   AT_ERROR("triangular_solve: oneMKL library not found in compilation");
 #endif
@@ -1463,8 +1483,9 @@ void apply_triangular_solve<c10::complex<float>>(
 
 template <>
 void apply_triangular_solve<c10::complex<double>>(
-    Tensor& b,
     Tensor& A,
+    Tensor& B,
+    bool left,
     bool upper,
     bool transpose,
     bool unitriangular) {
@@ -1475,30 +1496,39 @@ void apply_triangular_solve<c10::complex<double>>(
       transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
   oneapi::mkl::diag diag =
       unitriangular ? oneapi::mkl::diag::U : oneapi::mkl::diag::N;
+  oneapi::mkl::side side =
+      left ? oneapi::mkl::side::left : oneapi::mkl::side::right;
 
-  auto n = A.size(-2);
-  auto nrhs = b.size(-1);
+  auto A_data = A.data_ptr<c10::complex<double>>();
+  auto B_data = B.data_ptr<c10::complex<double>>();
+  auto A_mat_stride = native::matrixStride(A);
+  auto B_mat_stride = native::matrixStride(B);
+  auto batch_size = native::batchCount(A);
+
+  auto m = left ? A.size(-1) : B.size(-2);
+  auto n = B.size(-1);
   std::int64_t lda = A.size(-2);
-  std::int64_t ldb = b.size(-2);
-  std::int64_t scratchpadsize =
-      oneapi::mkl::lapack::trtrs_scratchpad_size<std::complex<double>>(
-          dpcpp_queue, uplo, trans, diag, n, nrhs, lda, ldb);
-  Tensor scratchpad_at = at::empty({scratchpadsize}, A.options());
-  DPCPP_ONEMKL_SUBMIT(
-      dpcpp_queue,
-      oneapi::mkl::lapack::trtrs,
-      dpcpp_queue,
-      uplo,
-      trans,
-      diag,
-      n,
-      nrhs,
-      reinterpret_cast<std::complex<double>*>(A.data_ptr()),
-      lda,
-      reinterpret_cast<std::complex<double>*>(b.data_ptr()),
-      ldb,
-      reinterpret_cast<std::complex<double>*>(scratchpad_at.data_ptr()),
-      scratchpadsize);
+  std::int64_t ldb = B.size(-2);
+  std::complex<double> alpha = 1.;
+  for (const auto i : c10::irange(batch_size)) {
+    c10::complex<double>* A_working_ptr = &A_data[i * A_mat_stride];
+    c10::complex<double>* B_working_ptr = &B_data[i * B_mat_stride];
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::blas::column_major::trsm,
+        dpcpp_queue,
+        side,
+        uplo,
+        trans,
+        diag,
+        m,
+        n,
+        alpha,
+        reinterpret_cast<std::complex<double>*>(A_working_ptr),
+        lda,
+        reinterpret_cast<std::complex<double>*>(B_working_ptr),
+        ldb);
+  }
 #else
   AT_ERROR("triangular_solve: oneMKL library not found in compilation");
 #endif
@@ -2647,19 +2677,69 @@ std::tuple<Tensor, Tensor> _symeig_helper(
 }
 
 std::tuple<Tensor, Tensor> _triangular_solve_helper(
-    const Tensor& self,
-    const Tensor& A,
+    Tensor& result,
+    Tensor& clone_input,
+    Tensor& infos,
+    const Tensor& input,
+    const Tensor& other,
     bool upper,
     bool transpose,
     bool unitriangular) {
-  auto self_working_copy = native::cloneBatchedColumnMajor(self);
-  auto A_working_copy = native::cloneBatchedColumnMajor(A);
+  // These internal asserts make explicit the assumptions in the implementation
+  // Error check with the actual error messages are done on the higher level of
+  // the hierarchy of calls
+  TORCH_INTERNAL_ASSERT(input.dim() >= 2);
+  TORCH_INTERNAL_ASSERT(input.size(-2) == input.size(-1));
+
+  TORCH_INTERNAL_ASSERT(input.device() == other.device());
+  TORCH_INTERNAL_ASSERT(input.device() == result.device());
+  TORCH_INTERNAL_ASSERT(input.device() == clone_input.device());
+  TORCH_INTERNAL_ASSERT(input.device() == infos.device());
+
+  TORCH_INTERNAL_ASSERT(input.scalar_type() == other.scalar_type());
+  TORCH_INTERNAL_ASSERT(input.scalar_type() == result.scalar_type());
+  TORCH_INTERNAL_ASSERT(input.scalar_type() == clone_input.scalar_type());
+
+  TORCH_INTERNAL_ASSERT(infos.scalar_type() == at::kInt);
+  TORCH_INTERNAL_ASSERT(
+      infos.numel() == std::max<int64_t>(1, native::batchCount(input)));
+  TORCH_INTERNAL_ASSERT(infos.is_contiguous());
+
+  // if 'result' has no elements we can modify it
+  if (result.numel() == 0) {
+    result.resize_(other.transpose(-2, -1).sizes(), MemoryFormat::Contiguous);
+    result.transpose_(
+        -2, -1); // make 'result' to have Fortran contiguous memory layout
+  }
+
+  // if 'clone_input' has no elements we can modify it
+  if (clone_input.numel() == 0) {
+    clone_input.resize_(
+        input.transpose(-2, -1).sizes(), MemoryFormat::Contiguous);
+    clone_input.transpose_(-2, -1);
+  }
+
+  // 'result' and 'clone_input' must be in batched column major order
+  TORCH_INTERNAL_ASSERT(result.transpose(-2, -1).is_contiguous());
+  TORCH_INTERNAL_ASSERT(clone_input.transpose(-2, -1).is_contiguous());
+
+  TORCH_INTERNAL_ASSERT(result.sizes().equals(other.sizes()));
+  TORCH_INTERNAL_ASSERT(clone_input.sizes().equals(input.sizes()));
+  result.copy_(other);
+  clone_input.copy_(input);
+
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
-      self.scalar_type(), "triangular_solve_xpu", [&] {
+      clone_input.scalar_type(), "triangular_solve_xpu", [&] {
         impl::apply_triangular_solve<scalar_t>(
-            self_working_copy, A_working_copy, upper, transpose, unitriangular);
+            clone_input,
+            result,
+            /*left=*/true,
+            upper,
+            transpose,
+            unitriangular);
       });
-  return std::tuple<Tensor, Tensor>(self_working_copy, A_working_copy);
+
+  return std::tuple<Tensor, Tensor>(result, clone_input);
 }
 
 // Supports arbitrary batch dimensions for self and A
@@ -2671,19 +2751,41 @@ std::tuple<Tensor, Tensor> triangular_solve(
     bool unitriangular) {
   TORCH_CHECK(
       self.dim() >= 2,
-      "b should have at least 2 dimensions, but has ",
+      "torch.triangular_solve: Expected b to have at least 2 dimensions, but it has ",
       self.dim(),
       " dimensions instead");
   TORCH_CHECK(
       A.dim() >= 2,
-      "u should have at least 2 dimensions, but has ",
+      "torch.triangular_solve: Expected A to have at least 2 dimensions, but it has ",
       A.dim(),
       " dimensions instead");
   Tensor self_broadcasted, A_broadcasted;
   std::tie(self_broadcasted, A_broadcasted) =
       native::_linalg_broadcast_batch_dims(self, A, "triangular_solve");
-  return at::AtenIpexTypeXPU::_triangular_solve_helper(
-      self_broadcasted, A_broadcasted, upper, transpose, unitriangular);
+
+  Tensor result = at::empty({0}, self.options());
+  Tensor clone_A = at::empty({0}, self.options());
+  Tensor infos = at::zeros(
+      {std::max<int64_t>(1, native::batchCount(self_broadcasted))},
+      self.options().dtype(kInt));
+
+  at::AtenIpexTypeXPU::_triangular_solve_helper(
+      result,
+      clone_A,
+      infos,
+      A_broadcasted,
+      self_broadcasted,
+      upper,
+      transpose,
+      unitriangular);
+
+  if (self_broadcasted.dim() > 2) {
+    native::batchCheckErrors(infos, "triangular_solve");
+  } else {
+    native::singleCheckErrors(infos.item().toInt(), "triangular_solve");
+  }
+
+  return std::tuple<Tensor, Tensor>(result, clone_A);
 }
 
 std::tuple<Tensor&, Tensor&> triangular_solve_out(
@@ -2695,9 +2797,8 @@ std::tuple<Tensor&, Tensor&> triangular_solve_out(
     Tensor& result,
     Tensor& clone_A) {
   Tensor result_tmp, clone_A_tmp;
-  std::tie(result_tmp, clone_A_tmp) =
-      at::AtenIpexTypeXPU::_triangular_solve_helper(
-          self, A, upper, transpose, unitriangular);
+  std::tie(result_tmp, clone_A_tmp) = at::AtenIpexTypeXPU::triangular_solve(
+      self, A, upper, transpose, unitriangular);
   result.resize_as_(result_tmp).copy_(result_tmp);
   clone_A.resize_as_(clone_A_tmp).copy_(clone_A_tmp);
   return std::tuple<Tensor&, Tensor&>(result, clone_A);
