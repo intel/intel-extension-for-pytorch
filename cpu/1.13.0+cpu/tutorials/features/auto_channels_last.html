@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auto Channels Last &mdash; intel_extension_for_pytorch 1.13.0+cpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Auto Mixed Precision (AMP)" href="amp.html" />
+    <link rel="prev" title="Channels Last" href="nhwc.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../../versions.html">1.13.0+cpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ease-of-use-python-api">Ease-of-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#isa-dynamic-dispatching">ISA Dynamic Dispatching</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#auto-channels-last">Auto Channels Last</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="nhwc.html">Channels Last</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Auto Channels Last</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ease-of-use-auto-channels-last-api">Ease-of-use auto channels last API</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#default">default</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#enable">enable</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#disable">disable</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#known-issue">Known issue</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-optimization">Graph Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#operator-optimization">Operator Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#runtime-extension">Runtime Extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#int8-quantization">INT8 Quantization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#codeless-optimization-experimental-new-feature-in-1-13-0">Codeless Optimization (Experimental, <em>NEW feature in 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-capture-experimental-new-feature-in-1-13-0">Graph Capture (Experimental, <em>NEW feature in 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#hypertune-experimental-new-feature-in-1-13-0">HyperTune (Experimental, <em>NEW feature in 1.13.0</em>)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../features.html">Features</a> &raquo;</li>
+      <li>Auto Channels Last</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/auto_channels_last.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="auto-channels-last">
+<h1>Auto Channels Last<a class="headerlink" href="#auto-channels-last" title="Permalink to this heading"></a></h1>
+<p>Channels last memory format is known to have performance advantage over channels first memory format. Refer to <a class="reference internal" href="nhwc.html"><span class="doc">Channels Last</span></a> for details.
+Intel® Extension for PyTorch* automatically converts the model to channels last memory format by default when users optimize their model with <code class="docutils literal notranslate"><span class="pre">ipex.optimize(model)</span></code>.</p>
+</section>
+<section id="ease-of-use-auto-channels-last-api">
+<h1>Ease-of-use auto channels last API<a class="headerlink" href="#ease-of-use-auto-channels-last-api" title="Permalink to this heading"></a></h1>
+<section id="default">
+<h2>default<a class="headerlink" href="#default" title="Permalink to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">)</span> <span class="c1"># by default, model is channels last</span>
+</pre></div>
+</div>
+</section>
+<section id="enable">
+<h2>enable<a class="headerlink" href="#enable" title="Permalink to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ipex</span><span class="o">.</span><span class="n">enable_auto_channels_last</span><span class="p">()</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">)</span> <span class="c1"># enable, model is channels last</span>
+</pre></div>
+</div>
+</section>
+<section id="disable">
+<h2>disable<a class="headerlink" href="#disable" title="Permalink to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ipex</span><span class="o">.</span><span class="n">disable_auto_channels_last</span><span class="p">()</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">)</span> <span class="c1"># disable, model is channels first </span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="known-issue">
+<h1>Known issue<a class="headerlink" href="#known-issue" title="Permalink to this heading"></a></h1>
+<p>For broad models, channels last memory format brings performance boost over channels first memory format. However, for few use cases, this may bring performance regression. If performance regression is observed, we recommend to feed sample input data to <code class="docutils literal notranslate"><span class="pre">ipex.optimize(model,</span> <span class="pre">sample_input=...)</span></code>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">sample_input</span><span class="o">=...</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="nhwc.html" class="btn btn-neutral float-left" title="Channels Last" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="amp.html" class="btn btn-neutral float-right" title="Auto Mixed Precision (AMP)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

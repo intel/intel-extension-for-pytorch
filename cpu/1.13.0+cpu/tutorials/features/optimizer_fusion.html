@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Optimizer Fusion &mdash; intel_extension_for_pytorch 1.13.0+cpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Split SGD" href="split_sgd.html" />
+    <link rel="prev" title="Graph Optimization" href="graph_optimization.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../../versions.html">1.13.0+cpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ease-of-use-python-api">Ease-of-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#isa-dynamic-dispatching">ISA Dynamic Dispatching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-channels-last">Auto Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-optimization">Graph Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#operator-optimization">Operator Optimization</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Optimizer Fusion</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#operation-fusion">Operation Fusion</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="split_sgd.html">Split SGD</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#runtime-extension">Runtime Extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#int8-quantization">INT8 Quantization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#codeless-optimization-experimental-new-feature-in-1-13-0">Codeless Optimization (Experimental, <em>NEW feature in 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-capture-experimental-new-feature-in-1-13-0">Graph Capture (Experimental, <em>NEW feature in 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#hypertune-experimental-new-feature-in-1-13-0">HyperTune (Experimental, <em>NEW feature in 1.13.0</em>)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../features.html">Features</a> &raquo;</li>
+      <li>Optimizer Fusion</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/optimizer_fusion.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="optimizer-fusion">
+<h1>Optimizer Fusion<a class="headerlink" href="#optimizer-fusion" title="Permalink to this heading"></a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading"></a></h2>
+<p>As with TorchScript, operation fusion reduces the number of operators that will be executed, and reduces overhead time. This methodology is also applied in ipex optimizer Optimization. We support Lamb/Adagrad/SGD fusion for both FP32/BF16(Split) at current stage.</p>
+<p>Let’s use <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.optim.Adagrad.html?highlight=adagrad#torch.optim.Adagrad">adagrad update</a> as an example.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>    <span class="k">if</span> <span class="n">weight_decay</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">grad</span> <span class="o">=</span> <span class="n">grad</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">weight_decay</span><span class="p">)</span>
+    <span class="n">clr</span> <span class="o">=</span> <span class="n">lr</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="n">step</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">lr_decay</span><span class="p">)</span>
+    <span class="n">state_sum</span><span class="o">.</span><span class="n">addcmul_</span><span class="p">(</span><span class="n">grad</span><span class="p">,</span> <span class="n">grad</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">std</span> <span class="o">=</span> <span class="n">state_sum</span><span class="o">.</span><span class="n">sqrt</span><span class="p">()</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">eps</span><span class="p">)</span>
+    <span class="n">param</span><span class="o">.</span><span class="n">addcdiv_</span><span class="p">(</span><span class="n">grad</span><span class="p">,</span> <span class="n">std</span><span class="p">,</span> <span class="n">value</span><span class="o">=-</span><span class="n">clr</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="operation-fusion">
+<h2>Operation Fusion<a class="headerlink" href="#operation-fusion" title="Permalink to this heading"></a></h2>
+<p>One problem of the native implementation above is that we need to access the whole storage of “grad”, “parameters”, and “state sum” several times. For example, we need to access the whole storage of “parameters” and “grad” at the first clause. For large topologies, it is possible that the “grad” and “parameters” cannot be stored on the onboard CPU cache. When we need to access the storage of “grad” again when executing the third clause, the processor must read data out from memory again instead of the more efficient onboard high speed CPU cache. This is a memory-bound bottle neck preventing good performance.</p>
+<p>Fusion is the methodology to solve this problem. Since the 5 clauses in the pseudo code are all element-wise operations. We can fuse them into a single one, like the pseudo code below.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>   <span class="n">adagrad_fused_step</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">grad</span><span class="p">,</span> <span class="n">state_sum</span><span class="p">,</span> <span class="o">...</span><span class="p">(</span><span class="n">other</span> <span class="n">args</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>In our fused operators, we can separate the storage of  “grad”, “parameters” and “state sum” in several groups and ensure each group is small enough to be stored in the cache. The pseudo code below illustrates our execution process.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>  <span class="n">grad</span> <span class="o">=</span> <span class="p">(</span><span class="n">grad0</span><span class="p">,</span> <span class="n">grad1</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">grad_n</span><span class="p">)</span>
+  <span class="n">param</span> <span class="o">=</span> <span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">param</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">param_n</span><span class="p">)</span>
+  <span class="n">state_sum</span> <span class="o">=</span> <span class="p">(</span><span class="n">state_sum</span><span class="p">,</span> <span class="n">state_sum</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">state_sum_n</span><span class="p">)</span>
+  <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+    <span class="n">adagrad_step</span><span class="p">(</span><span class="n">grad_i</span><span class="p">,</span> <span class="n">param_i</span><span class="p">,</span> <span class="n">state_sum_i</span><span class="p">,</span> <span class="o">...</span><span class="p">(</span><span class="n">other_args</span><span class="p">))</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="graph_optimization.html" class="btn btn-neutral float-left" title="Graph Optimization" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="split_sgd.html" class="btn btn-neutral float-right" title="Split SGD" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

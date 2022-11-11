@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>INT8 Recipe Tuning API (Experimental) &mdash; intel_extension_for_pytorch 1.13.0+cpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Codeless Optimization (Experimental)" href="codeless_optimization.html" />
+    <link rel="prev" title="Intel® Extension for PyTorch* optimizations for quantization" href="int8_overview.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../../versions.html">1.13.0+cpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ease-of-use-python-api">Ease-of-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#isa-dynamic-dispatching">ISA Dynamic Dispatching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-channels-last">Auto Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-optimization">Graph Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#operator-optimization">Operator Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#runtime-extension">Runtime Extension</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#int8-quantization">INT8 Quantization</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="int8_overview.html">Intel® Extension for PyTorch* optimizations for quantization</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">INT8 Recipe Tuning API (Experimental)</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#usage-example">Usage Example</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#codeless-optimization-experimental-new-feature-in-1-13-0">Codeless Optimization (Experimental, <em>NEW feature in 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-capture-experimental-new-feature-in-1-13-0">Graph Capture (Experimental, <em>NEW feature in 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#hypertune-experimental-new-feature-in-1-13-0">HyperTune (Experimental, <em>NEW feature in 1.13.0</em>)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../features.html">Features</a> &raquo;</li>
+      <li>INT8 Recipe Tuning API (Experimental)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/int8_recipe_tuning_api.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="int8-recipe-tuning-api-experimental">
+<h1>INT8 Recipe Tuning API (Experimental)<a class="headerlink" href="#int8-recipe-tuning-api-experimental" title="Permalink to this heading"></a></h1>
+<p>This <a class="reference external" href="../api_doc.html#ipex.quantization.autotune">new API</a> <code class="docutils literal notranslate"><span class="pre">ipex.quantization.autotune</span></code> supports INT8 recipe tuning by using Intel® Neural Compressor as the backend in Intel® Extension for PyTorch*. In general, we provid default recipe in Intel® Extension for PyTorch*, and we still recommend users to try out the default recipe first without bothering tuning. If the default recipe doesn’t bring about desired accuracy, users can use this API to tune for a more advanced receipe.</p>
+<p>Users need to provide a prepared model and some parameters required for tuning. The API will return a tuned model with advanced recipe.</p>
+<section id="usage-example">
+<h2>Usage Example<a class="headerlink" href="#usage-example" title="Permalink to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">resnet50</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">data_loader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span>
+        <span class="n">datasets</span><span class="o">.</span><span class="n">ImageFolder</span><span class="p">(</span><span class="n">valdir</span><span class="p">,</span> <span class="n">transforms</span><span class="o">.</span><span class="n">Compose</span><span class="p">([</span>
+            <span class="n">transforms</span><span class="o">.</span><span class="n">Resize</span><span class="p">(</span><span class="mi">256</span><span class="p">),</span>
+            <span class="n">transforms</span><span class="o">.</span><span class="n">CenterCrop</span><span class="p">(</span><span class="mi">224</span><span class="p">),</span>
+            <span class="n">transforms</span><span class="o">.</span><span class="n">ToTensor</span><span class="p">(),</span>
+            <span class="n">normalize</span><span class="p">,</span>
+        <span class="p">])),</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">num_workers</span><span class="o">=</span><span class="n">workers</span><span class="p">,</span> <span class="n">pin_memory</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># prepare model, do conv+bn folding, and init model quant_state.</span>
+<span class="n">qconfig</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">default_static_qconfig</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span>
+<span class="n">prepared_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">qconfig</span><span class="p">,</span> <span class="n">example_inputs</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="c1">######################## recipe tuning with INC ########################</span>
+<span class="k">def</span> <span class="nf">eval</span><span class="p">(</span><span class="n">prepared_model</span><span class="p">):</span>
+    <span class="c1"># return accuracy value</span>
+    <span class="k">return</span> <span class="n">evaluate</span><span class="p">(</span><span class="n">prepared_model</span><span class="p">,</span> <span class="n">data_loader</span><span class="p">)</span>
+<span class="n">tuned_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">autotune</span><span class="p">(</span><span class="n">prepared_model</span><span class="p">,</span> <span class="n">data_loader</span><span class="p">,</span> <span class="nb">eval</span><span class="p">,</span> <span class="n">sampling_size</span><span class="o">=</span><span class="p">[</span><span class="mi">100</span><span class="p">],</span> 
+        <span class="n">accuracy_criterion</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;relative&#39;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">},</span> <span class="n">tuning_time</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="c1">########################################################################</span>
+
+<span class="c1"># run tuned model</span>
+<span class="n">convert_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">tuned_model</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">convert_model</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+    <span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">traced_model</span><span class="p">)</span>
+    <span class="n">traced_model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+<span class="c1"># save tuned qconfig file</span>
+<span class="n">tuned_model</span><span class="o">.</span><span class="n">save_qconf_summary</span><span class="p">(</span><span class="n">qconf_summary</span> <span class="o">=</span> <span class="s2">&quot;tuned_conf.json&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="int8_overview.html" class="btn btn-neutral float-left" title="Intel® Extension for PyTorch* optimizations for quantization" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="codeless_optimization.html" class="btn btn-neutral float-right" title="Codeless Optimization (Experimental)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
