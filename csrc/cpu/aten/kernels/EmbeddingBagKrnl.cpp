@@ -117,13 +117,13 @@ static inline at::Tensor expand_values_if_needed(const at::Tensor& values) {
 static inline at::Tensor _sparse_coo_tensor_unsafe(
     const at::Tensor& indices,
     const at::Tensor& values_,
-    c10::ArrayRef<int64_t> size,
+    c10::SymIntArrayRef size,
     const at::TensorOptions& options) {
   at::Tensor values = expand_values_if_needed(values_);
   assert(options.has_layout() && options.layout() == c10::kSparse);
   int64_t sparse_dim = indices.size(0);
   int64_t dense_dim = values.dim() - 1;
-  return at::native::new_with_dims_and_tensor_sparse(
+  return at::native::new_with_dims_and_tensor_sparse_symint(
       sparse_dim,
       dense_dim,
       size,
