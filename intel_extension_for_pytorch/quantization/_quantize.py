@@ -63,7 +63,7 @@ def convert(
         inplace: (bool): It will change the given model in-place if True. The default value is ``False``.
 
     Returns:
-        torch.torch.nn.Module
+        torch.nn.Module
     """
     assert isinstance(model, torch.nn.Module), "Only support nn.Module convert for quantization path"
     assert hasattr(model, 'q_config'), "Please do prepare the model before doing convert"

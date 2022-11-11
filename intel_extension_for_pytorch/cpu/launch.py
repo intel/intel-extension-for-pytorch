@@ -35,13 +35,13 @@ For memory management, it configures NUMA binding and preload optimized memory a
 
 ::
 
-   >>> python -m intel_extension_for_pytorch.cpu.launch --throughput_mode script.py args
+   >>> ipexrun --throughput_mode script.py args
 
 2. Run single-instance inference or training on a single CPU node.
 
 ::
 
-   >>> python -m intel_extension_for_pytorch.cpu.launch --node_id 1 script.py args
+   >>> ipexrun --node_id 1 script.py args
 
 *** Multi-instance inference ***
 
@@ -50,12 +50,12 @@ For memory management, it configures NUMA binding and preload optimized memory a
    --ninstances and  --ncore_per_instance should be set.
 
 
-   >>> python -m intel_extension_for_pytorch.cpu.launch -- python_script args
+   >>> ipexrun -- python_script args
 
    eg: on CLX8280 with 14 instance, 4 cores per instance
 ::
 
-   >>> python -m intel_extension_for_pytorch.cpu.launch  --ninstances 14 --ncore_per_instance 4 python_script args
+   >>> ipexrun  --ninstances 14 --ncore_per_instance 4 python_script args
 
 2. Run single-instance inference among multiple instances.
    By default, runs all ninstances. If you want to independently run a single instance among ninstances, specify instance_idx.
@@ -63,17 +63,17 @@ For memory management, it configures NUMA binding and preload optimized memory a
    eg: run 0th instance among SKX with 2 instance (i.e., numactl -C 0-27)
 ::
 
-   >>> python -m intel_extension_for_pytorch.cpu.launch  --ninstances 2 --instance_idx 0 python_script args
+   >>> ipexrun  --ninstances 2 --instance_idx 0 python_script args
 
    eg: run 1st instance among SKX with 2 instance (i.e., numactl -C 28-55)
 ::
 
-   >>> python -m intel_extension_for_pytorch.cpu.launch  --ninstances 2 --instance_idx 1 python_script args
+   >>> ipexrun  --ninstances 2 --instance_idx 1 python_script args
 
    eg: run 0th instance among SKX with 2 instance, 2 cores per instance, first four cores (i.e., numactl -C 0-1)
 ::
 
-   >>> python -m intel_extension_for_pytorch.cpu.launch  --core_list "0, 1, 2, 3" --ninstances 2 --ncore_per_instance 2 --instance_idx 0 python_script args
+   >>> ipexrun  --core_list "0, 1, 2, 3" --ninstances 2 --ncore_per_instance 2 --instance_idx 0 python_script args
 
 *** Distributed Training ***
 
@@ -103,7 +103,7 @@ rank 0: *(IP: 192.168.10.10, and has a free port: 29500)*
 
 ::
 
-    >>> python -m intel_extension_for_pytorch.cpu.launch --distributed --nproc_per_node=xxx
+    >>> ipexrun --distributed --nproc_per_node=xxx
                --nnodes=2 --hostfile hostfile python_sript --arg1 --arg2 --arg3
                and all other arguments of your training script)
 
@@ -112,7 +112,7 @@ rank 0: *(IP: 192.168.10.10, and has a free port: 29500)*
 
 ::
 
-    >>> python -m intel_extension_for_pytorch.cpu.launch --help
+    >>> ipexrun --help
 
 *** Memory allocator  ***
 
@@ -796,14 +796,14 @@ def parse_args():
                                         "NUMA binding and preload optimized memory allocation library (e.g. tcmalloc, jemalloc) "
                                         "\n################################# Basic usage ############################# \n"
                                         "\n 1. single instance\n"
-                                        "\n   >>> python -m intel_extension_for_pytorch.cpu.launch python_script args \n"
+                                        "\n   >>> ipexrun python_script args \n"
                                         "\n2. multi-instance \n"
-                                        "\n    >>> python -m intel_extension_for_pytorch.cpu.launch --ninstances xxx --ncore_per_instance xx python_script args\n"
+                                        "\n    >>> ipexrun --ninstances xxx --ncore_per_instance xx python_script args\n"
                                         "\n3. Single-Node multi-process distributed training\n"
                                         "\n    >>> python  -m intel_extension_for_pytorch.cpu.launch --distributed  python_script args\n"
                                         "\n4. Multi-Node multi-process distributed training: (e.g. two nodes)\n"
                                         "\n   rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*\n"
-                                        "\n   >>> python -m intel_extension_for_pytorch.cpu.launch --distributed --nproc_per_node=2\n"
+                                        "\n   >>> ipexrun --distributed --nproc_per_node=2\n"
                                         "\n       --nnodes=2 --hostfile hostfile python_script args\n"
                                         "\n############################################################################# \n",
                                         formatter_class=RawTextHelpFormatter)

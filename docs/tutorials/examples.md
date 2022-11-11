@@ -1,6 +1,8 @@
 Examples
 ========
 
+**_NOTE:_** Check individual feature page for examples of feature usage. All features are listed in the [feature page](./features.rst).
+
 ## Training
 
 ### Single-instance Training
@@ -611,4 +613,4 @@ $ ldd example-app
 
 ## Model Zoo
 
-Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/pytorch-r1.12-models). A bunch of PyTorch use cases for benchmarking are also available on the [GitHub page](https://github.com/IntelAI/models/tree/pytorch-r1.12-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
+Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/pytorch-r1.13-models). A bunch of PyTorch use cases for benchmarking are also available on the [GitHub page](https://github.com/IntelAI/models/tree/pytorch-r1.13-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
