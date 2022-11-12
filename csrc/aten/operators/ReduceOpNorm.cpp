@@ -281,10 +281,11 @@ Tensor& renorm_out(
     const Scalar& maxnorm,
     Tensor& out) {
   TORCH_CHECK(!self.is_sparse(), "renorm(sycl_sparse) is not supported.");
-  TORCH_CHECK(dim >= 0 && dim < self.dim(), "invalid dimension dim=", dim);
   TORCH_CHECK(p.toFloat() > 0, "non-positive-norm not supported");
   TORCH_CHECK(self.dim() > 1, "need at least 2 dimensions, got ", self.dim());
 
+  auto self_sizes = self.sizes();
+  dim = c10::maybe_wrap_dim(dim, self_sizes.size());
   auto norm_vec_sz = self.size(dim);
   Tensor norm = at::empty(norm_vec_sz, self.options());
   at::AtenIpexTypeXPU::norm_out(
