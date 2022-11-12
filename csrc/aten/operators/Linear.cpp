@@ -1,5 +1,5 @@
+#include "Linear.h"
 #include <torch/library.h>
-#include "BlasImpl.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -11,69 +11,58 @@ struct LinearConverter {
     is_fused_ = false;
   }
 
-  // linear with accumul and post-ops
+  // linear_out with post-ops
   template <typename Func>
-  Tensor call(
+  void call(
       const Tensor& input,
       const Tensor& weight,
       const Tensor& bias,
-      const Tensor& accumul,
+      Tensor& result,
       Func func) {
-    const auto input_sizes = input.sizes();
-    const auto weight_sizes = weight.sizes();
-    std::vector<int64_t> output_sizes = {
-        input_sizes[0], input_sizes[1], weight_sizes[1]};
-    auto result = at::empty({0}, input.options());
+    // For those weight, which has been prepacked for linear through
+    // torch.xpu.optimize, the shape both in weight tensorimpl and metadata are
+    // matched, so there is no permution operation happened for context, thus
+    // the permution().size() will be zero, which means the transpose has
+    // happened through prepack, so there is no need to do transpose again here.
+    // If the permutation has elements, that means the shape in weight wrapper
+    // is not matched with the meta context, so the tranpose is not happened and
+    // it is needed here.
+    auto weight_ctx =
+        at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(weight);
+    bool m2_trans = (!weight_ctx.is_plain()) &&
+        (weight_ctx.permution().size() ? false : true);
 
     Attr attr = func();
     Tensor _bias = bias.defined() ? bias : at::Tensor();
     if (input.dim() == 2) {
       is_fused_ = true;
-      impl::onednn_matmul(result, input, weight, _bias, accumul, false, attr);
-      return result;
+      impl::onednn_matmul(result, input, weight, _bias, result, m2_trans, attr);
+      return;
     }
 
     if (input.dim() == 3 && input.is_contiguous()) {
       // Also hit the fused path for contiguous 3D input.
       is_fused_ = true;
       const auto input_sizes = input.sizes();
+      const auto weight_sizes = weight.sizes();
+      std::vector<int64_t> output_sizes = {
+          input_sizes[0], input_sizes[1], weight_sizes[1]};
       auto input_view =
           input.view({input_sizes[0] * input_sizes[1], input_sizes[2]});
-      auto accumul_view = accumul;
-      if (accumul.defined()) {
-        accumul_view =
-            accumul.view({output_sizes[0] * output_sizes[1], output_sizes[2]});
+      if (result.defined()) {
+        result =
+            result.view({output_sizes[0] * output_sizes[1], output_sizes[2]});
       }
       impl::onednn_matmul(
-          result, input_view, weight, _bias, accumul_view, false, attr);
-      return result.view({input_sizes[0], input_sizes[1], result.size(1)});
+          result, input_view, weight, _bias, result, m2_trans, attr);
+      result = result.view({input_sizes[0], input_sizes[1], result.size(1)});
+      return;
     }
 
-    auto output = at::matmul(input, weight.t());
+    result = at::matmul(input, weight.t());
     if (bias.defined()) {
-      output.add_(bias);
+      result.add_(bias);
     }
-    return output;
-  }
-
-  // linear with post-ops
-  template <typename Func>
-  Tensor call(
-      const Tensor& input,
-      const Tensor& weight,
-      const Tensor& bias,
-      Func func) {
-    Tensor accumul = at::Tensor();
-    return call(input, weight, bias, accumul, func);
-  }
-
-  // linear
-  Tensor call(const Tensor& input, const Tensor& weight, const Tensor& bias) {
-    auto post_op = [=]() {
-      Attr attr;
-      return attr;
-    };
-    return call(input, weight, bias, post_op);
   }
 
   bool is_fused() {
@@ -98,7 +87,8 @@ struct LinearConverter {
           attr.kind_with_##func);                                          \
       return attr;                                                         \
     };                                                                     \
-    Tensor output = linear_wrapper.call(input, weight, bias, post_op);     \
+    Tensor output;                                                         \
+    linear_wrapper.call(input, weight, bias, output, post_op);             \
     if (!linear_wrapper.is_fused()) {                                      \
       output = at::func(output);                                           \
     }                                                                      \
@@ -133,7 +123,8 @@ Tensor linear_silu(
         attr.kind_with_swish);
     return attr;
   };
-  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  Tensor output;
+  linear_wrapper.call(input, weight, bias, output, post_op);
   if (!linear_wrapper.is_fused()) {
     output = at::silu(output);
   }
@@ -156,7 +147,8 @@ Tensor linear_gelu(
         attr.kind_with_gelu);
     return attr;
   };
-  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  Tensor output;
+  linear_wrapper.call(input, weight, bias, output, post_op);
   if (!linear_wrapper.is_fused()) {
     output = at::AtenIpexTypeXPU::gelu_out(output, output);
   }
@@ -179,7 +171,8 @@ Tensor linear_log_sigmoid(
         attr.kind_with_logsigmoid);
     return attr;
   };
-  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  Tensor output;
+  linear_wrapper.call(input, weight, bias, output, post_op);
   if (!linear_wrapper.is_fused()) {
     output = at::log_sigmoid(output);
   }
@@ -202,7 +195,8 @@ Tensor linear_hardsigmoid(
         attr.kind_with_hardsigmoid);
     return attr;
   };
-  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  Tensor output;
+  linear_wrapper.call(input, weight, bias, output, post_op);
   if (!linear_wrapper.is_fused()) {
     output = at::hardsigmoid(output);
   }
@@ -226,7 +220,8 @@ Tensor linear_pow(
         attr.kind_with_pow);
     return attr;
   };
-  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  Tensor output;
+  linear_wrapper.call(input, weight, bias, output, post_op);
   if (!linear_wrapper.is_fused()) {
     output = at::pow(output, exponent);
   }
@@ -250,7 +245,8 @@ Tensor linear_leaky_relu(
         attr.kind_with_relu);
     return attr;
   };
-  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  Tensor output;
+  linear_wrapper.call(input, weight, bias, output, post_op);
   if (!linear_wrapper.is_fused()) {
     output = at::leaky_relu(output, negative_slope);
   }
@@ -275,7 +271,8 @@ Tensor linear_hardtanh(
         attr.kind_with_clip);
     return attr;
   };
-  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  Tensor output;
+  linear_wrapper.call(input, weight, bias, output, post_op);
   if (!linear_wrapper.is_fused()) {
     output = at::hardtanh(output);
   }
@@ -301,7 +298,8 @@ Tensor linear_elu(
         attr.kind_with_elu);
     return attr;
   };
-  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  Tensor output;
+  linear_wrapper.call(input, weight, bias, output, post_op);
   if (!linear_wrapper.is_fused()) {
     output = at::elu(output, alpha, scale, input_scale);
   }
@@ -313,7 +311,7 @@ Tensor linear_sum(
     const Tensor& input,
     const Tensor& weight,
     const Tensor& bias,
-    const Tensor& accumul,
+    Tensor& accumul,
     Scalar alpha) {
   RECORD_FUNCTION(
       "linear_sum", std::vector<c10::IValue>({input, weight, bias}));
@@ -322,25 +320,33 @@ Tensor linear_sum(
   std::vector<int64_t> output_sizes = {
       input_sizes[0], input_sizes[1], weight_sizes[1]};
 
-  Tensor result;
+  Tensor output = at::empty(output_sizes, input.options());
+  bool can_be_fused;
+  Attr attr = get_onednn_linear_sum_attr(
+      input, weight, accumul, output, alpha.to<float>(), can_be_fused);
+  auto post_op = [=]() { return attr; };
   auto linear_wrapper = LinearConverter();
-  bool can_be_fused = (accumul.sizes().vec() == output_sizes);
-  if (can_be_fused) {
-    auto post_op = [=]() {
-      Attr attr;
-      attr.append_post_sum(/* sum_scale */ alpha.to<float>());
-      return attr;
-    };
-    result = linear_wrapper.call(input, weight, bias, accumul, post_op);
-  } else {
-    result = linear_wrapper.call(input, weight, bias);
-  }
+  linear_wrapper.call(input, weight, bias, output, post_op);
 
   bool is_success_fused = can_be_fused && linear_wrapper.is_fused();
   if (!is_success_fused) {
-    result = at::AtenIpexTypeXPU::add(result, accumul, alpha.to<float>());
+    output = at::AtenIpexTypeXPU::add(output, accumul, alpha.to<float>());
   }
-  return result;
+  return output;
+}
+
+Tensor& dpcpp_linear_out(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    Tensor& output) {
+  auto post_op = [=]() {
+    Attr attr;
+    return attr;
+  };
+  auto linear_wrapper = LinearConverter();
+  linear_wrapper.call(input, weight, bias, output, post_op);
+  return output;
 }
 
 // IPEX customer linear for weight prepack
@@ -348,10 +354,10 @@ Tensor linear(
     const Tensor& input,
     const Tensor& weight,
     const c10::optional<Tensor>& bias_opt) {
+  RECORD_FUNCTION("linear", std::vector<c10::IValue>({input, weight}));
   auto bias = bias_opt.has_value()
       ? c10::MaybeOwned<Tensor>::borrowed(*bias_opt)
       : c10::MaybeOwned<Tensor>::owned(c10::in_place);
-
   auto weight_ctx =
       at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(weight);
   auto is_weight_plain = weight_ctx.is_plain();
@@ -390,7 +396,6 @@ Tensor linear(
   if (bias->defined()) {
     output.add_(*bias);
   }
-
   return output;
 }
 
@@ -399,6 +404,7 @@ Tensor& linear_out(
     const Tensor& weight,
     const c10::optional<Tensor>& bias_opt,
     Tensor& output) {
+  RECORD_FUNCTION("linear_out", std::vector<c10::IValue>({input, weight}));
   // See [Note: hacky wrapper removal for optional tensor]
   auto bias = bias_opt.has_value()
       ? c10::MaybeOwned<Tensor>::borrowed(*bias_opt)

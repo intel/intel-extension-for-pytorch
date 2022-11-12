@@ -176,6 +176,31 @@ class Attr {
     return *this;
   }
 
+  // append bias with binary_add method
+  template <int N>
+  Attr& append_bias(const Tensor& binary) {
+    memory::desc binary_md;
+    switch (N) {
+      case 2:
+        binary_md = memory::desc(
+            {1, binary.size(0), 1, 1},
+            memory::data_type::f32,
+            memory::format_tag::abcd);
+        break;
+      case 3:
+        binary_md = memory::desc(
+            {1, binary.size(0), 1, 1, 1},
+            memory::data_type::f32,
+            memory::format_tag::abcde);
+        break;
+      default:
+        AT_ERROR("IPEX only supports append_bias for Conv2d and Conv3d.");
+    }
+    ops_params_.push_back(PostOpParam(
+        binary.data_ptr(), binary_md, kind_with_binary_add, kind_t::binary));
+    return *this;
+  }
+
   // append prelu post op
   Attr& append_post_prelu(int mask) {
     ops_params_.push_back(PostOpParam(mask, kind_t::prelu));

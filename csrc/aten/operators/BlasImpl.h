@@ -515,6 +515,8 @@ static void onednn_matmul(
         ? std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(2)}
         : std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(1)};
   }
+  if (!result.defined())
+    result = at::empty(result_shape, m1.options());
 
   if (attr.with_sum()) {
     TORCH_CHECK(
@@ -546,6 +548,69 @@ static void onednn_matmul(
   if (!res.is_same(result)) {
     result.copy_(res);
   }
+}
+
+static Attr get_onednn_linear_sum_attr(
+    const Tensor& input,
+    const Tensor& weight,
+    Tensor& accumu,
+    Tensor& output,
+    float scale,
+    bool& is_fused) {
+  is_fused = true;
+  Attr attr;
+  if (scale == 0.f)
+    return attr;
+
+  const auto input_sizes = input.sizes();
+  const auto weight_sizes = weight.sizes();
+  std::vector<int64_t> output_sizes;
+  if (input.dim() == 2) {
+    output_sizes = {input_sizes[0], weight_sizes[1]};
+  } else if (input.dim() == 3) {
+    output_sizes = {input_sizes[0], input_sizes[1], weight_sizes[1]};
+  }
+
+  Tensor out = at::empty(output_sizes, input.options());
+  if (!xpu::oneDNN::binary_valid(out, accumu)) {
+    is_fused = false;
+    return attr;
+  }
+
+  // For post-sum and post-binary-add, onednn needs sum/binary scale=1.f
+  // Thus we need the following transformation
+  // conv(src, wei) + scale * accumu
+  // scale * (1/scale * linear(src, wei) + sum/binary)
+  if (scale != 1.f)
+    attr.append_post_eltwise(
+        /* scale */ 1.f,
+        /* alpha */ 1.f / scale,
+        /* beta */ 0.f,
+        attr.kind_with_linear);
+
+  auto accumu_ctx = DPCPPTensorContext::get_tensor_ctx(accumu);
+  if (accumu_ctx.is_plain())
+    accumu = accumu.contiguous();
+
+  if (accumu.sizes() == output_sizes) {
+    // If sizes are the same, post sum is used.
+    output = accumu;
+    attr.append_post_sum(/* sum_scale */ 1.f);
+  } else {
+    // If sizes are different, post binary is used.
+    if (input.dim() == 3)
+      accumu = accumu.view({-1, accumu.sizes()[2]});
+    attr.append_post_binary(attr.kind_with_binary_add, accumu);
+  }
+
+  if (scale != 1.f)
+    attr.append_post_eltwise(
+        /* scale */ 1.f,
+        /* alpha */ scale,
+        /* beta */ 0.f,
+        attr.kind_with_linear);
+
+  return attr;
 }
 
 /***** The helper function to get bias or post sum for onednn_matmul *****

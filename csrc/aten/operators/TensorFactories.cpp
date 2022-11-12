@@ -14,6 +14,7 @@
 #include "BitonicMergeSort.h"
 #include "Loops.h"
 #include "PSTLFunctions.h"
+#include "ReduceOpStdVar.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
@@ -361,7 +362,7 @@ Tensor triu_indices_dpcpp(
         at::ScalarType::Half, tensor.scalar_type(), "triu_indices_dpcpp", [&] {
           triu_indices_dpcpp_kernel<scalar_t>(
               tensor.data_ptr<scalar_t>(),
-              std::max<int64_t>(0, offset),
+              Numerics<int64_t>::max(0, offset),
               m_first_row,
               col,
               rectangle_size,
@@ -412,24 +413,6 @@ Tensor tril_indices_dpcpp(
 } // namespace impl
 
 namespace AtenIpexTypeXPU {
-
-at::Tensor& std_var_out(
-    at::Tensor& result,
-    const at::Tensor& self,
-    at::IntArrayRef dim,
-    int64_t correction_opt,
-    bool keepdim,
-    bool take_sqrt);
-
-std::tuple<Tensor&, Tensor&> std_var_mean_out(
-    const char* fname,
-    Tensor& result1,
-    Tensor& result2,
-    const Tensor& self,
-    IntArrayRef dim,
-    int64_t correction_opt,
-    bool keepdim,
-    bool take_sqrt);
 
 Tensor empty(
     IntArrayRef size,

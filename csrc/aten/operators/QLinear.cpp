@@ -7,6 +7,7 @@
 #include <quantized/QUtils.h>
 #include <runtime/Utils.h>
 #include "InnerProduct.h"
+#include "Linear.h"
 #include "comm/ParamUtils.h"
 
 using namespace dnnl;
@@ -16,8 +17,6 @@ using namespace xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
-
-using namespace impl;
 
 at::Tensor dpcppLinear(
     Tensor input,
@@ -42,8 +41,13 @@ at::Tensor dpcppLinear(
         output_scale);
   } else {
     // fallback to fp32 linear
-    return at::linear(
-        input.is_quantized() ? at::dequantize(input) : input, weight, bias);
+    Tensor output;
+    output = dpcpp_linear_out(
+        input.is_quantized() ? at::dequantize(input) : input,
+        weight,
+        bias,
+        output);
+    return output;
   }
 }
 
