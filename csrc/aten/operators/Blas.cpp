@@ -222,9 +222,9 @@ Tensor& addbmm_out(
   if (batch1.size(0) > 1) {
     b1 = batch1.transpose(0, 1).contiguous().view({batch1.size(1), -1});
   } else {
-    b1 = batch1.view({batch1.size(1), -1});
+    b1 = batch1.contiguous().view({batch1.size(1), -1});
   }
-  auto b2 = batch2.view({-1, batch2.size(2)});
+  auto b2 = batch2.contiguous().view({-1, batch2.size(2)});
   at::AtenIpexTypeXPU::addmm_out(self, b1, b2, beta, alpha, out);
 
   return out;
