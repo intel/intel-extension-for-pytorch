@@ -47,17 +47,17 @@ void InitIPEX::check_pytorch_version() {
       IPEX_VERSION_MINOR = std::stoi(match[2]);
     }
   }
-  if (IPEX_VERSION_MAJOR != TORCH_VERSION_MAJOR ||
-      IPEX_VERSION_MINOR != TORCH_VERSION_MINOR) {
-    printf(
-        "ERROR! Intel® Extension for PyTorch* needs to work with PyTorch/libtorch %d.%d.*, but PyTorch/libtorch %d.%d.%d is found. Please switch to the matching version and run again.\n",
-        IPEX_VERSION_MAJOR,
-        IPEX_VERSION_MINOR,
-        TORCH_VERSION_MAJOR,
-        TORCH_VERSION_MINOR,
-        TORCH_VERSION_PATCH);
-    exit(127);
-  }
+  // if (IPEX_VERSION_MAJOR != TORCH_VERSION_MAJOR ||
+  //     IPEX_VERSION_MINOR != TORCH_VERSION_MINOR) {
+  //   printf(
+  //       "ERROR! Intel® Extension for PyTorch* needs to work with PyTorch/libtorch %d.%d.*, but PyTorch/libtorch %d.%d.%d is found. Please switch to the matching version and run again.\n",
+  //       IPEX_VERSION_MAJOR,
+  //       IPEX_VERSION_MINOR,
+  //       TORCH_VERSION_MAJOR,
+  //       TORCH_VERSION_MINOR,
+  //       TORCH_VERSION_PATCH);
+  //   exit(127);
+  // }
 }
 
 } // namespace torch_ipex
