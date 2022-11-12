@@ -4,7 +4,6 @@
 #include <ATen/MemoryOverlap.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
-#include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
@@ -383,8 +382,7 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
     int64_t size1 = src.size(1);
     int64_t size = (k > 0) ? sycl::min((int64_t)size0, (int64_t)size1 - k)
                            : sycl::min((int64_t)size0 + k, (int64_t)size1);
-    int64_t size_[1] = {size};
-    TensorImpl_resizeNd(TensorImpl_Unwrap(dst), 1, size_, nullptr);
+    resize_output(dst, {size});
     if (size > 0) {
       auto in = src.data_ptr<scalar_t>();
       auto out = dst.data_ptr<scalar_t>();
@@ -406,8 +404,7 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
     int64_t totalElements = src.numel();
     int64_t size = (k > 0) ? totalElements + k : totalElements - k;
     int64_t strideSrc = src.dim() == 0 ? 1 : src.stride(0);
-    int64_t size_[2] = {size, size};
-    TensorImpl_resizeNd(TensorImpl_Unwrap(dst), 2, size_, nullptr);
+    resize_output(dst, {size, size});
     dst.zero_();
     if (size > 0) {
       auto in = src.data_ptr<scalar_t>();
@@ -524,17 +521,17 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
   // Determine our output size
   c10::optional<ScalarType> dtype;
   int totalElements = at::AtenIpexTypeXPU::sum(mask, dtype).item().to<int>();
-  int64_t real_sizes[1] = {(int64_t)totalElements};
+  int64_t real_sizes = {(int64_t)totalElements};
   if (totalElements == 0) {
-    TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 1, real_sizes, nullptr);
+    resize_output(tensor, real_sizes);
     return;
   }
 
   Tensor tensorContig = tensor.contiguous();
 
-  TensorImpl_resizeNd(TensorImpl_Unwrap(tensorContig), 1, real_sizes, nullptr);
+  resize_output(tensorContig, real_sizes);
   if (&tensor != &tensorContig) {
-    TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 1, real_sizes, nullptr);
+    resize_output(tensor, real_sizes);
   }
 
   Tensor maskLong = at::empty({0}, mask.options().dtype(kLong));

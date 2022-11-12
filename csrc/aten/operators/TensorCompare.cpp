@@ -7,7 +7,6 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/quantized/QTensorImpl.h>
 #include <core/Memory.h>
-#include <core/TensorImplUtils.h>
 #include <runtime/Utils.h>
 #include "PSTLFunctions.h"
 #include "comm/ApplyUtils.h"

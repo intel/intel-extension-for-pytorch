@@ -1,7 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/MemoryOverlap.h>
 
-#include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <utils/DPCPP.h>

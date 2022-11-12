@@ -2,7 +2,6 @@
 
 #include <ATen/ATen.h>
 
-#include <core/TensorImplUtils.h>
 #include <utils/DPCPP.h>
 #include <oneapi/dpl/cmath>
 #include <oneapi/dpl/complex>
@@ -34,7 +33,7 @@ const Tensor& resize_as_(
                                                                  \
   template <typename scalar_t>                                   \
   void NAME(Tensor& self_, const Tensor& src) {                  \
-    if (TensorImpl_Unwrap(self_) == TensorImpl_Unwrap(src)) {    \
+    if (self_.is_same(src)) {                                    \
       DPCPP_tensor_apply1<scalar_t>(                             \
           self_, Tensor_##NAME##_##REAL##_Op<scalar_t>());       \
     } else {                                                     \
@@ -83,7 +82,7 @@ const Tensor& resize_as_(
 #define CALLABLE_INIT_ARGS_DECL_2 CALLABLE_INIT_ARGS_DECL_1, scalar_t val2
 #define CALLABLE_INIT_ARGS_DECL_3 CALLABLE_INIT_ARGS_DECL_2, scalar_t val3
 
-#define CHECK_SAME_TENSOR() (TensorImpl_Unwrap(arg1) == TensorImpl_Unwrap(arg2))
+#define CHECK_SAME_TENSOR() (arg1.is_same(arg2))
 
 #define COMMA_0
 #define COMMA_1 ,

@@ -4,8 +4,8 @@
 #include <ATen/core/Reduction.h>
 #include <ATen/native/TensorIterator.h>
 
+#include <core/Device.h>
 #include <core/Memory.h>
-#include <core/TensorImplUtils.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 
@@ -216,7 +216,7 @@ void MultilabelMarginCriterion_updateGradInput(
         " for ",
         target_arg);
   }
-  IsOnSameDevice(
+  isOnSameDevice(
       "multilabel_margin_loss_backward_out", target_arg, is_target_arg);
 
   TORCH_CHECK(

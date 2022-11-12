@@ -1,6 +1,7 @@
 #include <ATen/Context.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/LinearAlgebraUtils.h>
+#include <ATen/native/Resize.h>
 
 #include <core/detail/OffsetCalculator.h>
 #include <oneDNN/oneDNN.h>

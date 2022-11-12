@@ -1,8 +1,8 @@
 #include <ATen/InitialTensorOptions.h>
+#include <ATen/native/Resize.h>
 #include <ATen/native/TensorFactories.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/quantized/QTensorImpl.h>
-#include <core/TensorImplUtils.h>
 #include <core/detail/ListUtils.h>
 #include <oneDNN/oneDNN.h>
 #include <quantized/QTensor.h>
@@ -48,6 +48,48 @@ Tensor new_qtensor(
   at::get_qtensorimpl(tensor)->empty_tensor_restride(memory_format);
 
   return tensor;
+}
+
+Tensor as_strided_quantized_dpcpp(
+    const Tensor& self,
+    IntArrayRef size,
+    IntArrayRef stride) {
+  auto storage_offset = self.storage_offset();
+  auto quantizer = at::get_qtensorimpl(self)->quantizer();
+  auto result = detail::make_tensor<QTensorImpl>(
+      Storage(self.storage()), self.key_set(), self.dtype(), quantizer);
+  at::native::setStrided(result, size, stride, storage_offset);
+  return result;
+}
+
+Tensor expand_as_quantized_dpcpp(const Tensor& self, const Tensor& other) {
+  auto size = other.sizes();
+  TORCH_CHECK(
+      size.size() >= (size_t)self.dim(),
+      "expand(",
+      self.toString(),
+      "{",
+      self.sizes(),
+      "}, size=",
+      size,
+      "): the number of sizes provided (",
+      size.size(),
+      ") ",
+      "must be greater or equal to the number of dimensions in the tensor (",
+      self.dim(),
+      ")");
+
+  std::vector<int64_t> expandedSizes;
+  std::vector<int64_t> expandedStrides;
+  std::tie(expandedSizes, expandedStrides) =
+      inferExpandGeometry(self.sizes(), self.strides(), size);
+
+  auto result =
+      as_strided_quantized_dpcpp(self, expandedSizes, expandedStrides);
+#ifdef BUILD_NAMEDTENSOR
+  namedinference::propagate_names_for_expand(result, self);
+#endif
+  return result;
 }
 
 } // namespace AtenIpexTypeXPU

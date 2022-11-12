@@ -1,9 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/Functions.h>
 #include <ATen/native/Activation.h>
+#include <ATen/native/Resize.h>
 
 #include <core/Generator.h>
-#include <core/TensorImplUtils.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <utils/Macros.h>

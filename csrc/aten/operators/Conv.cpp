@@ -1,6 +1,5 @@
 #include <ATen/quantized/QTensorImpl.h>
 #include <ATen/quantized/Quantizer.h>
-#include <core/TensorImplUtils.h>
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
 #include <tensor/Tensor.h>

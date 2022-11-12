@@ -12,6 +12,7 @@
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <core/detail/TensorInfo.h>
+#include <quantized/QTensor.h>
 #include <runtime/Exception.h>
 #include <runtime/Utils.h>
 
@@ -183,48 +184,6 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
 
     src_ready.block(getCurrentDPCPPStream(dst_device.index()));
   }
-}
-
-Tensor as_strided_quantized_dpcpp(
-    const Tensor& self,
-    IntArrayRef size,
-    IntArrayRef stride) {
-  auto storage_offset = self.storage_offset();
-  auto quantizer = at::get_qtensorimpl(self)->quantizer();
-  auto result = detail::make_tensor<QTensorImpl>(
-      Storage(self.storage()), self.key_set(), self.dtype(), quantizer);
-  native::setStrided(result, size, stride, storage_offset);
-  return result;
-}
-
-Tensor expand_as_quantized_dpcpp(const Tensor& self, const Tensor& other) {
-  auto size = other.sizes();
-  TORCH_CHECK(
-      size.size() >= (size_t)self.dim(),
-      "expand(",
-      self.toString(),
-      "{",
-      self.sizes(),
-      "}, size=",
-      size,
-      "): the number of sizes provided (",
-      size.size(),
-      ") ",
-      "must be greater or equal to the number of dimensions in the tensor (",
-      self.dim(),
-      ")");
-
-  std::vector<int64_t> expandedSizes;
-  std::vector<int64_t> expandedStrides;
-  std::tie(expandedSizes, expandedStrides) =
-      inferExpandGeometry(self.sizes(), self.strides(), size);
-
-  auto result =
-      as_strided_quantized_dpcpp(self, expandedSizes, expandedStrides);
-#ifdef BUILD_NAMEDTENSOR
-  namedinference::propagate_names_for_expand(result, self);
-#endif
-  return result;
 }
 
 void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {

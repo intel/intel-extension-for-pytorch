@@ -1,8 +1,8 @@
 #include <ATen/ATen.h>
 #include "comm/AccumulateType.h"
 
+#include <core/Device.h>
 #include <core/Memory.h>
-#include <core/TensorImplUtils.h>
 #include <runtime/Utils.h>
 #include "EmbeddingBackwardKernel.h"
 #include "Indexing.h"
@@ -109,7 +109,7 @@ Tensor embedding_dense_backward(
   auto grad_arg = TensorArg(grad_output, "grad", 1);
   auto indices_arg = TensorArg(indices, "indices", 1);
   checkScalarTypes("embedding_backward", indices_arg, {kLong, kInt});
-  IsOnSameDevice("embedding_backward", grad_arg, indices_arg);
+  isOnSameDevice("embedding_backward", grad_arg, indices_arg);
 
   auto num_indices = indices.numel();
   auto grad_output_cont =

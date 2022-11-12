@@ -10,8 +10,8 @@ set(IPEX_GPU_GEN_FILES)
 set(IPEX_GPU_GEN_TARGET)
 include(${PROJECT_SOURCE_DIR}/cmake/Codegen.cmake)
 
-set(IPEX_ATEN_OPS_SRCS)
 set(IPEX_ATEN_CORE_SRCS)
+set(IPEX_ATEN_OPS_SRCS)
 add_subdirectory(${IPEX_GPU_ATEN_SRC_DIR})
 
 set(IPEX_RUNTIME_SRCS)
@@ -19,9 +19,6 @@ add_subdirectory(${IPEX_GPU_RUNTIME_SRC_DIR})
 
 set(IPEX_JIT_SRCS)
 add_subdirectory(${IPEX_GPU_ROOT}/jit)
-
-set(IPEX_TENSOR_SRCS)
-add_subdirectory(${IPEX_GPU_ROOT}/tensor)
 
 set(IPEX_UTILS_SRCS)
 add_subdirectory(${IPEX_GPU_ROOT}/utils)
@@ -47,7 +44,6 @@ set(IPEX_GPU_CORE_SRC
         ${IPEX_ATEN_CORE_SRCS}
         ${IPEX_RUNTIME_SRCS}
         ${IPEX_GPU_GEN_FILES}
-        ${IPEX_TENSOR_SRCS}
         ${IPEX_UTILS_SRCS})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${IPEX_SYCL_KERNEL_FLAGS}")
@@ -141,8 +137,6 @@ if (ONEDPL_FOUND)
 else()
   message(FATAL_ERROR "Cannot find oneDPL")
 endif()
-
-
 
 if (USE_MULTI_CONTEXT)
   list(APPEND IPEX_COMPILE_DEFINITIONS "USE_MULTI_CONTEXT")

@@ -2,7 +2,6 @@
 #include <ATen/native/TensorFactories.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/quantized/QTensorImpl.h>
-#include <core/TensorImplUtils.h>
 #include <core/detail/ListUtils.h>
 #include <oneDNN/oneDNN.h>
 #include <quantized/QTensor.h>

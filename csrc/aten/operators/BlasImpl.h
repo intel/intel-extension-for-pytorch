@@ -2,7 +2,6 @@
 #include <ATen/CPUApplyUtils.h>
 #include <ATen/ExpandUtils.h>
 #include <ATen/record_function.h>
-#include <core/TensorImplUtils.h>
 
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>

@@ -3,7 +3,6 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <core/Memory.h>
-#include <core/TensorImplUtils.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"

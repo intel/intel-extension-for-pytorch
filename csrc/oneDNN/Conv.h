@@ -4,7 +4,6 @@
 #include <ATen/core/grad_mode.h>
 #include <ATen/record_function.h>
 #include <core/MemoryFormat.h>
-#include <core/TensorImplUtils.h>
 
 #include <oneDNN/Runtime.h>
 #include <quantized/Quantizer.h>
