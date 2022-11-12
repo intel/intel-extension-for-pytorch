@@ -5,10 +5,12 @@
 #include <core/Stream.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
+#include <math.h>
 #include <runtime/Utils.h>
 #include <utils/Helpers.h>
-
-#include <math.h>
+#include <oneapi/dpl/algorithm>
+#include <oneapi/dpl/cmath>
+namespace dpl = oneapi::dpl;
 
 using namespace xpu::dpcpp;
 using namespace xpu::dpcpp::detail;
@@ -237,7 +239,7 @@ void kernelPointwiseApply1(
                 a,
                 op,
                 a_pointer,
-                sycl::min(step, static_cast<int>(totalElements - linearIndex)),
+                dpl::min(step, static_cast<int>(totalElements - linearIndex)),
                 linearIndex);
           }
         });
@@ -459,7 +461,7 @@ void kernelPointwiseApply2(
                     op,
                     out_ptr,
                     in_ptr,
-                    sycl::min(
+                    dpl::min(
                         step, static_cast<int>(totalElements - linearIndex)),
                     linearIndex);
           }
@@ -680,7 +682,7 @@ void kernelPointwiseApply3(
                     out_ptr,
                     in1_ptr,
                     in2_ptr,
-                    sycl::min(
+                    dpl::min(
                         step, static_cast<int>(totalElements - linearIndex)),
                     linearIndex);
           }
@@ -940,7 +942,7 @@ void kernelPointwiseApply4(
                     in1_ptr,
                     in2_ptr,
                     in3_ptr,
-                    sycl::min(
+                    dpl::min(
                         step, static_cast<int>(totalElements - linearIndex)),
                     linearIndex);
           }

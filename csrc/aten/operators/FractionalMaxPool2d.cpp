@@ -3,10 +3,11 @@
 #include <core/Memory.h>
 #include <core/MemoryFormat.h>
 #include <runtime/Utils.h>
+#include <oneapi/dpl/limits>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Atomics.h"
-
+namespace dpl = oneapi::dpl;
 using namespace xpu::dpcpp;
 
 namespace at {
@@ -106,7 +107,7 @@ void fractional_max_pool2d_out_frame(
               outputSizeH,
               poolSizeH);
 
-          scalar_t maxVal = std::numeric_limits<scalar_t>::lowest();
+          scalar_t maxVal = dpl::numeric_limits<scalar_t>::lowest();
           int maxIndex = -1;
 
           for (int h = poolH; h < poolH + poolSizeH; ++h) {

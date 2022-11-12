@@ -7,11 +7,13 @@
 #include <c10/util/math_compat.h>
 #include <oneapi/dpl/cmath>
 #include <oneapi/dpl/complex>
+#include <oneapi/dpl/limits>
 #include <oneapi/dpl/type_traits>
 #include <oneapi/dpl/utility>
 #include "AccumulateType.h"
 #include "General.h"
 #include "Numerics.h"
+namespace dpl = oneapi::dpl;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -43,30 +45,30 @@ DPCPP_BOTH static inline scalar_t zeta(scalar_t _x, scalar_t _q) {
   int i = 0;
   acc_t a, b, k, s, t, w;
   if (x == one) {
-    return std::numeric_limits<scalar_t>::infinity();
+    return dpl::numeric_limits<scalar_t>::infinity();
   }
 
   if (x < one) {
-    return std::numeric_limits<scalar_t>::quiet_NaN();
+    return dpl::numeric_limits<scalar_t>::quiet_NaN();
   }
 
   if (q <= zero) {
-    if (q == sycl::floor(q)) {
-      return std::numeric_limits<scalar_t>::infinity();
+    if (q == dpl::floor(q)) {
+      return dpl::numeric_limits<scalar_t>::infinity();
     }
-    if (x != sycl::floor(x)) {
-      return std::numeric_limits<scalar_t>::quiet_NaN();
+    if (x != dpl::floor(x)) {
+      return dpl::numeric_limits<scalar_t>::quiet_NaN();
     }
   }
 
-  s = sycl::pow(q, -x);
+  s = dpl::pow(q, -x);
   a = q;
   i = 0;
   b = zero;
   while ((i < 9) || (a <= acc_t{9.0})) {
     i += 1;
     a += one;
-    b = sycl::pow(a, -x);
+    b = dpl::pow(a, -x);
     s += b;
     if ((-MACHEP * s < b) && (b < MACHEP * s)) {
       return static_cast<scalar_t>(s);
@@ -83,7 +85,7 @@ DPCPP_BOTH static inline scalar_t zeta(scalar_t _x, scalar_t _q) {
     b /= w;
     t = a * b / A[i];
     s = s + t;
-    t = sycl::fabs(t / s);
+    t = dpl::fabs(t / s);
     if (t < MACHEP) {
       return static_cast<scalar_t>(s);
     }
@@ -109,7 +111,7 @@ DPCPP_BOTH static scalar_t ratevl(
   int64_t i, dir;
   scalar_t y, num_ans, denom_ans;
   acc_t x_ = static_cast<acc_t>(x);
-  scalar_t absx = sycl::fabs(x_);
+  scalar_t absx = dpl::fabs(x_);
   const scalar_t* p;
 
   if (absx > 1) {
@@ -216,7 +218,7 @@ static scalar_t _igam_helper_fac(scalar_t a, scalar_t x) {
 
   acc_t a_x = static_cast<acc_t>(a - x);
   acc_t a_ = static_cast<acc_t>(a);
-  if (sycl::fabs(a_x) > 0.4 * sycl::fabs(a_)) {
+  if (dpl::fabs(a_x) > 0.4 * dpl::fabs(a_)) {
     ax = a * Numerics<scalar_t>::log(x) - x - Numerics<scalar_t>::lgamma(a_);
     if (ax < -MAXLOG) {
       return 0.0;
@@ -292,7 +294,7 @@ static inline DPCPP_BOTH scalar_t _igamc_helper_series(scalar_t a, scalar_t x) {
     fac *= -x / n;
     term = fac / (a + n);
     sum += term;
-    if (sycl::fabs(term) <= MACHEP * sycl::fabs(sum)) {
+    if (dpl::fabs(term) <= MACHEP * dpl::fabs(sum)) {
       break;
     }
   }
@@ -592,22 +594,22 @@ _igam_helper_asymptotic_series(scalar_t a, scalar_t x, bool igam) {
       }
       ckterm = d[k][n] * etapow[n];
       ck += ckterm;
-      if (sycl::fabs(ckterm) < MACHEP * sycl::fabs(ck)) {
+      if (dpl::fabs(ckterm) < MACHEP * dpl::fabs(ck)) {
         break;
       }
     }
     term = ck * afac;
-    absterm = sycl::fabs(term);
+    absterm = dpl::fabs(term);
     if (absterm > absoldterm) {
       break;
     }
     term = ck * afac;
-    absterm = sycl::fabs(term);
+    absterm = dpl::fabs(term);
     if (absterm > absoldterm) {
       break;
     }
     sum += term;
-    if (absterm < MACHEP * sycl::fabs(sum)) {
+    if (absterm < MACHEP * dpl::fabs(sum)) {
       break;
     }
     absoldterm = absterm;
@@ -662,7 +664,7 @@ _igamc_helper_continued_fraction(scalar_t a, scalar_t x) {
     qk = qkm1 * z - qkm2 * yc;
     if (qk != 0) {
       r = pk / qk;
-      t = sycl::fabs((ans - r) / r);
+      t = dpl::fabs((ans - r) / r);
       ans = r;
     } else {
       t = 1.0;
@@ -671,7 +673,7 @@ _igamc_helper_continued_fraction(scalar_t a, scalar_t x) {
     pkm1 = pk;
     qkm2 = qkm1;
     qkm1 = qk;
-    if (sycl::fabs(pk) > BIG) {
+    if (dpl::fabs(pk) > BIG) {
       pkm2 *= BIGINV;
       pkm1 *= BIGINV;
       qkm2 *= BIGINV;
@@ -707,25 +709,25 @@ static inline DPCPP_BOTH scalar_t calc_igammac(scalar_t a, scalar_t x) {
 
   if ((x < 0) || (a < 0)) {
     // out of defined-region of the function
-    return std::numeric_limits<accscalar_t>::quiet_NaN();
+    return dpl::numeric_limits<accscalar_t>::quiet_NaN();
   } else if (a == 0) {
     if (x > 0) {
       return 0.0;
     } else {
-      return std::numeric_limits<accscalar_t>::quiet_NaN();
+      return dpl::numeric_limits<accscalar_t>::quiet_NaN();
     }
   } else if (x == 0) {
     return 1.0;
   } else if (Numerics<accscalar_t>::isinf(static_cast<accscalar_t>(a))) {
     if (Numerics<accscalar_t>::isinf(static_cast<accscalar_t>(x))) {
-      return std::numeric_limits<accscalar_t>::quiet_NaN();
+      return dpl::numeric_limits<accscalar_t>::quiet_NaN();
     }
     return 1.0;
   } else if (Numerics<accscalar_t>::isinf(static_cast<accscalar_t>(x))) {
     return 0.0;
   }
 
-  absxma_a = sycl::fabs(static_cast<accscalar_t>(x - a)) / a;
+  absxma_a = dpl::fabs(static_cast<accscalar_t>(x - a)) / a;
   if ((a > SMALL) && (a < LARGE) && (absxma_a < SMALLRATIO)) {
     return _igam_helper_asymptotic_series(a, x, 0);
   } else if ((a > LARGE) && (absxma_a < LARGERATIO / ::sqrt(a))) {
@@ -776,18 +778,18 @@ static inline DPCPP_BOTH scalar_t calc_igamma(scalar_t a, scalar_t x) {
   // boundary values following SciPy
   if ((x < 0) || (a < 0)) {
     // out of defined-region of the function
-    return std::numeric_limits<accscalar_t>::quiet_NaN();
+    return dpl::numeric_limits<accscalar_t>::quiet_NaN();
   } else if (a == 0) {
     if (x > 0) {
       return 1.0;
     } else {
-      return std::numeric_limits<accscalar_t>::quiet_NaN();
+      return dpl::numeric_limits<accscalar_t>::quiet_NaN();
     }
   } else if (x == 0) {
     return 0.0; // zero integration limit
   } else if (Numerics<accscalar_t>::isinf(static_cast<accscalar_t>(a))) {
     if (Numerics<accscalar_t>::isinf(static_cast<accscalar_t>(x))) {
-      return std::numeric_limits<accscalar_t>::quiet_NaN();
+      return dpl::numeric_limits<accscalar_t>::quiet_NaN();
     }
     return 0.0;
   } else if (Numerics<accscalar_t>::isinf(static_cast<accscalar_t>(x))) {
@@ -795,7 +797,7 @@ static inline DPCPP_BOTH scalar_t calc_igamma(scalar_t a, scalar_t x) {
   }
 
   /* Asymptotic regime where a ~ x. */
-  absxma_a = sycl::fabs(static_cast<accscalar_t>(x - a)) / a;
+  absxma_a = dpl::fabs(static_cast<accscalar_t>(x - a)) / a;
   if ((a > SMALL) && (a < LARGE) && (absxma_a < SMALLRATIO)) {
     return _igam_helper_asymptotic_series(a, x, 1);
   } else if ((a > LARGE) && (absxma_a < LARGERATIO / ::sqrt(a))) {
@@ -847,8 +849,8 @@ static inline DPCPP_BOTH scalar_t calc_digamma(scalar_t in) {
     // a periodicity of pi, in practice the computation of pi * x is a source of
     // error (when |x| > 1).
     double q, r;
-    r = sycl::modf(static_cast<double>(x), &q);
-    result = static_cast<accscalar_t>(-PI_f64 / sycl::tan(PI_f64 * r));
+    r = dpl::modf(static_cast<double>(x), &q);
+    result = static_cast<accscalar_t>(-PI_f64 / dpl::tan(PI_f64 * r));
     x = 1 - x;
   }
 
@@ -872,7 +874,7 @@ static inline DPCPP_BOTH scalar_t calc_digamma(scalar_t in) {
   }
 
   return static_cast<scalar_t>(
-      sycl::log(x) - (static_cast<accscalar_t>(0.5) / x) - y + result);
+      dpl::log(x) - (static_cast<accscalar_t>(0.5) / x) - y + result);
 }
 
 template <typename scalar_t>
@@ -884,7 +886,7 @@ static inline DPCPP_BOTH scalar_t calc_trigamma(scalar_t in) {
   accscalar_t result = 0;
   if (x < 0.5f) {
     sign = -1;
-    accscalar_t sin_pi_x = sycl::sin(PI * x);
+    accscalar_t sin_pi_x = dpl::sin(PI * x);
     result -= (PI * PI) / (sin_pi_x * sin_pi_x);
     x = 1 - x;
   }
@@ -902,8 +904,8 @@ static inline DPCPP_BOTH scalar_t calc_trigamma(scalar_t in) {
 
 template <typename scalar_t>
 static inline DPCPP_BOTH scalar_t calc_gcd(scalar_t a_in, scalar_t b_in) {
-  scalar_t a = sycl::abs(a_in);
-  scalar_t b = sycl::abs(b_in);
+  scalar_t a = Numerics<scalar_t>::abs(a_in);
+  scalar_t b = Numerics<scalar_t>::abs(b_in);
   while (a != 0) {
     scalar_t c = a;
     a = b % a;
@@ -1002,22 +1004,22 @@ static inline DPCPP_BOTH scalar_t calc_i0(scalar_t _x) {
       "don't instantiate with low precision type");
   // Upcast input for numerical accuracy purposes
   // Needed for accurate results if input is bfloat16 or float16
-  scalar_t x = sycl::abs(_x);
+  scalar_t x = dpl::abs(_x);
 
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i0e_A<scalar_t>();
     auto A = std::get<0>(coeff_pair);
     auto len = std::get<1>(coeff_pair);
     scalar_t y = (x / scalar_t{2.0}) - scalar_t{2.0};
-    return (sycl::exp(x) * chbevl(y, A, len));
+    return (dpl::exp(x) * chbevl(y, A, len));
   }
 
   auto coeff_pair = chebyshev_coefficients_i0e_B<scalar_t>();
   auto B = std::get<0>(coeff_pair);
   auto len = std::get<1>(coeff_pair);
   return (
-      sycl::exp(x) * chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len) /
-      sycl::sqrt(x));
+      dpl::exp(x) * chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len) /
+      dpl::sqrt(x));
 }
 
 /*
@@ -1034,7 +1036,7 @@ static inline DPCPP_BOTH scalar_t calc_i0(scalar_t _x) {
  */
 template <typename scalar_t>
 static inline DPCPP_BOTH scalar_t calc_i0e(scalar_t _x) {
-  scalar_t x = sycl::abs(_x);
+  scalar_t x = dpl::abs(_x);
 
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i0e_A<scalar_t>();
@@ -1057,7 +1059,7 @@ static inline DPCPP_BOTH scalar_t calc_i0e(scalar_t _x) {
   auto B = std::get<0>(coeff_pair);
   auto len = std::get<1>(coeff_pair);
 #endif
-  return chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len) / sycl::sqrt(x);
+  return chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len) / dpl::sqrt(x);
 }
 
 // Upcast bfloat16 input to float for numerical accuracy purposes
@@ -1176,13 +1178,13 @@ DPCPP_BOTH inline typename std::
 
 template <typename scalar_t>
 static inline DPCPP_BOTH scalar_t calc_i1(scalar_t _x) {
-  const auto x = sycl::abs(_x);
+  const auto x = dpl::abs(_x);
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i1e_A<scalar_t>();
     auto A = std::get<0>(coeff_pair);
     auto len = std::get<1>(coeff_pair);
     scalar_t y = x / scalar_t{2.0} - scalar_t{2.0};
-    const scalar_t out = sycl::exp(x) * x * chbevl(y, A, len);
+    const scalar_t out = dpl::exp(x) * x * chbevl(y, A, len);
     return (_x < scalar_t{0.0}) ? -out : out;
   }
 
@@ -1190,14 +1192,14 @@ static inline DPCPP_BOTH scalar_t calc_i1(scalar_t _x) {
   auto B = std::get<0>(coeff_pair);
   auto len = std::get<1>(coeff_pair);
   const scalar_t out =
-      (sycl::exp(x) * chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len)) /
-      sycl::sqrt(x);
+      (dpl::exp(x) * chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len)) /
+      dpl::sqrt(x);
   return (_x < scalar_t{0.0}) ? -out : out;
 }
 
 template <typename scalar_t>
 static inline DPCPP_BOTH scalar_t calc_i1e(scalar_t _x) {
-  const auto x = sycl::abs(_x);
+  const auto x = dpl::abs(_x);
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i1e_A<scalar_t>();
     auto A = std::get<0>(coeff_pair);
@@ -1211,7 +1213,7 @@ static inline DPCPP_BOTH scalar_t calc_i1e(scalar_t _x) {
   auto B = std::get<0>(coeff_pair);
   auto len = std::get<1>(coeff_pair);
   const scalar_t out =
-      chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len) / sycl::sqrt(x);
+      chbevl(scalar_t{32.0} / x - scalar_t{2.0}, B, len) / dpl::sqrt(x);
   return (_x < scalar_t{0.0}) ? -out : out;
 }
 
@@ -1220,7 +1222,7 @@ static inline DPCPP_BOTH scalar_t calc_polygamma(scalar_t x, int n) {
   // already blocked if n <= 1
   const auto one = scalar_t{1};
   return ((n % 2) ? one : -one) *
-      sycl::exp(std::lgamma(static_cast<scalar_t>(n) + one)) *
+      dpl::exp(std::lgamma(static_cast<scalar_t>(n) + one)) *
       zeta<scalar_t>(static_cast<scalar_t>(n + 1), x);
 }
 /*
@@ -1343,7 +1345,7 @@ static inline DPCPP_BOTH scalar_t calc_ndtri(scalar_t y0) {
     return Numerics<scalar_t>::upper_bound();
   }
   if (y0 < zero || y0 > one) {
-    return std::numeric_limits<scalar_t>::quiet_NaN();
+    return dpl::numeric_limits<scalar_t>::quiet_NaN();
   }
   bool code = true;
   scalar_t y = y0;
