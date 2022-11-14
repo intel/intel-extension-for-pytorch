@@ -22,12 +22,18 @@ using namespace at::native;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-template <typename acc_t>
+// This accumulator template is used to calculate the order zero norm of the
+// absolute value of a set of numbers.
+// `scalar_t` is the type of the input and `acc_t` is the type of the
+// accumulated value. These types differ for complex number input support.
+template <typename scalar_t, typename acc_t = scalar_t>
 struct NormOps {
   acc_t norm;
 
-  inline acc_t reduce(acc_t acc, acc_t data, int64_t idx) const {
-    return acc + Numerics<acc_t>::pow(Numerics<acc_t>::fabs(data), norm);
+  inline acc_t reduce(acc_t acc, scalar_t data, int64_t idx) const {
+    return acc +
+        Numerics<acc_t>::pow(
+               static_cast<acc_t>(Numerics<scalar_t>::fabs(data)), norm);
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
@@ -50,10 +56,14 @@ struct NormOps {
   NormOps(acc_t norm) : norm(norm) {}
 };
 
-template <typename acc_t>
+// This accumulator template is used to calculate the order zero norm of the
+// absolute value of a set of numbers.
+// `scalar_t` is the type of the input and `acc_t` is the type of the
+// accumulated value. These types differ for complex number input support.
+template <typename scalar_t, typename acc_t = scalar_t>
 struct NormZeroOps {
-  inline acc_t reduce(acc_t acc, acc_t data, int64_t idx) const {
-    return acc + (data == acc_t(0) ? acc_t(0) : acc_t(1));
+  inline acc_t reduce(acc_t acc, scalar_t data, int64_t idx) const {
+    return acc + (data == static_cast<scalar_t>(0) ? acc_t(0) : acc_t(1));
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
@@ -73,10 +83,14 @@ struct NormZeroOps {
   }
 };
 
-template <typename acc_t>
+// This accumulator template is used to calculate the order one norm of the
+// absolute value of a set of numbers.
+// `scalar_t` is the type of the input and `acc_t` is the type of the
+// accumulated value. These types differ for complex number input support.
+template <typename scalar_t, typename acc_t = scalar_t>
 struct NormOneOps {
-  inline acc_t reduce(acc_t acc, acc_t data, int64_t idx) const {
-    return acc + Numerics<acc_t>::fabs(data);
+  inline acc_t reduce(acc_t acc, scalar_t data, int64_t idx) const {
+    return acc + static_cast<acc_t>(Numerics<scalar_t>::fabs(data));
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
@@ -96,10 +110,15 @@ struct NormOneOps {
   }
 };
 
-template <typename acc_t>
+// This accumulator template is used to calculate the maximum absolute value of
+// a set of numbers.
+// `scalar_t` is the type of the input and `acc_t` is the type of the
+// accumulated value. These types differ for complex number input support.
+template <typename scalar_t, typename acc_t = scalar_t>
 struct AbsMinOps {
-  inline acc_t reduce(acc_t acc, acc_t data, int64_t idx) const {
-    return Numerics<acc_t>::min(acc, Numerics<acc_t>::fabs(data));
+  inline acc_t reduce(acc_t acc, scalar_t data, int64_t idx) const {
+    return Numerics<acc_t>::min(
+        acc, static_cast<acc_t>(Numerics<scalar_t>::fabs(data)));
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
@@ -119,10 +138,15 @@ struct AbsMinOps {
   }
 };
 
-template <typename acc_t>
+// This accumulator template is used to calculate the maximum absolute value of
+// a set of numbers.
+// `scalar_t` is the type of the input and `acc_t` is the type of the
+// accumulated value. These types differ for complex number input support.
+template <typename scalar_t, typename acc_t = scalar_t>
 struct AbsMaxOps {
-  inline acc_t reduce(acc_t acc, acc_t data, int64_t idx) const {
-    return Numerics<acc_t>::max(acc, Numerics<acc_t>::fabs(data));
+  inline acc_t reduce(acc_t acc, scalar_t data, int64_t idx) const {
+    return Numerics<acc_t>::max(
+        acc, static_cast<acc_t>(Numerics<scalar_t>::fabs(data)));
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
@@ -142,10 +166,13 @@ struct AbsMaxOps {
   }
 };
 
+// This reduction accumulates results as the type `acc_t`. By default, when
+// `scalar_t` is complex, `acc_t` is the downgraded real number type.
+// Otherwise, `acc_t` and `scalar_t` are the same type.
 template <
     typename scalar_t,
-    typename acc_t = scalar_t,
-    typename out_t = scalar_t>
+    typename acc_t = typename scalar_value_type<scalar_t>::type,
+    typename out_t = typename scalar_value_type<scalar_t>::type>
 static void norm_kernel_impl(
     TensorIterator& iter,
     Scalar val,
@@ -161,19 +188,29 @@ static void norm_kernel_impl(
 
   auto input = iter.tensor(iter.ntensors() - 1);
   if (p == static_cast<float>(0)) {
-    dpcpp_reduce_kernel<scalar_t, out_t>(iter, NormZeroOps<acc_t>(), 0);
+    dpcpp_reduce_kernel<scalar_t, out_t>(
+        iter, NormZeroOps<scalar_t, acc_t>(), 0);
   } else if (p == static_cast<float>(1)) {
-    dpcpp_reduce_kernel<scalar_t, out_t>(iter, NormOneOps<acc_t>(), 0);
+    dpcpp_reduce_kernel<scalar_t, out_t>(
+        iter, NormOneOps<scalar_t, acc_t>(), 0);
   } else if (Numerics<float>::isinf(p)) {
     if (p < std::numeric_limits<float>::lowest()) {
       dpcpp_reduce_kernel<scalar_t, out_t>(
-          iter, AbsMinOps<acc_t>(), std::numeric_limits<acc_t>::max());
+          iter,
+          AbsMinOps<scalar_t, acc_t>(),
+          std::numeric_limits<acc_t>::max());
     } else {
       dpcpp_reduce_kernel<scalar_t, out_t>(
-          iter, AbsMaxOps<acc_t>(), std::numeric_limits<acc_t>::min());
+          iter,
+          AbsMaxOps<scalar_t, acc_t>(),
+          std::numeric_limits<acc_t>::min());
     }
   } else {
-    dpcpp_reduce_kernel<scalar_t, out_t>(iter, NormOps<acc_t>{acc_t(p)}, 0);
+    dpcpp_reduce_kernel<scalar_t, out_t>(
+        iter, NormOps<scalar_t, acc_t>{acc_t(p)}, 0);
+  }
+  if (at::isComplexType(iter.output().scalar_type())) {
+    at::imag(iter.output()).zero_();
   }
 }
 
@@ -191,7 +228,7 @@ static inline void norm_kernel(
   } else if (iter.dtype(1) == kBFloat16 && iter.dtype() == kFloat) {
     return norm_kernel_impl<at::BFloat16, float, float>(iter, p, dim);
   }
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
@@ -212,7 +249,7 @@ static Tensor& norm_out(
       opt_dtype.has_value() ? opt_dtype.value() : self.scalar_type();
   TORCH_CHECK(
       at::isFloatingType(scalarType) || at::isComplexType(scalarType),
-      "Can only calculate the mean of floating types. Got ",
+      "Can only calculate the mean of floating types or complex type. Got ",
       toString(scalarType),
       " instead.");
 
@@ -244,7 +281,7 @@ static inline Tensor _norm(const Tensor& self, Scalar p) {
     TORCH_CHECK(
         at::isFloatingType(self.scalar_type()) ||
             at::isComplexType(self.scalar_type()),
-        "norm only supports floating-point dtypes");
+        "norm only supports floating-point and complex dtypes");
 
     Tensor result;
     return at::AtenIpexTypeXPU::norm_out(

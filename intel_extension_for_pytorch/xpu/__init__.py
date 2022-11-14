@@ -19,6 +19,7 @@ from .random import *
 from .memory import *
 from .overrides import set_default_tensor_type as set_default_tensor_type
 from .overrides import enable_cl_to as enable_cl_to
+from .generator import Generator
 
 from torch._utils import _get_device_index
 import intel_extension_for_pytorch.optim as optim

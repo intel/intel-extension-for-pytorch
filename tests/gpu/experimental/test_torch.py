@@ -7337,7 +7337,12 @@ else:
     @onlyXPU
     @dtypes(torch.float, torch.double, torch.half)
     def test_multinomial_deterministic(self, device, dtype):
-        gen = torch.Generator(device=device)
+        # This is a WA. We will submit a PR to stock-PyTorch and make XPU backend
+        # supported in torch.Generator() API.
+        if ('xpu' in device):
+            gen = torch.xpu.Generator(device=device)
+        else:
+            gen = torch.Generator(device=device)
 
         trials = 5
         seed = 0
