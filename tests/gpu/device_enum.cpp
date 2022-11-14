@@ -9,18 +9,18 @@ Available DPC++ Platforms / Devices
 =====================================================================================
 |Platform 0:
 |Intel(R) OpenCL HD Graphics (opencl)
-|	|__|Device 0 :
-|	   |Intel(R) UHD Graphics 630 [0x3e9b] (gpu)
+| |__|Device 0 :
+|    |Intel(R) UHD Graphics 630 [0x3e9b] (gpu)
 -------------------------------------------------------------------------------------
 |Platform 1:
 |Intel(R) Level-Zero (level_zero)
-|	|__|Device 0 :
-|	   |Intel(R) UHD Graphics 630 [0x3e9b] (gpu)
+| |__|Device 0 :
+|    |Intel(R) UHD Graphics 630 [0x3e9b] (gpu)
 -------------------------------------------------------------------------------------
 |Platform 2:
 |SYCL host platform (host)
-|	|__|Device 0 :
-|	   |SYCL host device (host)
+| |__|Device 0 :
+|    |SYCL host device (host)
 -------------------------------------------------------------------------------------
 */
 
@@ -31,7 +31,7 @@ Available DPC++ Platforms / Devices
 
 #define DEL_WIDTH 85
 
-using namespace cl::sycl;
+using namespace sycl;
 
 std::string getDeviceTypeName(const device &Device) {
   auto DeviceType = Device.get_info<info::device::device_type>();

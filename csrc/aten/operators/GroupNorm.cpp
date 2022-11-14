@@ -43,10 +43,8 @@ static void RowwiseMomentsDPCPPKernel(
             sum1 += static_cast<T_ACC>(X[index]);
             sum2 += static_cast<T_ACC>(X[index]) * static_cast<T_ACC>(X[index]);
           }
-          sum1 =
-              sycl::reduce_over_group(g, sum1, cl::sycl::ext::oneapi::plus<>());
-          sum2 =
-              sycl::reduce_over_group(g, sum2, cl::sycl::ext::oneapi::plus<>());
+          sum1 = sycl::reduce_over_group(g, sum1, sycl::ext::oneapi::plus<>());
+          sum2 = sycl::reduce_over_group(g, sum2, sycl::ext::oneapi::plus<>());
           if (local_id == 0) {
             const T_ACC scale = T_ACC(1) / static_cast<T_ACC>(N);
             sum1 *= scale;
@@ -216,10 +214,8 @@ void ComputeInternalGradientsDPCPPKernel(
                 static_cast<T_ACC>(dY[index]) * static_cast<T_ACC>(X[index]);
             sum2 += static_cast<T_ACC>(dY[index]);
           }
-          sum1 =
-              sycl::reduce_over_group(g, sum1, cl::sycl::ext::oneapi::plus<>());
-          sum2 =
-              sycl::reduce_over_group(g, sum2, cl::sycl::ext::oneapi::plus<>());
+          sum1 = sycl::reduce_over_group(g, sum1, sycl::ext::oneapi::plus<>());
+          sum2 = sycl::reduce_over_group(g, sum2, sycl::ext::oneapi::plus<>());
           if (local_id == 0) {
             ds[nc] = sum1;
             db[nc] = sum2;
@@ -295,9 +291,9 @@ void ComputeBackwardFusedParamsDPCPPKernel(
             sum2 += db[index] * gamma_v;
           }
           sum1 = sycl::reduce_over_group(
-              group_id, sum1, cl::sycl::ext::oneapi::plus<>());
+              group_id, sum1, sycl::ext::oneapi::plus<>());
           sum2 = sycl::reduce_over_group(
-              group_id, sum2, cl::sycl::ext::oneapi::plus<>());
+              group_id, sum2, sycl::ext::oneapi::plus<>());
           if (local_id == 0) {
             const T_ACC s = T_ACC(1) / static_cast<T_ACC>(D * HxW);
             const T_ACC x = (sum2 * static_cast<T_ACC>(mean[ng]) - sum1) *
@@ -455,8 +451,8 @@ void GammaBetaBackwardDPCPPKernel(
       }
     }
     sum1 = sycl::reduce_over_group(group_id, sum1,
-  cl::sycl::ext::oneapi::plus<>()) sum2 = sycl::reduce_over_group(group_id,
-  sum2, cl::sycl::ext::oneapi::plus<>()) if (threadIdx.x == 0) { const int64_t
+  sycl::ext::oneapi::plus<>()) sum2 = sycl::reduce_over_group(group_id,
+  sum2, sycl::ext::oneapi::plus<>()) if (threadIdx.x == 0) { const int64_t
   c = blockIdx.x * blockDim.x + threadIdx.y; if (c < C) { if (dgamma !=
   nullptr) { dgamma[c] = sum1;
         }
@@ -466,8 +462,8 @@ void GammaBetaBackwardDPCPPKernel(
       }
     }
     sum1 = sycl::reduce_over_group(group_id, sum1,
-  cl::sycl::ext::oneapi::plus<>()) sum2 = sycl::reduce_over_group(group_id,
-  sum2, cl::sycl::ext::oneapi::plus<>()) if (threadIdx.x == 0) { const int64_t
+  sycl::ext::oneapi::plus<>()) sum2 = sycl::reduce_over_group(group_id,
+  sum2, sycl::ext::oneapi::plus<>()) if (threadIdx.x == 0) { const int64_t
   c = blockIdx.x * blockDim.x + threadIdx.y + blockDim.y; if (c < C) { if
   (dgamma != nullptr) { dgamma[c] = sum1;
         }

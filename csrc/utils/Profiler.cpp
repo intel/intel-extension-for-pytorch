@@ -196,14 +196,14 @@ bool is_profiler_enabled() {
   return xpu::dpcpp::is_profiler_enabled();
 }
 
-void profiler_record(std::string name, cl::sycl::event& event) {
+void profiler_record(std::string name, sycl::event& event) {
   return xpu::dpcpp::dpcpp_log(name, event);
 }
 
 void profiler_record(
     std::string name,
-    cl::sycl::event& start_event,
-    cl::sycl::event& end_event) {
+    sycl::event& start_event,
+    sycl::event& end_event) {
   xpu::dpcpp::dpcpp_log(name, start_event, end_event);
 }
 

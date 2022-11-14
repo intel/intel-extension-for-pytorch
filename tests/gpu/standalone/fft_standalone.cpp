@@ -58,7 +58,7 @@ static void init_data(float* data, int N1, int N2, int BATCH, int H1, int H2) {
 template <
     oneapi::mkl::dft::precision prec,
     oneapi::mkl::dft::domain signal_type>
-int run_dft(cl::sycl::device& dev) {
+int run_dft(sycl::device& dev) {
   int batch = 2;
   int64_t signal_ndim = 2;
   std::vector<int64_t> mkl_signal_sizes = {72, 72};
@@ -66,9 +66,9 @@ int run_dft(cl::sycl::device& dev) {
   std::vector<int64_t> ostrides = {5184, 72, 1};
   bool inverse = false;
 
-  cl::sycl::queue dpcpp_queue(dev);
-  float* in_data = cl::sycl::malloc_shared<float>((2 * 72 * 72), dpcpp_queue);
-  float* out_data = cl::sycl::malloc_shared<float>((2 * 72 * 72), dpcpp_queue);
+  sycl::queue dpcpp_queue(dev);
+  float* in_data = sycl::malloc_shared<float>((2 * 72 * 72), dpcpp_queue);
+  float* out_data = sycl::malloc_shared<float>((2 * 72 * 72), dpcpp_queue);
   init_data(in_data, 72, 72, 2, -1, 2);
 
   oneapi::mkl::dft::descriptor<prec, signal_type> desc(mkl_signal_sizes);
@@ -155,9 +155,9 @@ int main() {
 
   int returnCode = 0;
   try {
-    cl::sycl::device my_dev = cl::sycl::device(cl::sycl::gpu_selector());
+    sycl::device my_dev = sycl::device(sycl::gpu_selector());
     std::cout << "Platform: "
-              << sycl::platform(cl::sycl::gpu_selector())
+              << sycl::platform(sycl::gpu_selector())
                      .get_info<sycl::info::platform::version>()
               << std::endl;
     std::cout << "Device: " << my_dev.get_info<sycl::info::device::name>()
