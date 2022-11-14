@@ -10,19 +10,19 @@ namespace dpcpp {
 
 bool is_profiler_enabled();
 
-void dpcpp_mark(std::string name, cl::sycl::event& event);
+void dpcpp_mark(std::string name, sycl::event& event);
 
 void dpcpp_mark(
     std::string name,
-    cl::sycl::event& start_event,
-    cl::sycl::event& end_event);
+    sycl::event& start_event,
+    sycl::event& end_event);
 
-void dpcpp_log(std::string name, cl::sycl::event& event);
+void dpcpp_log(std::string name, sycl::event& event);
 
 void dpcpp_log(
     std::string name,
-    cl::sycl::event& start_event,
-    cl::sycl::event& end_event);
+    sycl::event& start_event,
+    sycl::event& end_event);
 
 void reportMemoryUsage(
     void* ptr,

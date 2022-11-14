@@ -310,7 +310,7 @@ void dispatch_softmax_forward_kernel(
         sycl::range<2>{local_size_row, sub_group_num}, cgh);
     cgh.parallel_for(
         sycl::nd_range<1>{global_range, local_range},
-        [=](cl::sycl::nd_item<1> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
+        [=](sycl::nd_item<1> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
           if (local_size == 1 && item_id.get_global_id(0) >= outer_size)
             return;
 
@@ -447,8 +447,8 @@ void softmax_forward_kernel(
               }
             }
           }
-          max_value = cl::sycl::reduce_over_group(
-              item_id.get_group(), max_value, cl::sycl::maximum<accscalar_t>());
+          max_value = sycl::reduce_over_group(
+              item_id.get_group(), max_value, sycl::maximum<accscalar_t>());
 
           // get sum value
           auto sum_value = accscalar_t(0);
@@ -463,8 +463,8 @@ void softmax_forward_kernel(
                     accscalar_t(in_val[j]) - max_value);
             }
           }
-          sum_value = cl::sycl::reduce_over_group(
-              item_id.get_group(), sum_value, cl::sycl::plus<accscalar_t>());
+          sum_value = sycl::reduce_over_group(
+              item_id.get_group(), sum_value, sycl::plus<accscalar_t>());
           if (LogSoftMax)
             sum_value = Numerics<accscalar_t>::log(sum_value);
           else
@@ -818,8 +818,8 @@ void softmax_backward_kernel(
               }
             }
           }
-          sum_value = cl::sycl::reduce_over_group(
-              item_id.get_group(), sum_value, cl::sycl::plus<accscalar_t>());
+          sum_value = sycl::reduce_over_group(
+              item_id.get_group(), sum_value, sycl::plus<accscalar_t>());
 
           // update result
           for (int i = local_id; i < loops_end; i += local_size) {
