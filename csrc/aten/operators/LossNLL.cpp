@@ -4,8 +4,8 @@
 #include <ATen/TensorUtils.h>
 #include <ATen/core/Reduction.h>
 
+#include <core/Device.h>
 #include <core/Memory.h>
-#include <core/TensorImplUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
@@ -945,11 +945,11 @@ Tensor& nll_loss2d_backward_out(
   const Tensor weight_val = weight.value();
   if (weight_val.defined()) {
     TORCH_CHECK(
-        IsOnSameDevice({self, target, weight_val, grad_input, total_weight}),
+        isOnSameDevice({self, target, weight_val, grad_input, total_weight}),
         "Some of weight/gradient/input tensors are located on different GPUs. Please move them to a single one.");
   } else {
     TORCH_CHECK(
-        IsOnSameDevice({self, target, grad_input, total_weight}),
+        isOnSameDevice({self, target, grad_input, total_weight}),
         "Some of weight/gradient/input tensors are located on different GPUs. Please move them to a single one.");
   }
 
@@ -1042,11 +1042,11 @@ std::tuple<Tensor&, Tensor&> nll_loss2d_forward_out(
   const Tensor weight_val = weight.value();
   if (weight_val.defined()) {
     TORCH_CHECK(
-        IsOnSameDevice({self, target, weight_val, output, total_weight}),
+        isOnSameDevice({self, target, weight_val, output, total_weight}),
         "Some of weight/gradient/input tensors are located on different GPUs. Please move them to a single one.");
   } else {
     TORCH_CHECK(
-        IsOnSameDevice({self, target, output, total_weight}),
+        isOnSameDevice({self, target, output, total_weight}),
         "Some of weight/gradient/input tensors are located on different GPUs. Please move them to a single one.");
   }
 

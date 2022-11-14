@@ -1,7 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/MemoryOverlap.h>
 
-#include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <utils/DPCPP.h>
@@ -52,7 +51,8 @@ void ScatterFill(
 template <typename scalar_t>
 typename std::enable_if<
     IS_FLOAT32(scalar_t) || IS_BFLOAT16(scalar_t) || IS_INT(scalar_t) ||
-        IS_INT64(scalar_t) || IS_DOUBLE(scalar_t) || IS_COMPLEX(scalar_t),
+        IS_INT64(scalar_t) || IS_DOUBLE(scalar_t) || IS_COMPLEX(scalar_t) ||
+        IS_BOOL(scalar_t),
     void>::type
 ScatterAdd(
     Tensor& result,
@@ -69,7 +69,8 @@ ScatterAdd(
 template <typename scalar_t>
 typename std::enable_if<
     !(IS_FLOAT32(scalar_t) || IS_BFLOAT16(scalar_t) || IS_INT(scalar_t) ||
-      IS_INT64(scalar_t) || IS_DOUBLE(scalar_t) || IS_COMPLEX(scalar_t)),
+      IS_INT64(scalar_t) || IS_DOUBLE(scalar_t) || IS_COMPLEX(scalar_t) ||
+      IS_BOOL(scalar_t)),
     void>::type
 ScatterAdd(
     Tensor& tensor,

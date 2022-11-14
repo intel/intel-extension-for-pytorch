@@ -337,19 +337,18 @@ Tensor& upsample_trilinear3d_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& output) {
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    xpu::oneDNN::resample(
-        input,
-        output,
-        output_size,
-        algorithm::resampling_linear,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-        scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+  TORCH_CHECK(
+      align_corners == false,
+      "we don't support align_cornser path by currently as oneDNN don't support this "
+      "algorithm!\n")
+  xpu::oneDNN::resample(
+      input,
+      output,
+      output_size,
+      algorithm::resampling_linear,
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
+      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
   return output;
 }
 
@@ -361,19 +360,18 @@ Tensor upsample_trilinear3d(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
   auto output = at::empty({0}, input.options());
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    xpu::oneDNN::resample(
-        input,
-        output,
-        output_size,
-        algorithm::resampling_linear,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-        scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+  TORCH_CHECK(
+      align_corners == false,
+      "We don't support align_corners currently as oneDNN don't support this "
+      "algorithm!\n");
+  xpu::oneDNN::resample(
+      input,
+      output,
+      output_size,
+      algorithm::resampling_linear,
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
+      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
   return output;
 }
 
@@ -382,24 +380,23 @@ Tensor upsample_trilinear3d(
     c10::optional<IntArrayRef> output_size,
     bool align_corners,
     c10::optional<ArrayRef<double>> scale_factors) {
+  TORCH_CHECK(
+      align_corners == false,
+      "We don't support align_corners currently as oneDNN don't support this "
+      "algorithm!\n");
   auto output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
   auto scale_d = get_scale_value(scale_factors, 0);
   auto scale_h = get_scale_value(scale_factors, 1);
   auto scale_w = get_scale_value(scale_factors, 2);
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    xpu::oneDNN::resample(
-        input,
-        output,
-        osize,
-        algorithm::resampling_linear,
-        scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
-        scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
-        scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
+  xpu::oneDNN::resample(
+      input,
+      output,
+      osize,
+      algorithm::resampling_linear,
+      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
+      scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
   return output;
 }
 
@@ -412,20 +409,19 @@ Tensor& upsample_trilinear3d_backward_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& grad_input) {
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    xpu::oneDNN::resample_backward(
-        grad_input,
-        grad_output,
-        input_size,
-        output_size,
-        algorithm::resampling_linear,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-        scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+  TORCH_CHECK(
+      align_corners == false,
+      "We don't support align_corners currently as oneDNN don't support this "
+      "algorithm!\n");
+  xpu::oneDNN::resample_backward(
+      grad_input,
+      grad_output,
+      input_size,
+      output_size,
+      algorithm::resampling_linear,
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
+      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
   return grad_input;
 }
 
@@ -437,6 +433,10 @@ Tensor upsample_trilinear3d_backward(
     c10::optional<double> scales_d,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
+  TORCH_CHECK(
+      align_corners == false,
+      "We don't support align_corners currently as oneDNN don't support this "
+      "algorithm!\n");
   auto ndim = grad_output.ndimension();
   Tensor grad_input;
   if (is_smf_channels_last(grad_output)) {
@@ -446,20 +446,15 @@ Tensor upsample_trilinear3d_backward(
     grad_input = at::empty(input_size, grad_output.options());
   }
 
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    xpu::oneDNN::resample_backward(
-        grad_input,
-        grad_output,
-        input_size,
-        output_size,
-        algorithm::resampling_linear,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-        scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+  xpu::oneDNN::resample_backward(
+      grad_input,
+      grad_output,
+      input_size,
+      output_size,
+      algorithm::resampling_linear,
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
+      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
   return grad_input;
 }
 
@@ -469,6 +464,10 @@ Tensor upsample_trilinear3d_backward(
     IntArrayRef input_size,
     bool align_corners,
     c10::optional<ArrayRef<double>> scale_factors) {
+  TORCH_CHECK(
+      align_corners == false,
+      "We don't support align_corners currently as oneDNN don't support this "
+      "algorithm!\n");
   auto osize = compute_output_size(input_size, output_size, scale_factors);
   auto scale_d = get_scale_value(scale_factors, 0);
   auto scale_h = get_scale_value(scale_factors, 1);
@@ -484,20 +483,15 @@ Tensor upsample_trilinear3d_backward(
     grad_input = at::empty(input_size, grad_output.options());
   }
 
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    xpu::oneDNN::resample_backward(
-        grad_input,
-        grad_output,
-        input_size,
-        osize,
-        algorithm::resampling_linear,
-        scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
-        scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
-        scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
+  xpu::oneDNN::resample_backward(
+      grad_input,
+      grad_output,
+      input_size,
+      osize,
+      algorithm::resampling_linear,
+      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
+      scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
   return grad_input;
 }
 
@@ -677,17 +671,16 @@ Tensor& upsample_linear1d_out(
     bool align_corners,
     c10::optional<double> scales,
     Tensor& output) {
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    xpu::oneDNN::resample(
-        input,
-        output,
-        output_size,
-        algorithm::resampling_linear,
-        scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
+  TORCH_CHECK(
+      align_corners == false,
+      "We don't support align_corners currently as oneDNN don't support this "
+      "algorithm!\n");
+  xpu::oneDNN::resample(
+      input,
+      output,
+      output_size,
+      algorithm::resampling_linear,
+      scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
   return output;
 }
 
@@ -698,18 +691,17 @@ Tensor& upsample_linear1d_backward_out(
     bool align_corners,
     c10::optional<double> scales,
     Tensor& grad_input) {
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    xpu::oneDNN::resample_backward(
-        grad_input,
-        grad_output,
-        input_size,
-        output_size,
-        algorithm::resampling_linear,
-        scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
+  TORCH_CHECK(
+      align_corners == false,
+      "We don't support align_corners currently as oneDNN don't support this "
+      "algorithm!\n");
+  xpu::oneDNN::resample_backward(
+      grad_input,
+      grad_output,
+      input_size,
+      output_size,
+      algorithm::resampling_linear,
+      scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
   return grad_input;
 }
 

@@ -727,7 +727,7 @@ std::tuple<at::Tensor&, at::Tensor&> topk_out(
     bool sorted,
     at::Tensor& values,
     at::Tensor& indices) {
-  auto dim_ = maybe_wrap_dim(dim, TensorImpl_Unwrap(self));
+  auto dim_ = maybe_wrap_dim(dim, self);
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,

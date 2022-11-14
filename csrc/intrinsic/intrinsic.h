@@ -4,6 +4,8 @@
 #include <ATen/native/quantized/PackedParams.h>
 #include <utils/Macros.h>
 
+#include <aten/operators/Linear.h>
+
 namespace at {
 namespace AtenIpexTypeXPU {
 
@@ -106,7 +108,7 @@ at::Tensor linear_sum(
     const at::Tensor& input,
     const at::Tensor& weight,
     const at::Tensor& bias,
-    const at::Tensor& accumu,
+    at::Tensor& accumu,
     at::Scalar alpha);
 
 at::Tensor mul_add(
@@ -492,33 +494,6 @@ DECLARE_LINEAR(mish)
 DECLARE_LINEAR(hardsigmoid)
 DECLARE_LINEAR(sigmoid)
 DECLARE_LINEAR(relu)
-
-Tensor linear_pow(
-    const Tensor& input,
-    const Tensor& weight,
-    const Tensor& bias,
-    Scalar exponent);
-
-Tensor linear_leaky_relu(
-    const Tensor& input,
-    const Tensor& weight,
-    const Tensor& bias,
-    Scalar negative_slope);
-
-Tensor linear_hardtanh(
-    const Tensor& input,
-    const Tensor& weight,
-    const Tensor& bias,
-    Scalar minval,
-    Scalar maxval);
-
-Tensor linear_elu(
-    const Tensor& input,
-    const Tensor& weight,
-    const Tensor& bias,
-    Scalar alpha,
-    Scalar scale,
-    Scalar input_scale);
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

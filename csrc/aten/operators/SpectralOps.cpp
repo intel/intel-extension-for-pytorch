@@ -7,11 +7,13 @@
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
 #include <utils/LRUCache.h>
+#include <oneapi/dpl/complex>
 #include "Resize.h"
 #include "Utils.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
+namespace dpl = oneapi::dpl;
 
 using namespace xpu::dpcpp;
 using namespace xpu::dpcpp::detail;
@@ -91,7 +93,7 @@ void _fft_conjugate_copy_kernel(
     auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto in_offset = ic.get(item_id)[0];
       auto out_offset = oc.get(item_id)[0];
-      out_data[out_offset] = std::conj(in_data[in_offset]);
+      out_data[out_offset] = dpl::conj(in_data[in_offset]);
     };
 
     cgh.parallel_for(sycl::range</*dim=*/1>(thread_num), kfn);

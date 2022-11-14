@@ -4,7 +4,6 @@
 #include <ATen/quantized/QTensorImpl.h>
 
 #include <ATen/native/TensorIterator.h>
-#include <core/TensorImplUtils.h>
 #include "Loops.h"
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"

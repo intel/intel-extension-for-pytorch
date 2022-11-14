@@ -3,7 +3,6 @@
 #include <ATen/MatrixRef.h>
 #include <ATen/cpp_custom_type_hack.h>
 #include <ATen/record_function.h>
-#include <core/TensorImplUtils.h>
 #include <dnnl.hpp>
 #include <oneDNN/oneDNN.h>
 #include <torch/autograd.h>
@@ -36,8 +35,10 @@ class LSTMFunction : public Function<LSTMFunction> {
       double dropout,
       bool train,
       bool bidirectional) {
+#ifdef BUILD_SIMPLE_TRACE
     SimpleTrace trace(
         "LSTM forward -> at::AtenIpexTypeXPU::LSTMFunction::forward");
+#endif
     variable_list saved_v = {input, hx, cx, weight_i, weight_h, bias};
     ctx->saved_data["has_biases"] = has_biases;
     ctx->saved_data["num_layers"] = num_layers;
@@ -73,8 +74,10 @@ class LSTMFunction : public Function<LSTMFunction> {
   static variable_list backward(
       AutogradContext* ctx,
       variable_list grad_outputs) {
+#ifdef BUILD_SIMPLE_TRACE
     SimpleTrace trace(
         "LSTM backward -> at::AtenIpexTypeXPU::LSTMFunction::backward");
+#endif
     auto saved = ctx->get_saved_variables();
     auto input = saved[0];
     auto hx = saved[1];

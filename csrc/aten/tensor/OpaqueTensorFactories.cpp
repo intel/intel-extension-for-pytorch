@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/native/Resize.h>
 #include <ATen/quantized/QTensorImpl.h>
 #include <core/Allocator.h>
 #include <tensor/OpaqueTensorFactories.h>
@@ -156,7 +157,9 @@ MaterializedITensorListRef to_plain_if_needed(
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
+
 using AtenIpexTypeXPU::DPCPPTensorContext;
 using AtenIpexTypeXPU::DPCPPTensorConvertor;
+
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

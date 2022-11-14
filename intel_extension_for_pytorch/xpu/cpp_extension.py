@@ -8,6 +8,7 @@ import re
 import shlex
 import sys
 import sysconfig
+import errno
 
 import warnings
 
@@ -44,6 +45,7 @@ JIT_EXTENSION_VERSIONER = ExtensionVersioner()
 
 # Taken directly from python stdlib < 3.9
 # See https://github.com/pytorch/pytorch/issues/48617
+
 def _nt_quote_args(args: Optional[List[str]]) -> List[str]:
     """Quote command-line arguments for DOS/Windows conventions.
 
@@ -54,6 +56,7 @@ def _nt_quote_args(args: Optional[List[str]]) -> List[str]:
     if not args:
         return []
     return [f'"{arg}"' if ' ' in arg else arg for arg in args]
+
 
 def get_default_build_root() -> str:
     r'''
@@ -111,7 +114,6 @@ def is_ninja_available():
     else:
         return True
 
-
 def verify_ninja_availability():
     r'''
     Raises ``RuntimeError`` if `ninja <https://ninja-build.org/>`_ build system is not
@@ -146,7 +148,7 @@ class DpcppBuildExtension(build_ext, object):
 
     ``no_python_abi_suffix`` (bool): If ``no_python_abi_suffix`` is ``False`` (default),
     then we attempt to build module with python abi suffix, example:
-    output module name: module_name.cpython-37m-x86_64-linux-gnu.so, the 
+    output module name: module_name.cpython-37m-x86_64-linux-gnu.so, the
     ``cpython-37m-x86_64-linux-gnu`` is append python abi suffix.
 
     .. note::
@@ -219,6 +221,9 @@ class DpcppBuildExtension(build_ext, object):
             original_spawn = self.compiler.spawn
         else:
             original_compile = self.compiler._compile
+            # save origin function for passthough
+            original_link_shared_object = self.compiler.link_shared_object
+            original_spawn = self.compiler.spawn
 
         def append_std17_if_no_std_present(cflags) -> None:
             cpp_format_prefix = '/{}:' if self.compiler.compiler_type == 'msvc' else '-{}='
@@ -265,6 +270,74 @@ class DpcppBuildExtension(build_ext, object):
             finally:
                 # Put the original compiler back in place.
                 self.compiler.set_executable('compiler_so', original_compiler)
+
+        def _gen_link_lib_cmd_line(
+                linker,
+                objects,
+                target_name,
+                library_dirs,
+                runtime_library_dirs,
+                libraries,
+                extra_postargs):
+            cmd_line = []
+
+            library_dirs_args = []
+            library_dirs_args += [f'-L{x}' for x in library_dirs]
+
+            runtime_library_dirs_args = []
+            runtime_library_dirs_args += [f'-L{x}' for x in runtime_library_dirs]
+
+            libraries_args = []
+            libraries_args += [f'-l{x}' for x in libraries]
+
+            common_args = ['-shared']
+
+            '''
+            link command formats:
+            cmd = [LD common_args objects library_dirs_args runtime_library_dirs_args libraries_args
+                    -o target_name extra_postargs]
+            '''
+
+            cmd_line += [linker]
+            cmd_line += common_args
+            cmd_line += objects
+            cmd_line += library_dirs_args
+            cmd_line += runtime_library_dirs_args
+            cmd_line += libraries_args
+            cmd_line += ['-o']
+            cmd_line += [target_name]
+            cmd_line += extra_postargs
+
+            return cmd_line
+
+        def create_parent_dirs_by_path(filename):
+            if not os.path.exists(os.path.dirname(filename)):
+                try:
+                    os.makedirs(os.path.dirname(filename))
+                except OSError as exc:  # Guard against race condition
+                    if exc.errno != errno.EEXIST:
+                        raise
+
+        def unix_wrap_single_link_shared_object(objects,
+                                                output_libname,
+                                                output_dir=None,
+                                                libraries=None,
+                                                library_dirs=None,
+                                                runtime_library_dirs=None,
+                                                export_symbols=None,
+                                                debug=0,
+                                                extra_preargs=None,
+                                                extra_postargs=None,
+                                                build_temp=None,
+                                                target_lang=None):
+            # create output directories avoid linker error.
+            create_parent_dirs_by_path(output_libname)
+
+            _cxxbin = get_dpcpp_complier()
+            cmd = _gen_link_lib_cmd_line(_cxxbin, objects, output_libname, library_dirs,
+                                         runtime_library_dirs, libraries, extra_postargs)
+
+            return original_spawn(cmd)
 
         def unix_wrap_ninja_compile(sources,
                                     output_dir=None,
@@ -325,6 +398,7 @@ class DpcppBuildExtension(build_ext, object):
                 self.compiler.compile = unix_wrap_ninja_compile
             else:
                 self.compiler._compile = unix_wrap_single_compile
+                self.compiler.link_shared_object = unix_wrap_single_link_shared_object
 
         build_ext.build_extensions(self)
 
@@ -381,7 +455,6 @@ BUILT_FROM_SOURCE_VERSION_PATTERN = re.compile(r'\d+\.\d+\.\d+\w+\+\w+')
 
 def _is_binary_build() -> bool:
     return not BUILT_FROM_SOURCE_VERSION_PATTERN.match(torch.version.__version__)
-
 
 def _accepted_compilers_for_platform() -> List[str]:
     # gnu-c++ and gnu-cc are the conda gcc compilers
@@ -894,8 +967,8 @@ def _jit_compile(name,
     )
     if version > 0:
         if version != old_version and verbose:
-            print(f'The input conditions for extension module {name} have changed. ' +
-                  f'Bumping to version {version} and re-building as {name}_v{version}...')
+            print(f'The input conditions for extension module {name} have changed. '
+                  + f'Bumping to version {version} and re-building as {name}_v{version}...')
         name = f'{name}_v{version}'
 
     if version != old_version:
@@ -1213,6 +1286,7 @@ class _one_api_help:
             f'{MKLROOT}/lib/intel64/libmkl_core.a',
         ]
 
+
 def get_pytorch_include_dir():
     lib_include = os.path.join(_TORCH_PATH, 'include')
     paths = [
@@ -1227,7 +1301,6 @@ def get_pytorch_include_dir():
 
 def get_pytorch_lib_dir():
     return [os.path.join(_TORCH_PATH, 'lib')]
-
 
 def DPCPPExtension(name, sources, *args, **kwargs):
     r'''

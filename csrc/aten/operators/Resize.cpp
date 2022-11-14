@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 
-#include <core/TensorImplUtils.h>
+#include <tensor/Tensor.h>
 #include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp;
@@ -14,7 +14,7 @@ const Tensor& resize_(
     IntArrayRef size,
     c10::optional<MemoryFormat> optional_memory_format) {
   auto* self_ = self.unsafeGetTensorImpl();
-  TensorImpl_resizeImpl(self_, size, /*strides=*/c10::nullopt);
+  resize_impl(self_, size, /*strides=*/c10::nullopt);
 
   if (optional_memory_format.has_value()) {
     auto memory_format = optional_memory_format.value();

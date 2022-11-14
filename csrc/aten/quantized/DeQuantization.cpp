@@ -7,7 +7,6 @@
 #include <ATen/quantized/Quantizer.h>
 #include <c10/util/Exception.h>
 
-#include <core/TensorImplUtils.h>
 #include <oneDNN/oneDNN.h>
 #include <quantized/DeQuantization.h>
 

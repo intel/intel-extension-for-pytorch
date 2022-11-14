@@ -7,13 +7,14 @@
 #include <c10/util/Exception.h>
 #include <core/Allocator.h>
 #include <core/Generator.h>
-#include <core/TensorImplUtils.h>
 #include <core/detail/ListUtils.h>
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
+#include <tensor/Tensor.h>
 #include "BitonicMergeSort.h"
 #include "Loops.h"
 #include "PSTLFunctions.h"
+#include "ReduceOpStdVar.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
@@ -22,6 +23,7 @@ using namespace at::native;
 using namespace xpu::dpcpp;
 
 namespace at {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 Tensor empty_dpcpp(
@@ -113,7 +115,7 @@ Tensor empty_strided_dpcpp(
     const TensorOptions& options) {
   check_size_nonnegative(size);
   auto t = empty_dpcpp({0}, options, c10::nullopt);
-  TensorImpl_resizeImpl(t.unsafeGetTensorImpl(), size, stride);
+  resize_impl(t.unsafeGetTensorImpl(), size, stride);
   return t;
 }
 
@@ -361,7 +363,7 @@ Tensor triu_indices_dpcpp(
         at::ScalarType::Half, tensor.scalar_type(), "triu_indices_dpcpp", [&] {
           triu_indices_dpcpp_kernel<scalar_t>(
               tensor.data_ptr<scalar_t>(),
-              std::max<int64_t>(0, offset),
+              Numerics<int64_t>::max(0, offset),
               m_first_row,
               col,
               rectangle_size,
@@ -411,31 +413,12 @@ Tensor tril_indices_dpcpp(
 
 } // namespace impl
 
-namespace AtenIpexTypeXPU {
-
-at::Tensor& std_var_out(
-    at::Tensor& result,
-    const at::Tensor& self,
-    c10::OptionalArrayRef<long> dim,
-    int64_t correction_opt,
-    bool keepdim,
-    bool take_sqrt);
-
-std::tuple<Tensor&, Tensor&> std_var_mean_out(
-    const char* fname,
-    Tensor& result1,
-    Tensor& result2,
-    const Tensor& self,
-    IntArrayRef dim,
-    int64_t correction_opt,
-    bool keepdim,
-    bool take_sqrt);
-
 Tensor empty(
     IntArrayRef size,
     const TensorOptions& options,
     c10::optional<MemoryFormat> optional_memory_format) {
-  return at::impl::empty_dpcpp(size, options, optional_memory_format);
+  return AtenIpexTypeXPU::impl::empty_dpcpp(
+      size, options, optional_memory_format);
 }
 
 Tensor empty(
@@ -461,16 +444,16 @@ Tensor empty_strided(
   TensorOptions options =
       TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
           pin_memory);
-  return at::impl::empty_strided_dpcpp(size, stride, options);
+  return AtenIpexTypeXPU::impl::empty_strided_dpcpp(size, stride, options);
 }
 
 Tensor& eye_out(int64_t n, Tensor& out) {
-  at::impl::eye_out_dpcpp(out, n);
+  AtenIpexTypeXPU::impl::eye_out_dpcpp(out, n);
   return out;
 }
 
 Tensor& eye_out(int64_t n, int64_t m, Tensor& out) {
-  at::impl::eye_out_dpcpp(out, n, m);
+  AtenIpexTypeXPU::impl::eye_out_dpcpp(out, n, m);
   return out;
 }
 
@@ -483,7 +466,7 @@ Tensor& randperm_out(
   result.resize_({n});
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, result.scalar_type(), "randperm", [&]() -> void {
-        at::impl::randperm_dpcpp<scalar_t>(result, n, generator);
+        AtenIpexTypeXPU::impl::randperm_dpcpp<scalar_t>(result, n, generator);
       });
 
   return result;
@@ -500,7 +483,7 @@ Tensor tril_indices(
   TensorOptions options =
       TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
           pin_memory);
-  return at::impl::tril_indices_dpcpp(row, col, offset, options);
+  return AtenIpexTypeXPU::impl::tril_indices_dpcpp(row, col, offset, options);
 }
 
 Tensor triu_indices(
@@ -514,7 +497,7 @@ Tensor triu_indices(
   TensorOptions options =
       TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
           pin_memory);
-  return at::impl::triu_indices_dpcpp(row, col, offset, options);
+  return AtenIpexTypeXPU::impl::triu_indices_dpcpp(row, col, offset, options);
 }
 
 Tensor var(
@@ -616,7 +599,8 @@ Tensor empty(
     IntArrayRef size,
     const TensorOptions& options,
     c10::optional<MemoryFormat> optional_memory_format) {
-  return at::impl::empty_dpcpp(size, options, optional_memory_format);
+  return AtenIpexTypeXPU::impl::empty_dpcpp(
+      size, options, optional_memory_format);
 }
 
 Tensor empty_strided(
@@ -629,7 +613,7 @@ Tensor empty_strided(
   TensorOptions options =
       TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
           pin_memory);
-  return at::impl::empty_strided_dpcpp(size, stride, options);
+  return AtenIpexTypeXPU::impl::empty_strided_dpcpp(size, stride, options);
 }
 
 Tensor empty(
@@ -653,7 +637,7 @@ Tensor empty_quantized(
     c10::optional<Device> device,
     c10::optional<bool> pin_memory,
     c10::optional<c10::MemoryFormat> memory_format) {
-  return at::impl::empty_quantized(
+  return AtenIpexTypeXPU::impl::empty_quantized(
       size, qtensor, dtype, layout, device, pin_memory, memory_format);
 }
 } // namespace AtenIpexTypeQuantizedXPU

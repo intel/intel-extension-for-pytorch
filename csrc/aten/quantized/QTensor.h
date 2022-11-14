@@ -11,6 +11,13 @@ Tensor new_qtensor(
     const TensorOptions& options,
     QuantizerPtr quantizer);
 
+Tensor as_strided_quantized_dpcpp(
+    const Tensor& self,
+    IntArrayRef size,
+    IntArrayRef stride);
+
+Tensor expand_as_quantized_dpcpp(const Tensor& self, const Tensor& other);
+
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {

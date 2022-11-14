@@ -1,8 +1,8 @@
 #include <ATen/ATen.h>
 #include <torch/torch.h>
 
+#include <core/Device.h>
 #include <core/Memory.h>
-#include <core/TensorImplUtils.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 
@@ -678,10 +678,10 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
   auto offsets_arg = TensorArg(offsets, "offsets", 1);
   checkScalarTypes("embedding_bag_dpcpp", offsets_arg, {kLong, kInt});
   checkSameType("embedding_bag_dpcpp", indices_arg, offsets_arg);
-  IsOnSameDevice("embedding_bag_dpcpp", indices_arg, offsets_arg);
+  isOnSameDevice("embedding_bag_dpcpp", indices_arg, offsets_arg);
   auto weight_arg = TensorArg(weight, "weight", 1);
-  IsOnSameDevice("embedding_bag_dpcpp", weight_arg, indices_arg);
-  IsOnSameDevice("embedding_bag_dpcpp", weight_arg, offsets_arg);
+  isOnSameDevice("embedding_bag_dpcpp", weight_arg, indices_arg);
+  isOnSameDevice("embedding_bag_dpcpp", weight_arg, offsets_arg);
 
   int64_t numIndices = indices.size(0);
   int64_t numBags = offsets.size(0);

@@ -8,8 +8,10 @@
 #include <c10/util/complex.h>
 #include <utils/DPCPP.h>
 
+#include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/cmath>
 #include <oneapi/dpl/complex>
+#include <oneapi/dpl/limits>
 #include <oneapi/dpl/type_traits>
 #include "General.h"
 
@@ -97,10 +99,10 @@ DPCPP_BOTH inline constexpr T pi_i() {
 template <>
 struct Numerics<uint8_t> {
   static inline uint8_t lower_bound() {
-    return std::numeric_limits<uint8_t>::lowest();
+    return dpl::numeric_limits<uint8_t>::lowest();
   }
   static inline uint8_t upper_bound() {
-    return std::numeric_limits<uint8_t>::max();
+    return dpl::numeric_limits<uint8_t>::max();
   }
   static inline constexpr uint8_t pi() {
     return pi_i<uint8_t>();
@@ -153,20 +155,20 @@ struct Numerics<uint8_t> {
     return false;
   }
   static inline uint8_t min(uint8_t a, uint8_t b) {
-    return sycl::min(a, b);
+    return dpl::min(a, b);
   }
   static inline uint8_t max(uint8_t a, uint8_t b) {
-    return sycl::max(a, b);
+    return dpl::max(a, b);
   }
 };
 
 template <>
 struct Numerics<bool> {
   static inline bool lower_bound() {
-    return std::numeric_limits<bool>::lowest();
+    return dpl::numeric_limits<bool>::lowest();
   }
   static inline bool upper_bound() {
-    return std::numeric_limits<bool>::max();
+    return dpl::numeric_limits<bool>::max();
   }
   static inline constexpr bool pi() {
     return pi_i<bool>();
@@ -216,10 +218,10 @@ struct Numerics<bool> {
 template <>
 struct Numerics<int8_t> {
   static inline int8_t lower_bound() {
-    return std::numeric_limits<int8_t>::lowest();
+    return dpl::numeric_limits<int8_t>::lowest();
   }
   static inline int8_t upper_bound() {
-    return std::numeric_limits<int8_t>::max();
+    return dpl::numeric_limits<int8_t>::max();
   }
   static inline constexpr int8_t pi() {
     return pi_i<int8_t>();
@@ -260,7 +262,7 @@ struct Numerics<int8_t> {
     return a / b;
   }
   static inline int8_t abs(int8_t a) {
-    return sycl::abs((int)a);
+    return dpl::abs((int)a);
   }
   static inline int8_t pow(int8_t a, int8_t b) {
     return powi<int8_t>(a, b);
@@ -272,20 +274,20 @@ struct Numerics<int8_t> {
     return false;
   }
   static inline int8_t min(int8_t a, int8_t b) {
-    return sycl::min(a, b);
+    return dpl::min(a, b);
   }
   static inline int8_t max(int8_t a, int8_t b) {
-    return sycl::max(a, b);
+    return dpl::max(a, b);
   }
 };
 
 template <>
 struct Numerics<int16_t> {
   static inline int16_t lower_bound() {
-    return std::numeric_limits<int16_t>::lowest();
+    return dpl::numeric_limits<int16_t>::lowest();
   }
   static inline int16_t upper_bound() {
-    return std::numeric_limits<int16_t>::max();
+    return dpl::numeric_limits<int16_t>::max();
   }
   static inline constexpr int16_t pi() {
     return pi_i<int16_t>();
@@ -326,7 +328,7 @@ struct Numerics<int16_t> {
     return a / b;
   }
   static inline int16_t abs(int16_t a) {
-    return sycl::abs(a);
+    return dpl::abs(a);
   }
   static inline int16_t pow(int16_t a, int16_t b) {
     return powi<int16_t>(a, b);
@@ -341,20 +343,20 @@ struct Numerics<int16_t> {
     return sgni<int16_t>(a);
   }
   static inline int16_t min(int16_t a, int16_t b) {
-    return sycl::min(a, b);
+    return dpl::min(a, b);
   }
   static inline int16_t max(int16_t a, int16_t b) {
-    return sycl::max(a, b);
+    return dpl::max(a, b);
   }
 };
 
 template <>
 struct Numerics<int32_t> {
   static inline int32_t lower_bound() {
-    return std::numeric_limits<int32_t>::lowest();
+    return dpl::numeric_limits<int32_t>::lowest();
   }
   static inline int32_t upper_bound() {
-    return std::numeric_limits<int32_t>::max();
+    return dpl::numeric_limits<int32_t>::max();
   }
   static inline constexpr int32_t pi() {
     return pi_i<int32_t>();
@@ -395,7 +397,7 @@ struct Numerics<int32_t> {
     return a / b;
   }
   static inline int32_t abs(int32_t a) {
-    return sycl::abs(a);
+    return dpl::abs(a);
   }
   static inline int32_t pow(int32_t a, int32_t b) {
     return powi<int32_t>(a, b);
@@ -410,20 +412,20 @@ struct Numerics<int32_t> {
     return sgni<int32_t>(a);
   }
   static inline int32_t min(int32_t a, int32_t b) {
-    return sycl::min(a, b);
+    return dpl::min(a, b);
   }
   static inline int32_t max(int32_t a, int32_t b) {
-    return sycl::max(a, b);
+    return dpl::max(a, b);
   }
 };
 
 template <>
 struct Numerics<int64_t> {
   static inline int64_t lower_bound() {
-    return std::numeric_limits<int64_t>::lowest();
+    return dpl::numeric_limits<int64_t>::lowest();
   }
   static inline int64_t upper_bound() {
-    return std::numeric_limits<int64_t>::max();
+    return dpl::numeric_limits<int64_t>::max();
   }
   static inline constexpr int64_t pi() {
     return pi_i<int64_t>();
@@ -464,7 +466,7 @@ struct Numerics<int64_t> {
     return a / b;
   }
   static inline int64_t abs(int64_t a) {
-    return sycl::abs(a);
+    return dpl::abs(a);
   }
   static inline int64_t pow(int64_t a, int64_t b) {
     return powi<int64_t>(a, b);
@@ -479,10 +481,10 @@ struct Numerics<int64_t> {
     return sgni<int64_t>(a);
   }
   static inline int64_t min(int64_t a, int64_t b) {
-    return sycl::min(a, b);
+    return dpl::min(a, b);
   }
   static inline int64_t max(int64_t a, int64_t b) {
-    return sycl::max(a, b);
+    return dpl::max(a, b);
   }
 };
 
@@ -523,9 +525,6 @@ struct Numerics<at::Half> {
   static inline at::Half exp2(at::Half a) {
     return dpl::exp2(float(a));
   }
-  static inline at::Half exp10(at::Half a) {
-    return sycl::exp10(float(a));
-  }
   static inline at::Half log(at::Half a) {
     return dpl::log(float(a));
   }
@@ -558,13 +557,13 @@ struct Numerics<at::Half> {
     return sycl::rsqrt(float(a));
   }
   static inline at::Half ceil(at::Half a) {
-    return sycl::ceil(float(a));
+    return dpl::ceil(float(a));
   }
   static inline at::Half floor(at::Half a) {
-    return sycl::floor(float(a));
+    return dpl::floor(float(a));
   }
   static inline at::Half trunc(at::Half a) {
-    return sycl::trunc(float(a));
+    return dpl::trunc(float(a));
   }
   static inline at::Half acos(at::Half a) {
     return dpl::acos(float(a));
@@ -606,10 +605,10 @@ struct Numerics<at::Half> {
     return dpl::erfc(float(a));
   }
   static inline at::Half round(float a) {
-    return sycl::round(float(a));
+    return dpl::round(float(a));
   }
   static inline at::Half frac(at::Half a) {
-    return a - sycl::trunc(float(a));
+    return a - dpl::trunc(float(a));
   }
   static inline at::Half atan2(at::Half a, at::Half b) {
     return dpl::atan2(float(a), float(b));
@@ -626,7 +625,7 @@ struct Numerics<at::Half> {
     } else if (b != b) {
       return b;
     } else {
-      return sycl::fmin(float(a), float(b));
+      return dpl::fmin(float(a), float(b));
     }
   }
   static inline at::Half add(at::Half a, at::Half b) {
@@ -651,32 +650,29 @@ struct Numerics<at::Half> {
     } else if (b != b) {
       return b;
     } else {
-      return sycl::fmax(float(a), float(b));
+      return dpl::fmax(float(a), float(b));
     }
   }
   static inline float fmin(at::Half a, at::Half b) {
-    return sycl::fmin((float)a, (float)b);
+    return dpl::fmin((float)a, (float)b);
   }
   static inline float fmax(at::Half a, at::Half b) {
-    return sycl::fmax((float)a, (float)b);
+    return dpl::fmax((float)a, (float)b);
   }
   static inline at::Half abs(at::Half a) {
-    return sycl::fabs(float(a));
+    return dpl::fabs(float(a));
   }
   static inline at::Half fabs(at::Half a) {
-    return sycl::fabs(float(a));
+    return dpl::fabs(float(a));
   }
   static inline bool isnan(at::Half a) {
-    return sycl::isnan((float)a);
+    return dpl::isnan((float)a);
   }
   static inline bool isinf(at::Half a) {
-    return sycl::isinf((float)a);
-  }
-  static inline at::Half sgn(at::Half a) {
-    return sycl::sign((float)a);
+    return dpl::isinf((float)a);
   }
   static inline at::Half copysign(at::Half a, at::Half b) {
-    return sycl::copysign((float)a, (float)b);
+    return dpl::copysign((float)a, (float)b);
   }
   static inline at::Half fmod(at::Half a, at::Half b) {
     return dpl::fmod((float)a, (float)b);
@@ -723,9 +719,6 @@ struct Numerics<at::BFloat16> {
   static inline at::BFloat16 exp2(at::BFloat16 a) {
     return dpl::exp2(float(a));
   }
-  static inline at::BFloat16 exp10(at::BFloat16 a) {
-    return sycl::exp10(float(a));
-  }
   static inline at::BFloat16 log(at::BFloat16 a) {
     return dpl::log(float(a));
   }
@@ -758,13 +751,13 @@ struct Numerics<at::BFloat16> {
     return sycl::rsqrt(float(a));
   }
   static inline at::BFloat16 ceil(at::BFloat16 a) {
-    return sycl::ceil(float(a));
+    return dpl::ceil(float(a));
   }
   static inline at::BFloat16 floor(at::BFloat16 a) {
-    return sycl::floor(float(a));
+    return dpl::floor(float(a));
   }
   static inline at::BFloat16 trunc(at::BFloat16 a) {
-    return sycl::trunc(float(a));
+    return dpl::trunc(float(a));
   }
   static inline at::BFloat16 acos(at::BFloat16 a) {
     return dpl::acos(float(a));
@@ -806,7 +799,7 @@ struct Numerics<at::BFloat16> {
     return dpl::lgamma(float(a));
   }
   static inline at::BFloat16 round(float a) {
-    return sycl::round(float(a));
+    return dpl::round(float(a));
   }
   static inline at::BFloat16 min(at::BFloat16 a, at::BFloat16 b) {
     if (a != a) {
@@ -814,7 +807,7 @@ struct Numerics<at::BFloat16> {
     } else if (b != b) {
       return b;
     } else {
-      return sycl::fmin(float(a), float(b));
+      return dpl::fmin(float(a), float(b));
     }
   }
   static inline at::BFloat16 max(at::BFloat16 a, at::BFloat16 b) {
@@ -823,17 +816,17 @@ struct Numerics<at::BFloat16> {
     } else if (b != b) {
       return b;
     } else {
-      return sycl::fmax(float(a), float(b));
+      return dpl::fmax(float(a), float(b));
     }
   }
   static inline float fmin(at::BFloat16 a, at::BFloat16 b) {
-    return sycl::fmin((float)a, (float)b);
+    return dpl::fmin((float)a, (float)b);
   }
   static inline float fmax(at::BFloat16 a, at::BFloat16 b) {
-    return sycl::fmax((float)a, (float)b);
+    return dpl::fmax((float)a, (float)b);
   }
   static inline at::BFloat16 frac(at::BFloat16 a) {
-    return a - sycl::trunc(float(a));
+    return a - dpl::trunc(float(a));
   }
   static inline at::BFloat16 atan2(at::BFloat16 a, at::BFloat16 b) {
     return dpl::atan2(float(a), float(b));
@@ -865,22 +858,19 @@ struct Numerics<at::BFloat16> {
     return dpl::pow(float(a), float(b));
   }
   static inline at::BFloat16 abs(at::BFloat16 a) {
-    return sycl::fabs(float(a));
+    return dpl::fabs(float(a));
   }
   static inline at::BFloat16 fabs(at::BFloat16 a) {
-    return sycl::fabs(float(a));
+    return dpl::fabs(float(a));
   }
   static inline bool isnan(at::BFloat16 a) {
-    return sycl::isnan((float)a);
+    return dpl::isnan((float)a);
   }
   static inline bool isinf(at::BFloat16 a) {
-    return sycl::isinf((float)a);
-  }
-  static inline at::BFloat16 sgn(at::BFloat16 a) {
-    return sycl::sign((float)a);
+    return dpl::isinf((float)a);
   }
   static inline at::BFloat16 copysign(at::BFloat16 a, at::BFloat16 b) {
-    return sycl::copysign((float)a, (float)b);
+    return dpl::copysign((float)a, (float)b);
   }
   static inline at::BFloat16 fmod(at::BFloat16 a, at::BFloat16 b) {
     return dpl::fmod((float)a, (float)b);
@@ -890,32 +880,32 @@ struct Numerics<at::BFloat16> {
 template <>
 struct Numerics<float> {
   static inline float lower_bound() {
-    return -std::numeric_limits<float>::infinity();
+    return -dpl::numeric_limits<float>::infinity();
   }
   static inline float upper_bound() {
-    return std::numeric_limits<float>::infinity();
+    return dpl::numeric_limits<float>::infinity();
   }
   static inline constexpr float pi() {
     return pi_i<float>();
   }
 
   static inline bool lt(float a, float b) {
-    return sycl::isless(a, b);
+    return dpl::isless(a, b);
   }
   static inline bool le(float a, float b) {
-    return sycl::islessequal(a, b);
+    return dpl::islessequal(a, b);
   }
   static inline bool gt(float a, float b) {
-    return sycl::isgreater(a, b);
+    return dpl::isgreater(a, b);
   }
   static inline bool ge(float a, float b) {
-    return sycl::isgreaterequal(a, b);
+    return dpl::isgreaterequal(a, b);
   }
   static inline bool eq(float a, float b) {
-    return sycl::isequal(a, b);
+    return a == b;
   }
   static inline bool ne(float a, float b) {
-    return sycl::isnotequal(a, b);
+    return a != b;
   }
 
   static inline float exp(float a) {
@@ -923,9 +913,6 @@ struct Numerics<float> {
   }
   static inline float exp2(float a) {
     return dpl::exp2(a);
-  }
-  static inline float exp10(float a) {
-    return sycl::exp10(a);
   }
   static inline float log(float a) {
     return dpl::log(a);
@@ -959,13 +946,13 @@ struct Numerics<float> {
     return sycl::rsqrt(a);
   }
   static inline float ceil(float a) {
-    return sycl::ceil(a);
+    return dpl::ceil(a);
   }
   static inline float floor(float a) {
-    return sycl::floor(a);
+    return dpl::floor(a);
   }
   static inline float trunc(float a) {
-    return sycl::trunc(a);
+    return dpl::trunc(a);
   }
 
   static inline float acos(float a) {
@@ -1008,11 +995,11 @@ struct Numerics<float> {
     return dpl::lgamma(a);
   }
   static inline float round(float a) {
-    return sycl::round(a);
+    return dpl::round(a);
   }
 
   static inline float frac(float a) {
-    return a - sycl::trunc(a);
+    return a - dpl::trunc(a);
   }
   static inline float cinv(float a) {
     return 1.0f / a;
@@ -1047,7 +1034,7 @@ struct Numerics<float> {
     } else if (b != b) {
       return b;
     } else {
-      return sycl::fmin(a, b);
+      return dpl::fmin(a, b);
     }
   }
   static inline float max(float a, float b) {
@@ -1056,32 +1043,29 @@ struct Numerics<float> {
     } else if (b != b) {
       return b;
     } else {
-      return sycl::fmax(a, b);
+      return dpl::fmax(a, b);
     }
   }
   static inline float fmin(float a, float b) {
-    return sycl::fmin(a, b);
+    return dpl::fmin(a, b);
   }
   static inline float fmax(float a, float b) {
-    return sycl::fmax(a, b);
+    return dpl::fmax(a, b);
   }
   static inline float abs(float a) {
-    return sycl::fabs(a);
+    return dpl::fabs(a);
   }
   static inline float fabs(float a) {
-    return sycl::fabs(a);
+    return dpl::fabs(a);
   }
   static inline bool isnan(float a) {
-    return sycl::isnan(a);
+    return dpl::isnan(a);
   }
   static inline bool isinf(float a) {
-    return sycl::isinf(a);
-  }
-  static inline float sgn(float a) {
-    return sycl::sign(a);
+    return dpl::isinf(a);
   }
   static inline float copysign(float a, float b) {
-    return sycl::copysign(a, b);
+    return dpl::copysign(a, b);
   }
   static inline float fmod(float a, float b) {
     return dpl::fmod(a, b);
@@ -1091,32 +1075,32 @@ struct Numerics<float> {
 template <>
 struct Numerics<double> {
   static inline double lower_bound() {
-    return -std::numeric_limits<double>::infinity();
+    return -dpl::numeric_limits<double>::infinity();
   }
   static inline double upper_bound() {
-    return std::numeric_limits<double>::infinity();
+    return dpl::numeric_limits<double>::infinity();
   }
   static inline constexpr double pi() {
     return pi_i<double>();
   }
 
   static inline bool lt(double a, double b) {
-    return sycl::isless(a, b);
+    return dpl::isless(a, b);
   }
   static inline bool le(double a, double b) {
-    return sycl::islessequal(a, b);
+    return dpl::islessequal(a, b);
   }
   static inline bool gt(double a, double b) {
-    return sycl::isgreater(a, b);
+    return dpl::isgreater(a, b);
   }
   static inline bool ge(double a, double b) {
-    return sycl::isgreaterequal(a, b);
+    return dpl::isgreaterequal(a, b);
   }
   static inline bool eq(double a, double b) {
-    return sycl::isequal(a, b);
+    return a == b;
   }
   static inline bool ne(double a, double b) {
-    return sycl::isnotequal(a, b);
+    return a != b;
   }
 
   static inline double exp(double a) {
@@ -1124,9 +1108,6 @@ struct Numerics<double> {
   }
   static inline double exp2(double a) {
     return dpl::exp2(a);
-  }
-  static inline double exp10(double a) {
-    return sycl::exp10(a);
   }
   static inline double log(double a) {
     return dpl::log(a);
@@ -1160,13 +1141,13 @@ struct Numerics<double> {
     return sycl::rsqrt(a);
   }
   static inline double ceil(double a) {
-    return sycl::ceil(a);
+    return dpl::ceil(a);
   }
   static inline double floor(double a) {
-    return sycl::floor(a);
+    return dpl::floor(a);
   }
   static inline double trunc(double a) {
-    return sycl::trunc(a);
+    return dpl::trunc(a);
   }
   static inline double acos(double a) {
     return dpl::acos(a);
@@ -1208,11 +1189,11 @@ struct Numerics<double> {
     return dpl::lgamma(a);
   }
   static inline double round(double a) {
-    return sycl::round(a);
+    return dpl::round(a);
   }
 
   static inline double frac(double a) {
-    return a - sycl::trunc(a);
+    return a - dpl::trunc(a);
   }
   static inline double cinv(double a) {
     return 1.0f / a;
@@ -1247,7 +1228,7 @@ struct Numerics<double> {
     } else if (b != b) {
       return b;
     } else {
-      return sycl::fmin(a, b);
+      return dpl::fmin(a, b);
     }
   }
   static inline double max(double a, double b) {
@@ -1256,32 +1237,29 @@ struct Numerics<double> {
     } else if (b != b) {
       return b;
     } else {
-      return sycl::fmax(a, b);
+      return dpl::fmax(a, b);
     }
   }
   static inline double fmin(double a, double b) {
-    return sycl::fmin(a, b);
+    return dpl::fmin(a, b);
   }
   static inline double fmax(double a, double b) {
-    return sycl::fmax(a, b);
+    return dpl::fmax(a, b);
   }
   static inline double abs(double a) {
-    return sycl::fabs(a);
+    return dpl::fabs(a);
   }
   static inline double fabs(double a) {
-    return sycl::fabs(a);
+    return dpl::fabs(a);
   }
   static inline bool isnan(double a) {
-    return sycl::isnan(a);
+    return dpl::isnan(a);
   }
   static inline bool isinf(double a) {
-    return sycl::isinf(a);
-  }
-  static inline double sgn(double a) {
-    return sycl::sign(a);
+    return dpl::isinf(a);
   }
   static inline double copysign(double a, double b) {
-    return sycl::copysign(a, b);
+    return dpl::copysign(a, b);
   }
   static inline double fmod(double a, double b) {
     return dpl::fmod(a, b);

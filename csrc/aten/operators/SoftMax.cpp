@@ -8,11 +8,13 @@
 #include "comm/RegistrationDeclarations.h"
 
 #include <aten/operators/MemoryAccess.h>
+#include <oneapi/dpl/limits>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 #include "comm/SimpleReduce.h"
+namespace dpl = oneapi::dpl;
 
 /*
 softmax forward and backward follow the same optimization routine, we take
@@ -319,7 +321,7 @@ void dispatch_softmax_forward_kernel(
 
           vec_t reg_in[NUM];
           // load data and get max value
-          accscalar_t max_value = std::numeric_limits<accscalar_t>::lowest();
+          accscalar_t max_value = dpl::numeric_limits<accscalar_t>::lowest();
 #pragma unroll(NUM)
           for (int i = 0; i < NUM; ++i) {
             auto index = (lid_col + i * local_size) * vec_size;
@@ -340,7 +342,7 @@ void dispatch_softmax_forward_kernel(
                 lid_row,
                 sub_group_num,
                 max_value,
-                std::numeric_limits<accscalar_t>::lowest(),
+                dpl::numeric_limits<accscalar_t>::lowest(),
                 local_max,
                 [](accscalar_t a, accscalar_t b) {
                   return Numerics<accscalar_t>::max(a, b);
@@ -431,7 +433,7 @@ void softmax_forward_kernel(
           IndexType loops_end = (dim_size + start + vec_size - 1) / vec_size;
 
           // get max value
-          auto max_value = std::numeric_limits<accscalar_t>::lowest();
+          auto max_value = dpl::numeric_limits<accscalar_t>::lowest();
           for (int i = local_id; i < loops_end; i += local_size) {
             vec_t in_val = *(reinterpret_cast<vec_t*>(
                 in_data + group_offset - start + i * vec_size));

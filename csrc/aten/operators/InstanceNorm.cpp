@@ -3,7 +3,6 @@
 #include <ATen/MatrixRef.h>
 #include <ATen/cpp_custom_type_hack.h>
 #include <ATen/record_function.h>
-#include <core/TensorImplUtils.h>
 #include <dnnl.hpp>
 #include <oneDNN/oneDNN.h>
 #include <torch/autograd.h>

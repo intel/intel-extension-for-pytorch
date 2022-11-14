@@ -3,7 +3,6 @@
 #include <ATen/MemoryOverlap.h>
 #include <ATen/native/TypeProperties.h>
 
-#include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <runtime/CachingHostAllocator.h>

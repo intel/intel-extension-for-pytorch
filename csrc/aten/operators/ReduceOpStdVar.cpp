@@ -14,6 +14,7 @@
 #include "comm/RegistrationDeclarations.h"
 
 #include "Reduce.h"
+#include "ReduceOpStdVar.h"
 #include "ReduceOpsUtils.h"
 
 #include <oneapi/dpl/cmath>

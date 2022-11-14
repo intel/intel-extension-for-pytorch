@@ -2,11 +2,14 @@
 
 #include <ATen/ATen.h>
 
-#include <core/TensorImplUtils.h>
 #include <utils/DPCPP.h>
+#include <oneapi/dpl/cmath>
+#include <oneapi/dpl/complex>
+#include <oneapi/dpl/limits>
 #include "ATDispatch.h"
 #include "ApplyUtils.h"
 #include "Numerics.h"
+namespace dpl = oneapi::dpl;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -30,7 +33,7 @@ const Tensor& resize_as_(
                                                                  \
   template <typename scalar_t>                                   \
   void NAME(Tensor& self_, const Tensor& src) {                  \
-    if (TensorImpl_Unwrap(self_) == TensorImpl_Unwrap(src)) {    \
+    if (self_.is_same(src)) {                                    \
       DPCPP_tensor_apply1<scalar_t>(                             \
           self_, Tensor_##NAME##_##REAL##_Op<scalar_t>());       \
     } else {                                                     \
@@ -79,7 +82,7 @@ const Tensor& resize_as_(
 #define CALLABLE_INIT_ARGS_DECL_2 CALLABLE_INIT_ARGS_DECL_1, scalar_t val2
 #define CALLABLE_INIT_ARGS_DECL_3 CALLABLE_INIT_ARGS_DECL_2, scalar_t val3
 
-#define CHECK_SAME_TENSOR() (TensorImpl_Unwrap(arg1) == TensorImpl_Unwrap(arg2))
+#define CHECK_SAME_TENSOR() (arg1.is_same(arg2))
 
 #define COMMA_0
 #define COMMA_1 ,
@@ -371,23 +374,23 @@ struct TensorDigammaOp {
 
     auto x = scalar_cast<compute_type>(in);
     if (x == 0) {
-      out = std::numeric_limits<T>::infinity();
+      out = dpl::numeric_limits<T>::infinity();
       return;
     }
 
-    bool x_is_integer = (x == sycl::floor(x));
+    bool x_is_integer = (x == dpl::floor(x));
     compute_type result = 0;
 
     if (x < 0) {
       if (x_is_integer) {
-        out = std::numeric_limits<T>::infinity();
+        out = dpl::numeric_limits<T>::infinity();
         return;
       }
 
       // Rounding errors in tan's input can really affect the output
       // for extreme values, so we always perform this computation in double.
       result = scalar_cast<compute_type>(
-          -PI_f64 / sycl::tan(PI_f64 * scalar_cast<double>(x)));
+          -PI_f64 / dpl::tan(PI_f64 * scalar_cast<double>(x)));
       x = 1 - x;
     }
 
@@ -411,7 +414,7 @@ struct TensorDigammaOp {
       y = z * polevl_result;
     }
 
-    out = scalar_cast<T>(sycl::log(x) - (0.5 / x) - y + result);
+    out = scalar_cast<T>(dpl::log(x) - (0.5 / x) - y + result);
     return;
   }
 
@@ -432,23 +435,23 @@ struct TensorDigammaOp {
 
     auto x = scalar_cast<compute_type>(v);
     if (x == 0) {
-      v = std::numeric_limits<T>::infinity();
+      v = dpl::numeric_limits<T>::infinity();
       return;
     }
 
-    bool x_is_integer = (x == sycl::floor(x));
+    bool x_is_integer = (x == dpl::floor(x));
     compute_type result = 0;
 
     if (x < 0) {
       if (x_is_integer) {
-        v = std::numeric_limits<T>::infinity();
+        v = dpl::numeric_limits<T>::infinity();
         return;
       }
 
       // Rounding errors in tan's input can really affect the output
       // for extreme values, so we always perform this computation in double.
       result = scalar_cast<compute_type>(
-          -PI_f64 / sycl::tan(PI_f64 * scalar_cast<double>(x)));
+          -PI_f64 / dpl::tan(PI_f64 * scalar_cast<double>(x)));
       x = 1 - x;
     }
 
@@ -472,7 +475,7 @@ struct TensorDigammaOp {
       y = z * polevl_result;
     }
 
-    v = scalar_cast<T>(sycl::log(x) - (0.5 / x) - y + result);
+    v = scalar_cast<T>(dpl::log(x) - (0.5 / x) - y + result);
     return;
   }
 };
@@ -496,17 +499,17 @@ struct TensorErfinvOp {
     static const compute_type d[2] = {3.543889200, 1.637067800};
 
     auto x = scalar_cast<compute_type>(in);
-    if (sycl::fabs(x) > 1.0f) {
+    if (dpl::fabs(x) > 1.0f) {
       out = scalar_cast<T>(NAN);
       return;
     }
-    if (sycl::fabs(x) == 1.0f) {
+    if (dpl::fabs(x) == 1.0f) {
       out = scalar_cast<T>(
-          (sycl::copysign(1.0, scalar_cast<double>(x))) *
-          (std::numeric_limits<double>::infinity()));
+          (dpl::copysign(1.0, scalar_cast<double>(x))) *
+          (dpl::numeric_limits<double>::infinity()));
       return;
     }
-    if (sycl::fabs(x) <= 0.7f) {
+    if (dpl::fabs(x) <= 0.7f) {
       z = x * x;
       num = (((a[3] * z + a[2]) * z + a[1]) * z + a[0]);
       dem =
@@ -515,22 +518,22 @@ struct TensorErfinvOp {
       out = x * num / dem;
     } else {
       z = scalar_cast<compute_type>(
-          sycl::sqrt(-sycl::log((1.0 - sycl::fabs(x)) / 2.0)));
+          dpl::sqrt(-dpl::log((1.0 - dpl::fabs(x)) / 2.0)));
       num = ((c[3] * z + c[2]) * z + c[1]) * z + c[0];
       dem = (d[1] * z + d[0]) * z + scalar_cast<compute_type>(1.0);
       out = scalar_cast<T>(
           scalar_cast<compute_type>(
-              sycl::copysign(1.0, scalar_cast<double>(x))) *
+              dpl::copysign(1.0, scalar_cast<double>(x))) *
           num / dem);
     }
     out = out -
         scalar_cast<T>(
-              (sycl::erf(scalar_cast<double>(out)) - x) /
-              ((2.0 / sycl::sqrt(PI_f64)) * sycl::exp(-x * x)));
+              (dpl::erf(scalar_cast<double>(out)) - x) /
+              ((2.0 / dpl::sqrt(PI_f64)) * dpl::exp(-x * x)));
     out = out -
         scalar_cast<T>(
-              (sycl::erf(scalar_cast<double>(out)) - x) /
-              ((2.0 / sycl::sqrt(PI_f64)) * sycl::exp(-x * x)));
+              (dpl::erf(scalar_cast<double>(out)) - x) /
+              ((2.0 / dpl::sqrt(PI_f64)) * dpl::exp(-x * x)));
     return;
   }
 
@@ -551,17 +554,17 @@ struct TensorErfinvOp {
     static const compute_type d[2] = {3.543889200, 1.637067800};
 
     auto x = scalar_cast<compute_type>(v);
-    if (sycl::fabs(x) > 1.0) {
+    if (dpl::fabs(x) > 1.0) {
       v = scalar_cast<T>(NAN);
       return;
     }
-    if (sycl::fabs(x) == 1.0) {
+    if (dpl::fabs(x) == 1.0) {
       v = scalar_cast<T>(
-          (sycl::copysign(1.0, scalar_cast<double>(x))) *
-          (std::numeric_limits<double>::infinity()));
+          (dpl::copysign(1.0, scalar_cast<double>(x))) *
+          (dpl::numeric_limits<double>::infinity()));
       return;
     }
-    if (sycl::fabs(x) <= 0.7) {
+    if (dpl::fabs(x) <= 0.7) {
       z = x * x;
       num = (((a[3] * z + a[2]) * z + a[1]) * z + a[0]);
       dem =
@@ -570,22 +573,22 @@ struct TensorErfinvOp {
       v = x * num / dem;
     } else {
       z = scalar_cast<compute_type>(
-          sycl::sqrt(-sycl::log((1.0 - sycl::fabs(x)) / 2.0)));
+          dpl::sqrt(-dpl::log((1.0 - dpl::fabs(x)) / 2.0)));
       num = ((c[3] * z + c[2]) * z + c[1]) * z + c[0];
       dem = (d[1] * z + d[0]) * z + scalar_cast<compute_type>(1.0);
       v = scalar_cast<T>(
           scalar_cast<compute_type>(
-              sycl::copysign(1.0, scalar_cast<double>(x))) *
+              dpl::copysign(1.0, scalar_cast<double>(x))) *
           num / dem);
     }
     v = v -
         scalar_cast<T>(
-            (sycl::erf(scalar_cast<double>(v)) - x) /
-            ((2.0 / sycl::sqrt(PI_f64)) * sycl::exp(-x * x)));
+            (dpl::erf(scalar_cast<double>(v)) - x) /
+            ((2.0 / dpl::sqrt(PI_f64)) * dpl::exp(-x * x)));
     v = v -
         scalar_cast<T>(
-            (sycl::erf(scalar_cast<double>(v)) - x) /
-            ((2.0 / sycl::sqrt(PI_f64)) * sycl::exp(-x * x)));
+            (dpl::erf(scalar_cast<double>(v)) - x) /
+            ((2.0 / dpl::sqrt(PI_f64)) * dpl::exp(-x * x)));
     return;
   }
 };
@@ -834,45 +837,45 @@ struct TensorCRemainderOp {
 template <>
 struct TensorCRemainderOp<float> {
   void operator()(float& out, float& in) const {
-    out = in != 0.f ? out - in * sycl::floor(out / in) : NAN;
+    out = in != 0.f ? out - in * dpl::floor(out / in) : NAN;
   }
 
   void operator()(float& out, float& in1, float& in2) const {
-    out = in2 != 0.f ? in1 - in2 * sycl::floor(in1 / in2) : NAN;
+    out = in2 != 0.f ? in1 - in2 * dpl::floor(in1 / in2) : NAN;
   }
 };
 
 template <>
 struct TensorCRemainderOp<double> {
   void operator()(double& out, double& in) const {
-    out = in != 0. ? out - in * sycl::floor(out / in) : NAN;
+    out = in != 0. ? out - in * dpl::floor(out / in) : NAN;
   }
 
   void operator()(double& out, double& in1, double& in2) const {
-    out = in2 != 0. ? in1 - in2 * sycl::floor(in1 / in2) : NAN;
+    out = in2 != 0. ? in1 - in2 * dpl::floor(in1 / in2) : NAN;
   }
 };
 
 template <>
 struct TensorCRemainderOp<at::Half> {
   void operator()(at::Half& out, at::Half& in) const {
-    out = in != 0.f ? out - in * sycl::floor(float(out / in)) : NAN;
+    out = in != 0.f ? out - in * dpl::floor(float(out / in)) : NAN;
   }
 
   void operator()(at::Half& out, at::Half& in1, at::Half& in2) const {
-    out = in2 != 0.f ? in1 - in2 * sycl::floor(float(in1 / in2)) : NAN;
+    out = in2 != 0.f ? in1 - in2 * dpl::floor(float(in1 / in2)) : NAN;
   }
 };
 
 template <>
 struct TensorCRemainderOp<at::BFloat16> {
   void operator()(at::BFloat16& out, at::BFloat16& in) const {
-    out = in != 0.f ? out - in * sycl::floor(float(out / in)) : NAN;
+    out = in != 0.f ? out - in * dpl::floor(float(out / in)) : NAN;
   }
 
   void operator()(at::BFloat16& out, at::BFloat16& in1, at::BFloat16& in2)
       const {
-    out = in2 != 0.f ? in1 - in2 * sycl::floor(float(in1 / in2)) : NAN;
+    out = in2 != 0.f ? in1 - in2 * dpl::floor(float(in1 / in2)) : NAN;
   }
 };
 
@@ -890,45 +893,45 @@ struct TensorCFmodOp {
 template <>
 struct TensorCFmodOp<float> {
   void operator()(float& out, float& in) const {
-    out = sycl::fmod(out, in);
+    out = dpl::fmod(out, in);
   }
 
   void operator()(float& out, float& in1, float& in2) const {
-    out = sycl::fmod(in1, in2);
+    out = dpl::fmod(in1, in2);
   }
 };
 
 template <>
 struct TensorCFmodOp<double> {
   void operator()(double& out, double& in) const {
-    out = sycl::fmod(out, in);
+    out = dpl::fmod(out, in);
   }
 
   void operator()(double& out, double& in1, double& in2) const {
-    out = sycl::fmod(in1, in2);
+    out = dpl::fmod(in1, in2);
   }
 };
 
 template <>
 struct TensorCFmodOp<at::Half> {
   void operator()(at::Half& out, at::Half& in) const {
-    out = sycl::fmod(float(out), float(in));
+    out = dpl::fmod(float(out), float(in));
   }
 
   void operator()(at::Half& out, at::Half& in1, at::Half& in2) const {
-    out = sycl::fmod(float(in1), float(in2));
+    out = dpl::fmod(float(in1), float(in2));
   }
 };
 
 template <>
 struct TensorCFmodOp<at::BFloat16> {
   void operator()(at::BFloat16& out, at::BFloat16& in) const {
-    out = sycl::fmod(float(out), float(in));
+    out = dpl::fmod(float(out), float(in));
   }
 
   void operator()(at::BFloat16& out, at::BFloat16& in1, at::BFloat16& in2)
       const {
-    out = sycl::fmod(float(in1), float(in2));
+    out = dpl::fmod(float(in1), float(in2));
   }
 };
 
@@ -946,22 +949,22 @@ struct TensorCPowOp {
 template <>
 struct TensorCPowOp<float> {
   void operator()(float& out, float& in) const {
-    out = sycl::pow(out, in);
+    out = dpl::pow(out, in);
   }
 
   void operator()(float& out, float& in1, float& in2) const {
-    out = sycl::pow(in1, in2);
+    out = dpl::pow(in1, in2);
   }
 };
 
 template <>
 struct TensorCPowOp<double> {
   void operator()(double& out, double& in) const {
-    out = sycl::pow(out, in);
+    out = dpl::pow(out, in);
   }
 
   void operator()(double& out, double& in1, double& in2) const {
-    out = sycl::pow(in1, in2);
+    out = dpl::pow(in1, in2);
   }
 };
 
