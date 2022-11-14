@@ -1344,7 +1344,12 @@ struct Numerics<c10::complex<float>> {
   }
 
   static inline float abs(c10::complex<float> a) {
-    return std::abs(a);
+    return dpl::abs(a);
+  }
+
+  static inline float fabs(c10::complex<float> a) {
+    // dpl::abs will return corresponding float type when arg is complex<float>
+    return dpl::abs(a);
   }
 
   static inline c10::complex<float> exp(c10::complex<float> a) {
@@ -1486,7 +1491,13 @@ struct Numerics<c10::complex<double>> {
   }
 
   static inline double abs(c10::complex<double> a) {
-    return std::abs(a);
+    return dpl::abs(a);
+  }
+
+  static inline double fabs(c10::complex<double> a) {
+    // dpl::abs will return corresponding double type when arg is
+    // complex<double>
+    return dpl::abs(a);
   }
 
   static inline c10::complex<double> exp(c10::complex<double> a) {
