@@ -390,6 +390,14 @@ class MultiInstanceLauncher(Launcher):
                 args.ninstances = len(cores) // args.ncore_per_instance
 
         else:
+            if os.environ.get('OMP_NUM_THREADS') is not None:
+                if args.node_id != -1:
+                    physical_cores_number = len(self.cpuinfo.get_node_physical_cores(args.node_id))
+                else:
+                    physical_cores_number = len(self.cpuinfo.get_all_physical_cores())
+                
+                if int(os.environ.get('OMP_NUM_THREADS')) > physical_cores_number:
+                    logger.warning("there are {} physical cores but you specify OMP_NUM_THREADS equals to {} ; please set OMP_NUM_THREADS <= physical cores or add argument --use_logical_core to use logical core to meet your setting threads".format(physical_cores_number, int(os.environ.get('OMP_NUM_THREADS')) ))
             if args.use_logical_core:
                 if args.node_id != -1:
                     cores = self.cpuinfo.get_node_logical_cores(args.node_id)
