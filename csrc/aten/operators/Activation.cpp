@@ -1,8 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/Functions.h>
 #include <ATen/native/Activation.h>
-#include "ATen/OpMathType.h"
 #include <ATen/native/Resize.h>
+#include "ATen/OpMathType.h"
 
 #include <core/Generator.h>
 #include <runtime/Utils.h>

@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/MemoryOverlap.h>
+#include <ATen/WrapDimUtils.h>
 #include <ATen/native/TypeProperties.h>
 
 #include <core/detail/IndexUtils.h>
