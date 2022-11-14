@@ -10,7 +10,7 @@ TinyTensor run_syclkernel_operation_scaledown(const TinyTensor& inp, sycl::queue
     float *dst = outp.data;
 
     q->submit([&](sycl::handler &h) {
-        h.parallel_for(outp.count(), [=](cl::sycl::item<1> item) {
+        h.parallel_for(outp.count(), [=](sycl::item<1> item) {
             int idx = item.get_id(0);
             dst[idx] = src[idx*4];
         });

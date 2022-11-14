@@ -915,9 +915,12 @@ static void apply_inverse_dpcpp_(
   int64_t batch_size = native::batchCount(self_);
 
   int64_t n = self_.size(-2);
-  int64_t lda = self_.size(-2);
-  int64_t stride_a = native::matrixStride(self_);
-  int64_t stride_ipiv = pivots_.size(-1);
+  // The lda, stride_a and stride_ipiv are assigned 0 when the shape of self_ is
+  // [0, 0]. And this function will fail. Aligning with Pytorch cpu, they are
+  // assigned 1 when the shape of self_ is [0, 0].
+  int64_t lda = std::max<int64_t>(1, n);
+  int64_t stride_a = std::max<int64_t>(1, native::matrixStride(self_));
+  int64_t stride_ipiv = std::max<int64_t>(1, pivots_.size(-1));
 
   scalar_t* a = (scalar_t*)(self_.data_ptr());
   int64_t* ipiv = (int64_t*)(pivots_.data_ptr());

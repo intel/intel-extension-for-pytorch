@@ -30,7 +30,7 @@ IPEX_API bool is_profiler_enabled();
 /// Use profiler to record event.
 /// @param name: name for the profiler recording.
 /// @param event: sycl event for recording.
-IPEX_API void profiler_record(std::string name, cl::sycl::event& event);
+IPEX_API void profiler_record(std::string name, sycl::event& event);
 
 /// Use profiler to record event.
 /// @param name: name for the profiler recording.
@@ -38,7 +38,7 @@ IPEX_API void profiler_record(std::string name, cl::sycl::event& event);
 /// @param end_event: sycl end event for recording.
 IPEX_API void profiler_record(
     std::string name,
-    cl::sycl::event& start_event,
-    cl::sycl::event& end_event);
+    sycl::event& start_event,
+    sycl::event& end_event);
 
 } // namespace xpu
