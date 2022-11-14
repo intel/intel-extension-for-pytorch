@@ -1,4 +1,4 @@
-#include <c10d/reducer_timer.hpp>
+#include <torch/csrc/distributed/c10d/reducer_timer.hpp>
 
 #include <aten/core/Event.h>
 #include <c10/core/DeviceGuard.h>
