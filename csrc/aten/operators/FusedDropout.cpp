@@ -436,7 +436,7 @@ std::tuple<Tensor, Tensor> native_dropout(
   }
   // short-cut
   if (p == 1) {
-    // native_dropout_cuda is in derivatives.yaml, so we don't need to add data
+    // native_dropout is in file yaml, so we don't need to add data
     // dependency from output to input for autograd
     auto ret = at::zeros_like(self);
     auto mask = at::zeros_like(
@@ -450,7 +450,7 @@ std::tuple<Tensor, Tensor> native_dropout(
   return impl::dropout_dpcpp<bool>(gen, self, p1m);
 }
 
-// NOTE: _fused_dropout is to be removed in CUDA, see PR #63937
+// NOTE: _fused_dropout will be removed, see PR #63937
 std::tuple<Tensor, Tensor> _fused_dropout(
     const Tensor& self,
     double p,
@@ -471,7 +471,7 @@ Tensor native_dropout_backward(
   return impl::dropout_backward_dpcpp<bool>(grad, mask, scale);
 }
 
-// NOTE: _masked_scale is to be removed in CUDA, see PR #63937
+// NOTE: _masked_scale will be removed, see PR #63937
 Tensor _masked_scale(const Tensor& self, const Tensor& mask, double scale) {
   TORCH_CHECK(mask.scalar_type() == at::ScalarType::Byte, "mask should be torch.uint8 dtype");
   return impl::dropout_backward_dpcpp<uint8_t>(self, mask, scale);
