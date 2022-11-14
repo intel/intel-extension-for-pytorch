@@ -363,6 +363,28 @@ class TestOptimizeCases(TestCase):
             ipex_model_state = ipex_model.state_dict()
             for var_name in origin_model_state:
                 self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
-    
+
+    def test_partial_model_update(self):
+        class M(torch.nn.Module):
+
+            def __init__(self):
+                super(M, self).__init__()
+                self.L1 = torch.nn.Linear(10, 10)
+                self.L2 = torch.nn.Linear(10, 10)
+
+            def forward(self, x):
+                return (self.L1(x), self.L2(x))
+
+        model = M()
+        optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5, eps=1e-8)
+        model.train()
+        model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
+
+        with torch.cpu.amp.autocast():
+            loss = model(torch.rand(10, 10))[0].sum()
+
+        loss.backward()
+        optimizer.step()
+
 if __name__ == '__main__':
     test = unittest.main()

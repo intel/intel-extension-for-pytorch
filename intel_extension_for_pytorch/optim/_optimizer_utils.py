@@ -55,12 +55,11 @@ def patch_step_for_master_weight_training(optimizer):
     def master_param_non_fused_step(self, closure=None):
         # convert bf16 or fp16 weight'grad to float.
         for k, value in self.params_attr.items():
-            if 'bf16_param' in value.keys():
-                if value['bf16_param'].requires_grad:
-                    k.grad = value['bf16_param'].grad.detach().float()
-            if 'fp16_param' in value.keys():
-                if value['fp16_param'].requires_grad:
-                    k.grad = value['fp16_param'].grad.detach().float()
+            for low_precision in ['bf16_param', 'fp16_param']:
+                if low_precision in value.keys():
+                    # check have grad
+                    if value[low_precision].requires_grad and value[low_precision].grad != None:
+                        k.grad = value[low_precision].grad.detach().float()
 
         loss = self._original_step(closure)
         # sync mater weight to model's paramerter
