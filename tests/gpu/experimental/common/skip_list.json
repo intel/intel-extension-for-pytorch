@@ -73,11 +73,6 @@
       "test_memory_format_type_shortcuts_xpu",
       "test_memory_format_type_xpu",
       "test_pickle_gradscaler_xpu"
-    ],
-    "Generator API won't be supported for now, will skip cases for temp": [
-      "test_multinomial_deterministic_xpu_float16",
-      "test_multinomial_deterministic_xpu_float32",
-      "test_multinomial_deterministic_xpu_float64"
     ]
   },
   "TestReductionsXPU": {

@@ -14,6 +14,7 @@
 #include <pybind11/stl.h>
 #include <utils/Settings.h>
 #include "Event.h"
+#include "Generator.h"
 #include "LazyInit.h"
 #include "Module.h"
 #include "Storage.h"
@@ -425,6 +426,10 @@ static struct PyMethodDef _THPModule_methods[] = {
     {"is_autocast_xpu_enabled", is_autocast_xpu_enabled, METH_NOARGS, nullptr},
     {"set_autocast_xpu_dtype", set_autocast_xpu_dtype, METH_O, nullptr},
     {"get_autocast_xpu_dtype", get_autocast_xpu_dtype, METH_NOARGS, nullptr},
+    {"generator_new",
+     castPyCFunctionWithKeywords(THPGenerator_New),
+     METH_VARARGS | METH_KEYWORDS,
+     nullptr},
     {nullptr}};
 
 std::string get_dev_type(const DeviceProp& prop) {

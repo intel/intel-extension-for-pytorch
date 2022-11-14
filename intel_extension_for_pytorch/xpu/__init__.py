@@ -16,6 +16,7 @@ from .amp import *
 from .utils import *
 from .random import *
 from .memory import *
+from .generator import Generator
 
 from torch._utils import _get_device_index
 import intel_extension_for_pytorch.optim as optim
