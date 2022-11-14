@@ -1586,22 +1586,28 @@ static void apply_cholesky_dpcpp(
 
   auto n = self_.size(-1);
 
-  std::int64_t lda = self_.size(-2);
+  int64_t lda = self_.size(-2);
+
+  int64_t stride = native::matrixStride(self_);
+  int64_t batch_size = native::batchCount(self_);
 
   scalar_t* a = (scalar_t*)(self_.data_ptr());
 
-  int64_t scratchpadsize = oneapi::mkl::lapack::potrf_scratchpad_size<scalar_t>(
-      dpcpp_queue, uplo, n, lda);
+  int64_t scratchpadsize =
+      oneapi::mkl::lapack::potrf_batch_scratchpad_size<scalar_t>(
+          dpcpp_queue, uplo, n, lda, stride, batch_size);
   Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
   try {
     DPCPP_ONEMKL_SUBMIT(
         dpcpp_queue,
-        oneapi::mkl::lapack::potrf,
+        oneapi::mkl::lapack::potrf_batch,
         dpcpp_queue,
         uplo,
         n,
         a,
         lda,
+        stride,
+        batch_size,
         (scalar_t*)(scratchpad_at.data_ptr()),
         scratchpadsize);
   } catch (oneapi::mkl::lapack::batch_error be) {
@@ -1624,23 +1630,28 @@ void apply_cholesky_dpcpp<c10::complex<float>>(
 
   auto n = self_.size(-1);
 
-  std::int64_t lda = self_.size(-2);
+  int64_t lda = self_.size(-2);
+
+  int64_t stride = native::matrixStride(self_);
+  int64_t batch_size = native::batchCount(self_);
 
   std::complex<float>* a = (std::complex<float>*)(self_.data_ptr());
 
   int64_t scratchpadsize =
-      oneapi::mkl::lapack::potrf_scratchpad_size<std::complex<float>>(
-          dpcpp_queue, uplo, n, lda);
+      oneapi::mkl::lapack::potrf_batch_scratchpad_size<std::complex<float>>(
+          dpcpp_queue, uplo, n, lda, stride, batch_size);
   Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
   try {
     DPCPP_ONEMKL_SUBMIT(
         dpcpp_queue,
-        oneapi::mkl::lapack::potrf,
+        oneapi::mkl::lapack::potrf_batch,
         dpcpp_queue,
         uplo,
         n,
         a,
         lda,
+        stride,
+        batch_size,
         reinterpret_cast<std::complex<float>*>(scratchpad_at.data_ptr()),
         scratchpadsize);
   } catch (oneapi::mkl::lapack::batch_error be) {
@@ -1663,23 +1674,28 @@ void apply_cholesky_dpcpp<c10::complex<double>>(
 
   auto n = self_.size(-1);
 
-  std::int64_t lda = self_.size(-2);
+  int64_t lda = self_.size(-2);
+
+  int64_t stride = native::matrixStride(self_);
+  int64_t batch_size = native::batchCount(self_);
 
   std::complex<double>* a = (std::complex<double>*)(self_.data_ptr());
 
   int64_t scratchpadsize =
-      oneapi::mkl::lapack::potrf_scratchpad_size<std::complex<double>>(
-          dpcpp_queue, uplo, n, lda);
+      oneapi::mkl::lapack::potrf_batch_scratchpad_size<std::complex<double>>(
+          dpcpp_queue, uplo, n, lda, stride, batch_size);
   Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
   try {
     DPCPP_ONEMKL_SUBMIT(
         dpcpp_queue,
-        oneapi::mkl::lapack::potrf,
+        oneapi::mkl::lapack::potrf_batch,
         dpcpp_queue,
         uplo,
         n,
         a,
         lda,
+        stride,
+        batch_size,
         reinterpret_cast<std::complex<double>*>(scratchpad_at.data_ptr()),
         scratchpadsize);
   } catch (oneapi::mkl::lapack::batch_error be) {
@@ -2811,7 +2827,9 @@ Tensor _cholesky_helper(const Tensor& self, bool upper) {
 
 Tensor cholesky(const Tensor& self, bool upper) {
   TORCH_CHECK(
-      self.dim() == 2, "input must be 2-d matrix, input shape=", self.sizes());
+      self.dim() >= 2,
+      "input must be 2-d matrix at least, input shape=",
+      self.sizes());
   if (self.size(-1) == 0) {
     return at::empty_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   }
