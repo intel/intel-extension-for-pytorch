@@ -101,7 +101,7 @@ template <typename scalar_t>
 void nonzero(Tensor& tensor, const Tensor& self_) {
   Tensor self = self_.contiguous();
 
-  const int64_t num_dim = self.dim() == 0 ? 1 : self.dim();
+  const int64_t num_dim = self.dim();
   TORCH_CHECK(num_dim <= MAX_TENSORINFO_DIMS, "dim exceed max allowed dim");
 
   int64_t N = self.numel();
