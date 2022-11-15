@@ -266,7 +266,7 @@ at::Tensor dil_transfree_vit_mha(
   value.resize_({batchSize, sequenceSize, head_num, head_size})
       .transpose_(1, 2);
 
-  bmm_impl(query, key, qk, ideep::attr_t(), {}, 1.f / dim_per_head);
+  bmm_impl(query, key, qk, ideep::attr_t(), {}, dim_per_head);
   qk = dil_softmax_(qk, softmax_dim, dtype);
 
   auto output = dil_mha_matmul_trans(qk, value);

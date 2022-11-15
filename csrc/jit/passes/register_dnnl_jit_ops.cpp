@@ -876,6 +876,88 @@ torch::jit::RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
+        "ipex::matmul_mul(Tensor left, Tensor right, Tensor(a!) out_opt, Tensor "
+        "mul_input) -> Tensor(a!)",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto mul_tensor = std::move(peek(stack, 3, 4).toTensor());
+            auto mul_input_data = mul_tensor.item();
+            // divide mul_input to reuse dil_matmul_div function
+            auto div_input_data = 1.0f / mul_input_data.to<float>();
+            auto result = dil_matmul_div(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                (std::move(peek(stack, 1, 4))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 2, 4))),
+                div_input_data);
+            drop(stack, 4);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::matmul_mul(Tensor left, Tensor right, Tensor(a!) out_opt, Scalar "
+        "mul_input) -> Tensor(a!)",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            // divide mul_input to reuse dil_matmul_div function
+            auto div_input_data =
+                1.0f / (std::move(peek(stack, 3, 4))).toScalar().to<float>();
+            auto result = dil_matmul_div(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                (std::move(peek(stack, 1, 4))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 2, 4))),
+                div_input_data);
+            drop(stack, 4);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::matmul_mul(Tensor left, Tensor right,  Tensor mul_input) -> "
+        "Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto mul_tensor = (std::move(peek(stack, 2, 3))).toTensor();
+            auto mul_input_data = mul_tensor.item();
+            // divide mul_input to reuse dil_matmul_div function
+            auto div_input_data = 1.0f / mul_input_data.to<float>();
+            auto result = dil_matmul_div(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toTensor(),
+                at::Tensor(),
+                div_input_data);
+            drop(stack, 3);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::matmul_mul(Tensor left, Tensor right,  Scalar mul_input) -> "
+        "Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            // divide mul_input to reuse dil_matmul_div function
+            auto div_input_data =
+                1.0f / (std::move(peek(stack, 2, 3))).toScalar().to<float>();
+            auto result = dil_matmul_div(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toTensor(),
+                at::Tensor(),
+                div_input_data);
+            drop(stack, 3);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
         "ipex::bmm_add(Tensor input, Tensor batch1, Tensor batch2, Scalar alpha) -> "
         "Tensor",
         [](const Node* node) -> Operation {
@@ -946,7 +1028,7 @@ torch::jit::RegisterOperators op({
           auto scale_tensor = std::move(peek(stack, 4, 7).toTensor());
           auto scale_data = scale_tensor.item();
           // divide scale to reuse dil_mha_scores_calc function
-          auto div_scale_data = 1 / scale_data.to<float>();
+          auto div_scale_data = 1.0f / scale_data.to<float>();
           auto result = dil_mha_scores_calc(
               peek(stack, 0, 7).toTensor(),
               peek(stack, 1, 7).toTensor(),
@@ -966,7 +1048,7 @@ torch::jit::RegisterOperators op({
         "Scalar scale, int softmax_dim, ScalarType ? dtype) -> Tensor",
         [](Stack& stack) {
           // divide scale to reuse dil_mha_scores_calc function
-          auto div_scale_data = 1 / peek(stack, 4, 7).toScalar().to<float>();
+          auto div_scale_data = 1.0f / peek(stack, 4, 7).toScalar().to<float>();
           auto result = dil_mha_scores_calc(
               peek(stack, 0, 7).toTensor(),
               peek(stack, 1, 7).toTensor(),
