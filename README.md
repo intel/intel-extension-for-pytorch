@@ -20,7 +20,7 @@ python -m pip install intel_extension_for_pytorch
 ```
 
 ```python
-python -m pip install intel_extension_for_pytorch -f https://software.intel.com/ipex-whl-stable-cpu
+python -m pip install intel_extension_for_pytorch -f https://developer.intel.com/ipex-whl-stable-cpu
 ```
 
 **Note:** Intel® Extension for PyTorch\* has PyTorch version requirement. Please check more detailed information via the URL below.
@@ -33,7 +33,7 @@ You can install Intel® Extension for PyTorch\* for GPU via command below.
 
 ```python
 python -m pip install torch==1.10.0a0 -f https://developer.intel.com/ipex-whl-stable-xpu
-python -m pip install intel_extension_for_pytorch==1.10.200+gpu -f https://software.intel.com/ipex-whl-stable-xpu
+python -m pip install intel_extension_for_pytorch==1.10.200+gpu -f https://developer.intel.com/ipex-whl-stable-xpu
 ```
 
 **Note:** The patched PyTorch 1.10.0a0 is required to work with Intel® Extension for PyTorch\* on Intel® graphics card for now.
