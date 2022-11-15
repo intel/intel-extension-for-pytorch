@@ -1,9 +1,5 @@
 import torch
-from torch.testing._internal.common_utils import (TestCase,
-                                                  repeat_test_for_types)
-
-from torch.testing._internal.common_dtype import (get_all_int_dtypes,
-                                                  get_all_fp_dtypes)
+from torch.testing._internal.common_utils import TestCase
 
 import numpy as np
 
@@ -13,8 +9,7 @@ cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
-    @repeat_test_for_types([*(get_all_int_dtypes() + get_all_fp_dtypes())])
-    def test_argmin(self, dtype):
+    def test_argmin(self, dtype=torch.float):
         t = torch.ones(3, 3, device=cpu_device, dtype=dtype)
         t_cpu = torch.argmin(t)
         dst_t = t.clone().to(dpcpp_device)
@@ -24,8 +19,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(t_cpu, t_np)
         self.assertEqual(t_np, t_xpu.to(cpu_device))
 
-    @repeat_test_for_types([*(get_all_int_dtypes() + get_all_fp_dtypes())])
-    def test_argmax(self, dtype):
+    def test_argmax(self, dtype=torch.float):
         t = torch.ones(3, 3, device=cpu_device, dtype=dtype)
         t_cpu = torch.argmax(t)
         dst_t = t.clone().to(dpcpp_device)

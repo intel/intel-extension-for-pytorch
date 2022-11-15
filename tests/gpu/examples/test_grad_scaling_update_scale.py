@@ -1,7 +1,6 @@
 import torch
 import intel_extension_for_pytorch  # noqa
-from torch.testing._internal.common_utils import (TestCase,
-                                                  repeat_test_for_types)
+from torch.testing._internal.common_utils import TestCase
 import pytest
 
 
@@ -29,7 +28,6 @@ class TestTorchMethod(TestCase):
         self.assertEqual(growth_tracker, 0)
         self.assertEqual(scale, 2.0)
 
-    @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
     def test_grad_scaling_unscale(self, dtype=torch.float):
         inv_scale = torch.full((1,), 0.25, dtype=torch.float, device="xpu")
         found_inf = torch.full((1,), 0.0, dtype=torch.float, device="xpu")

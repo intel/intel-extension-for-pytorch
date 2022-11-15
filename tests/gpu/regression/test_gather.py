@@ -1,9 +1,10 @@
 import torch
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch  # noqa
 from torch.testing._internal.common_utils import TestCase
 
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")
+
 
 class TestTorchMethod(TestCase):
     def test_gather(self):

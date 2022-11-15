@@ -1,8 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
+import intel_extension_for_pytorch  # noqa
 
-import intel_extension_for_pytorch
-import pytest
 
 class TestTorchMethod(TestCase):
     def test_nonzero_memory_leak(self):
@@ -24,19 +23,15 @@ class TestTorchMethod(TestCase):
         batch_indices = torch.arange(B, dtype=torch.long, device=xyz.device)
 
         for i in range(npoint):
-            print("Iter #", i)
             centroids[:, i] = farthest
             centroid = xyz[batch_indices, farthest, :].view(B, 1, 3)
             dist = torch.sum((xyz - centroid) ** 2, -1)
             mask = dist < distance
-            
+
             distance_cpu = distance.clone().cpu()
-            
+
             distance[mask] = dist[mask]
             distance_cpu[mask] = dist.cpu()[mask.cpu()]
-
-            print('CPU distance: ', distance_cpu)
-            print('XPU distance: ', distance.cpu())
 
             self.assertEqual(distance, distance_cpu)
 

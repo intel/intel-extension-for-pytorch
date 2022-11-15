@@ -1,12 +1,10 @@
 import torch
-from torch.testing._internal.common_utils import (TestCase,
-                                                  repeat_test_for_types)
+from torch.testing._internal.common_utils import TestCase
 
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")
 
 class TestAddcdivAddcmul(TestCase):
-    @repeat_test_for_types([torch.float, torch.int8, torch.half, torch.bfloat16])
     def test_Addcdiv(self, dtype=torch.float):
         t = torch.randn(1, 3)
         t1 = torch.randn(3, 1)
@@ -23,7 +21,6 @@ class TestAddcdivAddcmul(TestCase):
         self.assertEqual(res, res_xpu)
 
 
-    @repeat_test_for_types([torch.float, torch.int8, torch.half, torch.bfloat16])
     def test_Addcmul(self, dtype=torch.float):
         t = torch.randn(1, 3)
         t1 = torch.randn(3, 1)

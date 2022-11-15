@@ -3,14 +3,10 @@ import torch.nn as nn
 
 from torch.testing._internal.common_utils import dtype2prec_DONTUSE
 from torch.testing._internal.common_nn import NNTestCase
-from torch.testing._internal.common_utils import repeat_test_for_types
 from torch.testing._internal.common_device_type import dtypes
 
 import intel_extension_for_pytorch  # noqa
 import pytest
-ALL_TENSORTYPES = [torch.float,
-                   torch.double,
-                   torch.bfloat16]
 
 #  backup default dtype
 dtype_origin = torch.get_default_dtype()
@@ -23,7 +19,6 @@ class TestNN(NNTestCase):
     _do_xpu_memory_leak_check = True
     _do_xpu_non_default_stream = True
 
-    @repeat_test_for_types(ALL_TENSORTYPES)
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_conv2d_depthwise(self, dtype=torch.float):
         torch.set_default_dtype(torch.double)
@@ -65,7 +60,6 @@ class TestNN(NNTestCase):
                              atol=dtype2prec_DONTUSE[dtype], rtol=0)
         torch.set_default_dtype(dtype_origin)
 
-    @repeat_test_for_types(ALL_TENSORTYPES)
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_Conv3d_depthwise(self, dtype=torch.float):
         torch.set_default_dtype(torch.double)

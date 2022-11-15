@@ -1,6 +1,5 @@
 import torch
-from torch.testing._internal.common_utils import (TestCase,
-                                                  repeat_test_for_types)
+from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch # noqa
 
@@ -9,7 +8,6 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
     def test_nan_to_num(self, dtype=torch.float):
         x = torch.randn(3, 3, 3, 3, dtype=torch.float)
         with torch.no_grad():

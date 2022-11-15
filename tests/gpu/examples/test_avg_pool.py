@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.testing._internal.common_utils import (TestCase,
-                                                  repeat_test_for_types)
+from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch # noqa
 
@@ -85,7 +84,6 @@ class TestNNMethod(TestCase):
         print("x_dpcpp.grad", x_dpcpp.grad.to("cpu"))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
-    @repeat_test_for_types([torch.float, torch.bfloat16])
     def test_avg_pool_3D(self, dtype=torch.float):
         x = torch.randn([30, 40, 50])
         grad = torch.randn([30, 40, 50])
@@ -127,7 +125,6 @@ class TestNNMethod(TestCase):
         self.assertEqual(output_cpu, output_xpu.to(cpu_device))
         self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
 
-    @repeat_test_for_types([torch.float, torch.bfloat16])
     def test_avg_pool_4D(self, dtype=torch.float):
         x = torch.randn([20, 30, 40, 50])
         grad = torch.randn([20, 30, 40, 50])

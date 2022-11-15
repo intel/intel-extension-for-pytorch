@@ -43,7 +43,7 @@ from torch.nn import Parameter
 from torch.nn.parallel._functions import Broadcast
 from common.common_utils import freeze_rng_state, run_tests, TestCase, skipIfNoLapack, skipIfRocm, \
     TEST_NUMPY, TEST_SCIPY, TEST_WITH_ROCM, download_file, PY3, \
-    get_function_arglist, load_tests, repeat_test_for_types, ALL_TENSORTYPES, \
+    get_function_arglist, load_tests, ALL_TENSORTYPES, \
     ALL_TENSORTYPES2, TemporaryFileName, TEST_WITH_UBSAN, IS_PPC
 from common.common_nn import NNTestCase, NewModuleTest, NewCriterionTest, \
     module_tests, criterion_tests, new_criterion_tests, loss_reference_fns, \
@@ -5409,8 +5409,7 @@ class TestNN(NNTestCase):
             self.assertEqual(grad_output, grad_output_clone)
 
     @unittest.skipIf(not TEST_DPCPP, 'DPCPP not available')
-    @repeat_test_for_types(NO_HALF_TENSORTYPES_DPCPP)
-    def test_noncontig_conv_grad_dpcpp(self, dtype):
+    def test_noncontig_conv_grad_dpcpp(self, dtype=torch.float):
         # FIXME: remove after adding non-contiguous grad tests for all modules
         module = nn.Conv2d(3, 5, kernel_size=3, padding=1).to("xpu", dtype)
         # input = torch.randn(2, 3, 10, 10, dtype=dtype, device="xpu", requires_grad=True)
@@ -5767,7 +5766,6 @@ class TestNN(NNTestCase):
         self.assertEqual(output.type(), input.type())
 
     @unittest.skipIf(not TEST_DPCPP, "DPCPP unavailable")
-    @repeat_test_for_types([torch.float])
     def test_batchnorm_large_batch_dpcpp(self, dtype=torch.float):
         bn = nn.BatchNorm2d(1).to("xpu", dtype)
         data = torch.rand(880801, 1, 1, 1, device="xpu", dtype=dtype)
@@ -7314,7 +7312,6 @@ class TestNN(NNTestCase):
                          F.conv1d(input, weights2, bias=None, stride=2, dilation=2))
 
     @unittest.skipIf(True, "oneDNN primitive convolution unsupport datatype double")
-    @repeat_test_for_types(DOUBLE_TENSORTYPES)
     def test_conv_double_backward_dpcpp(self, dtype=torch.double):
         # Double backward only runs with DoubleTensor due to precison reason
         batch_size = 1
@@ -7488,7 +7485,6 @@ class TestNN(NNTestCase):
         self.assertEqual(F.softmin(x, 1), F.softmax(-x, 1))
         self.assertEqual(F.softmin(x, 0), F.softmax(-x, 0))
 
-    @repeat_test_for_types([torch.float, torch.bfloat16])
     def test_log_softmax(self, dtype=torch.float):
         x_small = torch.ones(1, 2, dtype=dtype)
         x_big = x_small + 1e16

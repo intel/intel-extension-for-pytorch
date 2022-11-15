@@ -1,14 +1,13 @@
 import torch
 import intel_extension_for_pytorch  # noqa
 import random
-from torch.testing._internal.common_utils import (TestCase,
-                                                  repeat_test_for_types)
+from torch.testing._internal.common_utils import TestCase
+
 from torch.nn import functional as F
 import pytest
 
 
 class TestTorchMethod(TestCase):
-    @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_gridSampler(self, dtype=torch.float):
         inp = torch.ones(1, 1, 4, 4)
@@ -25,7 +24,6 @@ class TestTorchMethod(TestCase):
         outp_xpu = F.grid_sample(inp_xpu, grid=grid_xpu, mode='bilinear', align_corners=True)
         self.assertEqual(outp.cpu(), outp_xpu.cpu())
 
-    @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
     def test_gridSampler_3d(self, dtype=torch.float):
         N = random.randint(2, 5)
         C = random.randint(2, 4)
@@ -44,7 +42,6 @@ class TestTorchMethod(TestCase):
         out_xpu = F.grid_sample(inp_xpu, grid=grid_xpu, mode='bilinear', align_corners=True)
         self.assertEqual(out_cpu.cpu(), out_xpu.cpu())
 
-    @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_gridSampler_2d_Bicubic(self, dtype=torch.float):
         N = random.randint(2, 8)

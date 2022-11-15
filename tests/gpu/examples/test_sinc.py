@@ -1,7 +1,6 @@
 import torch
 from torch.autograd import gradcheck
-from torch.testing._internal.common_utils import (TestCase,
-                                                  repeat_test_for_types)
+from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
 import pytest
@@ -25,7 +24,6 @@ class TestTorchMethod(TestCase):
         a_xpu = a.clone().to(dpcpp_device)
         gradcheck(torch.sinc, a_xpu)
 
-    @repeat_test_for_types([torch.float, torch.bfloat16])
     def test_sinc(self, dtype):
         a = torch.randn(4, device=cpu_device, dtype=dtype)
         a_xpu = a.clone().to(dpcpp_device)

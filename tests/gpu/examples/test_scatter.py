@@ -1,6 +1,5 @@
 import torch
-from torch.testing._internal.common_utils import (TestCase,
-                                                  repeat_test_for_types)
+from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
 import pytest
@@ -56,8 +55,6 @@ class TestTorchMethod(TestCase):
         self.assertEqual(w1_cpu, w1_dpcpp.cpu())
         self.assertEqual(w2_cpu, w2_dpcpp.cpu())
 
-    @repeat_test_for_types([torch.int, torch.int8, torch.int16,
-                            torch.double, torch.float, torch.half, torch.bfloat16])
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_scatter_out(self, dtype=torch.float):
         size = 10

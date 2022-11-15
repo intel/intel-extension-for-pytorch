@@ -1,7 +1,7 @@
 import pytest
-import socket
 import torch
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch  # noqa
+
 
 @pytest.mark.parametrize('prec', [torch.float32, torch.float64])
 def test_slogdet(prec):
@@ -10,8 +10,8 @@ def test_slogdet(prec):
     shape = (bs, N, N)
 
     A = torch.eye(N, dtype=prec, device=device).broadcast_to(*shape) \
-    + torch.rand(*shape, dtype=prec, device=device) \
-    + 1j*torch.rand(*shape, dtype=prec, device=device)
+        + torch.rand(*shape, dtype=prec, device=device) \
+        + 1j * torch.rand(*shape, dtype=prec, device=device)
 
     s, ldj = torch.linalg.slogdet(A)
     answ_s, answ_ldj = torch.linalg.slogdet(A.cpu())

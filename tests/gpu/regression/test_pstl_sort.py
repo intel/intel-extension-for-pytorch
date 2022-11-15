@@ -1,5 +1,5 @@
 import torch
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch  # noqa
 import copy
 from torch.testing._internal.common_utils import TestCase
 
@@ -23,9 +23,3 @@ class TestTorchMethod(TestCase):
         output_xpu.backward(grad_xpu)
         grad_weight_xpu = copy.deepcopy(es.weight.grad.data)
         self.assertEqual(grad_weight_cpu, grad_weight_xpu.cpu())
-        
-
-
-
-
-

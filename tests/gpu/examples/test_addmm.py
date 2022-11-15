@@ -1,6 +1,5 @@
 import torch
-from torch.testing._internal.common_utils import (TestCase,
-                                                  repeat_test_for_types)
+from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch # noqa
 
 xpu_device = torch.device("xpu")
@@ -41,7 +40,6 @@ class TestTorchMethod(TestCase):
         self.assertEqual(y, y_xpu.cpu())
 
     # This case is used to check opaque tensor's allocation size in reorder, so it is running in block format
-    @repeat_test_for_types([torch.float, torch.bfloat16])
     def test_admm_block(self, dtype=torch.float):
         bs = 64
         hidden = 17
