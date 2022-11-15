@@ -1,22 +1,22 @@
 import torch
 from torch.testing._internal.common_utils import (TestCase)
-from itertools import product
-from torch.testing._internal.common_device_type import (
-    dtypes,get_all_dtypes)
+from itertools import product  # noqa
 
 from torch.testing._internal.common_dtype import (get_all_int_dtypes,
                                                   get_all_fp_dtypes)
 import intel_extension_for_pytorch  # noqa
 import pytest
 from functools import wraps
-from torch.testing import make_tensor
+from torch.testing import make_tensor  # noqa
 
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")
 
 # TODO : Rebasing 1.13. 1.13 retires the repeat_test_for_types.
-# However, by the time submitting this change, the tests in experiments folder 
+# However, by the time submitting this change, the tests in experiments folder
 # are not handled correctly, thus, we put the function here for simplicity.
+
+
 def repeat_test_for_types(dtypes):
     def repeat_helper(f):
         @wraps(f)
@@ -27,6 +27,7 @@ def repeat_test_for_types(dtypes):
 
         return call_helper
     return repeat_helper
+
 
 class TestTorchMethod(TestCase):
     @repeat_test_for_types([*(get_all_int_dtypes() + get_all_fp_dtypes())])

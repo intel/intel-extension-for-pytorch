@@ -306,7 +306,6 @@ class _XPUBase(object):
             return super(_XPUBase, self).type(*args, **kwargs)  # type: ignore[misc]
     __new__ = _lazy_new
 
-from torch.storage import _LegacyStorage
 
 class _XPULegacyStorage(_LegacyStorage):
     @classmethod
@@ -483,10 +482,10 @@ torch._register_device_module('xpu', current_module)
 intel_extension_for_pytorch._C._postInitExtension()
 
 class FloatTensor:
-    def __new__(self, e):
+    def __new__(cls, e):
         return torch.tensor(e, device='xpu', dtype=torch.float)
 
 
 class DoubleTensor:
-    def __new__(self, e):
+    def __new__(cls, e):
         return torch.tensor(e, device='xpu', dtype=torch.float64)

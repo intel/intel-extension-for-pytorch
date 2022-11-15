@@ -4,14 +4,16 @@ from torch.distributions import Geometric
 from torch.testing._internal.common_utils import TestCase
 from torch.testing._internal.common_dtype import all_types_and
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 import numpy as np
 import pytest
 
 from functools import wraps
 # TODO : Rebasing 1.13. 1.13 retires the repeat_test_for_types.
-# However, by the time submitting this change, the tests in experiments folder 
+# However, by the time submitting this change, the tests in experiments folder
 # are not handled correctly, thus, we put the function here for simplicity.
+
+
 def repeat_test_for_types(dtypes):
     def repeat_helper(f):
         @wraps(f)
@@ -53,7 +55,7 @@ class TestTorchMethod(TestCase):
         a = torch.tensor([10], dtype=dtype, device=device).geometric_(0.5)
         self.assertEqual(a.dtype, dtype)
         self.assertEqual(a.size(), torch.Size([1]))
-    
+
     @pytest.mark.skip()
     @repeat_test_for_types([*all_types_and(torch.half, torch.bfloat16)])
     def test_geometric_kstest(self, dtype):

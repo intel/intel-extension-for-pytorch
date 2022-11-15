@@ -8,6 +8,8 @@ import pytest
 
 
 approximates = ["tanh", "none"]
+
+
 class TestNNMethod(TestCase):
 
     def test_activation_relu(self, dtype=torch.float):
@@ -145,8 +147,7 @@ class TestNNMethod(TestCase):
         with torch.xpu.onednn_layout():
             GELU = torch.nn.GELU()
             GELU_dpcpp = copy.deepcopy(GELU).to("xpu")
-            x_cpu = torch.tensor(
-                [[-0.1, 0.2], [-0.2, 0.3], [0.4, 0.5], [0.5, -0.6]])
+            x_cpu = torch.randn(test_shape)
             x_dpcpp = x_cpu.to("xpu")
             x_cpu.requires_grad_(True)
             x_dpcpp.requires_grad_(True)
@@ -154,36 +155,10 @@ class TestNNMethod(TestCase):
             y_dpcpp = GELU_dpcpp(to_block_dpcpp(x_dpcpp))
 
             self.assertEqual(y_cpu, y_dpcpp.cpu())
-
-            # y_cpu = torch.tensor([[1, 1],[1, 1],[1, 1],[1, 1]]);
-            # y_dpcpp = y_cpu.to("xpu")
             y_cpu.backward(x_cpu)
             y_dpcpp.backward(x_dpcpp)
 
             self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
-
-    def test_activation_gelu_block(self, dtype=torch.float):
-        to_block_cpu = torch.nn.Conv2d(4, 4, kernel_size=3, padding=1)
-        to_block_dpcpp = copy.deepcopy(to_block_cpu).xpu()
-        test_shape = [1, 4, 3, 3]
-        with torch.xpu.onednn_layout():
-            for approximate in approximates:
-                GELU = torch.nn.GELU(approximate=approximate)
-                GELU_dpcpp = copy.deepcopy(GELU).to("xpu")
-                x_cpu = torch.randn(test_shape)
-                x_dpcpp = x_cpu.to("xpu")
-                x_cpu.requires_grad_(True)
-                x_dpcpp.requires_grad_(True)
-                y_cpu = GELU(to_block_cpu(x_cpu))
-                y_dpcpp = GELU_dpcpp(to_block_dpcpp(x_dpcpp))
-                print("cpu gelu ", y_cpu)
-                print("dpcpp gelu ", y_dpcpp.cpu())
-                self.assertEqual(y_cpu, y_dpcpp.cpu())
-                y_cpu.backward(x_cpu)
-                y_dpcpp.backward(x_dpcpp)
-                print("cpu gelu bwd", x_cpu.grad)
-                print("dpcpp gelu bwd", x_dpcpp.grad.cpu())
-                self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_activation_prelu(self, dtype=torch.float):
         PReLU = torch.nn.PReLU(num_parameters=1)

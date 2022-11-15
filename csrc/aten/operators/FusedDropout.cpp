@@ -473,7 +473,9 @@ Tensor native_dropout_backward(
 
 // NOTE: _masked_scale will be removed, see PR #63937
 Tensor _masked_scale(const Tensor& self, const Tensor& mask, double scale) {
-  TORCH_CHECK(mask.scalar_type() == at::ScalarType::Byte, "mask should be torch.uint8 dtype");
+  TORCH_CHECK(
+      mask.scalar_type() == at::ScalarType::Byte,
+      "mask should be torch.uint8 dtype");
   return impl::dropout_backward_dpcpp<uint8_t>(self, mask, scale);
 }
 

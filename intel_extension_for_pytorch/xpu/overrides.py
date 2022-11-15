@@ -1,5 +1,5 @@
 import torch
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch  # noqa
 
 from torch.overrides import (
     handle_torch_function,
@@ -9,7 +9,11 @@ from torch.overrides import (
     is_tensor_method_or_property,
     TorchFunctionMode
 )
-import functools
+
+__all__ = ["handle_torch_function", "has_torch_function", "get_overridable_functions",
+           "get_testing_overrides", "is_tensor_method_or_property"]
+
+import functools  # noqa
 from functools import partial
 
 # The dispatch table for tensor factory's __torch_function__ implementation.
@@ -18,9 +22,11 @@ HANDLED_FUNCTIONS_SUB = {}
 DEFAULT_XPU_DEVICE = "xpu"
 DEFAULT_DTYPE = torch.float
 
+
 def implements_sub(torch_function):
     "Register a torch function override for SubTensor"
     HANDLED_FUNCTIONS_SUB[torch_function] = partial(torch_function, device=DEFAULT_XPU_DEVICE, dtype=DEFAULT_DTYPE)
+
 
 implements_sub(torch.empty)
 
@@ -43,8 +49,6 @@ def set_default_tensor_type(tensor_type):
                 return partial(func, device="xpu", dtype=self.dtype)(*args, **kwargs)
 
             return func(*args, **kwargs)
-
-
 
     if tensor_type in [torch.xpu.FloatTensor, torch.xpu.DoubleTensor]:
         mode_info = torch.overrides._TorchFunctionModeInfo()
