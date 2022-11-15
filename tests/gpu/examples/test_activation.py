@@ -8,8 +8,6 @@ import pytest
 
 
 approximates = ["tanh", "none"]
-
-
 class TestNNMethod(TestCase):
 
     def test_activation_relu(self, dtype=torch.float):
