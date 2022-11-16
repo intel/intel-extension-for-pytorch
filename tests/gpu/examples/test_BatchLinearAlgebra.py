@@ -202,17 +202,13 @@ class TestTorchMethod(TestCase):
             # CPU
             A_cpu = A.to('cpu')
             b_cpu = b.to('cpu')
-            x_cpu, lu_cpu = torch.solve(b_cpu, A_cpu)
-            _validate(A_cpu, x_cpu, b_cpu)
-            x_cpu, lu_cpu = b_cpu.solve(A_cpu)
+            x_cpu = torch.linalg.solve(A_cpu, b_cpu)
             _validate(A_cpu, x_cpu, b_cpu)
 
             # XPU
             A_xpu = A.to('xpu')
             b_xpu = b.to('xpu')
-            x_xpu, lu_xpu = torch.solve(b_xpu, A_xpu)
-            _validate(A_xpu.cpu(), x_xpu.cpu(), b_xpu.cpu())
-            x_xpu, lu_xpu = b_xpu.solve(A_xpu)
+            x_xpu = torch.linalg.solve(A_xpu, b_xpu)
             _validate(A_xpu.cpu(), x_xpu.cpu(), b_xpu.cpu())
 
     @pytest.mark.skipif("not torch.xpu.has_onemkl()")

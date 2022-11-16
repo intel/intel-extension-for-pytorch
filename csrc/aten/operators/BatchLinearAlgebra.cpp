@@ -3454,8 +3454,10 @@ std::tuple<Tensor&, Tensor&, Tensor&> linalg_lu_factor_ex_out(
   }
   // handle the info
   std::vector<int32_t> infos_vec(native::batchCount(A), 0);
+  // mkl needs long for pivots, but PT is int
+  Tensor pivots_ = at::empty(pivots.sizes(), pivots.options().dtype(kLong));
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(LU.scalar_type(), "lu_dpcpp", [&] {
-    impl::apply_lu_dpcpp_<scalar_t>(LU, pivots, infos_vec);
+    impl::apply_lu_dpcpp_<scalar_t>(LU, pivots_, infos_vec);
   });
   auto expected_info_shape =
       IntArrayRef(LU.sizes().cbegin(), LU.sizes().cend() - 2);
@@ -3468,6 +3470,8 @@ std::tuple<Tensor&, Tensor&, Tensor&> linalg_lu_factor_ex_out(
   if (check_errors) {
     at::_linalg_check_errors(info, "torch.linalg.lu_factor_ex", A.dim() == 2);
   }
+  //Copy to original pivots tensor
+  pivots.copy_(pivots_);
   return std::tuple<Tensor&, Tensor&, Tensor&>(LU, pivots, info);
 }
 
