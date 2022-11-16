@@ -395,7 +395,6 @@ torch._storage_classes.add(BoolStorage)
 torch._storage_classes.add(BFloat16Storage)
 torch._storage_classes.add(ComplexDoubleStorage)
 torch._storage_classes.add(ComplexFloatStorage)
-intel_extension_for_pytorch._C._initExtension()
 
 
 def _xpu_tag(obj):
