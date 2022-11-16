@@ -141,11 +141,15 @@ Tensor linear_gelu(
   auto linear_wrapper = LinearConverter();
   auto post_op = [=]() {
     Attr attr;
-    attr.append_post_eltwise(
-        /* gelu_scale */ 1.f,
-        /* alpha */ 0.f,
-        /* beta */ 0.f,
-        attr.kind_with_gelu);
+    algorithm algo;
+    if (approximate == "none") {
+      algo = attr.kind_with_gelu_erf;
+    } else if (approximate == "tanh") {
+      algo = attr.kind_with_gelu_tanh;
+    } else {
+      TORCH_INTERNAL_ASSERT(false, "Unsupported gelu algorithm: ", approximate);
+    }
+    attr.append_post_eltwise(1.0f, 0.0f, 0.0f, algo);
     return attr;
   };
   Tensor output;

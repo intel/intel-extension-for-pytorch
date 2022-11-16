@@ -997,7 +997,15 @@ Tensor convolution_gelu(
     int64_t groups_,
     c10::string_view approximate) {
   Attr att;
-  att.append_post_eltwise(1.0f, 0.0f, 0.0f, att.kind_with_gelu);
+  algorithm algo;
+  if (approximate == "none") {
+    algo = att.kind_with_gelu_erf;
+  } else if (approximate == "tanh") {
+    algo = att.kind_with_gelu_tanh;
+  } else {
+    TORCH_INTERNAL_ASSERT(false, "Unsupported gelu algorithm: ", approximate);
+  }
+  att.append_post_eltwise(1.0f, 0.0f, 0.0f, algo);
   Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
   return _convolution(
       input,
@@ -1028,7 +1036,15 @@ Tensor _convolution_gelu(
     bool allow_tf32,
     c10::string_view approximate) {
   Attr att;
-  att.append_post_eltwise(1.0f, 0.0f, 0.0f, att.kind_with_gelu);
+  algorithm algo;
+  if (approximate == "none") {
+    algo = att.kind_with_gelu_erf;
+  } else if (approximate == "tanh") {
+    algo = att.kind_with_gelu_tanh;
+  } else {
+    TORCH_INTERNAL_ASSERT(false, "Unsupported gelu algorithm: ", approximate);
+  }
+  att.append_post_eltwise(1.0f, 0.0f, 0.0f, algo);
   Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
   return _convolution(
       input,

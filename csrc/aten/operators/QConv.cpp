@@ -778,11 +778,19 @@ at::Tensor q_conv2d_gelu(
       Tensor bias = pack_ptr->bias.value();
       attr.append_bias<2>(bias);
     }
+    algorithm algo;
+    if (approximate == "none") {
+      algo = attr.kind_with_gelu_erf;
+    } else if (approximate == "tanh") {
+      algo = attr.kind_with_gelu_tanh;
+    } else {
+      TORCH_INTERNAL_ASSERT(false, "Unsupported gelu algorithm: ", approximate);
+    }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
         /* beta */ 0.f,
-        attr.kind_with_gelu);
+        algo);
   };
   return qconv_wrapper.call(input, att);
 }

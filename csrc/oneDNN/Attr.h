@@ -116,7 +116,8 @@ class Attr {
   /***** eltwise *****/
   algorithm kind_with_relu = algorithm::eltwise_relu;
   algorithm kind_with_sigmoid = algorithm::eltwise_logistic;
-  algorithm kind_with_gelu = algorithm::eltwise_gelu_tanh;
+  algorithm kind_with_gelu_tanh = algorithm::eltwise_gelu_tanh;
+  algorithm kind_with_gelu_erf = algorithm::eltwise_gelu_erf;
   algorithm kind_with_mish = algorithm::eltwise_mish;
   algorithm kind_with_linear = algorithm::eltwise_linear;
   algorithm kind_with_swish = algorithm::eltwise_swish;
