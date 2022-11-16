@@ -23,23 +23,11 @@ Tensor& bitwise_left_shift_out(
     const Tensor& other,
     Tensor& out) {
   auto iter = TensorIterator::binary_op(out, self, other);
-  if (iter.dtype() == ScalarType::Float || iter.dtype() == ScalarType::Double ||
-      iter.dtype() == ScalarType::Half ||
-      iter.dtype() == ScalarType::BFloat16) {
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        ScalarType::Half, ScalarType::BFloat16, iter.dtype(), "lshift", [&]() {
-          dpcpp_kernel_with_scalars(
-              iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                return a * Numerics<scalar_t>::pow(static_cast<scalar_t>(2), b);
-              });
-        });
-  } else {
-    IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "lshift", [&]() {
-      dpcpp_kernel_with_scalars(iter, [](scalar_t a, scalar_t b) -> scalar_t {
-        return static_cast<dpl::make_unsigned_t<scalar_t>>(a) << b;
-      });
+  IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "lshift", [&]() {
+    dpcpp_kernel_with_scalars(iter, [](scalar_t a, scalar_t b) -> scalar_t {
+      return static_cast<dpl::make_unsigned_t<scalar_t>>(a) << b;
     });
-  }
+  });
   return out;
 }
 
@@ -71,22 +59,10 @@ Tensor& bitwise_right_shift_out(
     const Tensor& other,
     Tensor& out) {
   auto iter = TensorIterator::binary_op(out, self, other);
-  if (iter.dtype() == ScalarType::Float || iter.dtype() == ScalarType::Double ||
-      iter.dtype() == ScalarType::Half ||
-      iter.dtype() == ScalarType::BFloat16) {
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        ScalarType::Half, ScalarType::BFloat16, iter.dtype(), "rshift", [&]() {
-          dpcpp_kernel_with_scalars(
-              iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                return a / Numerics<scalar_t>::pow(static_cast<scalar_t>(2), b);
-              });
-        });
-  } else {
-    IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "rshift", [&]() {
-      dpcpp_kernel_with_scalars(
-          iter, [](scalar_t a, scalar_t b) -> scalar_t { return a >> b; });
-    });
-  }
+  IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "rshift", [&]() {
+    dpcpp_kernel_with_scalars(
+        iter, [](scalar_t a, scalar_t b) -> scalar_t { return a >> b; });
+  });
   return out;
 }
 

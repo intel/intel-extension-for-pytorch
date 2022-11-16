@@ -2131,24 +2131,6 @@ class TestBinaryUfuncs(TestCase):
             # Tensor x int scalar
             self.assertEqual(torch_op(a, 2), torch.tensor(numpy_op(a_np, 2), device=device))
 
-    def test_bitwise_shift_float(self, device):
-        ops = [
-            (torch.bitwise_left_shift, lambda x, y: x * 2. ** y),
-            (operator.lshift, lambda x, y: x * 2. ** y),
-            (torch.bitwise_right_shift, lambda x, y: x / 2. ** y),
-            (operator.rshift, lambda x, y: x / 2. ** y),
-        ]
-        for torch_op, expected_op in ops:
-            # int tensor x float
-            a = torch.tensor([19, -20, -21, 22], dtype=torch.int64, device=device)
-            self.assertEqual(torch_op(a, 1.8), torch.floor(expected_op(a, 1)).to(a.dtype))
-            # float tensor x int scalar
-            a = torch.tensor([19.1, -20.2, -21.3, 22.4], dtype=torch.float32, device=device)
-            self.assertEqual(torch_op(a, 2), expected_op(a, 2))
-            # float tensor x float scalar
-            a = torch.tensor([19.1, -20.2, -21.3, 22.4], dtype=torch.float32, device=device)
-            self.assertEqual(torch_op(a, 2.2), expected_op(a, 2.2))
-
     @onlyOnCPUAndXPU
     @dtypes(*list(product(get_all_dtypes(include_complex=False),
                           get_all_dtypes(include_complex=False))))

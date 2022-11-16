@@ -6,10 +6,9 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
-    def test_lshift(self, dtype=torch.float):
-        x_cpu = torch.randn(4, dtype=torch.double)
-        y_cpu = torch.randn(1, dtype=torch.double)
+    def test_lshift(self, dtype=torch.int32):
+        x_cpu = torch.tensor([19, -20, -21, 22], dtype=dtype)
+        y_cpu = torch.tensor([2, 1, 3, 1], dtype=dtype)
         x_xpu = x_cpu.to("xpu")
         y_xpu = y_cpu.to("xpu")
 
@@ -21,10 +20,9 @@ class TestTorchMethod(TestCase):
         re_xpu = x_xpu.__ilshift__(y_xpu).cpu()
         self.assertEqual(re_cpu, re_xpu)
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
-    def test_rshift(self, dtype=torch.float):
-        x_cpu = torch.randn(4, dtype=torch.double)
-        y_cpu = torch.randn(1, dtype=torch.double)
+    def test_rshift(self, dtype=torch.int32):
+        x_cpu = torch.tensor([19, -20, -21, 22], dtype=dtype)
+        y_cpu = torch.tensor([2, 1, 3, 1], dtype=dtype)
         x_xpu = x_cpu.to("xpu")
         y_xpu = y_cpu.to("xpu")
 
