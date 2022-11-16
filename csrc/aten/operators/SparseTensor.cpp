@@ -241,6 +241,10 @@ SparseTensor coalesce(const SparseTensor& self) {
   return at::_coalesce(self);
 }
 
+Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
+  return at::native::copy_sparse_wrapper_(self, src, non_blocking);
+}
+
 Tensor _coalesce(const Tensor& self) {
   int64_t nnz = self._nnz();
   if (self.is_coalesced()) {
