@@ -45,3 +45,4 @@ supported:
   - sigmoid
   - sigmoid_
   - sigmoid.out
+  - _empty_per_channel_affine_quantized4

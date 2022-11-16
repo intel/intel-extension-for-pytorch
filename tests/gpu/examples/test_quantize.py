@@ -50,7 +50,7 @@ class TestTorchMethod(TestCase):
         src_cpu = torch.randn(1, 3, 2, 2)
         src_gpu = src_cpu.to("xpu")
 
-        data_type = torch.quint8
+        data_type = torch.qint8
         channel_scale_cpu = torch.Tensor([0.1, 0.3, 0.5])
         channel_zero_point_cpu = torch.tensor([0, 0, 0])
         channel_scale_xpu = torch.Tensor([0.1, 0.3, 0.5]).to("xpu")
@@ -61,4 +61,4 @@ class TestTorchMethod(TestCase):
         dst_gpu = torch.quantize_per_channel(src_gpu, scales=channel_scale_xpu,
                                              zero_points=channel_zero_point_xpu, dtype=data_type, axis=1)
 
-        self.assertEqual(dst_cpu, dst_gpu)
+        self.assertEqual(torch.dequantize(dst_cpu), torch.dequantize(dst_gpu))
