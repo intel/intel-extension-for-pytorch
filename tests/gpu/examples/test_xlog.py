@@ -41,13 +41,13 @@ class TestTorchMethod(TestCase):
             out_variant_helper(torch_fn, val, z)
 
         # Tensor-Tensor Test (tensor of same and different shape)
-        x = make_tensor((3, 2, 4, 5), device, x_dtype, low=0.5, high=1000)
-        y = make_tensor((3, 2, 4, 5), device, y_dtype, low=0.5, high=1000)
-        z = make_tensor((4, 5), device, y_dtype, low=0.5, high=1000)
+        x = make_tensor((3, 2, 4, 5), device=device, dtype=x_dtype, low=0.5, high=1000)
+        y = make_tensor((3, 2, 4, 5), device=device, dtype=y_dtype, low=0.5, high=1000)
+        z = make_tensor((4, 5), device=device, dtype=y_dtype, low=0.5, high=1000)
 
-        x_1p = make_tensor((3, 2, 4, 5), device, x_dtype, low=-0.5, high=1000)
-        y_1p = make_tensor((3, 2, 4, 5), device, y_dtype, low=-0.5, high=1000)
-        z_1p = make_tensor((4, 5), device, y_dtype, low=-0.5, high=1000)
+        x_1p = make_tensor((3, 2, 4, 5), device=device, dtype=x_dtype, low=-0.5, high=1000)
+        y_1p = make_tensor((3, 2, 4, 5), device=device, dtype=y_dtype, low=-0.5, high=1000)
+        z_1p = make_tensor((4, 5), device=device, dtype=y_dtype, low=-0.5, high=1000)
 
         xlogy_fns = torch.xlogy, scipy.special.xlogy
         xlog1py_fns = torch.special.xlog1py, scipy.special.xlog1py
