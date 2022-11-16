@@ -3470,7 +3470,7 @@ std::tuple<Tensor&, Tensor&, Tensor&> linalg_lu_factor_ex_out(
   if (check_errors) {
     at::_linalg_check_errors(info, "torch.linalg.lu_factor_ex", A.dim() == 2);
   }
-  //Copy to original pivots tensor
+  // Copy to original pivots tensor
   pivots.copy_(pivots_);
   return std::tuple<Tensor&, Tensor&, Tensor&>(LU, pivots, info);
 }
