@@ -766,7 +766,8 @@ at::Tensor q_conv2d_gelu(
     const Tensor& input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double output_scale,
-    int64_t output_zero_point) {
+    int64_t output_zero_point,
+    c10::string_view approximate) {
   auto qconv_wrapper = QuantizeConvConverter<2>(
       packed_weight, output_scale, output_zero_point, kQInt8);
   auto att = [=]() {
