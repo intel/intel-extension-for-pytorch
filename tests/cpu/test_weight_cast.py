@@ -5,7 +5,8 @@ import torch
 import intel_extension_for_pytorch as ipex
 from intel_extension_for_pytorch.nn.utils._weight_cast import weight_dtype_convert_with_ipex as cast
 from intel_extension_for_pytorch.nn.utils._weight_cast import IPEX_WEIGHT_CAST_MODULE as IPEX_WEIGHT_CAST_MODULE
-from intel_extension_for_pytorch.optim._optimizer_utils import IPEX_FUSED_OPTIMIZER_LIST as IPEX_FUSED_OPTIMIZER_LIST
+from intel_extension_for_pytorch.optim._optimizer_utils import IPEX_FUSED_OPTIMIZER_LIST_CPU as IPEX_FUSED_OPTIMIZER_LIST
+from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBag
 
 from torch.testing._internal.common_utils import TestCase
 from torch.optim import Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD

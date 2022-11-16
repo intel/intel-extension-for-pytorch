@@ -2,22 +2,33 @@ import torch
 import copy
 import types
 import warnings
-from ._functional import sgd_step, adagrad_step, lamb_step, adam_step
+from ._functional import sgd_step, adagrad_step, lamb_step, adam_step, adamw_step
 from ._lamb import Lamb
 from ..nn import utils
 
-IPEX_FUSED_OPTIMIZER_LIST = [
+IPEX_FUSED_OPTIMIZER_LIST_CPU = [
     torch.optim.SGD,
     torch.optim.Adagrad,
     torch.optim.Adam,
     Lamb,
 ]
 
-OPTIMIZER_FUSED_STEP_MAPPING = {
+IPEX_FUSED_OPTIMIZER_LIST_XPU = [
+    torch.optim.SGD,
+    torch.optim.AdamW,
+]
+
+OPTIMIZER_FUSED_STEP_MAPPING_CPU = {
     torch.optim.SGD: sgd_step,
     torch.optim.Adagrad: adagrad_step,
     torch.optim.Adam: adam_step,
-    Lamb: lamb_step
+    Lamb: lamb_step,
+}
+
+# TODO: For align frontend and pass build, the xpu code is temp commented
+OPTIMIZER_FUSED_STEP_MAPPING_XPU = {
+    torch.optim.SGD: sgd_step,
+    torch.optim.AdamW: adamw_step,
 }
 
 def patch_zero_grad_for_master_weight_training(optimizer):
@@ -65,10 +76,16 @@ def patch_step_for_master_weight_training(optimizer):
         loss = self._original_step(closure)
         # sync mater weight to model's paramerter
         for k, value in self.params_attr.items():
-            if 'bf16_param' in value.keys():
-                torch.ops.torch_ipex.sync_master_weight_to_bf16(k, value['bf16_param'])
-            if 'fp16_param' in value.keys():
-                torch.ops.torch_ipex.sync_master_weight_to_fp16(k, value['fp16_param'])
+            if k.device.type == 'cpu':
+                if 'bf16_param' in value.keys():
+                    torch.ops.torch_ipex.sync_master_weight_to_bf16(k, value['bf16_param'])
+                if 'fp16_param' in value.keys():
+                    torch.ops.torch_ipex.sync_master_weight_to_fp16(k, value['fp16_param'])
+            elif k.device.type == 'xpu':
+                if 'bf16_param' in value.keys():
+                    value['bf16_param'].data = k.data.to(dtype=torch.bfloat16)
+            else:
+                pass
         return loss
     # Split master_param_non_fused_step into 2 steps:
     # 1.Sync_grad: Convert grad to FP32
@@ -101,7 +118,7 @@ def patch_load_state_dict(optimizer):
     Forbid optimizer load state dict after weight-prepack or weight-cast
     """
     def load_state_dict(self, state_dict):
-        assert False, "_ipex_optimizer does not suppory load_state_dict"
+        assert False, "_ipex_optimizer does not support load_state_dict"
     setattr(optimizer, '_original_load_state_dict', optimizer.load_state_dict)
     setattr(optimizer, 'load_state_dict', types.MethodType(load_state_dict, optimizer))
 
@@ -154,7 +171,7 @@ def pack_optimizer_params_and_states(optimizer, param_pair, attrs, pack_dtype):
                                     # We have an assumtion here that any tensor's in parameter state, if they
                                     # have same shapes with the parameter, they should share same layout with 
                                     # the parameter. Thus we need pack the state as we did to parameters.
-                                    if attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE:
+                                    if attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE_CPU:
                                         if attr['op'] is torch.nn.Conv1d or attr['op'] is torch.nn.Conv2d or attr['op'] is torch.nn.Conv3d:
                                             if attr['op'] is torch.nn.Conv2d:
                                                 memory_format = torch.channels_last
@@ -186,7 +203,7 @@ def patch_state_dict(optimizer):
                         # the parameter. Thus we need unpack the state as we did to parameters.
                         if 'op' in params_attr:
                             # Secondly, unpack releated states
-                            if params_attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE:
+                            if params_attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE_CPU:
                                 state_value = params_attr['ctx'].to_public(state_value)
                             else:
                                 assert False, "unsupported op to unpack"
@@ -195,7 +212,7 @@ def patch_state_dict(optimizer):
     setattr(optimizer, '_original_state_dict', optimizer.state_dict)
     setattr(optimizer, 'state_dict', types.MethodType(get_optimizer_unpacked_state_dict, optimizer))
 
-def optimizer_fusion(optimizer, master_weight_split):
+def optimizer_fusion(optimizer, master_weight_split, is_xpu=False):
     r"""
     Patch "step" method to choose IPEX optimized fused update kernel.
     """
@@ -203,7 +220,10 @@ def optimizer_fusion(optimizer, master_weight_split):
     if not hasattr(optimizer, 'params_attr'):
         setattr(optimizer, 'params_attr', {})
     try:
-        step = OPTIMIZER_FUSED_STEP_MAPPING[type(optimizer)]
+        if not is_xpu:
+            step = OPTIMIZER_FUSED_STEP_MAPPING_CPU[type(optimizer)]
+        else:
+            step = OPTIMIZER_FUSED_STEP_MAPPING_XPU[type(optimizer)]
         if not hasattr(optimizer, '_original_step'):
             setattr(optimizer, '_original_step', optimizer.step)
         setattr(optimizer, 'step', types.MethodType(step, optimizer))

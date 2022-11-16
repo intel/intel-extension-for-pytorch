@@ -65,6 +65,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import copy
 from pathlib import Path
 import re
 
@@ -392,14 +393,11 @@ def get_build_type():
 def get_build_type_dir():
     return os.path.join(get_build_dir(), get_build_type())
 
-
 def get_package_base_dir():
     return os.path.join(get_build_type_dir(), "packages")
 
-
 def get_package_dir():
     return os.path.join(get_package_base_dir(), package_name)
-
 
 def get_package_lib_dir():
     return os.path.join(get_package_dir(), "lib")
@@ -412,13 +410,20 @@ def get_ipex_cpu_dir():
 def get_ipex_cpu_build_dir():
     return os.path.join(get_build_type_dir(), 'csrc', 'cpu')
 
+def get_xpu_project_dir():
+    project_root_dir = os.path.abspath(os.path.dirname(__file__))
+    return os.path.join(project_root_dir, 'csrc', 'gpu')
+
+def get_xpu_project_build_dir():
+    return os.path.join(get_build_type_dir(), 'csrc', 'gpu')
+
 def get_ipex_python_dir():
     project_root_dir = os.path.dirname(__file__)
-    python_root_dir = os.path.join(project_root_dir, 'intel_extension_for_pytorch', 'csrc', 'python')
+    python_root_dir = os.path.join(project_root_dir, 'intel_extension_for_pytorch', 'csrc')
     return os.path.abspath(python_root_dir)
 
 def get_ipex_python_build_dir():
-    return os.path.join(get_build_type_dir(), 'csrc', 'python')
+    return os.path.join(get_build_type_dir(), 'intel_extension_for_pytorch', 'csrc')
 
 # initialize variables for compilation
 IS_WINDOWS = (platform.system() == 'Windows')
@@ -426,13 +431,22 @@ IS_DARWIN = (platform.system() == 'Darwin')
 IS_LINUX = (platform.system() == 'Linux')
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
-python_include_dir = get_paths()['include']
+python_include_dir = get_paths()['include'] 
 
 # Generate version info (ipex.__version__)
 ipex_git_sha, torch_git_sha = get_git_head_sha(base_dir)
 ipex_build_version = get_build_version(ipex_git_sha)
 create_version_files(base_dir, ipex_build_version, ipex_git_sha, torch_git_sha)
 
+IPEX_BUILD_WITH_XPU = False
+if _check_env_flag("USE_XPU"):
+    IPEX_BUILD_WITH_XPU = True
+
+def get_xpu_compliers():
+    if shutil.which('icx') is None or shutil.which('dpcpp') is None:
+        raise RuntimeError("Failed to find compiler path from OS PATH")
+    # dpcpp build
+    return "icx", "dpcpp"
 
 # global setup modules
 class IPEXClean(distutils.command.clean.clean, object):
@@ -511,6 +525,9 @@ class IPEXCPPLibBuild(build_clib, object):
         ipex_python_dir = get_ipex_python_dir()
         ipex_python_build_dir = get_ipex_python_build_dir()
 
+        ipex_xpu_dir = get_xpu_project_dir()
+        ipex_xpu_build_dir = get_xpu_project_build_dir()
+
         if not os.path.exists(build_type_dir):
             Path(build_type_dir).mkdir(parents=True, exist_ok=True)
 
@@ -519,6 +536,9 @@ class IPEXCPPLibBuild(build_clib, object):
 
         if not os.path.exists(ipex_cpu_build_dir):
             Path(ipex_cpu_build_dir).mkdir(parents=True, exist_ok=True)
+
+        if not os.path.exists(ipex_xpu_build_dir):
+            Path(ipex_xpu_build_dir).mkdir(parents=True, exist_ok=True)
 
         if not os.path.exists(ipex_python_build_dir):
             Path(ipex_python_build_dir).mkdir(parents=True, exist_ok=True)
@@ -535,6 +555,9 @@ class IPEXCPPLibBuild(build_clib, object):
             '-DPYBIND11_CL_FLAGS=' + get_pybind11_abi_compiler_flags()
             ]
 
+        if(IPEX_BUILD_WITH_XPU):
+            cmake_args += ['-DIPEX_BUILD_WITH_XPU=1']
+
         if _check_env_flag("IPEX_DISP_OP"):
             cmake_args += ['-DIPEX_DISP_OP=1']
 
@@ -549,7 +572,6 @@ class IPEXCPPLibBuild(build_clib, object):
             use_ninja = True
             cmake_args += ['-GNinja']
 
-
         build_args = ['-j', str(multiprocessing.cpu_count())]
         # build_args += ['VERBOSE=1']
 
@@ -557,6 +579,24 @@ class IPEXCPPLibBuild(build_clib, object):
         if _check_env_flag("USE_SYCL"):
             os.environ['CXX'] = 'compute++'
 
+        # Build XPU module:
+        if(IPEX_BUILD_WITH_XPU):
+            if os.path.isdir(ipex_xpu_dir) is False:
+                raise RuntimeError('It maybe CPU only branch, and it is not contains XPU code.')
+
+            cmake_args_xpu = copy.deepcopy(cmake_args)
+            gpu_cc, gpu_cxx = get_xpu_compliers()
+            cmake_args_xpu += ['-DCMAKE_C_COMPILER={}'.format(gpu_cc)]
+            cmake_args_xpu += ['-DCMAKE_CXX_COMPILER={}'.format(gpu_cxx)]
+
+            check_call([self.cmake, ipex_xpu_dir] + cmake_args_xpu, cwd=ipex_xpu_build_dir, env=env)
+
+            if use_ninja:
+                check_call(['ninja'] + build_args, cwd=ipex_xpu_build_dir, env=env)
+            else:
+                check_call(['make'] + build_args, cwd=ipex_xpu_build_dir, env=env)
+
+        # Build CPU module:
         check_call([self.cmake, ipex_cpu_dir] + cmake_args, cwd=ipex_cpu_build_dir, env=env)
 
         if use_ninja:
@@ -564,7 +604,7 @@ class IPEXCPPLibBuild(build_clib, object):
         else:
             check_call(['make'] + build_args, cwd=ipex_cpu_build_dir, env=env)
 
-        # Build python.so
+        # Build common python module:
         check_call([self.cmake, ipex_python_dir] + cmake_args, cwd=ipex_python_build_dir, env=env)
 
         if use_ninja:
@@ -704,11 +744,11 @@ elif mode == 'python':
 
     def pyi_module():
         main_libraries = ['intel-ext-pt-python']
-        main_sources = [os.path.join("intel_extension_for_pytorch", "csrc", "python", "_C.cpp")]
+        main_sources = [os.path.join("intel_extension_for_pytorch", "csrc", "_C.cpp")]
 
         include_dirs = [
             os.path.realpath("."),
-            os.path.realpath(os.path.join("intel_extension_for_pytorch", "csrc", "python")),
+            os.path.realpath(os.path.join("intel_extension_for_pytorch", "csrc")),
             os.path.join(mkl_include_path),
             os.path.join(pytorch_install_dir, "include"),
             os.path.join(pytorch_install_dir, "include", "torch", "csrc", "api", "include")]
@@ -736,6 +776,9 @@ elif mode == 'python':
             # braces warnings, see
             # https://bugs.llvm.org/show_bug.cgi?id=21629
             '-Wno-missing-braces']
+
+        if(IPEX_BUILD_WITH_XPU):
+            extra_compile_args += ['-DIPEX_BUILD_WITH_XPU=1']
 
         C_ext = CppExtension(
             "intel_extension_for_pytorch._C",

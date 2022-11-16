@@ -4,13 +4,13 @@ project(IPEX CXX C)
 
 set(LINUX TRUE)
 set(CMAKE_INSTALL_MESSAGE NEVER)
-# set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(PLUGIN_NAME_PYTHON intel-ext-pt-python)
 
 # Setup project top directory.
-set(IPEX_PROJECT_TOP_DIR "${PROJECT_SOURCE_DIR}/../../../")
+set(IPEX_PROJECT_TOP_DIR "${PROJECT_SOURCE_DIR}/../../")
 
 set(RPATH_VALUE $ORIGIN)
 set(CMAKE_SKIP_BUILD_RPATH  FALSE)
@@ -66,9 +66,16 @@ endif()
 
 set(IPEX_PYTHON_CPP_SRCS)
 set(IPEX_PYTHON_CPP_CPU_SRCS)
+set(IPEX_PYTHON_CPP_XPU_SRCS)
 add_subdirectory(cpu)
 
-set(IPEX_PYTHON_CPP_SRCS ${IPEX_PYTHON_CPP_CPU_SRCS})
+if(DEFINED IPEX_BUILD_WITH_XPU)
+  # pass down definition from CMAKE to CPP files.
+  add_compile_definitions(IPEX_BUILD_WITH_XPU)
+  add_subdirectory(xpu)
+endif()
+
+set(IPEX_PYTHON_CPP_SRCS ${IPEX_PYTHON_CPP_CPU_SRCS} ${IPEX_PYTHON_CPP_XPU_SRCS})
 
 add_library(${PLUGIN_NAME_PYTHON} SHARED ${IPEX_PYTHON_CPP_SRCS})
 
@@ -81,3 +88,7 @@ endif()
 
 target_link_directories(${PLUGIN_NAME_PYTHON} PUBLIC ${IPEX_INSTALL_LIBDIR})
 target_link_libraries(${PLUGIN_NAME_PYTHON} PUBLIC intel-ext-pt-cpu)
+
+if(DEFINED IPEX_BUILD_WITH_XPU)
+target_link_libraries(${PLUGIN_NAME_PYTHON} PUBLIC intel-ext-pt-gpu)
+endif()

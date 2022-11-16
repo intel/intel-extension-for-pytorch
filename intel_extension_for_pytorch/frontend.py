@@ -6,7 +6,7 @@ from torch.jit._trace import TracerWarning
 import warnings
 
 from .nn import utils
-from .optim._optimizer_utils import optimizer_fusion, IPEX_FUSED_OPTIMIZER_LIST
+from .optim._optimizer_utils import optimizer_fusion, IPEX_FUSED_OPTIMIZER_LIST_CPU, IPEX_FUSED_OPTIMIZER_LIST_XPU
 import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.utils.channels_last_1d import to_channels_last_1d
 from intel_extension_for_pytorch.utils.linear_bn_folding import linear_bn_fuse
@@ -348,9 +348,17 @@ def optimize(
             "Options are 'O0', 'O1'.")
     else:
         opt_properties = opt_levels[level](opt_properties)
-    
+
+    device_type = 'cpu'
+    if len(list(model.parameters())) and list(model.parameters())[0].device.type == 'xpu':
+        if not all([param.device.type == 'xpu' for param in list(model.parameters())]):
+            raise RuntimeError("The model is mixed with different device type")
+        else:
+            device_type = 'xpu'
+
     # auto model channels_last memory format conversion 
-    if auto_channels_last:
+    # TODO: for xpu, the auto channels last is temp disabled
+    if auto_channels_last and device_type == 'cpu':
         _convert_convNd_weight_memory_format(model)
 
     if level is not None:
@@ -377,6 +385,29 @@ def optimize(
     _disable_dnnl()
     if opt_properties.auto_kernel_selection:
         _enable_dnnl()
+
+    # when on xpu, some features are not supported
+    if device_type == 'xpu':
+        if opt_properties.auto_kernel_selection:
+            warnings.warn("For XPU device , the auto kernel selection is unsupported, so disable it")
+            opt_properties.auto_kernel_selection = False
+        if opt_properties.split_master_weight_for_bf16:
+            warnings.warn("For XPU device, the split master weight is unsupported for now, so temp to disable it")
+            # TODO: for xpu, the split master weight will be supported soon
+            opt_properties.split_master_weight_for_bf16 = False
+        if opt_properties.graph_mode:
+            warnings.warn("For XPU, the oob solution for inference is to trace model outside of the ipex.optimize, so temp to disable the graph mode")
+            # TODO: for xpu now, the oob solution for inference is to trace model outside of the ipex.optimize.
+            opt_properties.graph_mode = False
+        if not inplace:
+            warnings.warn("For XPU device to save valuable device memory, temp to do optimization on inplaced model, so make inplace to be true")
+            # TODO: for xpu, inplace is true will add device memory pressure, so set inplace to be true
+            inplace = True
+        if opt_properties.weights_prepack:
+            warnings.warn("For XPU, the weight prepack and sample input are disabled. For onednn layout, IPEX_XPU_ONEDNN_LAYOUT is recommended to use")
+            opt_properties.weights_prepack = False
+            sample_input = None
+
     if inplace:
         optimized_model = model
         optimized_optimizer = optimizer
@@ -416,34 +447,47 @@ def optimize(
                 "have reset split_master_weight_for_bf16 flag to False." +
                 "If you want to use split_master_weight_for_bf16." +
                 "Please set both split_master_weight_for_bf16 and fuse_update_step to True")
-        elif type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST:
+        elif type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST_CPU and device_type == 'cpu':
             opt_properties.split_master_weight_for_bf16 = False
             opt_properties.fuse_update_step = False
             warnings.warn(
-                "IPEX does not support fused/fused split update for" + str(type(optimizer)) +
-                "will use non-fused master weight update for bf16 training")
+                "IPEX CPU does not support fused/fused split update for" + str(type(optimizer)) +
+                "will use non-fused master weight update for bf16 training on CPU")
+        elif type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST_XPU and device_type == 'xpu':
+            opt_properties.split_master_weight_for_bf16 = False
+            opt_properties.fuse_update_step = False
+            warnings.warn(
+                "IPEX XPU does not support fused/fused split update for" + str(type(optimizer)) +
+                "will use non-fused master weight update for bf16 training on XPU")
 
     # convert optimizer for training case.
     params_attr = {}
     if dtype == torch.bfloat16 and model.training:
         optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
-            optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16)
+            optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16, convert_dtype=torch.bfloat16)
     if dtype == torch.half and model.training:
+        assert device_type != 'xpu', "For now, XPU device does not support model training with half precision"
         optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
             optimized_model, optimized_optimizer, params_attr, False, convert_dtype=torch.half)
     # Since TorchDynamo cannot handle custom operations yet, for the case of inference graph mode,
     # the weights prepacking here is temporarily cancelled, and it will be completed on the graph.
-    if opt_properties.weights_prepack and (opt_properties.graph_mode is not True or optimizer is not None):
-        if dtype == torch.bfloat16:
-            assert core.onednn_has_bf16_support(), \
-                    "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, " + \
-                    "please set dtype to torch.float or set weights_prepack to False."
-        if dtype == torch.half:
-            assert core.onednn_has_fp16_support(), \
-                    "FP16 weight prepack needs the cpu support avx512_core_fp16, " + \
-                    "please set dtype to torch.float or set weights_prepack to False."
-        optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
-            optimized_model, optimized_optimizer, params_attr)
+    if opt_properties.weights_prepack:
+        if device_type == 'cpu':
+            if opt_properties.graph_mode is not True or optimizer is not None:
+                if dtype == torch.bfloat16:
+                    assert core.onednn_has_bf16_support(), \
+                            "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, " + \
+                            "please set dtype to torch.float or set weights_prepack to False."
+                if dtype == torch.half:
+                    assert core.onednn_has_fp16_support(), \
+                            "FP16 weight prepack needs the cpu support avx512_core_fp16, " + \
+                            "please set dtype to torch.float or set weights_prepack to False."
+                optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
+                    optimized_model, optimized_optimizer, params_attr, 'cpu')
+        else:
+            assert device_type == 'xpu', "Unknown device type, only support device CPU and XPU"
+            optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
+                optimized_model, optimized_optimizer, params_attr, 'xpu')
 
     if opt_properties.graph_mode:
         _old_forward = optimized_model.forward
@@ -527,12 +571,24 @@ def set_fp32_math_mode(mode=FP32MathMode.FP32, device="cpu"):
         >>> ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.FP32)
     """
 
-    if mode == FP32MathMode.BF32:
-        core.set_fp32_math_mode(core.FP32MathMode.BF32)
-    elif mode == FP32MathMode.FP32:
-        core.set_fp32_math_mode(core.FP32MathMode.FP32)
+    if device == "cpu":
+        if mode == FP32MathMode.BF32:
+            core.set_fp32_math_mode(core.FP32MathMode.BF32)
+        elif mode == FP32MathMode.FP32:
+            core.set_fp32_math_mode(core.FP32MathMode.FP32)
+        else:
+            warnings.warn("For CPU device, IPEX does not support mode except FP32MathMode.FP32 and FP32MathMode.BF32 for fpmath_mode right now.")
+    elif device == "xpu":
+        if mode == FP32MathMode.BF32:
+            torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.BF32)
+        elif mode == FP32MathMode.FP32:
+            torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.FP32)
+        elif mode == FP32MathMode.TF32:
+            torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.TF32)
+        else:
+            warnings.warn("For XPU device, IPEX does not support mode except FP32MathMode.FP32, FP32MathMode.BF32 and FP32MathMode.TF32 for fpmath_mode right now.")
     else:
-        warnings.warn("IPEX does not support mode except FP32MathMode.FP32 and FP32MathMode.BF32 for fpmath_mode right now.")
+        raise RuntimeError("Unexpected device type {}. ".format(device) + "Supported are 'cpu', 'xpu'.")
 
 
 def get_fp32_math_mode(device="cpu"):
@@ -555,4 +611,9 @@ def get_fp32_math_mode(device="cpu"):
         >>> ipex.get_fp32_math_mode(device="cpu")
     """
 
-    return core.get_fp32_math_mode()
+    if device == "cpu":
+        return core.get_fp32_math_mode()
+    elif device == "xpu":
+        return torch.xpu.get_fp32_math_mode()
+    else:
+        raise RuntimeError("Unexpected device type {}. ".format(device) + "Supported are 'cpu', 'xpu'.")
