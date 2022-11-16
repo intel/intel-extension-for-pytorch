@@ -2608,17 +2608,18 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
         infos.begin(), infos.end(), infos_tensor.template data_ptr<int32_t>());
     at::_linalg_check_errors(infos_tensor, "svd_xpu", self.dim() == 2);
 
-    if (compute_uv) {
-      if (some) {
-        VT_working_copy = VT_working_copy.narrow(-1, 0, k);
-      }
-    } else {
+    if (!compute_uv) {
       VT_working_copy.zero_();
       U_working_copy.zero_();
     }
   } else {
     U_working_copy.zero_();
     VT_working_copy.zero_();
+  }
+  if (compute_uv) {
+    if (some) {
+      VT_working_copy = VT_working_copy.narrow(-1, 0, k);
+    }
   }
   return std::make_tuple(U_working_copy, S_working_copy, VT_working_copy);
 }
