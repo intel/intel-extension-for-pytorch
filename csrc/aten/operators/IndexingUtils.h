@@ -206,11 +206,17 @@ struct AdvancedIndex {
       }
     }
 
+    // Check if the indexed subspace contains a dim of size 0, but the
+    // replacement shape does not. This implies that an index is out of bounds,
+    // because there is no number that's a valid index for an empty tensor.
+    // Normally, out of bounds is handled in the indexing kernel, but this case
+    // fails earlier in restride_src with an unhelpful error message.
     if (std::find(indexed_sizes.begin(), indexed_sizes.end(), 0) !=
             indexed_sizes.end() &&
         std::find(replacement_shape.begin(), replacement_shape.end(), 0) ==
             replacement_shape.end()) {
-      TORCH_CHECK(0, "index is out of bounds for dimension with size 0");
+      TORCH_CHECK_INDEX(
+          false, "index is out of bounds for dimension with size 0");
     }
 
     this->dims_before = dims_before;
@@ -251,8 +257,8 @@ static AdvancedIndex make_info(
   try {
     indices = expand_outplace(indices);
   } catch (std::exception& e) {
-    TORCH_CHECK(
-        0,
+    TORCH_CHECK_INDEX(
+        false,
         "shape mismatch: indexing tensors could not be broadcast together"
         " with shapes ",
         shapes_as_str(indices));
