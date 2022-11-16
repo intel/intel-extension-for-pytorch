@@ -5,7 +5,7 @@
 #include <utils/Macros.h>
 
 #include <aten/operators/Linear.h>
-#include "c10/util/string_view.h"
+#include <c10/util/string_view.h>
 
 namespace at {
 namespace AtenIpexTypeXPU {
