@@ -24,7 +24,7 @@ class TestTorchMethod(TestCase):
         a_xpu = a.clone().to(dpcpp_device)
         gradcheck(torch.sinc, a_xpu)
 
-    def test_sinc(self, dtype):
+    def test_sinc(self, dtype=torch.bfloat16):
         a = torch.randn(4, device=cpu_device, dtype=dtype)
         a_xpu = a.clone().to(dpcpp_device)
         result_cpu = torch.sinc(a)
