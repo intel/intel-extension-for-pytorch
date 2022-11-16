@@ -986,62 +986,7 @@ IPEX_CONV_DEFINATION(sigmoid)
 IPEX_CONV_DEFINATION(relu)
 IPEX_CONV_DEFINATION(hardswish)
 IPEX_CONV_DEFINATION(mish)
-
-Tensor convolution_gelu(
-    const Tensor& input,
-    const Tensor& weight,
-    const c10::optional<Tensor>& bias,
-    std::vector<int64_t> stride_,
-    std::vector<int64_t> padding_,
-    std::vector<int64_t> dilation_,
-    int64_t groups_,
-    c10::string_view approximate) {
-  Attr att;
-  att.append_post_eltwise(1.0f, 0.0f, 0.0f, att.kind_with_gelu);
-  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
-  return _convolution(
-      input,
-      weight,
-      bias_,
-      stride_,
-      padding_,
-      dilation_,
-      false,
-      {{0, 0}},
-      groups_,
-      att);
-}
-
-Tensor _convolution_gelu(
-    const Tensor& input,
-    const Tensor& weight,
-    const c10::optional<Tensor>& bias,
-    std::vector<int64_t> stride_,
-    std::vector<int64_t> padding_,
-    std::vector<int64_t> dilation_,
-    bool transposed,
-    std::vector<int64_t> output_padding_,
-    int groups,
-    bool benchmark,
-    bool deterministic,
-    bool cudnn_enabled,
-    bool allow_tf32,
-    c10::string_view approximate) {
-  Attr att;
-  att.append_post_eltwise(1.0f, 0.0f, 0.0f, att.kind_with_gelu);
-  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
-  return _convolution(
-      input,
-      weight,
-      bias_,
-      stride_,
-      padding_,
-      dilation_,
-      transposed,
-      output_padding_,
-      groups,
-      att);
-}
+IPEX_CONV_DEFINATION(gelu)
 
 Tensor convolution_silu(
     const Tensor& input,

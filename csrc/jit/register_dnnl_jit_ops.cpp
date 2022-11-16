@@ -568,9 +568,8 @@ RegisterOperators op({
     IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(hardswish),
     IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(mish),
     IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(silu),
+    IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(gelu),
     IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(hardsigmoid),
-
-    IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(gelu, EXTRA_SCHEMA("str approximate")),
 
     IPEX_GENERAL_CONV2D_JIT_OP_REGISTER(
         leaky_relu,
@@ -728,7 +727,7 @@ RegisterOperators op({
         AtenIpexTypeXPU::t_matmul_add),
 
     IPEX_JIT_OP_REGISTER(
-        "xpu::t_matmul_add_gelu(Tensor m2, Tensor m1, Tensor(a!) accumu, *, Scalar alpha, str approximate='none') -> Tensor(a!)",
+        "xpu::t_matmul_add_gelu(Tensor m2, Tensor m1, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
         "xpu::t_matmul_add_gelu",
         AtenIpexTypeXPU::t_matmul_add_gelu),
 

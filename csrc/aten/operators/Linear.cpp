@@ -110,7 +110,8 @@ IPEX_LINEAR_DEFINATION(mish)
 Tensor linear_silu(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias) {
+    const Tensor& bias,
+    c10::string_view approximate) {
   RECORD_FUNCTION(
       "linear_silu", std::vector<c10::IValue>({input, weight, bias}));
   auto linear_wrapper = LinearConverter();
