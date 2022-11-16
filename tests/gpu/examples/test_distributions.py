@@ -234,9 +234,6 @@ class TestDistributions(TestCase):
         #  sample check for extreme value of probs
         # self.assertEqual(Multinomial(total_count, s).sample().to(cpu_device), torch.tensor([[total_count, 0], [0, total_count]]))
 
-        #  check entropy computation
-        self.assertRaises(NotImplementedError, Multinomial(10, p).entropy)
-
     def test_normal(self):
         loc = torch.randn(5, 5, requires_grad=True, device=sycl_device)
         scale = torch.randn(5, 5).abs().requires_grad_().to("xpu")
