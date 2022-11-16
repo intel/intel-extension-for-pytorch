@@ -66,8 +66,6 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-import warnings
-import urllib.request
 import re
 
 try:
@@ -132,7 +130,6 @@ if mode != 'clean':
         mkl_header = glob.glob(f'{mkl_install_dir}/include/**/mkl_version.h', recursive = True)
         if len(mkl_header) == 0:
             raise RuntimeError(f'{mkl_install_dir} doesn\'t seem to be a valid MKL library directory.\n{" ":14}mkl_version.h not found.')
-            mkl_install_dir = ''
         else:
             mkl_header = mkl_header[0]
             mkl_major = 0
@@ -152,11 +149,9 @@ if mode != 'clean':
             mkl_version = f'{mkl_major}.{mkl_minor}.{mkl_patch}'
             if pkg_ver.parse(mkl_version) < pkg_ver.parse('2021.0.0'):
                 raise RuntimeError(f'MKL version({mkl_version}) is not supported. Please use MKL later than 2021.0.0.')
-                mkl_install_dir = ''
             mkl_library = glob.glob(f'{mkl_install_dir}/lib/**/libmkl_core.a', recursive = True)
             if len(mkl_library) == 0:
                 raise RuntimeError(f'libmkl_core.a not found in {mkl_install_dir}/lib/intel64.')
-                mkl_install_dir = ''
     if not mkl_install_dir:
         subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'mkl-include>=2021.0.0'])
         subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-deps', 'mkl-static>=2021.0.0'])
@@ -205,6 +200,7 @@ def _install_requirements():
 def _build_installation_dependency():
     install_requires = []
     install_requires.append('psutil')
+    install_requires.append('numpy')
     return install_requires
 
     # Disable PyTorch wheel binding temporarily

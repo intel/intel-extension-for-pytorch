@@ -5,7 +5,7 @@ Installation Guide
 
 |Category|Content|
 |--|--|
-|Compiler|Recommend using GCC 10|
+|Compiler|Recommend using GCC 11|
 |Operating System|CentOS 7, RHEL 8, Rocky Linux 8.5, Ubuntu newer than 18.04|
 |Python|See prebuilt wheel files availability matrix below|
 
@@ -17,7 +17,8 @@ Make sure PyTorch is installed so that the extension will work properly. For eac
 
 |PyTorch Version|Extension Version|
 |--|--|
-|[v1.12.\*](https://github.com/pytorch/pytorch/tree/v1.12.0 "v1.12.0")|[v1.12.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.12.100)|
+|[v1.13.\*](https://github.com/pytorch/pytorch/tree/v1.13.0 "v1.13.0")|[v1.13.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.13.0)|
+|[v1.12.\*](https://github.com/pytorch/pytorch/tree/v1.12.0 "v1.12.0")|[v1.12.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.12.300)|
 |[v1.11.\*](https://github.com/pytorch/pytorch/tree/v1.11.0 "v1.11.0")|[v1.11.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.11.200)|
 |[v1.10.\*](https://github.com/pytorch/pytorch/tree/v1.10.0 "v1.10.0")|[v1.10.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.10.100)|
 |[v1.9.0](https://github.com/pytorch/pytorch/tree/v1.9.0 "v1.9.0")|[v1.9.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.9.0)|
@@ -46,6 +47,8 @@ Prebuilt wheel files availability matrix for Python versions
 
 | Extension Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 | Python 3.10 |
 | :--: | :--: | :--: | :--: | :--: | :--: |
+| 1.13.0 |  | ✔️ | ✔️ | ✔️ | ✔️ |
+| 1.12.300 |  | ✔️ | ✔️ | ✔️ | ✔️ |
 | 1.12.100 |  | ✔️ | ✔️ | ✔️ | ✔️ |
 | 1.12.0 |  | ✔️ | ✔️ | ✔️ | ✔️ |
 | 1.11.200 |  | ✔️ | ✔️ | ✔️ | ✔️ |
@@ -66,13 +69,7 @@ python -m pip install intel_extension_for_pytorch
 Alternatively, you can also install the latest version with the following commands:
 
 ```
-python -m pip install intel_extension_for_pytorch -f https://developer.intel.com/ipex-whl-stable
-```
-
-For pre-built wheel files with oneDNN Graph Compiler, use the following command to perform the installation.
-<a class="headerlink" id="installation_onednn_graph_compiler" title="Permalink to this headline"></a>
-```
-python -m pip install intel_extension_for_pytorch -f https://developer.intel.com/ipex-whl-dev
+python -m pip install intel_extension_for_pytorch -f https://developer.intel.com/ipex-whl-stable-cpu
 ```
 
 **Note:** For versions before 1.10.0, use package name `torch_ipex`, rather than `intel_extension_for_pytorch`.
@@ -80,7 +77,7 @@ python -m pip install intel_extension_for_pytorch -f https://developer.intel.com
 **Note:** To install a package with a specific version, run with the following command:
 
 ```
-python -m pip install <package_name>==<version_name> -f https://developer.intel.com/ipex-whl-stable
+python -m pip install <package_name>==<version_name> -f https://developer.intel.com/ipex-whl-stable-cpu
 ```
 
 ## Install via source compilation
@@ -88,7 +85,7 @@ python -m pip install <package_name>==<version_name> -f https://developer.intel.
 ```bash
 git clone --recursive https://github.com/intel/intel-extension-for-pytorch
 cd intel-extension-for-pytorch
-git checkout v1.12.100
+git checkout v1.13.0
 
 # if you are updating an existing checkout
 git submodule sync
@@ -131,6 +128,8 @@ docker pull intel/intel-optimized-pytorch:latest
 
 |Version|Pre-cxx11 ABI|cxx11 ABI|
 |--|--|--|
+| 1.13.0 | [libintel-ext-pt-1.13.0+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libtorch_zip/libintel-ext-pt-1.13.0%2Bcpu.run) | [libintel-ext-pt-cxx11-abi-1.13.0+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libtorch_zip/libintel-ext-pt-cxx11-abi-1.13.0%2Bcpu.run) |
+| 1.12.300 | [libintel-ext-pt-1.12.300+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libtorch_zip/libintel-ext-pt-1.12.300%2Bcpu.run) | [libintel-ext-pt-cxx11-abi-1.12.300+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libtorch_zip/libintel-ext-pt-cxx11-abi-1.12.300%2Bcpu.run) |
 | 1.12.100 | [libintel-ext-pt-1.12.100+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libtorch_zip/libintel-ext-pt-1.12.100%2Bcpu.run) | [libintel-ext-pt-cxx11-abi-1.12.100+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libtorch_zip/libintel-ext-pt-cxx11-abi-1.12.100%2Bcpu.run) |
 | 1.12.0 | [libintel-ext-pt-1.12.0+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libtorch_zip/libintel-ext-pt-1.12.0%2Bcpu.run) | [libintel-ext-pt-cxx11-abi-1.12.0+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libtorch_zip/libintel-ext-pt-cxx11-abi-1.12.0%2Bcpu.run) |
 | 1.11.200 | [libintel-ext-pt-1.11.200+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libtorch_zip/libintel-ext-pt-shared-with-deps-1.11.200%2Bcpu.run) | [libintel-ext-pt-cxx11-abi-1.11.200+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libtorch_zip/libintel-ext-pt-cxx11-abi-shared-with-deps-1.11.200%2Bcpu.run) |
