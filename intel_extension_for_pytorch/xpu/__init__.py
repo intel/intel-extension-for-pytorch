@@ -399,8 +399,8 @@ intel_extension_for_pytorch._C._initExtension()
 
 
 def _xpu_tag(obj):
-    if type(obj).__module__ == 'intel_extension_for_pytorch.xpu':
-        return 'xpu:' + str(obj.get_device())
+    if obj.device.type == 'xpu':
+        return 'xpu:' + str(obj.device.index)
 
 
 def validate_xpu_device(location):
@@ -454,8 +454,11 @@ def _xpu(self, device=None, non_blocking=False, **kwargs):
             # return new_type(indices, values, self.size())
             pass
         else:
-            new_type = getattr(current_module, self.__class__.__name__)
-            return new_type(self.size()).copy_(self, non_blocking)
+            untyped_storage = torch.UntypedStorage(
+                self.size(), device=torch.device("xpu")
+            )
+            untyped_storage.copy_(self, non_blocking)
+            return untyped_storage
 
 
 def _xpu_deserialize(obj, location):
