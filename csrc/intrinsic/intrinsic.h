@@ -5,6 +5,7 @@
 #include <utils/Macros.h>
 
 #include <aten/operators/Linear.h>
+#include "c10/util/string_view.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -95,8 +96,7 @@ at::Tensor trans_matmul_div(
 at::Tensor linear_silu(
     const at::Tensor& input,
     const at::Tensor& weight,
-    const at::Tensor& bias,
-    c10::string_view approximate);
+    const at::Tensor& bias);
 
 at::Tensor linear_gelu(
     const at::Tensor& input,
@@ -251,10 +251,42 @@ DECLARE_CONV(log_sigmoid)
 DECLARE_CONV(hardswish)
 DECLARE_CONV(mish)
 DECLARE_CONV(silu)
-DECLARE_CONV(gelu)
 DECLARE_CONV(hardsigmoid)
 DECLARE_CONV(sigmoid)
 DECLARE_CONV(relu)
+
+Tensor convolution_gelu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    int64_t groups_,
+    c10::string_view approximate);
+
+Tensor _convolution_gelu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    c10::string_view approximate);
+
+at::Tensor q_conv2d_gelu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    c10::string_view approximate);
 
 at::Tensor q_conv2d_pow(
     const Tensor& input,
