@@ -772,7 +772,7 @@ template <
     typename arg2_t = arg1_t,
     typename return_t = arg1_t,
     typename func_t,
-    bool fast_mode>
+    bool fast_mode = false>
 void opmath_gpu_kernel_with_scalars(TensorIteratorBase& iter, const func_t& f) {
   TORCH_INTERNAL_ASSERT(iter.ntensors() == 3);
 
