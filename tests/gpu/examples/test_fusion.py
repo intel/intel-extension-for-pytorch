@@ -1427,7 +1427,6 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
 
-    @pytest.mark.skip("oneDNN's post-op implementation will get incorrect result on this case. need skip")
     def test_linear_mish_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
         model = LinearMish(4, 4)
@@ -1466,7 +1465,6 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
 
-    @pytest.mark.skip("oneDNN's post-op implementation will get incorrect result on this case. need skip")
     def test_linear_tanh_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
         model = LinearTanh(4, 4)

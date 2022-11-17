@@ -36,8 +36,8 @@ class TestTorchMethod(TestCase):
         self.assertEqual(a.dtype, dtype)
         self.assertEqual(a.size(), torch.Size([1]))
 
-    @pytest.mark.skip()
-    def test_geometric_kstest(self, dtype):
+    @pytest.mark.skip("Skip due to unexpected numeric errors")
+    def test_geometric_kstest(self, dtype=torch.float):
         device = sycl_device
         print("Dtype is ", dtype, flush=True)
 

@@ -27,8 +27,5 @@ class TestTorchMethod(TestCase):
         reshape_out2 = conv_out2.reshape(1, 3, 300, 300, 8)
 
         cat_out = torch.cat((reshape_out1, reshape_out2), -1)
-        # Force wait for previous concat to avoid random segfault
-        # If exit the case before the kernel is finished
-        torch.xpu.synchronize()
 
         self.assertEqual(cat_out.shape, torch.Size([1, 3, 300, 300, 40]))
