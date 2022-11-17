@@ -12,7 +12,7 @@ test_nn.py::TestNNDeviceTypeXPU::test_MaxPool3d_indices_xpu_float16
 test_nn.py::TestNNDeviceTypeXPU::test_MaxPool3d_indices_xpu_float32
 # test_nn.py::TestNNDeviceTypeXPU::test_activations_bfloat16_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_conv_cudnn_nhwc_support_xpu_float32
-test_nn.py::TestNNDeviceTypeXPU::test_conv_noncontig_weights_xpu
+# test_nn.py::TestNNDeviceTypeXPU::test_conv_noncontig_weights_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_embedding_padding_idx_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_empty_dropout_xpu
 # test_nn.py::TestNNDeviceTypeXPU::test_gumbel_softmax_xpu_float32

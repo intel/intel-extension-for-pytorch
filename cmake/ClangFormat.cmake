@@ -16,7 +16,7 @@ endif()
 
 find_program(CLANG_FORMAT "clang-format-12")
 if(NOT CLANG_FORMAT)
-  message(WARNING "Please install clang-format before contributing to IPEX!")
+  message(WARNING "Please install clang-format-12 before contributing to IPEX!")
 else()
   set(CLANG_FORMAT_EXEC clang-format-12)
 endif()
