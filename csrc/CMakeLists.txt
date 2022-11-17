@@ -72,7 +72,7 @@ add_dependencies(intel-ext-pt-gpu IPEX_GPU_GEN_TARGET)
 include(${PROJECT_SOURCE_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)
   file(GLOB_RECURSE ALL_NATIVE_CSRC_FILES ${IPEX_GPU_ROOT}/**.[ch] ${IPEX_GPU_ROOT}/**.[ch]pp)
-  add_custom_target(CL_FORMAT_NATIVE_CSRC COMMAND clang-format -i -style=file ${ALL_NATIVE_CSRC_FILES})
+  add_custom_target(CL_FORMAT_NATIVE_CSRC COMMAND ${CLANG_FORMAT_EXEC} -i -style=file ${ALL_NATIVE_CSRC_FILES})
   add_dependencies(intel-ext-pt-gpu CL_FORMAT_NATIVE_CSRC)
 endif()
 

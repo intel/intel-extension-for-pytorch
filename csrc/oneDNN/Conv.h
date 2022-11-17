@@ -86,18 +86,18 @@ static inline memory::format_tag conv_wgh_fmt(
     return (ndim == 3)
         ? (grouped ? memory::format_tag::goiw : memory::format_tag::oiw)
         : (ndim == 4)
-            ? (grouped ? memory::format_tag::goihw : memory::format_tag::oihw)
-            : ((ndim == 5) ? (grouped ? memory::format_tag::goidhw
-                                      : memory::format_tag::oidhw)
-                           : memory::format_tag::undef);
+        ? (grouped ? memory::format_tag::goihw : memory::format_tag::oihw)
+        : ((ndim == 5) ? (grouped ? memory::format_tag::goidhw
+                                  : memory::format_tag::oidhw)
+                       : memory::format_tag::undef);
   } else {
     return (ndim == 3)
         ? (grouped ? memory::format_tag::gowi : memory::format_tag::owi)
         : (ndim == 4)
-            ? (grouped ? memory::format_tag::gohwi : memory::format_tag::ohwi)
-            : ((ndim == 5) ? (grouped ? memory::format_tag::godhwi
-                                      : memory::format_tag::odhwi)
-                           : memory::format_tag::undef);
+        ? (grouped ? memory::format_tag::gohwi : memory::format_tag::ohwi)
+        : ((ndim == 5) ? (grouped ? memory::format_tag::godhwi
+                                  : memory::format_tag::odhwi)
+                       : memory::format_tag::undef);
   }
 }
 

@@ -286,19 +286,19 @@ __torch__.torch.nn.modules.conv.Conv2d = prim::GetAttr[name="conv"](%self)
 xpu::conv2d_relu(%x.1, %weight, %bias, %13, %14, %13, %3) return (%16)
 */
 
-#define IPEX_JIT_OP_REGISTER(schema, name, func)                       \
-  Operator(                                                            \
-      schema,                                                          \
-      [](const Node* node) -> Operation {                              \
-        constexpr int n = c10::guts::infer_function_traits_t<decltype( \
-            func)>::number_of_parameters;                              \
-        return generateJitOperation<                                   \
-            n,                                                         \
-            decltype(func),                                            \
-            c10::guts::infer_function_traits_t<decltype(               \
-                func)>::parameter_types>(                              \
-            func, name, std::make_index_sequence<n>());                \
-      },                                                               \
+#define IPEX_JIT_OP_REGISTER(schema, name, func)              \
+  Operator(                                                   \
+      schema,                                                 \
+      [](const Node* node) -> Operation {                     \
+        constexpr int n = c10::guts::infer_function_traits_t< \
+            decltype(func)>::number_of_parameters;            \
+        return generateJitOperation<                          \
+            n,                                                \
+            decltype(func),                                   \
+            c10::guts::infer_function_traits_t<               \
+                decltype(func)>::parameter_types>(            \
+            func, name, std::make_index_sequence<n>());       \
+      },                                                      \
       aliasAnalysisFromSchema())
 
 #define IPEX_SUFFIX ") -> Tensor"

@@ -479,10 +479,8 @@ template <typename scalar_t>
 inline scalar_t mish_forward(scalar_t self) {
   using T_ACC = acc_type<scalar_t>;
   const T_ACC x_acc = static_cast<T_ACC>(self);
-  return (scalar_t)(
-      x_acc *
-      Numerics<T_ACC>::tanh(
-          Numerics<T_ACC>::log1p(Numerics<T_ACC>::exp(x_acc))));
+  return (
+      scalar_t)(x_acc * Numerics<T_ACC>::tanh(Numerics<T_ACC>::log1p(Numerics<T_ACC>::exp(x_acc))));
 }
 } // namespace impl
 

@@ -85,21 +85,19 @@ Tensor quantize_tensor_per_tensor_affine(
   rattr.set_dst_sc_and_zp(mask, scls, mask, zps);
   if (qtensor.scalar_type() == kQUInt8 && zero_point == 128) {
     Tensor qtensor_opt = qtensor;
-    memory::dims q_dims = rtensor.dim() == 5
-        ? memory::dims(
-              {rtensor.size(0),
-               rtensor.size(1),
-               rtensor.size(2),
-               rtensor.size(3),
-               rtensor.size(4)})
+    memory::dims q_dims = rtensor.dim() == 5 ? memory::dims(
+                                                   {rtensor.size(0),
+                                                    rtensor.size(1),
+                                                    rtensor.size(2),
+                                                    rtensor.size(3),
+                                                    rtensor.size(4)})
         : rtensor.dim() == 4 ? memory::dims(
                                    {rtensor.size(0),
                                     rtensor.size(1),
                                     rtensor.size(2),
                                     rtensor.size(3)})
-                             : rtensor.dim() == 2
-                ? memory::dims({rtensor.size(0), rtensor.size(1)})
-                : memory::dims({rtensor.size(0)});
+        : rtensor.dim() == 2 ? memory::dims({rtensor.size(0), rtensor.size(1)})
+                             : memory::dims({rtensor.size(0)});
 
     memory::format_tag q_fmt =
         quant_dst_fmt(rtensor.dim(), is_smf_channels_last(rtensor));

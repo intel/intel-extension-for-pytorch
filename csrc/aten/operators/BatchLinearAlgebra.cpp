@@ -3412,8 +3412,8 @@ Tensor& linalg_lu_solve_out(
       LU.mT().is_contiguous(), LU, LU, /*row_major=*/false);
 
   const auto trans = !adjoint ? TransposeType::NoTranspose
-                              : LU.is_complex() ? TransposeType::ConjTranspose
-                                                : TransposeType::Transpose;
+      : LU.is_complex()       ? TransposeType::ConjTranspose
+                              : TransposeType::Transpose;
   std::vector<int32_t> infos_vec(native::batchCount(LU), 0);
 
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
