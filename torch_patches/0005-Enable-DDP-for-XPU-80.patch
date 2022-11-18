@@ -1,0 +1,123 @@
+From 97d359474abe230f01b5a0c243f8a82d7fdfe950 Mon Sep 17 00:00:00 2001
+From: zhuhong61 <95205772+zhuhong61@users.noreply.github.com>
+Date: Thu, 10 Nov 2022 22:08:51 +0800
+Subject: [PATCH 5/9] Enable DDP for XPU (#80)
+
+* Enable xpu distributed data parallel (DDP) in a device-agnostic way
+* Support DDP both in xpu and cuda with minor code changes.
+* Pytorch has supported xpu registration (_register_device_module (in torch/__init__.py), and we use _get_available_device_type (in torch/_utils.py) to get DDP device type.
+* Use DDP device type to get the ddp_torch_module (torch.cuda or torch.xpu), replacing the hard code of xpu.
+* Now we only support cuda-like devices, and not consider xla.
+
+Co-authored-by: Zhu Hong <hong.zhu@intel.com>
+Co-authored-by: Lu Chengjun <chengjun.lu@intel.com>
+---
+ torch/distributed/utils.py      | 11 ++++++-----
+ torch/nn/parallel/_functions.py | 29 +++++++++++++++++++++--------
+ 2 files changed, 27 insertions(+), 13 deletions(-)
+
+diff --git a/torch/distributed/utils.py b/torch/distributed/utils.py
+index c559577cc8..8ae5b8ed72 100644
+--- a/torch/distributed/utils.py
++++ b/torch/distributed/utils.py
+@@ -1,6 +1,6 @@
+ import torch
+ import torch.distributed as dist
+-from torch.nn.parallel._functions import _get_stream
++from torch.nn.parallel._functions import _get_stream, _get_device_impl
+ from torch.nn.parallel.scatter_gather import (  # type: ignore[attr-defined]
+     _is_namedtuple
+ )
+@@ -51,8 +51,9 @@ def _recursive_to(inputs, target_gpu, use_side_stream_for_tensor_copies):
+     """
+ 
+     def to_map(obj):
++        ddp_device_type, ddp_gpu = _get_device_impl()
+         if isinstance(obj, torch.Tensor):
+-            if obj.device == torch.device("cuda", target_gpu):
++            if obj.device == torch.device(ddp_device_type, target_gpu):
+                 return (obj,)
+             if not use_side_stream_for_tensor_copies:
+                 return (obj.to(target_gpu),)
+@@ -60,11 +61,11 @@ def _recursive_to(inputs, target_gpu, use_side_stream_for_tensor_copies):
+                 # Perform CPU -> GPU copies in a background stream. This code is
+                 # motivated from similar logic in torch/nn/parallel/_functions.py
+                 stream = _get_stream(target_gpu)
+-                with torch.cuda.stream(stream):
++                with ddp_gpu.stream(stream):
+                     output = obj.to(target_gpu)
+                 # synchronize with the copy stream
+-                with torch.cuda.device(target_gpu):
+-                    current_stream = torch.cuda.current_stream()
++                with ddp_gpu.device(target_gpu):
++                    current_stream = ddp_gpu.current_stream()
+                     # Sync the current stream with the copy stream
+                     current_stream.wait_stream(stream)
+                     # Ensure tensor memory is not reused until work on
+diff --git a/torch/nn/parallel/_functions.py b/torch/nn/parallel/_functions.py
+index 834d444ec8..11bde6d360 100644
+--- a/torch/nn/parallel/_functions.py
++++ b/torch/nn/parallel/_functions.py
+@@ -1,11 +1,22 @@
+ import warnings
+ 
+ import torch
++import types
++import importlib
+ from . import comm
+ from torch.autograd import Function
+-from torch._utils import _get_device_index
+-from typing import List, Optional
+-
++from torch._utils import _get_device_index, _get_available_device_type
++from typing import List, Optional, Tuple
++from functools import lru_cache
++
++@lru_cache(maxsize=None)
++def _get_device_impl() -> Tuple[str, types.ModuleType]:
++    ddp_device_type = _get_available_device_type()
++    if ddp_device_type is not None:
++        ddp_gpu = importlib.import_module("torch." + ddp_device_type)
++    else:
++        raise ImportError("Failed to import the gpu device module of pytorch (torch.cuda or torch.xpu).")
++    return (ddp_device_type, ddp_gpu)
+ 
+ class Broadcast(Function):
+ 
+@@ -90,15 +101,16 @@ class Scatter(Function):
+         ctx.dim = dim
+         ctx.input_device = input.get_device() if input.device.type != "cpu" else -1
+         streams = None
+-        if torch.cuda.is_available() and ctx.input_device == -1:
++        ddp_gpu = _get_device_impl()[1]
++        if ddp_gpu.is_available() and ctx.input_device == -1:
+             # Perform CPU to GPU copies in a background stream
+             streams = [_get_stream(device) for device in target_gpus]
+         outputs = comm.scatter(input, target_gpus, chunk_sizes, ctx.dim, streams)
+         # Synchronize with the copy stream
+         if streams is not None:
+             for i, output in enumerate(outputs):
+-                with torch.cuda.device(target_gpus[i]):
+-                    main_stream = torch.cuda.current_stream()
++                with ddp_gpu.device(target_gpus[i]):
++                    main_stream = ddp_gpu.current_stream()
+                     main_stream.wait_stream(streams[i])
+                     output.record_stream(main_stream)
+         return outputs
+@@ -115,10 +127,11 @@ _streams: Optional[List[Optional[torch.cuda.Stream]]] = None
+ def _get_stream(device: int):
+     """Gets a background stream for copying between CPU and GPU"""
+     global _streams
++    ddp_gpu = _get_device_impl()[1]
+     if device == -1:
+         return None
+     if _streams is None:
+-        _streams = [None] * torch.cuda.device_count()
++        _streams = [None] * ddp_gpu.device_count()
+     if _streams[device] is None:
+-        _streams[device] = torch.cuda.Stream(device)
++        _streams[device] = ddp_gpu.Stream(device)
+     return _streams[device]
+-- 
+2.25.1
+

@@ -1,0 +1,53 @@
+From fcdc6688c643aef6e47748b64c0e80d859d0b3a2 Mon Sep 17 00:00:00 2001
+From: leizhenyuan <zhenyuan.lei@intel.com>
+Date: Wed, 19 Oct 2022 13:24:48 +0000
+Subject: [PATCH 3/9] add support for pin memory on xpu device (#86545)
+
+add support for pin memory on xpu device
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/86545
+Approved by: https://github.com/ezyang
+---
+ torch/utils/data/_utils/pin_memory.py | 5 ++++-
+ torch/utils/data/dataloader.py        | 6 +++++-
+ 2 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/torch/utils/data/_utils/pin_memory.py b/torch/utils/data/_utils/pin_memory.py
+index d3aa9118cb..466cf0c70e 100644
+--- a/torch/utils/data/_utils/pin_memory.py
++++ b/torch/utils/data/_utils/pin_memory.py
+@@ -19,7 +19,10 @@ def _pin_memory_loop(in_queue, out_queue, device_id, done_event, device):
+     # consuming all CPU cores.
+     torch.set_num_threads(1)
+ 
+-    torch.cuda.set_device(device_id)
++    if device == "cuda":
++        torch.cuda.set_device(device_id)
++    elif device == "xpu":
++        torch.xpu.set_device(device_id)  # type: ignore[attr-defined]
+ 
+     def do_one_step():
+         try:
+diff --git a/torch/utils/data/dataloader.py b/torch/utils/data/dataloader.py
+index eac52ba29c..5dc0358ddc 100644
+--- a/torch/utils/data/dataloader.py
++++ b/torch/utils/data/dataloader.py
+@@ -1040,10 +1040,14 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
+ 
+             # Queue is not type-annotated
+             self._data_queue = queue.Queue()  # type: ignore[var-annotated]
++            if self._pin_memory_device == "xpu":
++                current_device = torch.xpu.current_device()  # type: ignore[attr-defined]
++            else:
++                current_device = torch.cuda.current_device()  # choose cuda for default
+             pin_memory_thread = threading.Thread(
+                 target=_utils.pin_memory._pin_memory_loop,
+                 args=(self._worker_result_queue, self._data_queue,
+-                      torch.cuda.current_device(),
++                      current_device,
+                       self._pin_memory_thread_done_event, self._pin_memory_device))
+             pin_memory_thread.daemon = True
+             pin_memory_thread.start()
+-- 
+2.25.1
+

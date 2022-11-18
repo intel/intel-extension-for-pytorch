@@ -1,36 +1,31 @@
-From cecdb00cfffe26cf59a4be417f57ab4215349175 Mon Sep 17 00:00:00 2001
-From: "Xunsong, Huang" <xunsong.huang@intel.com>
-Date: Thu, 3 Mar 2022 14:15:47 +0800
-Subject: [PATCH 27/29] Add xpu legacy profiler (#30)
+From 1f70653db353bb70c5d7cd46cbd723fa9aea290d Mon Sep 17 00:00:00 2001
+From: johnlu <chengjun.lu@intel.com>
+Date: Wed, 20 Apr 2022 00:28:18 +0800
+Subject: [PATCH 7/9] Add xpu legacy profiler (#30)
 
 Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
 ---
- torch/_C/_autograd.pyi                        |   3 +
+ torch/_C/_autograd.pyi                        |   1 +
  torch/autograd/profiler.py                    |  18 +-
- torch/autograd/profiler_legacy.py             | 118 ++++++++---
- torch/autograd/profiler_util.py               | 189 +++++++++++++++---
- torch/csrc/autograd/init.cpp                  |   9 +-
- torch/csrc/autograd/profiler_cuda.cpp         |  33 ++-
- torch/csrc/autograd/profiler_kineto.h         |   8 +-
- torch/csrc/autograd/profiler_legacy.cpp       | 107 ++++++++--
- torch/csrc/autograd/profiler_legacy.h         | 124 +++++++++---
+ torch/autograd/profiler_legacy.py             | 114 ++++++++---
+ torch/autograd/profiler_util.py               | 187 +++++++++++++++---
+ torch/csrc/autograd/init.cpp                  |  10 +
+ torch/csrc/autograd/profiler_legacy.cpp       | 111 ++++++++---
+ torch/csrc/autograd/profiler_legacy.h         |  59 ++++--
+ torch/csrc/profiler/api.cpp                   | 109 ++++------
+ torch/csrc/profiler/api.h                     |  12 +-
+ torch/csrc/profiler/cuda.cpp                  |  18 +-
+ torch/csrc/profiler/itt.cpp                   |   5 +
+ torch/csrc/profiler/orchestration/observer.h  |   1 +
+ torch/csrc/profiler/python/init.cpp           |   1 +
  .../_internal/distributed/rpc/rpc_test.py     |   4 +-
- 10 files changed, 499 insertions(+), 114 deletions(-)
+ 14 files changed, 469 insertions(+), 181 deletions(-)
 
 diff --git a/torch/_C/_autograd.pyi b/torch/_C/_autograd.pyi
-index 7ffb618e3f..c9d5c968da 100644
+index bddda0a8c9..9206273838 100644
 --- a/torch/_C/_autograd.pyi
 +++ b/torch/_C/_autograd.pyi
-@@ -7,6 +7,8 @@ class ProfilerState(Enum):
-     Disable = ...
-     CPU = ...
-     CUDA = ...
-+    XPU = ...
-+    ITT = ...
-     NVTX = ...
-     KINETO = ...
-     KINETO_GPU_FALLBACK = ...
-@@ -18,6 +20,7 @@ class ProfilerActivity(Enum):
+@@ -9,6 +9,7 @@ from ._profiler import _ProfilerEvent, ActiveProfilerType, ProfilerActivity, Pro
  class DeviceType(Enum):
      CPU = ...
      CUDA = ...
@@ -39,10 +34,10 @@ index 7ffb618e3f..c9d5c968da 100644
      OPENGL = ...
      OPENCL = ...
 diff --git a/torch/autograd/profiler.py b/torch/autograd/profiler.py
-index c121b11363..4b745a12a2 100644
+index dd5700f949..24ba73512d 100644
 --- a/torch/autograd/profiler.py
 +++ b/torch/autograd/profiler.py
-@@ -51,6 +51,8 @@ class profile(object):
+@@ -67,6 +67,8 @@ class profile(object):
          use_cuda (bool, optional): Enables timing of CUDA events as well using the cudaEvent API.
              Adds approximately 4us of overhead to each tensor operation.
  
@@ -51,7 +46,7 @@ index c121b11363..4b745a12a2 100644
          record_shapes (bool, optional): If shapes recording is set, information
              about input dimensions will be collected. This allows one to see which
              dimensions have been used under the hood and further group by them
-@@ -121,6 +123,7 @@ class profile(object):
+@@ -142,6 +144,7 @@ class profile(object):
              enabled=True,
              *,
              use_cuda=False,
@@ -59,7 +54,7 @@ index c121b11363..4b745a12a2 100644
              record_shapes=False,
              with_flops=False,
              profile_memory=False,
-@@ -132,6 +135,7 @@ class profile(object):
+@@ -154,6 +157,7 @@ class profile(object):
          if not self.enabled:
              return
          self.use_cuda = use_cuda
@@ -67,7 +62,7 @@ index c121b11363..4b745a12a2 100644
          self.function_events: Optional[EventList] = None
          self.entered = False
          self.record_shapes = record_shapes
-@@ -151,6 +155,10 @@ class profile(object):
+@@ -176,6 +180,10 @@ class profile(object):
              warn("CUDA is not available, disabling CUDA profiling")
              self.use_cuda = False
  
@@ -78,7 +73,7 @@ index c121b11363..4b745a12a2 100644
          self.kineto_activities = set()
          if self.use_cpu:
              self.kineto_activities.add(ProfilerActivity.CPU)
-@@ -163,6 +171,9 @@ class profile(object):
+@@ -188,6 +196,9 @@ class profile(object):
                  self.profiler_kind = ProfilerState.KINETO_GPU_FALLBACK
              else:
                  self.kineto_activities.add(ProfilerActivity.CUDA)
@@ -88,7 +83,7 @@ index c121b11363..4b745a12a2 100644
  
          assert len(self.kineto_activities) > 0, \
              "No activities specified for the profiler"
-@@ -204,6 +215,7 @@ class profile(object):
+@@ -230,6 +241,7 @@ class profile(object):
          self.function_events = EventList(
              parsed_results,
              use_cuda=self.use_cuda,
@@ -96,7 +91,7 @@ index c121b11363..4b745a12a2 100644
              profile_memory=self.profile_memory,
              with_flops=self.with_flops)
          self.function_events._build_tree()
-@@ -334,7 +346,7 @@ class profile(object):
+@@ -375,7 +387,7 @@ class profile(object):
                  if cuda_time > 0:
                      fe.append_kernel(
                          fe.name,
@@ -105,7 +100,7 @@ index c121b11363..4b745a12a2 100644
                          cuda_time)
                      fe.is_legacy = True
              function_events.append(fe)
-@@ -352,7 +364,7 @@ class profile(object):
+@@ -393,7 +405,7 @@ class profile(object):
                      if f_evt.device_type == DeviceType.CUDA:
                          fe.append_kernel(
                              f_evt.name,
@@ -114,7 +109,7 @@ index c121b11363..4b745a12a2 100644
                              f_evt.time_range.end - f_evt.time_range.start)
                      elif f_evt.device_type == DeviceType.CPU:
                          # make sure that 'thread' of a CPU Kineto (e.g. CUDA Runtime) event is associated
-@@ -658,7 +670,7 @@ def parse_nvprof_trace(path):
+@@ -780,7 +792,7 @@ def parse_nvprof_trace(path):
          assert (row['cbid'] == 211)
          evt = functions_map[row['marker_id']]
          evt.append_kernel(row['kernel_name'],
@@ -124,7 +119,7 @@ index c121b11363..4b745a12a2 100644
  
      functions.sort(key=lambda evt: evt.time_range.start)
 diff --git a/torch/autograd/profiler_legacy.py b/torch/autograd/profiler_legacy.py
-index 445decf333..546a762d02 100644
+index b3e875f252..190199f51a 100644
 --- a/torch/autograd/profiler_legacy.py
 +++ b/torch/autograd/profiler_legacy.py
 @@ -1,7 +1,7 @@
@@ -175,7 +170,7 @@ index 445decf333..546a762d02 100644
          else:
              self.profiler_kind = ProfilerState.CPU
  
-@@ -74,14 +84,18 @@ class profile(object):
+@@ -77,14 +87,18 @@ class profile(object):
              return
          if self.use_cuda:
              torch.cuda.synchronize()
@@ -195,21 +190,7 @@ index 445decf333..546a762d02 100644
          self.function_events._build_tree()
          return False
  
-@@ -99,11 +113,11 @@ class profile(object):
-         if self.function_events is None:
-             raise RuntimeError("Profiler didn't finish running")
- 
--    def table(self, sort_by=None, row_limit=100, max_src_column_width=75, header=None, top_level_events_only=False):
-+    def table(self, sort_by=None, row_limit=100, max_src_column_width=75, max_depth=10, header=None, top_level_events_only=False):
-         self._check_finish()
-         assert self.function_events is not None
-         return self.function_events.table(
--            sort_by=sort_by, row_limit=row_limit, max_src_column_width=max_src_column_width, header=header,
-+            sort_by=sort_by, row_limit=row_limit, max_src_column_width=max_src_column_width, max_depth=max_depth, header=header,
-             top_level_events_only=top_level_events_only
-         )
-     table.__doc__ = EventList.table.__doc__
-@@ -167,8 +181,12 @@ def _parse_legacy_records(thread_records):
+@@ -184,8 +198,12 @@ def _parse_legacy_records(thread_records):
          # accumulated memory allocations per handle
          cpu_memory_allocs = {}
          cuda_memory_allocs = {}
@@ -222,7 +203,7 @@ index 445decf333..546a762d02 100644
  
          filtered_handles = set()
          prev_record = None
-@@ -192,9 +210,27 @@ def _parse_legacy_records(thread_records):
+@@ -209,9 +227,27 @@ def _parse_legacy_records(thread_records):
                          filtered_handles.add(record_key)
                          continue
  
@@ -251,7 +232,7 @@ index 445decf333..546a762d02 100644
              elif record.kind() == 'pop':
                  assert (
                      record_key in range_starts
-@@ -203,37 +239,33 @@ def _parse_legacy_records(thread_records):
+@@ -220,37 +256,33 @@ def _parse_legacy_records(thread_records):
                      record_key
                  )
  
@@ -307,7 +288,7 @@ index 445decf333..546a762d02 100644
                  # note: async events have only cpu total time
                  if not is_async and start.has_cuda():
                      duration = start.cuda_elapsed_us(record)
-@@ -243,9 +275,11 @@ def _parse_legacy_records(thread_records):
+@@ -260,9 +292,11 @@ def _parse_legacy_records(thread_records):
                              start.device(),
                              duration)
                  functions.append(fe)
@@ -319,7 +300,7 @@ index 445decf333..546a762d02 100644
              elif record.kind() == 'memory_alloc':
                  num_open_handles_cpu = len(cpu_memory_allocs)
                  num_open_handles_cuda = len(cuda_memory_allocs)
-@@ -254,6 +288,8 @@ def _parse_legacy_records(thread_records):
+@@ -271,6 +305,8 @@ def _parse_legacy_records(thread_records):
                      cpu_memory_allocs[handle] += record.cpu_memory_usage()
                  for handle in cuda_memory_allocs.keys():
                      cuda_memory_allocs[handle] += record.cuda_memory_usage()
@@ -328,7 +309,7 @@ index 445decf333..546a762d02 100644
                  if num_open_handles_cpu == 0:
                      # output event as a top-level memory event
                      fe = FunctionEvent(
-@@ -266,9 +302,37 @@ def _parse_legacy_records(thread_records):
+@@ -283,9 +319,37 @@ def _parse_legacy_records(thread_records):
                          stack=[],
                          cpu_memory_usage=record.cpu_memory_usage(),
                          cuda_memory_usage=record.cuda_memory_usage(),
@@ -367,7 +348,7 @@ index 445decf333..546a762d02 100644
  
      # Sort functions by start time then by end time ascending.
 diff --git a/torch/autograd/profiler_util.py b/torch/autograd/profiler_util.py
-index 6062c097b2..0e4ae0b72f 100644
+index 7d0532d611..42f17defe5 100644
 --- a/torch/autograd/profiler_util.py
 +++ b/torch/autograd/profiler_util.py
 @@ -15,13 +15,17 @@ class EventList(list):
@@ -388,20 +369,7 @@ index 6062c097b2..0e4ae0b72f 100644
  
      def _build_tree(self):
          self._populate_cpu_children()
-@@ -146,7 +150,7 @@ class EventList(list):
-     def self_cpu_time_total(self):
-         return sum([event.self_cpu_time_total for event in self])
- 
--    def table(self, sort_by=None, row_limit=100, max_src_column_width=75, header=None, top_level_events_only=False):
-+    def table(self, sort_by=None, row_limit=100, max_src_column_width=75, max_depth=10, header=None, top_level_events_only=False):
-         """Prints an EventList as a nicely formatted table.
- 
-         Args:
-@@ -169,9 +173,11 @@ class EventList(list):
-             sort_by=sort_by,
-             row_limit=row_limit,
-             max_src_column_width=max_src_column_width,
-+            max_depth=max_depth,
+@@ -183,6 +187,7 @@ class EventList(list):
              header=header,
              profile_memory=self._profile_memory,
              with_flops=self._with_flops,
@@ -409,7 +377,7 @@ index 6062c097b2..0e4ae0b72f 100644
              top_level_events_only=top_level_events_only)
  
      def export_chrome_trace(self, path):
-@@ -209,20 +215,36 @@ class EventList(list):
+@@ -220,20 +225,36 @@ class EventList(list):
                          else f'" node_id:{evt.node_id}, thread_id:{evt.thread} "',
                      )
                  )
@@ -460,7 +428,7 @@ index 6062c097b2..0e4ae0b72f 100644
              if len(self) > 0:
                  # remove trailing whitespace and comma
                  f.seek(f.tell() - 2, os.SEEK_SET)
-@@ -279,8 +301,10 @@ class EventList(list):
+@@ -290,8 +311,10 @@ class EventList(list):
          avg_list = EventList(
              stats.values(),
              use_cuda=self._use_cuda,
@@ -472,7 +440,7 @@ index 6062c097b2..0e4ae0b72f 100644
          for evt in avg_list:
              evt.stack = evt.stack[:group_by_stack_n]
              if not group_by_input_shapes:
-@@ -343,10 +367,13 @@ class FormattedTimesMixin(object):
+@@ -354,10 +377,13 @@ class FormattedTimesMixin(object):
      """
      cpu_time_str = _attr_formatter('cpu_time')
      cuda_time_str = _attr_formatter('cuda_time')
@@ -486,7 +454,7 @@ index 6062c097b2..0e4ae0b72f 100644
  
      @property
      def cpu_time(self):
-@@ -356,6 +383,10 @@ class FormattedTimesMixin(object):
+@@ -367,6 +393,10 @@ class FormattedTimesMixin(object):
      def cuda_time(self):
          return 0.0 if self.count == 0 else 1.0 * self.cuda_time_total / self.count  # type: ignore[attr-defined]
  
@@ -497,7 +465,7 @@ index 6062c097b2..0e4ae0b72f 100644
  
  class Interval(object):
      def __init__(self, start, end):
-@@ -373,7 +404,7 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -384,7 +414,7 @@ class FunctionEvent(FormattedTimesMixin):
      """Profiling information about a single function."""
      def __init__(
              self, id, name, thread, start_us, end_us, fwd_thread=None, input_shapes=None,
@@ -506,7 +474,7 @@ index 6062c097b2..0e4ae0b72f 100644
              is_remote=False, sequence_nr=-1, node_id=-1, device_type=DeviceType.CPU, device_index=0,
              is_legacy=False, flops=None, trace_name=None):
          self.id: int = id
-@@ -389,9 +420,11 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -400,9 +430,11 @@ class FunctionEvent(FormattedTimesMixin):
          self.cpu_parent: Optional[FunctionEvent] = None
          self.input_shapes: Tuple[int, ...] = input_shapes
          self.stack: List = stack
@@ -518,7 +486,7 @@ index 6062c097b2..0e4ae0b72f 100644
          self.is_async: bool = is_async
          self.is_remote: bool = is_remote
          self.sequence_nr: int = sequence_nr
-@@ -400,7 +433,7 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -411,7 +443,7 @@ class FunctionEvent(FormattedTimesMixin):
          self.is_legacy: bool = is_legacy
          self.flops: Optional[int] = flops
  
@@ -527,7 +495,7 @@ index 6062c097b2..0e4ae0b72f 100644
          assert self.device_type == DeviceType.CPU
          self.kernels.append(Kernel(name, device, duration))
  
-@@ -445,6 +478,12 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -456,6 +488,12 @@ class FunctionEvent(FormattedTimesMixin):
              [child.cuda_memory_usage for child in self.cpu_children]
          )
  
@@ -540,7 +508,7 @@ index 6062c097b2..0e4ae0b72f 100644
      @property
      def self_cpu_time_total(self):
          if self.is_async or self.device_type != DeviceType.CPU:
-@@ -460,14 +499,15 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -471,14 +509,15 @@ class FunctionEvent(FormattedTimesMixin):
          if self.device_type == DeviceType.CPU:
              if not self.is_legacy:
                  # account for the kernels in the children ops
@@ -560,7 +528,7 @@ index 6062c097b2..0e4ae0b72f 100644
  
      @property
      def self_cuda_time_total(self):
-@@ -476,9 +516,10 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -487,9 +526,10 @@ class FunctionEvent(FormattedTimesMixin):
          if self.device_type == DeviceType.CPU:
              return self.cuda_time_total - \
                  sum([child.cuda_time_total for child in self.cpu_children])
@@ -573,7 +541,7 @@ index 6062c097b2..0e4ae0b72f 100644
  
      @property
      def cpu_time_total(self):
-@@ -487,6 +528,27 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -498,6 +538,27 @@ class FunctionEvent(FormattedTimesMixin):
          else:
              return 0
  
@@ -601,7 +569,7 @@ index 6062c097b2..0e4ae0b72f 100644
      @property
      def key(self):
          return self.name
-@@ -494,8 +556,8 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -505,8 +566,8 @@ class FunctionEvent(FormattedTimesMixin):
      def __repr__(self):
          return (
              '<FunctionEvent id={} name={} device_type={} node_id={} cpu_time={} start_us={} end_us={} '
@@ -612,7 +580,7 @@ index 6062c097b2..0e4ae0b72f 100644
                  self.id,
                  self.name,
                  self.device_type,
-@@ -505,11 +567,14 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -516,11 +577,14 @@ class FunctionEvent(FormattedTimesMixin):
                  self.time_range.end,
                  str([child.id for child in self.cpu_children]),
                  self.cuda_time_str,
@@ -627,7 +595,7 @@ index 6062c097b2..0e4ae0b72f 100644
                  self.is_async,
                  self.is_remote,
                  self.sequence_nr,
-@@ -528,15 +593,20 @@ class FunctionEventAvg(FormattedTimesMixin):
+@@ -539,15 +603,20 @@ class FunctionEventAvg(FormattedTimesMixin):
          self.is_remote: bool = False
          self.cpu_time_total: int = 0
          self.cuda_time_total: int = 0
@@ -648,7 +616,7 @@ index 6062c097b2..0e4ae0b72f 100644
          self.cpu_children: Optional[List[FunctionEvent]] = None
          self.cpu_parent: Optional[FunctionEvent] = None
          self.device_type: DeviceType = DeviceType.CPU
-@@ -556,6 +626,7 @@ class FunctionEventAvg(FormattedTimesMixin):
+@@ -567,6 +636,7 @@ class FunctionEventAvg(FormattedTimesMixin):
  
              self.input_shapes = other.input_shapes
              self.stack = other.stack
@@ -656,7 +624,7 @@ index 6062c097b2..0e4ae0b72f 100644
              self.scope = other.scope
              self.device_type = other.device_type
              self.is_legacy = other.is_legacy
-@@ -564,12 +635,16 @@ class FunctionEventAvg(FormattedTimesMixin):
+@@ -575,12 +645,16 @@ class FunctionEventAvg(FormattedTimesMixin):
          assert other.key == self.key
          self.cpu_time_total += other.cpu_time_total
          self.cuda_time_total += other.cuda_time_total
@@ -673,7 +641,7 @@ index 6062c097b2..0e4ae0b72f 100644
          self.count += other.count
          if self.flops is None:
              self.flops = other.flops
-@@ -583,16 +658,20 @@ class FunctionEventAvg(FormattedTimesMixin):
+@@ -594,16 +668,20 @@ class FunctionEventAvg(FormattedTimesMixin):
      def __repr__(self):
          return (
              '<FunctionEventAvg key={} self_cpu_time={} cpu_time={} '
@@ -696,17 +664,15 @@ index 6062c097b2..0e4ae0b72f 100644
              )
          )
  
-@@ -667,7 +746,9 @@ def _build_table(
-         header=None,
-         row_limit=100,
-         max_src_column_width=75,
-+        max_depth=10,
+@@ -684,6 +762,7 @@ def _build_table(
+         max_name_column_width=55,
+         max_shapes_column_width=80,
          with_flops=False,
 +        with_calling_stack=False,
          profile_memory=False,
          top_level_events_only=False):
      """Prints a summary of events (which can be a list of FunctionEvent or FunctionEventAvg)."""
-@@ -676,13 +757,15 @@ def _build_table(
+@@ -692,13 +771,15 @@ def _build_table(
  
      has_cuda_time = any([event.self_cuda_time_total > 0 for event in events])
      has_cuda_mem = any([event.self_cuda_memory_usage > 0 for event in events])
@@ -721,19 +687,19 @@ index 6062c097b2..0e4ae0b72f 100644
 -        ), use_cuda=has_cuda_time, profile_memory=profile_memory, with_flops=with_flops)
 +        ), use_cuda=has_cuda_time, use_xpu=has_xpu_time, profile_memory=profile_memory, with_flops=with_flops, with_calling_stack=with_calling_stack)
  
-     MAX_NAME_COLUMN_WIDTH = 55
      name_column_width = max([len(evt.key) for evt in events]) + 4
-@@ -695,6 +778,9 @@ def _build_table(
+     if max_name_column_width is not None:
+@@ -711,6 +792,9 @@ def _build_table(
      DEFAULT_COLUMN_WIDTH = 12
      flops_column_width = DEFAULT_COLUMN_WIDTH
  
-+    cstack_column_width = max([len(str(evt.cstack[:max_depth])[1:-1]) for evt in events]) + 8
-+    cstack_column_width = max(cstack_column_width, 20)
++    # cstack_column_width = max([len(str(evt.cstack[:max_depth])[1:-1]) for evt in events]) + 8
++    # cstack_column_width = max(cstack_column_width, 20)
 +
      src_column_width = None
      stacks = []
      for evt in events:
-@@ -720,6 +806,13 @@ def _build_table(
+@@ -737,6 +821,13 @@ def _build_table(
              'CUDA total',
              'CUDA time avg',
          ])
@@ -747,7 +713,7 @@ index 6062c097b2..0e4ae0b72f 100644
      if profile_memory:
          headers.extend([
              'CPU Mem',
-@@ -730,6 +823,11 @@ def _build_table(
+@@ -747,6 +838,11 @@ def _build_table(
                  'CUDA Mem',
                  'Self CUDA Mem',
              ])
@@ -759,18 +725,19 @@ index 6062c097b2..0e4ae0b72f 100644
      headers.append(
          '# of Calls'
      )
-@@ -789,6 +887,10 @@ def _build_table(
+@@ -806,6 +902,11 @@ def _build_table(
          else:
              with_flops = False  # can't find any valid flops
  
 +    if with_calling_stack:
-+        headers.append('Calling Stack Tree'.ljust(cstack_column_width))
-+        add_column(cstack_column_width)
++        # headers.append('Calling Stack Tree'.ljust(cstack_column_width))
++        # add_column(cstack_column_width)
++        pass
 +
      row_format = row_format_lst[0]
      header_sep = header_sep_lst[0]
      line_length = line_length_lst[0]
-@@ -803,14 +905,19 @@ def _build_table(
+@@ -820,14 +921,19 @@ def _build_table(
  
      sum_self_cpu_time_total = sum([event.self_cpu_time_total for event in events])
      sum_self_cuda_time_total = 0
@@ -790,7 +757,7 @@ index 6062c097b2..0e4ae0b72f 100644
  
      # Actual printing
      if header is not None:
-@@ -861,6 +968,14 @@ def _build_table(
+@@ -878,6 +984,14 @@ def _build_table(
                  evt.cuda_time_total_str,
                  evt.cuda_time_str,  # Cuda time avg
              ])
@@ -805,7 +772,7 @@ index 6062c097b2..0e4ae0b72f 100644
          if profile_memory:
              row_values.extend([
                  # CPU Mem Total
-@@ -875,6 +990,13 @@ def _build_table(
+@@ -892,6 +1006,13 @@ def _build_table(
                      # Self CUDA Mem Total
                      _format_memory(evt.self_cuda_memory_usage),
                  ])
@@ -819,20 +786,21 @@ index 6062c097b2..0e4ae0b72f 100644
          row_values.append(
              evt.count,  # Number of calls
          )
-@@ -893,6 +1015,12 @@ def _build_table(
+@@ -910,6 +1031,13 @@ def _build_table(
              if len(evt.stack) > 0:
                  src_field = trim_path(evt.stack[0], src_column_width)
              row_values.append(src_field)
 +        if with_calling_stack:
-+            if len(evt.cstack) > max_depth:
-+                cstack_str = str(evt.cstack[:max_depth])[1:-1] + ",..."
-+            else:
-+                cstack_str = str(evt.cstack)[1:-1]
-+            row_values.append(cstack_str.ljust(cstack_column_width))
++            # if len(evt.cstack) > max_depth:
++            #     cstack_str = str(evt.cstack[:max_depth])[1:-1] + ",..."
++            # else:
++            #     cstack_str = str(evt.cstack)[1:-1]
++            # row_values.append(cstack_str.ljust(cstack_column_width))
++            pass
          append(row_format.format(*row_values))
  
          if has_stack:
-@@ -902,8 +1030,11 @@ def _build_table(
+@@ -919,8 +1047,11 @@ def _build_table(
              empty_headers.append("")
              append(row_format.format(*empty_headers))
  
@@ -845,24 +813,21 @@ index 6062c097b2..0e4ae0b72f 100644
 +        append("Self XPU time total: {}".format(_format_time(sum_self_xpu_time_total)))
      return ''.join(result)
 diff --git a/torch/csrc/autograd/init.cpp b/torch/csrc/autograd/init.cpp
-index 3551267459..2cbd1005df 100644
+index a1d6de21d1..46c2704bc9 100644
 --- a/torch/csrc/autograd/init.cpp
 +++ b/torch/csrc/autograd/init.cpp
-@@ -67,6 +67,8 @@ PyObject* THPAutograd_initExtension(PyObject* _unused, PyObject *unused) {
-       .value("CPU", ProfilerState::CPU)
-       .value("CUDA", ProfilerState::CUDA)
-       .value("NVTX", ProfilerState::NVTX)
-+      .value("XPU", ProfilerState::XPU)
-+      .value("ITT", ProfilerState::ITT)
-       .value("KINETO", ProfilerState::KINETO)
-       .value("KINETO_GPU_FALLBACK", ProfilerState::KINETO_GPU_FALLBACK);
- 
-@@ -91,10 +93,14 @@ PyObject* THPAutograd_initExtension(PyObject* _unused, PyObject *unused) {
+@@ -111,10 +111,20 @@ PyObject* THPAutograd_initExtension(PyObject* _unused, PyObject* unused) {
        .def("device", &LegacyEvent::device)
        .def("cpu_elapsed_us", &LegacyEvent::cpuElapsedUs)
        .def("cuda_elapsed_us", &LegacyEvent::cudaElapsedUs)
-+      .def("xpu_elapsed_us", static_cast<double (LegacyEvent::*)(void) const>(&LegacyEvent::xpuElapsedUs))
-+      .def("xpu_elapsed_us", static_cast<double (LegacyEvent::*)(const LegacyEvent& e) const>(&LegacyEvent::xpuElapsedUs))
++      .def(
++          "xpu_elapsed_us",
++          static_cast<double (LegacyEvent::*)(void) const>(
++              &LegacyEvent::xpuElapsedUs))
++      .def(
++          "xpu_elapsed_us",
++          static_cast<double (LegacyEvent::*)(const LegacyEvent& e) const>(
++              &LegacyEvent::xpuElapsedUs))
        .def("has_cuda", &LegacyEvent::hasCuda)
 +      .def("has_xpu", &LegacyEvent::hasXpu)
        .def("shapes", &LegacyEvent::shapes)
@@ -872,168 +837,36 @@ index 3551267459..2cbd1005df 100644
        .def("handle", &LegacyEvent::handle)
        .def("node_id", &LegacyEvent::nodeId)
        .def("is_remote", &LegacyEvent::isRemote)
-@@ -122,7 +128,8 @@ PyObject* THPAutograd_initExtension(PyObject* _unused, PyObject *unused) {
-       .value("HPU", c10::DeviceType::HPU)
-       .value("Meta", c10::DeviceType::Meta)
-       .value("Vulkan", c10::DeviceType::Vulkan)
--      .value("Metal", c10::DeviceType::Metal);
-+      .value("Metal", c10::DeviceType::Metal)
-+      .value("XPU", c10::DeviceType::XPU);
- 
-   py::class_<KinetoEvent>(m, "_KinetoEvent")
-       // name of the event
-diff --git a/torch/csrc/autograd/profiler_cuda.cpp b/torch/csrc/autograd/profiler_cuda.cpp
-index aefc1d5c95..1a5154756a 100644
---- a/torch/csrc/autograd/profiler_cuda.cpp
-+++ b/torch/csrc/autograd/profiler_cuda.cpp
-@@ -5,6 +5,8 @@
- 
- #include <sstream>
- 
-+struct CUevent_st;
-+
- namespace torch { namespace autograd { namespace profiler {
- 
- namespace {
-@@ -32,17 +34,30 @@ static inline void cudaCheck(cudaError_t result, const char * file, int line) {
- }
- #define TORCH_CUDA_CHECK(result) cudaCheck(result,__FILE__,__LINE__);
- 
-+class CUDAEventProfiler : public KernelEventBase {
-+public:
-+  CUDAEventProfiler(CUevent_st* evt_ptr = nullptr) : event_(evt_ptr, CUDAEventDestory) {};
-+  virtual ~CUDAEventProfiler() = default;
-+  CUevent_st* get() const {
-+    return event_.get();
-+  }
-+private:
-+  static void CUDAEventDestory(CUevent_st* ptr) {
-+    TORCH_CUDA_CHECK(cudaEventDestroy(ptr));
-+  }
-+  std::unique_ptr<CUevent_st, std::function<void(CUevent_st*)>> event_;
-+};
-+
- struct CUDAMethods : public CUDAStubs {
--  void record(int* device, CUDAEventStub* event, int64_t* cpu_ns) const override {
-+  void record(int* device, KernelEventStub* event, int64_t* cpu_ns) const override {
-     if (device) {
-       TORCH_CUDA_CHECK(cudaGetDevice(device));
-     }
-     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
-     CUevent_st* cuda_event_ptr;
-     TORCH_CUDA_CHECK(cudaEventCreate(&cuda_event_ptr));
--    *event = std::shared_ptr<CUevent_st>(cuda_event_ptr, [](CUevent_st* ptr) {
--      TORCH_CUDA_CHECK(cudaEventDestroy(ptr));
--    });
-+    auto cuda_event_stub = std::make_shared<CUDAEventProfiler>(cuda_event_ptr);
-+    *event = cuda_event_stub;
-     auto stream = at::cuda::getCurrentCUDAStream();
-     if (cpu_ns) {
-       *cpu_ns = getTime();
-@@ -50,12 +65,14 @@ struct CUDAMethods : public CUDAStubs {
-     TORCH_CUDA_CHECK(cudaEventRecord(cuda_event_ptr, stream));
-   }
- 
--  float elapsed(const CUDAEventStub* event, const CUDAEventStub* event2) const override{
--    TORCH_CUDA_CHECK(cudaEventSynchronize(event->get()));
--    TORCH_CUDA_CHECK(cudaEventSynchronize(event2->get()));
-+  float elapsed(const KernelEventStub* event, const KernelEventStub* event2) const override{
-+    CUDAEventProfiler* cuda_event_ = dynamic_cast<CUDAEventProfiler*>(event->get());
-+    CUDAEventProfiler* cuda_event2_ = dynamic_cast<CUDAEventProfiler*>(event2->get());
-+    TORCH_CUDA_CHECK(cudaEventSynchronize(cuda_event_->get()));
-+    TORCH_CUDA_CHECK(cudaEventSynchronize(cuda_event2_->get()));
-     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
-     float ms;
--    TORCH_CUDA_CHECK(cudaEventElapsedTime(&ms, event->get(), event2->get()));
-+    TORCH_CUDA_CHECK(cudaEventElapsedTime(&ms, cuda_event_->get(), cuda_event2_->get()));
-     // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-avoid-magic-numbers,cppcoreguidelines-narrowing-conversions)
-     return ms*1000.0;
-   }
-diff --git a/torch/csrc/autograd/profiler_kineto.h b/torch/csrc/autograd/profiler_kineto.h
-index 21bc318ed8..46a60b2707 100644
---- a/torch/csrc/autograd/profiler_kineto.h
-+++ b/torch/csrc/autograd/profiler_kineto.h
-@@ -46,8 +46,8 @@ struct KinetoObserverContext : public at::ObserverContext {
-   c10::optional<std::vector<std::string>> module_hierarchy;
-   // Extra arguments for computing op flops
-   c10::optional<std::unordered_map<std::string, c10::IValue>> extraArgs;
--  CUDAEventStub cuda_event_start_ = nullptr;
--  CUDAEventStub cuda_event_end_ = nullptr;
-+  KernelEventStub cuda_event_start_ = nullptr;
-+  KernelEventStub cuda_event_end_ = nullptr;
-   int64_t debug_handle;
- };
- 
-@@ -293,8 +293,8 @@ struct TORCH_API KinetoEvent {
-   bool is_async_{false};
-   int64_t debug_handle_{-1};
- 
--  CUDAEventStub cuda_event_start_ = nullptr;
--  CUDAEventStub cuda_event_end_ = nullptr;
-+  KernelEventStub cuda_event_start_ = nullptr;
-+  KernelEventStub cuda_event_end_ = nullptr;
- };
- 
- // Consolidating events returned directly from Kineto
 diff --git a/torch/csrc/autograd/profiler_legacy.cpp b/torch/csrc/autograd/profiler_legacy.cpp
-index ed96209a10..332cb9024d 100644
+index f77b4f5928..eb0cd7948e 100644
 --- a/torch/csrc/autograd/profiler_legacy.cpp
 +++ b/torch/csrc/autograd/profiler_legacy.cpp
-@@ -144,12 +144,20 @@ std::vector<std::string> callstackStr(const std::vector<FileLineFunc>& cs) {
- //
+@@ -140,6 +140,10 @@ struct ProfilerLegacyThreadLocalState : public ProfilerStateBase {
  
- namespace {
--const CUDAStubs default_stubs;
--constexpr const CUDAStubs* default_stubs_addr = &default_stubs;
-+const CUDAStubs default_cuda_stubs;
-+constexpr const CUDAStubs* default_cuda_stubs_addr = &default_cuda_stubs;
- // Constant initialization, so it is guaranteed to be initialized before
- // static initialization calls which may invoke registerCUDAMethods
- inline const CUDAStubs*& cuda_stubs() {
--  static const CUDAStubs* stubs_ = default_stubs_addr;
-+  static const CUDAStubs* stubs_ = default_cuda_stubs_addr;
-+  return stubs_;
-+}
-+const XPUStubs default_xpu_stubs;
-+constexpr const XPUStubs* default_xpu_stubs_addr = &default_xpu_stubs;
-+// Constant initialization, so it is guaranteed to be initialized before
-+// static initialization calls which may invoke registerXPUMethods
-+inline const XPUStubs*& xpu_stubs() {
-+  static const XPUStubs* stubs_ = default_xpu_stubs_addr;
-   return stubs_;
- }
- }
-@@ -158,6 +166,10 @@ const CUDAStubs* cudaStubs() {
-   return cuda_stubs();
- }
+   void mark(std::string name, bool include_cuda = true);
  
-+const XPUStubs* xpuStubs() {
-+  return xpu_stubs();
-+}
++  void markKernel(
++      std::string name,
++      torch::profiler::impl::ProfilerEventStub kernel_event);
 +
- // Profiler state
- const ProfilerConfig& ProfilerThreadLocalState::config() const {
-   return config_;
-@@ -180,23 +192,40 @@ thread_event_lists ProfilerThreadLocalState::consolidate() {
+   void setOrAddRemoteProfiledEvents(
+       std::vector<LegacyEvent>&& remoteProfiledEvents);
+ 
+@@ -195,7 +199,7 @@ thread_event_lists ProfilerLegacyThreadLocalState::consolidate() {
    return result;
  }
  
--void ProfilerThreadLocalState::mark(std::string name, bool include_cuda) {
-+void ProfilerThreadLocalState::mark(std::string name, bool include_kernel) {
-   if (config_.state == ProfilerState::Disabled) {
+-void ProfilerLegacyThreadLocalState::mark(std::string name, bool include_cuda) {
++void ProfilerLegacyThreadLocalState::mark(std::string name, bool include_kernel) {
+   if (config_.disabled()) {
      return;
    }
-   if (config_.state == ProfilerState::NVTX) {
-     cuda_stubs()->nvtxMarkA(name.c_str());
--  } else {
-+  } else if (config_.state == ProfilerState::ITT) {
-+    xpu_stubs()->ittMark(name.c_str());
-+  }else {
-     LegacyEvent evt(
+@@ -206,13 +210,29 @@ void ProfilerLegacyThreadLocalState::mark(std::string name, bool include_cuda) {
          EventKind::Mark,
          at::StringView(std::move(name)),
          at::RecordFunction::currentThreadId(),
--        include_cuda && config_.state == ProfilerState::CUDA);
+-        include_cuda &&
+-            config_.state == torch::profiler::impl::ProfilerState::CUDA);
 +        include_kernel,
 +        config_.state);
      evt.setNodeId(at::RecordFunction::getDefaultNodeId());
@@ -1041,7 +874,9 @@ index ed96209a10..332cb9024d 100644
    }
  }
  
-+void ProfilerThreadLocalState::markKernel(std::string name, KernelEventStub kernel_event) {
++void ProfilerLegacyThreadLocalState::markKernel(
++    std::string name,
++    torch::profiler::impl::ProfilerEventStub kernel_event) {
 +  if (config_.state == ProfilerState::Disabled) {
 +    return;
 +  }
@@ -1055,28 +890,21 @@ index ed96209a10..332cb9024d 100644
 +  }
 +}
 +
- void ProfilerThreadLocalState::setOrAddRemoteProfiledEvents(
+ void ProfilerLegacyThreadLocalState::setOrAddRemoteProfiledEvents(
      std::vector<LegacyEvent>&& remoteProfiledEvents) {
    // Lock to serialize access from multiple callback threads.
-@@ -210,7 +239,7 @@ void ProfilerThreadLocalState::setOrAddRemoteProfiledEvents(
+@@ -226,7 +246,7 @@ void ProfilerLegacyThreadLocalState::setOrAddRemoteProfiledEvents(
  
- void ProfilerThreadLocalState::pushRange(
+ void ProfilerLegacyThreadLocalState::pushRange(
      const at::RecordFunction& fn,
 -    const bool record_cuda,
 +    const bool include_kernel,
      std::vector<std::vector<int64_t>>&& shapes) {
-   if (config_.state == ProfilerState::Disabled) {
+   if (config_.disabled()) {
      return;
-@@ -218,12 +247,15 @@ void ProfilerThreadLocalState::pushRange(
-   if (config_.state == ProfilerState::NVTX) {
-     cuda_stubs()->nvtxRangePushA(getNvtxStr(
-         fn.name(), fn.seqNr(), shapes).c_str());
-+  } else if (config_.state == ProfilerState::ITT) {
-+    xpu_stubs()->ittRangePush(fn.name().str());
-   } else {
-     LegacyEvent evt(
+@@ -240,7 +260,8 @@ void ProfilerLegacyThreadLocalState::pushRange(
          EventKind::PushRange,
-         fn.name(),
+         at::StringView(std::string(fn.name())),
          at::RecordFunction::currentThreadId(),
 -        record_cuda,
 +        include_kernel,
@@ -1084,23 +912,16 @@ index ed96209a10..332cb9024d 100644
          fn.handle(),
          std::move(shapes),
          at::RecordFunction::getDefaultNodeId(),
-@@ -252,12 +284,14 @@ void ProfilerThreadLocalState::pushRange(
-   }
- }
+@@ -275,7 +296,7 @@ void ProfilerLegacyThreadLocalState::pushRange(
  
--void ProfilerThreadLocalState::popRange(const at::RecordFunction& fn, const bool record_cuda) {
-+void ProfilerThreadLocalState::popRange(const at::RecordFunction& fn, const bool include_kernel) {
-   if (config_.state == ProfilerState::Disabled) {
+ void ProfilerLegacyThreadLocalState::popRange(
+     const at::RecordFunction& fn,
+-    const bool record_cuda) {
++    const bool include_kernel) {
+   if (config_.disabled()) {
      return;
    }
-   if (config_.state == ProfilerState::NVTX) {
-     cuda_stubs()->nvtxRangePop();
-+  } else if (config_.state == ProfilerState::ITT) {
-+    xpu_stubs()->ittRangePop();
-   } else {
-     // In some cases RecordFunction (and popRange) may be
-     // called on a different thread than pushRange
-@@ -267,7 +301,8 @@ void ProfilerThreadLocalState::popRange(const at::RecordFunction& fn, const bool
+@@ -290,7 +311,8 @@ void ProfilerLegacyThreadLocalState::popRange(
          EventKind::PopRange,
          at::StringView(""),
          at::RecordFunction::currentThreadId(),
@@ -1110,75 +931,90 @@ index ed96209a10..332cb9024d 100644
          fn.handle());
      evt.setNodeId(at::RecordFunction::getDefaultNodeId());
      getEventList(fn.threadId()).record(std::move(evt));
-@@ -286,7 +321,8 @@ void ProfilerThreadLocalState::reportMemoryUsage(
+@@ -309,7 +331,8 @@ void ProfilerLegacyThreadLocalState::reportMemoryUsage(
          EventKind::MemoryAlloc,
          at::StringView(""),
          thread_id,
--        config_.state == ProfilerState::CUDA);
+-        config_.state == torch::profiler::impl::ProfilerState::CUDA);
 +        false,
 +        config_.state);
      evt.updateMemoryStats(alloc_size, device);
      getEventList(thread_id).record(std::move(evt));
    }
-@@ -473,6 +509,10 @@ void registerCUDAMethods(CUDAStubs* stubs) {
-   cuda_stubs() = stubs;
- }
+@@ -415,12 +438,13 @@ void pushProfilingCallbacksLegacy() {
  
-+void registerXPUMethods(XPUStubs* stubs) {
-+  xpu_stubs() = stubs;
-+}
-+
- at::IValue ProfilerConfig::toIValue() const {
-   c10::impl::GenericList eventIValueList(at::AnyType::get());
-   eventIValueList.reserve(NUM_PROFILER_CFG_IVALUE_IDX);
-@@ -516,6 +556,8 @@ bool profilerEnabled() {
- void enableProfilerLegacy(const ProfilerConfig& new_config) {
-   TORCH_CHECK(new_config.state != ProfilerState::NVTX || cuda_stubs()->enabled(),
-     "Can't use NVTX profiler - PyTorch was compiled without CUDA");
-+  TORCH_CHECK(new_config.state != ProfilerState::ITT || xpu_stubs()->enabled(),
-+    "Can't use Intel(R) VTune Profiler's ITT functionality - PyTorch was compiled without XPU");
+ } // namespace
  
-   TORCH_CHECK(new_config.state != ProfilerState::KINETO);
+-void enableProfilerLegacy(
+-    const torch::profiler::impl::ProfilerConfig& new_config) {
++void enableProfilerLegacy(const torch::profiler::impl::ProfilerConfig& new_config) {
++  TORCH_CHECK(new_config.state != torch::profiler::impl::ProfilerState::NVTX || torch::profiler::impl::cudaStubs()->enabled(),
++    "Can't use NVTX profiler - PyTorch was compiled without CUDA");
+   TORCH_CHECK(
+-      new_config.state != torch::profiler::impl::ProfilerState::NVTX ||
+-          torch::profiler::impl::cudaStubs()->enabled(),
+-      "Can't use NVTX profiler - PyTorch was compiled without CUDA");
++      new_config.state != ProfilerState::ITT ||
++          torch::profiler::impl::xpuStubs()->enabled(),
++      "Can't use Intel(R) VTune Profiler's ITT functionality - PyTorch was compiled without XPU");
  
-@@ -529,6 +571,11 @@ void enableProfilerLegacy(const ProfilerConfig& new_config) {
+   TORCH_CHECK(new_config.state != torch::profiler::impl::ProfilerState::KINETO);
+ 
+@@ -434,14 +458,17 @@ void enableProfilerLegacy(
    state->mark("__start_profile", false);
  }
  
-+void markKernel(std::string name, KernelEventStub& kernel_event) {
-+  auto state_ptr = getProfilerTLSState();
+-thread_event_lists disableProfilerLegacy(
+-    c10::optional<ProfilerDisableOptions> profilerDisableOptions) {
+-  auto cleanupTLSState =
+-      profilerDisableOptions ? profilerDisableOptions->cleanupTLSState : true;
+-  auto consolidate =
+-      profilerDisableOptions ? profilerDisableOptions->consolidate : true;
+-  // all the DebugInfoBase objects are scope based and supposed to use
+-  // DebugInfoGuard
++void markKernel(
++    std::string name,
++    torch::profiler::impl::ProfilerEventStub& kernel_event) {
++  auto state_ptr = ProfilerLegacyThreadLocalState::getTLS();
 +  state_ptr->markKernel(name, kernel_event);
 +}
 +
- thread_event_lists disableProfilerLegacy(c10::optional<ProfilerDisableOptions> profilerDisableOptions) {
-   auto cleanupTLSState = profilerDisableOptions ? profilerDisableOptions->cleanupTLSState : true;
-   auto consolidate = profilerDisableOptions ? profilerDisableOptions->consolidate : true;
-@@ -563,10 +610,21 @@ void addEventList(std::vector<LegacyEvent>&& profiledEvents) {
++thread_event_lists disableProfilerLegacy(c10::optional<ProfilerDisableOptions> profilerDisableOptions) {
++  auto cleanupTLSState = profilerDisableOptions ? profilerDisableOptions->cleanupTLSState : true;
++  auto consolidate = profilerDisableOptions ? profilerDisableOptions->consolidate : true;
++  // all the DebugInfoBase objects are scope based and supposed to use DebugInfoGuard
+   std::shared_ptr<c10::DebugInfoBase> state;
+   if (cleanupTLSState) {
+     state = c10::ThreadLocalDebugInfo::_pop(c10::DebugInfoKind::PROFILER_STATE);
+@@ -472,10 +499,23 @@ void addEventList(std::vector<LegacyEvent>&& profiledEvents) {
    state_ptr->setOrAddRemoteProfiledEvents(std::move(profiledEvents));
  }
  
 -void LegacyEvent::record(bool record_cuda) {
 -  if (record_cuda) {
--    cuda_stubs()->record(&device_, &cuda_event, &cpu_ns_);
+-    torch::profiler::impl::cudaStubs()->record(&device_, &cuda_event, &cpu_ns_);
 -    return;
 +void LegacyEvent::record(bool include_kernel, ProfilerState state) {
 +  if (include_kernel) {
 +    int device_id;
-+    switch(state) {
++    switch (state) {
 +      case ProfilerState::CUDA:
-+        cuda_stubs()->record(&device_id, &kernel_event_, &cpu_ns_);
++        torch::profiler::impl::cudaStubs()->record(
++            &device_id, &kernel_event_, &cpu_ns_);
 +        device_ = at::Device(DeviceType::CUDA, device_id);
 +        break;
 +      case ProfilerState::XPU:
-+        xpu_stubs()->record(&device_id, &kernel_event_, &cpu_ns_);
++        torch::profiler::impl::xpuStubs()->record(
++            &device_id, &kernel_event_, &cpu_ns_);
 +        device_ = at::Device(DeviceType::XPU, device_id);
 +        break;
 +      default:
 +        break;
 +    }
    }
-   cpu_ns_ = getTime();
+   cpu_ns_ = torch::profiler::impl::getTime();
  }
-@@ -620,7 +678,7 @@ void LegacyEvent::record(bool record_cuda) {
+@@ -529,7 +569,7 @@ void LegacyEvent::record(bool record_cuda) {
        ivalues.get(EventIValueIdx::CPU_NS).toInt(), // cpu_ns
        ivalues.get(EventIValueIdx::CUDA_RECORDED).toBool(), // was cuda recorded
        ivalues.get(EventIValueIdx::CUDA_MEM_USAGE).toInt(), // cuda memory usage
@@ -1187,123 +1023,37 @@ index ed96209a10..332cb9024d 100644
        ivalues.get(EventIValueIdx::CUDA_US).toInt() // cuda_us
    );
    return evt;
-@@ -669,7 +727,22 @@ double LegacyEvent::cudaElapsedUs(const LegacyEvent& e) const {
-     TORCH_INTERNAL_ASSERT(cuda_us_ >= 0 && e.cuda_us_ >= 0);
+@@ -579,7 +619,24 @@ double LegacyEvent::cudaElapsedUs(const LegacyEvent& e) const {
      return static_cast<double>(e.cuda_us_ - cuda_us_);
    }
--  return cuda_stubs()->elapsed(&cuda_event, &e.cuda_event);
-+  return cuda_stubs()->elapsed(&kernel_event_, &e.kernel_event_);
+   return torch::profiler::impl::cudaStubs()->elapsed(
+-      &cuda_event, &e.cuda_event);
++      &kernel_event_, &e.kernel_event_);
 +}
 +
 +double LegacyEvent::xpuElapsedUs() const {
 +  if (!hasXpu()) {
 +    throw std::logic_error("Events were not recorded for XPU");
 +  }
-+  return xpu_stubs()->elapsed(kernel_event_);
++  return torch::profiler::impl::xpuStubs()->elapsed(&kernel_event_);
 +}
 +
 +double LegacyEvent::xpuElapsedUs(const LegacyEvent& e) const {
 +  TORCH_CHECK(e.hasXpu() && hasXpu(), "Events were not recorded for XPU");
 +  TORCH_CHECK(
 +      e.device() == device(),
-+      c10::str("Events are not on the same device: ", e.device(), " vs ", device()));
-+  return xpu_stubs()->timeDiff(kernel_event_, e.kernel_event_);
++      c10::str(
++          "Events are not on the same device: ", e.device(), " vs ", device()));
++  return torch::profiler::impl::xpuStubs()->elapsed(
++      &kernel_event_, &e.kernel_event_);
  }
  
- CUDAStubs::~CUDAStubs() = default;
+ static const at::jit::CodeTemplate event_template(R"(
 diff --git a/torch/csrc/autograd/profiler_legacy.h b/torch/csrc/autograd/profiler_legacy.h
-index 363a42df52..f741247c34 100644
+index e12beca806..3b12a5c35a 100644
 --- a/torch/csrc/autograd/profiler_legacy.h
 +++ b/torch/csrc/autograd/profiler_legacy.h
-@@ -23,8 +23,11 @@
- 
- #include <torch/csrc/jit/frontend/source_range.h>
- 
--struct CUevent_st;
--typedef std::shared_ptr<CUevent_st> CUDAEventStub;
-+class KernelEventBase {
-+public:
-+  virtual ~KernelEventBase() = default;
-+};
-+typedef std::shared_ptr<KernelEventBase> KernelEventStub;
- 
- namespace torch { namespace autograd {
- 
-@@ -33,10 +36,10 @@ struct Node;
- namespace profiler {
- 
- struct TORCH_API CUDAStubs {
--  virtual void record(int* device, CUDAEventStub* event, int64_t* cpu_ns) const {
-+  virtual void record(int* device, KernelEventStub* event, int64_t* cpu_ns) const {
-     fail();
-   }
--  virtual float elapsed(const CUDAEventStub* event, const CUDAEventStub* event2) const {
-+  virtual float elapsed(const KernelEventStub* event, const KernelEventStub* event2) const {
-     fail();
-     return 0.f;
-   }
-@@ -69,6 +72,41 @@ private:
- TORCH_API void registerCUDAMethods(CUDAStubs* stubs);
- TORCH_API const CUDAStubs* cudaStubs();
- 
-+struct TORCH_API XPUStubs {
-+  virtual void record(int* device, KernelEventStub* event, int64_t* cpu_ns) const {
-+    fail();
-+  }
-+  virtual float timeDiff(const KernelEventStub& event, const KernelEventStub& event2) const {
-+    fail();
-+    return 0.f;
-+  }
-+  virtual float elapsed(const KernelEventStub& event) const {
-+    fail();
-+    return 0.f;
-+  }
-+  virtual bool enabled() const {
-+    return false;
-+  }
-+  virtual void ittMark(const char* name) const {
-+    fail();
-+  }
-+  virtual void ittRangePush(const char* name) const {
-+    fail();
-+  }
-+  virtual void ittRangePop() const {
-+    fail();
-+  }
-+  virtual ~XPUStubs() {};
-+
-+private:
-+  void fail() const {
-+    AT_ERROR("XPU used in profiler but not enabled.");
-+  }
-+};
-+
-+TORCH_API void registerXPUMethods(XPUStubs* stubs);
-+TORCH_API const XPUStubs* xpuStubs();
-+
- constexpr inline size_t ceilToMultiple(size_t a, size_t b) {
-   return ((a + b - 1) / b) * b;
- }
-@@ -96,6 +134,18 @@ inline int64_t getTime(bool allow_monotonic = false) {
- #endif
- }
- 
-+enum class C10_API_ENUM ProfilerState {
-+  Disabled = 0,
-+  CPU, // CPU-only profiling
-+  CUDA, // CPU + CUDA events
-+  NVTX, // only emit NVTX markers,
-+  XPU, // CPU + XPU events
-+  ITT, // only emit ITT markers,
-+  KINETO, // use libkineto
-+  KINETO_GPU_FALLBACK, // use CUDA events when CUPTI is not available
-+  NUM_PROFILER_STATES, // must be the last one
-+};
-+
- enum class C10_API_ENUM EventKind : uint16_t {
-   Mark,
-   PushRange,
-@@ -110,7 +160,8 @@ struct TORCH_API LegacyEvent {
+@@ -35,7 +35,8 @@ struct TORCH_API LegacyEvent {
        EventKind kind,
        at::StringView name,
        uint16_t thread_id,
@@ -1313,7 +1063,7 @@ index 363a42df52..f741247c34 100644
        at::RecordFunctionHandle handle = 0,
        std::vector<std::vector<int64_t>>&& shapes = {},
        int node_id = -1,
-@@ -122,7 +173,21 @@ struct TORCH_API LegacyEvent {
+@@ -47,7 +48,21 @@ struct TORCH_API LegacyEvent {
          shapes_(shapes),
          node_id_(node_id),
          is_async_(is_async) {
@@ -1327,7 +1077,7 @@ index 363a42df52..f741247c34 100644
 +      at::StringView name,
 +      uint16_t thread_id,
 +      ProfilerState state,
-+      KernelEventStub event)
++      torch::profiler::impl::ProfilerEventStub event)
 +      : name_(std::move(name)),
 +        kind_(kind),
 +        thread_id_(thread_id),
@@ -1336,7 +1086,7 @@ index 363a42df52..f741247c34 100644
    }
  
    // Constructor to be used in conjunction with LegacyEvent::fromIValue.
-@@ -139,7 +204,7 @@ struct TORCH_API LegacyEvent {
+@@ -64,7 +79,7 @@ struct TORCH_API LegacyEvent {
        int64_t cpu_ns,
        bool cuda_recorded,
        int64_t cuda_memory_usage = 0,
@@ -1345,7 +1095,7 @@ index 363a42df52..f741247c34 100644
        double cuda_us = -1)
        : cpu_ns_(cpu_ns),
          name_(std::move(name)),
-@@ -156,7 +221,7 @@ struct TORCH_API LegacyEvent {
+@@ -81,7 +96,7 @@ struct TORCH_API LegacyEvent {
      // Sanity check values that were deserialized
      TORCH_INTERNAL_ASSERT(cpu_ns_ > 0);
      if (cuda_recorded) {
@@ -1354,7 +1104,7 @@ index 363a42df52..f741247c34 100644
        TORCH_INTERNAL_ASSERT(cuda_us_ >= 0);
      }
    }
-@@ -168,7 +233,7 @@ struct TORCH_API LegacyEvent {
+@@ -93,7 +108,7 @@ struct TORCH_API LegacyEvent {
    // Reconstructs an event from IValues given by toIValue.
    static LegacyEvent fromIValue(const at::IValue& eventIValue);
  
@@ -1363,8 +1113,8 @@ index 363a42df52..f741247c34 100644
  
    std::string kindStr() const {
      switch (kind_) {
-@@ -209,13 +274,24 @@ struct TORCH_API LegacyEvent {
-     return cpu_ns_ / (1000.0);
+@@ -138,13 +153,24 @@ struct TORCH_API LegacyEvent {
+     return static_cast<double>(cpu_ns_) / (1000.0);
    }
  
 +  bool hasKernel() const {
@@ -1390,8 +1140,8 @@ index 363a42df52..f741247c34 100644
      return device_;
    }
  
-@@ -227,6 +303,8 @@ struct TORCH_API LegacyEvent {
-         device.type() == c10::DeviceType::MKLDNN ||
+@@ -155,6 +181,8 @@ struct TORCH_API LegacyEvent {
+         device.is_cpu() || device.type() == c10::DeviceType::MKLDNN ||
          device.type() == c10::DeviceType::IDEEP) {
        cpu_memory_usage_ = alloc_size;
 +    } else if (device.is_xpu()) {
@@ -1399,7 +1149,7 @@ index 363a42df52..f741247c34 100644
      } else {
        LOG(WARNING) << "Unsupported memory profiling device: " << device;
      }
-@@ -240,6 +318,10 @@ struct TORCH_API LegacyEvent {
+@@ -168,6 +196,10 @@ struct TORCH_API LegacyEvent {
      return cuda_memory_usage_;
    }
  
@@ -1410,59 +1160,315 @@ index 363a42df52..f741247c34 100644
    at::RecordFunctionHandle handle() const {
      return handle_;
    }
-@@ -337,8 +419,9 @@ struct TORCH_API LegacyEvent {
+@@ -265,8 +297,9 @@ struct TORCH_API LegacyEvent {
    std::vector<std::vector<int64_t>> shapes_;
    int64_t cpu_memory_usage_ = 0;
    int64_t cuda_memory_usage_ = 0;
 -  int device_ = -1;
--  CUDAEventStub cuda_event = nullptr;
+-  torch::profiler::impl::ProfilerEventStub cuda_event = nullptr;
 +  int64_t xpu_memory_usage_ = 0;
 +  at::Device device_ = at::Device(DeviceType::CPU);
-+  KernelEventStub kernel_event_ = nullptr;
++  torch::profiler::impl::ProfilerEventStub kernel_event_ = nullptr;
    int node_id_ = 0;
    bool is_remote_ = false;
    int64_t cuda_us_ = -1;
-@@ -397,15 +480,6 @@ std::string getNvtxStr(
-     int64_t sequence_nr,
-     const std::vector<std::vector<int64_t>>& shapes);
- 
--enum class C10_API_ENUM ProfilerState {
--  Disabled = 0,
--  CPU, // CPU-only profiling
--  CUDA, // CPU + CUDA events
--  NVTX,  // only emit NVTX markers
--  KINETO, // use libkineto
--  KINETO_GPU_FALLBACK, // use CUDA events when CUPTI is not available
--  NUM_PROFILER_STATES, // must be the last one
--};
- 
- struct TORCH_API ProfilerConfig {
-   explicit ProfilerConfig(
-@@ -467,6 +541,8 @@ TORCH_API bool profilerEnabled();
- TORCH_API ProfilerConfig getProfilerConfig();
+@@ -350,9 +383,11 @@ TORCH_API thread_event_lists disableProfilerLegacy(
+ // will be marked with node ID given by fromNodeId.
+ TORCH_API void addEventList(std::vector<LegacyEvent>&& profiledEvents);
  // Writes profiled events to a stream.
- TORCH_API void writeProfilerEventsToStream(std::ostream& out, const std::vector<LegacyEvent*>& events);
+-TORCH_API void writeProfilerEventsToStream(
+-    std::ostream& out,
+-    const std::vector<LegacyEvent*>& events);
++TORCH_API void writeProfilerEventsToStream(std::ostream& out, const std::vector<LegacyEvent*>& events);
 +// Add a kernel event to profile.
-+TORCH_API void markKernel(std::string name, KernelEventStub& kernel_event);
++TORCH_API void markKernel(
++    std::string name,
++    torch::profiler::impl::ProfilerEventStub& kernel_event);
  
  // Usage:
  //   {
-@@ -543,7 +619,9 @@ struct TORCH_API ProfilerThreadLocalState : public c10::MemoryReportingInfoBase
+diff --git a/torch/csrc/profiler/api.cpp b/torch/csrc/profiler/api.cpp
+index 61a285919e..d8f62b5c05 100644
+--- a/torch/csrc/profiler/api.cpp
++++ b/torch/csrc/profiler/api.cpp
+@@ -1,7 +1,5 @@
+ #include <torch/csrc/profiler/api.h>
  
-   thread_event_lists consolidate();
+-#include <torch/csrc/profiler/util.h>
+-
+ namespace torch {
+ namespace profiler {
+ namespace impl {
+@@ -9,7 +7,9 @@ namespace impl {
+ ProfilerStubs::~ProfilerStubs() = default;
  
--  void mark(std::string name, bool include_cuda = true);
-+  void mark(std::string name, bool include_kernel = true);
+ namespace {
+-struct DefaultCUDAStubs : public ProfilerStubs {
++struct DefaultStubs : public ProfilerStubs {
++  DefaultStubs(const char* name) : name_{name} {}
 +
-+  void markKernel(std::string name, KernelEventStub kernel_event);
+   void record(
+       int* /*device*/,
+       ProfilerEventStub* /*event*/,
+@@ -22,52 +22,7 @@ struct DefaultCUDAStubs : public ProfilerStubs {
+     fail();
+     return 0.f;
+   }
+-  void mark(const char* /*name*/) const override {
+-    fail();
+-  }
+-  void rangePush(const char* /*name*/) const override {
+-    fail();
+-  }
+-  void rangePop() const override {
+-    fail();
+-  }
+-  bool enabled() const override {
+-    return false;
+-  }
+-  void onEachDevice(std::function<void(int)> /*op*/) const override {
+-    fail();
+-  }
+-  void synchronize() const override {
+-    fail();
+-  }
+-  ~DefaultCUDAStubs() override = default;
+-
+- private:
+-  void fail() const {
+-    AT_ERROR("CUDA used in profiler but not enabled.");
+-  }
+-};
+-
+-const DefaultCUDAStubs default_cuda_stubs;
+-constexpr const DefaultCUDAStubs* default_cuda_stubs_addr = &default_cuda_stubs;
+-// Constant initialization, so it is guaranteed to be initialized before
+-// static initialization calls which may invoke registerCUDAMethods
+-inline const ProfilerStubs*& cuda_stubs() {
+-  static const ProfilerStubs* stubs_ =
+-      static_cast<const ProfilerStubs*>(default_cuda_stubs_addr);
+-  return stubs_;
+-}
+-
+-struct DefaultITTStubs : public ProfilerStubs {
+-  void record(
+-      int* /*device*/,
+-      ProfilerEventStub* /*event*/,
+-      int64_t* /*cpu_ns*/) const override {
+-    fail();
+-  }
+-  float elapsed(
+-      const ProfilerEventStub* /*event*/,
+-      const ProfilerEventStub* /*event2*/) const override {
++  virtual float elapsed(const ProfilerEventStub* /*event*/) const override {
+     fail();
+     return 0.f;
+   }
+@@ -89,40 +44,44 @@ struct DefaultITTStubs : public ProfilerStubs {
+   void synchronize() const override {
+     fail();
+   }
+-  ~DefaultITTStubs() override = default;
++  ~DefaultStubs() override = default;
  
-   void setOrAddRemoteProfiledEvents(
-       std::vector<LegacyEvent>&& remoteProfiledEvents);
+  private:
+   void fail() const {
+-    AT_ERROR("ITT used in profiler but not enabled.");
++    AT_ERROR(name_, " used in profiler but not enabled.");
+   }
+-};
+ 
+-const DefaultITTStubs default_itt_stubs;
+-constexpr const DefaultITTStubs* default_itt_stubs_addr = &default_itt_stubs;
+-// Constant initialization, so it is guaranteed to be initialized before
+-// static initialization calls which may invoke registerITTMethods
+-inline const ProfilerStubs*& itt_stubs() {
+-  static const ProfilerStubs* stubs_ =
+-      static_cast<const ProfilerStubs*>(default_itt_stubs_addr);
+-  return stubs_;
+-}
++  const char* const name_;
++};
+ } // namespace
+ 
+-const ProfilerStubs* cudaStubs() {
+-  return cuda_stubs();
+-}
+-
+-void registerCUDAMethods(ProfilerStubs* stubs) {
+-  cuda_stubs() = stubs;
+-}
+-
+-const ProfilerStubs* ittStubs() {
+-  return itt_stubs();
+-}
++#define REGISTER_DEFAULT(name, upper_name)                                   \
++  namespace {                                                                \
++  const DefaultStubs default_##name##_stubs{#upper_name};                    \
++  constexpr const DefaultStubs* default_##name##_stubs_addr =                \
++      &default_##name##_stubs;                                               \
++                                                                             \
++  /* Constant initialization, so it is guaranteed to be initialized before*/ \
++  /* static initialization calls which may invoke register<name>Methods*/    \
++  inline const ProfilerStubs*& name##_stubs() {                              \
++    static const ProfilerStubs* stubs_ =                                     \
++        static_cast<const ProfilerStubs*>(default_##name##_stubs_addr);      \
++    return stubs_;                                                           \
++  }                                                                          \
++  } /*namespace*/                                                            \
++                                                                             \
++  const ProfilerStubs* name##Stubs() {                                       \
++    return name##_stubs();                                                   \
++  }                                                                          \
++                                                                             \
++  void register##upper_name##Methods(ProfilerStubs* stubs) {                 \
++    name##_stubs() = stubs;                                                  \
++  }
+ 
+-void registerITTMethods(ProfilerStubs* stubs) {
+-  itt_stubs() = stubs;
+-}
++REGISTER_DEFAULT(cuda, CUDA)
++REGISTER_DEFAULT(itt, ITT)
++REGISTER_DEFAULT(xpu, XPU)
++#undef REGISTER_DEFAULT
+ 
+ } // namespace impl
+ } // namespace profiler
+diff --git a/torch/csrc/profiler/api.h b/torch/csrc/profiler/api.h
+index 0414b8c323..5eb5133348 100644
+--- a/torch/csrc/profiler/api.h
++++ b/torch/csrc/profiler/api.h
+@@ -4,16 +4,19 @@
+ #include <torch/csrc/Export.h>
+ #include <torch/csrc/profiler/orchestration/observer.h>
+ 
+-struct CUevent_st;
+-
+ namespace torch {
+ namespace profiler {
+ namespace impl {
+ 
++class KernelEventBase {
++public:
++  virtual ~KernelEventBase() = default;
++};
++
+ // ----------------------------------------------------------------------------
+ // -- Annotation --------------------------------------------------------------
+ // ----------------------------------------------------------------------------
+-using ProfilerEventStub = std::shared_ptr<CUevent_st>;
++using ProfilerEventStub = std::shared_ptr<KernelEventBase>;
+ 
+ struct TORCH_API ProfilerStubs {
+   virtual void record(int* device, ProfilerEventStub* event, int64_t* cpu_ns)
+@@ -21,6 +24,7 @@ struct TORCH_API ProfilerStubs {
+   virtual float elapsed(
+       const ProfilerEventStub* event,
+       const ProfilerEventStub* event2) const = 0;
++  virtual float elapsed(const ProfilerEventStub* event) const = 0;
+   virtual void mark(const char* name) const = 0;
+   virtual void rangePush(const char* name) const = 0;
+   virtual void rangePop() const = 0;
+@@ -36,6 +40,8 @@ TORCH_API void registerCUDAMethods(ProfilerStubs* stubs);
+ TORCH_API const ProfilerStubs* cudaStubs();
+ TORCH_API void registerITTMethods(ProfilerStubs* stubs);
+ TORCH_API const ProfilerStubs* ittStubs();
++TORCH_API void registerXPUMethods(ProfilerStubs* stubs);
++TORCH_API const ProfilerStubs* xpuStubs();
+ 
+ } // namespace impl
+ } // namespace profiler
+diff --git a/torch/csrc/profiler/cuda.cpp b/torch/csrc/profiler/cuda.cpp
+index c64eb5e9ca..80357a29e8 100644
+--- a/torch/csrc/profiler/cuda.cpp
++++ b/torch/csrc/profiler/cuda.cpp
+@@ -5,6 +5,8 @@
+ 
+ #include <sstream>
+ 
++struct CUevent_st;
++
+ namespace torch {
+ namespace profiler {
+ namespace impl {
+@@ -42,9 +44,8 @@ struct CUDAMethods : public ProfilerStubs {
+     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+     CUevent_st* cuda_event_ptr;
+     TORCH_CUDA_CHECK(cudaEventCreate(&cuda_event_ptr));
+-    *event = std::shared_ptr<CUevent_st>(cuda_event_ptr, [](CUevent_st* ptr) {
+-      TORCH_CUDA_CHECK(cudaEventDestroy(ptr));
+-    });
++    auto cuda_event_stub = std::make_shared<CUDAEventProfiler>(cuda_event_ptr);
++    *event = cuda_event_stub;
+     auto stream = at::cuda::getCurrentCUDAStream();
+     if (cpu_ns) {
+       *cpu_ns = torch::profiler::impl::getTime();
+@@ -54,11 +55,16 @@ struct CUDAMethods : public ProfilerStubs {
+ 
+   float elapsed(const ProfilerEventStub* event, const ProfilerEventStub* event2)
+       const override {
+-    TORCH_CUDA_CHECK(cudaEventSynchronize(event->get()));
+-    TORCH_CUDA_CHECK(cudaEventSynchronize(event2->get()));
++    CUDAEventProfiler* cuda_event_ =
++        dynamic_cast<CUDAEventProfiler*>(event->get());
++    CUDAEventProfiler* cuda_event2_ =
++        dynamic_cast<CUDAEventProfiler*>(event2->get());
++    TORCH_CUDA_CHECK(cudaEventSynchronize(cuda_event_->get()));
++    TORCH_CUDA_CHECK(cudaEventSynchronize(cuda_event2_->get()));
+     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+     float ms;
+-    TORCH_CUDA_CHECK(cudaEventElapsedTime(&ms, event->get(), event2->get()));
++    TORCH_CUDA_CHECK(
++        cudaEventElapsedTime(&ms, cuda_event_->get(), cuda_event2_->get()));
+     // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-avoid-magic-numbers,cppcoreguidelines-narrowing-conversions)
+     return ms * 1000.0;
+   }
+diff --git a/torch/csrc/profiler/itt.cpp b/torch/csrc/profiler/itt.cpp
+index 3269a5784a..54bdf50320 100644
+--- a/torch/csrc/profiler/itt.cpp
++++ b/torch/csrc/profiler/itt.cpp
+@@ -18,6 +18,11 @@ struct ITTMethods : public ProfilerStubs {
+     return 0;
+   }
+ 
++  virtual float elapsed(const ProfilerEventStub* event)
++      const override {
++    return 0;
++  }
++
+   void mark(const char* name) const override {
+     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+     torch::profiler::itt_mark(name);
+diff --git a/torch/csrc/profiler/orchestration/observer.h b/torch/csrc/profiler/orchestration/observer.h
+index 3b75a91804..7d75623363 100644
+--- a/torch/csrc/profiler/orchestration/observer.h
++++ b/torch/csrc/profiler/orchestration/observer.h
+@@ -20,6 +20,7 @@ enum class C10_API_ENUM ProfilerState {
+   Disabled = 0,
+   CPU, // CPU-only profiling
+   CUDA, // CPU + CUDA events
++  XPU, // CPU + XPU events
+   NVTX, // only emit NVTX markers
+   ITT, // only emit ITT markers
+   KINETO, // use libkineto
+diff --git a/torch/csrc/profiler/python/init.cpp b/torch/csrc/profiler/python/init.cpp
+index 9e1b663d65..813057df40 100644
+--- a/torch/csrc/profiler/python/init.cpp
++++ b/torch/csrc/profiler/python/init.cpp
+@@ -32,6 +32,7 @@ void initPythonBindings(PyObject* module) {
+       .value("Disabled", ProfilerState::Disabled)
+       .value("CPU", ProfilerState::CPU)
+       .value("CUDA", ProfilerState::CUDA)
++      .value("XPU", ProfilerState::XPU)
+       .value("NVTX", ProfilerState::NVTX)
+       .value("ITT", ProfilerState::ITT)
+       .value("KINETO", ProfilerState::KINETO)
 diff --git a/torch/testing/_internal/distributed/rpc/rpc_test.py b/torch/testing/_internal/distributed/rpc/rpc_test.py
-index e0ef915ee8..f92fdc0d81 100644
+index ea294b43c3..326b5cc0aa 100644
 --- a/torch/testing/_internal/distributed/rpc/rpc_test.py
 +++ b/torch/testing/_internal/distributed/rpc/rpc_test.py
-@@ -4607,9 +4607,9 @@ class CudaRpcTest(RpcAgentTestFixture):
+@@ -4583,9 +4583,9 @@ class CudaRpcTest(RpcAgentTestFixture):
                      self.assertEqual(1, len(event.kernels))
                      kernel = event.kernels[0]
                      if event.node_id == dst_cuda_0:

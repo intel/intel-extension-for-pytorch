@@ -1,24 +1,21 @@
-From 2c6f8ceb88565420b13aa7a91a927624b3b2c05e Mon Sep 17 00:00:00 2001
-From: Feng Yuan <feng1.yuan@intel.com>
-Date: Fri, 28 Oct 2022 14:54:24 +0800
-Subject: [PATCH 29/29] SYCL BF16 intrinsic (#60) (#77)
+From b990920956ae6e3d78bcee5a580a4d6a94e6cf4d Mon Sep 17 00:00:00 2001
+From: "Gu, Jinghui" <jinghui.gu@intel.com>
+Date: Wed, 16 Nov 2022 13:11:37 +0000
+Subject: [PATCH 4/9] SYCL BF16 intrinsic (#60) (#77)
 
 * Add SYCL bfloat16 type support to c10::BFloat16
-
-Co-authored-by: ch <hao3.chen@intel.com>
-Co-authored-by: Yutao Xu <yutao.xu@intel.com>
 ---
  c10/util/BFloat16-inl.h | 18 ++++++++++++++++++
  c10/util/BFloat16.h     | 11 +++++++++++
  2 files changed, 29 insertions(+)
 
 diff --git a/c10/util/BFloat16-inl.h b/c10/util/BFloat16-inl.h
-index 9dd30d2d5a..b51bb4d9d7 100644
+index 29fda9c388..a076214fa4 100644
 --- a/c10/util/BFloat16-inl.h
 +++ b/c10/util/BFloat16-inl.h
-@@ -3,6 +3,11 @@
- #include <c10/macros/Macros.h>
- #include <limits>
+@@ -8,6 +8,11 @@ C10_CLANG_DIAGNOSTIC_PUSH()
+ C10_CLANG_DIAGNOSTIC_IGNORE("-Wimplicit-int-float-conversion")
+ #endif
  
 +#ifdef SYCL_LANGUAGE_VERSION
 +#include <CL/sycl.hpp>
@@ -28,7 +25,7 @@ index 9dd30d2d5a..b51bb4d9d7 100644
  namespace c10 {
  
  /// Constructors
-@@ -10,6 +15,8 @@ inline C10_HOST_DEVICE BFloat16::BFloat16(float value) {
+@@ -15,6 +20,8 @@ inline C10_HOST_DEVICE BFloat16::BFloat16(float value) {
  #if defined(CUDA_VERSION) && CUDA_VERSION >= 11000 && \
      defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
    x = __bfloat16_as_ushort(__float2bfloat16(value));
@@ -37,7 +34,7 @@ index 9dd30d2d5a..b51bb4d9d7 100644
  #else
    // RNE by default
    x = detail::round_to_nearest_even(value);
-@@ -20,6 +27,8 @@ inline C10_HOST_DEVICE BFloat16::BFloat16(float value) {
+@@ -25,6 +32,8 @@ inline C10_HOST_DEVICE BFloat16::BFloat16(float value) {
  inline C10_HOST_DEVICE BFloat16::operator float() const {
  #if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
    return __bfloat162float(*reinterpret_cast<const __nv_bfloat16*>(&x));
@@ -46,7 +43,7 @@ index 9dd30d2d5a..b51bb4d9d7 100644
  #else
    return detail::f32_from_bits(x);
  #endif
-@@ -34,6 +43,15 @@ inline C10_HOST_DEVICE BFloat16::operator __nv_bfloat16() const {
+@@ -39,6 +48,15 @@ inline C10_HOST_DEVICE BFloat16::operator __nv_bfloat16() const {
  }
  #endif
  
@@ -63,7 +60,7 @@ index 9dd30d2d5a..b51bb4d9d7 100644
  
  #if defined(__CUDACC__) || defined(__HIPCC__)
 diff --git a/c10/util/BFloat16.h b/c10/util/BFloat16.h
-index 5446eb9419..428ae79b50 100644
+index 1ada02bba1..d7fdad867e 100644
 --- a/c10/util/BFloat16.h
 +++ b/c10/util/BFloat16.h
 @@ -11,6 +11,11 @@

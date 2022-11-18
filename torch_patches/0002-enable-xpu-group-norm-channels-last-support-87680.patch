@@ -1,0 +1,42 @@
+From 6b2263d64809504f0c653e48678a9cecff34e749 Mon Sep 17 00:00:00 2001
+From: KevinYuk <kevin.yu@intel.com>
+Date: Mon, 31 Oct 2022 19:46:01 +0000
+Subject: [PATCH 2/9] enable xpu group norm channels last support (#87680)
+
+XPU would support channels last format for group norm operator, however, Pytorch converts all input tensor to contiguous format, which includes channels last tensor. Need Pytorch pass down this memory format hint to us.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/87680
+Approved by: https://github.com/albanD
+---
+ aten/src/ATen/native/group_norm.cpp | 2 +-
+ tools/autograd/derivatives.yaml     | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/aten/src/ATen/native/group_norm.cpp b/aten/src/ATen/native/group_norm.cpp
+index db1d82f84f..527e04c582 100644
+--- a/aten/src/ATen/native/group_norm.cpp
++++ b/aten/src/ATen/native/group_norm.cpp
+@@ -172,7 +172,7 @@ Tensor group_norm(
+ 
+   const Tensor kEmpty;
+   auto memory_format = input.suggest_memory_format();
+-  const auto& X = input.device().is_cpu() ?
++  const auto& X = input.device().is_cpu() || input.device().is_xpu() ?
+       input.contiguous(memory_format) : input.contiguous();
+   const auto& gamma = weight.defined() ? weight.contiguous() : kEmpty;
+   const auto& beta = bias.defined() ? bias.contiguous() : kEmpty;
+diff --git a/tools/autograd/derivatives.yaml b/tools/autograd/derivatives.yaml
+index 3fb18bd206..18236ea244 100644
+--- a/tools/autograd/derivatives.yaml
++++ b/tools/autograd/derivatives.yaml
+@@ -1164,7 +1164,7 @@
+   rstd: not_implemented("native_layer_norm_backward rstd")
+ 
+ - name: native_group_norm(Tensor input, Tensor? weight, Tensor? bias, SymInt N, SymInt C, SymInt HxW, int group, float eps) -> (Tensor, Tensor, Tensor)
+-  input, weight, bias: "GradMode::is_enabled() || grads[1].defined() || grads[2].defined() ? infinitely_differentiable_native_group_norm_backward(grads[0], grads[1], grads[2], input, result1, result2, weight, N, C, HxW, group, eps, grad_input_mask) : (grads[0].defined() ? native_group_norm_backward_symint(grads[0].is_contiguous() ? grads[0] : grads[0].contiguous(), input.is_contiguous() ? input : input.contiguous(), result1, result2, weight, N, C, HxW, group, grad_input_mask) : std::tuple<Tensor, Tensor, Tensor>())"
++  input, weight, bias: "GradMode::is_enabled() || grads[1].defined() || grads[2].defined() ? infinitely_differentiable_native_group_norm_backward(grads[0], grads[1], grads[2], input, result1, result2, weight, N, C, HxW, group, eps, grad_input_mask) : (grads[0].defined() ? native_group_norm_backward_symint(grads[0].device().is_xpu() ? grads[0] : grads[0].contiguous(), input.device().is_xpu() ? input : input.contiguous(), result1, result2, weight, N, C, HxW, group, grad_input_mask) : std::tuple<Tensor, Tensor, Tensor>())"
+   result0: group_norm_jvp(input_p, input_t, weight_p, weight_t, bias_p, bias_t, result1, result2, group)
+   result1: group_norm_mean_jvp(input_t, result1, group)
+   result2: group_norm_invstd_jvp(input_p, input_t, result1, result2, group)
+-- 
+2.25.1
+

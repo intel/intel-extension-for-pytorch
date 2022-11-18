@@ -1,0 +1,86 @@
+From d979b4b2e157b437e03641a8742449a84fdd8b5d Mon Sep 17 00:00:00 2001
+From: Jinghui <jinghui.gu@intel.com>
+Date: Wed, 16 Nov 2022 22:55:55 +0800
+Subject: [PATCH 8/9] Add compatible sycl path (#86)
+
+Signed-off-by: Gu, Jinghui <jinghui.gu@intel.com>
+---
+ c10/util/BFloat16-inl.h | 6 +++++-
+ c10/util/BFloat16.h     | 6 +++++-
+ c10/util/Half-inl.h     | 4 +++-
+ c10/util/Half.h         | 4 +++-
+ 4 files changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/c10/util/BFloat16-inl.h b/c10/util/BFloat16-inl.h
+index a076214fa4..0a7a27fa0c 100644
+--- a/c10/util/BFloat16-inl.h
++++ b/c10/util/BFloat16-inl.h
+@@ -9,7 +9,11 @@ C10_CLANG_DIAGNOSTIC_IGNORE("-Wimplicit-int-float-conversion")
+ #endif
+ 
+ #ifdef SYCL_LANGUAGE_VERSION
+-#include <CL/sycl.hpp>
++#if __has_include(<sycl/sycl.hpp>)
++#include <sycl/sycl.hpp> // for SYCL 2020
++#elif __has_include(<CL/sycl.hpp>)
++#include <CL/sycl.hpp> // for SYCL 1.2.1
++#endif
+ #include <ext/oneapi/experimental/bfloat16.hpp>
+ #endif
+ 
+diff --git a/c10/util/BFloat16.h b/c10/util/BFloat16.h
+index d7fdad867e..e1b9e064cd 100644
+--- a/c10/util/BFloat16.h
++++ b/c10/util/BFloat16.h
+@@ -12,7 +12,11 @@
+ #endif
+ 
+ #if defined(SYCL_LANGUAGE_VERSION)
+-#include <CL/sycl.hpp>
++#if __has_include(<sycl/sycl.hpp>)
++#include <sycl/sycl.hpp> // for SYCL 2020
++#elif __has_include(<CL/sycl.hpp>)
++#include <CL/sycl.hpp> // for SYCL 1.2.1
++#endif
+ #include <ext/oneapi/experimental/bfloat16.hpp>
+ #endif
+ 
+diff --git a/c10/util/Half-inl.h b/c10/util/Half-inl.h
+index 3ed8cf80d1..4cf93eaf5f 100644
+--- a/c10/util/Half-inl.h
++++ b/c10/util/Half-inl.h
+@@ -13,10 +13,12 @@
+ #endif
+ 
+ #if defined(SYCL_LANGUAGE_VERSION)
++#if __has_include(<sycl/sycl.hpp>)
+ #include <sycl/sycl.hpp> // for SYCL 2020
+-#elif defined(CL_SYCL_LANGUAGE_VERSION)
++#elif __has_include(<CL/sycl.hpp>)
+ #include <CL/sycl.hpp> // for SYCL 1.2.1
+ #endif
++#endif
+ 
+ C10_CLANG_DIAGNOSTIC_PUSH()
+ #if C10_CLANG_HAS_WARNING("-Wimplicit-int-float-conversion")
+diff --git a/c10/util/Half.h b/c10/util/Half.h
+index a786db956c..c855c943a7 100644
+--- a/c10/util/Half.h
++++ b/c10/util/Half.h
+@@ -46,10 +46,12 @@
+ #endif
+ 
+ #if defined(SYCL_LANGUAGE_VERSION)
++#if __has_include(<sycl/sycl.hpp>)
+ #include <sycl/sycl.hpp> // for SYCL 2020
+-#elif defined(CL_SYCL_LANGUAGE_VERSION)
++#elif __has_include(<CL/sycl.hpp>)
+ #include <CL/sycl.hpp> // for SYCL 1.2.1
+ #endif
++#endif
+ 
+ // Standard check for compiling CUDA with clang
+ #if defined(__clang__) && defined(__CUDA__) && defined(__CUDA_ARCH__)
+-- 
+2.25.1
+
