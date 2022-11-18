@@ -1,7 +1,13 @@
 #ifndef DEVICE_MEMORY_H_
 #define DEVICE_MEMORY_H_
 
+#if __has_include(<sycl/sycl.hpp>)
+#include <sycl/sycl.hpp>
+#elif __has_include(<CL/sycl.hpp>)
 #include <CL/sycl.hpp>
+#else
+#error "Unsupported compiler"
+#endif
 #include <vector>
 
 // In IPEX, device memory are allocated and reused, and released at last.

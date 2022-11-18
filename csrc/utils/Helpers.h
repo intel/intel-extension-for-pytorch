@@ -1,7 +1,13 @@
 #pragma once
 
-#include <ATen/ATen.h>
+#if __has_include(<sycl/sycl.hpp>)
+#include <sycl/sycl.hpp>
+#elif __has_include(<CL/sycl.hpp>)
 #include <CL/sycl.hpp>
+#else
+#error "Unsupported compiler"
+#endif
+#include <ATen/ATen.h>
 #include <c10/core/Device.h>
 #include <c10/macros/Macros.h>
 #include <utils/Macros.h>

@@ -1,6 +1,12 @@
 #pragma once
 
+#if __has_include(<sycl/sycl.hpp>)
+#include <sycl/sycl.hpp>
+#elif __has_include(<CL/sycl.hpp>)
 #include <CL/sycl.hpp>
+#else
+#error "Unsupported compiler"
+#endif
 #include <ext/oneapi/atomic_enums.hpp>
 #include <utils/Helpers.h>
 #include <utils/Macros.h>
@@ -119,7 +125,9 @@ enum DPCPP_STATUS {
 
 #define THREAD_WORK_SIZE 16
 
-// info value type
+#if !defined(__INTEL_LLVM_COMPILER) || \
+    (defined(__INTEL_LLVM_COMPILER) && __INTEL_LLVM_COMPILER < 20230000)
+
 template <typename T, T v>
 using dpcpp_info_t = typename sycl::info::param_traits<T, v>::return_type;
 
@@ -284,6 +292,155 @@ static constexpr auto dpcpp_event_profiling_start =
     sycl::info::event_profiling::command_start;
 static constexpr auto dpcpp_event_profiling_end =
     sycl::info::event_profiling::command_end;
+
+#else
+template <typename T>
+using dpcpp_info_t = typename T::return_type;
+
+// dpcpp platform info
+using dpcpp_platform_name = sycl::info::platform::name;
+
+// dpcpp device info
+// Returns the device name of this SYCL device
+using dpcpp_dev_name = sycl::info::device::name;
+// Returns the device type associated with the device.
+using dpcpp_dev_type = sycl::info::device::device_type;
+// Returns the SYCL platform associated with this SYCL device.
+using dpcpp_dev_platform = sycl::info::device::platform;
+// Returns the vendor of this SYCL device.
+using dpcpp_dev_vendor = sycl::info::device::vendor;
+// Returns a backend-defined driver version as a std::string.
+using dpcpp_dev_driver_version = sycl::info::device::driver_version;
+// Returns the SYCL version as a std::string in the form:
+// <major_version>.<minor_version>
+using dpcpp_dev_version = sycl::info::device::version;
+// Returns a string describing the version of the SYCL backend associated with
+// the device. static constexpr auto dpcpp_dev_backend_version =
+// sycl::info::device::backend_version; Returns true if the SYCL device is
+// available and returns false if the device is not available.
+using dpcpp_dev_is_available = sycl::info::device::is_available;
+// Returns the maximum size in bytes of the arguments that can be passed to a
+// kernel.
+using dpcpp_dev_max_param_size = sycl::info::device::max_parameter_size;
+// Returns the number of parallel compute units available to the device.
+using dpcpp_dev_max_compute_units = sycl::info::device::max_compute_units;
+// Returns the maximum dimensions that specify the global and local work-item
+// IDs used by the data parallel execution model.
+using dpcpp_dev_max_work_item_dims =
+    sycl::info::device::max_work_item_dimensions;
+// Returns the maximum number of workitems that are permitted in a work-group
+// executing a kernel on a single compute unit.
+using dpcpp_dev_max_work_group_size = sycl::info::device::max_work_group_size;
+// Returns the maximum number of subgroups in a work-group for any kernel
+// executed on the device
+using dpcpp_dev_max_num_subgroup = sycl::info::device::max_num_sub_groups;
+// Returns a std::vector of size_t containing the set of sub-group sizes
+// supported by the device
+using dpcpp_dev_subgroup_sizes = sycl::info::device::sub_group_sizes;
+// Returns the maximum configured clock frequency of this SYCL device in MHz.
+using dpcpp_dev_max_clock_freq = sycl::info::device::max_clock_frequency;
+// Returns the default compute device address space size specified as an
+// unsigned integer value in bits. Must return either 32 or 64.
+using dpcpp_dev_address_bits = sycl::info::device::address_bits;
+// Returns the maximum size of memory object allocation in bytes
+using dpcpp_dev_max_alloc_size = sycl::info::device::max_mem_alloc_size;
+// Returns the minimum value in bits of the largest supported SYCL built-in data
+// type if this SYCL device is not of device type info::device_type::custom.
+using dpcpp_dev_mem_base_addr_align = sycl::info::device::mem_base_addr_align;
+// Returns a std::vector of info::fp_config describing the half precision
+// floating-point capability of this SYCL device.
+using dpcpp_dev_half_fp_config = sycl::info::device::half_fp_config;
+// Returns a std::vector of info::fp_config describing the single precision
+// floating-point capability of this SYCL device.
+using dpcpp_dev_single_fp_config = sycl::info::device::single_fp_config;
+// Returns a std::vector of info::fp_config describing the double precision
+// floatingpoint capability of this SYCL device.
+using dpcpp_dev_double_fp_config = sycl::info::device::double_fp_config;
+// Returns the size of global device memory in bytes
+using dpcpp_dev_global_mem_size = sycl::info::device::global_mem_size;
+// Returns the type of global memory cache supported.
+using dpcpp_dev_global_mem_cache_type =
+    sycl::info::device::global_mem_cache_type;
+// Returns the size of global memory cache in bytes.
+using dpcpp_dev_global_mem_cache_size =
+    sycl::info::device::global_mem_cache_size;
+// Returns the size of global memory cache line in bytes.
+using dpcpp_dev_global_mem_cache_line_size =
+    sycl::info::device::global_mem_cache_line_size;
+// Returns the type of local memory supported.
+using dpcpp_dev_local_mem_type = sycl::info::device::local_mem_type;
+// Returns the size of local memory arena in bytes.
+using dpcpp_dev_local_mem_size = sycl::info::device::local_mem_size;
+// Returns the maximum number of sub-devices that can be created when this
+// device is partitioned.
+using dpcpp_dev_max_sub_devices = sycl::info::device::partition_max_sub_devices;
+// Returns the resolution of device timer in nanoseconds.
+using dpcpp_dev_profiling_resolution =
+    sycl::info::device::profiling_timer_resolution;
+// Returns the preferred native vector width size for built-in
+// scalar types that can be put into vectors.
+using dpcpp_dev_pref_vec_width_char =
+    sycl::info::device::preferred_vector_width_char;
+using dpcpp_dev_pref_vec_width_short =
+    sycl::info::device::preferred_vector_width_short;
+using dpcpp_dev_pref_vec_width_int =
+    sycl::info::device::preferred_vector_width_int;
+using dpcpp_dev_pref_vec_width_long =
+    sycl::info::device::preferred_vector_width_long;
+using dpcpp_dev_pref_vec_width_float =
+    sycl::info::device::preferred_vector_width_float;
+using dpcpp_dev_pref_vec_width_double =
+    sycl::info::device::preferred_vector_width_double;
+using dpcpp_dev_pref_vec_width_half =
+    sycl::info::device::preferred_vector_width_half;
+// Returns the native ISA vector width. The vector width is defined as
+// the number of scalar elements that can be stored in the vector.
+using dpcpp_dev_native_vec_width_char =
+    sycl::info::device::native_vector_width_char;
+using dpcpp_dev_native_vec_width_short =
+    sycl::info::device::native_vector_width_short;
+using dpcpp_dev_native_vec_width_int =
+    sycl::info::device::native_vector_width_int;
+using dpcpp_dev_native_vec_width_long =
+    sycl::info::device::native_vector_width_long;
+using dpcpp_dev_native_vec_width_float =
+    sycl::info::device::native_vector_width_float;
+using dpcpp_dev_native_vec_width_double =
+    sycl::info::device::native_vector_width_double;
+using dpcpp_dev_native_vec_width_half =
+    sycl::info::device::native_vector_width_half;
+
+// intel extensions
+using dpcpp_dev_ext_intel_gpu_eu_simd_width =
+    sycl::info::device::ext_intel_gpu_eu_simd_width;
+using dpcpp_dev_ext_intel_gpu_hw_threads_per_eu =
+    sycl::info::device::ext_intel_gpu_hw_threads_per_eu;
+
+// aspects for extensions
+static constexpr auto dpcpp_dev_aspect_gpu_eu_simd_width =
+    sycl::aspect::ext_intel_gpu_eu_simd_width;
+static constexpr auto dpcpp_dev_aspect_hw_threads_per_eu =
+    sycl::aspect::ext_intel_gpu_hw_threads_per_eu;
+static constexpr auto dpcpp_dev_aspect_fp64 = sycl::aspect::fp64;
+static constexpr auto dpcpp_dev_aspect_atomic64 = sycl::aspect::atomic64;
+
+// dpcpp event info
+using dpcpp_event_exec_stat = sycl::info::event::command_execution_status;
+// dpcpp event command status
+static constexpr auto dpcpp_event_cmd_stat_submitted =
+    sycl::info::event_command_status::submitted;
+static constexpr auto dpcpp_event_cmd_stat_running =
+    sycl::info::event_command_status::running;
+static constexpr auto dpcpp_event_cmd_stat_complete =
+    sycl::info::event_command_status::complete;
+
+// dpcpp event profiling info
+using dpcpp_event_profiling_submit =
+    sycl::info::event_profiling::command_submit;
+using dpcpp_event_profiling_start = sycl::info::event_profiling::command_start;
+using dpcpp_event_profiling_end = sycl::info::event_profiling::command_end;
+
+#endif
 
 // dpcpp access mode
 static constexpr auto dpcpp_r_mode = sycl::access::mode::read;
