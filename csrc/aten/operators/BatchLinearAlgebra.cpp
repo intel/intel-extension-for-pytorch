@@ -1404,8 +1404,8 @@ static void apply_triangular_solve(
 
   auto m = left ? A.size(-1) : B.size(-2);
   auto n = B.size(-1);
-  std::int64_t lda = A.size(-2);
-  std::int64_t ldb = B.size(-2);
+  auto lda = std::max<int64_t>(1, A.size(-2));
+  auto ldb = std::max<int64_t>(1, B.size(-2));
   scalar_t alpha = 1.;
   for (const auto i : c10::irange(batch_size)) {
     scalar_t* A_working_ptr = &A_data[i * A_mat_stride];
@@ -1457,8 +1457,8 @@ void apply_triangular_solve<c10::complex<float>>(
 
   auto m = left ? A.size(-1) : B.size(-2);
   auto n = B.size(-1);
-  std::int64_t lda = A.size(-2);
-  std::int64_t ldb = B.size(-2);
+  auto lda = std::max<int64_t>(1, A.size(-2));
+  auto ldb = std::max<int64_t>(1, B.size(-2));
   std::complex<float> alpha = 1.f;
   for (const auto i : c10::irange(batch_size)) {
     c10::complex<float>* A_working_ptr = &A_data[i * A_mat_stride];
@@ -1510,8 +1510,8 @@ void apply_triangular_solve<c10::complex<double>>(
 
   auto m = left ? A.size(-1) : B.size(-2);
   auto n = B.size(-1);
-  std::int64_t lda = A.size(-2);
-  std::int64_t ldb = B.size(-2);
+  auto lda = std::max<int64_t>(1, A.size(-2));
+  auto ldb = std::max<int64_t>(1, B.size(-2));
   std::complex<double> alpha = 1.;
   for (const auto i : c10::irange(batch_size)) {
     c10::complex<double>* A_working_ptr = &A_data[i * A_mat_stride];
