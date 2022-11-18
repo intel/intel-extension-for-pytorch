@@ -67,7 +67,7 @@ namespace AtenIpexTypeXPU {
       return at::native::foreach_tensor_##NAME##_slow_(self, other);       \
     }                                                                      \
                                                                            \
-    AT_DISPATCH_ALL_TYPES_AND2(                                            \
+    IPEX_DISPATCH_ALL_TYPES_AND2(                                          \
         kHalf,                                                             \
         kBFloat16,                                                         \
         self[0].scalar_type(),                                             \
