@@ -2,6 +2,7 @@
 #include <ATen/Functions.h>
 #include <ATen/native/Activation.h>
 #include <ATen/record_function.h>
+#include <torch/library.h>
 
 #include <core/Memory.h>
 #include <runtime/Utils.h>
@@ -533,7 +534,7 @@ static void ComputeAdamWKernel(
 } // namespace impl
 
 // fusing adamw kernel and using vector load/store
-void fused_ADAMW(
+void adamw_fused_step(
     at::Tensor& param_,
     at::Tensor& exp_avg_,
     at::Tensor& exp_avg_sq_,
@@ -588,7 +589,7 @@ void fused_ADAMW(
       "; param2_ sizes: ",
       param2_.sizes());
   RECORD_FUNCTION(
-      "fused_ADAMW",
+      "adamw_fused_step",
       std::vector<c10::IValue>(
           {param_, exp_avg_, exp_avg_sq_, max_exp_avg_sq_, grad_, param2_}));
 
@@ -609,7 +610,7 @@ void fused_ADAMW(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         param2_.scalar_type(),
-        "fused_ADAMW",
+        "adamw_fused_step",
         [&] {
           impl::ComputeAdamWKernelMasterWeight<scalar_t>(
               param_,
@@ -628,7 +629,7 @@ void fused_ADAMW(
         });
   } else {
     // normal mode, no master weight, all fp32, scalar_t = fp32
-    IPEX_DISPATCH_FLOATING_TYPES(param_.scalar_type(), "fused_ADAMW", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES(param_.scalar_type(), "adamw_fused_step", [&] {
       impl::ComputeAdamWKernel<scalar_t>(
           param_,
           exp_avg_,
@@ -648,3 +649,16 @@ void fused_ADAMW(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "adamw_fused_step(Tensor param_, Tensor exp_avg_, Tensor exp_avg_sq_, Tensor max_exp_avg_sq_, "
+      "Tensor grad_, Tensor param2_, bool amsgrad, float step, float beta1, float beta2, "
+      "float learning_rate, float weight_decay, float eps) -> ()");
+  m.impl(
+      "adamw_fused_step",
+      c10::DispatchKey::XPU,
+      at::AtenIpexTypeXPU::adamw_fused_step);
+}
+} // namespace

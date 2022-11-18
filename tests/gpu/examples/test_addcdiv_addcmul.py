@@ -1,4 +1,5 @@
 import torch
+import intel_extension_for_pytorch # noqa F401
 from torch.testing._internal.common_utils import TestCase
 
 cpu_device = torch.device("cpu")

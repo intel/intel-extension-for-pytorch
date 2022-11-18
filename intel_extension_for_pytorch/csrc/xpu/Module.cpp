@@ -25,6 +25,8 @@
   if (!(cmd))            \
   return
 
+namespace xpu {
+
 PyObject* module;
 
 static bool in_bad_fork = false; // True for children forked after xpu init
@@ -514,158 +516,11 @@ at::Scalar scalar_slow(PyObject* object) {
   return at::Scalar(THPUtils_unpackDouble(object));
 }
 
-void init_module(pybind11::module& m) {
-  m.def(
-      "linear_gelu",
-      [](const at::Tensor& input,
-         const at::Tensor& weight,
-         const at::Tensor& bias,
-         c10::string_view approximate) {
-        return xpu::dpcpp::linear_gelu(input, weight, bias, approximate);
-      },
-      "fused linear with gelu opt. on Intel device");
-  m.def(
-      "linear_relu",
-      [](const at::Tensor& input,
-         const at::Tensor& weight,
-         const at::Tensor& bias) {
-        return xpu::dpcpp::linear_relu(input, weight, bias);
-      },
-      "fused linear with relu opt. on Intel device");
-
-  m.def(
-      "linear_sigmoid",
-      [](const at::Tensor& input,
-         const at::Tensor& weight,
-         const at::Tensor& bias) {
-        return xpu::dpcpp::linear_sigmoid(input, weight, bias);
-      },
-      "fused linear with sigmoid opt. on Intel device");
-
+void init_xpu_module(pybind11::module& m) {
+  // For Runtime API, still use pybind
   m.def("_synchronize", [](const int& device_index) {
     auto& dpcpp_queue = getCurrentDPCPPStream(device_index).dpcpp_queue();
     dpcpp_queue.wait();
-  });
-
-  m.def(
-      "mul_add",
-      [](const at::Tensor& self,
-         const at::Tensor& other,
-         const at::Tensor& accumu,
-         float alpha) {
-        return xpu::dpcpp::mul_add(self, other, accumu, alpha);
-      },
-      "fused mul with add opt. on Intel device");
-
-  m.def(
-      "packed_add",
-      [](at::Tensor& top_half,
-         at::Tensor& bot_half,
-         const at::Tensor& grad,
-         float alpha) {
-        return xpu::dpcpp::packed_add(top_half, bot_half, grad, alpha);
-      },
-      "enable split SGD for BF16 weight update. on Intel device");
-
-  m.def(
-      "interaction",
-      [](at::Tensor& input_mlp, at::Tensor& input_emb) {
-        return xpu::dpcpp::interaction(input_mlp, input_emb);
-      },
-      "interaction kernel implemtation on Intel device");
-
-  m.def(
-      "fused_ADAMW",
-      [](at::Tensor& param_,
-         at::Tensor& exp_avg_,
-         at::Tensor& exp_avg_sq_,
-         at::Tensor& max_exp_avg_sq_,
-         at::Tensor& grad_,
-         at::Tensor& param2_,
-         const bool amsgrad,
-         const double step,
-         const double beta1,
-         const double beta2,
-         const double learning_rate,
-         const double weight_decay,
-         const double eps) {
-        return xpu::dpcpp::fused_ADAMW(
-            param_,
-            exp_avg_,
-            exp_avg_sq_,
-            max_exp_avg_sq_,
-            grad_,
-            param2_,
-            amsgrad,
-            step,
-            beta1,
-            beta2,
-            learning_rate,
-            weight_decay,
-            eps);
-      },
-      "fuse optimizer AdamW's step implementation on Intel device");
-
-  m.def(
-      "fused_SGD",
-      [](at::Tensor& fp32_weight,
-         at::Tensor& grad,
-         const c10::optional<at::Tensor>& momentum_buffer_,
-         at::Tensor& weight,
-         const double momentum,
-         const double lr,
-         const double weight_decay,
-         const double dampening,
-         const bool nesterov) {
-        return xpu::dpcpp::fused_SGD(
-            fp32_weight,
-            grad,
-            momentum_buffer_,
-            weight,
-            momentum,
-            lr,
-            weight_decay,
-            dampening,
-            nesterov);
-      },
-      "fuse optimizer SGD's step implementation on Intel device");
-
-  m.def(
-      "convert_conv_weight_layout",
-      [](const at::Tensor& weight,
-         const IntArrayRef padding,
-         const IntArrayRef stride,
-         IntArrayRef dilation,
-         const int64_t groups,
-         const IntArrayRef input_size) {
-        xpu::oneDNN::convert_conv_weight_layout(
-            weight, padding, stride, dilation, groups, input_size);
-      },
-      "convert oneDNN convolution weight layout");
-
-  m.def(
-      "convert_convtranspose_weight_layout",
-      [](const at::Tensor& weight,
-         const IntArrayRef padding,
-         const IntArrayRef stride,
-         IntArrayRef dilation,
-         const IntArrayRef dst_padding,
-         const int64_t groups,
-         const IntArrayRef input_size) {
-        xpu::oneDNN::convert_convtranspose_weight_layout(
-            weight, padding, stride, dilation, dst_padding, groups, input_size);
-      },
-      "convert oneDNN convolution transpose weight layout");
-
-  m.def(
-      "convert_linear_weight_layout",
-      [](at::Tensor& weight, const IntArrayRef input_size) {
-        return xpu::oneDNN::convert_linear_weight_layout(weight, input_size);
-      },
-      "convert torch layer Linear weight layout");
-
-  m.def("to_plain", [](const at::Tensor& input) {
-    return xpu::dpcpp::to_plain_if_needed(input);
   });
 
   m.def("dump_memory_stat", [](const int& device_index) {
@@ -752,12 +607,6 @@ void init_module(pybind11::module& m) {
     return Settings::I().set_onemkl_verbose(level);
   });
 
-  py::enum_<xpu::FP32_MATH_MODE>(m, "FP32MathMode")
-      .value("FP32", xpu::FP32_MATH_MODE::FP32)
-      .value("TF32", xpu::FP32_MATH_MODE::TF32)
-      .value("BF32", xpu::FP32_MATH_MODE::BF32)
-      .export_values();
-
   m.def("_get_fp32_math_mode", []() {
     return static_cast<int>(Settings::I().get_fp32_math_mode());
   });
@@ -782,3 +631,4 @@ void init_module(pybind11::module& m) {
   register_xpu_device_properties(module);
   bindGetDeviceProperties(module);
 }
+} // namespace xpu

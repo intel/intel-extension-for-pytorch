@@ -24,6 +24,4 @@ exclude =
     ./tests,
     ./scripts,
     ./third_party,
-    ./ipex/include,
-    ./ipex/lib,
     *.pyi

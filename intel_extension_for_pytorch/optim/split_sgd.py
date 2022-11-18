@@ -1,5 +1,5 @@
 import torch
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch # noqa F401
 from torch.optim.optimizer import Optimizer, required
 
 # TODO: low priority. will be deleted and redo in torch.xpu.optimize
@@ -53,7 +53,7 @@ class SplitSGD(Optimizer):
                         b_d = param_state['bottom_half']
 
                 if p.dtype == torch.bfloat16:
-                    intel_extension_for_pytorch._C.packed_add(p.data, b_d, d_p, -group['lr'])
+                    torch.ops.torch_ipex.packed_add(p.data, b_d, d_p, -group['lr'])
                     param_state['bottom_half'] = b_d
                 else:
                     p.data.add_(d_p, alpha=-group['lr'])

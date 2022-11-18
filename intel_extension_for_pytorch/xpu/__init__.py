@@ -2,6 +2,8 @@ r"""
 This package is lazily initialized, so you can always import it.
 """
 
+from torch import serialization
+from torch.storage import _StorageBase
 import sys
 from typing import List, Optional, Tuple, Union
 import torch
@@ -20,10 +22,10 @@ from .memory import *
 from .overrides import set_default_tensor_type as set_default_tensor_type
 from .overrides import enable_cl_to as enable_cl_to
 from .generator import Generator
+from .dummy_xpu import *
 
 from torch._utils import _get_device_index
 import intel_extension_for_pytorch.optim as optim
-
 
 default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
@@ -198,7 +200,7 @@ class StreamContext(object):
             ``None``.
     .. note:: Streams are per-device.
     """
-    cur_stream : Optional['Stream']
+    cur_stream: Optional['Stream']
 
     def __init__(self, stream: Optional['Stream']):
         self.stream = stream
@@ -281,8 +283,6 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
     return Stream(_cdata=intel_extension_for_pytorch._C._getCurrentStream(
         _get_device_index(device, optional=True)))
 
-
-from torch.storage import _StorageBase
 
 from torch.storage import _LegacyStorage
 
@@ -474,14 +474,14 @@ def get_device_type() -> str:
     return 'xpu'
 
 
-from torch import serialization
-
 serialization.register_package(30, _xpu_tag, _xpu_deserialize)
 
 torch._register_device_module('xpu', current_module)
 
 # post initial
-intel_extension_for_pytorch._C._postInitExtension()
+# add dummy function for xpu
+if hasattr(intel_extension_for_pytorch._C, '_postInitExtension'):
+    intel_extension_for_pytorch._C._postInitExtension()
 
 # class FloatTensor:
 #     def __new__(cls, e):

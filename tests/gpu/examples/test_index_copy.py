@@ -59,7 +59,6 @@ class TestTorchMethod(TestCase):
 
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_index_copy_multi_dim(self, dtype=torch.float):
-# dim = 0
         x = torch.zeros([100, 3, 5], device=cpu_device, dtype=dtype)
         t = torch.tensor([[[1, 2, 3, 4, 5], [4, 5, 6, 7, 8], [9, 10, 11, 12, 13]],
                           [[11, 22, 33, 44, 55], [44, 55, 66, 77, 88], [99, 10, 11, 12, 13]],

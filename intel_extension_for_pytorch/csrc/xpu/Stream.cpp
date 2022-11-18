@@ -7,6 +7,8 @@
 #include <core/Device.h>
 #include <structmember.h>
 
+namespace xpu {
+
 PyObject* THDPStreamClass = nullptr;
 
 static PyObject* THDPStream_pynew(
@@ -188,3 +190,4 @@ void THDPStream_init(PyObject* module) {
     throw python_error();
   }
 }
+} // namespace xpu

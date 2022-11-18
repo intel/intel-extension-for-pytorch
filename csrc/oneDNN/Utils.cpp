@@ -1,5 +1,6 @@
 #include <oneapi/dnnl/dnnl.hpp>
 #include <tensor/Tensor.h>
+#include <torch/library.h>
 #include "oneDNN.h"
 
 namespace xpu {
@@ -201,3 +202,35 @@ void convert_convtranspose_weight_layout(
 
 } // namespace oneDNN
 } // namespace xpu
+
+namespace {
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "convert_conv_weight_layout(Tensor weight, int[] padding, int[] stride, "
+      "int[] dilation, int groups, int[] input_size) -> ()");
+  m.impl(
+      "convert_conv_weight_layout",
+      c10::DispatchKey::XPU,
+      xpu::oneDNN::convert_conv_weight_layout);
+}
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "convert_convtranspose_weight_layout(Tensor weight, int[] padding, int[] stride, "
+      "int[] dilation, int[] dst_padding, int groups, int[] input_size) -> ()");
+  m.impl(
+      "convert_convtranspose_weight_layout",
+      c10::DispatchKey::XPU,
+      xpu::oneDNN::convert_convtranspose_weight_layout);
+}
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "convert_linear_weight_layout(Tensor weight, int[] input_size) -> Tensor");
+  m.impl(
+      "convert_linear_weight_layout",
+      c10::DispatchKey::XPU,
+      xpu::oneDNN::convert_linear_weight_layout);
+}
+
+} // namespace

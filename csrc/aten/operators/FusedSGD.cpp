@@ -2,6 +2,7 @@
 #include <ATen/Functions.h>
 #include <ATen/native/Activation.h>
 #include <ATen/record_function.h>
+#include <torch/library.h>
 
 #include <core/Memory.h>
 #include <runtime/Utils.h>
@@ -587,7 +588,7 @@ static void ComputeSGDKernel(
 // from no casted layer momentum_buffer: be none for first iter. weight: bf16
 // weight(mapped to fp32 master weight) and empty tensor(empty means no need
 // casted latey's weight)
-c10::optional<at::Tensor> fused_SGD(
+c10::optional<at::Tensor> sgd_fused_step(
     at::Tensor& fp32_weight,
     at::Tensor& grad,
     const c10::optional<at::Tensor>& momentum_buffer_,
@@ -598,7 +599,7 @@ c10::optional<at::Tensor> fused_SGD(
     const double dampening,
     const bool nesterov) {
   RECORD_FUNCTION(
-      "fused_SGD",
+      "sgd_fused_step",
       std::vector<c10::IValue>({fp32_weight, grad, momentum_buffer_, weight}));
 
   at::Tensor momentum_buffer;
@@ -680,3 +681,16 @@ c10::optional<at::Tensor> fused_SGD(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "sgd_fused_step(Tensor fp32_weight, Tensor grad, Tensor? momentum_buffer_, "
+      "Tensor weight, float momentum, float lr, float weight_decay, "
+      "float dampening, bool nesterov) -> Tensor?");
+  m.impl(
+      "sgd_fused_step",
+      c10::DispatchKey::XPU,
+      at::AtenIpexTypeXPU::sgd_fused_step);
+}
+} // namespace

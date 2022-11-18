@@ -3,6 +3,8 @@
 #include <torch/csrc/utils/python_arg_parser.h>
 #include "Stream.h"
 
+namespace xpu {
+
 PyObject* THDPEventClass = nullptr;
 
 static PyObject* THDPEvent_pynew(
@@ -220,3 +222,4 @@ void THDPEvent_init(PyObject* module) {
     throw python_error();
   }
 }
+} // namespace xpu

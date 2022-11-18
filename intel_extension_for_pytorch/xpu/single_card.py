@@ -2,14 +2,15 @@ import os
 import tempfile
 import torch
 import torch.distributed as dist
-import intel_extension_for_pytorch # noqa
-import oneccl_bindings_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
+import oneccl_bindings_for_pytorch  # noqa
+
 
 class single_card_dist:
 
     r"""DistributedDataParallel(DDP) scaling API for XPU devices on one card.
 
-    This API wraps pytorch DDP related module, and provides a simple usage to 
+    This API wraps pytorch DDP related module, and provides a simple usage to
     enable DDP training of models based on XPU devices on one card.
 
     Note: This API only focus on XPU devices on one card currently. Devices on multi-cards will be supported further.
@@ -52,6 +53,7 @@ class single_card_dist:
 
 
     """
+
     def __init__(self, model=None, train_dataset=None):
         self.model = model
         self.train_dataset = train_dataset
@@ -97,7 +99,7 @@ class single_card_dist:
             processes.append(process)
         for process in processes:
             process.join()
-            return process.exitcode        
+            return process.exitcode
 
     # device set (local_rank)
     def get_localrank(self):

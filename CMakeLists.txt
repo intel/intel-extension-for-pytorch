@@ -91,6 +91,7 @@ function (print_configuration_summary)
     message(STATUS "  OpenCL include        : ${OpenCL_INCLUDE_DIR}")
     message(STATUS "  OpenCL library        : ${OpenCL_LIBRARY}")
 
+    message(STATUS "  BUILD_WITH_XPU        : ${BUILD_WITH_XPU}")
     message(STATUS "  USE_ONEMKL            : ${USE_ONEMKL}")
   if (USE_ONEMKL)
     message(STATUS "  ONEMKL include        : ${ONEMKL_INCLUDE_DIR}")

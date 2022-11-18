@@ -1,6 +1,5 @@
 import torch
 
-
 class autocast(torch.amp.autocast_mode.autocast):
     r"""
     See :class:`torch.autocast`.

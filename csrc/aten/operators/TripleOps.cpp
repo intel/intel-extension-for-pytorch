@@ -7,6 +7,7 @@
 #include <core/detail/ListUtils.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
+#include <torch/library.h>
 #include <utils/DPCPP.h>
 
 #include "Loops.h"
@@ -308,7 +309,7 @@ Tensor packed_add(
     at::Tensor& top_half,
     at::Tensor& bot_half,
     const at::Tensor& grad,
-    float alpha) {
+    double alpha) {
   RECORD_FUNCTION(
       "packed_add", std::vector<c10::IValue>({top_half, bot_half, grad}));
   if (grad.is_sparse()) {
@@ -372,3 +373,14 @@ Tensor packed_add(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "mul_add(Tensor self, Tensor other, Tensor accumu, Scalar alpha) -> Tensor");
+  m.impl("mul_add", c10::DispatchKey::XPU, at::AtenIpexTypeXPU::mul_add);
+  m.def(
+      "packed_add(Tensor top_half, Tensor bot_half, Tensor grad, float alpha) -> Tensor");
+  m.impl("packed_add", c10::DispatchKey::XPU, at::AtenIpexTypeXPU::packed_add);
+}
+} // namespace

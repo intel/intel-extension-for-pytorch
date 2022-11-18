@@ -14,7 +14,7 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking);
 
 at::Tensor interaction(at::Tensor& input_mlp, at::Tensor& input_emb);
 
-void fused_ADAMW(
+void adamw_fused_step(
     at::Tensor& param_,
     at::Tensor& exp_avg_,
     at::Tensor& exp_avg_sq_,
@@ -29,7 +29,7 @@ void fused_ADAMW(
     const double weight_decay,
     const double eps);
 
-c10::optional<at::Tensor> fused_SGD(
+c10::optional<at::Tensor> sgd_fused_step(
     at::Tensor& fp32_weight,
     at::Tensor& grad,
     const c10::optional<at::Tensor>& momentum_buffer_,
@@ -127,7 +127,7 @@ at::Tensor packed_add(
     at::Tensor& top_half,
     at::Tensor& bot_half,
     const at::Tensor& grad,
-    float alpha);
+    double alpha);
 
 at::Tensor to_plain_if_needed(const Tensor& tensor);
 
@@ -538,16 +538,7 @@ namespace dpcpp {
  * implementation. We export operators here under xpu::dpcpp namespace for
  * frontend usage.
  */
-EXPORT_TO_XPU(interaction);
-EXPORT_TO_XPU(fused_ADAMW);
-EXPORT_TO_XPU(fused_SGD);
 EXPORT_TO_XPU(to_plain_if_needed);
-EXPORT_TO_XPU(packed_add);
-EXPORT_TO_XPU(mul_add);
-EXPORT_TO_XPU(linear_gelu);
-EXPORT_TO_XPU(linear_relu);
-EXPORT_TO_XPU(linear_sigmoid);
-
 EXPORT_TO_XPU_ALIAS(copy_, direct_copy);
 
 } // namespace dpcpp

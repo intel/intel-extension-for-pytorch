@@ -3,6 +3,7 @@
 #include <ATen/quantized/QTensorImpl.h>
 #include <core/Allocator.h>
 #include <tensor/OpaqueTensorFactories.h>
+#include <torch/library.h>
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -121,6 +122,10 @@ Tensor to_plain_if_needed(const Tensor& tensor) {
   return DPCPPTensorConvertor::to_plain(tensor);
 }
 
+Tensor to_plain(const Tensor& tensor) {
+  return to_plain_if_needed(tensor);
+}
+
 Tensor to_plain_if_needed_(const Tensor& tensor) {
   if (!need_to_plain(tensor))
     return tensor;
@@ -155,6 +160,13 @@ MaterializedITensorListRef to_plain_if_needed(
 }
 
 } // namespace AtenIpexTypeXPU
+
+namespace {
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def("to_plain(Tensor tensor) -> Tensor");
+  m.impl("to_plain", c10::DispatchKey::XPU, at::AtenIpexTypeXPU::to_plain);
+}
+} // namespace
 
 namespace AtenIpexTypeQuantizedXPU {
 

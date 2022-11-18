@@ -3,6 +3,8 @@
 #include <core/Event.h>
 #include <torch/csrc/python_headers.h>
 
+namespace xpu {
+
 struct THDPEvent {
   PyObject_HEAD xpu::dpcpp::DPCPPEvent dpcpp_event;
 };
@@ -13,3 +15,4 @@ void THDPEvent_init(PyObject* module);
 inline bool THDPEvent_Check(PyObject* obj) {
   return THDPEventClass && PyObject_IsInstance(obj, THDPEventClass);
 }
+} // namespace xpu

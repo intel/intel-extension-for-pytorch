@@ -1,5 +1,11 @@
 import ctypes
 import intel_extension_for_pytorch
+from ._utils import _dummy_type
+
+if not hasattr(intel_extension_for_pytorch._C, '_XPUStreamBase'):
+    # Define dummy base classes
+    intel_extension_for_pytorch._C.__dict__['_XPUStreamBase'] = _dummy_type('_XPUStreamBase')
+    intel_extension_for_pytorch._C.__dict__['_XPUEventBase'] = _dummy_type('_XPUEventBase')
 
 
 class Stream(intel_extension_for_pytorch._C._XPUStreamBase):

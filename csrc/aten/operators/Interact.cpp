@@ -3,6 +3,7 @@
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include <torch/custom_class.h>
+#include <torch/library.h>
 #include "comm/ATDispatch.h"
 
 using namespace xpu::dpcpp;
@@ -238,3 +239,11 @@ Tensor interaction(Tensor& input_mlp, Tensor& input_emb) {
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def("interaction(Tensor input_mlp, Tensor input_emb) -> Tensor");
+  m.impl(
+      "interaction", c10::DispatchKey::XPU, at::AtenIpexTypeXPU::interaction);
+}
+} // namespace

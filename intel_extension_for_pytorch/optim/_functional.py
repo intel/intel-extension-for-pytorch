@@ -2,14 +2,13 @@ r"""Functional interface, port from torch/optim/_function.py"""
 import torch
 from torch import Tensor
 from typing import List, Optional
-import intel_extension_for_pytorch
 
 
 def is_master_weight(param, params_attr):
     return (
-        param.dtype == torch.float
-        and param in params_attr
-        and 'bf16_param' in params_attr[param]
+        param.dtype == torch.float and
+        param in params_attr and
+        'bf16_param' in params_attr[param]
     )
 
 
@@ -19,9 +18,9 @@ def get_bf16_grad(param, params_attr):
 
 
 def get_param2(param, params_attr):
-    # For pure fp32 layer, param2 is not needed.
-    # For master weight layer, param2 is the bf16 copy of fp32 weight
-    # For master weight split layer, param2 is the trail part of fp32 weight
+    # For pure fp32 case, param2 is not needed.
+    # For master weight case, param2 is the bf16 copy of fp32 weight
+    # For master weight split case, param2 is the trail part of fp32 weight
     param2 = torch.Tensor()
     if param in params_attr:
         if 'trail' in params_attr[param]:
@@ -31,6 +30,216 @@ def get_param2(param, params_attr):
             assert param.dtype is torch.float
             param2 = params_attr[param]['bf16_param']
     return param2
+
+
+def _make_sparse(grad, grad_indices, values):
+    size = grad.size()
+    if grad_indices.numel() == 0 or values.numel() == 0:
+        return torch.empty_like(grad)
+    return torch.sparse_coo_tensor(grad_indices, values, size)
+
+
+def _single_tensor_adagrad(params: List[Tensor],
+                           params2: List[Tensor],
+                           grads: List[Tensor],
+                           state_sums: List[Tensor],
+                           state_steps: List[Tensor],
+                           *,
+                           lr: float,
+                           weight_decay: float,
+                           lr_decay: float,
+                           eps: float,
+                           has_sparse_grad: bool,
+                           maximize: bool,
+                           fused: bool):
+
+    for (param, param2, grad, state_sum, step_t) in zip(params, params2, grads, state_sums, state_steps):
+        # update step
+        step_t += 1
+        step = step_t.item()
+        grad = grad if not maximize else -grad
+        if not (grad.is_sparse or torch.is_complex(param)):
+            torch.ops.torch_ipex.adagrad_fused_step(
+                param,
+                grad,
+                state_sum,
+                param2,
+                step,
+                lr,
+                weight_decay,
+                lr_decay,
+                eps)
+            continue
+
+        if weight_decay != 0:
+            if grad.is_sparse:
+                raise RuntimeError("weight_decay option is not compatible with sparse gradients")
+            grad = grad.add(param, alpha=weight_decay)
+
+        grad = grad.to(param.dtype)
+        clr = lr / (1 + (step - 1) * lr_decay)
+
+        if grad.is_sparse:
+            grad = grad.coalesce()  # the update is non-linear so indices must be unique
+            grad_indices = grad._indices()
+            grad_values = grad._values()
+            size = grad.size()
+
+            state_sum.add_(_make_sparse(grad, grad_indices, grad_values.pow(2)))
+            std = state_sum.sparse_mask(grad)
+            std_values = std._values().sqrt_().add_(eps)
+            param.add_(_make_sparse(grad, grad_indices, grad_values / std_values), alpha=-clr)
+        else:
+            is_complex = torch.is_complex(param)
+            if is_complex:
+                grad = torch.view_as_real(grad)
+                state_sum = torch.view_as_real(state_sum)
+                param = torch.view_as_real(param)
+            state_sum.addcmul_(grad, grad, value=1)
+            std = state_sum.sqrt().add_(eps)
+            param.addcdiv_(grad, std, value=-clr)
+            if is_complex:
+                param = torch.view_as_complex(param)
+                state_sum = torch.view_as_complex(state_sum)
+
+# keep this function here if enable fused_foreach_adagrad_later
+
+
+def _multi_tensor_adagrad(params: List[Tensor],
+                          params2: List[Tensor],
+                          grads: List[Tensor],
+                          state_sums: List[Tensor],
+                          state_steps: List[Tensor],
+                          *,
+                          lr: float,
+                          weight_decay: float,
+                          lr_decay: float,
+                          eps: float,
+                          has_sparse_grad: bool,
+                          maximize: bool,
+                          fused: bool):
+
+    # Foreach functions will throw errors if given empty lists
+    if len(params) == 0:
+        return
+
+    if maximize:
+        grads = torch._foreach_neg(grads)
+
+    _single_tensor_adagrad(params,
+                           params2,
+                           grads,
+                           state_sums,
+                           state_steps,
+                           lr=lr,
+                           weight_decay=weight_decay,
+                           lr_decay=lr_decay,
+                           eps=eps,
+                           has_sparse_grad=has_sparse_grad,
+                           maximize=False,
+                           fused=fused)
+    return
+
+
+def adagrad(params: List[Tensor],
+            params2: List[Tensor],
+            grads: List[Tensor],
+            state_sums: List[Tensor],
+            state_steps: List[Tensor],
+            # kwonly args with defaults are not supported by functions compiled with torchscript issue #70627
+            # setting these as kwargs for now as functional API is compiled by torch/distributed/optim
+            has_sparse_grad: bool = None,
+            foreach: bool = None,
+            *,
+            lr: float,
+            weight_decay: float,
+            lr_decay: float,
+            eps: float,
+            maximize: bool,
+            fused: bool):
+    r"""Functional API that performs Adagrad algorithm computation.
+
+    See :class:`~torch.optim.Adagrad` for details.
+    """
+
+    if not all([isinstance(t, torch.Tensor) for t in state_steps]):
+        raise RuntimeError("API has changed, `state_steps` argument must contain a list of singleton tensors")
+
+    if foreach is None:
+        # Placeholder for more complex foreach logic to be added when value is not set
+        foreach = False
+
+    if foreach and torch.jit.is_scripting():
+        raise RuntimeError('torch.jit.script not supported with foreach optimizers')
+
+    if foreach and not torch.jit.is_scripting():
+        func = _multi_tensor_adagrad
+    else:
+        func = _single_tensor_adagrad
+
+    func(params,
+         params2,
+         grads,
+         state_sums,
+         state_steps,
+         lr=lr,
+         weight_decay=weight_decay,
+         lr_decay=lr_decay,
+         eps=eps,
+         has_sparse_grad=has_sparse_grad,
+         maximize=maximize,
+         fused=fused)
+
+
+@torch.no_grad()
+def adagrad_step(self, closure=None):
+    """Performs a single optimization step.
+
+    Args:
+        closure (callable, optional): A closure that reevaluates the model
+            and returns the loss.
+    """
+    loss = None
+    if closure is not None:
+        with torch.enable_grad():
+            loss = closure()
+
+    for group in self.param_groups:
+        params_with_grad = []
+        params2 = []
+        grads = []
+        state_sums = []
+        state_steps = []
+
+        has_sparse_grad = False
+        for p in group['params']:
+            grad = get_bf16_grad(p, self.params_attr) if is_master_weight(p, self.params_attr) else p.grad
+            if grad is not None:
+                if grad.is_sparse:
+                    has_sparse_grad = True
+                params_with_grad.append(p)
+                grads.append(grad)
+                state = self.state[p]
+                state_sums.append(state['sum'])
+                state_steps.append(state['step'])
+                param2 = get_param2(p, self.params_attr)
+                params2.append(param2)
+
+        adagrad(params_with_grad,
+                params2,
+                grads,
+                state_sums,
+                state_steps,
+                lr=group['lr'],
+                weight_decay=group['weight_decay'],
+                lr_decay=group['lr_decay'],
+                eps=group['eps'],
+                has_sparse_grad=has_sparse_grad,
+                foreach=group['foreach'],
+                maximize=group["maximize"],
+                fused=self.fused)
+
+    return loss
 
 
 def _sgd_non_fused_micro_step(
@@ -77,20 +286,12 @@ def _single_tensor_sgd(params: List[Tensor],
                        maximize: bool,
                        has_sparse_grad: bool,
                        fused: bool):
-    if maximize:
-        lr = -lr
-
-    # TODO: multi tensor apply for updating some small weights
-    # watch out empty tensor in params2 and mixed datatype in grad
     for i, param in enumerate(params):
-        if not grads[i].is_sparse:
-            # param: fp32 master weight and fp32 weight(some layer no need cast)
-            # grad: bf16/fp32 grad, bf16 grad from casted layer, fp32 grad from no casted layer
-            # momentum_buffer_list[i]: be none for first iter
-            # param2: bf16 weight(mapped to fp32 master weight) and empty tensor(empty means no need casted layer's weight)
-            momentum_buffer_list[i] = intel_extension_for_pytorch._C.fused_SGD(
+        grad = grads[i] if not maximize else -grads[i]
+        if not grad.is_sparse:
+            momentum_buffer_list[i] = torch.ops.torch_ipex.sgd_fused_step(
                 param,
-                grads[i],
+                grad,
                 momentum_buffer_list[i],
                 params2[i],
                 momentum,
@@ -101,21 +302,20 @@ def _single_tensor_sgd(params: List[Tensor],
             continue
 
         if (
-            param.dtype == torch.bfloat16
-            and grads[i].is_sparse
-            and grads[i].dtype == torch.bfloat16
-            and weight_decay == 0
-            and momentum == 0
+            param.dtype == torch.bfloat16 and
+            grad.is_sparse and
+            grad.dtype == torch.bfloat16 and
+            weight_decay == 0 and
+            momentum == 0
         ):
             # packed_add can support sparse tensor
-            raise RuntimeError("not implemented step function for sparse grad update")
-            # torch.ops.torch_ipex.packed_add(param, params2[i], grads[i], alpha=-lr)
+            torch.ops.torch_ipex.packed_add(param, params2[i], grad, alpha=-lr)
         else:
             # no special optimize for other non fused case, fall back to naive implementation
-            grads[i] = grads[i].to(param.dtype)
+            grad = grad.to(param.dtype)
             momentum_buffer_list[i] = _sgd_non_fused_micro_step(
                 param,
-                grads[i],
+                grad,
                 momentum_buffer_list[i],
                 momentum,
                 lr,
@@ -123,6 +323,8 @@ def _single_tensor_sgd(params: List[Tensor],
                 dampening,
                 nesterov
             )
+
+# keep this function here if enable fused_foreach_sgd_later
 
 
 def _multi_tensor_sgd(params: List[Tensor],
@@ -217,21 +419,13 @@ def sgd_step(self, closure=None):
             loss = closure()
 
     for group in self.param_groups:
-        # fp32 master weight and fp32 weight(some layer no need cast)
         params_with_grad = []
-        # bf16 weight(mapped to fp32 master weight) and empty tensor(empty means no need casted layer's weight)
         params2 = []
-        # bf16/fp32 grad, bf16 grad from casted layer, fp32 grad from no casted layer
         d_p_list = []
-        # be None for first iter
         momentum_buffer_list = []
         has_sparse_grad = False
 
-        # p is model's parameter
-        # in refresh_optimizer_params_after_cast, p is master weight
         for p in group['params']:
-            # params_attr: {'layer.master_weight(fp32)': {'bf16_param': 'layer.weight(bf16)'}}
-            # if p is master weight, the grad should be fetched from layer.weight(bf16)
             grad = get_bf16_grad(p, self.params_attr) if is_master_weight(p, self.params_attr) else p.grad
             if grad is not None:
                 params_with_grad.append(p)
@@ -248,8 +442,7 @@ def sgd_step(self, closure=None):
                 param2 = get_param2(p, self.params_attr)
                 params2.append(param2)
 
-        # TODO: the attribute 'foreach' can be used for us to choose multi_tensor_apply
-        # TODO: torch1.10 has no attribute: group['maximize'] and group['foreach']. They are in torch1.13
+        # TODO: for torch 1.10, the group['maximize'] and group['foreach'] are temp set False
         sgd(params_with_grad,
             params2,
             d_p_list,
@@ -272,8 +465,147 @@ def sgd_step(self, closure=None):
     return loss
 
 
+def _lamb_fused_impl(
+    params: List[Tensor],
+    grads: List[Tensor],
+    exp_avgs: List[Tensor],
+    exp_avg_sqs: List[Tensor],
+    attr: dict,
+    state_steps: List[int],
+    beta1: float,
+    beta2: float,
+    lr: float,
+    weight_decay: float,
+    eps: float,
+):
+    r"""Functional API that performs Lamb algorithm computation.
+    See :class:`~torch.optim.Lamb` for details.
+    """
+
+    for i, param in enumerate(params):
+
+        grad = grads[i]
+        exp_avg = exp_avgs[i]
+        exp_avg_sq = exp_avg_sqs[i]
+        step = state_steps[i]
+        param2 = get_param2(param, attr)
+        torch.ops.torch_ipex.lamb_fused_step(
+            param,
+            exp_avg,
+            exp_avg_sq,
+            grad,
+            param2,
+            step,
+            beta1,
+            beta2,
+            lr,
+            weight_decay,
+            eps)
+
+
+def _lamb_impl(
+    params: List[Tensor],
+    grads: List[Tensor],
+    exp_avgs: List[Tensor],
+    exp_avg_sqs: List[Tensor],
+    state_steps: List[int],
+    beta1: float,
+    beta2: float,
+    lr: float,
+    weight_decay: float,
+    eps: float,
+):
+    r"""Functional API that performs Lamb algorithm computation.
+    """
+    for i, param in enumerate(params):
+        grad = grads[i]
+        exp_avg = exp_avgs[i]
+        exp_avg_sq = exp_avg_sqs[i]
+        step = state_steps[i]
+
+        bias_correction1 = 1 - beta1 ** step
+        bias_correction2 = 1 - beta2 ** step
+        grad = grad.to(exp_avg.dtype)
+        # Decay the first and second moment running average coefficient
+        exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
+        exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
+
+        adam_step = (exp_avg / bias_correction1) / ((exp_avg_sq / bias_correction2).sqrt() + eps)
+
+        if weight_decay != 0:
+            adam_step.add_(param, alpha=weight_decay)
+
+        weight_norm = param.norm(p=2)
+        rtw_norm = adam_step.norm(p=2)
+        true_ratio = weight_norm / rtw_norm
+
+        param.add_(adam_step, alpha=-lr * true_ratio)
+
+
 @torch.no_grad()
-def adamw_step(self, closure=None):
+def lamb_step(self, closure=None):
+    """Performs a single optimization step.
+    Args:
+        closure (callable, optional): A closure that reevaluates the model
+            and returns the loss.
+    """
+    loss = None
+    if closure is not None:
+        with torch.enable_grad():
+            loss = closure()
+
+    for group in self.param_groups:
+        params_with_grad = []
+        grads = []
+        exp_avgs = []
+        exp_avg_sqs = []
+        trails = []
+        state_steps = []
+
+        for p in group['params']:
+            grad = get_bf16_grad(p, self.params_attr) if is_master_weight(p, self.params_attr) else p.grad
+            if grad is not None:
+                params_with_grad.append(p)
+                if grad.is_sparse:
+                    raise RuntimeError('Lamb does not support sparse gradients')
+                if grad.device != torch.device('cpu'):
+                    raise RuntimeError('Lamb supports only CPU device')
+                grads.append(grad)
+
+                state = self.state[p]
+                # Lazy state initialization
+                if len(state) == 0:
+                    state['step'] = 0
+                    buffer_dtype = p.dtype if p.dtype is torch.float64 else torch.float
+                    state['exp_avg'] = torch.zeros(p.shape, dtype=buffer_dtype)
+                    state['exp_avg_sq'] = torch.zeros(p.shape, dtype=buffer_dtype)
+
+                exp_avgs.append(state['exp_avg'])
+                exp_avg_sqs.append(state['exp_avg_sq'])
+
+                # update the steps for each param group update
+                state['step'] += 1
+                # record the step after step update
+                state_steps.append(state['step'])
+
+        beta1, beta2 = group['betas']
+        _lamb_fused_impl(
+            params_with_grad,
+            grads,
+            exp_avgs,
+            exp_avg_sqs,
+            self.params_attr,
+            state_steps,
+            beta1,
+            beta2,
+            group['lr'],
+            group['weight_decay'],
+            group['eps'])
+    return loss
+
+
+@torch.no_grad()
+def adam_step(self, closure=None):
     """Performs a single optimization step.
 
     Args:
@@ -286,10 +618,7 @@ def adamw_step(self, closure=None):
             loss = closure()
 
     for group in self.param_groups:
-
-        # fp32 master weight and fp32 weight(some layer no need cast)
         params_with_grad = []
-        # bf16 weight(mapped to fp32 master weight) and empty tensor(empty means no need casted layer's weight)
         params2 = []
         grads = []
         exp_avgs = []
@@ -299,7 +628,6 @@ def adamw_step(self, closure=None):
         beta1, beta2 = group['betas']
 
         for p in group['params']:
-            # params_attr: {'layer.master_weight(fp32)': {'bf16_param': 'layer.weight(bf16)'}}
             grad = get_bf16_grad(p, self.params_attr) if is_master_weight(p, self.params_attr) else p.grad
             if grad is not None:
                 params_with_grad.append(p)
@@ -310,10 +638,7 @@ def adamw_step(self, closure=None):
                 state = self.state[p]
                 # Lazy state initialization
                 if len(state) == 0:
-                    buffer_dtype = p.dtype
-                    if p.dtype is not torch.float:
-                        raise RuntimeError("parameter in optimizer(Adamw) is not FP32, need check")
-
+                    buffer_dtype = p.dtype if p.dtype is torch.float64 else torch.float
                     state['step'] = torch.tensor(0.)
                     # Exponential moving average of gradient values
                     state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format, dtype=buffer_dtype)
@@ -335,25 +660,163 @@ def adamw_step(self, closure=None):
                 param2 = get_param2(p, self.params_attr)
                 params2.append(param2)
 
-        # TODO: the attribute 'foreach' can be used for us to choose multi_tensor_apply
-        # TODO: torch1.10 has no attribute: group['maximize'] and group['foreach']. They are in torch1.13
-        adamw(params_with_grad,
-              params2,
-              grads,
-              exp_avgs,
-              exp_avg_sqs,
-              max_exp_avg_sqs,
-              state_steps,
-              amsgrad=group['amsgrad'],
-              beta1=beta1,
-              beta2=beta2,
-              lr=group['lr'],
-              weight_decay=group['weight_decay'],
-              eps=group['eps'],
-              maximize=False,
-              foreach=False)
+        adam(params_with_grad,
+             params2,
+             grads,
+             exp_avgs,
+             exp_avg_sqs,
+             max_exp_avg_sqs,
+             state_steps,
+             amsgrad=group['amsgrad'],
+             beta1=beta1,
+             beta2=beta2,
+             lr=group['lr'],
+             weight_decay=group['weight_decay'],
+             eps=group['eps'],
+             maximize=False,
+             foreach=False)
 
     return loss
+
+
+def adam(params: List[Tensor],
+         params2: List[Tensor],
+         grads: List[Tensor],
+         exp_avgs: List[Tensor],
+         exp_avg_sqs: List[Tensor],
+         max_exp_avg_sqs: List[Tensor],
+         state_steps: List[Tensor],
+         # kwonly args with defaults are not supported by functions compiled with torchscript issue #70627
+         # setting this as kwarg for now as functional API is compiled by torch/distributed/optim
+         foreach: bool = None,
+         *,
+         amsgrad: bool,
+         beta1: float,
+         beta2: float,
+         lr: float,
+         weight_decay: float,
+         eps: float,
+         maximize: bool):
+    r"""Functional API that performs Adam algorithm computation.
+    See :class:`~torch.optim.Adam` for details.
+    """
+
+    if not all([isinstance(t, torch.Tensor) for t in state_steps]):
+        raise RuntimeError("API has changed, `state_steps` argument must contain a list of singleton tensors")
+
+    if foreach is None:
+        # Placeholder for more complex foreach logic to be added when value is not set
+        foreach = False
+
+    if foreach and torch.jit.is_scripting():
+        raise RuntimeError('torch.jit.script not supported with foreach optimizers')
+
+    if foreach and not torch.jit.is_scripting():
+        func = _multi_tensor_adam
+    else:
+        func = _single_tensor_adam
+
+    func(params,
+         params2,
+         grads,
+         exp_avgs,
+         exp_avg_sqs,
+         max_exp_avg_sqs,
+         state_steps,
+         amsgrad=amsgrad,
+         beta1=beta1,
+         beta2=beta2,
+         lr=lr,
+         weight_decay=weight_decay,
+         eps=eps,
+         maximize=maximize)
+
+
+def _single_tensor_adam(params: List[Tensor],
+                        params2: List[Tensor],
+                        grads: List[Tensor],
+                        exp_avgs: List[Tensor],
+                        exp_avg_sqs: List[Tensor],
+                        max_exp_avg_sqs: List[Tensor],
+                        state_steps: List[Tensor],
+                        *,
+                        amsgrad: bool,
+                        beta1: float,
+                        beta2: float,
+                        lr: float,
+                        weight_decay: float,
+                        eps: float,
+                        maximize: bool):
+
+    for i, param in enumerate(params):
+
+        grad = grads[i] if not maximize else -grads[i]
+        exp_avg = exp_avgs[i]
+        exp_avg_sq = exp_avg_sqs[i]
+        if amsgrad:
+            max_exp_avg_sq = max_exp_avg_sqs[i]
+        else:
+            max_exp_avg_sq = torch.Tensor()
+        step_t = state_steps[i]
+        param2 = params2[i]
+        # update step
+        step_t += 1
+        step = step_t.item()
+
+        torch.ops.torch_ipex.adam_fused_step(
+            param,
+            exp_avg,
+            exp_avg_sq,
+            max_exp_avg_sq,
+            grad,
+            param2,
+            amsgrad,
+            step,
+            beta1,
+            beta2,
+            lr,
+            weight_decay,
+            eps)
+
+
+def _multi_tensor_adam(params: List[Tensor],
+                       params2: List[Tensor],
+                       grads: List[Tensor],
+                       exp_avgs: List[Tensor],
+                       exp_avg_sqs: List[Tensor],
+                       max_exp_avg_sqs: List[Tensor],
+                       state_steps: List[Tensor],
+                       *,
+                       amsgrad: bool,
+                       beta1: float,
+                       beta2: float,
+                       lr: float,
+                       weight_decay: float,
+                       eps: float,
+                       maximize: bool):
+
+    if len(params) == 0:
+        return
+
+    if maximize:
+        grads = torch._foreach_neg(tuple(grads))  # type: ignore[assignment]
+
+    _single_tensor_adam(
+        params,
+        params2,
+        grads,
+        exp_avgs,
+        exp_avg_sqs,
+        max_exp_avg_sqs,
+        state_steps,
+        amsgrad=amsgrad,
+        beta1=beta1,
+        beta2=beta2,
+        lr=lr,
+        weight_decay=weight_decay,
+        eps=eps,
+        maximize=False
+    )
 
 
 def adamw(params: List[Tensor],
@@ -440,19 +903,19 @@ def _single_tensor_adamw(params: List[Tensor],
         step_t += 1
         step = step_t.item()
 
-        intel_extension_for_pytorch._C.fused_ADAMW(param,
-                                                   exp_avg,
-                                                   exp_avg_sq,
-                                                   max_exp_avg_sq,
-                                                   grad,
-                                                   param2,
-                                                   amsgrad,
-                                                   step,
-                                                   beta1,
-                                                   beta2,
-                                                   lr,
-                                                   weight_decay,
-                                                   eps)
+        torch.ops.torch_ipex.adamw_fused_step(param,
+                                              exp_avg,
+                                              exp_avg_sq,
+                                              max_exp_avg_sq,
+                                              grad,
+                                              param2,
+                                              amsgrad,
+                                              step,
+                                              beta1,
+                                              beta2,
+                                              lr,
+                                              weight_decay,
+                                              eps)
 
 
 def _multi_tensor_adamw(params: List[Tensor],
@@ -493,3 +956,85 @@ def _multi_tensor_adamw(params: List[Tensor],
         eps=eps,
         maximize=False
     )
+
+
+@torch.no_grad()
+def adamw_step(self, closure=None):
+    """Performs a single optimization step.
+
+    Args:
+        closure (callable, optional): A closure that reevaluates the model
+            and returns the loss.
+    """
+    loss = None
+    if closure is not None:
+        with torch.enable_grad():
+            loss = closure()
+
+    for group in self.param_groups:
+
+        # fp32 master weight and fp32 weight(some layer no need cast)
+        params_with_grad = []
+        # bf16 weight(mapped to fp32 master weight) and empty tensor(empty means no need casted layer's weight)
+        params2 = []
+        grads = []
+        exp_avgs = []
+        exp_avg_sqs = []
+        max_exp_avg_sqs = []
+        state_steps = []
+        beta1, beta2 = group['betas']
+
+        for p in group['params']:
+            # params_attr: {'layer.master_weight(fp32)': {'bf16_param': 'layer.weight(bf16)'}}
+            grad = get_bf16_grad(p, self.params_attr) if is_master_weight(p, self.params_attr) else p.grad
+            if grad is not None:
+                params_with_grad.append(p)
+                if grad.is_sparse:
+                    raise RuntimeError('Adam does not support sparse gradients, please consider SparseAdam instead')
+                grads.append(grad)
+
+                state = self.state[p]
+                # Lazy state initialization
+                if len(state) == 0:
+                    buffer_dtype = p.dtype
+                    if p.dtype is not torch.float:
+                        raise RuntimeError("parameter in optimizer(Adamw) is not FP32, need check")
+
+                    state['step'] = torch.tensor(0.)
+                    # Exponential moving average of gradient values
+                    state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format, dtype=buffer_dtype)
+                    # Exponential moving average of squared gradient values
+                    state['exp_avg_sq'] = torch.zeros_like(p, memory_format=torch.preserve_format, dtype=buffer_dtype)
+                    if group['amsgrad']:
+                        # Maintains max of all exp. moving avg. of sq. grad. values
+                        state['max_exp_avg_sq'] = torch.zeros_like(
+                            p, memory_format=torch.preserve_format, dtype=buffer_dtype)
+
+                exp_avgs.append(state['exp_avg'])
+                exp_avg_sqs.append(state['exp_avg_sq'])
+
+                if group['amsgrad']:
+                    max_exp_avg_sqs.append(state['max_exp_avg_sq'])
+
+                state_steps.append(state['step'])
+
+                param2 = get_param2(p, self.params_attr)
+                params2.append(param2)
+
+        adamw(params_with_grad,
+              params2,
+              grads,
+              exp_avgs,
+              exp_avg_sqs,
+              max_exp_avg_sqs,
+              state_steps,
+              amsgrad=group['amsgrad'],
+              beta1=beta1,
+              beta2=beta2,
+              lr=group['lr'],
+              weight_decay=group['weight_decay'],
+              eps=group['eps'],
+              maximize=False,
+              foreach=False)
+
+    return loss

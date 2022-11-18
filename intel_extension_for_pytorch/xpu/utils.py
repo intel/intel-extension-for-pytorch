@@ -4,6 +4,16 @@ from .. import _C
 from enum import Enum
 from .. import frontend
 import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch._C as core
+
+from ._utils import _dummy_type
+
+if not hasattr(core, 'XPUBackend'):
+    # Define dummy base Enum classes
+    core.__dict__['XPUBackend'] = _dummy_type('XPUBackend')
+    setattr(core.XPUBackend, 'GPU', 0) # noqa B010
+    setattr(core.XPUBackend, 'CPU', 1) # noqa B010
+    setattr(core.XPUBackend, 'AUTO', 2) # noqa B010
 
 
 def to_channels_last_1d(t):
@@ -173,10 +183,11 @@ class onemkl_verbose(object):
 
 
 def optimize(model, dtype=None, optimizer=None, level="O1",
-             inplace=False, conv_bn_folding=None, weights_prepack=None,
-             replace_dropout_with_identity=None, optimize_lstm=None,
-             split_master_weight_for_bf16=None, fuse_update_step=None,
-             sample_input=None):
+             inplace=False, conv_bn_folding=None, linear_bn_folding=None,
+             weights_prepack=None, replace_dropout_with_identity=None,
+             optimize_lstm=None, split_master_weight_for_bf16=None,
+             fuse_update_step=None, auto_kernel_selection=None,
+             sample_input=None, graph_mode=None):
     r"""
     torch.xpu.optimize is an alternative of optimize API in Intel® Extension for
     PyTorch*, to provide identical usage for XPU device only. The motivation of
@@ -203,63 +214,25 @@ def optimize(model, dtype=None, optimizer=None, level="O1",
         >>> # running training step.
     """
     return frontend.optimize(model, dtype, optimizer, level,
-                             inplace, conv_bn_folding, weights_prepack,
-                             replace_dropout_with_identity, optimize_lstm,
-                             split_master_weight_for_bf16, fuse_update_step,
-                             sample_input)
+                             inplace, conv_bn_folding, linear_bn_folding,
+                             weights_prepack, replace_dropout_with_identity,
+                             optimize_lstm, split_master_weight_for_bf16,
+                             fuse_update_step, auto_kernel_selection,
+                             sample_input, graph_mode)
 
 
-# FP32 math mode
 class FP32MathMode(EnumBase):
-    FP32 = int(_C.FP32MathMode.FP32)
-    TF32 = int(_C.FP32MathMode.TF32)
-    BF32 = int(_C.FP32MathMode.BF32)
+    FP32 = int(core.FP32MathMode.FP32)
+    TF32 = int(core.FP32MathMode.TF32)
+    BF32 = int(core.FP32MathMode.BF32)
 
 
 def get_fp32_math_mode():
-    r"""
-    Get the current fpmath_mode setting.
-
-    Returns:
-        Fpmath mode
-        The value will be ``FP32MathMode.FP32`` or ``FP32MathMode.TF32`` or ``FP32MathMode.BF32``.
-        ``FP32MathMode.FP32: 0`` means implicit down-conversion is disabled;
-        ``FP32MathMode.TF32: 1`` means implicit down-conversions from f32 to tf32;
-        ``FP32MathMode.BF32: 2`` means implicit down-conversions from f32 to bf16.
-
-    Examples:
-
-        >>> import intel_extension_for_pytorch
-        >>> # to get the current fpmath mode
-        >>> torch.xpu.get_fp32_math_mode()
-    """
-    return FP32MathMode.get_value(_C._get_fp32_math_mode)
+    return FP32MathMode.get_value(core._get_fp32_math_mode)
 
 
 def set_fp32_math_mode(mode):
-    r"""
-    Enable or disable implicit data type conversion.
-    If mode is FP32MathMode.FP32 which means to disable the oneDNN fpmath mode.
-    If mode is FP32MathMode.TF32 which means to enable the oneDNN fpmath mode by down converting to tf32 implicitly.
-    If mode is FP32MathMode.BF32 which means to enable the oneDNN fpmath mode by down converting to bfloat16 implicitly.
-
-    Args:
-        mode (FP32MathMode): Only works for ``FP32MathMode.FP32``, ``FP32MathMode.TF32`` and ``FP32MathMode.BF32``.
-            oneDNN fpmath mode will be disabled by default if dtype is set to ``FP32MathMode.FP32``.
-            The implicit FP32 to TF32 data type conversion will be enabled if dtype is set to ``FP32MathMode.TF32`.
-            The implicit FP32 to BF16 data type conversion will be enabled if dtype is set to ``FP32MathMode.BF32`.
-
-    Examples:
-
-        >>> import intel_extension_for_pytorch
-        >>> # to enable the implicit data type conversion to tf32
-        >>> torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.TF32)
-        >>> # to enable the implicit data type conversion to bfloat16
-        >>> torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.BF32)
-        >>> # to disable the implicit data type conversion
-        >>> torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.FP32)
-    """
-    st = FP32MathMode.set_value(_C._set_fp32_math_mode, mode)
+    st = FP32MathMode.set_value(core._set_fp32_math_mode, mode)
     assert bool(st), "WARNING: Failed to set FP32 math mode!"
 
 

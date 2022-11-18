@@ -36,7 +36,7 @@ from subprocess import check_call
 
 import setuptools.command.build_ext
 import setuptools.command.install
-from setuptools import Extension, distutils, setup
+from setuptools import Extension, distutils, setup, find_packages
 
 from scripts.tools.setup.cmake import CMake
 
@@ -71,7 +71,7 @@ for i, arg in enumerate(sys.argv):
 sys.argv = filtered_args
 
 
-def _get_complier():
+def _get_xpu_compliers():
     if shutil.which('icx') is None or shutil.which('dpcpp') is None:
         raise RuntimeError("Failed to find compiler path from OS PATH")
     # dpcpp build
@@ -134,7 +134,7 @@ def get_build_version(ipex_git_sha):
             sys.exit(1)
     version = versions['VERSION_MAJOR'] + '.' + versions['VERSION_MINOR'] + '.' + versions['VERSION_PATCH']
     version_backend = version + (('+' + _get_env_backend() if (_get_env_backend()
-                                 in ['xpu', 'cpu', 'gpu']) else 'Unknown'))
+                                                               in ['xpu', 'cpu', 'gpu']) else 'Unknown'))
     version_sha = version + (('+' + ipex_git_sha) if (ipex_git_sha != 'Unknown') else '')
     return version, version_backend, version_sha
 
@@ -152,7 +152,6 @@ def create_version_files(base_dir, version, git_sha_dict):
             f.write("{key} = '{value}'\n".format(key=k, value=v))
 
 
-
 git_sha_dict = {
     "__ipex_git_sha__": get_git_head_sha(base_dir),
     "__torch_git_sha__": torch.version.git_version,
@@ -163,6 +162,11 @@ version, version_backend, version_sha = get_build_version(git_sha_dict.get('__ip
 
 # Generate version info (intel_extension_for_pytorch.__version__)
 create_version_files(base_dir, version, git_sha_dict)
+
+BUILD_WITH_XPU = False
+# FIXME: For IPEX XPU, build with xpu code is temp to choose, laterly will remove the 'True'
+if _check_env_flag("BUILD_WITH_XPU") or True:
+    BUILD_WITH_XPU = True
 
 
 class DPCPPExt(Extension, object):
@@ -278,32 +282,36 @@ class DPCPPBuild(BuildExtension, object):
                 'LIB_NAME': ext.name,
             }
 
-            my_env = os.environ.copy()
-            for var, val in my_env.items():
-                if var.startswith(('BUILD_', 'USE_', 'CMAKE_')):
-                    if var == 'BUILD_STATS' and val.upper() not in ['OFF', 'NO', '0']:
-                        sequential_build = True
-                    if var == 'CMAKE_PREFIX_PATH':
-                        # Do NOT overwrite this path. Append into the list, instead.
-                        build_options[var] += ';' + val
-                    else:
-                        build_options[var] = val
+            if BUILD_WITH_XPU:
+                my_env = os.environ.copy()
+                for var, val in my_env.items():
+                    if var.startswith(('BUILD_', 'USE_', 'CMAKE_')):
+                        if var == 'BUILD_STATS' and val.upper() not in ['OFF', 'NO', '0']:
+                            sequential_build = True
+                        if var == 'CMAKE_PREFIX_PATH':
+                            # Do NOT overwrite this path. Append into the list, instead.
+                            build_options[var] += ';' + val
+                        else:
+                            build_options[var] = val
 
-            cc, cxx = _get_complier()
-            defines(cmake_args, CMAKE_C_COMPILER=cc)
-            defines(cmake_args, CMAKE_CXX_COMPILER=cxx)
-            defines(cmake_args, **build_options)
+                cc, cxx = _get_xpu_compliers()
+                defines(cmake_args, CMAKE_C_COMPILER=cc)
+                defines(cmake_args, CMAKE_CXX_COMPILER=cxx)
+                defines(cmake_args, BUILD_WITH_XPU="1")
+                defines(cmake_args, **build_options)
 
-            cmake = find_executable('cmake3') or find_executable('cmake')
-            if cmake is None:
-                raise RuntimeError(
-                    "CMake must be installed to build the following extensions: " +
-                    ", ".join(e.name for e in self.extensions))
-            command = [cmake, ext.project_dir] + cmake_args
-            print(' '.join(command))
+                cmake = find_executable('cmake3') or find_executable('cmake')
+                if cmake is None:
+                    raise RuntimeError(
+                        "CMake must be installed to build the following extensions: "
+                        + ", ".join(e.name for e in self.extensions))
+                command = [cmake, ext.project_dir] + cmake_args
+                print(' '.join(command))
 
-            env = os.environ.copy()
-            check_call(command, cwd=ext.build_dir, env=env)
+                env = os.environ.copy()
+                check_call(command, cwd=ext.build_dir, env=env)
+
+            # add cpu build code
 
         env = os.environ.copy()
 
@@ -348,6 +356,10 @@ def get_c_module():
         '-Wno-missing-braces',
     ]
 
+    if BUILD_WITH_XPU:
+        # used for _C.cpp
+        extra_compile_args.append('-DBUILD_WITH_XPU=1')
+
     def make_relative_rpath(path):
         return '-Wl,-rpath,$ORIGIN/' + path
 
@@ -375,6 +387,8 @@ def get_c_module():
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
+packages = find_packages(where=base_dir, exclude=["*scripts*"])
+
 setup(
     name='intel_extension_for_pytorch',
     version=version_backend if (_get_build_type() == "Release") else version_sha,
@@ -382,14 +396,7 @@ setup(
     author='Intel PyTorch Team',
     url='https://github.com/intel/intel-extension-for-pytorch',
     # Exclude the build files.
-    packages=['intel_extension_for_pytorch',
-              'intel_extension_for_pytorch.xpu',
-              'intel_extension_for_pytorch.xpu.intrinsic',
-              'intel_extension_for_pytorch.xpu.intrinsic.modules',
-              'intel_extension_for_pytorch.xpu.amp',
-              'intel_extension_for_pytorch.nn',
-              'intel_extension_for_pytorch.nn.utils',
-              'intel_extension_for_pytorch.optim'],
+    packages=packages,
     install_requires=['typing_extensions'],
     package_data={
         'intel_extension_for_pytorch': [

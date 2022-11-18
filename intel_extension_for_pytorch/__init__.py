@@ -1,12 +1,23 @@
+# coding: utf-8
+from . import optim
+from .frontend import optimize
+import intel_extension_for_pytorch.xpu
+from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl
+from .frontend import enable_onednn_fusion, set_fp32_math_mode, get_fp32_math_mode, FP32MathMode
+from .utils.verbose import verbose
 import os
 import torch
+try:
+    import torchvision
+except ImportError:
+    pass  # skip if torchvision is not available
 from . import _C
+# TODO: will uniform here after setup.py is uniformed
 from ._version import (__version__, __ipex_git_sha__,
                        __torch_version__, __torch_git_sha__,
                        __onednn_git_sha__)
-
-from . import optim
-
+from .utils import _cpu_isa, _custom_fx_tracer
+_cpu_isa.check_minimal_isa_support()
 
 def version():
     print("intel_extension_for_pytorch gpu version:          {}".format(__version__))
@@ -60,5 +71,19 @@ def library_paths():
 # Path to folder containing CMake definitions for torch ipex package
 cmake_prefix_path = os.path.join(os.path.dirname(__file__), 'share', 'cmake')
 
-import intel_extension_for_pytorch.xpu
-from .frontend import optimize
+
+# For CPU
+torch_version = ''
+ipex_version = ''
+import re
+matches = re.match('(\d+\.\d+).*', torch.__version__) # noqa W605
+if matches and len(matches.groups()) == 1:
+    torch_version = matches.group(1)
+matches = re.match('(\d+\.\d+).*', __version__) # noqa W605
+if matches and len(matches.groups()) == 1:
+    ipex_version = matches.group(1)
+if torch_version == '' or ipex_version == '' or torch_version != ipex_version:
+    print('ERROR! Intel® Extension for PyTorch* needs to work with PyTorch \
+      {0}.*, but PyTorch {1} is found. Please switch to the matching version \
+          and run again.'.format(ipex_version, torch.__version__))
+    exit(127)

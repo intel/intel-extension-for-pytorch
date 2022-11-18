@@ -1,46 +1,113 @@
-set(IPEX_GPU_SRCS)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/gpu)
+# CMAKE FILE for intel-ext-pt-python.so
+cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+project(IPEX CXX C)
 
-set(IPEX_COMMON_SRCS)
-FILE(GLOB IPEX_COMMON_SRCS "*.cpp")
-list(REMOVE_ITEM IPEX_COMMON_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/_C.cpp")
+set(LINUX TRUE)
+set(CMAKE_INSTALL_MESSAGE NEVER)
+# set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(TORCH_IPEX_SRCS)
-list(APPEND TORCH_IPEX_SRCS ${IPEX_COMMON_SRCS} ${IPEX_GPU_SRCS})
-add_library(intel-ext-pt-python SHARED ${TORCH_IPEX_SRCS})
+set(PLUGIN_NAME_PYTHON intel-ext-pt-python)
 
-include(${PROJECT_SOURCE_DIR}/cmake/ClangFormat.cmake)
-if(CLANG_FORMAT)
-  file(GLOB_RECURSE ALL_IPEX_CSRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/**.[ch] ${CMAKE_CURRENT_SOURCE_DIR}/**.[ch]pp)
-  add_custom_target(CL_FORMAT_IPEX_CSRC COMMAND ${CLANG_FORMAT_EXEC} -i -style=file ${ALL_IPEX_CSRC_FILES})
-  add_dependencies(intel-ext-pt-python CL_FORMAT_IPEX_CSRC)
-endif()
+# Setup project top directory.
+# TODO: CPU: why need cpu to be 'set(IPEX_PROJECT_TOP_DIR "${PROJECT_SOURCE_DIR}/../../../")'
+set(IPEX_PROJECT_TOP_DIR "${PROJECT_SOURCE_DIR}/../../")
 
-find_package(pybind11)
-if(NOT pybind11_FOUND)
-    find_package(pybind11 CONFIG)
-    if(NOT pybind11_FOUND)
-        message(FATAL_ERROR "System pybind11 not found")
-    else()
-        message(STATUS "SYSTEM pybind11 found")
-    endif()
+set(RPATH_VALUE $ORIGIN)
+set(CMAKE_SKIP_BUILD_RPATH  FALSE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+set(CMAKE_INSTALL_RPATH "${RPATH_VALUE}/lib/:${RPATH_VALUE}/")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${IPEX_INSTALL_LIBDIR})
+
+list(APPEND CMAKE_MODULE_PATH ${IPEX_PROJECT_TOP_DIR}/cmake/Modules)
+
+set(IPEX_CPU_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/cpu")
+set(IPEX_CPU_CPP_THIRD_PARTY_ROOT "${IPEX_PROJECT_TOP_DIR}/third_party")
+set(IPEX_JIT_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/jit")
+set(IPEX_UTLIS_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/utils")
+
+set(DNNL_BUILD_TESTS FALSE CACHE BOOL "" FORCE)
+set(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "" FORCE)
+set(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
+set(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
+
+# ---[ Build flags
+# TODO: CPU: include(${IPEX_PROJECT_TOP_DIR}/cmake/python/BuildOptions.cmake)
+include(${IPEX_PROJECT_TOP_DIR}/cmake/BuildOptions.cmake)
+
+# includes
+include_directories(${IPEX_PROJECT_TOP_DIR})
+include_directories(${IPEX_CPU_CPP_ROOT})
+include_directories(${IPEX_CPU_CPP_ROOT}/aten)
+include_directories(${IPEX_CPU_CPP_ROOT}/utils)
+
+include_directories(${IPEX_JIT_CPP_ROOT})
+include_directories(${IPEX_UTLIS_CPP_ROOT})
+
+# Set installed PyTorch dir
+if(DEFINED PYTORCH_INSTALL_DIR)
+  include_directories(${PYTORCH_INSTALL_DIR}/include)
+  include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include/)
 else()
-    message(STATUS "pybind11 found")
+  message(FATAL_ERROR, "Cannot find installed PyTorch directory")
 endif()
 
-message(STATUS "pybind11 include dirs: " "${pybind11_INCLUDE_DIRS}")
-target_include_directories(intel-ext-pt-python PUBLIC ${pybind11_INCLUDE_DIRS})
-
-if(BUILD_SIMPLE_TRACE)
-  target_compile_definitions(intel-ext-pt-python PUBLIC BUILD_SIMPLE_TRACE)
+if(DEFINED PYBIND11_CL_FLAGS)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PYBIND11_CL_FLAGS}")
+else()
+# TODO: specific for cpu
+  message(FATAL_ERROR, "Cannot get pybind11 abi compiler flags")
 endif()
 
-if(BUILD_STRIPPED_BIN)
-  set_target_properties(intel-ext-pt-python PROPERTIES LINK_FLAGS_RELEASE -s)
+# Set Python include dir
+if(DEFINED PYTHON_INCLUDE_DIR)
+  include_directories(${PYTHON_INCLUDE_DIR})
+else()
+  message(FATAL_ERROR, "Cannot find installed Python head file directory")
 endif()
 
-target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-gpu)
+set(IPEX_PYTHON_CPP_SRCS)
+set(IPEX_PYTHON_CPP_CPU_SRCS)
+set(IPEX_PYTHON_CPP_XPU_SRCS)
 
-install(TARGETS intel-ext-pt-python
+add_subdirectory(cpu)
+# for xpu
+if(DEFINED BUILD_WITH_XPU)
+  # pass down definition from CMAKE to CPP files.
+  add_compile_definitions(BUILD_WITH_XPU)
+  add_subdirectory(xpu)
+endif()
+
+list(APPEND IPEX_PYTHON_CPP_SRCS ${IPEX_PYTHON_CPP_CPU_SRCS})
+list(APPEND IPEX_PYTHON_CPP_SRCS ${IPEX_PYTHON_CPP_XPU_SRCS})
+
+add_library(${PLUGIN_NAME_PYTHON} SHARED ${IPEX_PYTHON_CPP_SRCS})
+
+if(DEFINED BUILD_WITH_XPU)
+  message(STATUS "pybind11 include dirs: " "${pybind11_INCLUDE_DIRS}")
+  target_include_directories(${PLUGIN_NAME_PYTHON} PUBLIC ${pybind11_INCLUDE_DIRS})
+
+  # xpu specific BUILD_SIMPLE_TRACE
+  if(BUILD_SIMPLE_TRACE)
+    target_compile_definitions(${PLUGIN_NAME_PYTHON} PUBLIC BUILD_SIMPLE_TRACE)
+  endif()
+
+  # xpu specific BUILD_STRIPPED_BIN
+  if(BUILD_STRIPPED_BIN)
+    set_target_properties(${PLUGIN_NAME_PYTHON} PROPERTIES LINK_FLAGS_RELEASE -s)
+  endif()
+endif()
+
+# TODO: XPU no need to set the search directory
+# target_link_directories(${PLUGIN_NAME_PYTHON} PUBLIC ${IPEX_INSTALL_LIBDIR})
+
+# TODO: temp comment the python so link cpu.so
+# target_link_libraries(${PLUGIN_NAME_PYTHON} PUBLIC intel-ext-pt-cpu)
+if(DEFINED BUILD_WITH_XPU)
+  target_link_libraries(${PLUGIN_NAME_PYTHON} PUBLIC intel-ext-pt-gpu)
+  # TODO: install python so for xpu
+  install(TARGETS intel-ext-pt-python
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()

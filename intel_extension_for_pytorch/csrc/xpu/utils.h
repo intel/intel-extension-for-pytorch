@@ -1,6 +1,11 @@
-#include "utils.h"
+#pragma once
 
-void module_add_py_defs(
+#include <Python.h>
+#include <vector>
+
+namespace xpu {
+
+static inline void module_add_py_defs(
     std::vector<PyMethodDef>& vector,
     PyMethodDef* methods) {
   if (!vector.empty()) {
@@ -15,3 +20,4 @@ void module_add_py_defs(
     methods++;
   }
 }
+} // namespace xpu
