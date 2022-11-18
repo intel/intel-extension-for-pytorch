@@ -96,59 +96,6 @@ inline void distribution_elementwise_kernel(
   }
 }
 
-template <
-    typename scalar_t,
-    typename accscalar_t,
-    int vec_size,
-    typename dist_t,
-    typename transform_t,
-    typename item_t>
-inline void distribution_vectorize_kernel(
-    item_t& item,
-    char* out,
-    int numel,
-    PhiloxState philox_args,
-    const dist_t dist_func,
-    const transform_t transform_func) {
-  int group_size = item.get_local_range(0);
-  int num_groups = item.get_group_range(0);
-  int idx = item.get_group(0) * group_size + item.get_local_id(0);
-
-  auto seeds = philox_unpack(philox_args);
-  randStatePhilox4_32_10_t state;
-  rand_init(std::get<0>(seeds), idx, std::get<1>(seeds), &state);
-
-  int full_tile_work_size = group_size * num_groups * vec_size;
-  int rounded_size =
-      ((numel - 1) / full_tile_work_size + 1) * full_tile_work_size;
-  for (int linear_index = idx; linear_index < rounded_size;
-       linear_index += full_tile_work_size) {
-    auto rand = dist_func(&state);
-    auto offset = linear_index - idx + idx * vec_size;
-    auto remaining = numel - offset;
-    if (remaining < vec_size) {
-      scalar_t* to_ = reinterpret_cast<scalar_t*>(out);
-#pragma unroll
-      for (int i = 0; i < vec_size; i++) {
-        int li = offset + i;
-        if (li < numel) {
-          to_[li] = transform_func(static_cast<accscalar_t>((&rand.x)[i]));
-        }
-      }
-    } else {
-      using vec_t = native::Memory::aligned_vector_loop<scalar_t, vec_size>;
-      vec_t* to_ =
-          reinterpret_cast<vec_t*>(reinterpret_cast<scalar_t*>(out) + offset);
-      vec_t v;
-#pragma unroll
-      for (int i = 0; i < vec_size; i++)
-        v.val[i] = transform_func(static_cast<accscalar_t>((&rand.x)[i]));
-      *to_ = v;
-    }
-    item.barrier(dpcpp_local_fence);
-  }
-}
-
 inline std::tuple<uint64_t, uint32_t, uint32_t> calc_execution_policy(
     int64_t total_elements) {
   auto group_size = dpcppGpuHWThreadsPerEU() * dpcppMaxSubGroupSize();
@@ -205,27 +152,16 @@ void distribution_nullary_kernel(
   char* out_data = (char*)iter.data_ptr(0);
   auto& sycl_queue = dpcppGetCurrentQueue();
 
-  if ((sizeof(scalar_t) < sizeof(float)) && iter.is_contiguous() &&
-      ((reinterpret_cast<uint64_t>(out_data) %
-        std::alignment_of<
-            native::Memory::aligned_vector_loop<scalar_t, unroll_factor>>::
-            value) == 0)) {
-    auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        distribution_vectorize_kernel<scalar_t, accscalar_t, unroll_factor>(
-            item,
-            out_data,
-            numel,
-            PhiloxState(
-                std::get<0>(rng_engine_inputs), std::get<1>(rng_engine_inputs)),
-            dist_func,
-            transform_func);
-      };
-      cgh.parallel_for(
-          sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
-    };
-    DPCPP_Q_SUBMIT(sycl_queue, cgf);
-  } else if (iter.is_trivial_1d()) {
+  /* [Note: Why don't vectorize #1812]
+   * Commit 36f9fab deletes the vectorization because the vectorization
+   * acceleration would generate a different result with the default one. It is
+   * nontrivial to get the same result of vectorized <-> non-vectorized. Thus,
+   * if the user use a CUDA seed 1234, the vectorization result xpu_1234 output
+   * would NOT be the identical value with cuda_1234. This makes user willing to
+   * reproduce the best result with the given CUDA seed, would be difficult on
+   * XPU platform.
+   */
+  if (iter.is_trivial_1d()) {
     auto strides = iter.get_inner_strides();
     int stride0 = strides[0];
     auto cgf = DPCPP_Q_CGF(cgh) {

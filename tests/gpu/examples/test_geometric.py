@@ -2,10 +2,12 @@ import torch
 from torch._six import inf
 from torch.distributions import Geometric
 from torch.testing._internal.common_utils import TestCase
+from torch.testing._internal.common_dtype import (
+   get_all_fp_dtypes, get_all_int_dtypes)
+from torch.testing._internal.common_device_type import dtypes
 
 import intel_extension_for_pytorch  # noqa
 import numpy as np
-import pytest
 
 cpu_device = torch.device("cpu")
 sycl_device = torch.device("xpu")
@@ -36,11 +38,13 @@ class TestTorchMethod(TestCase):
         self.assertEqual(a.dtype, dtype)
         self.assertEqual(a.size(), torch.Size([1]))
 
-    @pytest.mark.skip("Skip due to unexpected numeric errors")
-    def test_geometric_kstest(self, dtype=torch.float):
-        device = sycl_device
-        print("Dtype is ", dtype, flush=True)
+    @dtypes(torch.float)
+    def test_geometric_kstest(self, dtype=torch.int8):
 
+        device = sycl_device
+        # Add the manual_seed, for tests in experiment folder, this 
+        # seed would be set globally.
+        torch.xpu.manual_seed(1234)
         from scipy import stats
         size = 1000
         for p in [0.2, 0.5, 0.8]:
