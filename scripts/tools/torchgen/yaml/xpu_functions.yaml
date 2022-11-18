@@ -19,7 +19,9 @@ supported:
   - _compute_linear_combination.out
   - _convert_indices_from_coo_to_csr.out
   - _ctc_loss
+  - _ctc_loss.Tensor
   - _ctc_loss_backward
+  - _ctc_loss_backward.Tensor
   - cumprod.out
   - cumsum.out  # newly added
   - _embedding_bag
