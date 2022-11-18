@@ -497,6 +497,7 @@ supported:
   - resize_as_
   - roll
   - rot90
+  - round.decimals_out
   - round.out
   - rrelu_with_noise
   - rrelu_with_noise.out

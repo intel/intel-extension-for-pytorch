@@ -156,6 +156,16 @@ self.assertEqual(y_cpu, y_xpu.cpu())
         sign_xpu = torch.signbit(sign_xpu)
         self.assertFalse(sign_xpu.any())
 
+    @dtypes([torch.float, torch.half, torch.bfloat16])
+    def test_unary_op_round_with_decimals(self, dtype=torch.float):
+        x_cpu = torch.tensor([4.7, -2.3, 9.1, -7.7])
+        x_xpu = x_cpu.clone().to("xpu")
+        
+        for dec in [0, 3, -3]:
+            round_cpu = torch.round(x_cpu, decimals=dec)
+            round_xpu = torch.round(x_xpu, decimals=dec)
+            self.assertEqual(round_cpu, round_xpu.cpu())
+
     def _test_unary_backward(self, op, x_cpu, x_xpu, param):
         if (len(param) == 0):
             y_cpu = op(x_cpu)
