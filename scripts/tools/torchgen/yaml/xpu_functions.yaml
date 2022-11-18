@@ -708,7 +708,9 @@ supported:
   - _foreach_neg_
   - _foreach_zero_
   - _foreach_maximum.List
+  - _foreach_maximum_.List
   - _foreach_minimum.List
+  - _foreach_minimum_.List
   - _foreach_addcdiv.Scalar
   - _foreach_addcdiv_.Scalar
   - _foreach_addcmul.Scalar

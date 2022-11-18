@@ -14,6 +14,7 @@ class TestForeachBinary(TestCase):
         x2_xpu = torch.tensor([6., 9., 3., 7., 0., 56., 97., 50., 14.]).to(xpu_device)
 
         self.assertEqual(torch._foreach_maximum((x1_cpu, ), (x2_cpu, )), torch._foreach_maximum((x1_xpu, ), (x2_xpu,)))
+        self.assertEqual(torch._foreach_maximum_((x1_cpu, ), (x2_cpu, )), torch._foreach_maximum_((x1_xpu, ), (x2_xpu,)))
 
     def test_minimum(self, dtype=torch.float):
         x1_cpu = torch.tensor([1, 3, 9, 6]).to(cpu_device)
@@ -23,6 +24,7 @@ class TestForeachBinary(TestCase):
         x2_xpu = torch.tensor([6, 9, 3, 7]).to(xpu_device)
 
         self.assertEqual(torch._foreach_minimum((x1_cpu, ), (x2_cpu, )), torch._foreach_minimum((x1_xpu, ), (x2_xpu, )))
+        self.assertEqual(torch._foreach_minimum_((x1_cpu, ), (x2_cpu, )), torch._foreach_minimum_((x1_xpu, ), (x2_xpu, )))
 
 
 if __name__ == "__main__":
