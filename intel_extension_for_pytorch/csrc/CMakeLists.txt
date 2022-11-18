@@ -27,11 +27,6 @@ set(IPEX_CPU_CPP_THIRD_PARTY_ROOT "${IPEX_PROJECT_TOP_DIR}/third_party")
 set(IPEX_JIT_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/jit")
 set(IPEX_UTLIS_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/utils")
 
-set(DNNL_BUILD_TESTS FALSE CACHE BOOL "" FORCE)
-set(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "" FORCE)
-set(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
-set(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
-
 # ---[ Build flags
 # TODO: CPU: include(${IPEX_PROJECT_TOP_DIR}/cmake/python/BuildOptions.cmake)
 include(${IPEX_PROJECT_TOP_DIR}/cmake/BuildOptions.cmake)
@@ -73,9 +68,7 @@ set(IPEX_PYTHON_CPP_XPU_SRCS)
 
 add_subdirectory(cpu)
 # for xpu
-if(DEFINED BUILD_WITH_XPU)
-  # pass down definition from CMAKE to CPP files.
-  add_compile_definitions(BUILD_WITH_XPU)
+if(BUILD_WITH_XPU)
   add_subdirectory(xpu)
 endif()
 
@@ -84,9 +77,11 @@ list(APPEND IPEX_PYTHON_CPP_SRCS ${IPEX_PYTHON_CPP_XPU_SRCS})
 
 add_library(${PLUGIN_NAME_PYTHON} SHARED ${IPEX_PYTHON_CPP_SRCS})
 
-if(DEFINED BUILD_WITH_XPU)
+if(BUILD_WITH_XPU)
   message(STATUS "pybind11 include dirs: " "${pybind11_INCLUDE_DIRS}")
   target_include_directories(${PLUGIN_NAME_PYTHON} PUBLIC ${pybind11_INCLUDE_DIRS})
+
+  target_compile_definitions(${PLUGIN_NAME_PYTHON} PUBLIC BUILD_WITH_XPU)
 
   # xpu specific BUILD_SIMPLE_TRACE
   if(BUILD_SIMPLE_TRACE)
@@ -104,7 +99,8 @@ endif()
 
 # TODO: temp comment the python so link cpu.so
 # target_link_libraries(${PLUGIN_NAME_PYTHON} PUBLIC intel-ext-pt-cpu)
-if(DEFINED BUILD_WITH_XPU)
+
+if(BUILD_WITH_XPU)
   target_link_libraries(${PLUGIN_NAME_PYTHON} PUBLIC intel-ext-pt-gpu)
   # TODO: install python so for xpu
   install(TARGETS intel-ext-pt-python

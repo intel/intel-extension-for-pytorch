@@ -21,6 +21,7 @@ option(USE_PRIMITIVE_CACHE "Cache oneDNN primitives by FRAMEWORK, instead of one
 option(USE_QUEUE_BARRIER "Use queue submit_barrier, otherwise use dummy kernel" ON)
 option(USE_MULTI_CONTEXT "Create DPC++ runtime context per device" ON)
 option(BUILD_STATS "Count statistics for each component during build process" OFF)
+option(BUILD_WITH_XPU "Build XPU backend implementation" ON)
 option(BUILD_BY_PER_KERNEL "Build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)" OFF)
 option(BUILD_STRIPPED_BIN "Strip all symbols after build" OFF)
 option(BUILD_INTERNAL_DEBUG "Use internal debug code path" OFF)

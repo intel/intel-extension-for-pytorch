@@ -12,6 +12,7 @@
 # USE_AOT_DEVLIST       - to set device list for AOT build option, for example, bdw,tgl,ats,..."
 # USE_SYCL_ASSERT       - to enable assert in sycl kernel
 # BUILD_STATS           - to count statistics for each component during build process
+# BUILD_WITH_XPU        - to build XPU backend implementation
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)
 # BUILD_STRIPPED_BIN    - to strip all symbols after build
 # BUILD_SEPARATE_OPS    - to build each operator in separate library
@@ -163,12 +164,6 @@ version, version_backend, version_sha = get_build_version(git_sha_dict.get('__ip
 # Generate version info (intel_extension_for_pytorch.__version__)
 create_version_files(base_dir, version, git_sha_dict)
 
-BUILD_WITH_XPU = False
-# FIXME: For IPEX XPU, build with xpu code is temp to choose, laterly will remove the 'True'
-if _check_env_flag("BUILD_WITH_XPU") or True:
-    BUILD_WITH_XPU = True
-
-
 class DPCPPExt(Extension, object):
     def __init__(self, name, project_dir=os.path.dirname(__file__)):
         Extension.__init__(self, name, sources=[])
@@ -282,34 +277,32 @@ class DPCPPBuild(BuildExtension, object):
                 'LIB_NAME': ext.name,
             }
 
-            if BUILD_WITH_XPU:
-                my_env = os.environ.copy()
-                for var, val in my_env.items():
-                    if var.startswith(('BUILD_', 'USE_', 'CMAKE_')):
-                        if var == 'BUILD_STATS' and val.upper() not in ['OFF', 'NO', '0']:
-                            sequential_build = True
-                        if var == 'CMAKE_PREFIX_PATH':
-                            # Do NOT overwrite this path. Append into the list, instead.
-                            build_options[var] += ';' + val
-                        else:
-                            build_options[var] = val
+            my_env = os.environ.copy()
+            for var, val in my_env.items():
+                if var.startswith(('BUILD_', 'USE_', 'CMAKE_')):
+                    if var == 'BUILD_STATS' and val.upper() not in ['OFF', 'NO', '0']:
+                        sequential_build = True
+                    if var == 'CMAKE_PREFIX_PATH':
+                        # Do NOT overwrite this path. Append into the list, instead.
+                        build_options[var] += ';' + val
+                    else:
+                        build_options[var] = val
 
-                cc, cxx = _get_xpu_compliers()
-                defines(cmake_args, CMAKE_C_COMPILER=cc)
-                defines(cmake_args, CMAKE_CXX_COMPILER=cxx)
-                defines(cmake_args, BUILD_WITH_XPU="1")
-                defines(cmake_args, **build_options)
+            cc, cxx = _get_xpu_compliers()
+            defines(cmake_args, CMAKE_C_COMPILER=cc)
+            defines(cmake_args, CMAKE_CXX_COMPILER=cxx)
+            defines(cmake_args, **build_options)
 
-                cmake = find_executable('cmake3') or find_executable('cmake')
-                if cmake is None:
-                    raise RuntimeError(
-                        "CMake must be installed to build the following extensions: "
-                        + ", ".join(e.name for e in self.extensions))
-                command = [cmake, ext.project_dir] + cmake_args
-                print(' '.join(command))
+            cmake = find_executable('cmake3') or find_executable('cmake')
+            if cmake is None:
+                raise RuntimeError(
+                    "CMake must be installed to build the following extensions: "
+                    + ", ".join(e.name for e in self.extensions))
+            command = [cmake, ext.project_dir] + cmake_args
+            print(' '.join(command))
 
-                env = os.environ.copy()
-                check_call(command, cwd=ext.build_dir, env=env)
+            env = os.environ.copy()
+            check_call(command, cwd=ext.build_dir, env=env)
 
             # add cpu build code
 
@@ -355,10 +348,6 @@ def get_c_module():
         # https://bugs.llvm.org/show_bug.cgi?id=21629
         '-Wno-missing-braces',
     ]
-
-    if BUILD_WITH_XPU:
-        # used for _C.cpp
-        extra_compile_args.append('-DBUILD_WITH_XPU=1')
 
     def make_relative_rpath(path):
         return '-Wl,-rpath,$ORIGIN/' + path
