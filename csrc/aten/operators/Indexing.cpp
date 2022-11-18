@@ -30,6 +30,18 @@ Tensor sum(const Tensor& self, c10::optional<ScalarType> dtype);
 
 namespace impl {
 
+// Pretend that the scalar tensor is in fact a one-element vector.
+template <typename T, typename IndexType>
+xpu::dpcpp::detail::TensorInfo<T, IndexType> tensorInfoIfScalar(
+    xpu::dpcpp::detail::TensorInfo<T, IndexType> ti) {
+  if (ti.dims == 0) {
+    ti.dims = 1;
+    ti.sizes[0] = 1;
+    ti.strides[0] = 1;
+  }
+  return ti;
+}
+
 template <typename scalar_t>
 void indexSelect(
     const Tensor& dst,
@@ -41,21 +53,21 @@ void indexSelect(
   at::assert_no_overlap(dst, indices);
 
   dim = at::maybe_wrap_dim(dim, src);
-  int srcDims = src.dim();
+  int srcDims = src.dim() == 0 ? 1 : src.dim();
   int dstDims = dst.dim();
   int idxDims = indices.dim();
 
   TORCH_CHECK(
-      srcDims <= MAX_DPCPPTORCH_DIMS && srcDims > 0,
-      "src tensor dim should be > 0 and < ",
+      srcDims <= MAX_DPCPPTORCH_DIMS,
+      "src tensor dim should be < ",
       MAX_DPCPPTORCH_DIMS);
   TORCH_CHECK(
-      dstDims <= MAX_DPCPPTORCH_DIMS && dstDims > 0,
-      "dst tensor dim should be > 0 and < ",
+      dstDims <= MAX_DPCPPTORCH_DIMS,
+      "dst tensor dim should be < ",
       MAX_DPCPPTORCH_DIMS);
   TORCH_CHECK(
-      idxDims <= MAX_DPCPPTORCH_DIMS && idxDims > 0,
-      "index tensor dim should be > 0 and < ",
+      idxDims <= MAX_DPCPPTORCH_DIMS,
+      "index tensor dim should be < ",
       MAX_DPCPPTORCH_DIMS);
   TORCH_CHECK(
       idxDims <= 1, "Index is supposed to be an empty tensor or a vector");
@@ -74,12 +86,16 @@ void indexSelect(
 
   IPEX_DISPATCH_INDEX_TYPES(indices.scalar_type(), "indexSelect", [&] {
     TensorInfo<index_t, int64_t> indices_info =
-        getTensorInfo<index_t, int64_t>(indices);
+        tensorInfoIfScalar(getTensorInfo<index_t, int64_t>(indices));
     indices_info.collapseDims();
 
     auto new_size = src.sizes().vec();
-    new_size[dim] = indices_info.sizes[0];
-    dst.resize_(new_size);
+
+    if (src.dim() > 0) {
+      new_size[dim] = indices.numel();
+    }
+
+    at::native::resize_output(dst, new_size);
 
     ptrdiff_t dst_num_elem = dst.numel();
     if (dst_num_elem == 0) {
@@ -87,9 +103,9 @@ void indexSelect(
     }
 
     TensorInfo<scalar_t, int64_t> dst_info =
-        getTensorInfo<scalar_t, int64_t>(dst);
+        tensorInfoIfScalar(getTensorInfo<scalar_t, int64_t>(dst));
     TensorInfo<scalar_t, int64_t> src_info =
-        getTensorInfo<scalar_t, int64_t>(src);
+        tensorInfoIfScalar(getTensorInfo<scalar_t, int64_t>(src));
     int new_indexing_dim = src_info.collapseDims(dim);
 
     _index_select_kernel(src_info, dst_info, indices_info, new_indexing_dim);
@@ -182,7 +198,6 @@ void _index_add(
     const Scalar& alpha) {
   scalar_t alpha_val = alpha.to<scalar_t>();
   dim = maybe_wrap_dim(dim, dst.dim());
-
   auto numIndices = indices.numel();
   TORCH_CHECK(
       indices.dim() <= 1, "index_add_(): Index is supposed to be a vector");
@@ -228,18 +243,22 @@ void _index_add(
         false, "index_add is not implemented with deterministic algorithm.")
   }
 
+  // Scalars are treated as 1-d tensor
+  Tensor dst_ = (dst.dim() == 0) ? dst.view(1) : dst;
+  Tensor src_ = (src.dim() == 0) ? src.view(1) : src;
+
   // The `src` is partitioned into two parts:
   // -the size of each slice we are indexing, which is the
   // total size of the tensor ignoring dimension `dim`;
   // -the number of indices we are choosing, which is the total size
   // of the tensor `indices`.
 
-  int dstDims = dst.dim() == 0 ? 1 : dst.dim();
-  int srcDims = src.dim() == 0 ? 1 : src.dim();
+  int dstDims = dst_.dim() == 0 ? 1 : dst_.dim();
+  int srcDims = src_.dim() == 0 ? 1 : src_.dim();
   ptrdiff_t dstSliceSize = 1;
   for (int d = 0; d < dstDims; d++) {
     if (d != dim) {
-      dstSliceSize *= dst.dim() == 0 ? 1 : dst.size(d);
+      dstSliceSize *= dst_.dim() == 0 ? 1 : dst_.size(d);
     }
   }
 
@@ -251,10 +270,10 @@ void _index_add(
 
   for (int d = 0; d < srcDims; d++) {
     if (d != dim) {
-      srcSliceSize *= src.dim() == 0 ? 1 : src.size(d);
+      srcSliceSize *= src_.dim() == 0 ? 1 : src_.size(d);
       if (!mismatch &&
-          (dst.dim() == 0 ? 1 : dst.size(d)) !=
-              (src.dim() == 0 ? 1 : src.size(d)))
+          (dst_.dim() == 0 ? 1 : dst_.size(d)) !=
+              (src_.dim() == 0 ? 1 : src_.size(d)))
         mismatch = true;
     }
   }
@@ -275,8 +294,8 @@ void _index_add(
   }
 
   ptrdiff_t sliceSize = dstSliceSize;
-  ptrdiff_t srcTotalSize = src.numel();
-  int64_t dstAddDimSize = dst.dim() == 0 ? 1 : dst.size(dim);
+  ptrdiff_t srcTotalSize = src_.numel();
+  int64_t dstAddDimSize = dst_.dim() == 0 ? 1 : dst_.size(dim);
 
   if (sliceSize == 0) {
     return;
@@ -287,10 +306,10 @@ void _index_add(
   indices_info.collapseDims();
 
   TensorInfo<scalar_t, int64_t> src_info =
-      getTensorInfo<scalar_t, int64_t>(src);
+      getTensorInfo<scalar_t, int64_t>(src_);
 
   TensorInfo<scalar_t, int64_t> dst_info =
-      getTensorInfo<scalar_t, int64_t>(dst);
+      getTensorInfo<scalar_t, int64_t>(dst_);
   int new_indexing_dim = dst_info.collapseDims(dim);
 
   _index_add_kernel(
