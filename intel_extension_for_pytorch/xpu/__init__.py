@@ -483,11 +483,11 @@ torch._register_device_module('xpu', current_module)
 # post initial
 intel_extension_for_pytorch._C._postInitExtension()
 
-class FloatTensor:
-    def __new__(cls, e):
-        return torch.tensor(e, device='xpu', dtype=torch.float)
+# class FloatTensor:
+#     def __new__(cls, e):
+#         return torch.tensor(e, device='xpu', dtype=torch.float)
 
 
-class DoubleTensor:
-    def __new__(cls, e):
-        return torch.tensor(e, device='xpu', dtype=torch.float64)
+# class DoubleTensor:
+#     def __new__(cls, e):
+#         return torch.tensor(e, device='xpu', dtype=torch.float64)

@@ -1,6 +1,7 @@
 #include <torch/csrc/Dtype.h>
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/THP.h>
+#include <torch/csrc/tensor/python_tensor.h>
 
 #include <ATen/autocast_mode.h>
 
@@ -120,7 +121,7 @@ static PyObject* THPModule_postInitExtension(PyObject* self, PyObject* noargs) {
       c10::ScalarType::BFloat16};
   for (auto& backend : backends) {
     for (auto& scalar_type : scalar_types) {
-      //      torch::tensors::register_python_tensor_type(backend, scalar_type);
+      torch::tensors::register_python_tensor_type(backend, scalar_type);
     }
   }
 
