@@ -7,6 +7,7 @@ list(APPEND CMAKE_MODULE_PATH ${IPEX_ROOT_DIR}/cmake/Modules)
 set(LINUX TRUE)
 set(CMAKE_INSTALL_MESSAGE NEVER)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # relocatable binary with automatically rpath of depend libraries
 set(CMAKE_INSTALL_RPATH $ORIGIN)

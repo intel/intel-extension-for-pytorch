@@ -1,26 +1,8 @@
-# CMAKE FILE for intel-ext-pt-python.so
-cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
-project(IPEX CXX C)
-
-set(LINUX TRUE)
-set(CMAKE_INSTALL_MESSAGE NEVER)
-# set(CMAKE_VERBOSE_MAKEFILE ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 set(PLUGIN_NAME_PYTHON intel-ext-pt-python)
 
 # Setup project top directory.
 # TODO: CPU: why need cpu to be 'set(IPEX_PROJECT_TOP_DIR "${PROJECT_SOURCE_DIR}/../../../")'
 set(IPEX_PROJECT_TOP_DIR "${PROJECT_SOURCE_DIR}/../../")
-
-set(RPATH_VALUE $ORIGIN)
-set(CMAKE_SKIP_BUILD_RPATH  FALSE)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-set(CMAKE_INSTALL_RPATH "${RPATH_VALUE}/lib/:${RPATH_VALUE}/")
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${IPEX_INSTALL_LIBDIR})
-
-list(APPEND CMAKE_MODULE_PATH ${IPEX_PROJECT_TOP_DIR}/cmake/Modules)
 
 set(IPEX_CPU_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/cpu")
 set(IPEX_CPU_CPP_THIRD_PARTY_ROOT "${IPEX_PROJECT_TOP_DIR}/third_party")
@@ -29,7 +11,7 @@ set(IPEX_UTLIS_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/utils")
 
 # ---[ Build flags
 # TODO: CPU: include(${IPEX_PROJECT_TOP_DIR}/cmake/python/BuildOptions.cmake)
-include(${IPEX_PROJECT_TOP_DIR}/cmake/xpu/BuildFlags.cmake)
+include(${IPEX_ROOT_DIR}/cmake/xpu/BuildFlags.cmake)
 
 # includes
 include_directories(${IPEX_PROJECT_TOP_DIR})

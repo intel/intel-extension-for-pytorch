@@ -34,7 +34,6 @@ set(IPEX_INCLUDE_DIRS
         ${PYTHON_INCLUDE_DIR}
         ${TORCH_INCLUDE_DIRS}
         ${SYCL_INCLUDE_DIR}
-        ${PROJECT_SOURCE_DIR}/torch_unexported_headers
         ${IPEX_GPU_ROOT}
         ${IPEX_GPU_ATEN_SRC_DIR})
 
