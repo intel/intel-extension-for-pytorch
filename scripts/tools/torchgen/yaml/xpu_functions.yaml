@@ -393,6 +393,8 @@ supported:
   - mse_loss_backward
   - mse_loss_backward.grad_input
   - mul.Tensor
+  - mul.Scalar
+  - mul_.Scalar
   - mul.out
   - mul_.Tensor
   - multi_margin_loss
