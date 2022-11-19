@@ -29,7 +29,7 @@ set(IPEX_UTLIS_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/utils")
 
 # ---[ Build flags
 # TODO: CPU: include(${IPEX_PROJECT_TOP_DIR}/cmake/python/BuildOptions.cmake)
-include(${IPEX_PROJECT_TOP_DIR}/cmake/BuildOptions.cmake)
+include(${IPEX_PROJECT_TOP_DIR}/cmake/xpu/BuildFlags.cmake)
 
 # includes
 include_directories(${IPEX_PROJECT_TOP_DIR})

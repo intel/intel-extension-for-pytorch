@@ -1,8 +1,8 @@
 ## Included by CMakeLists
-if(GPU_cmake_included)
+if(BuildFlags_GPU_cmake_included)
     return()
 endif()
-set(GPU_cmake_included true)
+set(BuildFlags_GPU_cmake_included true)
 
 # ---[ Build flags
 set(CMAKE_C_STANDARD 99)

@@ -148,11 +148,11 @@ endif()
 set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl,--disable-new-dtags")
 
 if(BUILD_BY_PER_KERNEL)
-  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl,-T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
+  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl,-T ${PROJECT_SOURCE_DIR}/cmake/xpu/per_ker.ld")
 elseif(USE_AOT_DEVLIST)
   if(NOT BUILD_SEPARATE_OPS)
     # Use customized link script to workaround huge binary issue for multi-target AOT build
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl,-T ${PROJECT_SOURCE_DIR}/cmake/single_aot.ld")
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl,-T ${PROJECT_SOURCE_DIR}/cmake/xpu/single_aot.ld")
   endif()
 endif()
 
