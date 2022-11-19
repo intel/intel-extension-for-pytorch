@@ -60,8 +60,8 @@ static inline void eltwise(
   eltwise_forward::desc eltwise_eltwiseFwd_desc(
       prop_kind::forward, alg_kind, src_md, alpha, beta);
 
-#ifdef USE_SCRATCHPAD_MODE
   primitive_attr attr;
+#ifdef USE_SCRATCHPAD_MODE
   attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
   auto eltwise_forward_pd =
@@ -197,8 +197,8 @@ static inline void eltwise_backward(
   create_key(key, alg_kind, src_dst_md, alpha, beta);
 #endif
 
-#ifdef USE_SCRATCHPAD_MODE
   primitive_attr attr;
+#ifdef USE_SCRATCHPAD_MODE
   attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
 

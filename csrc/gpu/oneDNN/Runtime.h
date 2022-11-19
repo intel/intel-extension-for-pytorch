@@ -93,7 +93,7 @@ struct GpuStreamManager {
     TORCH_INTERNAL_ASSERT(device_index < xpu::dpcpp::device_count());
     return dnnl::sycl_interop::make_stream(
         GpuEngineManager::Instance().get_engine({kXPU, device_index}),
-        getCurrentQueue(device_index).getDpcppQueue());
+        getCurrentQueue(device_index)->getDpcppQueue());
   }
 #endif
 

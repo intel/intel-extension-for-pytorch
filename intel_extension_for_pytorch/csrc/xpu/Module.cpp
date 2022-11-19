@@ -10,7 +10,6 @@
 #include <core/Generator.h>
 #include <include/xpu/Settings.h>
 #include <intrinsic/intrinsic.h>
-#include <oneDNN/Utils.h>
 #include <pybind11/stl.h>
 #include <utils/Settings.h>
 #include "Event.h"

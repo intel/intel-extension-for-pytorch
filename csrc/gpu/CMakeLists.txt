@@ -1,9 +1,8 @@
-set(IPEX_GPU_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
-set(IPEX_GPU_ATEN_SRC_DIR "${IPEX_GPU_ROOT}/aten")
+set(IPEX_GPU_ATEN_SRC_DIR "${IPEX_GPU_ROOT_DIR}/aten")
 set(IPEX_GPU_ATEN_CORE_DIR "${IPEX_GPU_ATEN_SRC_DIR}/core")
-set(IPEX_GPU_RUNTIME_SRC_DIR "${IPEX_GPU_ROOT}/runtime")
-set(IPEX_GPU_UTILS_SRC_DIR "${IPEX_GPU_ROOT}/utils")
-set(IPEX_GPU_INCLUDE_DIR "${IPEX_GPU_ROOT}/include")
+set(IPEX_GPU_RUNTIME_SRC_DIR "${IPEX_GPU_ROOT_DIR}/runtime")
+set(IPEX_GPU_UTILS_SRC_DIR "${IPEX_GPU_ROOT_DIR}/utils")
+set(IPEX_GPU_INCLUDE_DIR "${IPEX_GPU_ROOT_DIR}/include")
 
 # sources
 set(IPEX_GPU_GEN_FILES)
@@ -18,23 +17,22 @@ set(IPEX_RUNTIME_SRCS)
 add_subdirectory(${IPEX_GPU_RUNTIME_SRC_DIR})
 
 set(IPEX_JIT_SRCS)
-add_subdirectory(${IPEX_GPU_ROOT}/jit)
+add_subdirectory(${IPEX_GPU_ROOT_DIR}/jit)
 
 set(IPEX_UTILS_SRCS)
-add_subdirectory(${IPEX_GPU_ROOT}/utils)
+add_subdirectory(${IPEX_GPU_ROOT_DIR}/utils)
 
 set(IPEX_DISTRIBUTED_SRCS)
-add_subdirectory(${IPEX_GPU_ROOT}/distributed)
+add_subdirectory(${IPEX_GPU_ROOT_DIR}/distributed)
 
 if(NOT DEFINED SYCL_INCLUDE_DIR)
     message(FATAL_ERROR, "Cannot find SYCL include directory")
 endif()
 
 set(IPEX_INCLUDE_DIRS
-        ${PYTHON_INCLUDE_DIR}
         ${TORCH_INCLUDE_DIRS}
         ${SYCL_INCLUDE_DIR}
-        ${IPEX_GPU_ROOT}
+        ${IPEX_GPU_ROOT_DIR}
         ${IPEX_GPU_ATEN_SRC_DIR})
 
 set(IPEX_GPU_CORE_SRC
@@ -70,7 +68,7 @@ target_link_directories(intel-ext-pt-gpu PUBLIC ${SYCL_LIBRARY_DIR})
 add_dependencies(intel-ext-pt-gpu IPEX_GPU_GEN_TARGET)
 include(${PROJECT_SOURCE_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)
-  file(GLOB_RECURSE ALL_NATIVE_CSRC_FILES ${IPEX_GPU_ROOT}/**.[ch] ${IPEX_GPU_ROOT}/**.[ch]pp)
+  file(GLOB_RECURSE ALL_NATIVE_CSRC_FILES ${IPEX_GPU_ROOT_DIR}/**.[ch] ${IPEX_GPU_ROOT_DIR}/**.[ch]pp)
   add_custom_target(CL_FORMAT_NATIVE_CSRC COMMAND ${CLANG_FORMAT_EXEC} -i -style=file ${ALL_NATIVE_CSRC_FILES})
   add_dependencies(intel-ext-pt-gpu CL_FORMAT_NATIVE_CSRC)
 endif()
@@ -120,6 +118,7 @@ endif()
 find_package(oneDPL)
 if (ONEDPL_FOUND)
   target_link_libraries(intel-ext-pt-gpu PUBLIC oneDPL)
+  set_target_properties(intel-ext-pt-gpu PROPERTIES ONEDPL_INCLUDE_DIR ${ONEDPL_INCLUDE_DIR})
   if(BUILD_SEPARATE_OPS)
       foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
           target_link_libraries(${op_lib} PUBLIC oneDPL)
@@ -147,37 +146,39 @@ if (USE_PROFILER)
   list(APPEND IPEX_COMPILE_DEFINITIONS "USE_PROFILER")
 endif()
 
-if (USE_ONEMKL)
-    find_package(oneMKL QUIET)
-    if (ONEMKL_FOUND)
-        set(ONEMKL_INCLUDE_DIR ${ONEMKL_INCLUDE_DIR} PARENT_SCOPE)
-        target_link_libraries(intel-ext-pt-gpu PUBLIC ${ONEMKL_SHARED_LIBS})
-        target_include_directories(intel-ext-pt-gpu PUBLIC ${ONEMKL_INCLUDE_DIR})
-        list(APPEND IPEX_COMPILE_DEFINITIONS "USE_ONEMKL")
-        if(BUILD_SEPARATE_OPS)
-            foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
-                target_link_libraries(${op_lib} PUBLIC ${ONEMKL_SHARED_LIBS})
-                target_include_directories(${op_lib} PUBLIC ${ONEMKL_INCLUDE_DIR})
-            endforeach()
-        endif()
-    else()
-        set(USE_ONEMKL OFF PARENT_SCOPE)
-        message(WARNING "WARNING: Cannot find oneMKL! Continue to build without oneMKL!")
-    endif()
-endif()
+ if (USE_ONEMKL)
+     find_package(oneMKL QUIET)
+     if (ONEMKL_FOUND)
+         target_link_libraries(intel-ext-pt-gpu PUBLIC ${ONEMKL_SHARED_LIBS})
+         target_include_directories(intel-ext-pt-gpu PUBLIC ${ONEMKL_INCLUDE_DIR})
+         list(APPEND IPEX_COMPILE_DEFINITIONS "USE_ONEMKL")
+         if(BUILD_SEPARATE_OPS)
+             foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
+                 target_link_libraries(${op_lib} PUBLIC ${ONEMKL_SHARED_LIBS})
+                 target_include_directories(${op_lib} PUBLIC ${ONEMKL_INCLUDE_DIR})
+             endforeach()
+         endif()
+         set_target_properties(intel-ext-pt-gpu PROPERTIES USE_ONEMKL ON)
+         set_target_properties(intel-ext-pt-gpu PROPERTIES ONEMKL_INCLUDE_DIR ${ONEMKL_INCLUDE_DIR})
+     else()
+         message(WARNING "WARNING: Cannot find oneMKL! Continue to build without oneMKL!")
+         set_target_properties(intel-ext-pt-gpu PROPERTIES USE_ONEMKL OFF)
+     endif()
+ endif()
 
-# XXX: Try to find oneMKL support before oneDNN settings
+# XXX: Please make sure to find oneMKL before oneDNN
 find_package(oneDNN QUIET)
 if(ONEDNN_FOUND)
     target_link_libraries(intel-ext-pt-gpu PRIVATE ${ONEDNN_LIBRARY})
     target_include_directories(intel-ext-pt-gpu BEFORE PUBLIC ${ONEDNN_INCLUDE_DIR})
+    set_target_properties(intel-ext-pt-gpu PROPERTIES ONEDNN_INCLUDE_DIR ${ONEDNN_INCLUDE_DIR})
     if(BUILD_SEPARATE_OPS)
+      # Use same lib path with op libs to avoid link errors
+      set(ONEDNN_LIB_DIR "${CMAKE_BINARY_DIR}/csrc/gpu")
       # Suppress soname to prevent from creating symbolic link
-      # Change output path to avoid link error from dependents
-      get_filename_component(DIR_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
       set_target_properties(${ONEDNN_LIBRARY} PROPERTIES NO_SONAME ON
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${DIR_NAME}"
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${DIR_NAME}")
+        LIBRARY_OUTPUT_DIRECTORY ${ONEDNN_LIB_DIR}
+        RUNTIME_OUTPUT_DIRECTORY ${ONEDNN_LIB_DIR})
         foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
             target_link_libraries(${op_lib} PRIVATE ${ONEDNN_LIBRARY})
             target_include_directories(${op_lib} BEFORE PUBLIC ${ONEDNN_INCLUDE_DIR})
