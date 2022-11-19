@@ -78,11 +78,15 @@ Tensor& argmax_out(
     c10::optional<int64_t> dim,
     bool keepdim,
     Tensor& result) {
-  TORCH_CHECK(
-      self.numel() > 0,
-      "cannot perform reduction function argmax on a "
-      "tensor with no elements because the operation does not have an "
-      "identity");
+  if (dim.has_value()) {
+    auto dim_ = maybe_wrap_dim(dim.value(), self.dim());
+    zero_numel_check_dims(self, dim_, "argmax");
+  } else {
+    TORCH_CHECK_INDEX(
+        self.numel() != 0,
+        "argmax",
+        ": Expected reduction dim to be specified for input.numel() == 0.");
+  }
   Tensor in;
   if (dim) {
     in = self;
@@ -106,11 +110,15 @@ Tensor& argmin_out(
     c10::optional<int64_t> dim,
     bool keepdim,
     Tensor& result) {
-  TORCH_CHECK(
-      self.numel() > 0,
-      "cannot perform reduction function argmin on a "
-      "tensor with no elements because the operation does not have an "
-      "identity");
+  if (dim.has_value()) {
+    auto dim_ = maybe_wrap_dim(dim.value(), self.dim());
+    zero_numel_check_dims(self, dim_, "argmin");
+  } else {
+    TORCH_CHECK_INDEX(
+        self.numel() != 0,
+        "argmin",
+        ": Expected reduction dim to be specified for input.numel() == 0.");
+  }
   Tensor in;
   if (dim) {
     in = self;

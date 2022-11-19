@@ -353,13 +353,9 @@ void kthvalue_template(
     bool keepdim,
     Tensor& values,
     Tensor& indices) {
-  int64_t dim = maybe_wrap_dim(dim_, self.dim());
+  int64_t dim = maybe_wrap_dim(dim_, self.dim(), /*wrap_scalar=*/true);
+  zero_numel_check_dims(self, dim, "kthvalue()");
   at::assert_no_overlap(self, values);
-  TORCH_CHECK(
-      self.numel() > 0,
-      "cannot perform reduction function kthvalue",
-      " on tensor with no elements because the operation does not have "
-      "an identity");
 
   if (self.dim() > 0) {
     int64_t slicesize = self.size(dim);
