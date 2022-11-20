@@ -727,14 +727,15 @@ std::tuple<at::Tensor&, at::Tensor&> topk_out(
     bool sorted,
     at::Tensor& values,
     at::Tensor& indices) {
-  auto dim_ = maybe_wrap_dim(dim, self);
+  auto input = (self.dim() == 0) ? self.view(1) : self;
+  auto dim_ = maybe_wrap_dim(dim, self.dim(), /*wrap_scalar=*/true);
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
-      self.scalar_type(),
+      input.scalar_type(),
       "Topk",
       [&]() {
-        Topk<scalar_t>(values, indices, self, k, dim_, largest, sorted);
+        Topk<scalar_t>(values, indices, input, k, dim_, largest, sorted);
       });
 
   return std::forward_as_tuple(values, indices);
