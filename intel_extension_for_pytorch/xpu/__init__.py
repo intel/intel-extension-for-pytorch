@@ -22,7 +22,7 @@ from .memory import *
 from .overrides import set_default_tensor_type as set_default_tensor_type
 from .overrides import enable_cl_to as enable_cl_to
 from .generator import Generator
-from .dummy_xpu import *
+from ._trap_module import *
 
 from torch._utils import _get_device_index
 import intel_extension_for_pytorch.optim as optim
@@ -479,7 +479,6 @@ serialization.register_package(30, _xpu_tag, _xpu_deserialize)
 torch._register_device_module('xpu', current_module)
 
 # post initial
-# add dummy function for xpu
 if hasattr(intel_extension_for_pytorch._C, '_postInitExtension'):
     intel_extension_for_pytorch._C._postInitExtension()
 

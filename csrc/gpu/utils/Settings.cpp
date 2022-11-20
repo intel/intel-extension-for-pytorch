@@ -299,6 +299,8 @@ void Settings::disable_simple_trace() {
 
 } // namespace dpcpp
 
+/* FIXME: The backend is not ready for now.
+ * Do not export to public
 XPU_BACKEND get_backend() {
   return dpcpp::Settings::I().get_backend();
 }
@@ -306,6 +308,7 @@ XPU_BACKEND get_backend() {
 bool set_backend(XPU_BACKEND backend) {
   return dpcpp::Settings::I().set_backend(backend);
 }
+*/
 
 FP32_MATH_MODE get_fp32_math_mode() {
   return dpcpp::Settings::I().get_fp32_math_mode();

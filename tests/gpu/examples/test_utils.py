@@ -51,12 +51,6 @@ class TestVerbose(TestCase):
         with torch.xpu.onednn_layout():
             assert torch.xpu.using_onednn_layout(), 'Fail to set onednn layout'
 
-    def test_xpu_backend(self):
-        backend_list = [torch.xpu.Backend.GPU, torch.xpu.Backend.CPU, torch.xpu.Backend.AUTO]
-        for backend in backend_list:
-            torch.xpu.set_backend(backend)
-            assert torch.xpu.get_backend() == backend, 'Fail to set XPU backend: ' + backend
-
     def test_force_onednn_primitive(self):
         with torch.xpu.force_onednn_primitive():
             assert torch.xpu.using_force_onednn_primitive(), 'Fail to force onednn primitive'

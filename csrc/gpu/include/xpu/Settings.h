@@ -22,14 +22,6 @@
 
 namespace xpu {
 
-enum IPEX_API XPU_BACKEND {
-  GPU = 0,
-  CPU = 1,
-  AUTO = 2,
-  XPU_BACKEND_MAX = AUTO
-};
-static const char* IPEX_API XPU_BACKEND_STR[]{"GPU", "CPU", "AUTO"};
-
 /// \enum FP32_MATH_MODE
 /// \brief specifies the available DPCCP packet types
 enum IPEX_API FP32_MATH_MODE {
@@ -39,10 +31,6 @@ enum IPEX_API FP32_MATH_MODE {
   FP32_MATH_MODE_MAX = BF32 ///< set floating-point math mode.
 };
 static const char* IPEX_API FP32_MATH_MODE_STR[]{"FP32", "TF32", "BF32"};
-
-IPEX_API XPU_BACKEND get_backend();
-
-IPEX_API bool set_backend(XPU_BACKEND backend);
 
 /// Get Math Mode Setting Status.
 IPEX_API FP32_MATH_MODE get_fp32_math_mode();

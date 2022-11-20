@@ -6,15 +6,6 @@ from .. import frontend
 import intel_extension_for_pytorch  # noqa
 import intel_extension_for_pytorch._C as core
 
-from ._utils import _dummy_type
-
-if not hasattr(core, 'XPUBackend'):
-    # Define dummy base Enum classes
-    core.__dict__['XPUBackend'] = _dummy_type('XPUBackend')
-    setattr(core.XPUBackend, 'GPU', 0) # noqa B010
-    setattr(core.XPUBackend, 'CPU', 1) # noqa B010
-    setattr(core.XPUBackend, 'AUTO', 2) # noqa B010
-
 
 def to_channels_last_1d(t):
     if isinstance(t, torch.nn.Module):
@@ -284,23 +275,6 @@ def enable_tile_as_device():
 # Only work before lazy init
 def disable_tile_as_device():
     _C._disable_tile_as_device()
-
-
-# XPU Backend
-# NOTE: XPU Backend is not available yet.
-class Backend(EnumBase):
-    GPU = int(_C.XPUBackend.GPU)
-    CPU = int(_C.XPUBackend.CPU)
-    AUTO = int(_C.XPUBackend.AUTO)
-
-
-def get_backend():
-    return Backend.get_value(_C._get_backend)
-
-
-def set_backend(backend):
-    st = Backend.set_value(_C._set_backend, backend)
-    assert bool(st), "WARNING: Failed to set XPU backend!"
 
 
 ################################################################
