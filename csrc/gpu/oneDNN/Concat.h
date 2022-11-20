@@ -138,7 +138,7 @@ static void concat(Tensor& dst, const TensorList srcs, int dimension) {
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key(key, dst_dims, static_cast<int>(dimension), cat_tensors_md);
+  create_key(key, static_cast<int>(dimension), dst_md, srcs_md);
 #endif
 
   memory dst_m;
@@ -287,7 +287,7 @@ static void concat(
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key(key, dst_dims, static_cast<int>(dimension), cat_tensors_md);
+  create_key(key, static_cast<int>(dimension), dst_md, srcs_md);
 #endif
 
   memory dst_m;

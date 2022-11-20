@@ -126,7 +126,7 @@ static at::Tensor pooling(
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
   create_key(
-      key, src_md, dst_md_any, stride, kernel, padding, padding, alg_kind);
+      key, src_md, dst_md_any, stride, kernel, padding_l, padding_r, alg_kind);
 #endif
   auto pooling_fwd_desc = pooling_forward::desc(
       prop_kind,
@@ -283,7 +283,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
   create_key(
-      key, src_md, dst_md_any, stride, kernel, padding, padding, alg_kind);
+      key, src_md, dst_md_any, stride, kernel, padding_l, padding_r, alg_kind);
 #endif
   auto pooling_fwd_desc = pooling_forward::desc(
       prop_kind,
