@@ -5,7 +5,6 @@ FILE(GLOB IPEX_PYTHON_CPP_CPU_SRCS *.cpp)
 add_library(PY_CPU_OBJ OBJECT ${IPEX_PYTHON_CPP_CPU_SRCS})
 
 # includes
-set(IPEX_CPU_ROOT_DIR "${IPEX_ROOT_DIR}/csrc/cpu")
 target_include_directories(PY_CPU_OBJ PUBLIC ${IPEX_CPU_ROOT_DIR}/aten)
 target_include_directories(PY_CPU_OBJ PUBLIC ${IPEX_CPU_ROOT_DIR}/utils)
 
