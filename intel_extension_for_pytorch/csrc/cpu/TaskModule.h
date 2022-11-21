@@ -16,7 +16,9 @@
 
 /**********************Dummy Functions**************************/
 #include <stdio.h>
-#define DUMMY_FE_TRACE printf("[dummy_cpu_fe] %s\n", __FUNCTION__);
+#define DUMMY_FE_TRACE
+// comment here print for building hvd
+// #define DUMMY_FE_TRACE printf("[dummy_cpu_fe] %s\n", __FUNCTION__);
 /***************************************************************/
 
 namespace torch_ipex {
