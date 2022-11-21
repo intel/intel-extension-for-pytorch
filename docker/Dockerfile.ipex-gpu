@@ -31,8 +31,8 @@ RUN apt-get update && \
 
 RUN no_proxy=$no_proxy wget -qO - https://repositories.intel.com/graphics/intel-graphics.key | \
     gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg
-RUN echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu focal main' | \
-    tee  /etc/apt/sources.list.d/intel.gpu.focal.list
+RUN echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu jammy flex' | \
+    tee  /etc/apt/sources.list.d/intel.gpu.jammy.list
 
 ARG ICD_VER
 ARG LEVEL_ZERO_GPU_VER
@@ -64,8 +64,10 @@ RUN apt-get update && \
 ENV LANG=C.UTF-8
 ARG PYTHON=python3.9
 
+RUN apt-get update && apt-get install software-properties-common -y && add-apt-repository ppa:deadsnakes/ppa 
+
 RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
-    ${PYTHON} lib${PYTHON} python3-pip && \
+    ${PYTHON} lib${PYTHON} python3-pip python3.9-distutils && \
     apt-get clean && \
     rm -rf  /var/lib/apt/lists/*
 
