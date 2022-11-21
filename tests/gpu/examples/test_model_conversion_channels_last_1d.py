@@ -22,7 +22,7 @@ class Model(torch.nn.Module):
         return x
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skip("[1.13] Failed after rebase. Must fix soon!")
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
     def test_model_conversion_channels_last_1d(self, dtype=torch.float):
         model = Model()
         test_input = torch.rand([2, 3, 4])

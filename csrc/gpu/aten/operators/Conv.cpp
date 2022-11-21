@@ -685,6 +685,10 @@ Tensor _convolution_out(
     int64_t groups_,
     Attr attr,
     IntArrayRef pad_nd = IntArrayRef({})) {
+  Tensor output = output_r;
+  Tensor input = input_r;
+  Tensor weight = weight_r;
+
   auto ndim = input_r.ndimension();
   TORCH_CHECK(
       3 == ndim || 4 == ndim || 5 == ndim,
@@ -694,16 +698,24 @@ Tensor _convolution_out(
   // if one of input and weight is in channels_last, then propagate it to dst
   bool is_channels_last_suggested =
       using_channels_last_for_conv(input_r, weight_r);
-  auto mem_fmt = get_cl_tag_by_ndim(ndim);
-  auto input = is_channels_last_suggested ? input_r.contiguous(mem_fmt)
-                                          : input_r.contiguous();
-  auto weight = is_channels_last_suggested ? weight_r.contiguous(mem_fmt)
-                                           : weight_r.contiguous();
+
+  bool is_onednn_layout_suggested =
+      using_onednn_layout_for_conv(input_r, weight_r);
+  if (3 == ndim && !is_onednn_layout_suggested) {
+    input = view4d(input);
+    weight = view4d(weight);
+  }
+
+  auto mem_fmt = get_cl_tag_by_ndim(input.ndimension());
+  input = is_channels_last_suggested ? input.contiguous(mem_fmt)
+                                     : input.contiguous();
+  weight = is_channels_last_suggested ? weight.contiguous(mem_fmt)
+                                      : weight.contiguous();
+
   auto bias = bias_r.contiguous();
-  Tensor output;
   if (output_r.defined())
-    output = is_channels_last_suggested ? output_r.contiguous(mem_fmt)
-                                        : output_r.contiguous();
+    output = is_channels_last_suggested ? output.contiguous(mem_fmt)
+                                        : output.contiguous();
 
   auto k = weight.ndimension();
   if (k == input.ndimension() + 1) {
@@ -713,13 +725,28 @@ Tensor _convolution_out(
   TORCH_CHECK(dim > 0, "weight should have at least three dimensions");
 
   ConvParams params;
-  params.stride = expand_param_if_needed(stride_, "stride", dim);
-  // PyTorch default Conv padding should be a single integer value
-  // or a list of values to match the conv dimensions
-  // conv2d, the number of padding values should be 1 or 2
-  // conv3d, the number of padding values should be 1 or 3
-  // the padding value will be padded into both side of Conv input (D, H, W)
-  params.padding = expand_param_if_needed(padding_, "padding", dim);
+  if (3 == ndim && !is_onednn_layout_suggested) {
+    params.stride = stride_.vec();
+    params.padding = padding_.vec();
+    params.dilation = dilation_.vec();
+    params.transposed = transposed_;
+    params.output_padding = output_padding_.vec();
+    params.groups = groups_;
+    params.view1d_as_2d();
+  } else {
+    params.stride = expand_param_if_needed(stride_, "stride", dim);
+    // PyTorch default Conv padding should be a single integer value
+    // or a list of values to match the conv dimensions
+    // conv2d, the number of padding values should be 1 or 2
+    // conv3d, the number of padding values should be 1 or 3
+    // the padding value will be padded into both side of Conv input (D, H, W)
+    params.padding = expand_param_if_needed(padding_, "padding", dim);
+    params.dilation = expand_param_if_needed(dilation_, "dilation", dim);
+    params.transposed = transposed_;
+    params.output_padding =
+        expand_param_if_needed(output_padding_, "output_padding", dim);
+    params.groups = groups_;
+  }
 
   // oneDNN supports padding the two sides of src with different values
   // the padding order should be front_top_left and back_bottom_right
@@ -737,12 +764,6 @@ Tensor _convolution_out(
       padding_back_bottom_right[i] += pad_nd[2 * dim - 2 * i - 1]; // 5, 3, 1
     }
   }
-
-  params.dilation = expand_param_if_needed(dilation_, "dilation", dim);
-  params.transposed = transposed_;
-  params.output_padding =
-      expand_param_if_needed(output_padding_, "output_padding", dim);
-  params.groups = groups_;
 
   check_shape_forward(input, weight, bias, params, true);
 
@@ -775,6 +796,9 @@ Tensor _convolution_out(
         attr);
   }
 
+  if (3 == ndim && !is_onednn_layout_suggested) {
+    output_ = view3d(output_);
+  }
   return output_;
 }
 
@@ -885,7 +909,6 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
     IntArrayRef output_padding,
     int64_t groups,
     std::array<bool, 3> output_mask) {
-  // Tensor input_ = input;
   // oneDNN can revice non-contiguous input if we define the stride in input_md,
   // for now, we contiguous the input before oneDNN.
   auto input_ndim = input.ndimension();
@@ -900,73 +923,118 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
       "so far only support float, bfloat16 and double convolution backward in XPU backend, your data type is ",
       grad_output.scalar_type());
 
-  auto cl_tag = get_cl_tag_by_ndim(input_ndim);
-  // try best to make sure that suggest memory format is propagated
-  Tensor input_ = (suggest_memory_format_dpcpp(grad_output) == cl_tag ||
-                   suggest_memory_format_dpcpp(input) == cl_tag ||
-                   suggest_memory_format_dpcpp(weight) == cl_tag)
-      ? input.contiguous(cl_tag)
-      : input.contiguous();
+  auto tmp_cl_tag = get_cl_tag_by_ndim(input.ndimension());
+  bool is_channels_last_suggested =
+      (suggest_memory_format_dpcpp(grad_output) == tmp_cl_tag) ||
+      (suggest_memory_format_dpcpp(input) == tmp_cl_tag) ||
+      (suggest_memory_format_dpcpp(weight) == tmp_cl_tag);
+  bool is_onednn_layout_suggested = using_onednn_layout_for_conv(input, weight);
 
-  Tensor grad_output_ = (suggest_memory_format_dpcpp(grad_output) == cl_tag ||
-                         suggest_memory_format_dpcpp(input) == cl_tag ||
-                         suggest_memory_format_dpcpp(weight) == cl_tag)
-      ? grad_output.contiguous(cl_tag)
-      : grad_output.contiguous();
+  Tensor grad_output_, input_, weight_;
+  IntArrayRef stride_, padding_, dilation_, output_padding_;
+  bool transposed_;
+  int64_t groups_;
+  ConvParams params;
+  if (3 == input_ndim && !is_onednn_layout_suggested) {
+    grad_output_ = view4d(grad_output);
+    input_ = view4d(input);
+    weight_ = view4d(weight);
+    params.stride = stride.vec();
+    params.padding = padding.vec();
+    params.dilation = dilation.vec();
+    params.transposed = transposed;
+    params.output_padding = output_padding.vec();
+    params.groups = groups;
+    params.view1d_as_2d();
+    stride_ = params.stride;
+    padding_ = params.padding;
+    dilation_ = params.dilation;
+    transposed_ = params.transposed;
+    output_padding_ = params.output_padding;
+    groups_ = params.groups;
+  } else {
+    grad_output_ = grad_output;
+    input_ = input;
+    weight_ = weight;
+    stride_ = stride;
+    padding_ = padding;
+    dilation_ = dilation;
+    transposed_ = transposed;
+    output_padding_ = output_padding;
+    groups_ = groups;
+  }
+
+  auto cl_tag = get_cl_tag_by_ndim(input_.ndimension());
+  // try best to make sure that suggest memory format is propagated
+  input_ = (suggest_memory_format_dpcpp(grad_output_) == cl_tag ||
+            suggest_memory_format_dpcpp(input_) == cl_tag ||
+            suggest_memory_format_dpcpp(weight_) == cl_tag)
+      ? input_.contiguous(cl_tag)
+      : input_.contiguous();
+
+  grad_output_ = (suggest_memory_format_dpcpp(grad_output_) == cl_tag ||
+                  suggest_memory_format_dpcpp(input_) == cl_tag ||
+                  suggest_memory_format_dpcpp(weight_) == cl_tag)
+      ? grad_output_.contiguous(cl_tag)
+      : grad_output_.contiguous();
 
   Tensor grad_input, grad_weight, grad_bias;
 
   if (output_mask[0]) {
-    if (transposed) {
+    if (transposed_) {
       grad_input = xpu::oneDNN::deconvolution_backward_data(
-          input,
-          weight,
-          grad_output,
-          stride,
-          padding,
-          dilation,
-          groups,
+          input_,
+          weight_,
+          grad_output_,
+          stride_,
+          padding_,
+          dilation_,
+          groups_,
           output_mask[2]);
     } else {
       grad_input = dpcpp_convolution_backward_input(
           input_.sizes(),
           grad_output_,
-          weight,
-          padding,
-          padding,
-          stride,
-          dilation,
-          groups,
+          weight_,
+          padding_,
+          padding_,
+          stride_,
+          dilation_,
+          groups_,
           output_mask[2]);
     }
   }
   if (output_mask[1] || output_mask[2]) {
-    if (transposed) {
+    if (transposed_) {
       std::tie(grad_weight, grad_bias) =
           xpu::oneDNN::deconvolution_backward_weights(
-              input,
-              weight,
-              grad_output,
-              stride,
-              padding,
-              dilation,
-              groups,
+              input_,
+              weight_,
+              grad_output_,
+              stride_,
+              padding_,
+              dilation_,
+              groups_,
               output_mask[2]);
     } else {
       std::tie(grad_weight, grad_bias) =
           xpu::oneDNN::convolution_backward_weights(
               grad_output_,
               input_,
-              weight.sizes(),
-              padding,
-              padding,
-              stride,
-              dilation,
-              groups,
+              weight_.sizes(),
+              padding_,
+              padding_,
+              stride_,
+              dilation_,
+              groups_,
               output_mask[2]);
     }
   }
 
+  if (3 == input_ndim && !is_onednn_layout_suggested) {
+    grad_input = view3d(grad_input);
+    grad_weight = view3d(grad_weight);
+  }
   return std::tuple<Tensor, Tensor, Tensor>{grad_input, grad_weight, grad_bias};
 }
 
