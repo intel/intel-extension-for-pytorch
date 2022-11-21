@@ -50,14 +50,14 @@ struct OffsetCalculator {
 
 #pragma unroll
     for (int dim = 0; dim < MAX_DIMS; ++dim) {
-      if (dim < dims) {
-        auto divmod = sizes_[dim].divmod(linear_idx);
-        linear_idx = divmod.div;
+      if (dim == dims)
+        break;
+      auto divmod = sizes_[dim].divmod(linear_idx);
+      linear_idx = divmod.div;
 
 #pragma unroll
-        for (int arg = 0; arg < NARGS; arg++) {
-          offsets[arg] += divmod.mod * strides_[dim][arg];
-        }
+      for (int arg = 0; arg < NARGS; arg++) {
+        offsets[arg] += divmod.mod * strides_[dim][arg];
       }
     }
     return offsets;
