@@ -2334,6 +2334,21 @@ std::tuple<Tensor&, Tensor&> linalg_qr_out(
 }
 
 Tensor linalg_householder_product(const Tensor& self, const Tensor& input2) {
+  TORCH_CHECK(
+      self.dim() >= 2,
+      "torch.linalg.householder_product: input must have at least 2 dimensions.");
+  TORCH_CHECK(
+      self.size(-2) >= self.size(-1),
+      "torch.linalg.householder_product: input.shape[-2] must be greater than or equal to input.shape[-1]");
+  TORCH_CHECK(
+      self.size(-1) >= input2.size(-1),
+      "torch.linalg.householder_product: input.shape[-1] must be greater than or equal to tau.shape[-1]");
+  TORCH_CHECK(
+      self.dim() - input2.dim() == 1,
+      "torch.linalg.householder_product: Expected tau to have one dimension less than input, but got tau.ndim equal to ",
+      input2.dim(),
+      " and input.ndim is equal to ",
+      self.dim());
   if (self.numel() == 0) {
     return at::empty_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   }
