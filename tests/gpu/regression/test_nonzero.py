@@ -5,7 +5,6 @@ import intel_extension_for_pytorch  # noqa
 import pytest
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skip("[1.13] Failed after rebase. Must fix soon!")
     def test_nonzero_memory_leak(self):
         '''
         Regression desc:
