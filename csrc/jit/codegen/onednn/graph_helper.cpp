@@ -184,18 +184,45 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
         .setAttr("filter_format", std::string("OIX"));
   } else if (nodeKind == Symbol::aten("_convolution")) {
     bool transposed = Operator::Bool(node, 6);
-    REQ(!transposed);
-
-    return Operator(node, opkind::Convolution)
+    if (transposed) {
+      return Operator(node, opkind::ConvTranspose)
+          .setInput(0, 1, 2)
+          .setOutput(0)
+          .setAttr("data_format", std::string("NCX"))
+          .setAttr("strides", Operator::Ints, 3)
+          .setAttr("pads_begin", Operator::Ints, 4)
+          .setAttr("pads_end", Operator::Ints, 4)
+          .setAttr("output_padding", Operator::Ints, 7)
+          .setAttr("dilations", Operator::Ints, 5)
+          .setAttr("groups", Operator::Int, 8)
+          .setAttr("filter_format", std::string("IOX"));
+    } else {
+      return Operator(node, opkind::Convolution)
+          .setInput(0, 1, 2)
+          .setOutput(0)
+          .setAttr("data_format", std::string("NCX"))
+          .setAttr("strides", Operator::Ints, 3)
+          .setAttr("pads_begin", Operator::Ints, 4)
+          .setAttr("pads_end", Operator::Ints, 4)
+          .setAttr("dilations", Operator::Ints, 5)
+          .setAttr("groups", Operator::Int, 8)
+          .setAttr("filter_format", std::string("OIX"));
+    }
+  } else if (
+      (nodeKind == Symbol::aten("conv_transpose2d")) ||
+      (nodeKind == Symbol::aten("conv_transpose3d"))) {
+    fixConvOptionalBias(node);
+    return Operator(node, opkind::ConvTranspose)
         .setInput(0, 1, 2)
         .setOutput(0)
         .setAttr("data_format", std::string("NCX"))
         .setAttr("strides", Operator::Ints, 3)
         .setAttr("pads_begin", Operator::Ints, 4)
         .setAttr("pads_end", Operator::Ints, 4)
-        .setAttr("dilations", Operator::Ints, 5)
-        .setAttr("groups", Operator::Int, 8)
-        .setAttr("filter_format", std::string("OIX"));
+        .setAttr("output_padding", Operator::Ints, 5)
+        .setAttr("dilations", Operator::Ints, 7)
+        .setAttr("groups", Operator::Int, 6)
+        .setAttr("filter_format", std::string("IOX"));
   } else if (nodeKind == Symbol::aten("batch_norm")) {
     auto training = toIValue(node->input(5));
     REQ(training.has_value()); // cannot get training status in script mode

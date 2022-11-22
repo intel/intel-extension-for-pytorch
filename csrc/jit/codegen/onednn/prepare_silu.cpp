@@ -16,13 +16,8 @@ bool shouldDecomposeSilu(Node* node) {
   if (node->kind() != aten::silu) {
     return false;
   }
-  auto inputToSilu = node->input(0)->node();
-  if (inputToSilu->kind() == aten::_convolution) {
-    // TODO: remove transpose check once the bridge supported ConvTranspose
-    bool transposed = Operator::Bool(inputToSilu, 6);
-    return !transposed;
-  }
-  if (inputToSilu->kind() == aten::linear) {
+  auto inputToSilu = node->input(0)->node()->kind();
+  if ((inputToSilu == aten::_convolution) || (inputToSilu == aten::linear)) {
     return true;
   }
   return false;
