@@ -1128,8 +1128,8 @@ bool THXPStorage_init(PyObject* module) {
        METH_VARARGS,
        nullptr},
       {"from_file",
-       (PyCFunction)(void (*)(void))(
-           THXPStorage_Bridge<scalarType>::THXPStorage_fromFile),
+       (PyCFunction)(void (*)(
+           void))(THXPStorage_Bridge<scalarType>::THXPStorage_fromFile),
        METH_VARARGS | METH_KEYWORDS | METH_STATIC,
        nullptr},
       {"get_device",
