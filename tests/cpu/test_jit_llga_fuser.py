@@ -816,6 +816,34 @@ class TestDebugLog(JitLlgaTestCase):
         self.assertTrue(num == 2 , 'IPEX LLGA op profiling info not found.')
         self.assertTrue(num_debug_str > 0, 'IPEX LLGA debug info not found')
 
+@unittest.skip("Enable when integration with dynamo aot_autograd is more stable")
+class TestDynamoAOT(JitLlgaTestCase):
+    def test_dynamo_aot_ts_onednn(self):
+        class Seq(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.layers = nn.Sequential(
+                    nn.Linear(10, 10),
+                    nn.ReLU(),
+                    nn.Linear(10, 10),
+                    nn.ReLU(),
+                )
+
+            def forward(self, x):
+                return self.layers(x)
+
+        mod = Seq()
+
+        import torch._dynamo
+        aot_mod = torch._dynamo.optimize("aot_ts", nopython=True)(mod)
+
+        for _ in range(10):
+            with torch.jit.fuser("fuser3"):
+                loss = aot_mod(torch.rand([10, 10])).sum()
+                loss.backward()
+
+        torch._dynamo.reset()
+
 class TestModel(JitLlgaTestCase):
     @skipIfNoTorchVision
     @llga_fp32_bf16_test_env
