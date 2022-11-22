@@ -1,5 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/TensorUtils.h>
+#include <ATen/Utils.h>
 #include <core/Memory.h>
 #include <core/MemoryFormat.h>
 #include <runtime/Utils.h>
@@ -266,74 +268,51 @@ void fractional_max_pool3d_out_frame_cl(
 
 template <typename scalar_t>
 void fractional_max_pool3d_backward_out_frame(
-    scalar_t* gradInput,
-    scalar_t* gradOutput,
-    int64_t* indices,
-    int numBatch,
-    int numPlane,
-    int gradInputSizeT,
-    int gradInputSizeH,
-    int gradInputSizeW,
-    int gradOutputSizeT,
-    int gradOutputSizeH,
-    int gradOutputSizeW) {
+    PackedTensorAccessor64<scalar_t, 5> gradInput,
+    PackedTensorAccessor64<scalar_t, 5> gradOutput,
+    PackedTensorAccessor64<int64_t, 5> indices) {
+  auto numBatch = gradInput.size(0);
+  auto numPlane = gradInput.size(1);
+  auto gradOutputSizeT = gradOutput.size(2);
+  auto gradOutputSizeH = gradOutput.size(3);
+  auto gradOutputSizeW = gradOutput.size(4);
+  auto gradInputSizeT = gradInput.size(2);
+  auto gradInputSizeH = gradInput.size(3);
+  auto gradInputSizeW = gradInput.size(4);
   auto& queue = dpcppGetCurrentQueue();
   int gradOutputPlaneSize = gradOutputSizeT * gradOutputSizeH * gradOutputSizeW;
-  int work_group_size = gradOutputPlaneSize > 128 ? 128 : gradOutputPlaneSize;
-  int work_group_num = (gradOutputPlaneSize + 127) / 128;
+  int work_group_size = gradOutputPlaneSize > 256 ? 256 : gradOutputPlaneSize;
+  int work_group_num =
+      (gradOutputPlaneSize + work_group_size - 1) / work_group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto gradInput_data = gradInput;
-    auto gradOutput_data = gradOutput;
-    auto indices_data = indices;
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
-      auto gradInput_ptr = gradInput_data;
-      auto gradOutput_ptr = gradOutput_data;
-      auto indices_ptr = indices_data;
-
-      int ourOutputPoint = item.get_global_id()[0];
+      int ourOutputPoint = item.get_global_id()[2];
       int plane = item.get_group()[1];
-      int batch = item.get_group()[2];
+      int batch = item.get_group()[0];
 
       if (ourOutputPoint < gradOutputPlaneSize) {
+        int64_t outputT = ourOutputPoint / gradOutputSizeH / gradOutputSizeW;
+        int64_t outputH = ourOutputPoint / gradOutputSizeW % gradOutputSizeH;
         int64_t outputW = ourOutputPoint % gradOutputSizeW;
-        int64_t outputH = (ourOutputPoint / gradOutputSizeW % gradOutputSizeH);
-        int64_t outputT = ourOutputPoint / (gradOutputSizeH * gradOutputSizeW);
 
-        int64_t index = indices_ptr
-            [batch * numPlane * gradOutputSizeT * gradOutputSizeH *
-                 gradOutputSizeW +
-             plane * gradOutputSizeT * gradOutputSizeH * gradOutputSizeW +
-             outputT * gradOutputSizeH * gradOutputSizeW +
-             outputH * gradOutputSizeW +
-             outputW] /*[batch][plane][outputT][outputH][outputW]*/;
+        int64_t index = indices[batch][plane][outputT][outputH][outputW];
+        assert(index >= 0);
         int64_t inputW = index % gradInputSizeW;
         int64_t inputH = (index / gradInputSizeW % gradInputSizeH);
         int64_t inputT = index / (gradInputSizeH * gradInputSizeW);
-
+        assert(inputT < gradInput.size(2));
         atomicAdd(
-            (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr
-                [batch * numPlane * gradInputSizeT * gradInputSizeH *
-                     gradInputSizeW +
-                 plane * gradInputSizeT * gradInputSizeH * gradInputSizeW +
-                 inputT * gradInputSizeH * gradInputSizeW +
-                 inputH * gradInputSizeW +
-                 inputW] /*[batch][plane][inputT][inputH][inputW]*/,
-            gradOutput_ptr
-                [batch * numPlane * gradOutputSizeT * gradOutputSizeH *
-                     gradOutputSizeW +
-                 plane * gradOutputSizeT * gradOutputSizeH * gradOutputSizeW +
-                 outputT * gradOutputSizeH * gradOutputSizeW +
-                 outputH * gradOutputSizeW +
-                 outputW] /*[batch][plane][outputT][outputH][outputW]*/
-        );
+            (dpcpp_global_ptr_pt<scalar_t>)&gradInput[batch][plane][inputT]
+                                                     [inputH][inputW],
+            gradOutput[batch][plane][outputT][outputH][outputW]);
       }
     };
     cgh.parallel_for(
         sycl::nd_range<3>(
             sycl::range<3>(
-                work_group_size * work_group_num, numPlane, numBatch),
-            sycl::range<3>(work_group_size, 1, 1)),
+                numBatch, numPlane, work_group_size * work_group_num),
+            sycl::range<3>(1, 1, work_group_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -515,7 +494,7 @@ void fractional_max_pool3d_backward_out_template(
   gradInput.zero_();
 
   auto gradInput_ = gradInput;
-  auto gradOutput_ = gradOutput.contiguous();
+  auto gradOutput_ = gradOutput;
   auto indices_ = indices;
 
   if (ndims == 4) {
@@ -534,17 +513,9 @@ void fractional_max_pool3d_backward_out_template(
       "fractional_max_pool3d_backward_out_frame",
       [&] {
         fractional_max_pool3d_backward_out_frame<scalar_t>(
-            gradInput_.data_ptr<scalar_t>(),
-            gradOutput_.data_ptr<scalar_t>(),
-            indices_.data_ptr<int64_t>(),
-            gradInput_.size(0),
-            gradInput_.size(1),
-            inputT,
-            inputH,
-            inputW,
-            outputT,
-            outputH,
-            outputW);
+            gradInput_.packed_accessor64<scalar_t, 5>(),
+            gradOutput_.packed_accessor64<scalar_t, 5>(),
+            indices_.packed_accessor64<int64_t, 5>());
       });
 }
 
@@ -571,7 +542,8 @@ std::tuple<Tensor, Tensor> fractional_max_pool3d(
   Tensor indices = at::empty({0}, self.options().dtype(kLong));
   impl::fractional_max_pool3d_out_template(
       output, indices, self, kernel_size, output_size, random_samples);
-  return std::tuple<Tensor, Tensor>(output, indices);
+  Tensor indices_ = indices.contiguous();
+  return std::tuple<Tensor, Tensor>(output, indices_);
 }
 
 Tensor& fractional_max_pool3d_backward_out(
