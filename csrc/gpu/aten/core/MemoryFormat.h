@@ -106,6 +106,26 @@ inline at::MemoryFormat suggest_memory_format_dpcpp(
   return at::MemoryFormat::Contiguous;
 }
 
+// Note: Only all input tensors are channels last format, cat's output would be
+// channels last tensor. This may cause perf issue in the future.
+inline c10::MemoryFormat cat_compute_output_memory_format(
+    const MaterializedITensorListRef& tensors,
+    bool channels_last_strides_exact_match = false) {
+  c10::optional<c10::MemoryFormat> format = c10::nullopt;
+  for (auto mt : tensors) {
+    auto t = mt.get();
+    auto f = suggest_memory_format_dpcpp(t, channels_last_strides_exact_match);
+    if (f == c10::MemoryFormat::Contiguous) {
+      return f;
+    }
+    if (format.has_value() && format.value() != f) {
+      return c10::MemoryFormat::Contiguous;
+    }
+    format = f;
+  }
+  return format.value();
+}
+
 inline Tensor& convert_tensor_to_channels_last_1d(Tensor& t) {
   const auto ndim = t.ndimension();
   if (3 != ndim) {

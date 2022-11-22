@@ -302,7 +302,7 @@ static void cat(
   TORCH_CHECK(dimension >= 0, "invalid dimension");
 
   Tensor first_tensor = inputs[0];
-  auto ft_smf = suggest_memory_format_dpcpp(first_tensor);
+  auto ft_smf = cat_compute_output_memory_format(inputs);
 
   std::vector<int64_t> size(nDims);
 

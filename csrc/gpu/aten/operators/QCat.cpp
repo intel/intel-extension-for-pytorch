@@ -39,7 +39,8 @@ Tensor q_cat(
       scale_out,
       zero_point_out,
       MemoryFormat::Contiguous);
-  xpu::oneDNN::concat(out, tensors_cat_array, dim);
+  ITensorListRef tensors_ref = ITensorListRef(tensors_cat_array);
+  xpu::oneDNN::concat(out, tensors_ref.materialize(), dim);
   return out;
 }
 

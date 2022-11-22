@@ -78,8 +78,8 @@ class TestTorchMethod(TestCase):
                 self.assertEqual(res_dpcpp.is_contiguous(), True)
                 self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(res_dpcpp), True)
             else:
-                self.assertEqual(res_dpcpp.is_contiguous(), False)
-                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(res_dpcpp), True)
+                self.assertEqual(res_dpcpp.is_contiguous(), True)
+                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(res_dpcpp), False)
 
             user_cpu1 = torch.randn([N, C, W], device=cpu_device, dtype=dtype)
             user_cpu2 = torch.randn([N, C, W], device=cpu_device, dtype=dtype)
@@ -185,8 +185,8 @@ class TestTorchMethod(TestCase):
                 self.assertEqual(res_dpcpp.is_contiguous(), True)
                 self.assertEqual(res_dpcpp.is_contiguous(memory_format=torch.channels_last), True)
             else:
-                self.assertEqual(res_dpcpp.is_contiguous(), False)
-                self.assertEqual(res_dpcpp.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(res_dpcpp.is_contiguous(), True)
+                self.assertEqual(res_dpcpp.is_contiguous(memory_format=torch.channels_last), False)
 
             user_cpu1 = torch.randn([N, C, H, W], device=cpu_device, dtype=dtype)
             user_cpu2 = torch.randn([N, C, H, W], device=cpu_device, dtype=dtype)
