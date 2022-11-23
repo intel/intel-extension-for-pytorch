@@ -465,7 +465,7 @@ def _xpu_deserialize(obj, location):
         device_id = validate_xpu_device(location)
         if getattr(obj, "_torch_load_uninitialized", False):
             with torch.xpu.device(device):
-                return torch._UntypedStorage(obj.nbytes(), device=torch.device(location))
+                return torch.UntypedStorage(obj.nbytes(), device=torch.device(location))
         else:
             return _xpu(obj, device=device_id)
 
