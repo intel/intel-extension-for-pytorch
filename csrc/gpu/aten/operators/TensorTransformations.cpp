@@ -184,14 +184,20 @@ void roll_dpcpp_kernel(
     int64_t stride,
     int64_t total_dims) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto offset = ((size - start) * stride);
-  int64_t local_range = static_cast<int64_t>(1);
-  int64_t global_range = static_cast<int64_t>(1);
-  if (N != 0) {
-    int64_t wg_size = dpcppMaxWorkGroupSize();
-    local_range = N < wg_size ? N : wg_size;
-    global_range = ((N + local_range - 1) / local_range) * local_range;
-  }
+  auto shift = size - start;
+  auto offset = shift * stride;
+  auto start_offset = start * stride;
+  auto total_offset = size * stride;
+
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto local_range = dpcppMaxWorkGroupSize(dev_id);
+  const auto target_global_range =
+      dpcppMaxWorkItemsPerTile(dev_id) / local_range * local_range;
+  int global_range = (N + local_range - 1) / local_range * local_range;
+  auto val_of_work_item =
+      (global_range + target_global_range - 1) / target_global_range;
+  global_range =
+      global_range < target_global_range ? global_range : target_global_range;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = in_tensor.data_ptr<scalar_t>();
@@ -201,20 +207,18 @@ void roll_dpcpp_kernel(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
         [=](sycl::nd_item<1> item) {
           int64_t linear_index = item.get_global_id(0);
-          auto in_ptr = in_data;
-          auto out_ptr = out_data;
-          if (linear_index < N) {
-            // roll dim idx is the index of linear_index along the rolling
-            // dimension.
-            int64_t roll_dim_idx = linear_index % (stride * size) / stride;
-            // index into the source data to find appropriate value.
-            int64_t source_idx = 0;
-            if (roll_dim_idx >= (size - start)) {
-              source_idx = linear_index - offset;
-            } else {
-              source_idx = linear_index + (start * stride);
+          for (int i = 0; i < val_of_work_item; i++) {
+            if (linear_index < N) {
+              // roll dim idx is the index of linear_index along the rolling
+              // dimension.
+              int64_t roll_dim_idx = linear_index % (total_offset) / stride;
+              // index into the source data to find appropriate value.
+              int64_t source_idx = 0;
+              source_idx = roll_dim_idx >= shift ? linear_index - offset
+                                                 : linear_index + start_offset;
+              out_data[linear_index] = in_data[source_idx];
+              linear_index += global_range;
             }
-            out_ptr[linear_index] = in_ptr[source_idx];
           }
         });
   };
@@ -227,7 +231,6 @@ Tensor roll_dpcpp(const Tensor& self, IntArrayRef shifts, IntArrayRef dims) {
   if (dims.size() != 1 || shifts.size() != 1) {
     return roll_common(self, shifts, dims);
   }
-
   auto in_tensor = self.contiguous();
   auto out_tensor = at::empty_like(in_tensor);
   if (out_tensor.numel() == 0) {
