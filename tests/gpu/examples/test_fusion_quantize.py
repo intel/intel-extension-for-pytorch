@@ -81,6 +81,20 @@ class ConvMishAdd(torch.nn.Module):
         x = x + h
         return x
 
+class ConvBinaryBias(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.block = torch.nn.Sequential(
+            torch.nn.Conv2d(in_channels=256, out_channels=128, kernel_size=1, bias=True),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1, bias=True),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(in_channels=256, out_channels=128, kernel_size=3, padding=1, bias=False),
+        )
+
+    def forward(self, x):
+        x = self.block(x);
+        return x
 
 def impe_fp32_model(model, device, test_input):
     modelImpe = model.to(device)
@@ -209,3 +223,8 @@ class TestTorchMethod(TestCase):
         xpu_res = trace_int8_model(model, "xpu", test_input.clone())
         xpu_ref = impe_fp32_model(model, "xpu", test_input.clone())
         self.assertEqual(xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol)
+
+    def test_conv_binary_bias(self, dtype=torch.float):
+        model = ConvBinaryBias()
+        test_input = torch.rand([1, 256, 1, 1])
+        xpu_res = trace_int8_model(model, "xpu", test_input.clone())

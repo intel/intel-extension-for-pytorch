@@ -323,30 +323,33 @@ class Attr {
         auto binary_memory = dpcpp_onednn_memory(binary_md, engine, binary_ptr);
         auto expected_binary_memory = binary_memory;
 
-        if (binary_md.dims() == dst_md.dims()) {
-          // for non-int8 case, expected_binary should in the same datatype and
-          // fmt as dst
-          // for int8 case, expected_binary should in the same fmt as dst while
-          // in fp32 datatype
-          auto expected_md = dst_md;
-          if (dst_md.data_type() == memory::data_type::u8 ||
-              dst_md.data_type() == memory::data_type::s8) {
-            expected_md.data.data_type =
-                static_cast<dnnl_data_type_t>(binary_md.data_type());
-          }
+        // How to set expected_md for binary need more discussion with oneDNN.
+        // if (binary_md.dims() == dst_md.dims()) {
+        //   // for non-int8 case, expected_binary should in the same datatype
+        //   and
+        //   // fmt as dst
+        //   // for int8 case, expected_binary should in the same fmt as dst
+        //   while
+        //   // in fp32 datatype
+        //   auto expected_md = dst_md;
+        //   if (dst_md.data_type() == memory::data_type::u8 ||
+        //       dst_md.data_type() == memory::data_type::s8) {
+        //     expected_md.data.data_type =
+        //         static_cast<dnnl_data_type_t>(binary_md.data_type());
+        //   }
 
-          // if binary_md is not equal to expected_md, reorder is needed.
-          if (binary_md != expected_md) {
-            expected_binary_memory =
-                dpcpp_onednn_memory(expected_md, engine, nullptr);
-            auto strm = GpuStreamManager::Instance().get_stream();
-            DPCPP_ONEDNN_EXEC(
-                dnnl::reorder(binary_memory, expected_binary_memory),
-                strm,
-                {{DNNL_ARG_FROM, binary_memory},
-                 {DNNL_ARG_TO, expected_binary_memory}});
-          }
-        }
+        //   // if binary_md is not equal to expected_md, reorder is needed.
+        //   if (binary_md != expected_md) {
+        //     expected_binary_memory =
+        //         dpcpp_onednn_memory(expected_md, engine, nullptr);
+        //     auto strm = GpuStreamManager::Instance().get_stream();
+        //     DPCPP_ONEDNN_EXEC(
+        //         dnnl::reorder(binary_memory, expected_binary_memory),
+        //         strm,
+        //         {{DNNL_ARG_FROM, binary_memory},
+        //          {DNNL_ARG_TO, expected_binary_memory}});
+        //   }
+        // }
         args.insert(
             {DNNL_ARG_ATTR_MULTIPLE_POST_OP(i) | DNNL_ARG_SRC_1,
              expected_binary_memory});
