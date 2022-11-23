@@ -387,7 +387,6 @@ supported:
   - mm
   - mm.out
   - mode
-  - mode.values
   - mse_loss
   - mse_loss.out
   - mse_loss_backward
@@ -509,8 +508,6 @@ supported:
   - rrelu_with_noise_backward
   - rsqrt.out
   - rsub.Tensor
-  - scatter.src
-  - scatter_.src
   - scatter.value_out
   - scatter.reduce_out
   - scatter.src_out

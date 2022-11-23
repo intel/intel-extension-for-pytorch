@@ -185,6 +185,10 @@ static void norm_kernel_impl(
   } else {
     TORCH_CHECK(0, "norm_kernel_impl expects norm to be integer or float");
   }
+  if (iter.numel() == 0) {
+    iter.output().fill_((p < 0) ? INFINITY : 0);
+    return;
+  }
 
   auto input = iter.tensor(iter.ntensors() - 1);
   if (p == static_cast<float>(0)) {
@@ -317,51 +321,57 @@ Tensor& renorm_out(
     int64_t dim,
     const Scalar& maxnorm,
     Tensor& out) {
-  TORCH_CHECK(!self.is_sparse(), "renorm(sycl_sparse) is not supported.");
-  TORCH_CHECK(p.toFloat() > 0, "non-positive-norm not supported");
-  TORCH_CHECK(self.dim() > 1, "need at least 2 dimensions, got ", self.dim());
-
   auto self_sizes = self.sizes();
   dim = c10::maybe_wrap_dim(dim, self_sizes.size());
-  auto norm_vec_sz = self.size(dim);
-  Tensor norm = at::empty(norm_vec_sz, self.options());
-  at::AtenIpexTypeXPU::norm_out(
-      norm,
-      self.transpose(0, dim).reshape({norm_vec_sz, -1}),
-      p,
-      IntArrayRef(1),
-      false,
-      c10::nullopt);
 
+  DimVector reduce_dims(self_sizes.size());
+  std::iota(reduce_dims.begin(), reduce_dims.end(), 0);
+  reduce_dims.erase(reduce_dims.begin() + dim);
+
+  // For dpcpp half, calculate norm in float precision then cast
+  // normalization factor to half
+  auto dtype = self.scalar_type();
+  auto acc_type = at::AtenIpexTypeXPU::toAccumulateType(dtype);
+  Tensor norm;
+  if (acc_type != dtype) {
+    norm = at::linalg_vector_norm(
+        self,
+        p.toDouble(),
+        reduce_dims,
+        /*keepdim=*/true,
+        /*dtype=*/acc_type);
+  } else {
+    norm = at::linalg_vector_norm(
+        self,
+        p.toDouble(),
+        reduce_dims,
+        /*keepdim=*/true);
+  }
+
+  auto factor = (acc_type == c10::toRealValueType(dtype))
+      ? norm
+      : at::empty(norm.sizes(), self.options());
   auto iter = TensorIteratorConfig()
-                  .add_output(norm)
+                  .add_output(factor)
                   .add_input(norm)
-                  .set_check_mem_overlap(true)
+                  .set_check_mem_overlap(false)
+                  .cast_common_dtype_to_outputs(true)
                   .build();
 
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.common_dtype(),
-      "renorm_out",
+      "renorm_out_dpcpp",
       [&] {
         auto maxnorm_elm = maxnorm.to<scalar_t>();
         dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t norm) -> scalar_t {
           if (norm > maxnorm_elm)
             return maxnorm_elm / (norm + 1e-7);
-          return 1;
+          return 1.;
         });
       });
-
-  std::vector<int64_t> sizes_;
-  sizes_.push_back(norm_vec_sz);
-  size_t tailing_dims = self.dim() - (dim + 1);
-  for (size_t dimension = 0; dimension < tailing_dims; ++dimension) {
-    sizes_.push_back(1);
-  }
-
-  return at::AtenIpexTypeXPU::mul_out(
-      self, norm.contiguous().view(sizes_), out);
+  return at::mul_outf(self, factor, const_cast<Tensor&>(out));
 }
 
 static Tensor& linalg_vector_norm_impl(

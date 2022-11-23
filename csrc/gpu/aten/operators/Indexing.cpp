@@ -922,6 +922,9 @@ Tensor& index_add_out(
   if (!out.is_same(self)) {
     out.copy_(self);
   }
+  if (index.numel() == 0) {
+    return out;
+  }
   IPEX_DISPATCH_ATOMIC_ALL_TYPES_AND_COMPLEX(
       out.scalar_type(), "index_add_", [&] {
         impl::_index_add<scalar_t>(out, dim, index, source, alpha);
@@ -937,6 +940,9 @@ at::Tensor& index_copy_out(
     at::Tensor& out) {
   if (!out.is_same(self)) {
     out.copy_(self);
+  }
+  if (index.numel() == 0) {
+    return out;
   }
   dim = maybe_wrap_dim(dim, out.dim());
   TORCH_CHECK_INDEX(
@@ -1038,6 +1044,8 @@ Tensor& index_fill_(
     int64_t dim,
     const Tensor& index,
     const Scalar& value) {
+  if (index.numel() == 0)
+    return self;
   TORCH_CHECK_INDEX(
       index.scalar_type() == ScalarType::Long,
       "index_fill_(): Expected dtype int64 for index.");
@@ -1059,6 +1067,7 @@ Tensor& index_fill_(
   // Handle the case when `self` is 0-dim
   Tensor self_nonzero_dim = (self.dim() == 0) ? self.unsqueeze(-1) : self;
 
+  dim = at::maybe_wrap_dim(dim, self_nonzero_dim);
   TORCH_CHECK(index.dim() <= 1, "Index has to be a vector/scalar");
   TORCH_CHECK(self.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(index.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);

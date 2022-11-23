@@ -154,6 +154,9 @@ Tensor& gather_out(
     const Tensor& index,
     bool sparse_grad,
     Tensor& out) {
+  if (index.numel() == 0)
+    return out;
+  dim = at::maybe_wrap_dim(dim, self.dim());
   out.resize_(index.sizes());
 
   bool check_result = out.defined();
@@ -173,66 +176,7 @@ Tensor& gather_out(
 }
 
 // scatter family
-Tensor& scatter_(
-    Tensor& self,
-    int64_t dim,
-    const Tensor& index,
-    const Tensor& src) {
-  at::assert_no_internal_overlap(self);
-  at::assert_no_overlap(self, index);
-  at::assert_no_overlap(self, src);
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      at::ScalarType::Bool,
-      self.scalar_type(),
-      "Scatter",
-      [&]() { impl::Scatter<scalar_t>(self, dim, index, src); });
-  return self;
-}
-
-Tensor scatter(
-    const Tensor& self,
-    int64_t dim,
-    const Tensor& index,
-    const Tensor& src) {
-  at::assert_no_internal_overlap(self);
-  Tensor out = at::empty_like(self);
-  out.copy_(self);
-  at::assert_no_internal_overlap(out);
-  at::assert_no_overlap(out, index);
-  at::assert_no_overlap(out, src);
-
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      at::ScalarType::Bool,
-      out.scalar_type(),
-      "Scatter",
-      [&]() { impl::Scatter<scalar_t>(out, dim, index, src); });
-  return out;
-}
-
-Tensor scatter(
-    const Tensor& self,
-    int64_t dim,
-    const Tensor& index,
-    const Scalar& value) {
-  at::assert_no_internal_overlap(self);
-  Tensor out = at::empty_like(self);
-  out.copy_(self);
-  at::assert_no_internal_overlap(out);
-  at::assert_no_overlap(out, index);
-  IPEX_DISPATCH_ALL_TYPES_AND3(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      at::ScalarType::Bool,
-      out.scalar_type(),
-      "ScatterFill",
-      [&]() { impl::ScatterFill<scalar_t>(out, dim, index, value); });
-  return out;
-}
-
+// scatter.value_out
 Tensor& scatter_out(
     const Tensor& self,
     int64_t dim,
@@ -261,6 +205,9 @@ Tensor& scatter_add_out(
     const Tensor& index,
     const Tensor& src,
     Tensor& out) {
+  if (index.numel() == 0)
+    return out;
+  dim = maybe_wrap_dim(dim, self.dim());
   at::assert_no_internal_overlap(self);
   if (!self.is_same(out)) {
     out.copy_(self);

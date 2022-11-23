@@ -2,12 +2,18 @@
 #include <ATen/Config.h>
 #include <c10/util/BFloat16.h>
 #include <c10/util/Half.h>
+#include "ScalarType.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
 
 template <typename T>
 struct AccumulateType {};
+
+template <>
+struct AccumulateType<bool> {
+  using type = bool;
+};
 
 template <>
 struct AccumulateType<at::Half> {
@@ -62,6 +68,21 @@ struct AccumulateType<c10::complex<double>> {
 
 template <typename T>
 using acc_type = typename AccumulateType<T>::type;
+
+// This function always return accumulator type for dpcpp
+TORCH_API static inline c10::ScalarType toAccumulateType(c10::ScalarType type) {
+  switch (type) {
+#define DEFINE_CASE(scalar_t, TypeNum) \
+  case ScalarType::TypeNum:            \
+    return CppTypeToScalarType<at::AtenIpexTypeXPU::acc_type<scalar_t>>::value;
+
+    IPEX_FORALL_SCALAR_TYPES_WITH_COMPLEX_EXCEPT_COMPLEX_HALF(DEFINE_CASE)
+#undef DEFINE_CASE
+
+    default:
+      TORCH_INTERNAL_ASSERT(false, "Unrecognized ScalarType: ", type);
+  }
+}
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

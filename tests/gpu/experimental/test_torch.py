@@ -3226,7 +3226,9 @@ class TestTorchDeviceType(TestCase):
         self.assertEqual((1,), torch.min(zero_d, one_d).shape)
 
         # diag
-        self.assertRaises(RuntimeError, lambda: torch.diag(zero_d))
+        # torch.diag API is changed in PyTorch 1.13.
+        # will recover in 1.13 UT.
+        # self.assertRaises(RuntimeError, lambda: torch.diag(zero_d))
 
         zero_d_int = torch.tensor(1, device=device)
         one_d_int = torch.tensor([1], device=device)

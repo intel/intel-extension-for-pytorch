@@ -592,15 +592,22 @@ std::tuple<Tensor, Tensor> mode(const Tensor& self, int64_t dim, bool keepdim) {
   // often in chosen dimensions of tensor. If evey element appears just once,
   // then return the smallest element and its indices. For now, we only
   // implement less than 2 dimensions Tensor and no keepdim.
-  TORCH_CHECK(
-      self.dim() > 0 && self.dim() <= 2,
-      "Input Tensor's dimension must be within (0, 2]");
-
-  TORCH_CHECK(dim == -1 || dim == 0 || dim == 1, "Input dim must be -1, 0, 1");
-
   Tensor values, indices;
 
-  if (self.dim() != 1) {
+  if (self.dim() == 0) {
+    values = at::empty({0}, self.options());
+    indices = at::empty({0}, self.options().dtype(kLong));
+    dim = maybe_wrap_dim(dim, self.dim());
+    if (self.numel() == 0) {
+      zero_numel_tensor_resize(values, indices, self, dim, keepdim, "mode()");
+      return std::tie(values, indices);
+    } else if (_dimreduce_return_trivial_no_ident(
+                   values, self, dim, keepdim, "mode")) {
+      AT_ASSERT(values.dim() == 0);
+      indices.resize_({}).fill_(0);
+      return std::forward_as_tuple(values, indices);
+    }
+  } else if (self.dim() != 1) {
     auto size = self.size(dim);
     values = at::empty(size, self.options());
     indices = at::empty(size, self.options().dtype(kLong));
@@ -613,8 +620,13 @@ std::tuple<Tensor, Tensor> mode(const Tensor& self, int64_t dim, bool keepdim) {
     indices = at::empty({1}, self.options().dtype(kLong));
     auto ans =
         at::AtenIpexTypeXPU::mode_out(self, dim, keepdim, values, indices);
-    values = std::get<0>(ans).squeeze();
-    indices = std::get<1>(ans).squeeze();
+    if (keepdim) {
+      values = std::get<0>(ans);
+      indices = std::get<1>(ans);
+    } else {
+      values = std::get<0>(ans).squeeze();
+      indices = std::get<1>(ans).squeeze();
+    }
   }
 
   return std::forward_as_tuple(values, indices);

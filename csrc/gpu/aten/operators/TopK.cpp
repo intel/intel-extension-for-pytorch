@@ -590,18 +590,6 @@ void Topk(
 
   auto input = input_.contiguous();
 
-  // Build the output size, which is the dim being selected set to
-  // size k
-  std::vector<int64_t> topKSize = {1};
-  if (input.dim() != 0)
-    topKSize = input.sizes().vec();
-  topKSize[dim] = k;
-  at::AtenIpexTypeXPU::resize_(topK, topKSize, c10::nullopt);
-  at::AtenIpexTypeXPU::resize_(indices, topKSize, c10::nullopt);
-
-  if (k == 0)
-    return;
-
 // static_cast is required to ensure that the correct type (INDEX_T)
 // is provided to the kernel for the arguments.
 #define RUN_K(INDEX_T, DIM, DIR)                                 \
@@ -635,45 +623,59 @@ void Topk(
     RUN_DIR(INDEX_T, -1);    \
   }
 
-#define RUN_T(INDEX_T)                                             \
-  TensorInfo<scalar_t, INDEX_T> inputInfo =                        \
-      getTensorInfo<scalar_t, INDEX_T>(input);                     \
-  TensorInfo<scalar_t, INDEX_T> topKInfo =                         \
-      getTensorInfo<scalar_t, INDEX_T>(topK);                      \
-  TensorInfo<int64_t, INDEX_T> indicesInfo =                       \
-      getTensorInfo<int64_t, INDEX_T>(indices);                    \
-                                                                   \
-  /* We use these structures solely to find the offset to */       \
-  /* each slice we are operating on */                             \
-  inputInfo.sizes[dim] = 1;                                        \
-  topKInfo.sizes[dim] = 1;                                         \
-  indicesInfo.sizes[dim] = 1;                                      \
-                                                                   \
-  /* Collapse all other dims */                                    \
-  int collapseInputDim = inputInfo.collapseDims(dim);              \
-  int collapseTopKDim = topKInfo.collapseDims(dim);                \
-  int collapseIndicesDim = indicesInfo.collapseDims(dim);          \
-                                                                   \
-  int64_t inputSlices = 1;                                         \
-  for (int i = 0; i < inputInfo.dims; ++i) {                       \
-    inputSlices *= inputInfo.sizes[i];                             \
-  }                                                                \
-  int64_t topKSlices = 1;                                          \
-  for (int i = 0; i < topKInfo.dims; ++i) {                        \
-    topKSlices *= topKInfo.sizes[i];                               \
-  }                                                                \
-                                                                   \
-  /* This is used as a template parameter to calculate indices. */ \
-  /* We only specialize it if all collapsed dim sizes are the */   \
-  /* same; otherwise, we use -1 which is the specialization */     \
-  /* parameter for arbitrary dimensions */                         \
-  int allDims = inputInfo.dims;                                    \
-  if (topKInfo.dims != allDims || indicesInfo.dims != allDims) {   \
-    allDims = -1;                                                  \
-  }                                                                \
-                                                                   \
+#define RUN_T(INDEX_T)                                                   \
+  TensorInfo<scalar_t, INDEX_T> inputInfo =                              \
+      getTensorInfo<scalar_t, INDEX_T>(input);                           \
+  TensorInfo<scalar_t, INDEX_T> topKInfo =                               \
+      getTensorInfo<scalar_t, INDEX_T>(topK);                            \
+  TensorInfo<int64_t, INDEX_T> indicesInfo =                             \
+      getTensorInfo<int64_t, INDEX_T>(indices);                          \
+  /*tensorInfoLegacyIfScalar*/                                           \
+  if (!input.dim()) {                                                    \
+    inputInfo.dims = 1;                                                  \
+    inputInfo.sizes[0] = 1;                                              \
+    inputInfo.strides[0] = 1;                                            \
+    topKInfo.dims = 1;                                                   \
+    topKInfo.sizes[0] = 1;                                               \
+    topKInfo.strides[0] = 1;                                             \
+    indicesInfo.dims = 1;                                                \
+    indicesInfo.sizes[0] = 1;                                            \
+    indicesInfo.strides[0] = 1;                                          \
+  }                                                                      \
+  /* We use these structures solely to find the offset to */             \
+  /* each slice we are operating on */                                   \
+  inputInfo.sizes[dim] = 1;                                              \
+  topKInfo.sizes[dim] = 1;                                               \
+  indicesInfo.sizes[dim] = 1;                                            \
+  /* stash the stride of dim because it can be accidentally collapsed */ \
+  auto strideTopK = topKInfo.strides[dim];                               \
+  auto strideIndices = indicesInfo.strides[dim];                         \
+  /* Collapse all other dims */                                          \
+  int collapseInputDim = inputInfo.collapseDims(dim);                    \
+  int collapseTopKDim = topKInfo.collapseDims(dim);                      \
+  int collapseIndicesDim = indicesInfo.collapseDims(dim);                \
+  /* restore stride in case it was collapsed */                          \
+  topKInfo.strides[collapseTopKDim] = strideTopK;                        \
+  indicesInfo.strides[collapseIndicesDim] = strideIndices;               \
+  int64_t inputSlices = 1;                                               \
+  for (int i = 0; i < inputInfo.dims; ++i) {                             \
+    inputSlices *= inputInfo.sizes[i];                                   \
+  }                                                                      \
+  int64_t topKSlices = 1;                                                \
+  for (int i = 0; i < topKInfo.dims; ++i) {                              \
+    topKSlices *= topKInfo.sizes[i];                                     \
+  }                                                                      \
+                                                                         \
+  /* This is used as a template parameter to calculate indices. */       \
+  /* We only specialize it if all collapsed dim sizes are the */         \
+  /* same; otherwise, we use -1 which is the specialization */           \
+  /* parameter for arbitrary dimensions */                               \
+  int allDims = inputInfo.dims;                                          \
+  if (topKInfo.dims != allDims || indicesInfo.dims != allDims) {         \
+    allDims = -1;                                                        \
+  }                                                                      \
+                                                                         \
   RUN_DIM(INDEX_T);
-
   if (input.numel() > 0) {
     // Based on required index size, run the algorithm with the
     // appropriate index type
@@ -688,10 +690,9 @@ void Topk(
 #undef RUN_DIM
 #undef RUN_DIR
 #undef RUN_K
-
   // Sort the results if the user wants them sorted, since our
   // selection routine does not ensure sorting
-  if (sorted) {
+  if (sorted && topK.numel() > 1) {
     int64_t prb_size = topK.size(dim);
     int64_t stride = topK.stride(dim);
     int64_t batch_size = topK.numel() / prb_size / stride;
@@ -727,6 +728,12 @@ std::tuple<at::Tensor&, at::Tensor&> topk_out(
     bool sorted,
     at::Tensor& values,
     at::Tensor& indices) {
+  // If k is 0 the result is an empty tensor, so we don't need to launch a
+  // kernel.
+  if (k == 0) {
+    return std::forward_as_tuple(values, indices);
+  }
+
   auto input = (self.dim() == 0) ? self.view(1) : self;
   auto dim_ = maybe_wrap_dim(dim, self.dim(), /*wrap_scalar=*/true);
   IPEX_DISPATCH_ALL_TYPES_AND2(
