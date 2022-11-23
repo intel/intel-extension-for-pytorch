@@ -11,13 +11,8 @@ static const char* ENV_VAL_STR[]{"OFF", "ON"};
 enum VERBOSE_LEVEL { DISABLE = 0, DEBUG = 1, VERBOSE_LEVEL_MAX = DEBUG };
 static const char* VERBOSE_LEVEL_STR[]{"DISABLE", "DEBUG"};
 
-enum IPEX_API XPU_BACKEND {
-  GPU = 0,
-  CPU = 1,
-  AUTO = 2,
-  XPU_BACKEND_MAX = AUTO
-};
-static const char* IPEX_API XPU_BACKEND_STR[]{"GPU", "CPU", "AUTO"};
+enum XPU_BACKEND { GPU = 0, CPU = 1, AUTO = 2, XPU_BACKEND_MAX = AUTO };
+static const char* XPU_BACKEND_STR[]{"GPU", "CPU", "AUTO"};
 
 namespace dpcpp {
 

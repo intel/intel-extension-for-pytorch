@@ -19,10 +19,6 @@ target_include_directories(PY_XPU_OBJ PUBLIC ${TORCH_INCLUDE_DIRS})
 target_include_directories(PY_XPU_OBJ PUBLIC ${IPEX_GPU_ROOT_DIR})
 target_include_directories(PY_XPU_OBJ PUBLIC ${IPEX_GPU_ROOT_DIR}/aten)
 
-# Will be removed as long as intrinsic.h is not needed
-target_include_directories(PY_XPU_OBJ PUBLIC ${IPEX_ROOT_DIR}/third_party/oneDNN/include)
-target_include_directories(PY_XPU_OBJ PUBLIC ${CMAKE_BINARY_DIR}/csrc/gpu/oneDNN/include)
-
 target_include_directories(PY_XPU_OBJ PUBLIC ${PYTHON_INCLUDE_DIR})
 set_target_properties(PY_XPU_OBJ PROPERTIES PYTHON_DIR ${PYTHON_INCLUDE_DIR})
 
