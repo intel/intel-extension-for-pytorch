@@ -9,6 +9,7 @@
 #include "c10/util/Optional.h"
 #include "comm/ParamUtils.h"
 #include "comm/RegistrationDeclarations.h"
+#include "utils/CustomOperatorRegistration.h"
 
 using namespace dnnl;
 using namespace at::native;
@@ -61,7 +62,7 @@ signiture.
       std::vector<int64_t> dilation_,                              \
       bool transposed,                                             \
       std::vector<int64_t> output_padding_,                        \
-      int groups,                                                  \
+      int64_t groups,                                              \
       bool benchmark,                                              \
       bool deterministic,                                          \
       bool cudnn_enabled,                                          \
@@ -605,7 +606,7 @@ Attr get_onednn_conv_sum_attr(
     IntArrayRef padding_,
     IntArrayRef dilation_,
     Tensor& accumu,
-    float scale,
+    double scale,
     Tensor& output,
     bool& is_fused) {
   is_fused = true;
@@ -833,12 +834,13 @@ Tensor pad_convolution(
     IntArrayRef pad_nd,
     Scalar value,
     const Tensor& weight_r,
-    const Tensor& bias_r,
+    const c10::optional<Tensor>& bias,
     IntArrayRef stride_,
     IntArrayRef padding_,
     IntArrayRef dilation_,
     int64_t groups_) {
   // oneDNN only support padding value with 0
+  Tensor bias_r = bias.has_value() ? bias.value() : at::Tensor();
   if (value.to<float>() != 0.0) {
     auto padded_input = at::constant_pad_nd(input_r, pad_nd, value);
     Tensor output_r;
@@ -1097,7 +1099,7 @@ Tensor _convolution_gelu(
     std::vector<int64_t> dilation_,
     bool transposed,
     std::vector<int64_t> output_padding_,
-    int groups,
+    int64_t groups,
     bool benchmark,
     bool deterministic,
     bool cudnn_enabled,
@@ -1160,7 +1162,7 @@ Tensor _convolution_silu(
     std::vector<int64_t> dilation_,
     bool transposed,
     std::vector<int64_t> output_padding_,
-    int groups,
+    int64_t groups,
     bool benchmark,
     bool deterministic,
     bool cudnn_enabled,
@@ -1214,7 +1216,7 @@ Tensor _convolution_log_sigmoid(
     std::vector<int64_t> dilation_,
     bool transposed,
     std::vector<int64_t> output_padding_,
-    int groups,
+    int64_t groups,
     bool benchmark,
     bool deterministic,
     bool cudnn_enabled,
@@ -1269,7 +1271,7 @@ Tensor _convolution_hardsigmoid(
     std::vector<int64_t> dilation_,
     bool transposed,
     std::vector<int64_t> output_padding_,
-    int groups,
+    int64_t groups,
     bool benchmark,
     bool deterministic,
     bool cudnn_enabled,
@@ -1325,7 +1327,7 @@ Tensor _convolution_pow(
     std::vector<int64_t> dilation_,
     bool transposed,
     std::vector<int64_t> output_padding_,
-    int groups,
+    int64_t groups,
     bool benchmark,
     bool deterministic,
     bool cudnn_enabled,
@@ -1382,7 +1384,7 @@ Tensor _convolution_leaky_relu(
     std::vector<int64_t> dilation_,
     bool transposed,
     std::vector<int64_t> output_padding_,
-    int groups,
+    int64_t groups,
     bool benchmark,
     bool deterministic,
     bool cudnn_enabled,
@@ -1441,7 +1443,7 @@ Tensor _convolution_hardtanh(
     std::vector<int64_t> dilation_,
     bool transposed,
     std::vector<int64_t> output_padding_,
-    int groups,
+    int64_t groups,
     bool benchmark,
     bool deterministic,
     bool cudnn_enabled,
@@ -1504,7 +1506,7 @@ Tensor _convolution_elu(
     std::vector<int64_t> dilation_,
     bool transposed,
     std::vector<int64_t> output_padding_,
-    int groups,
+    int64_t groups,
     bool benchmark,
     bool deterministic,
     bool cudnn_enabled,
@@ -1534,7 +1536,7 @@ Tensor _convolution_elu(
 Tensor convolution_sum(
     const Tensor& input_r,
     const Tensor& weight_r,
-    const Tensor& bias_r,
+    const c10::optional<Tensor>& bias,
     IntArrayRef stride_,
     IntArrayRef padding_,
     IntArrayRef dilation_,
@@ -1543,6 +1545,7 @@ Tensor convolution_sum(
     Scalar scale) {
   bool is_fused;
   Tensor output;
+  Tensor bias_r = bias.has_value() ? bias.value() : at::Tensor();
   Attr attr = get_onednn_conv_sum_attr(
       input_r,
       weight_r,
@@ -1573,7 +1576,7 @@ Tensor convolution_sum(
 Tensor _convolution_sum(
     const Tensor& input_r,
     const Tensor& weight_r,
-    const Tensor& bias_r,
+    const c10::optional<Tensor>& bias,
     IntArrayRef stride_,
     IntArrayRef padding_,
     IntArrayRef dilation_,
@@ -1588,6 +1591,7 @@ Tensor _convolution_sum(
     Scalar scale) {
   bool is_fused;
   Tensor output;
+  Tensor bias_r = bias.has_value() ? bias.value() : at::Tensor();
   Attr attr = get_onednn_conv_sum_attr(
       input_r,
       weight_r,
@@ -1618,7 +1622,7 @@ Tensor _convolution_sum(
 Tensor convolution_sum_relu(
     const Tensor& input_r,
     const Tensor& weight_r,
-    const Tensor& bias_r,
+    const c10::optional<Tensor>& bias,
     IntArrayRef stride_,
     IntArrayRef padding_,
     IntArrayRef dilation_,
@@ -1627,6 +1631,7 @@ Tensor convolution_sum_relu(
     Scalar scale) {
   bool is_fused;
   Tensor output;
+  Tensor bias_r = bias.has_value() ? bias.value() : at::Tensor();
   Attr attr = get_onednn_conv_sum_attr(
       input_r,
       weight_r,
@@ -1666,7 +1671,7 @@ Tensor convolution_sum_relu(
 Tensor _convolution_sum_relu(
     const Tensor& input_r,
     const Tensor& weight_r,
-    const Tensor& bias_r,
+    const c10::optional<Tensor>& bias,
     IntArrayRef stride_,
     IntArrayRef padding_,
     IntArrayRef dilation_,
@@ -1681,6 +1686,7 @@ Tensor _convolution_sum_relu(
     Scalar scale) {
   bool is_fused;
   Tensor output;
+  Tensor bias_r = bias.has_value() ? bias.value() : at::Tensor();
   Attr attr = get_onednn_conv_sum_attr(
       input_r,
       weight_r,
@@ -1720,7 +1726,7 @@ Tensor _convolution_sum_relu(
 Tensor convolution_binary_mul(
     const Tensor& input_r,
     const Tensor& weight_r,
-    const Tensor& bias_r,
+    const c10::optional<Tensor>& bias,
     IntArrayRef stride_,
     IntArrayRef padding_,
     IntArrayRef dilation_,
@@ -1735,6 +1741,7 @@ Tensor convolution_binary_mul(
       padding_,
       stride_,
       dilation_);
+  Tensor bias_r = bias.has_value() ? bias.value() : at::Tensor();
   Tensor out = at::empty(output_size, input_r.options());
   bool is_fused = xpu::oneDNN::binary_valid(out, binary) ? true : false;
   Attr attr;
@@ -1758,6 +1765,36 @@ Tensor convolution_binary_mul(
     output_r = at::AtenIpexTypeXPU::mul_out(binary, output_r, output_r);
 
   return output_r;
+}
+
+#define IPEX_OP_REGISTER_CONVOLUTION(op)             \
+  IPEX_OP_REGISTER("conv2d_" #op, convolution_##op); \
+  IPEX_OP_REGISTER("_convolution_" #op, _convolution_##op);
+
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_CONVOLUTION(sigmoid);
+  IPEX_OP_REGISTER_CONVOLUTION(relu);
+  IPEX_OP_REGISTER_CONVOLUTION(sqrt);
+  IPEX_OP_REGISTER_CONVOLUTION(abs);
+  IPEX_OP_REGISTER_CONVOLUTION(tanh);
+  IPEX_OP_REGISTER_CONVOLUTION(square);
+  IPEX_OP_REGISTER_CONVOLUTION(exp);
+  IPEX_OP_REGISTER_CONVOLUTION(log);
+  IPEX_OP_REGISTER_CONVOLUTION(round);
+  IPEX_OP_REGISTER_CONVOLUTION(log_sigmoid);
+  IPEX_OP_REGISTER_CONVOLUTION(hardswish);
+  IPEX_OP_REGISTER_CONVOLUTION(mish);
+  IPEX_OP_REGISTER_CONVOLUTION(silu);
+  IPEX_OP_REGISTER_CONVOLUTION(hardsigmoid);
+  IPEX_OP_REGISTER_CONVOLUTION(gelu);
+  IPEX_OP_REGISTER_CONVOLUTION(leaky_relu);
+  IPEX_OP_REGISTER_CONVOLUTION(pow);
+  IPEX_OP_REGISTER_CONVOLUTION(hardtanh);
+  IPEX_OP_REGISTER_CONVOLUTION(elu);
+  IPEX_OP_REGISTER_CONVOLUTION(sum);
+  IPEX_OP_REGISTER_CONVOLUTION(sum_relu);
+  IPEX_OP_REGISTER("pad_conv2d", pad_convolution);
+  IPEX_OP_REGISTER("conv2d_binary_mul", convolution_binary_mul);
 }
 
 } // namespace AtenIpexTypeXPU

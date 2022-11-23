@@ -7,6 +7,7 @@
 #include <oneapi/dnnl/dnnl.hpp>
 
 #include <oneDNN/oneDNN.h>
+#include "utils/CustomOperatorRegistration.h"
 
 using namespace xpu::oneDNN;
 
@@ -49,7 +50,7 @@ at::Tensor fold_weight(
     const at::Tensor& weight,
     const at::Tensor& bn_weight,
     const at::Tensor& running_var,
-    float eps) {
+    double eps) {
   const OptionalDeviceGuard device_guard(device_of(weight));
   return at::empty_like(weight);
 }
@@ -61,7 +62,7 @@ at::Tensor fold_bias(
     const at::Tensor& bn_bias,
     const at::Tensor& running_mean,
     const at::Tensor& running_var,
-    float eps) {
+    double eps) {
   const OptionalDeviceGuard device_guard(device_of(weight));
   return at::empty_like(bias);
 }
@@ -75,6 +76,13 @@ at::Tensor reorder(
   return at::empty_like(input);
 }
 
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER("batch_norm", batch_norm);
+  IPEX_OP_REGISTER("fold_bias", fold_bias);
+  IPEX_OP_REGISTER("fold_weight", fold_weight);
+  IPEX_OP_REGISTER("dequant_pixelshuffle", dequant_pixelshuffle);
+  IPEX_OP_REGISTER("dequant_pixelshuffle_quant", dequant_pixelshuffle_quant);
+}
 } // namespace xpu
 
 } // namespace jit

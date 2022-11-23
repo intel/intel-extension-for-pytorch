@@ -1,5 +1,5 @@
 #include "Linear.h"
-#include <torch/library.h>
+#include "utils/CustomOperatorRegistration.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -469,5 +469,30 @@ TORCH_LIBRARY_IMPL(aten, AutogradXPU, m) {
   m.impl("linear_out", TORCH_FN(linear_out));
 }
 
+#define IPEX_OP_REGISTER_LINEAR(op) \
+  IPEX_OP_REGISTER("linear_" #op, linear_##op);
+
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_LINEAR(sigmoid);
+  IPEX_OP_REGISTER_LINEAR(relu);
+  IPEX_OP_REGISTER_LINEAR(sqrt);
+  IPEX_OP_REGISTER_LINEAR(abs);
+  IPEX_OP_REGISTER_LINEAR(tanh);
+  IPEX_OP_REGISTER_LINEAR(square);
+  IPEX_OP_REGISTER_LINEAR(exp);
+  IPEX_OP_REGISTER_LINEAR(log);
+  IPEX_OP_REGISTER_LINEAR(round);
+  IPEX_OP_REGISTER_LINEAR(log_sigmoid);
+  IPEX_OP_REGISTER_LINEAR(hardswish);
+  IPEX_OP_REGISTER_LINEAR(mish);
+  IPEX_OP_REGISTER_LINEAR(silu);
+  IPEX_OP_REGISTER_LINEAR(hardsigmoid);
+  IPEX_OP_REGISTER_LINEAR(leaky_relu);
+  IPEX_OP_REGISTER_LINEAR(pow);
+  IPEX_OP_REGISTER_LINEAR(hardtanh);
+  IPEX_OP_REGISTER_LINEAR(elu);
+  IPEX_OP_REGISTER_LINEAR(sum);
+  IPEX_OP_REGISTER_LINEAR(gelu);
+}
 } // namespace AtenIpexTypeXPU
 } // namespace at

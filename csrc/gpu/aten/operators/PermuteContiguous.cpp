@@ -7,6 +7,7 @@
 #include <oneapi/dnnl/dnnl.hpp>
 
 #include <oneDNN/oneDNN.h>
+#include "utils/CustomOperatorRegistration.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -66,6 +67,10 @@ at::Tensor permute_contiguous(
   ::xpu::oneDNN::reorder(self, permute_one);
   result = at::native::permute(permute_one, dims);
   return result;
+}
+
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER("permute_contiguous", permute_contiguous);
 }
 } // namespace AtenIpexTypeXPU
 } // namespace at

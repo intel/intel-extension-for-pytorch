@@ -1,7 +1,7 @@
 #include <ATen/WrapDimUtilsMulti.h>
 #include <ATen/native/Resize.h>
 #include "BlasImpl.h"
-
+#include "utils/CustomOperatorRegistration.h"
 namespace at {
 namespace AtenIpexTypeXPU {
 
@@ -513,8 +513,8 @@ at::Tensor matmul_add(
 // res = m1 * m2.transpose()
 at::Tensor trans_matmul(
     const at::Tensor& tensor2,
-    int dim1,
-    int dim2,
+    int64_t dim1,
+    int64_t dim2,
     const at::Tensor& tensor1) {
   RECORD_FUNCTION("trans_matmul", std::vector<c10::IValue>({tensor1, tensor2}));
   bool trans = false, fallback = false;
@@ -645,8 +645,8 @@ at::Tensor t_matmul_add_add(
 // res = (m1 * m2.transpose()) / oscale
 at::Tensor trans_matmul_div(
     const at::Tensor& tensor2,
-    int dim1,
-    int dim2,
+    int64_t dim1,
+    int64_t dim2,
     const at::Tensor& tensor1,
     Scalar oscale) {
   RECORD_FUNCTION(
@@ -695,6 +695,16 @@ Tensor addmm(
   Tensor bias;
   onednn_matmul(result, m1, m2, bias, input, true, attr);
   return result;
+}
+
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER("matmul_add", matmul_add);
+  IPEX_OP_REGISTER("trans_matmul", trans_matmul);
+  IPEX_OP_REGISTER("t_matmul", t_matmul);
+  IPEX_OP_REGISTER("t_matmul_add", t_matmul_add);
+  IPEX_OP_REGISTER("t_matmul_add_gelu", t_matmul_add_gelu);
+  IPEX_OP_REGISTER("t_matmul_add_add", t_matmul_add_add);
+  IPEX_OP_REGISTER("trans_matmul_div", trans_matmul_div);
 }
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

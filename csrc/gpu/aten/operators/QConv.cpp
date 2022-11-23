@@ -12,6 +12,7 @@
 #include <runtime/Utils.h>
 #include <unistd.h>
 #include "comm/RegistrationDeclarations.h"
+#include "utils/CustomOperatorRegistration.h"
 
 using namespace dnnl;
 using namespace at::native;
@@ -276,8 +277,8 @@ at::Tensor q_conv2d_sum(
     double output_scale,
     int64_t output_zero_point,
     Tensor& accumu,
-    float sum_scale,
-    int sum_zero_point) {
+    double sum_scale,
+    int64_t sum_zero_point) {
   auto qconv_wrapper = QuantizeConvConverter<2>(
       packed_weight, sum_scale, sum_zero_point, kQInt8);
   auto att = [=]() {
@@ -299,8 +300,8 @@ at::Tensor q_conv2d_sum_relu(
     double output_scale,
     int64_t output_zero_point,
     Tensor& accumu,
-    float sum_scale,
-    int sum_zero_point) {
+    double sum_scale,
+    int64_t sum_zero_point) {
   auto qconv_wrapper = QuantizeConvConverter<2>(
       packed_weight, sum_scale, sum_zero_point, kQUInt8);
   auto att = [=]() {
@@ -902,6 +903,39 @@ at::Tensor q_conv2d_elu(
         attr.kind_with_elu);
   };
   return qconv_wrapper.call(input, att);
+}
+
+#define IPEX_OP_REGISTER_QCONV(op) \
+  IPEX_OP_REGISTER("q_conv2d_" #op, q_conv2d_##op);
+
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_QCONV(sigmoid);
+  IPEX_OP_REGISTER_QCONV(relu);
+  IPEX_OP_REGISTER_QCONV(sqrt);
+  IPEX_OP_REGISTER_QCONV(abs);
+  IPEX_OP_REGISTER_QCONV(tanh);
+  IPEX_OP_REGISTER_QCONV(square);
+  IPEX_OP_REGISTER_QCONV(exp);
+  IPEX_OP_REGISTER_QCONV(log);
+  IPEX_OP_REGISTER_QCONV(round);
+  IPEX_OP_REGISTER_QCONV(log_sigmoid);
+  IPEX_OP_REGISTER_QCONV(hardswish);
+  IPEX_OP_REGISTER_QCONV(mish);
+  IPEX_OP_REGISTER_QCONV(silu);
+  IPEX_OP_REGISTER_QCONV(hardsigmoid);
+  IPEX_OP_REGISTER_QCONV(gelu);
+  IPEX_OP_REGISTER_QCONV(leaky_relu);
+  IPEX_OP_REGISTER_QCONV(pow);
+  IPEX_OP_REGISTER_QCONV(hardtanh);
+  IPEX_OP_REGISTER_QCONV(elu);
+  IPEX_OP_REGISTER_QCONV(sum);
+  IPEX_OP_REGISTER_QCONV(sum_relu);
+  IPEX_OP_REGISTER_QCONV(dequantize);
+  IPEX_OP_REGISTER_QCONV(dequantize_softplus_tanh_mul);
+  IPEX_OP_REGISTER_QCONV(dequantize_softplus_tanh_mul_quantize);
+  IPEX_OP_REGISTER_QCONV(dequantize_softplus_tanh_mul_quantize_add);
+  IPEX_OP_REGISTER_NEED_PLAIN("softplus_tanh", softplus_tanh);
+  IPEX_OP_REGISTER_NEED_PLAIN("softplus_tanh_mul", softplus_tanh_mul)
 }
 
 } // namespace AtenIpexTypeXPU

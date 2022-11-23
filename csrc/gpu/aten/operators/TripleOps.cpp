@@ -7,7 +7,6 @@
 #include <core/detail/ListUtils.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
-#include <torch/library.h>
 #include <utils/DPCPP.h>
 
 #include "Loops.h"
@@ -15,6 +14,8 @@
 #include "comm/AccumulateType.h"
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
+#include "jit/dpcpp_ops.h"
+#include "utils/CustomOperatorRegistration.h"
 
 using namespace xpu::dpcpp;
 using namespace at::sparse;
@@ -375,10 +376,9 @@ Tensor packed_add(
 } // namespace at
 
 namespace {
-TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      "mul_add(Tensor self, Tensor other, Tensor accumu, Scalar alpha) -> Tensor");
-  m.impl("mul_add", c10::DispatchKey::XPU, at::AtenIpexTypeXPU::mul_add);
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER("mul_add", mul_add);
+  IPEX_OP_REGISTER("mul_add.Scalar", mul_add_scalar);
   m.def(
       "packed_add(Tensor top_half, Tensor bot_half, Tensor grad, float alpha) -> Tensor");
   m.impl("packed_add", c10::DispatchKey::XPU, at::AtenIpexTypeXPU::packed_add);
