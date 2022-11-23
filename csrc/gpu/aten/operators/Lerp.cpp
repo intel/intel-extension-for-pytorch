@@ -49,9 +49,6 @@ Tensor& lerp_out(
     const Tensor& weight,
     Tensor& out) {
   c10::MaybeOwned<Tensor> b_self, b_end, b_weight;
-  TORCH_CHECK(
-      weight.dim() <= std::max(self.dim(), end.dim()),
-      "weight should be of dimension max(self.dim(), end.dim()) or lesser");
   std::tie(b_self, b_end, b_weight) =
       expand_outplace(self, end, weight, "lerp_out");
   out.resize_as_(*b_self);
