@@ -39,24 +39,6 @@ Tensor quantize_tensor_per_channel_affine(
   return qtensor;
 }
 
-static inline memory::format_tag quant_dst_fmt(
-    const int64_t ndim,
-    const bool is_channels_last = false) {
-  if (!is_channels_last) {
-    return (ndim == 3)
-        ? memory::format_tag::ncw
-        : ((ndim == 4) ? memory::format_tag::nchw
-                       : ((ndim == 5) ? memory::format_tag::ncdhw
-                                      : memory::format_tag::undef));
-  } else {
-    return (ndim == 3)
-        ? memory::format_tag::nwc
-        : ((ndim == 4) ? memory::format_tag::nhwc
-                       : ((ndim == 5) ? memory::format_tag::ndhwc
-                                      : memory::format_tag::undef));
-  }
-}
-
 Tensor quantize_tensor_per_tensor_affine(
     Tensor& qtensor,
     const Tensor& rtensor,
@@ -85,40 +67,18 @@ Tensor quantize_tensor_per_tensor_affine(
   rattr.set_dst_sc_and_zp(mask, scls, mask, zps);
   if (qtensor.scalar_type() == kQUInt8 && zero_point == 128) {
     Tensor qtensor_opt = qtensor;
-    memory::dims q_dims = rtensor.dim() == 5 ? memory::dims(
-                                                   {rtensor.size(0),
-                                                    rtensor.size(1),
-                                                    rtensor.size(2),
-                                                    rtensor.size(3),
-                                                    rtensor.size(4)})
-        : rtensor.dim() == 4 ? memory::dims(
-                                   {rtensor.size(0),
-                                    rtensor.size(1),
-                                    rtensor.size(2),
-                                    rtensor.size(3)})
-        : rtensor.dim() == 2 ? memory::dims({rtensor.size(0), rtensor.size(1)})
-                             : memory::dims({rtensor.size(0)});
-
-    memory::format_tag q_fmt =
-        quant_dst_fmt(rtensor.dim(), is_smf_channels_last(rtensor));
+    memory::dims q_dims = xpu::oneDNN::get_onednn_dims(rtensor);
+    memory::format_tag q_fmt = xpu::oneDNN::get_dnnl_default_format(
+        rtensor.dim(), is_smf_channels_last(rtensor));
 
     // We will force to specify s8 as quantization data type to meet the
-    // requirement of pytorch calibration with unified data type.
-    memory::data_type q_dt =
-        (qtensor.scalar_type() == kQUInt8 && zero_point == 128)
-        ? memory::data_type::s8
-        : xpu::oneDNN::get_onednn_dtype(qtensor);
+    // requirement of pytorch calibration with unified data type. Dueing to
+    // PyTorch use zp=128 for u8 symmetric quantization, while oneDNN use 0. We
+    // need forcely quant input to a s8 tensor.
+    memory::data_type q_dt = memory::data_type::s8;
     memory::desc q_md = memory::desc(q_dims, q_dt, q_fmt);
-    auto q_type = (qtensor.scalar_type() == kQUInt8 && zero_point == 128)
-        ? kQInt8
-        : qtensor.scalar_type();
-    auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
-        scale,
-        0,
-        (xpu::oneDNN::get_onednn_dtype(qtensor) == memory::data_type::u8 &&
-         zero_point == 128)
-            ? kQInt8
-            : q_type);
+    auto quantizer = dpcpp_make_per_tensor_affine_quantizer(scale, 0, kQInt8);
+
     qtensor_opt =
         AtenIpexTypeXPU::empty_opaque_qtensor(q_md, c10::nullopt, quantizer);
 
