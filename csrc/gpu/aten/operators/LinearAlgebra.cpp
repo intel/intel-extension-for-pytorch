@@ -157,7 +157,7 @@ void copy_triangle_symmetric_template(Tensor& self, bool upper) {
     auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
       auto linear_id = item_id.get_linear_id();
       float triangle_row_ =
-          (Numerics<float>::sqrt(1 + 8.0 * linear_id) - 1) / 2;
+          (Numerics<float>::sqrt(1 + 8.0f * linear_id) - 1) / 2;
       int64_t triangle_row = triangle_row_;
       int64_t triangle_col =
           linear_id - (triangle_row * (triangle_row + 1)) / 2;
