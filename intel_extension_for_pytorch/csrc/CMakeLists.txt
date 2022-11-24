@@ -32,7 +32,7 @@ set(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
 set(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 # ---[ Build flags
-include(${IPEX_PROJECT_TOP_DIR}/cmake/python/BuildOptions.cmake)
+include(${IPEX_PROJECT_TOP_DIR}/cmake/cpu/BuildFlags.cmake)
 
 # includes
 include_directories(${IPEX_PROJECT_TOP_DIR})

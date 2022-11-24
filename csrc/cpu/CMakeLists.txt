@@ -49,7 +49,7 @@ IF("${IPEX_DISP_OP}" STREQUAL "1")
 ENDIF()
 
 # ---[ Build flags
-include(${IPEX_PROJECT_TOP_DIR}/cmake/cpu/BuildOptions.cmake)
+include(${IPEX_PROJECT_TOP_DIR}/cmake/cpu/BuildFlags.cmake)
 
 # ---[ Main build
 # include mkl-dnn before PyTorch
