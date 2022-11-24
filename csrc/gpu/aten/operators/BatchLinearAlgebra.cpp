@@ -5,6 +5,7 @@
 #include <ATen/ops/_linalg_check_errors.h>
 
 #include <runtime/Utils.h>
+#include <tensor/TensorMeta.h>
 #include <utils/oneMKLUtils.h>
 
 #include "comm/ATDispatch.h"
@@ -21,15 +22,6 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
-void set_strided(Tensor& output, IntArrayRef sizes, IntArrayRef strides) {
-  output.resize_(sizes);
-  output.as_strided_(sizes, strides);
-}
-
-void set_contiguous(Tensor& output, IntArrayRef sizes) {
-  auto strides = c10::contiguous_strides(sizes);
-  set_strided(output, sizes, strides);
-}
 
 // Used as an interface between the different BLAS-like libraries
 enum class TransposeType {
@@ -3238,22 +3230,25 @@ Tensor lu_det_P(const Tensor& pivots) {
 
 std::tuple<Tensor&, Tensor&, Tensor&> _linalg_det_out(
     const Tensor& A,
-    Tensor& result,
+    Tensor& det,
     Tensor& LU,
     Tensor& pivots) {
   auto shape = A.sizes();
   auto ndim = shape.size();
 
   // det
-  set_contiguous(result, shape.slice(0, ndim - 2));
+  auto det_new = set_contiguous(det, shape.slice(0, ndim - 2), A.options());
+  Tensor det_use = C10_UNLIKELY(det_new.has_value()) ? det_new.value() : det;
 
   // LU
   auto LU_strides =
       at::native::batched_matrix_contiguous_strides(shape, /*f-contig*=*/true);
-  set_strided(LU, shape, LU_strides);
+  auto LU_new = set_strided(LU, shape, LU_strides, A.options());
+  Tensor LU_use = C10_UNLIKELY(LU_new.has_value()) ? LU_new.value() : LU;
 
   // pivots
-  set_contiguous(pivots, shape.slice(0, ndim - 1));
+  set_contiguous_no_create(
+      pivots, shape.slice(0, ndim - 1), A.options().dtype(kInt));
 
   // info is an aux tensor
   auto info = at::empty({0}, A.options().dtype(kInt));
@@ -3262,17 +3257,92 @@ std::tuple<Tensor&, Tensor&, Tensor&> _linalg_det_out(
   // limit this to real matrices, but it could also be implemented for complex
   // matrices
   at::linalg_lu_factor_ex_out(
-      const_cast<Tensor&>(LU),
+      const_cast<Tensor&>(LU_use),
       const_cast<Tensor&>(pivots),
       const_cast<Tensor&>(info),
       A.is_contiguous() && !A.is_complex() ? A.mH() : A);
 
   // det = det_P * prod(diag(LU))
   at::mul_out(
-      const_cast<Tensor&>(result),
+      const_cast<Tensor&>(det_use),
       lu_det_P(pivots),
-      at::prod(LU.diagonal(0, -2, -1), /*dim=*/-1));
-  return std::tuple<Tensor&, Tensor&, Tensor&>(result, LU, pivots);
+      at::prod(LU_use.diagonal(0, -2, -1), /*dim=*/-1));
+  if (det_new.has_value())
+    det.copy_(det_use);
+  if (LU_new.has_value())
+    LU.copy_(LU_use);
+  return std::tuple<Tensor&, Tensor&, Tensor&>(det, LU, pivots);
+}
+
+std::tuple<Tensor&, Tensor&, Tensor&, Tensor&> _linalg_slogdet_out(
+    const Tensor& A,
+    Tensor& sign,
+    Tensor& logabsdet,
+    Tensor& LU,
+    Tensor& pivots) {
+  at::native::squareCheckInputs(A, "linalg.slogdet");
+  at::native::checkFloatingOrComplex(
+      A, "linalg.slogdet", /*low_precision*/ false);
+
+  auto shape = A.sizes();
+  auto ndim = shape.size();
+
+  auto shape_outputs = shape.slice(0, ndim - 2);
+
+  // sign
+  auto sign_new = set_contiguous(sign, shape_outputs, A.options());
+  Tensor sign_use =
+      C10_UNLIKELY(sign_new.has_value()) ? sign_new.value() : sign;
+
+  // logabsdet
+  auto logabsdet_new = set_contiguous(
+      logabsdet,
+      shape_outputs,
+      A.options().dtype(toRealValueType(A.scalar_type())));
+  Tensor logabsdet_use = C10_UNLIKELY(logabsdet_new.has_value())
+      ? logabsdet_new.value()
+      : logabsdet;
+
+  // LU
+  auto LU_strides = at::native::batched_matrix_contiguous_strides(
+      shape,
+      /*f-contig*=*/true);
+  auto LU_new = set_strided(LU, shape, LU_strides, A.options());
+  Tensor LU_use = C10_UNLIKELY(LU_new.has_value()) ? LU_new.value() : LU;
+
+  // pivots
+  set_contiguous_no_create(
+      pivots, shape.slice(0, ndim - 1), A.options().dtype(kInt));
+
+  // info is an aux tensor
+  auto info = at::empty({0}, A.options().dtype(kInt));
+  // Optimisation: lu_factor_ex requires the input to be F-contig, otherwise it
+  // copies Use the transpose of if A is contiguous since det(A^T) = det(A) We
+  // limit this to real matrices, but it could also be implemented for complex
+  // matrices
+  at::linalg_lu_factor_ex_out(
+      const_cast<Tensor&>(LU_use),
+      const_cast<Tensor&>(pivots),
+      const_cast<Tensor&>(info),
+      A.is_contiguous() && !A.is_complex() ? A.mH() : A);
+
+  auto diag_U = LU_use.diagonal(0, -2, -1);
+  // sign
+  at::mul_out(
+      const_cast<Tensor&>(sign_use), diag_U.sgn().prod(-1), lu_det_P(pivots));
+
+  // logabsdet
+  at::sum_out(const_cast<Tensor&>(logabsdet_use), diag_U.abs().log_(), -1);
+
+  if (sign_new.has_value())
+    sign.copy_(sign_use);
+  if (logabsdet_new.has_value())
+    logabsdet.copy_(logabsdet_use);
+  if (LU_new.has_value())
+    LU.copy_(LU_use);
+
+  return std::tuple<Tensor&, Tensor&, Tensor&, Tensor&>(
+      sign, logabsdet, LU, pivots);
 }
 
 // In PyTorch1.10, inverse is implemented by MKL api getrf + getri. In
@@ -3372,17 +3442,20 @@ std::tuple<Tensor&, Tensor&, Tensor&, Tensor&> _linalg_solve_ex_out(
   // LU
   auto LU_strides =
       at::native::batched_matrix_contiguous_strides(shape, /*f-contig*=*/true);
-  set_strided(LU, shape, LU_strides);
+  auto LU_new = set_strided(LU, shape, LU_strides, A.options());
+  Tensor LU_use = C10_UNLIKELY(LU_new.has_value()) ? LU_new.value() : LU;
 
   // pivots
-  set_contiguous(pivots, shape.slice(0, ndim - 1));
+  set_contiguous_no_create(
+      pivots, shape.slice(0, ndim - 1), A.options().dtype(kInt));
 
   // info
-  set_contiguous(info, shape.slice(0, ndim - 2));
+  set_contiguous_no_create(
+      info, shape.slice(0, ndim - 2), A.options().dtype(kInt));
 
   const bool use_A_T = A.is_contiguous() && !A.is_complex();
   at::linalg_lu_factor_ex_out(
-      const_cast<Tensor&>(LU),
+      const_cast<Tensor&>(LU_use),
       const_cast<Tensor&>(pivots),
       const_cast<Tensor&>(info),
       use_A_T ? A.mT() : A);
@@ -3391,9 +3464,12 @@ std::tuple<Tensor&, Tensor&, Tensor&, Tensor&> _linalg_solve_ex_out(
   }
 
   // [numpy-compat] Handle vectors on the rhs
-  const bool vector_case_B = at::native::linalg_solve_is_vector_rhs(LU, B);
+  const bool vector_case_B = at::native::linalg_solve_is_vector_rhs(LU_use, B);
   auto result_ = vector_case_B ? result.unsqueeze(-1) : result;
-  at::linalg_lu_solve_out(result_, LU, pivots, B_, left, /*adjoint*/ use_A_T);
+  at::linalg_lu_solve_out(
+      result_, LU_use, pivots, B_, left, /*adjoint*/ use_A_T);
+  if (LU_new.has_value())
+    LU.copy_(LU_use);
   return std::tuple<Tensor&, Tensor&, Tensor&, Tensor&>(
       result, LU, pivots, info);
 }
@@ -3455,6 +3531,32 @@ std::tuple<Tensor&, Tensor&, Tensor&> linalg_lu_factor_ex_out(
     Tensor& pivots,
     Tensor& info) {
   TORCH_CHECK(
+      A.dim() >= 2,
+      "torch.lu_factor: Expected tensor with 2 or more dimensions. Got size: ",
+      A.sizes(),
+      " instead");
+
+  auto sizes = A.sizes().vec();
+  const auto m = sizes.cend()[-2];
+  const auto n = sizes.cend()[-1];
+
+  // make column major strides for BLAS
+  auto LU_strides = at::native::batched_matrix_contiguous_strides(
+      sizes,
+      /*f-contig*=*/true);
+  auto LU_new = set_strided(LU, sizes, LU_strides, A.options());
+  Tensor LU_use = C10_UNLIKELY(LU_new.has_value()) ? LU_new.value() : LU;
+
+  // Set sizes to the size of pivots
+  sizes.pop_back();
+  sizes.back() = std::min(m, n);
+  set_contiguous_no_create(pivots, sizes, A.options().dtype(kInt));
+
+  // Set sizes to the size of info
+  sizes.pop_back();
+  set_contiguous_no_create(info, sizes, A.options().dtype(kInt));
+
+  TORCH_CHECK(
       pivot,
       "linalg.lu_factor: LU without pivoting is not implemented on the XPU");
   if (A.numel() == 0) {
@@ -3464,18 +3566,19 @@ std::tuple<Tensor&, Tensor&, Tensor&> linalg_lu_factor_ex_out(
     return std::tuple<Tensor&, Tensor&, Tensor&>(LU, pivots, info);
   }
 
-  if (!LU.is_same(A)) {
-    LU.copy_(A);
+  if (!LU_use.is_same(A)) {
+    LU_use.copy_(A);
   }
   // handle the info
   std::vector<int32_t> infos_vec(native::batchCount(A), 0);
   // mkl needs long for pivots, but PT is int
   Tensor pivots_ = at::empty(pivots.sizes(), pivots.options().dtype(kLong));
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(LU.scalar_type(), "lu_dpcpp", [&] {
-    impl::apply_lu_dpcpp_<scalar_t>(LU, pivots_, infos_vec);
-  });
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      LU_use.scalar_type(), "lu_dpcpp", [&] {
+        impl::apply_lu_dpcpp_<scalar_t>(LU_use, pivots_, infos_vec);
+      });
   auto expected_info_shape =
-      IntArrayRef(LU.sizes().cbegin(), LU.sizes().cend() - 2);
+      IntArrayRef(LU_use.sizes().cbegin(), LU_use.sizes().cend() - 2);
 
   info.copy_(at::from_blob(
       (int32_t*)(infos_vec.data()),
@@ -3487,6 +3590,8 @@ std::tuple<Tensor&, Tensor&, Tensor&> linalg_lu_factor_ex_out(
   }
   // Copy to original pivots tensor
   pivots.copy_(pivots_);
+  if (LU_new.has_value())
+    LU.copy_(LU_use);
   return std::tuple<Tensor&, Tensor&, Tensor&>(LU, pivots, info);
 }
 

@@ -621,8 +621,7 @@ supported:
   - xlogy.OutTensor
   - zero_
   - channel_shuffle
-  - linalg_slogdet
-  - linalg_slogdet.out
+  - _linalg_slogdet.sign
   - _linalg_det.result
   - conj_physical.out
   - conj_physical_

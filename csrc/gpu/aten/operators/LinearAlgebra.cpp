@@ -6,6 +6,7 @@
 #include <core/detail/OffsetCalculator.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
+#include <tensor/TensorMeta.h>
 #include <utils/oneMKLUtils.h>
 #include <oneapi/dpl/utility>
 #include "Loops.h"
@@ -618,57 +619,6 @@ static inline std::
   return std::make_tuple(
       c10::ExclusivelyOwned<Tensor>(std::move(num_exchanges)),
       c10::ExclusivelyOwned<Tensor>(std::move(u_diagonal)));
-}
-
-std::tuple<Tensor, Tensor> linalg_slogdet(const Tensor& self) {
-  squareCheckInputs(self);
-  ScalarType t = self.scalar_type();
-  TORCH_CHECK(
-      t == ScalarType::Double || t == ScalarType::Float ||
-          t == ScalarType::ComplexFloat || t == ScalarType::ComplexDouble,
-      "linalg_slogdet: expected a tensor of float, double, cfloat or cdouble types but got ",
-      t);
-
-  c10::ExclusivelyOwned<Tensor> det_P, diag_U;
-  std::tie(det_P, diag_U) = _lu_det_P_diag_U(self);
-  auto det_sign = diag_U->sgn().prod(-1).mul_(*det_P);
-  // abslogdet_val is -inf if U is singular, in which case
-  // diag_U.abs_().log_().sum(-1) will return -inf. U is singular when U(i, i) =
-  // 0 for some i in [1, self.size(-1)]. Since abslogdet_val cannot take nan, no
-  // special case handling is required. in-place abs is not supported for
-  // complex tensors
-  auto abslogdet_val = isComplexType(t) ? diag_U->abs().log_().sum(-1)
-                                        : diag_U->abs_().log_().sum(-1);
-  return std::make_tuple(det_sign, abslogdet_val);
-}
-
-// TODO: implement _out variant avoiding copy and using already allocated
-// storage directly
-std::tuple<Tensor&, Tensor&> linalg_slogdet_out(
-    const Tensor& input,
-    Tensor& sign,
-    Tensor& logabsdet) {
-  checkSameDevice("linalg_slogdet", sign, input, "sign");
-  checkSameDevice("linalg_slogdet", logabsdet, input, "logabsdet");
-  checkLinalgCompatibleDtype("linalg_slogdet", sign, input, "sign");
-  ScalarType real_dtype = toRealValueType(input.scalar_type());
-  // logabsdet is always real-valued here
-  checkLinalgCompatibleDtype(
-      "linalg_slogdet", logabsdet.scalar_type(), real_dtype, "logabsdet");
-
-  Tensor sign_tmp, logabsdet_tmp;
-  std::tie(sign_tmp, logabsdet_tmp) = at::linalg_slogdet(input);
-
-  resize_output(sign, sign_tmp.sizes());
-  sign.copy_(sign_tmp);
-  resize_output(logabsdet, logabsdet_tmp.sizes());
-  logabsdet.copy_(logabsdet_tmp);
-
-  return std::tuple<Tensor&, Tensor&>(sign, logabsdet);
-}
-
-std::tuple<Tensor, Tensor> slogdet(const Tensor& self) {
-  return at::linalg_slogdet(self);
 }
 
 // std::tuple<Tensor, Tensor, Tensor> _det_lu_based_helper(const Tensor& self) {
