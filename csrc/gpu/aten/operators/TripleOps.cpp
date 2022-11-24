@@ -382,5 +382,9 @@ IPEX_LIBRARY_FRAGMENT() {
   m.def(
       "packed_add(Tensor top_half, Tensor bot_half, Tensor grad, float alpha) -> Tensor");
   m.impl("packed_add", c10::DispatchKey::XPU, at::AtenIpexTypeXPU::packed_add);
+  m.impl(
+      "packed_add",
+      c10::DispatchKey::SparseXPU,
+      at::AtenIpexTypeXPU::packed_add);
 }
 } // namespace
