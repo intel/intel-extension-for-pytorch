@@ -36,36 +36,42 @@ void batch_norm_update_stats(
     const Tensor& save_var,
     const Tensor& running_mean,
     const Tensor& running_var,
-    double momentum,
+    double momentum_,
     int64_t N) {
-  auto feature_num = N;
+  auto iter = TensorIteratorConfig()
+                  .add_output(running_mean)
+                  .add_output(running_var)
+                  .add_input(save_mean)
+                  .add_input(save_var)
+                  .add_input(running_mean)
+                  .add_input(running_var)
+                  .check_all_same_dtype(false)
+                  .promote_inputs_to_common_dtype(false)
+                  .build();
+
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       running_mean.scalar_type(),
-      "mScale1",
-      [&]() {
-        dpcppMemoryScale1(
-            running_mean.data_ptr<scalar_t>(),
-            save_mean.data_ptr<float>(),
-            feature_num,
-            momentum);
-      });
-  size_t orig_size = feature_num;
-  size_t adjust_size = orig_size - 1;
-  float adjust_factor = (static_cast<float>(orig_size)) / adjust_size;
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      running_var.scalar_type(),
-      "mScale2",
-      [&]() {
-        dpcppMemoryScale2(
-            running_var.data_ptr<scalar_t>(),
-            save_var.data_ptr<float>(),
-            feature_num,
-            adjust_factor,
-            momentum);
+      "batch_norm_update_stats",
+      [&] {
+        using acc_t = acc_type<scalar_t>;
+        const auto bessel_correction_factor = static_cast<acc_t>(
+            static_cast<double>(N) / static_cast<double>(N - 1));
+        const auto momentum = static_cast<acc_t>(momentum_);
+
+        dpcpp_kernel_multiple_outputs_for_tensor_iter(
+            iter,
+            [=](acc_t mean,
+                acc_t var,
+                scalar_t running_mean,
+                scalar_t running_var) -> dpl::tuple<scalar_t, scalar_t> {
+              const auto unbiased_var = var * bessel_correction_factor;
+              return dpl::tuple<scalar_t, scalar_t>{
+                  mean * momentum + (1 - momentum) * running_mean,
+                  unbiased_var * momentum + (1 - momentum) * running_var,
+              };
+            });
       });
 }
 
