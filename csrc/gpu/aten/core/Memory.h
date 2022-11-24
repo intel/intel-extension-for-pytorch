@@ -24,11 +24,5 @@ void dpcppMemset(void* data, int value, size_t n_bytes);
 
 void dpcppMemsetAsync(void* data, int value, size_t n_bytes);
 
-template <class T>
-void dpcppFill(T* data, T value, size_t n_elems);
-
-template <class T>
-void dpcppFillAsync(T* data, T value, size_t n_elems);
-
 } // namespace dpcpp
 } // namespace xpu

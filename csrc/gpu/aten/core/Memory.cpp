@@ -53,29 +53,5 @@ void dpcppMemsetAsync(void* data, int value, size_t n_bytes) {
   memsetDevice(data, value, n_bytes, true);
 }
 
-template <class T>
-void dpcppFill(T* data, T value, size_t n_elems) {
-  fillDevice(data, value, n_elems, false);
-}
-
-template <class T>
-void dpcppFillAsync(T* data, T value, size_t n_elems) {
-  fillDevice(data, value, n_elems, true);
-}
-
-#define DEFINE_CAST(T, name)                              \
-  template <>                                             \
-  void dpcppFill(T* data, T value, size_t n_elems) {      \
-    fillDevice(data, value, n_elems, false);              \
-  }                                                       \
-                                                          \
-  template <>                                             \
-  void dpcppFillAsync(T* data, T value, size_t n_elems) { \
-    fillDevice(data, value, n_elems, true);               \
-  }
-
-IPEX_FORALL_SCALAR_TYPES_WITH_COMPLEX_AND_QINTS(DEFINE_CAST)
-#undef DEFINE_CAST
-
 } // namespace dpcpp
 } // namespace xpu
