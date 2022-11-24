@@ -22,3 +22,8 @@ class TestTorchMethod(TestCase):
         output.contiguous()
         output_xpu.contiguous()
         self.assertEqual(output, output_xpu.cpu())
+
+    def test_copy_big_numel(self, dtype=torch.float):
+        tensor1 = torch.rand([8, 2048, 50304], device=dpcpp_device)
+        tensor2 = tensor1.clone()
+        self.assertEqual(tensor1.to(cpu_device), tensor2.to(cpu_device))

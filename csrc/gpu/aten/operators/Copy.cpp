@@ -83,15 +83,18 @@ static bool maybe_enable_p2p_access(Device dst_device, Device src_device) {
 #endif
 }
 
-inline void loops_memcpy(char* dst, char* src, size_t size) {
-  at::detail::Array<char*, 2> data;
-  data[0] = dst;
-  data[1] = src;
-  auto fn = [](char a) -> char { return a; };
-  int vec_size = at::native::Memory::can_vectorize_up_to_loop<decltype(fn)>(
-      getDeviceIdOfCurrentQueue(), data);
-  auto ic = TrivialOffsetCalculator<1>();
-  launch_vectorized_kernel(size, fn, data, ic, vec_size);
+inline void loops_memcpy(TensorIterator& iter, int64_t numel) {
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      kBool, kBFloat16, kHalf, iter.dtype(), "loops_memcpy", [&] {
+        at::detail::Array<char*, 2> data;
+        data[0] = (char*)iter.data_ptr(0);
+        data[1] = (char*)iter.data_ptr(1);
+        auto fn = [](scalar_t a) -> scalar_t { return a; };
+        int vec_size = at::native::Memory::can_vectorize_up_to_loop<scalar_t>(
+            getDeviceIdOfCurrentQueue(), data[0]);
+        auto ic = TrivialOffsetCalculator<1>();
+        launch_vectorized_kernel(numel, fn, data, ic, vec_size);
+      });
 }
 
 void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
@@ -133,10 +136,7 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
     // SYCL queue.memcpy performance is worse than SYCL copy kernel
     // implementation. JIRA:
     // https://jira.devtools.intel.com/browse/CMPLRLLVM-41292
-    loops_memcpy(
-        (char*)iter.data_ptr(0),
-        (char*)iter.data_ptr(1),
-        numel * iter.element_size(0));
+    loops_memcpy(iter, numel);
   } else {
     auto dtype = iter.dtype(0);
     if (isQIntType(dtype)) {
