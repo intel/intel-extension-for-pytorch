@@ -31,30 +31,18 @@ For more detailed information, check `ISA Dynamic Dispatching <features/isa_dyna
 
    features/isa_dynamic_dispatch
 
-Channels Last
--------------
+Auto Channels Last
+------------------
 
-Compared with the default NCHW memory format, using channels_last (NHWC) memory format could further accelerate convolutional neural networks. In Intel® Extension for PyTorch\*, NHWC memory format has been enabled for most key CPU operators, though not all of them have been accepted and merged into the PyTorch master branch yet.
+Comparing to the default NCHW memory format, using channels_last (NHWC) memory format could further accelerate convolutional neural networks. In Intel® Extension for PyTorch*, NHWC memory format has been enabled for most key CPU operators. More detailed information is available at `Channels Last <features/nhwc.md>`_.
 
-For more detailed information, check `Channels Last <features/nhwc.md>`_.
+Intel® Extension for PyTorch* automatically converts a model to channels last memory format when users optimize the model with `ipex.optimize(model)`. With this feature users won't need to manually apply `model=model.to(memory_format=torch.channels_last)` any more. More detailed information is available at `Auto Channels Last <features/auto_channels_last.md>`_.
 
 .. toctree::
    :hidden:
    :maxdepth: 1
 
    features/nhwc
-
-Auto Channels Last
-------------------
-
-Intel® Extension for PyTorch* automatically converts the model to channels last memory format by default when users optimize their model with ``ipex.optimize(model)``. 
-
-For more detailed information, check `Auto Channels Last <features/auto_channels_last.md>`_.
-
-.. toctree::
-   :hidden:
-   :maxdepth: 1
-
    features/auto_channels_last
 
 Auto Mixed Precision (AMP)
@@ -89,7 +77,7 @@ Compared to eager mode, graph mode in PyTorch normally yields better performance
 Operator Optimization
 ---------------------
 
-Intel® Extension for PyTorch\* also optimizes operators and implements several customized operators for performance boosts. A few ATen operators are replaced by their optimized counterparts in Intel® Extension for PyTorch\* via the ATen registration mechanism. Some customized operators are implemented for several popular topologies. For instance, ROIAlign and NMS are defined in Mask R-CNN. To improve performance of these topologies, Intel® Extension for PyTorch\* also optimized these customized operators.
+Intel® Extension for PyTorch* also optimizes operators and implements several customized operators for performance boosts. A few ATen operators are replaced by their optimized counterparts in Intel® Extension for PyTorch* via the ATen registration mechanism. Some customized operators are implemented for several popular topologies. For instance, ROIAlign and NMS are defined in Mask R-CNN. To improve performance of these topologies, Intel® Extension for PyTorch* also optimized these customized operators.
 
 .. currentmodule:: intel_extension_for_pytorch.nn
 .. autoclass:: FrozenBatchNorm2d
@@ -97,10 +85,13 @@ Intel® Extension for PyTorch\* also optimizes operators and implements several 
 .. currentmodule:: intel_extension_for_pytorch.nn.functional
 .. autofunction:: interaction
 
+**Auto kernel selection** is a feature that enables users to tune for better performance with GEMM operations. It is provided as parameter –auto_kernel_selection, with boolean value, of the ipex.optimize() function. By default, the GEMM kernel is computed with oneMKL primitives. However, under certain circumstances oneDNN primitives run faster. Users are able to set –auto_kernel_selection to True to run GEMM kernels with oneDNN primitives.” -> "We aims to provide good default performance by leveraging the best of math libraries and enabled weights_prepack, and it has been verified with broad set of models. If you would like to try other alternatives, you can use auto_kernel_selection toggle in ipex.optimize to switch, and you can diesable weights_preack in ipex.optimize if you are concerning the memory footprint more than performance gain. However in majority cases, keeping default is what we recommend.
+
 Optimizer Optimization
 ----------------------
 
-Optimizers are one of key parts of the training workloads. Intel® Extension for PyTorch\* brings two types of optimizations to optimizers:
+Optimizers are one of key parts of the training workloads. Intel® Extension for PyTorch* brings two types of optimizations to optimizers:
+
 1.	Operator fusion for the computation in the optimizers.
 2.	SplitSGD for BF16 training, which reduces the memory footprint of the master weights by half.
 
@@ -114,9 +105,8 @@ For more detailed information, check `Optimizer Fusion <features/optimizer_fusio
    features/optimizer_fusion
    features/split_sgd
 
-
 Runtime Extension
---------------------------------
+-----------------
 
 Intel® Extension for PyTorch* Runtime Extension provides PyTorch frontend APIs for users to get finer-grained control of the thread runtime and provides:
 
@@ -135,14 +125,54 @@ For more detailed information, check `Runtime Extension <features/runtime_extens
    features/runtime_extension
 
 INT8 Quantization
---------------------------------
+-----------------
 
-Intel® Extension for PyTorch* has built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models.
+Intel® Extension for PyTorch* provides built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models. On top of that, if users would like to tune for a higher accuracy than what the default recipe provides, a recipe tuning API powered by Intel® Neural Compressor is provided for users to try.
 
-Check more detailed information for `INT8 Quantization <features/int8.md>`_.
+Check more detailed information for `INT8 Quantization <features/int8_overview.md>`_ and `INT8 recipe tuning API guide (Experimental, *NEW feature in 1.13.0*) <features/int8_recipe_tuning_api.md>`_.
 
 .. toctree::
    :hidden:
    :maxdepth: 1
 
-   features/int8
+   features/int8_overview
+   features/int8_recipe_tuning_api
+
+Codeless Optimization (Experimental, *NEW feature in 1.13.0*)
+-------------------------------------------------------------
+
+This feature enables users to get performance benefits from Intel® Extension for PyTorch* without changing Python scripts. It hopefully eases the usage and has been verified working well with broad scope of models, though in few cases there could be small overhead comparing to applying optimizations with Intel® Extension for PyTorch* APIs.
+
+For more detailed information, check `Codeless Optimization <features/codeless_optimization.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/codeless_optimization.md
+
+Graph Capture (Experimental, *NEW feature in 1.13.0*)
+-----------------------------------------------------
+
+Since graph mode is key for deployment performance, this feature automatically captures graphs based on set of technologies that PyTorch supports, such as TorchScript and TorchDynamo. Users won't need to learn and try different PyTorch APIs to capture graphs, instead, they can turn on a new boolean flag `--graph_mode` (default off) in `ipex.optimize` to get the best of graph optimization.
+
+For more detailed information, check `Graph Capture <features/graph_capture.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/graph_capture
+
+HyperTune (Experimental, *NEW feature in 1.13.0*)
+-------------------------------------------------
+
+HyperTune is an experimental feature to perform hyperparameter/execution configuration searching. The searching is used in various areas such as optimization of hyperparameters of deep learning models. The searching is extremely useful in real situations when the number of hyperparameters, including configuration of script execution, and their search spaces are huge that manually tuning these hyperparameters/configuration is impractical and time consuming. Hypertune automates this process of execution configuration searching for the `launcher <performance_tuning/launch_script.md>`_ and Intel® Extension for PyTorch*.
+
+For more detailed information, check `HyperTune <features/hypertune.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/hypertune

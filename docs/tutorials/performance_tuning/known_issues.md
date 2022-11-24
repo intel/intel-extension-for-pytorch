@@ -1,6 +1,8 @@
 Known Issues
 ============
 
+- If you found the workload runs with Intel® Extension for PyTorch\* occupies a remarkably large amount of memory, you can try to reduce the occupied memory size by setting the `--weights_prepack` parameter of the `ipex.optimize()` function to `False`.
+
 - Supporting of EmbeddingBag with INT8 when bag size > 1 is working in progress.
 
 - Compiling with gcc 11 might result in `illegal instruction` error.

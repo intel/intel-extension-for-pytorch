@@ -251,16 +251,19 @@ void FuseMatmulDivOrMul(std::shared_ptr<Graph>& graph) {
         return (%r) )";
   std::string fused_matmul_mul = R"(
       graph(%x, %y, %z):
-        %ones : float = prim::Constant[value=1.0]()
-        %z_ = aten::div(%ones, %z)
-        %r = ipex::matmul_div(%x, %y, %z_)
+        %r = ipex::matmul_mul(%x, %y, %z)
         return (%r) )";
   std::string fused_matmul_mul_with_out = R"(
       graph(%x, %y, %z, %out):
-        %ones : float = prim::Constant[value=1.0]()
-        %z_ = aten::div(%ones, %z)
-        %r = ipex::matmul_div(%x, %y, %out, %z_)
+        %r = ipex::matmul_mul(%x, %y, %out, %z)
         return (%r) )";
+  auto filter_scalar = [](const Match& match,
+                          const std::unordered_map<std::string, Value*>& vmap) {
+    Node* node = match.anchor;
+    auto target_value = node->input(1);
+    return utils::is_scalar(target_value);
+  };
+
   for (auto const& it : div_ops) {
     at::jit::TemplateEnv env;
     env.s("div_op", it);
@@ -281,7 +284,7 @@ void FuseMatmulDivOrMul(std::shared_ptr<Graph>& graph) {
         aten_mul_pattern.format(env), fused_matmul_mul);
     rewriter.RegisterRewritePattern(
         aten_mul_pattern_with_out.format(env), fused_matmul_mul_with_out);
-    rewriter.runOnGraph(graph);
+    rewriter.runOnGraph(graph, filter_scalar);
   }
 }
 
@@ -309,11 +312,16 @@ void PostScalarDivOrMul(std::shared_ptr<Graph>& graph) {
         %qk = aten::matmul(%q, %k) 
         %r = aten::mul(%qk, %scale)
         return (%r) )";
-
+  auto filter_scalar = [](const Match& match,
+                          const std::unordered_map<std::string, Value*>& vmap) {
+    Node* node = match.anchor;
+    auto target_value = node->input(0)->node()->input(1);
+    return utils::is_scalar(target_value);
+  };
   SubgraphRewriter rewriter;
   rewriter.RegisterRewritePattern(div_matmul, matmul_div);
   rewriter.RegisterRewritePattern(mul_matmul, matmul_mul);
-  rewriter.runOnGraph(graph);
+  rewriter.runOnGraph(graph, filter_scalar);
 }
 
 // MHA fusion covers aten::softmax, ipex::softmax and ipex::softmax_:
@@ -495,7 +503,8 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
         // This constant fill value could be either 0-dim tensor or just a
         // scalar
         auto fill_value_node = qk_node->input(2)->node();
-        if (fill_value_node->kind() != prim::Constant) {
+        if (fill_value_node->kind() != prim::Constant ||
+            !utils::is_scalar(qk_node->input(2))) {
           return false;
         }
 

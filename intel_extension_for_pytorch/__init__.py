@@ -29,3 +29,7 @@ from . import jit
 from .utils.verbose import verbose
 from .frontend import optimize, enable_auto_channels_last, disable_auto_channels_last, enable_onednn_fusion, set_fp32_math_mode, get_fp32_math_mode, FP32MathMode
 from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl
+
+# for xpu
+import intel_extension_for_pytorch.xpu
+from . import optim

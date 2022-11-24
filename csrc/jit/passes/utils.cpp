@@ -171,6 +171,25 @@ bool is_contiguous(c10::TensorTypePtr tensor) {
   return is_contiguous;
 }
 
+// Check if the target IValue is a scalar or a 0-dim scalar tensor
+bool is_scalar(torch::jit::Value* target_value) {
+  if (!toIValue(target_value).has_value()) {
+    return false;
+  }
+  if (toIValue(target_value).value().isScalar()) {
+    return true;
+  } else if (toIValue(target_value).value().isTensor()) {
+    auto target_tensor_dim = target_value->type()->cast<TensorType>()->dim();
+    if (!target_tensor_dim.has_value()) {
+      return false;
+    } else {
+      return target_tensor_dim.value() == 0 ? true : false;
+    }
+  } else {
+    return false;
+  }
+}
+
 } // namespace utils
 } // namespace graph_rewrite
 } // namespace jit

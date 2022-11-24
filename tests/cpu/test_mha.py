@@ -131,7 +131,7 @@ class TransFreeMHATester(TestCase):
                 for _ in range(2):
                     mha_jit = mha_ipex(mat, mask_base)
                     vit_mha_jit = vit_mha_ipex(mat)
-                
+
                 mha_ref = mha_model(mat, mask_base)
                 vit_mha_ref = vit_mha_model(mat)
 
@@ -140,6 +140,7 @@ class TransFreeMHATester(TestCase):
 
                 mha_graph = mha_ipex.graph_for(mat, mask_base)
                 vit_mha_graph = vit_mha_ipex.graph_for(mat)
+
 
                 self.assertTrue(any(n.kind() == "ipex::transfree_mha" for n in mha_graph.nodes()))
                 self.assertTrue(any(n.kind() == "ipex::transfree_vit_mha" for n in vit_mha_graph.nodes()))
@@ -336,7 +337,7 @@ class TransFreeMHATester(TestCase):
                 fake_mha_jit.append(fake_mha_ipex[i](mat))
                 fake_mha_ref.append(fake_mha_model[i](mat))
                 fake_mha_graph = fake_mha_ipex[i].graph_for(mat)
-                self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fake_mha_graph.nodes()))
+                self.assertTrue(any(n.kind() == "ipex::matmul_mul" for n in fake_mha_graph.nodes()))
                 with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU]) as p:
                     fake_mha_ipex[i](mat)
                 if i == 6:

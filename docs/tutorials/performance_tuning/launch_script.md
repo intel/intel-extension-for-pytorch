@@ -42,6 +42,15 @@ Available option settings (knobs) are listed below:
 | ```--use_default_allocator``` | - |  False | Use default memory allocator |
 | ```--benchmark``` | - |  False | Enable benchmark config. JeMalloc's MALLOC_CONF has been tuned for low latency. Recommend to use this for benchmarking purpose; for other use cases, this MALLOC_CONF may cause Out-of-Memory crash. |
 
+[Codeless Optimization feature](../features/codeless_optimization.md) related option settings (knobs) are listed below:
+
+| knob | type | default value | help |
+| :-- | :--: | :--: | :-- |
+| ```--auto_ipex``` | - | False | Auto enabled the ipex optimization feature |
+| ```--dtype``` | string | False | data type, can choose from ['float32', 'bfloat16'] |
+| ```--auto_ipex_verbose``` | - | False | This flag is only used for debug and UT of auto ipex. |
+| ```--disable_ipex_graph_mode``` | - | False | Enable the Graph Mode for `ipex.optimize()` function |
+
 **Note:** ```--latency_mode``` and ```--throughput_mode``` are exclusive knobs to ```--ninstances```, ```--ncore_per_instance```, ```--node_id``` and ```--use_logical_core```. I.e., setting either of ```--latency_mode``` or ```--throughput_mode``` overwrites settings of ```--ninstances```, ```--ncore_per_instance```, ```--node_id``` and ```--use_logical_core``` if they are explicitly set in command line. ```--latency_mode``` and ```--throughput_mode``` are mutually exclusive.
 
 ```--skip_cross_node_cores``` is exclusive knob to ```--ninstances```. Setting ```--skip_cross_node_cores``` overwrites setting of ```--ninstances``` if it is explicitly set on the command line.
@@ -60,7 +69,7 @@ run_20210712212258_instance_0_cores_0-43.log
 
 ## Usage Examples
 
-Example script [resnet50.py](../examples/resnet50.py) will be used in this guide.
+Example script [resnet50.py](https://github.com/intel/intel-extension-for-pytorch/tree/v1.13.0/examples/resnet50.py) will be used in this guide.
 
 - Single instance for inference
   - [I. Use all physical cores](#i-use-all-physical-cores)

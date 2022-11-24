@@ -794,7 +794,7 @@ def module_call_to_function_call(module, args, weights):
         output = F.embedding_bag(args[0], weights[0], args[1], module.max_norm, \
             module.norm_type, module.scale_grad_by_freq, module.mode, module.sparse,
             args[2] if len(args) == 3 else None, module.include_last_offset, module.padding_idx)
-    elif isinstance(module, torch.nn.ConvTranspose2d) or isinstance(module, torch.nn.ConvTranspose2d):
+    elif isinstance(module, torch.nn.ConvTranspose2d) or isinstance(module, torch.nn.ConvTranspose3d):
         if module.padding_mode != 'zeros':
             raise ValueError('Only `zeros` padding mode is supported for ConvTranspose2d')
         assert isinstance(module.padding, tuple)

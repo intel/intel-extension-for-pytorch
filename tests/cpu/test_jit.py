@@ -876,6 +876,28 @@ class MatmulDivInplace(nn.Module):
         else:
             return mm_res.div_(torch.ones(mm_res_shape,dtype=x.dtype)+1)
 
+class MatmulMul(nn.Module):
+    def __init__(self, mul_scalar=False, with_out=False):
+        super(MatmulMul, self).__init__()
+        self.with_out = with_out
+        self.mul_scalar = mul_scalar
+    def forward(self, x):
+        mm_res = None
+        y = torch.transpose(x, -1, -2).contiguous()
+        mm_res_shape = x.size()[:-1] + (y.size()[-1:])
+        if not self.mul_scalar:
+            x = x * (torch.ones([1],dtype=x.dtype) + 1)
+        if self.with_out:
+            mm_res = torch.randn(mm_res_shape, dtype=x.dtype)
+            mm_res = torch.matmul(x, y, out=mm_res)
+        else:
+            mm_res = torch.matmul(x, y)
+        if self.mul_scalar:
+            mm_res = mm_res * 0.125
+        else:
+            mm_res = mm_res * (torch.ones([1],dtype=x.dtype) + 1)
+        return mm_res
+
 class TransposedMatmulDiv(nn.Module):
     def __init__(self):
         super(TransposedMatmulDiv, self).__init__()
@@ -1312,7 +1334,6 @@ class Tester(TestCase):
                     #bf16, jit trace path
                     trace_graph = trace_fused_model.graph_for(x3)
                     fused_tresult = trace_fused_model(x3)
-
                 self.assertEqual(fused_tresult, result, prec=prec)
                 if not torch._C._jit_texpr_fuser_enabled():
                     self.assertEqual(fused_tresult.dtype, torch.bfloat16)
@@ -3380,9 +3401,37 @@ class Tester(TestCase):
         self.assertEqual(scripted_fn(input, weight, bias), result)
         self.assertEqual(traced_fn(input, weight, bias), result)
 
-    def test_matmul_div(self):
+    def test_matmul_div_or_mul(self):
         inputs = [torch.randn(10, 3, 4), torch.randn(3, 4)]
         for x in inputs:
+            self._test_output(
+                MatmulMul(mul_scalar=True, with_out=False),
+                x,
+                kind_in_graph="ipex::matmul_mul",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulMul(mul_scalar=True, with_out=True),
+                x,
+                kind_in_graph="ipex::matmul_mul",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulMul(mul_scalar=False, with_out=True),
+                x,
+                kind_in_graph=None,
+                kind_not_in_graph="ipex::matmul_mul")
+            self._test_output_bf16(
+                MatmulMul(mul_scalar=True, with_out=False),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_mul",
+                kind_not_in_graph=None,
+                prec=5e-2)
+            self._test_output_bf16(
+                MatmulMul(mul_scalar=True, with_out=True),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_mul",
+                kind_not_in_graph=None,
+                prec=5e-2)
+
             self._test_output(
                 MatmulDivOutplace(div_scalar=True, with_out=True),
                 x,
@@ -3509,14 +3558,14 @@ class Tester(TestCase):
                     fused_mod = traced_mod.graph_for(x1[i], y1[j])
                     out = traced_mod(x1[i], y1[j])
                     expected = model(x1[i], y1[j])
-                    self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fused_mod.nodes()))
+                    self.assertTrue(any(n.kind() == "ipex::matmul_mul" for n in fused_mod.nodes()))
                     self.assertEqual(out, expected, prec=1e-4)
                 with torch.cpu.amp.autocast(), torch.no_grad():
                     traced_mod = torch.jit.trace(model, (x1[i].bfloat16(), y1[j].bfloat16()))
                     fused_mod = traced_mod.graph_for(x1[i].bfloat16(), y1[j].bfloat16())
                     out = traced_mod(x1[i].bfloat16(), y1[j].bfloat16())
                     expected = model(x1[i].bfloat16(), y1[j].bfloat16())
-                    self.assertTrue(any(n.kind() == "ipex::matmul_div" for n in fused_mod.nodes()))
+                    self.assertTrue(any(n.kind() == "ipex::matmul_mul" for n in fused_mod.nodes()))
                     self.assertEqual(out, expected, prec=1e-1)
 
     def test_bmm_add(self):
