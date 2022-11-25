@@ -54,27 +54,7 @@ message(STATUS "  BUILD_WITH_XPU        : ${BUILD_WITH_XPU}")
 message(STATUS "  BUILD_NO_CLANGFORMAT  : ${BUILD_NO_CLANGFORMAT}")
 message(STATUS "  BUILD_STATS           : ${BUILD_STATS}")
 message(STATUS "  BUILD_STRIPPED_BIN    : ${BUILD_STRIPPED_BIN}")
+message(STATUS "")
 
-# print_cpu_config_summary()
-
-if(BUILD_MODULE_TYPE STREQUAL "GPU")
-  add_subdirectory(${IPEX_ROOT_DIR}/csrc)
-  print_xpu_config_summary()
-endif()
-
-if(BUILD_MODULE_TYPE STREQUAL "CPU")
-  add_subdirectory(${IPEX_ROOT_DIR}/csrc)
-endif()
-
-if(BUILD_MODULE_TYPE STREQUAL "PYTHON")
-  add_subdirectory(${IPEX_ROOT_DIR}/intel_extension_for_pytorch/csrc)
-
-  # Fetch configurations of PY_XPU_OBJ
-  get_target_property(PYTHON_DIR PY_XPU_OBJ PYTHON_DIR)
-  get_target_property(PYBIND11_DIR PY_XPU_OBJ PYBIND11_DIR)
-  message(STATUS "")
-
-  message(STATUS "******** Summary on Python ********")
-  message(STATUS "  Python include        : ${PYTHON_DIR}")
-  message(STATUS "  pybind11 include      : ${PYBIND11_DIR}")  
-endif()
+add_subdirectory(${IPEX_ROOT_DIR}/csrc)
+add_subdirectory(${IPEX_ROOT_DIR}/intel_extension_for_pytorch/csrc)

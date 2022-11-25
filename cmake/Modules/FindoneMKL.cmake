@@ -20,8 +20,6 @@
 #  ONEMKL_SHARED_LIBS      : list of libraries for oneMKL
 #===============================================================================
 
-cmake_minimum_required(VERSION 3.4.3)
-
 if (NOT ONEMKL_FOUND)
 set(ONEMKL_FOUND OFF)
 

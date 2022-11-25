@@ -22,6 +22,7 @@
 */**/**/**/*.pyc
 */**/**/**/**/*.pyc
 
+csrc/utils/version.h
 intel_extension_for_pytorch/_version.py
 intel_extension_for_pytorch/README.md
 intel_extension_for_pytorch/requirements.txt

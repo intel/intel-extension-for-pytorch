@@ -22,8 +22,6 @@ if(DPCPP_cmake_included)
 endif()
 set(DPCPP_cmake_included true)
 
-cmake_minimum_required(VERSION 3.4.3)
-
 include(FindPackageHandleStandardArgs)
 
 find_package(IntelDPCPP REQUIRED)

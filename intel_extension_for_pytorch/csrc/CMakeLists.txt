@@ -1,3 +1,7 @@
+if(NOT BUILD_MODULE_TYPE STREQUAL "PYTHON")
+  return()
+endif()
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhonor-nans")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhonor-infinities")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-associative-math")
@@ -8,6 +12,8 @@ list(APPEND PY_CPP_OBJS $<TARGET_OBJECTS:PY_CPU_OBJ>)
 if(BUILD_WITH_XPU)
   add_subdirectory(xpu)
   list(APPEND PY_CPP_OBJS $<TARGET_OBJECTS:PY_XPU_OBJ>)
+  get_target_property(PYTHON_DIR PY_XPU_OBJ PYTHON_DIR)
+  get_target_property(PYBIND11_DIR PY_XPU_OBJ PYBIND11_DIR)
 endif()
 
 add_library(intel-ext-pt-python SHARED ${PY_CPP_OBJS})
@@ -16,15 +22,23 @@ if(BUILD_STRIPPED_BIN)
   set_target_properties(intel-ext-pt-python PROPERTIES LINK_FLAGS_RELEASE -s)
 endif()
 
-if(NOT BUILD_SKIP_CPU)
-  target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-cpu)
-endif()
+# target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-cpu)
 
 if(BUILD_WITH_XPU)
   target_link_directories(intel-ext-pt-python PRIVATE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
   target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-gpu)
 endif()
 
+function (print_python_config_summary)
+  message(STATUS "")
+  message(STATUS "******** Summary on Python ********")
+  message(STATUS "  Python include        : ${PYTHON_DIR}")
+  message(STATUS "  pybind11 include      : ${PYBIND11_DIR}")
+  message(STATUS "")
+endfunction()
+
 install(TARGETS intel-ext-pt-python
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+print_python_config_summary()
