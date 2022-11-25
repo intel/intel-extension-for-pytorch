@@ -16,9 +16,12 @@ if(BUILD_STRIPPED_BIN)
   set_target_properties(intel-ext-pt-python PROPERTIES LINK_FLAGS_RELEASE -s)
 endif()
 
-# target_link_libraries(PY_CPU_OBJ PUBLIC intel-ext-pt-cpu)
+if(NOT BUILD_SKIP_CPU)
+  target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-cpu)
+endif()
 
 if(BUILD_WITH_XPU)
+  target_link_directories(intel-ext-pt-python PRIVATE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
   target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-gpu)
 endif()
 

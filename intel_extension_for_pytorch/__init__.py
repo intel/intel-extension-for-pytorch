@@ -13,18 +13,16 @@ except ImportError:
     pass  # skip if torchvision is not available
 from . import _C
 # TODO: will uniform here after setup.py is uniformed
-from ._version import (__version__, __ipex_git_sha__,
-                       __torch_version__, __torch_git_sha__,
-                       __onednn_git_sha__)
+from ._version import (__version__, __ipex_gitrev__,
+                    __torch_gitrev__, __gpu_onednn_gitrev__)
 from .utils import _cpu_isa, _custom_fx_tracer
 _cpu_isa.check_minimal_isa_support()
 
 def version():
-    print("intel_extension_for_pytorch gpu version:          {}".format(__version__))
-    print("intel_extension_for_pytorch gpu git sha:          {}".format(__ipex_git_sha__))
-    print("private gpu torch version: {}".format(__torch_version__))
-    print("private gpu torch sha:     {}".format(__torch_git_sha__))
-    print("submodule oneDNN sha:      {}".format(__onednn_git_sha__))
+    print("intel_extension_for_pytorch version:          {}".format(__version__))
+    print("intel_extension_for_pytorch git sha:          {}".format(__ipex_gitrev__))
+    print("torch version and sha:     {}".format(__torch_gitrev__))
+    print("submodule oneDNN sha:      {}".format(__gpu_onednn_gitrev__))
 
 
 def _find_dpcpp_home():

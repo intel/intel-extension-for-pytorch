@@ -35,10 +35,6 @@ function (print_xpu_config_summary)
   get_target_property(ONEMKL_INCLUDE_DIR intel-ext-pt-gpu ONEMKL_INCLUDE_DIR)
   get_target_property(ONEDPL_INCLUDE_DIR intel-ext-pt-gpu ONEDPL_INCLUDE_DIR)
 
-  # Fetch configurations of PY_XPU_OBJ
-  get_target_property(PYTHON_DIR PY_XPU_OBJ PYTHON_DIR)
-  get_target_property(PYBIND11_DIR PY_XPU_OBJ PYBIND11_DIR)
-
     message(STATUS "")
 
     message(STATUS "******** Summary on XPU ********")
@@ -69,9 +65,7 @@ function (print_xpu_config_summary)
     message(STATUS "  OpenCL include        : ${OpenCL_INCLUDE_DIR}")
     message(STATUS "  OpenCL library        : ${OpenCL_LIBRARY}")
 
-    message(STATUS "  Python include        : ${PYTHON_DIR}")
     message(STATUS "  Torch include         : ${TORCH_INCLUDE_DIRS}")
-    message(STATUS "  pybind11 include      : ${PYBIND11_DIR}")
 
     message(STATUS "  oneDNN include        : ${ONEDNN_INCLUDE_DIR}")
   if (USE_ONEMKL)

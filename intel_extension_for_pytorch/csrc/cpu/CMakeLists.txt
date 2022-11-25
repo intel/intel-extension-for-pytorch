@@ -1,5 +1,6 @@
 # ---[ Build flags
-# TODO: CPU: include(${IPEX_ROOT_DIR}/cmake/python/BuildOptions.cmake)
+# TODO: CPU: include(${IPEX_ROOT_DIR}/cmake/cpu/BuildFlags.cmake)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -fPIC")
 
 FILE(GLOB IPEX_PYTHON_CPP_CPU_SRCS *.cpp)
 add_library(PY_CPU_OBJ OBJECT ${IPEX_PYTHON_CPP_CPU_SRCS})
