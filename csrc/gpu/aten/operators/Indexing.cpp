@@ -640,6 +640,9 @@ struct alignas(N) OpaqueType {
 template <typename scalar_t, typename Func>
 void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
   auto numel = index.numel();
+  if (numel == 0)
+    return;
+
   auto out_numel = self.numel();
   size_t scalar_bytes = sizeof(scalar_t);
 
@@ -672,6 +675,10 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
           IndexToOffset<long, uint64_t>::get(linear_idx, indices_info);
 
       auto index = indices_ptr[idx_offset];
+      if (index < 0) {
+        index += out_numel;
+      }
+
       if (index > out_numel) {
         /*error handle*/
         return;
@@ -761,11 +768,13 @@ void index_put_impl(
 
 template <typename scalar_t>
 void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
+  ptrdiff_t src_num_elem = src.numel();
+  ptrdiff_t index_num_elem = index.numel();
   TORCH_CHECK(src.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(index.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(
-      !(src.numel() == 0 && index.numel() != 0),
+      !(src_num_elem == 0 && index_num_elem != 0),
       "tried to take from an empty tensor");
 
   dst = dst.resize_as_(index);
@@ -800,19 +809,19 @@ void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       auto linear_idx = item.get_global_linear_id();
       if (linear_idx < dst_num_elem) {
-        auto idx_offset = linear_idx;
-        IndexToOffset<int64_t, int64_t>::get(
+        auto idx_offset = IndexToOffset<int64_t, int64_t>::get(
             linear_idx,
             idx_info,
             IndexToOffset<int64_t, int64_t>::NON_STRICT_CONTIGUOUS);
-        auto idx = idx_data[idx_offset];
-        auto source_offset = idx;
-        IndexToOffset<scalar_t, int64_t>::get(
-            idx,
+        auto src_idx = idx_data[idx_offset];
+        if (src_idx < 0) {
+          src_idx += src_num_elem;
+        }
+        auto source_offset = IndexToOffset<scalar_t, int64_t>::get(
+            src_idx,
             src_info,
             IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
-        auto dst_offset = linear_idx;
-        IndexToOffset<scalar_t, int64_t>::get(
+        auto dst_offset = IndexToOffset<scalar_t, int64_t>::get(
             linear_idx,
             dst_info,
             IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
