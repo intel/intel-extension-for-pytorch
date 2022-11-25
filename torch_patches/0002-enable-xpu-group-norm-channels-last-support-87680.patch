@@ -1,7 +1,7 @@
 From 6b2263d64809504f0c653e48678a9cecff34e749 Mon Sep 17 00:00:00 2001
 From: KevinYuk <kevin.yu@intel.com>
 Date: Mon, 31 Oct 2022 19:46:01 +0000
-Subject: [PATCH 2/9] enable xpu group norm channels last support (#87680)
+Subject: [PATCH 02/10] enable xpu group norm channels last support (#87680)
 
 XPU would support channels last format for group norm operator, however, Pytorch converts all input tensor to contiguous format, which includes channels last tensor. Need Pytorch pass down this memory format hint to us.
 Pull Request resolved: https://github.com/pytorch/pytorch/pull/87680

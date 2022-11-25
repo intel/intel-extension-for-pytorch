@@ -1,7 +1,7 @@
 From efca3558f7af0f470540c6c980db19fd4339e496 Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Mon, 28 Mar 2022 20:49:03 +0800
-Subject: [PATCH 1/9] Add DLPack oneAPI support for the XPU device for
+Subject: [PATCH 01/10] Add DLPack oneAPI support for the XPU device for
  experimental.
 
 ---

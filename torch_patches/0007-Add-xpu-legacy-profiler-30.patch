@@ -1,7 +1,7 @@
 From 1f70653db353bb70c5d7cd46cbd723fa9aea290d Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Wed, 20 Apr 2022 00:28:18 +0800
-Subject: [PATCH 7/9] Add xpu legacy profiler (#30)
+Subject: [PATCH 07/10] Add xpu legacy profiler (#30)
 
 Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
 ---

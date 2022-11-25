@@ -1,0 +1,91 @@
+From 34b0bd0b7069d0cecfb678f6962218f70d23605e Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
+Date: Fri, 25 Nov 2022 15:16:48 +0800
+Subject: [PATCH 10/10] support XPU backend on writeFileRaw in torch.save and
+ readFileRaw in torch.load (#89)
+
+* support XPU on torch.save
+* copy only once
+* make CUDA same path as XPU
+
+Co-authored-by: Deng, Weishi <weishi.deng@intel.com>
+---
+ torch/csrc/serialization.cpp | 44 +++++++++++++++++++++++++++++-------
+ 1 file changed, 36 insertions(+), 8 deletions(-)
+
+diff --git a/torch/csrc/serialization.cpp b/torch/csrc/serialization.cpp
+index 46f3a04f35..ce5f173583 100644
+--- a/torch/csrc/serialization.cpp
++++ b/torch/csrc/serialization.cpp
+@@ -1,5 +1,6 @@
+ #include <torch/csrc/python_headers.h>
+ #include <system_error>
++#include <ATen/ops/from_blob.h>
+ 
+ #include <c10/core/CPUAllocator.h>
+ #include <torch/csrc/THP.h>
+@@ -233,13 +234,24 @@ void THPStorage_writeFileRaw(
+   int64_t numel = size_bytes / element_size;
+   if (self->device_type() == at::kCPU) {
+     data = self->data<uint8_t>();
++  } else if (
+ #ifdef USE_CUDA
+-  } else if (self->device_type() == at::kCUDA) {
++      self->device_type() == at::kCUDA ||
++#endif
++      self->device_type() == at::kXPU /*|| add more device here*/) {
++    auto device_tensor = at::from_blob(
++      self->data<void>(),
++      {size_bytes}, 
++      NULL,
++      at::device(self->device()).dtype(c10::kByte),
++      {self->device()});
+     cpu_data = std::unique_ptr<char[]>(new char[size_bytes]);
++    auto cpu_tensor = at::from_blob(
++      (void*)cpu_data.get(),
++      {size_bytes},
++      at::device(at::kCPU).dtype(c10::kByte));
++    cpu_tensor.copy_(device_tensor);
+     data = (uint8_t*)cpu_data.get();
+-    C10_CUDA_CHECK(cudaMemcpy(
+-        data, self->data<uint8_t>(), size_bytes, cudaMemcpyDeviceToHost));
+-#endif
+   } else {
+     TORCH_CHECK(
+         false, "writeFileRaw: Device not recognized: ", self->device_type());
+@@ -398,12 +410,28 @@ c10::intrusive_ptr<c10::StorageImpl> THPStorage_readFileRaw(
+     }
+   }
+ 
++  if (storage->device_type() == at::kCPU) {
++    return storage;
++  } else if (
+ #ifdef USE_CUDA
+-  if (storage->device_type() == at::kCUDA) {
+-    C10_CUDA_CHECK(cudaMemcpy(
+-        storage->data<uint8_t>(), data, nbytes, cudaMemcpyHostToDevice));
+-  }
++      storage->device_type() == at::kCUDA ||
+ #endif
++      storage->device_type() == at::kXPU /*|| add more device here*/) {
++    auto cpu_tensor = at::from_blob(
++      (void*)data,
++      {nbytes},
++      at::device(at::kCPU).dtype(c10::kByte));
++    auto device_tensor = at::from_blob(
++      storage->data<void>(),
++      {nbytes},
++      NULL,
++      at::device(storage->device()).dtype(c10::kByte),
++      {storage->device()});
++    device_tensor.copy_(cpu_tensor);
++  } else {
++    TORCH_CHECK(
++      false, "readFileRaw: Device not recognized: ", storage->device_type());
++  }
+   return storage;
+ }
+ 
+-- 
+2.25.1
+

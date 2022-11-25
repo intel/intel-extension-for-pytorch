@@ -1,7 +1,7 @@
 From d979b4b2e157b437e03641a8742449a84fdd8b5d Mon Sep 17 00:00:00 2001
 From: Jinghui <jinghui.gu@intel.com>
 Date: Wed, 16 Nov 2022 22:55:55 +0800
-Subject: [PATCH 8/9] Add compatible sycl path (#86)
+Subject: [PATCH 08/10] Add compatible sycl path (#86)
 
 Signed-off-by: Gu, Jinghui <jinghui.gu@intel.com>
 ---
