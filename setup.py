@@ -435,12 +435,12 @@ def get_xpu_compliers():
 
 def get_ipex_python_dir():
     project_root_dir = os.path.dirname(__file__)
-    python_root_dir = os.path.join(project_root_dir, 'intel_extension_for_pytorch', 'csrc')
+    python_root_dir = os.path.join(project_root_dir, PACKAGE_NAME, 'csrc')
     return os.path.abspath(python_root_dir)
 
 
 def get_ipex_python_build_dir():
-    python_build_dir = os.path.join(get_build_type_dir(), 'intel_extension_for_pytorch', 'csrc')
+    python_build_dir = os.path.join(get_build_type_dir(), PACKAGE_NAME, 'csrc')
     create_if_not_exist(python_build_dir)
     return python_build_dir
 
@@ -567,7 +567,7 @@ class IPEXCPPLibBuild(build_clib, object):
             'PYTORCH_INSTALL_DIR'   : pytorch_install_dir,
             # 'MKL_INSTALL_DIR'     : mkl_install_dir,
             'PYBIND11_CL_FLAGS'     : get_pybind11_abi_compiler_flags(),
-            'LIB_NAME'              : PACKAGE_NAME
+            'IPEX_PROJ_NAME'        : PACKAGE_NAME
         }
 
         use_ninja = False
@@ -772,11 +772,11 @@ def make_relative_rpath(path):
 
 def pyi_module():
     main_libraries = ['intel-ext-pt-python']
-    main_sources = [os.path.join("intel_extension_for_pytorch", "csrc", "_C.cpp")]
+    main_sources = [os.path.join(PACKAGE_NAME, "csrc", "_C.cpp")]
 
     include_dirs = [
         os.path.realpath("."),
-        os.path.realpath(os.path.join("intel_extension_for_pytorch", "csrc")),
+        os.path.realpath(os.path.join(PACKAGE_NAME, "csrc")),
         #os.path.join(mkl_include_path),
         os.path.join(pytorch_install_dir, "include"),
         os.path.join(pytorch_install_dir, "include", "torch", "csrc", "api", "include")]
@@ -806,7 +806,7 @@ def pyi_module():
         '-Wno-missing-braces']
 
     C_ext = CppExtension(
-        "intel_extension_for_pytorch._C",
+        "{}._C".format(PACKAGE_NAME),
         libraries=main_libraries,
         sources=main_sources,
         language='c++',
@@ -839,7 +839,7 @@ with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 entry_points = {
     'console_scripts': [
-        'ipexrun = intel_extension_for_pytorch.cpu.launch:main',
+        'ipexrun = {}.cpu.launch:main'.format(PACKAGE_NAME),
     ]
 }
 
@@ -852,10 +852,9 @@ setup(
     url='https://github.com/intel/intel-extension-for-pytorch',
     author='Intel Corp.',
     install_requires=_build_installation_dependency(),
-    packages=[
-        'intel_extension_for_pytorch'],
+    packages=[PACKAGE_NAME],
     package_data={
-        "intel_extension_for_pytorch": [
+        PACKAGE_NAME: [
             "*.so",
             "lib/*.so",
         ]},

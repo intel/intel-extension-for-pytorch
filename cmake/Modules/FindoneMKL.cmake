@@ -93,12 +93,6 @@ if(MKL_DPCPP_HEADER)
         message(FATAL_ERROR "DPCPP library mkl_sequential not found")
     endif()
 
-    message(STATUS "Intel MKL DPCPP include dir: ${ONEMKL_INCLUDE_DIR}")
-    message(STATUS "Intel MKL DPCPP library: ${ONEMKL_SYCL_LIBRARY}")
-    message(STATUS "Intel MKL DPCPP library: ${ONEMKL_ILP64_LIBRARY}")
-    message(STATUS "Intel MKL DPCPP library: ${ONEMKL_CORE_LIBRARY}")
-    message(STATUS "Intel MKL DPCPP library: ${ONEMKL_THREADS_LIBRARY}")
-
     list(APPEND ONEMKL_SHARED_LIBS ${ONEMKL_SYCL_LIBRARY} ${ONEMKL_ILP64_LIBRARY} ${ONEMKL_CORE_LIBRARY} ${ONEMKL_THREADS_LIBRARY})
     set(ONEMKL_FOUND ON)
     message(STATUS "Intel oneMKL found.")

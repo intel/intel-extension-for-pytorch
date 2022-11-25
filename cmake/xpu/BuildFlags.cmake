@@ -96,3 +96,7 @@ set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
 set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -v")
 set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer")
+
+# XXX: Disable TBB in oneMKL BEFORE call find_package(Torch REQUIRED)
+set(MKL_THREADING "sequential" CACHE STRING "set mkl threading (for example, sequential, tbb_thread)")
+message(STATUS "To avoid link with TBB, we force to disable oneMKL to link with TBB here!")

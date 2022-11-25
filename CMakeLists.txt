@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
-project(intel_extension_for_pytorch VERSION ${CMAKE_PROJECT_VERSION})
+project(${IPEX_PROJ_NAME} VERSION ${CMAKE_PROJECT_VERSION})
 
 set(IPEX_ROOT_DIR ${PROJECT_SOURCE_DIR})
 set(IPEX_CPU_ROOT_DIR ${IPEX_ROOT_DIR}/csrc/cpu)
@@ -39,13 +39,14 @@ find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
 message(STATUS "")
+
 message(STATUS "******** General Summary ********")
 message(STATUS "General:")
 message(STATUS "  CMake version         : ${CMAKE_VERSION}")
 message(STATUS "  CMake command         : ${CMAKE_COMMAND}")
 message(STATUS "  System                : ${CMAKE_SYSTEM_NAME}")
 message(STATUS "  Platform              : ${PYTHON_PLATFORM_INFO}")
-message(STATUS "  Target name           : ${LIB_NAME}")
+message(STATUS "  Target name           : ${IPEX_PROJ_NAME}")
 message(STATUS "  Target version        : ${CMAKE_PROJECT_VERSION}")
 message(STATUS "  Install path          : ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "  Build type            : ${CMAKE_BUILD_TYPE}")
@@ -54,6 +55,7 @@ message(STATUS "  BUILD_WITH_XPU        : ${BUILD_WITH_XPU}")
 message(STATUS "  BUILD_NO_CLANGFORMAT  : ${BUILD_NO_CLANGFORMAT}")
 message(STATUS "  BUILD_STATS           : ${BUILD_STATS}")
 message(STATUS "  BUILD_STRIPPED_BIN    : ${BUILD_STRIPPED_BIN}")
+
 message(STATUS "")
 
 add_subdirectory(${IPEX_ROOT_DIR}/csrc)
