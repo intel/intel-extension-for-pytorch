@@ -562,7 +562,7 @@ class IPEXCPPLibBuild(build_clib, object):
             'CMAKE_PREFIX_PATH'     : cmake_prefix_path,
             'CMAKE_INSTALL_PREFIX'  : os.path.abspath(get_package_dir()),
             'IPEX_INSTALL_LIBDIR'   : os.path.abspath(output_lib_path),
-            'GLIBCXX_USE_CXX11_ABI' : str(int(USE_CXX11_ABI)), # TODO: check if is must need in bdist_cppsdk build.
+            '_GLIBCXX_USE_CXX11_ABI': str(int(USE_CXX11_ABI)), # TODO: check if is must need in bdist_cppsdk build.
             'CMAKE_PROJECT_VERSION' : get_version_num(),
             'PYTHON_INCLUDE_DIR'    : sysconfig.get_paths()['include'],
             'PYTHON_EXECUTABLE'     : sys.executable,

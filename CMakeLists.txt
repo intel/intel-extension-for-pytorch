@@ -21,17 +21,17 @@ option(BUILD_NO_CLANGFORMAT "Build without force clang-format" OFF)
 option(BUILD_STATS "Count statistics for each component during build process" OFF)
 option(BUILD_STRIPPED_BIN "Strip all symbols after build" OFF)
 
+if (BUILD_STATS)
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "time -v")
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "time -v")
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_CUSTOM "time -v")
+endif()
+
 # CPU options:
 
 # XPU options:
 if(BUILD_MODULE_TYPE STREQUAL "GPU")
   include(${IPEX_ROOT_DIR}/cmake/xpu/Options.cmake)
-endif()
-
-if (BUILD_STATS)
-  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "time -v")
-  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "time -v")
-  set_property(GLOBAL PROPERTY RULE_LAUNCH_CUSTOM "time -v")
 endif()
 
 # Need the torch package
