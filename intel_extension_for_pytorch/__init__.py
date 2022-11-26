@@ -14,7 +14,7 @@ except ImportError:
 from . import _C
 # TODO: will uniform here after setup.py is uniformed
 from ._version import (__version__, __ipex_gitrev__,
-                    __torch_gitrev__, __gpu_onednn_gitrev__)
+                    __torch_gitrev__, __gpu_onednn_gitrev__, __build_type__)
 from .utils import _cpu_isa, _custom_fx_tracer
 _cpu_isa.check_minimal_isa_support()
 

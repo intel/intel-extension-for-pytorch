@@ -40,6 +40,8 @@ function (print_xpu_config_summary)
     message(STATUS "******** Summary on XPU ********")
     message(STATUS "General:")
 
+    message(STATUS "  C compiler            : ${CMAKE_C_COMPILER}")
+
     message(STATUS "  C++ compiler          : ${CMAKE_CXX_COMPILER}")
     message(STATUS "  C++ compiler id       : ${CMAKE_CXX_COMPILER_ID}")
     message(STATUS "  C++ compiler version  : ${CMAKE_CXX_COMPILER_VERSION}")

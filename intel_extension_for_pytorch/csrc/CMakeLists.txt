@@ -43,6 +43,17 @@ function (print_python_config_summary)
   message(STATUS "")
 
   message(STATUS "******** Summary on Python ********")
+  message(STATUS "General:")
+
+  message(STATUS "  C compiler            : ${CMAKE_C_COMPILER}")
+
+  message(STATUS "  C++ compiler          : ${CMAKE_CXX_COMPILER}")
+  message(STATUS "  C++ compiler id       : ${CMAKE_CXX_COMPILER_ID}")
+  message(STATUS "  C++ compiler version  : ${CMAKE_CXX_COMPILER_VERSION}")
+
+  message(STATUS "  CXX flags             : ${CMAKE_CXX_FLAGS}")
+  message(STATUS "  CXX Linker options    : ${CMAKE_SHARED_LINKER_FLAGS}")
+
   message(STATUS "  Python include        : ${PYTHON_INCLUDE_DIR}")
   message(STATUS "  pybind11 include      : ${pybind11_INCLUDE_DIRS}")
 
