@@ -1,6 +1,0 @@
-test_serialization_new_format_old_format_compat_xpu (__main__.TestBothSerializationXPU) ... ok
-
-----------------------------------------------------------------------
-Ran 1 test in 2.548s
-
-OK
