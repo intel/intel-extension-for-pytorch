@@ -592,3 +592,7 @@ with torch.no_grad():
 ## C++
 
 Intel® Extension for PyTorch\* provides its C++ dynamic library to allow users to implement custom DPC++ kernels to run on the XPU device. Refer to the [DPC++ extension](./features/DPC++_Extension.md) for the details.
+
+## Model Zoo
+
+Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/v2.9.0). A bunch of PyTorch use cases for benchmarking are also available on the [GitHub page](https://github.com/IntelAI/models/tree/v2.9.0#use-cases). Models verified on Intel dGPUs are marked in `Model Documentation` Column. You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
