@@ -476,6 +476,7 @@ def _xpu_deserialize(obj, location):
 def get_device_type() -> str:
     return 'xpu'
 
+_StorageBase.xpu = _xpu
 
 serialization.register_package(30, _xpu_tag, _xpu_deserialize)
 

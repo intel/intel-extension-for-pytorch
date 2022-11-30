@@ -8,6 +8,9 @@ import intel_extension_for_pytorch  # noqa
 import pytest
 import os
 
+cpu_device = torch.device("cpu")
+xpu_device = torch.device("xpu")
+
 batch_size = 128
 class_num = 1000
 input_channel = 512
@@ -39,11 +42,27 @@ class TestTorchMethod(TestCase):
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_save_load(self):
         a = torch.ones([10], dtype=torch.float64)
-        a = a.to("xpu")
+        a = a.to(xpu_device)
         ckpt = tempfile.NamedTemporaryFile()
         torch.save(a, ckpt.name)
         b = torch.load(ckpt.name)
         assert torch.equal(a, b), "tensor saved & loaded not equal"
+
+    def test_serialization_map_location(self):
+        a = torch.randn(5)
+        ckpt = tempfile.NamedTemporaryFile()
+        torch.save(a, ckpt.name)
+        b = torch.load(ckpt.name, map_location=lambda storage, loc: storage.xpu(0))
+        self.assertEqual(a, b.to(cpu_device))
+
+    @pytest.mark.skipif(torch.xpu.device_count() < 2, reason="doesn't support with one device")
+    def test_serialization_multi_map_location(self):
+        a = torch.randn(5, device='xpu:0')
+        ckpt = tempfile.NamedTemporaryFile()
+        torch.save(a, ckpt.name)
+        b = torch.load(ckpt.name, map_location={'xpu:0':'xpu:1'})
+        self.assertEqual(a.to(cpu_device), b.to(cpu_device))
+        self.assertEqual(b.device.__str__(), 'xpu:1')
 
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_xpu_checkpoint_save_load_integrity_and_accuracy(self, dtype=torch.bfloat16):
