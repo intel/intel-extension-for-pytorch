@@ -560,6 +560,9 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{Symbol::fromQualString("aten::conv2d"),
       Symbol::fromQualString("aten::mul")},
      xpu::conv2d_binary_mul_sym},
+    {{Symbol::fromQualString("quantized::cat"),
+      Symbol::fromQualString("aten::dequantize")},
+     xpu::q_cat_dequantize_sym},
 
     IPEX_DEFINE_CONV_FUSION(sqrt),
     IPEX_DEFINE_CONV_FUSION(square),

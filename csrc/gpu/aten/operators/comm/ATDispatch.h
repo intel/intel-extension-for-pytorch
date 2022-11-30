@@ -636,3 +636,37 @@
 
 #define IPEX_DISPATCH_INDEX_TYPES(TYPE, NAME, ...) \
   AT_DISPATCH_INDEX_TYPES(TYPE, NAME, __VA_ARGS__)
+
+#define IPEX_PRIVATE_CASE_TYPE_WITH_UNDERLYING(enum_type, type, SUFFIX, ...) \
+  case enum_type: {                                                          \
+    using scalar_t_##SUFFIX C10_UNUSED = type;                               \
+    using underlying_t_##SUFFIX C10_UNUSED = type;                           \
+    using bool_t_##SUFFIX C10_UNUSED = std::false_type;                      \
+    return __VA_ARGS__();                                                    \
+  }
+
+#define IPEX_QINT_PRIVATE_CASE_TYPE_WITH_UNDERLYING(                \
+    enum_type, type, underlying_enum, underlying_type, SUFFIX, ...) \
+  case enum_type: {                                                 \
+    const auto& UNDERLYING_TYPE C10_UNUSED = underlying_enum;       \
+    using scalar_t_##SUFFIX C10_UNUSED = underlying_type;           \
+    using underlying_t_##SUFFIX C10_UNUSED = underlying_type;       \
+    using bool_t_##SUFFIX C10_UNUSED = std::true_type;              \
+    return __VA_ARGS__();                                           \
+  }
+
+#define IPEX_DISPATCH_QTYPE_WITH_UNDERLYING(TYPE, NAME, SUFFIX, ...)        \
+  [&] {                                                                     \
+    switch (TYPE) {                                                         \
+      IPEX_PRIVATE_CASE_TYPE_WITH_UNDERLYING(                               \
+          at::ScalarType::Float, float, SUFFIX, __VA_ARGS__)                \
+      IPEX_QINT_PRIVATE_CASE_TYPE_WITH_UNDERLYING(                          \
+          at::kQInt8, at::qint8, at::kChar, int8_t, SUFFIX, __VA_ARGS__)    \
+      IPEX_QINT_PRIVATE_CASE_TYPE_WITH_UNDERLYING(                          \
+          at::kQUInt8, at::quint8, at::kByte, uint8_t, SUFFIX, __VA_ARGS__) \
+      IPEX_QINT_PRIVATE_CASE_TYPE_WITH_UNDERLYING(                          \
+          at::kQInt32, at::qint32, at::kInt, int, SUFFIX, __VA_ARGS__)      \
+      default:                                                              \
+        AT_ERROR(#NAME, " not implemented for '", TYPE, "'");               \
+    }                                                                       \
+  }()

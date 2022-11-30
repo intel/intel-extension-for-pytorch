@@ -148,13 +148,10 @@ std::vector<Tensor> to_plain_if_needed(TensorList tensors) {
   return _tensors;
 }
 
-MaterializedITensorListRef to_plain_if_needed(
-    MaterializedITensorListRef tensors) {
-  if (!Settings::I().is_onednn_layout_enabled())
-    return tensors;
-  MaterializedITensorListRef _tensors;
+std::vector<Tensor> to_plain_if_needed(MaterializedITensorListRef tensors) {
+  std::vector<Tensor> _tensors;
   for (auto tensor : tensors) {
-    _tensors.push_back(std::reference_wrapper<const at::Tensor>(tensor.get()));
+    _tensors.push_back(to_plain_if_needed(tensor.get()));
   }
   return _tensors;
 }
