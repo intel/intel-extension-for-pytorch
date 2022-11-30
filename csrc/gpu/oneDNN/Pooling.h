@@ -331,7 +331,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
     at::Tensor idx_;
     memory idx_m;
     if (src_ctx.is_plain() || using_channels_last_for_onednn_op(src)) {
-      idx_ = at::empty({dst_tz}, at::TensorOptions(at::kXPU).dtype(at::kInt));
+      idx_ = at::empty_like(idx, at::TensorOptions().dtype(at::kInt));
       idx_m = dpcpp_onednn_memory(idx_md, engine, idx_.data_ptr());
     } else {
       auto expected_idx_md = pooling_fwd_pd.workspace_desc();
@@ -356,8 +356,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
          {DNNL_ARG_WORKSPACE, idx_m}});
 
     if (src_ctx.is_plain() || using_channels_last_for_onednn_op(src)) {
-      dtype_convert_by_scalar(
-          idx.data_ptr<int64_t>(), idx_.data_ptr<int32_t>(), idx_.numel());
+      idx.copy_(idx_);
     } else {
       // reorder if materialized
       auto idx_internal_ctx = DPCPPTensorContext::release_tensor_ctx(idx_);
@@ -725,10 +724,7 @@ static at::Tensor pooling_backward(
   auto idx_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(idx);
   at::Tensor idx_usr = idx;
   if (idx_ctx.is_plain()) {
-    idx_usr =
-        at::empty({diff_dst_tz}, at::TensorOptions(at::kXPU).dtype(at::kInt));
-    dtype_convert_by_scalar(
-        idx_usr.data_ptr<int32_t>(), idx.data_ptr<int64_t>(), idx_usr.numel());
+    idx_usr = idx.to(kInt);
 
     idx_usr_m = dpcpp_onednn_memory(
         {diff_dst_tz,

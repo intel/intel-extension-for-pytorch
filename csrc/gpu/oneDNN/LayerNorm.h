@@ -34,9 +34,9 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
   auto prop =
       training ? prop_kind::forward_training : prop_kind::forward_inference;
   normalization_flags flags = wgh.defined() && bia.defined()
-      ? normalization_flags::use_scale_shift
+      ? normalization_flags::use_scale | normalization_flags::use_shift
       : normalization_flags::none;
-  bool useScaleShift = (bool)(flags & normalization_flags::use_scale_shift);
+  bool useScaleShift = (bool)(flags & normalization_flags::use_scale);
 
   int32_t n, ic, ih;
   memory::dims tz, st, stats_tz;
@@ -110,28 +110,25 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
     args.insert({DNNL_ARG_VARIANCE, var_memory});
   }
 
+  Tensor wgh_f32 = wgh;
+  Tensor bia_f32 = bia;
   if (useScaleShift) {
-    auto wgh_bia = at::empty(2 * ih, wgh.options().dtype(at::kFloat));
-    if (wgh.scalar_type() == ScalarType::Half) {
-      dtype_convert_by_scalar(
-          wgh_bia.data_ptr<float>(), wgh.data_ptr<at::Half>(), ih);
-      dtype_convert_by_scalar(
-          wgh_bia.data_ptr<float>() + ih, bia.data_ptr<at::Half>(), ih);
-    } else if (wgh.scalar_type() == ScalarType::BFloat16) {
-      dtype_convert_by_scalar(
-          wgh_bia.data_ptr<float>(), wgh.data_ptr<at::BFloat16>(), ih);
-      dtype_convert_by_scalar(
-          wgh_bia.data_ptr<float>() + ih, bia.data_ptr<at::BFloat16>(), ih);
-    } else {
-      dtype_convert_by_scalar(
-          wgh_bia.data_ptr<float>(), wgh.data_ptr<float>(), ih);
-      dtype_convert_by_scalar(
-          wgh_bia.data_ptr<float>() + ih, bia.data_ptr<float>(), ih);
+    if (wgh.scalar_type() == ScalarType::Half ||
+        wgh.scalar_type() == ScalarType::BFloat16) {
+      wgh_f32 = wgh.to(at::kFloat);
     }
 
-    auto wgh_bia_m = dpcpp_onednn_memory(
-        ln_fwd_pd.weights_desc(), engine, wgh_bia.data_ptr());
-    args.insert({DNNL_ARG_SCALE_SHIFT, wgh_bia_m});
+    if (bia.scalar_type() == ScalarType::Half ||
+        bia.scalar_type() == ScalarType::BFloat16) {
+      bia_f32 = bia.to(at::kFloat);
+    }
+
+    auto scl_m = dpcpp_onednn_memory(
+        ln_fwd_pd.weights_desc(), engine, wgh_f32.data_ptr());
+    auto sft_m = dpcpp_onednn_memory(
+        ln_fwd_pd.weights_desc(), engine, bia_f32.data_ptr());
+    args.insert({DNNL_ARG_SCALE, scl_m});
+    args.insert({DNNL_ARG_SHIFT, sft_m});
   }
 
 #ifdef USE_PRIMITIVE_CACHE
@@ -161,9 +158,9 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   normalization_flags flags = wgh.defined()
-      ? normalization_flags::use_scale_shift
+      ? normalization_flags::use_scale | normalization_flags::use_shift
       : normalization_flags::none;
-  bool useScaleShift = (bool)(flags & normalization_flags::use_scale_shift);
+  bool useScaleShift = (bool)(flags & normalization_flags::use_scale);
 
   int32_t n, ic, ih;
   memory::dims src_tz, src_st, diff_dst_tz, diff_dst_st, stats_tz;
@@ -272,29 +269,29 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
       {DNNL_ARG_VARIANCE, rstd_m},
       {DNNL_ARG_DIFF_SRC, diff_src_m},
   };
-  Tensor diff_wgh_bia;
+  Tensor wgh_f32, bia_f32, diff_wgh, diff_bia;
   if (useScaleShift) {
-    auto wgh_bia = at::empty(2 * ih, wgh.options().dtype(at::kFloat));
-    if (wgh.scalar_type() == ScalarType::BFloat16) {
-      dtype_convert_by_scalar(
-          wgh_bia.data_ptr<float>(), wgh.data_ptr<at::BFloat16>(), ih);
-    } else {
-      dtype_convert_by_scalar(
-          wgh_bia.data_ptr<float>(), wgh.data_ptr<float>(), ih);
-    }
-    dpcppMemsetAsync(
-        static_cast<uint8_t*>(wgh_bia.data_ptr()) + ih * sizeof(float),
-        0,
-        ih * wgh.itemsize());
-    auto wgh_bia_m = dpcpp_onednn_memory(
-        ln_bwd_pd.weights_desc(), engine, wgh_bia.data_ptr());
+    wgh_f32 = wgh.to(at::kFloat);
+    auto wgh_m = dpcpp_onednn_memory(
+        ln_bwd_pd.weights_desc(), engine, wgh_f32.data_ptr());
 
-    diff_wgh_bia = at::empty(2 * ih, wgh.options().dtype(at::kFloat));
-    auto diff_wgh_bia_m = dpcpp_onednn_memory(
-        ln_bwd_pd.diff_weights_desc(), engine, diff_wgh_bia.data_ptr());
+    bia_f32 = at::empty_like(wgh_f32);
+    auto bia_m = dpcpp_onednn_memory(
+        ln_bwd_pd.weights_desc(), engine, bia_f32.data_ptr());
 
-    args.insert({DNNL_ARG_SCALE_SHIFT, wgh_bia_m});
-    args.insert({DNNL_ARG_DIFF_SCALE_SHIFT, diff_wgh_bia_m});
+    diff_wgh = at::empty(wgh.sizes(), wgh.options().dtype(ScalarType::Float));
+    diff_bia = at::empty(wgh.sizes(), wgh.options().dtype(ScalarType::Float));
+
+    auto diff_wgh_m = dpcpp_onednn_memory(
+        ln_bwd_pd.diff_weights_desc(), engine, diff_wgh.data_ptr());
+
+    auto diff_bia_m = dpcpp_onednn_memory(
+        ln_bwd_pd.diff_weights_desc(), engine, diff_bia.data_ptr());
+
+    args.insert({DNNL_ARG_SCALE, wgh_m});
+    args.insert({DNNL_ARG_SHIFT, bia_m});
+    args.insert({DNNL_ARG_DIFF_SCALE, diff_wgh_m});
+    args.insert({DNNL_ARG_DIFF_SHIFT, diff_bia_m});
   }
 
 #ifdef USE_PRIMITIVE_CACHE
@@ -316,28 +313,6 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
 #endif
 
   DPCPP_ONEDNN_EXEC(ln_backward, strm, args);
-
-  Tensor diff_wgh;
-  Tensor diff_bia;
-  if (useScaleShift) {
-    diff_wgh = at::empty_like(wgh);
-    diff_bia = at::empty_like(wgh);
-    if (wgh.scalar_type() == ScalarType::BFloat16) {
-      dtype_convert_by_scalar(
-          diff_wgh.data_ptr<at::BFloat16>(),
-          diff_wgh_bia.data_ptr<float>(),
-          ih);
-      dtype_convert_by_scalar(
-          diff_bia.data_ptr<at::BFloat16>(),
-          diff_wgh_bia.data_ptr<float>() + ih,
-          ih);
-    } else {
-      dtype_convert_by_scalar(
-          diff_wgh.data_ptr<float>(), diff_wgh_bia.data_ptr<float>(), ih);
-      dtype_convert_by_scalar(
-          diff_bia.data_ptr<float>(), diff_wgh_bia.data_ptr<float>() + ih, ih);
-    }
-  }
 
   return std::make_tuple(diff_src, diff_wgh, diff_bia);
 }
