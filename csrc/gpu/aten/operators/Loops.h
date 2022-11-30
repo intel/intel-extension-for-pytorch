@@ -126,7 +126,7 @@ static inline void launch_unrolled_kernel(
     storer_t s) {
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int group_items = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
+  int group_items = dpcppMaxWorkItemsPerEU();
   int group_work_size = ITEM_WORK_SIZE * group_items;
   int num_groups = (N + group_work_size - 1) / group_work_size;
 
@@ -254,7 +254,7 @@ static inline void launch_vectorized_kernel(
   constexpr auto max_scalar_bytes = max_scalar_size<func_t>();
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto group_size = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
+  auto group_size = dpcppMaxWorkItemsPerEU();
 
 #define VEC_LOOPS_KERNEL(vec_size)                                    \
   {                                                                   \
@@ -306,6 +306,47 @@ static inline void launch_vectorized_kernel(
 #undef VEC_LOOPS_KERNEL
 }
 
+template <typename func_t>
+static inline void elementwise_kernel(
+    sycl::nd_item<1>& item,
+    int N,
+    func_t f,
+    int group_size) {
+  int lid = item.get_group(0) * item.get_local_range(0) + item.get_local_id(0);
+  for (int idx = lid; idx < N;
+       idx += item.get_group_range(0) * item.get_local_range(0)) {
+    if (idx < N) {
+      f(idx);
+    }
+  }
+}
+
+template <typename func_t>
+static inline void launch_legacy_kernel(int64_t N, const func_t& f) {
+  TORCH_INTERNAL_ASSERT(N >= 0 && N <= std::numeric_limits<int32_t>::max());
+  if (N == 0) {
+    return;
+  }
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto group_size = dpcppMaxWorkItemsPerEU();
+  int num_groups = (N + group_size - 1) / group_size;
+  int hw_max_groups = dpcppMaxWorkItemsPerTile() / group_size;
+  num_groups = num_groups > hw_max_groups ? hw_max_groups : num_groups;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
+      elementwise_kernel<func_t>(item_id, N, f, group_size);
+    };
+
+    cgh.parallel_for(
+        sycl::nd_range<1>(
+            sycl::range<1>(num_groups * group_size),
+            sycl::range<1>(group_size)),
+        kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
 template <int vec_size, typename func_t>
 static inline void elementwise_kernel(
     sycl::nd_item<1>& item,
@@ -330,7 +371,7 @@ static inline void launch_legacy_kernel(int64_t N, const func_t& f) {
     return;
   }
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto max_group_size = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
+  auto max_group_size = dpcppMaxWorkItemsPerEU();
   auto num_groups =
       (N + max_group_size * vec_size - 1) / (max_group_size * vec_size);
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -459,6 +500,9 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
 
   bool contiguous = iter.is_contiguous();
   bool dynamic_casting = at::native::needs_dynamic_casting<func_t>::check(iter);
+  auto item_of_tile = dpcppMaxWorkItemsPerTile();
+  bool latency_case =
+      numel <= item_of_tile * 4; /* on tuning for different data types */
 
   if (!dynamic_casting) {
     if (contiguous) {
@@ -470,7 +514,8 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
     } else {
       if constexpr (fast_mode) {
         int vec_size;
-        if (can_use_broadcast_vectorize<func_t>(iter, data, vec_size) &&
+        if (!latency_case &&
+            can_use_broadcast_vectorize<func_t>(iter, data, vec_size) &&
             !signed_strides) {
           auto input_offset_calculator =
               make_input_offset_calculator<traits::arity, signed_strides>(iter);
@@ -481,8 +526,7 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
       }
       auto offset_calc =
           make_offset_calculator<traits::arity + 1, signed_strides>(iter);
-      constexpr int unroll_factor = 16 / sizeof(arg0_t);
-      launch_legacy_kernel<unroll_factor>(numel, [=](int idx) {
+      launch_legacy_kernel(numel, [=](int idx) {
         auto offsets = offset_calc.get(idx);
         arg0_t* out = (arg0_t*)(data[0] + offsets[0]);
         *out = invoke(f, &data.data[1], &offsets.data[1], 1);
@@ -588,7 +632,7 @@ static inline void launch_unrolled_kernel_for_multi_outputs(
     out_calc_t oc) {
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int group_items = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
+  int group_items = dpcppMaxWorkItemsPerEU();
   int group_work_size = ITEM_WORK_SIZE * group_items;
   int num_groups = (N + group_work_size - 1) / group_work_size;
 

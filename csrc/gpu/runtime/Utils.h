@@ -94,6 +94,14 @@ static inline int64_t dpcppMaxWorkItemsPerTile(
   return eu_num * simd_width * hw_threads;
 }
 
+static inline int64_t dpcppMaxWorkItemsPerEU(
+    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  int64_t simd_width = dpcppMaxSubGroupSize(dev_id);
+  int64_t hw_threads = dev_prop->gpu_hw_threads_per_eu;
+  return simd_width * hw_threads;
+}
+
 static inline int64_t dpcppMaxDSSNum(
     DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
   // TODO: We need to got this info from DPC++ Runtime
