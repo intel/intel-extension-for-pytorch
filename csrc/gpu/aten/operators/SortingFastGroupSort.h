@@ -168,8 +168,28 @@ inline uint64_t radix_sort_last_power2(uint64_t n) {
 
 } // namespace impl
 
+inline std::tuple<int, int, int> get_sorting_workload() {
+  constexpr int ITEM_WORK_SIZE = 4;
+  constexpr int MERGE_CHUNK_BOUND = 4;
+  auto q = dpcppGetDeviceIdOfCurrentQueue();
+  auto* dev_prop = dpcppGetDeviceProperties(q);
+  auto max_group_size = dpcppMaxWorkGroupSize(q);
+  switch (dev_prop->subgroup_sizes[0] * 2) {
+    case 32:
+      return std::make_tuple(max_group_size, ITEM_WORK_SIZE, MERGE_CHUNK_BOUND);
+    default:
+      // Reduce local memory pressure
+      return std::make_tuple(max_group_size / 2, ITEM_WORK_SIZE, 1);
+  }
+  return std::make_tuple(0, 0, 0);
+}
+
 inline int get_fast_group_sort_bound() {
-  return dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue()) * 4 * 4;
+  auto wl = get_sorting_workload();
+  auto group_size = std::get<0>(wl);
+  auto item_work_size = std::get<1>(wl);
+  auto merge_chunk_bound = std::get<2>(wl);
+  return group_size * item_work_size * merge_chunk_bound;
 }
 
 template <

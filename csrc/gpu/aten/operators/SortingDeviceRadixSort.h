@@ -3,6 +3,7 @@
 #include <utils/DPCPP.h>
 #include <limits>
 #include "SortingCommon.h"
+#include "SortingFastGroupSort.h"
 #include "comm/General.h"
 #include "comm/KeyTraits.h"
 
@@ -267,7 +268,8 @@ struct SegmentedDeviceRadixSortDesc {
         stride(stride),
         descending(descending),
         use_indices(use_indices) {
-    max_group_sz = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
+    auto wl = get_sorting_workload();
+    max_group_sz = std::get<0>(wl);
   }
 
   inline bool valid() {
