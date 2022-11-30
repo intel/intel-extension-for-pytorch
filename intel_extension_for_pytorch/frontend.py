@@ -525,7 +525,7 @@ def optimize(
     # with an optimizer
     if opt_properties.fuse_update_step:
         optimized_optimizer = optimizer_fusion(
-            optimized_optimizer, opt_properties.split_master_weight_for_bf16)
+            optimized_optimizer, opt_properties.split_master_weight_for_bf16, device_type)
     return optimized_model, optimized_optimizer
 
 
