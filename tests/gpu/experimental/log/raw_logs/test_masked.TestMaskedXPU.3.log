@@ -1,0 +1,211 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_mask_layout_sparse_coo_masked_amax_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_amax_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_amax_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_amax_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_amax_xpu_int16 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_amax_xpu_int32 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_amax_xpu_int64 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_amax_xpu_int8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_amax_xpu_uint8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_amin_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_amin_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_amin_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_amin_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_amin_xpu_int16 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_amin_xpu_int32 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_amin_xpu_int64 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_amin_xpu_int8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_amin_xpu_uint8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_mean_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped 'masked.mean does not support inputs with sparse_coo layout'
+test_mask_layout_sparse_coo_masked_mean_xpu_bool (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_mean_xpu_complex128 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_sparse_coo_masked_mean_xpu_complex64 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_sparse_coo_masked_mean_xpu_float16 (__main__.TestMaskedXPU) ... skipped 'masked.mean does not support inputs with sparse_coo layout'
+test_mask_layout_sparse_coo_masked_mean_xpu_float32 (__main__.TestMaskedXPU) ... skipped 'masked.mean does not support inputs with sparse_coo layout'
+test_mask_layout_sparse_coo_masked_mean_xpu_float64 (__main__.TestMaskedXPU) ... skipped 'masked.mean does not support inputs with sparse_coo layout'
+test_mask_layout_sparse_coo_masked_mean_xpu_int16 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_mean_xpu_int32 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_mean_xpu_int64 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_mean_xpu_int8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_mean_xpu_uint8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_coo_masked_prod_xpu_bool (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_prod_xpu_complex128 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_sparse_coo_masked_prod_xpu_complex64 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_sparse_coo_masked_prod_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_prod_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_prod_xpu_int16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_prod_xpu_int32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_prod_xpu_int64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_prod_xpu_int8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_prod_xpu_uint8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_sum_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_sum_xpu_bool (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_sum_xpu_complex128 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_sparse_coo_masked_sum_xpu_complex64 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_sparse_coo_masked_sum_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_sum_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_sum_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_sum_xpu_int16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_sum_xpu_int32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_sum_xpu_int64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_sum_xpu_int8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_coo_masked_sum_xpu_uint8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_amax_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_amax_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_amax_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_amax_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_amax_xpu_int16 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_amax_xpu_int32 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_amax_xpu_int64 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_amax_xpu_int8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_amax_xpu_uint8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_amin_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_amin_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_amin_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_amin_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_amin_xpu_int16 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_amin_xpu_int32 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_amin_xpu_int64 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_amin_xpu_int8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_amin_xpu_uint8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_mean_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_mean_xpu_bool (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_mean_xpu_complex128 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_sparse_csr_masked_mean_xpu_complex64 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_sparse_csr_masked_mean_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_mean_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_mean_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_mean_xpu_int16 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_mean_xpu_int32 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_mean_xpu_int64 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_mean_xpu_int8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_mean_xpu_uint8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_sparse_csr_masked_prod_xpu_bool (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_prod_xpu_complex128 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_sparse_csr_masked_prod_xpu_complex64 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_sparse_csr_masked_prod_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_prod_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_prod_xpu_int16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_prod_xpu_int32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_prod_xpu_int64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_prod_xpu_int8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_prod_xpu_uint8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_sum_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_sum_xpu_bool (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_sum_xpu_complex128 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_sparse_csr_masked_sum_xpu_complex64 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_sparse_csr_masked_sum_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_sum_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_sum_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_sum_xpu_int16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_sum_xpu_int32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_sum_xpu_int64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_sum_xpu_int8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_sparse_csr_masked_sum_xpu_uint8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_amax_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_amax_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_amax_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_amax_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_amax_xpu_int16 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_amax_xpu_int32 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_amax_xpu_int64 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_amax_xpu_int8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_amax_xpu_uint8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_amin_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_amin_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_amin_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_amin_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_amin_xpu_int16 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_amin_xpu_int32 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_amin_xpu_int64 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_amin_xpu_int8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_amin_xpu_uint8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_mean_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_mean_xpu_bool (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_mean_xpu_complex128 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_strided_masked_mean_xpu_complex64 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_strided_masked_mean_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_mean_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_mean_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_mean_xpu_int16 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_mean_xpu_int32 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_mean_xpu_int64 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_mean_xpu_int8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_mean_xpu_uint8 (__main__.TestMaskedXPU) ... skipped 'Skipped!'
+test_mask_layout_strided_masked_prod_xpu_bool (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_prod_xpu_complex128 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_strided_masked_prod_xpu_complex64 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_strided_masked_prod_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_prod_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_prod_xpu_int16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_prod_xpu_int32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_prod_xpu_int64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_prod_xpu_int8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_prod_xpu_uint8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_sum_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_sum_xpu_bool (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_sum_xpu_complex128 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_strided_masked_sum_xpu_complex64 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_mask_layout_strided_masked_sum_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_sum_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_sum_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_sum_xpu_int16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_sum_xpu_int32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_sum_xpu_int64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_sum_xpu_int8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_mask_layout_strided_masked_sum_xpu_uint8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_log_softmax_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_log_softmax_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_log_softmax_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_norm_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_norm_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_norm_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_norm_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_normalize_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_normalize_xpu_complex128 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_reference_masked_masked_normalize_xpu_complex64 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_reference_masked_masked_normalize_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_normalize_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_normalize_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_softmax_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_softmax_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_softmax_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_softmin_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_softmin_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_softmin_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_std_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_std_xpu_complex128 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_reference_masked_masked_std_xpu_complex64 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_reference_masked_masked_std_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_std_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_std_xpu_int16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_std_xpu_int32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_std_xpu_int64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_std_xpu_int8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_std_xpu_uint8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_var_xpu_bfloat16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_var_xpu_complex128 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_reference_masked_masked_var_xpu_complex64 (__main__.TestMaskedXPU) ... skipped 'dtype not support on XPU'
+test_reference_masked_masked_var_xpu_float16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_var_xpu_float32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_var_xpu_float64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_var_xpu_int16 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_var_xpu_int32 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_var_xpu_int64 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_var_xpu_int8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_masked_masked_var_xpu_uint8 (__main__.TestMaskedXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_where_coo_fill_value_0_xpu (__main__.TestMaskedXPU) ... ok
+test_where_coo_fill_value_123_xpu (__main__.TestMaskedXPU) ... ok
+test_where_csr_fill_value_0_xpu (__main__.TestMaskedXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_masked.py:272: UserWarning: Sparse CSR tensor support is in beta state. If you miss a functionality in the sparse tensor support, please submit a feature request to https://github.com/pytorch/pytorch/issues. (Triggered internally at /home/gta/xunsongh/pytorch/aten/src/ATen/SparseCsrTensorImpl.cpp:54.)
+  return dense.to_sparse_csr()
+ok
+test_where_csr_fill_value_123_xpu (__main__.TestMaskedXPU) ... ok
+test_where_hybrid_coo_fill_value_0_xpu (__main__.TestMaskedXPU) ... ok
+test_where_hybrid_coo_fill_value_123_xpu (__main__.TestMaskedXPU) ... ok
+
+----------------------------------------------------------------------
+Ran 202 tests in 0.078s
+
+OK (skipped=196)

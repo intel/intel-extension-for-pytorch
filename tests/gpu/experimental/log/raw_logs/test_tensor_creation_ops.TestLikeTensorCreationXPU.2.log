@@ -1,0 +1,13 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_empty_like_xpu_xpu (__main__.TestLikeTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_full_like_inference_xpu_xpu (__main__.TestLikeTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_ones_like_multiple_device_xpu_xpu (__main__.TestLikeTensorCreationXPU) ... ok
+test_ones_like_xpu_xpu (__main__.TestLikeTensorCreationXPU) ... ok
+test_zeros_like_multiple_device_xpu_xpu (__main__.TestLikeTensorCreationXPU) ... ok
+test_zeros_like_xpu_xpu (__main__.TestLikeTensorCreationXPU) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.713s
+
+OK (skipped=2)

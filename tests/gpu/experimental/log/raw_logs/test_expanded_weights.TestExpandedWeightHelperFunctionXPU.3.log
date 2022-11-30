@@ -1,0 +1,15 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_forward_helper_failure_args_xpu_xpu (__main__.TestExpandedWeightHelperFunctionXPU) ... ok
+test_forward_helper_xpu_xpu (__main__.TestExpandedWeightHelperFunctionXPU) ... ok
+test_set_grad_sample_if_exists_failure_xpu_xpu (__main__.TestExpandedWeightHelperFunctionXPU) ... ok
+test_set_grad_sample_if_exists_xpu_xpu (__main__.TestExpandedWeightHelperFunctionXPU) ... ok
+test_sum_over_all_but_batch_and_last_n_xpu_xpu (__main__.TestExpandedWeightHelperFunctionXPU) ... ok
+test_unpack_expanded_weight_or_tensor_failure_xpu_xpu (__main__.TestExpandedWeightHelperFunctionXPU) ... ok
+test_unpack_expanded_weight_or_tensor_with_custom_function_xpu_xpu (__main__.TestExpandedWeightHelperFunctionXPU) ... ok
+test_unpack_expanded_weight_or_tensor_xpu_xpu (__main__.TestExpandedWeightHelperFunctionXPU) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 1.614s
+
+OK

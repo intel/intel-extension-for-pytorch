@@ -1,0 +1,172 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_normal_std_error_xpu_xpu (__main__.TestRandomTensorCreationXPU) ... ok
+test_normal_xpu_xpu_float32 (__main__.TestRandomTensorCreationXPU) ... ok
+test_normal_xpu_xpu_float64 (__main__.TestRandomTensorCreationXPU) ... ok
+test_rand_xpu_xpu_complex128 (__main__.TestRandomTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_rand_xpu_xpu_complex32 (__main__.TestRandomTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_rand_xpu_xpu_complex64 (__main__.TestRandomTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_rand_xpu_xpu_float32 (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_rand_xpu_xpu_float64 (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_randint_inference_xpu_xpu (__main__.TestRandomTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_randint_xpu_xpu (__main__.TestRandomTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_randn_xpu_xpu_bfloat16 (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_randn_xpu_xpu_complex128 (__main__.TestRandomTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_randn_xpu_xpu_complex32 (__main__.TestRandomTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_randn_xpu_xpu_complex64 (__main__.TestRandomTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_randn_xpu_xpu_float16 (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_randn_xpu_xpu_float32 (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_randn_xpu_xpu_float64 (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_random_neg_values_xpu_xpu (__main__.TestRandomTensorCreationXPU) ... ok
+test_randperm_device_compatibility_xpu_xpu (__main__.TestRandomTensorCreationXPU) ... skipped 'not ready on XPU'
+test_randperm_xpu_xpu (__main__.TestRandomTensorCreationXPU) ... FAIL
+test_uniform_from_to_xpu_xpu_bfloat16 (__main__.TestRandomTensorCreationXPU) ... ok
+test_uniform_from_to_xpu_xpu_float16 (__main__.TestRandomTensorCreationXPU) ... ok
+test_uniform_from_to_xpu_xpu_float32 (__main__.TestRandomTensorCreationXPU) ... ok
+test_uniform_from_to_xpu_xpu_float64 (__main__.TestRandomTensorCreationXPU) ... ok
+
+======================================================================
+FAIL: test_rand_xpu_xpu_float32 (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2448, in test_rand
+    self.assertEqual(res1, res2)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 9976 / 10000 (99.8%)
+Greatest absolute difference: 0.9822478052228689 at index (22, 80) (up to 0.001 allowed)
+Greatest relative difference: 4532.48748522764 at index (44, 14) (up to 1.3e-06 allowed)
+
+======================================================================
+FAIL: test_rand_xpu_xpu_float64 (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2448, in test_rand
+    self.assertEqual(res1, res2)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 9978 / 10000 (99.8%)
+Greatest absolute difference: 0.9973025785095808 at index (61, 31) (up to 0.001 allowed)
+Greatest relative difference: 1394.0282900485693 at index (4, 87) (up to 1e-07 allowed)
+
+======================================================================
+FAIL: test_randn_xpu_xpu_bfloat16 (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2437, in test_randn
+    self.assertEqual(res1, res2)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 9937 / 10000 (99.4%)
+Greatest absolute difference: 5.4375 at index (62, 69) (up to 0.001 allowed)
+Greatest relative difference: 10087.748299319728 at index (62, 94) (up to 0.016 allowed)
+
+======================================================================
+FAIL: test_randn_xpu_xpu_float16 (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2437, in test_randn
+    self.assertEqual(res1, res2)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 9986 / 10000 (99.9%)
+Greatest absolute difference: 5.505859375 at index (3, 10) (up to 0.001 allowed)
+Greatest relative difference: 9961.403791469194 at index (36, 51) (up to 0.001 allowed)
+
+======================================================================
+FAIL: test_randn_xpu_xpu_float32 (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2437, in test_randn
+    self.assertEqual(res1, res2)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 9996 / 10000 (100.0%)
+Greatest absolute difference: 5.329720735549927 at index (21, 43) (up to 0.001 allowed)
+Greatest relative difference: 2715.298000557905 at index (34, 93) (up to 1.3e-06 allowed)
+
+======================================================================
+FAIL: test_randn_xpu_xpu_float64 (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2437, in test_randn
+    self.assertEqual(res1, res2)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 9993 / 10000 (99.9%)
+Greatest absolute difference: 6.127431087113145 at index (13, 89) (up to 0.001 allowed)
+Greatest relative difference: 47902.38714184218 at index (99, 36) (up to 1e-07 allowed)
+
+======================================================================
+FAIL: test_randperm_xpu_xpu (__main__.TestRandomTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2463, in test_randperm
+    with torch.random.fork_rng(devices=rng_device):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/contextlib.py", line 119, in __enter__
+    return next(self.gen)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/random.py", line 122, in fork_rng
+    gpu_rng_states.append(torch.cuda.get_rng_state(device))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/cuda/random.py", line 22, in get_rng_state
+    _lazy_init()
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/cuda/__init__.py", line 221, in _lazy_init
+    raise AssertionError("Torch not compiled with CUDA enabled")
+AssertionError: Torch not compiled with CUDA enabled
+
+----------------------------------------------------------------------
+Ran 24 tests in 1.705s
+
+FAILED (failures=7, skipped=9)
+Raised CalledProcessError: return code 1.

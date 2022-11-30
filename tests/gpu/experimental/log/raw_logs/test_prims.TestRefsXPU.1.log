@@ -1,0 +1,8 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_constant_pad_nd_memory_format_xpu_xpu_float32 (__main__.TestRefsXPU) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.007s
+
+OK

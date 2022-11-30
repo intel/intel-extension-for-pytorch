@@ -1,0 +1,767 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_cnn_model_mean_xpu_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_cnn_model_sum_xpu_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_embedding_model_xpu_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_error_xpu_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_conv1d_xpu_bfloat16 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_conv1d_xpu_complex128 (__main__.TestExpandedWeightFunctionalXPU) ... skipped 'dtype not support on XPU'
+test_expanded_weight_forward_nn_functional_conv1d_xpu_complex64 (__main__.TestExpandedWeightFunctionalXPU) ... skipped 'dtype not support on XPU'
+test_expanded_weight_forward_nn_functional_conv1d_xpu_float32 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_conv1d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_conv1d_xpu_int64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_forward_nn_functional_conv2d_xpu_bfloat16 (__main__.TestExpandedWeightFunctionalXPU) ... /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py:1068: UserWarning: Using padding='same' with even kernel lengths and odd dilation may require a zero-padded copy of the input be created (Triggered internally at /home/gta/xunsongh/pytorch/aten/src/ATen/native/Convolution.cpp:895.)
+  return self.op(*args, **kwargs)
+ok
+test_expanded_weight_forward_nn_functional_conv2d_xpu_complex128 (__main__.TestExpandedWeightFunctionalXPU) ... skipped 'dtype not support on XPU'
+test_expanded_weight_forward_nn_functional_conv2d_xpu_complex64 (__main__.TestExpandedWeightFunctionalXPU) ... skipped 'dtype not support on XPU'
+test_expanded_weight_forward_nn_functional_conv2d_xpu_float32 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_conv2d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_conv2d_xpu_int64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_forward_nn_functional_embedding_xpu_bfloat16 (__main__.TestExpandedWeightFunctionalXPU) ... skipped "not implemented: Could not run 'aten::embedding_renorm_' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::embedding_renorm_' is only available for these backends: [CPU, Meta, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_1.cpp:21945 [kernel]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:5089 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_expanded_weight_forward_nn_functional_embedding_xpu_float16 (__main__.TestExpandedWeightFunctionalXPU) ... skipped "not implemented: Could not run 'aten::embedding_renorm_' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::embedding_renorm_' is only available for these backends: [CPU, Meta, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_1.cpp:21945 [kernel]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:5089 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_expanded_weight_forward_nn_functional_embedding_xpu_float32 (__main__.TestExpandedWeightFunctionalXPU) ... skipped "not implemented: Could not run 'aten::embedding_renorm_' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::embedding_renorm_' is only available for these backends: [CPU, Meta, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_1.cpp:21945 [kernel]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:5089 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_expanded_weight_forward_nn_functional_embedding_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... skipped "not implemented: Could not run 'aten::embedding_renorm_' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::embedding_renorm_' is only available for these backends: [CPU, Meta, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_1.cpp:21945 [kernel]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:5089 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_expanded_weight_forward_nn_functional_group_norm_xpu_bfloat16 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_forward_nn_functional_group_norm_xpu_float32 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_group_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_instance_norm_xpu_bfloat16 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_forward_nn_functional_instance_norm_xpu_float32 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_forward_nn_functional_instance_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_forward_nn_functional_layer_norm_xpu_bfloat16 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_layer_norm_xpu_float32 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_layer_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_forward_nn_functional_linear_xpu_bfloat16 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_linear_xpu_complex128 (__main__.TestExpandedWeightFunctionalXPU) ... skipped 'dtype not support on XPU'
+test_expanded_weight_forward_nn_functional_linear_xpu_complex64 (__main__.TestExpandedWeightFunctionalXPU) ... skipped 'dtype not support on XPU'
+test_expanded_weight_forward_nn_functional_linear_xpu_float32 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_linear_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_linear_xpu_int16 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_forward_nn_functional_linear_xpu_int32 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_forward_nn_functional_linear_xpu_int64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_forward_nn_functional_linear_xpu_int8 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_forward_nn_functional_linear_xpu_uint8 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_per_sample_grad_mean_nn_functional_conv1d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_per_sample_grad_mean_nn_functional_conv2d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_per_sample_grad_mean_nn_functional_embedding_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_per_sample_grad_mean_nn_functional_group_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_per_sample_grad_mean_nn_functional_instance_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_per_sample_grad_mean_nn_functional_layer_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_per_sample_grad_mean_nn_functional_linear_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_per_sample_grad_sum_nn_functional_conv1d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_per_sample_grad_sum_nn_functional_conv2d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_per_sample_grad_sum_nn_functional_embedding_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_per_sample_grad_sum_nn_functional_group_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weight_per_sample_grad_sum_nn_functional_instance_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_per_sample_grad_sum_nn_functional_layer_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weight_per_sample_grad_sum_nn_functional_linear_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weights_per_sample_grad_input_no_grad_nn_functional_conv1d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weights_per_sample_grad_input_no_grad_nn_functional_conv2d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weights_per_sample_grad_input_no_grad_nn_functional_embedding_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weights_per_sample_grad_input_no_grad_nn_functional_group_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_expanded_weights_per_sample_grad_input_no_grad_nn_functional_instance_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weights_per_sample_grad_input_no_grad_nn_functional_layer_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_expanded_weights_per_sample_grad_input_no_grad_nn_functional_linear_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_group_norm_error_xpu_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_group_norm_model_num_dim_1_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_group_norm_model_num_dim_2_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_group_norm_model_num_dim_3_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_instance_norm_model_num_dim_1_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_instance_norm_model_num_dim_2_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_instance_norm_model_num_dim_3_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_layer_norm_model_num_dim_1_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ERROR
+test_layer_norm_model_num_dim_2_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_layer_norm_model_num_dim_3_xpu (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_unsupported_expand_weights_nn_functional_conv1d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_unsupported_expand_weights_nn_functional_conv2d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_unsupported_expand_weights_nn_functional_embedding_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_unsupported_expand_weights_nn_functional_group_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_unsupported_expand_weights_nn_functional_instance_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_unsupported_expand_weights_nn_functional_layer_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+test_unsupported_expand_weights_nn_functional_linear_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU) ... ok
+
+======================================================================
+ERROR: test_expanded_weight_forward_nn_functional_conv1d_xpu_int64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 212, in test_expanded_weight_forward
+    expanded_weight_result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+RuntimeError: Long is not supported in oneDNN!
+
+======================================================================
+ERROR: test_expanded_weight_forward_nn_functional_conv2d_xpu_int64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 212, in test_expanded_weight_forward
+    expanded_weight_result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+RuntimeError: Long is not supported in oneDNN!
+
+======================================================================
+ERROR: test_expanded_weight_forward_nn_functional_group_norm_xpu_bfloat16 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 212, in test_expanded_weight_forward
+    expanded_weight_result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 2528, in group_norm
+    return torch.group_norm(input, num_groups, weight, bias, eps, torch.backends.cudnn.enabled)
+RuntimeError: expected scalar type Float but found BFloat16
+
+======================================================================
+ERROR: test_expanded_weight_forward_nn_functional_instance_norm_xpu_bfloat16 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 212, in test_expanded_weight_forward
+    expanded_weight_result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 2495, in instance_norm
+    return torch.instance_norm(
+RuntimeError: tensor does not have a device
+
+======================================================================
+ERROR: test_expanded_weight_forward_nn_functional_instance_norm_xpu_float32 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 212, in test_expanded_weight_forward
+    expanded_weight_result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 2495, in instance_norm
+    return torch.instance_norm(
+RuntimeError: tensor does not have a device
+
+======================================================================
+ERROR: test_expanded_weight_forward_nn_functional_instance_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 212, in test_expanded_weight_forward
+    expanded_weight_result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 2495, in instance_norm
+    return torch.instance_norm(
+RuntimeError: DPCPP batch_norm backend got unsupported type=Double
+
+======================================================================
+ERROR: test_expanded_weight_forward_nn_functional_layer_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 212, in test_expanded_weight_forward
+    expanded_weight_result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 2515, in layer_norm
+    return torch.layer_norm(input, normalized_shape, weight, bias, eps, torch.backends.cudnn.enabled)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_expanded_weight_forward_nn_functional_linear_xpu_int16 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 212, in test_expanded_weight_forward
+    expanded_weight_result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+RuntimeError: Short is not supported in oneDNN!
+
+======================================================================
+ERROR: test_expanded_weight_forward_nn_functional_linear_xpu_int32 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 212, in test_expanded_weight_forward
+    expanded_weight_result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+RuntimeError: could not create a descriptor for a matmul primitive
+
+======================================================================
+ERROR: test_expanded_weight_forward_nn_functional_linear_xpu_int64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 212, in test_expanded_weight_forward
+    expanded_weight_result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+RuntimeError: Long is not supported in oneDNN!
+
+======================================================================
+ERROR: test_expanded_weight_forward_nn_functional_linear_xpu_uint8 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 212, in test_expanded_weight_forward
+    expanded_weight_result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+RuntimeError: could not create a descriptor for a matmul primitive
+
+======================================================================
+ERROR: test_expanded_weight_per_sample_grad_mean_nn_functional_conv1d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 173, in test_expanded_weight_per_sample_grad_mean
+    self._compare_ew_and_for_loop_per_sample_grads(op, sample_input, torch.mean)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 148, in _compare_ew_and_for_loop_per_sample_grads
+    reduction(result).backward()
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_tensor.py", line 487, in backward
+    torch.autograd.backward(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 197, in backward
+    Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/function.py", line 267, in apply
+    return user_fn(self, *args)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/conv_expanded_weights.py", line 52, in backward
+    return conv_backward(ctx.conv_fn, ctx, grad_output)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/conv_utils.py", line 110, in conv_backward
+    out = transpose_func(grad_output, weight_, None, stride, padding, tuple(output_padding), groups, dilation)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_expanded_weight_per_sample_grad_mean_nn_functional_conv2d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 173, in test_expanded_weight_per_sample_grad_mean
+    self._compare_ew_and_for_loop_per_sample_grads(op, sample_input, torch.mean)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 148, in _compare_ew_and_for_loop_per_sample_grads
+    reduction(result).backward()
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_tensor.py", line 487, in backward
+    torch.autograd.backward(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 197, in backward
+    Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/function.py", line 267, in apply
+    return user_fn(self, *args)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/conv_expanded_weights.py", line 52, in backward
+    return conv_backward(ctx.conv_fn, ctx, grad_output)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/conv_utils.py", line 110, in conv_backward
+    out = transpose_func(grad_output, weight_, None, stride, padding, tuple(output_padding), groups, dilation)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_expanded_weight_per_sample_grad_mean_nn_functional_instance_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 173, in test_expanded_weight_per_sample_grad_mean
+    self._compare_ew_and_for_loop_per_sample_grads(op, sample_input, torch.mean)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 147, in _compare_ew_and_for_loop_per_sample_grads
+    result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 2481, in instance_norm
+    return handle_torch_function(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/overrides.py", line 1534, in handle_torch_function
+    result = torch_func_method(public_api, types, args, kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/expanded_weights_impl.py", line 49, in __torch_function__
+    return cls.handled_functions[func].apply(tuple(kwargs.keys()), func, *(args + tuple(kwargs.values())))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/instance_norm_expanded_weights.py", line 15, in forward
+    output = forward_helper(instance_norm, expanded_args, expanded_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/expanded_weights_utils.py", line 35, in forward_helper
+    return func(*unexpanded_args, **unexpanded_kwargs)
+RuntimeError: DPCPP batch_norm backend got unsupported type=Double
+
+======================================================================
+ERROR: test_expanded_weight_per_sample_grad_mean_nn_functional_layer_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 173, in test_expanded_weight_per_sample_grad_mean
+    self._compare_ew_and_for_loop_per_sample_grads(op, sample_input, torch.mean)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 147, in _compare_ew_and_for_loop_per_sample_grads
+    result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 2512, in layer_norm
+    return handle_torch_function(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/overrides.py", line 1534, in handle_torch_function
+    result = torch_func_method(public_api, types, args, kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/expanded_weights_impl.py", line 49, in __torch_function__
+    return cls.handled_functions[func].apply(tuple(kwargs.keys()), func, *(args + tuple(kwargs.values())))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/layer_norm_expanded_weights.py", line 19, in forward
+    output, mean, rstd = forward_helper(torch.native_layer_norm, expanded_args, expanded_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/expanded_weights_utils.py", line 35, in forward_helper
+    return func(*unexpanded_args, **unexpanded_kwargs)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_expanded_weight_per_sample_grad_sum_nn_functional_conv1d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 165, in test_expanded_weight_per_sample_grad_sum
+    self._compare_ew_and_for_loop_per_sample_grads(op, sample_input, torch.sum)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 148, in _compare_ew_and_for_loop_per_sample_grads
+    reduction(result).backward()
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_tensor.py", line 487, in backward
+    torch.autograd.backward(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 197, in backward
+    Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/function.py", line 267, in apply
+    return user_fn(self, *args)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/conv_expanded_weights.py", line 52, in backward
+    return conv_backward(ctx.conv_fn, ctx, grad_output)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/conv_utils.py", line 110, in conv_backward
+    out = transpose_func(grad_output, weight_, None, stride, padding, tuple(output_padding), groups, dilation)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_expanded_weight_per_sample_grad_sum_nn_functional_conv2d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 165, in test_expanded_weight_per_sample_grad_sum
+    self._compare_ew_and_for_loop_per_sample_grads(op, sample_input, torch.sum)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 148, in _compare_ew_and_for_loop_per_sample_grads
+    reduction(result).backward()
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_tensor.py", line 487, in backward
+    torch.autograd.backward(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 197, in backward
+    Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/function.py", line 267, in apply
+    return user_fn(self, *args)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/conv_expanded_weights.py", line 52, in backward
+    return conv_backward(ctx.conv_fn, ctx, grad_output)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/conv_utils.py", line 110, in conv_backward
+    out = transpose_func(grad_output, weight_, None, stride, padding, tuple(output_padding), groups, dilation)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_expanded_weight_per_sample_grad_sum_nn_functional_instance_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 165, in test_expanded_weight_per_sample_grad_sum
+    self._compare_ew_and_for_loop_per_sample_grads(op, sample_input, torch.sum)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 147, in _compare_ew_and_for_loop_per_sample_grads
+    result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 2481, in instance_norm
+    return handle_torch_function(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/overrides.py", line 1534, in handle_torch_function
+    result = torch_func_method(public_api, types, args, kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/expanded_weights_impl.py", line 49, in __torch_function__
+    return cls.handled_functions[func].apply(tuple(kwargs.keys()), func, *(args + tuple(kwargs.values())))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/instance_norm_expanded_weights.py", line 15, in forward
+    output = forward_helper(instance_norm, expanded_args, expanded_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/expanded_weights_utils.py", line 35, in forward_helper
+    return func(*unexpanded_args, **unexpanded_kwargs)
+RuntimeError: DPCPP batch_norm backend got unsupported type=Double
+
+======================================================================
+ERROR: test_expanded_weight_per_sample_grad_sum_nn_functional_layer_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 165, in test_expanded_weight_per_sample_grad_sum
+    self._compare_ew_and_for_loop_per_sample_grads(op, sample_input, torch.sum)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 147, in _compare_ew_and_for_loop_per_sample_grads
+    result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 2512, in layer_norm
+    return handle_torch_function(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/overrides.py", line 1534, in handle_torch_function
+    result = torch_func_method(public_api, types, args, kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/expanded_weights_impl.py", line 49, in __torch_function__
+    return cls.handled_functions[func].apply(tuple(kwargs.keys()), func, *(args + tuple(kwargs.values())))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/layer_norm_expanded_weights.py", line 19, in forward
+    output, mean, rstd = forward_helper(torch.native_layer_norm, expanded_args, expanded_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/expanded_weights_utils.py", line 35, in forward_helper
+    return func(*unexpanded_args, **unexpanded_kwargs)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_expanded_weights_per_sample_grad_input_no_grad_nn_functional_conv1d_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 182, in test_expanded_weights_per_sample_grad_input_no_grad
+    self._compare_ew_and_for_loop_per_sample_grads(op, sample_input, torch.mean)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 151, in _compare_ew_and_for_loop_per_sample_grads
+    per_sample_grad = for_loop_per_sample_grad(batch_size, reduction, input, func, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 550, in for_loop_per_sample_grad
+    per_sample_grad.append(torch.autograd.grad(result, diff_input_list, torch.ones_like(result), allow_unused=True))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 300, in grad
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+RuntimeError: expected 4D tensor, got tensor with 1 dimensions instead
+
+======================================================================
+ERROR: test_expanded_weights_per_sample_grad_input_no_grad_nn_functional_instance_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 182, in test_expanded_weights_per_sample_grad_input_no_grad
+    self._compare_ew_and_for_loop_per_sample_grads(op, sample_input, torch.mean)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 147, in _compare_ew_and_for_loop_per_sample_grads
+    result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 2481, in instance_norm
+    return handle_torch_function(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/overrides.py", line 1534, in handle_torch_function
+    result = torch_func_method(public_api, types, args, kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/expanded_weights_impl.py", line 49, in __torch_function__
+    return cls.handled_functions[func].apply(tuple(kwargs.keys()), func, *(args + tuple(kwargs.values())))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/instance_norm_expanded_weights.py", line 15, in forward
+    output = forward_helper(instance_norm, expanded_args, expanded_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/expanded_weights_utils.py", line 35, in forward_helper
+    return func(*unexpanded_args, **unexpanded_kwargs)
+RuntimeError: DPCPP batch_norm backend got unsupported type=Double
+
+======================================================================
+ERROR: test_expanded_weights_per_sample_grad_input_no_grad_nn_functional_layer_norm_xpu_float64 (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 815, in test_wrapper
+    return test(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 182, in test_expanded_weights_per_sample_grad_input_no_grad
+    self._compare_ew_and_for_loop_per_sample_grads(op, sample_input, torch.mean)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 147, in _compare_ew_and_for_loop_per_sample_grads
+    result = run_op(op, ew_input, *ew_args, **ew_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 505, in run_op
+    return op(input, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/opinfo/core.py", line 1068, in __call__
+    return self.op(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 2512, in layer_norm
+    return handle_torch_function(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/overrides.py", line 1534, in handle_torch_function
+    result = torch_func_method(public_api, types, args, kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/expanded_weights_impl.py", line 49, in __torch_function__
+    return cls.handled_functions[func].apply(tuple(kwargs.keys()), func, *(args + tuple(kwargs.values())))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/layer_norm_expanded_weights.py", line 19, in forward
+    output, mean, rstd = forward_helper(torch.native_layer_norm, expanded_args, expanded_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/expanded_weights_utils.py", line 35, in forward_helper
+    return func(*unexpanded_args, **unexpanded_kwargs)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_group_norm_model_num_dim_1_xpu (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 280, in test_group_norm_model
+    return self._test_conv_model(group_norm_model, 7, num_dim, device)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 232, in _test_conv_model
+    return self._test_model(partial(model, num_dim=num_dim), batch_size, input, device, loss_reduction)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 248, in _test_model
+    expected.append(torch.autograd.grad(loss, model.parameters(), torch.ones_like(loss)))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 300, in grad
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+RuntimeError: expected 4D tensor, got tensor with 1 dimensions instead
+
+======================================================================
+ERROR: test_instance_norm_model_num_dim_1_xpu (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 272, in test_instance_norm_model
+    return self._test_conv_model(instance_norm_model, 7, num_dim, device)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 232, in _test_conv_model
+    return self._test_model(partial(model, num_dim=num_dim), batch_size, input, device, loss_reduction)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 240, in _test_model
+    loss.backward()
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_tensor.py", line 487, in backward
+    torch.autograd.backward(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 197, in backward
+    Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/function.py", line 267, in apply
+    return user_fn(self, *args)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/instance_norm_expanded_weights.py", line 46, in backward
+    res = torch.ops.aten.native_batch_norm_backward(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_ops.py", line 442, in __call__
+    return self._op(*args, **kwargs or {})
+RuntimeError: Cannot access data pointer of Tensor that doesn't have storage
+
+======================================================================
+ERROR: test_instance_norm_model_num_dim_2_xpu (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 272, in test_instance_norm_model
+    return self._test_conv_model(instance_norm_model, 7, num_dim, device)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 232, in _test_conv_model
+    return self._test_model(partial(model, num_dim=num_dim), batch_size, input, device, loss_reduction)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 240, in _test_model
+    loss.backward()
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_tensor.py", line 487, in backward
+    torch.autograd.backward(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 197, in backward
+    Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/function.py", line 267, in apply
+    return user_fn(self, *args)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/instance_norm_expanded_weights.py", line 46, in backward
+    res = torch.ops.aten.native_batch_norm_backward(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_ops.py", line 442, in __call__
+    return self._op(*args, **kwargs or {})
+RuntimeError: Cannot access data pointer of Tensor that doesn't have storage
+
+======================================================================
+ERROR: test_instance_norm_model_num_dim_3_xpu (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 272, in test_instance_norm_model
+    return self._test_conv_model(instance_norm_model, 7, num_dim, device)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 232, in _test_conv_model
+    return self._test_model(partial(model, num_dim=num_dim), batch_size, input, device, loss_reduction)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 240, in _test_model
+    loss.backward()
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_tensor.py", line 487, in backward
+    torch.autograd.backward(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 197, in backward
+    Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/function.py", line 267, in apply
+    return user_fn(self, *args)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/utils/_expanded_weights/instance_norm_expanded_weights.py", line 46, in backward
+    res = torch.ops.aten.native_batch_norm_backward(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_ops.py", line 442, in __call__
+    return self._op(*args, **kwargs or {})
+RuntimeError: Cannot access data pointer of Tensor that doesn't have storage
+
+======================================================================
+ERROR: test_layer_norm_model_num_dim_1_xpu (__main__.TestExpandedWeightFunctionalXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 289, in test_layer_norm_model
+    return self._test_conv_model(layer_norm_model, 7, num_dim, device)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 232, in _test_conv_model
+    return self._test_model(partial(model, num_dim=num_dim), batch_size, input, device, loss_reduction)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_expanded_weights.py", line 248, in _test_model
+    expected.append(torch.autograd.grad(loss, model.parameters(), torch.ones_like(loss)))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 300, in grad
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+RuntimeError: expected 4D tensor, got tensor with 1 dimensions instead
+
+----------------------------------------------------------------------
+Ran 77 tests in 76.806s
+
+FAILED (errors=27, skipped=10)
+Raised CalledProcessError: return code 1.

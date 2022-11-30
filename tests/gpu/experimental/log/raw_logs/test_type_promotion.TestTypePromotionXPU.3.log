@@ -1,0 +1,599 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_add_wrapped_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_alpha_mismatch_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_alternate_result_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_bfloat16_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_booleans_xpu_xpu (__main__.TestTypePromotionXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_type_promotion.py:327: UserWarning: This overload of add is deprecated:
+	add(Tensor input, Number alpha, Tensor other, *, Tensor out)
+Consider using one of the following signatures instead:
+	add(Tensor input, Tensor other, *, Number alpha, Tensor out) (Triggered internally at /home/gta/xunsongh/pytorch/torch/csrc/utils/python_arg_parser.cpp:1420.)
+  self.assertEqual(torch.add(torch.tensor(True, device=device), torch.tensor(True, device=device), True), torch.tensor(True, device=device))
+ok
+test_can_cast_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_cat_different_dtypes_xpu_xpu (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_cat_out_different_dtypes_xpu_xpu (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_bool_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_bool_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_bool_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_bool_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_float32_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_float32_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_float32_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_float32_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_float64_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_float64_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_float64_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_float64_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_int32_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_int32_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_int32_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_bool_int32_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_bool_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_bool_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_bool_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_bool_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_float32_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_float32_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_float32_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_float32_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_float64_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_float64_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_float64_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_float64_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_int32_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_int32_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_int32_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float32_int32_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_bool_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_bool_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_bool_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_bool_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_float32_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_float32_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_float32_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_float32_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_float64_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_float64_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_float64_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_float64_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_int32_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_int32_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_int32_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_float64_int32_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_bool_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_bool_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_bool_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_bool_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_float32_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_float32_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_float32_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_float32_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_float64_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_float64_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_float64_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_float64_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_int32_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_int32_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_int32_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_clamp_type_promotion_xpu_xpu_int32_int32_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_comparison_ops_with_type_promotion_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_complex_assertraises_xpu_xpu (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_complex_half_xpu_xpu (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_complex_promotion_xpu_xpu (__main__.TestTypePromotionXPU) ... ERROR
+test_complex_scalar_mult_tensor_promotion_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_computation_ignores_out_xpu_xpu (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_create_bool_tensors_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_xpu_bool (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_xpu_float32 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_xpu_float64 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_xpu_int16 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_xpu_int32 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_xpu_int64 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_xpu_int8 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_inplace_xpu_xpu_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_out_xpu_xpu_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_div_promotion_out_xpu_xpu_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_div_promotion_out_xpu_xpu_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_div_promotion_out_xpu_xpu_int16 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_div_promotion_out_xpu_xpu_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_div_promotion_out_xpu_xpu_int64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_div_promotion_out_xpu_xpu_int8 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_div_promotion_out_xpu_xpu_uint8 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_div_promotion_xpu_xpu_bool (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_xpu_xpu_int16 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_xpu_xpu_int32 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_xpu_xpu_int64 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_xpu_xpu_int8 (__main__.TestTypePromotionXPU) ... ok
+test_div_promotion_xpu_xpu_uint8 (__main__.TestTypePromotionXPU) ... ok
+test_float_promotion_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_from_issue_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_half_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_indexing_fail_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_indexing_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_inplace_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_int_promotion_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_int_to_float_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_integer_addcdiv_deprecated_xpu_xpu_int16 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_integer_addcdiv_deprecated_xpu_xpu_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_integer_addcdiv_deprecated_xpu_xpu_int64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_integer_addcdiv_deprecated_xpu_xpu_int8 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_integer_addcdiv_deprecated_xpu_xpu_uint8 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_lt_with_type_promotion_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_many_promotions_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_mixed_type_backward_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_non_promoting_ops_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_bool_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_bool_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_bool_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_bool_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_bool_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_bool_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_bool_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_bool_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_bool_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_bool_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_bool_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex128_bool (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex128_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex128_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex128_float16 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex128_float32 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex128_float64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex128_int16 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex128_int32 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex128_int64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex128_int8 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex128_uint8 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex64_bool (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex64_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex64_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex64_float16 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex64_float32 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex64_float64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex64_int16 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex64_int32 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex64_int64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex64_int8 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_complex64_uint8 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float16_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float16_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float16_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float16_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float16_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float16_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float16_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float16_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float16_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float16_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float16_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float32_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float32_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float32_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float32_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float32_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float32_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float32_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float32_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float32_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float32_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float32_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float64_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float64_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float64_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float64_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float64_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float64_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float64_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float64_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float64_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float64_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_float64_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int16_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int16_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int16_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int16_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int16_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int16_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int16_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int16_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int16_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int16_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int16_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int32_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int32_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int32_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int32_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int32_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int32_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int32_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int32_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int32_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int32_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int32_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int64_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int64_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int64_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int64_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int64_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int64_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int64_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int64_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int64_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int64_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int64_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int8_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int8_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int8_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int8_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int8_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int8_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int8_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int8_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int8_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int8_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_int8_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_uint8_bool (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_uint8_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_uint8_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_uint8_float16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_uint8_float32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_uint8_float64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_uint8_int16 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_uint8_int32 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_uint8_int64 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_uint8_int8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_binary_ufunc_promotion_xpu_xpu_uint8_uint8 (__main__.TestTypePromotionXPU) ... skipped 'Only runs on cpu'
+test_promote_self_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_promote_types_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_result_type_tensor_vs_scalar_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_result_type_xpu_xpu_bfloat16_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bfloat16_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bfloat16_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_bfloat16_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_bfloat16_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bfloat16_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bfloat16_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bfloat16_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bfloat16_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bfloat16_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bfloat16_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bfloat16_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bool_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bool_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bool_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_bool_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_bool_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bool_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bool_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bool_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bool_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bool_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bool_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_bool_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_complex128_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex128_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex128_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex128_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex128_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex128_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex128_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex128_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex128_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex128_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex128_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex128_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex64_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex64_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex64_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex64_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex64_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex64_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex64_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex64_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex64_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex64_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex64_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_complex64_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_float16_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float16_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float16_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_float16_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_float16_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float16_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float16_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float16_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float16_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float16_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float16_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float16_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float32_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float32_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float32_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_float32_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_float32_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float32_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float32_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float32_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float32_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float32_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float32_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float32_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float64_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float64_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float64_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_float64_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_float64_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float64_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float64_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float64_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float64_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float64_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float64_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_float64_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int16_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int16_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int16_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_int16_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_int16_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int16_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int16_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int16_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int16_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int16_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int16_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int16_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int32_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int32_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int32_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_int32_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_int32_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int32_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int32_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int32_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int32_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int32_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int32_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int32_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int64_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int64_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int64_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_int64_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_int64_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int64_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int64_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int64_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int64_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int64_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int64_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int64_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int8_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int8_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int8_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_int8_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_int8_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int8_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int8_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int8_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int8_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int8_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int8_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_int8_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_uint8_bfloat16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_uint8_bool (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_uint8_complex128 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_uint8_complex64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... skipped 'dtype not support on XPU'
+test_result_type_xpu_xpu_uint8_float16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_uint8_float32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_uint8_float64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_uint8_int16 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_uint8_int32 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_uint8_int64 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_uint8_int8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_result_type_xpu_xpu_uint8_uint8 (__main__.TestTypePromotionXPU)
+Test result_type for tensor vs tensor and scalar vs scalar. ... ok
+test_sparse_add_xpu_xpu (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_sparse_div_promotion_xpu_xpu_bool (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_sparse_div_promotion_xpu_xpu_int16 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_sparse_div_promotion_xpu_xpu_int32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_sparse_div_promotion_xpu_xpu_int64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_sparse_div_promotion_xpu_xpu_uint8 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_sparse_div_xpu_xpu (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_sparse_mul_xpu_xpu (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_sparse_sub_xpu_xpu (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_transpose_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+test_unary_op_out_casting_xpu_xpu_complex128_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_complex128_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_complex128_float32 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_complex128_float64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_complex128_int64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_complex64_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_complex64_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_complex64_float32 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_complex64_float64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_complex64_int64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_float32_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_float32_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_float32_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_unary_op_out_casting_xpu_xpu_float32_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_unary_op_out_casting_xpu_xpu_float32_int64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_unary_op_out_casting_xpu_xpu_float64_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_float64_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_float64_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_unary_op_out_casting_xpu_xpu_float64_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_unary_op_out_casting_xpu_xpu_float64_int64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_unary_op_out_casting_xpu_xpu_int64_complex128 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_int64_complex64 (__main__.TestTypePromotionXPU) ... skipped 'dtype not support on XPU'
+test_unary_op_out_casting_xpu_xpu_int64_float32 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_unary_op_out_casting_xpu_xpu_int64_float64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_unary_op_out_casting_xpu_xpu_int64_int64 (__main__.TestTypePromotionXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_unsigned_xpu_xpu (__main__.TestTypePromotionXPU) ... ok
+
+======================================================================
+ERROR: test_complex_promotion_xpu_xpu (__main__.TestTypePromotionXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_type_promotion.py", line 20, in wrapped_fn
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_type_promotion.py", line 109, in test_complex_promotion
+    s = make_scalar_tensor(dtype=torch.chalf)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_type_promotion.py", line 92, in make_scalar_tensor
+    return make_tensor((), dtype=dtype, device=device)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_creation.py", line 142, in make_tensor
+    result = torch.complex(real, imag)
+RuntimeError: Expected both inputs to be Float or Double tensors but got Half and Half
+
+----------------------------------------------------------------------
+Ran 422 tests in 5.629s
+
+FAILED (errors=1, skipped=281)
+Raised CalledProcessError: return code 1.

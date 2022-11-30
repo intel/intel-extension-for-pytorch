@@ -1,0 +1,148 @@
+{
+  "test_spectral_ops.py": [
+    "TestFFT"
+  ],
+  "test_nestedtensor.py": [
+    "TestNestedTensorDeviceType"
+  ],
+  "test_sparse.py": [
+    "TestSparseUnaryUfuncs",
+    "TestSparseMaskedReductions",
+    "TestSparse"
+  ],
+  "test_meta.py": [
+    "TestMeta"
+  ],
+  "test_fx.py": [
+    "TestOperatorSignatures"
+  ],
+  "test_scatter_gather_ops.py": [
+    "TestScatterGather"
+  ],
+  "test_ops_gradients.py": [
+    "TestGradients"
+  ],
+  "test_sparse_csr.py": [
+    "TestSparseCSR",
+    "TestSparseCompressed"
+  ],
+  "test_linalg.py": [
+    "TestLinalg"
+  ],
+  "test_torch.py": [
+    "TestViewOps",
+    "TestTensorDeviceOps",
+    "TestTorchDeviceType",
+    "TestDevicePrecision"
+  ],
+  "test_expanded_weights.py": [
+    "TestExpandedWeightHelperFunction",
+    "TestExpandedWeightFunctional"
+  ],
+  "test_complex.py": [
+    "TestComplexTensor"
+  ],
+  "test_shape_ops.py": [
+    "TestShapeOps"
+  ],
+  "test_modules.py": [
+    "TestModule"
+  ],
+  "test_indexing.py": [
+    "TestIndexing",
+    "NumpyTests"
+  ],
+  "test_foreach.py": [
+    "TestForeach"
+  ],
+  "test_decomp.py": [
+    "TestDecomp",
+    "DecompContiguousTests"
+  ],
+  "test_autograd.py": [
+    "TestAutogradDeviceType"
+  ],
+  "test_sort_and_select.py": [
+    "TestSortAndSelect"
+  ],
+  "test_prims.py": [
+    "TestPrims",
+    "TestRefs",
+    "TestDecomp"
+  ],
+  "test_segment_reductions.py": [
+    "TestSegmentReductions"
+  ],
+  "test_nn.py": [
+    "TestNNDeviceType"
+  ],
+  "test_dlpack.py": [
+    "TestTorchDlPack"
+  ],
+  "test_ops_jit.py": [
+    "TestJit"
+  ],
+  "test_view_ops.py": [
+    "TestViewOps",
+    "TestOldViewOps"
+  ],
+  "test_type_promotion.py": [
+    "TestTypePromotion"
+  ],
+  "test_numpy_interop.py": [
+    "TestNumPyInterop"
+  ],
+  "test_reductions.py": [
+    "TestReductions"
+  ],
+  "test_testing.py": [
+    "TestTesting",
+    "TestTestParametrizationDeviceType"
+  ],
+  "test_module_init.py": [
+    "TestModuleInit"
+  ],
+  "test_serialization.py": [
+    "TestBothSerialization"
+  ],
+  "test_binary_ufuncs.py": [
+    "TestBinaryUfuncs"
+  ],
+  "test_tensor_creation_ops.py": [
+    "TestTensorCreation",
+    "TestRandomTensorCreation",
+    "TestLikeTensorCreation",
+    "TestAsArray"
+  ],
+  "test_unary_ufuncs.py": [
+    "TestUnaryUfuncs"
+  ],
+  "test_fx_experimental.py": [
+    "TestNormalizeOperators"
+  ],
+  "test_ops.py": [
+    "TestCommon",
+    "TestCompositeCompliance",
+    "TestMathBits",
+    "TestFakeTensor",
+    "TestTags"
+  ],
+  "test_vmap.py": [
+    "TestVmapBatchedGradient"
+  ],
+  "test_masked.py": [
+    "TestMasked"
+  ],
+  "nn/test_dropout.py": [
+    "TestDropoutNNDeviceType"
+  ],
+  "nn/test_pooling.py": [
+    "TestPoolingNNDeviceType"
+  ],
+  "nn/test_embedding.py": [
+    "TestEmbeddingNNDeviceType"
+  ],
+  "distributed/test_data_parallel.py": [
+    "TestDataParallelDeviceType"
+  ]
+}

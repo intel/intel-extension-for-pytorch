@@ -1,0 +1,50 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_default_names_xpu_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_dtypes_composition_invalid_xpu_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_dtypes_composition_valid_xpu_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_multiple_handling_of_same_param_error_xpu_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_name_fn_xpu_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_ops_composition_names_xpu_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_subtest_expected_failure_x_1_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_subtest_expected_failure_x_2_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_subtest_expected_failure_x_3_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_subtest_names_xpu_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_two_things_subtest_expected_failure_x_1_y_4_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_two_things_subtest_expected_failure_x_1_y_5_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_two_things_subtest_expected_failure_x_1_y_6_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_two_things_subtest_expected_failure_x_2_y_4_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_two_things_subtest_expected_failure_x_2_y_5_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_two_things_subtest_expected_failure_x_2_y_6_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_two_things_subtest_expected_failure_x_3_y_4_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_two_things_subtest_expected_failure_x_3_y_5_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... ok
+test_two_things_subtest_expected_failure_x_3_y_6_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... expected failure
+test_unparametrized_names_xpu_xpu (__main__.TestTestParametrizationDeviceTypeXPU) ... FAIL
+
+======================================================================
+FAIL: test_unparametrized_names_xpu_xpu (__main__.TestTestParametrizationDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_testing.py", line 1057, in test_unparametrized_names
+    self.assertEqual(expected_test_names, test_names)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: String comparison failed: 'TestParametrizedXPU.test_device_dtype_specific_xpu_float32' != 'TestParametrizedXPU.test_device_dtype_specific_xpu_xpu_float32'
+- TestParametrizedXPU.test_device_dtype_specific_xpu_float32
++ TestParametrizedXPU.test_device_dtype_specific_xpu_xpu_float32
+?                                                    ++++
+
+
+The failure occurred for item [0]
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.551s
+
+FAILED (failures=1, expected failures=6)
+Raised CalledProcessError: return code 1.

@@ -1,0 +1,905 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_xpu_int32_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_xpu_int32_int32_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_xpu_int32_int32_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_xpu_int32_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_xpu_int32_int64_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_xpu_int32_int64_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_xpu_int64_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_xpu_int64_int32_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_xpu_int64_int32_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_xpu_int64_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_xpu_int64_int64_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_xpu_int64_int64_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int32_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int32_int32_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int32_int32_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int32_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int32_int64_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int32_int64_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int64_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int64_int32_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int64_int32_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int64_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int64_int64_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int64_int64_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_no_offsets_xpu_xpu_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::_to_dense' with arguments from the 'SparseXPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::_to_dense' is only available for these backends: [MkldnnCPU, SparseCPU, SparseCsrCPU, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nMkldnnCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMkldnnCPU.cpp:492 [kernel]\nSparseCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCPU.cpp:1261 [kernel]\nSparseCsrCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCsrCPU.cpp:1030 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/FunctionalizeFallbackKernel.cpp:291 [backend fallback]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_EmbeddingBag_per_sample_weights_and_no_offsets_xpu_xpu_int32_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::_to_dense' with arguments from the 'SparseXPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::_to_dense' is only available for these backends: [MkldnnCPU, SparseCPU, SparseCsrCPU, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nMkldnnCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMkldnnCPU.cpp:492 [kernel]\nSparseCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCPU.cpp:1261 [kernel]\nSparseCsrCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCsrCPU.cpp:1030 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/FunctionalizeFallbackKernel.cpp:291 [backend fallback]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_EmbeddingBag_per_sample_weights_and_no_offsets_xpu_xpu_int32_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::_to_dense' with arguments from the 'SparseXPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::_to_dense' is only available for these backends: [MkldnnCPU, SparseCPU, SparseCsrCPU, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nMkldnnCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMkldnnCPU.cpp:492 [kernel]\nSparseCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCPU.cpp:1261 [kernel]\nSparseCsrCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCsrCPU.cpp:1030 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/FunctionalizeFallbackKernel.cpp:291 [backend fallback]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_EmbeddingBag_per_sample_weights_and_no_offsets_xpu_xpu_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::_to_dense' with arguments from the 'SparseXPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::_to_dense' is only available for these backends: [MkldnnCPU, SparseCPU, SparseCsrCPU, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nMkldnnCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMkldnnCPU.cpp:492 [kernel]\nSparseCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCPU.cpp:1261 [kernel]\nSparseCsrCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCsrCPU.cpp:1030 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/FunctionalizeFallbackKernel.cpp:291 [backend fallback]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_EmbeddingBag_per_sample_weights_and_no_offsets_xpu_xpu_int64_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::_to_dense' with arguments from the 'SparseXPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::_to_dense' is only available for these backends: [MkldnnCPU, SparseCPU, SparseCsrCPU, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nMkldnnCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMkldnnCPU.cpp:492 [kernel]\nSparseCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCPU.cpp:1261 [kernel]\nSparseCsrCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCsrCPU.cpp:1030 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/FunctionalizeFallbackKernel.cpp:291 [backend fallback]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_EmbeddingBag_per_sample_weights_and_no_offsets_xpu_xpu_int64_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::_to_dense' with arguments from the 'SparseXPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::_to_dense' is only available for these backends: [MkldnnCPU, SparseCPU, SparseCsrCPU, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nMkldnnCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMkldnnCPU.cpp:492 [kernel]\nSparseCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCPU.cpp:1261 [kernel]\nSparseCsrCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCsrCPU.cpp:1030 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/FunctionalizeFallbackKernel.cpp:291 [backend fallback]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_2.cpp:16899 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_EmbeddingBag_per_sample_weights_and_offsets_xpu_xpu_int32_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_EmbeddingBag_per_sample_weights_and_offsets_xpu_xpu_int32_int32_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_offsets_xpu_xpu_int32_int32_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_offsets_xpu_xpu_int32_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_offsets_xpu_xpu_int32_int64_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_offsets_xpu_xpu_int32_int64_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_offsets_xpu_xpu_int64_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_offsets_xpu_xpu_int64_int32_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_offsets_xpu_xpu_int64_int32_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_offsets_xpu_xpu_int64_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_offsets_xpu_xpu_int64_int64_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_and_offsets_xpu_xpu_int64_int64_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_EmbeddingBag_per_sample_weights_failures_xpu_xpu_int32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not_implemented: embedding_bag: per_sample_weights was not None. per_sample_weights is only supported for mode='sum' (got mode='max'). Please open a feature request on GitHub."
+test_EmbeddingBag_per_sample_weights_failures_xpu_xpu_int32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not_implemented: embedding_bag: per_sample_weights was not None. per_sample_weights is only supported for mode='sum' (got mode='max'). Please open a feature request on GitHub."
+test_EmbeddingBag_per_sample_weights_failures_xpu_xpu_int64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not_implemented: embedding_bag: per_sample_weights was not None. per_sample_weights is only supported for mode='sum' (got mode='max'). Please open a feature request on GitHub."
+test_EmbeddingBag_per_sample_weights_failures_xpu_xpu_int64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not_implemented: embedding_bag: per_sample_weights was not None. per_sample_weights is only supported for mode='sum' (got mode='max'). Please open a feature request on GitHub."
+test_embedding_backward_xpu_xpu_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::zero_' with arguments from the 'SparseXPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::zero_' is only available for these backends: [CPU, XPU, Meta, MkldnnCPU, SparseCPU, SparseMeta, SparseCsrCPU, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nXPU: registered at /home/gta/xunsongh/ipex-gpu/build/Release/csrc/gpu/csrc/aten/generated/ATen/RegisterXPU.cpp:10022 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nMkldnnCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMkldnnCPU.cpp:492 [kernel]\nSparseCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCPU.cpp:1261 [kernel]\nSparseMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseMeta.cpp:249 [kernel]\nSparseCsrCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCsrCPU.cpp:1030 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_2.cpp:20548 [kernel]\nNamed: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:11 [kernel]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_0.cpp:4822 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_3.cpp:14484 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/BatchRulesUnaryOps.cpp:82 [kernel]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1068 [kernel]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_embedding_backward_xpu_xpu_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::zero_' with arguments from the 'SparseXPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::zero_' is only available for these backends: [CPU, XPU, Meta, MkldnnCPU, SparseCPU, SparseMeta, SparseCsrCPU, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nXPU: registered at /home/gta/xunsongh/ipex-gpu/build/Release/csrc/gpu/csrc/aten/generated/ATen/RegisterXPU.cpp:10022 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nMkldnnCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMkldnnCPU.cpp:492 [kernel]\nSparseCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCPU.cpp:1261 [kernel]\nSparseMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseMeta.cpp:249 [kernel]\nSparseCsrCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterSparseCsrCPU.cpp:1030 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_2.cpp:20548 [kernel]\nNamed: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:11 [kernel]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_0.cpp:4822 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_0.cpp:14883 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_3.cpp:14484 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/BatchRulesUnaryOps.cpp:82 [kernel]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1068 [kernel]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_embedding_bag_1D_padding_idx_xpu_xpu_bfloat16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_embedding_bag_1D_padding_idx_xpu_xpu_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_embedding_bag_2D_padding_idx_xpu_xpu_bfloat16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_embedding_bag_2D_padding_idx_xpu_xpu_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_embedding_bag_bfloat16_xpu_xpu_int32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_embedding_bag_bfloat16_xpu_xpu_int32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_embedding_bag_bfloat16_xpu_xpu_int64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_embedding_bag_bfloat16_xpu_xpu_int64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_embedding_bag_device_xpu_xpu_int32_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_device_xpu_xpu_int32_int32_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_device_xpu_xpu_int32_int32_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_device_xpu_xpu_int32_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_device_xpu_xpu_int32_int64_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_device_xpu_xpu_int32_int64_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_device_xpu_xpu_int64_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_device_xpu_xpu_int64_int32_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_device_xpu_xpu_int64_int32_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_device_xpu_xpu_int64_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_device_xpu_xpu_int64_int64_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_device_xpu_xpu_int64_int64_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_empty_input_xpu_xpu_int32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_empty_input_xpu_xpu_int32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_empty_input_xpu_xpu_int64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_empty_input_xpu_xpu_int64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_half_xpu_xpu_int32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_embedding_bag_half_xpu_xpu_int32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_embedding_bag_half_xpu_xpu_int64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_embedding_bag_half_xpu_xpu_int64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_embedding_bag_non_contiguous_weight_xpu_xpu_int32_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_non_contiguous_weight_xpu_xpu_int32_int32_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_non_contiguous_weight_xpu_xpu_int32_int32_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_non_contiguous_weight_xpu_xpu_int32_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_non_contiguous_weight_xpu_xpu_int32_int64_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_non_contiguous_weight_xpu_xpu_int32_int64_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_non_contiguous_weight_xpu_xpu_int64_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_non_contiguous_weight_xpu_xpu_int64_int32_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_non_contiguous_weight_xpu_xpu_int64_int32_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_non_contiguous_weight_xpu_xpu_int64_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_non_contiguous_weight_xpu_xpu_int64_int64_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_non_contiguous_weight_xpu_xpu_int64_int64_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_max_xpu_float32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_max_xpu_float32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_max_xpu_float64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_max_xpu_float64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_mean_xpu_float32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_mean_xpu_float32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_mean_xpu_float64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_mean_xpu_float64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_sum_xpu_float32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_sum_xpu_float32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_sum_xpu_float64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_sum_xpu_float64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_max_xpu_float32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_max_xpu_float32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_max_xpu_float64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_max_xpu_float64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_mean_xpu_float32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_mean_xpu_float32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_mean_xpu_float64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_mean_xpu_float64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_sum_xpu_float32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_sum_xpu_float32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_sum_xpu_float64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_sum_xpu_float64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... FAIL
+test_embedding_dense_grad_xpu_xpu (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_max_norm_backward_xpu_xpu_bfloat16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::embedding_renorm_' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::embedding_renorm_' is only available for these backends: [CPU, Meta, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_1.cpp:21945 [kernel]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:5089 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_embedding_max_norm_backward_xpu_xpu_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::embedding_renorm_' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::embedding_renorm_' is only available for these backends: [CPU, Meta, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_1.cpp:21945 [kernel]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:5089 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_embedding_max_norm_backward_xpu_xpu_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::embedding_renorm_' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::embedding_renorm_' is only available for these backends: [CPU, Meta, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_1.cpp:21945 [kernel]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:5089 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_embedding_max_norm_backward_xpu_xpu_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::embedding_renorm_' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::embedding_renorm_' is only available for these backends: [CPU, Meta, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_1.cpp:21945 [kernel]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:5089 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_embedding_max_norm_device_xpu_xpu_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_embedding_max_norm_device_xpu_xpu_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_embedding_max_norm_device_xpu_xpu_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_embedding_max_norm_fwd_AD_xpu_xpu_bfloat16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::embedding_renorm_' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::embedding_renorm_' is only available for these backends: [CPU, Meta, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_1.cpp:21945 [kernel]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:5089 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_embedding_max_norm_fwd_AD_xpu_xpu_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::embedding_renorm_' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::embedding_renorm_' is only available for these backends: [CPU, Meta, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_1.cpp:21945 [kernel]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:5089 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_embedding_max_norm_fwd_AD_xpu_xpu_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::embedding_renorm_' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::embedding_renorm_' is only available for these backends: [CPU, Meta, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_1.cpp:21945 [kernel]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:5089 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_embedding_max_norm_fwd_AD_xpu_xpu_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... skipped "not implemented: Could not run 'aten::embedding_renorm_' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::embedding_renorm_' is only available for these backends: [CPU, Meta, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nMeta: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterMeta.cpp:26815 [kernel]\nBackendSelect: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/BackendSelectFallbackKernel.cpp:3 [backend fallback]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterFunctionalization_1.cpp:21945 [kernel]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/ADInplaceOrViewType_1.cpp:5089 [kernel]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_3.cpp:15910 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_2.cpp:16890 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+test_embedding_padding_idx_xpu_xpu_bfloat16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_padding_idx_xpu_xpu_float16 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_padding_idx_xpu_xpu_float32 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_padding_idx_xpu_xpu_float64 (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+test_embedding_scalar_weight_error_xpu_xpu (__main__.TestEmbeddingNNDeviceTypeXPU) ... ok
+
+======================================================================
+FAIL: test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int32_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 642, in test_EmbeddingBag_per_sample_weights_and_new_offsets
+    test_per_sample_weights_new_offsets(mode, trainable, include_last_offset, has_weight)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 631, in test_per_sample_weights_new_offsets
+    self.assertEqual(result, expected, atol=dtype2prec_DONTUSE[dtypes[2]], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 10 (20.0%)
+Greatest absolute difference: 0.015625 at index (3, 0) (up to 0.01 allowed)
+Greatest relative difference: 0.0007204610951008645 at index (3, 0) (up to 0 allowed)
+
+======================================================================
+FAIL: test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_xpu_int64_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 642, in test_EmbeddingBag_per_sample_weights_and_new_offsets
+    test_per_sample_weights_new_offsets(mode, trainable, include_last_offset, has_weight)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 631, in test_per_sample_weights_new_offsets
+    self.assertEqual(result, expected, atol=dtype2prec_DONTUSE[dtypes[2]], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 1 / 10 (10.0%)
+Greatest absolute difference: 0.03125 at index (3, 1) (up to 0.01 allowed)
+Greatest relative difference: 0.000931098696461825 at index (3, 1) (up to 0 allowed)
+
+======================================================================
+FAIL: test_EmbeddingBag_per_sample_weights_and_offsets_xpu_xpu_int32_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 609, in test_EmbeddingBag_per_sample_weights_and_offsets
+    test_per_sample_weights(mode, trainable)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 599, in test_per_sample_weights
+    self.assertEqual(result, expected, atol=dtype2prec_DONTUSE[dtypes[2]], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 10 (20.0%)
+Greatest absolute difference: 0.015625 at index (3, 0) (up to 0.01 allowed)
+Greatest relative difference: 0.0008748906386701663 at index (3, 0) (up to 0 allowed)
+
+======================================================================
+FAIL: test_embedding_bag_device_xpu_xpu_int32_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 773, in test_embedding_bag_device
+    self._test_EmbeddingBag(device, 'sum', False, wdtype=dtypes[2], dtype=dtypes[0], odtype=dtypes[1])
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 756, in _test_EmbeddingBag
+    self._test_EmbeddingBag_vs_Embedding(*p, max_norm=max_norm, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 671, in _test_EmbeddingBag_vs_Embedding
+    self.assertEqual(output, ref_output, atol=dtype2prec_DONTUSE[wdtype], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 2 (100.0%)
+Greatest absolute difference: 0.373046875 at index (0, 1) (up to 0.01 allowed)
+Greatest relative difference: 0.16324786324786325 at index (0, 1) (up to 0 allowed)
+
+======================================================================
+FAIL: test_embedding_bag_device_xpu_xpu_int32_int32_float32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 773, in test_embedding_bag_device
+    self._test_EmbeddingBag(device, 'sum', False, wdtype=dtypes[2], dtype=dtypes[0], odtype=dtypes[1])
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 756, in _test_EmbeddingBag
+    self._test_EmbeddingBag_vs_Embedding(*p, max_norm=max_norm, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 671, in _test_EmbeddingBag_vs_Embedding
+    self.assertEqual(output, ref_output, atol=dtype2prec_DONTUSE[wdtype], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 2 (100.0%)
+Greatest absolute difference: 0.37223267555236816 at index (0, 0) (up to 0.001 allowed)
+Greatest relative difference: 0.16277882884846004 at index (0, 0) (up to 0 allowed)
+
+======================================================================
+FAIL: test_embedding_bag_device_xpu_xpu_int32_int32_float64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 773, in test_embedding_bag_device
+    self._test_EmbeddingBag(device, 'sum', False, wdtype=dtypes[2], dtype=dtypes[0], odtype=dtypes[1])
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 756, in _test_EmbeddingBag
+    self._test_EmbeddingBag_vs_Embedding(*p, max_norm=max_norm, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 671, in _test_EmbeddingBag_vs_Embedding
+    self.assertEqual(output, ref_output, atol=dtype2prec_DONTUSE[wdtype], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 2 (100.0%)
+Greatest absolute difference: 0.3722325646251221 at index (0, 0) (up to 0.001 allowed)
+Greatest relative difference: 0.16277879199673337 at index (0, 0) (up to 0 allowed)
+
+======================================================================
+FAIL: test_embedding_bag_device_xpu_xpu_int32_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 773, in test_embedding_bag_device
+    self._test_EmbeddingBag(device, 'sum', False, wdtype=dtypes[2], dtype=dtypes[0], odtype=dtypes[1])
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 756, in _test_EmbeddingBag
+    self._test_EmbeddingBag_vs_Embedding(*p, max_norm=max_norm, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 671, in _test_EmbeddingBag_vs_Embedding
+    self.assertEqual(output, ref_output, atol=dtype2prec_DONTUSE[wdtype], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 2 (100.0%)
+Greatest absolute difference: 0.373046875 at index (0, 1) (up to 0.01 allowed)
+Greatest relative difference: 0.16324786324786325 at index (0, 1) (up to 0 allowed)
+
+======================================================================
+FAIL: test_embedding_bag_device_xpu_xpu_int32_int64_float32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 773, in test_embedding_bag_device
+    self._test_EmbeddingBag(device, 'sum', False, wdtype=dtypes[2], dtype=dtypes[0], odtype=dtypes[1])
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 756, in _test_EmbeddingBag
+    self._test_EmbeddingBag_vs_Embedding(*p, max_norm=max_norm, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 671, in _test_EmbeddingBag_vs_Embedding
+    self.assertEqual(output, ref_output, atol=dtype2prec_DONTUSE[wdtype], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 2 (100.0%)
+Greatest absolute difference: 0.37223267555236816 at index (0, 0) (up to 0.001 allowed)
+Greatest relative difference: 0.16277882884846004 at index (0, 0) (up to 0 allowed)
+
+======================================================================
+FAIL: test_embedding_bag_device_xpu_xpu_int32_int64_float64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 773, in test_embedding_bag_device
+    self._test_EmbeddingBag(device, 'sum', False, wdtype=dtypes[2], dtype=dtypes[0], odtype=dtypes[1])
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 756, in _test_EmbeddingBag
+    self._test_EmbeddingBag_vs_Embedding(*p, max_norm=max_norm, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 671, in _test_EmbeddingBag_vs_Embedding
+    self.assertEqual(output, ref_output, atol=dtype2prec_DONTUSE[wdtype], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 2 (100.0%)
+Greatest absolute difference: 0.3722325646251221 at index (0, 0) (up to 0.001 allowed)
+Greatest relative difference: 0.16277879199673337 at index (0, 0) (up to 0 allowed)
+
+======================================================================
+FAIL: test_embedding_bag_device_xpu_xpu_int64_int32_float16 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 773, in test_embedding_bag_device
+    self._test_EmbeddingBag(device, 'sum', False, wdtype=dtypes[2], dtype=dtypes[0], odtype=dtypes[1])
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 756, in _test_EmbeddingBag
+    self._test_EmbeddingBag_vs_Embedding(*p, max_norm=max_norm, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 671, in _test_EmbeddingBag_vs_Embedding
+    self.assertEqual(output, ref_output, atol=dtype2prec_DONTUSE[wdtype], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 2 (100.0%)
+Greatest absolute difference: 0.373046875 at index (0, 1) (up to 0.01 allowed)
+Greatest relative difference: 0.16324786324786325 at index (0, 1) (up to 0 allowed)
+
+======================================================================
+FAIL: test_embedding_bag_device_xpu_xpu_int64_int32_float32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 773, in test_embedding_bag_device
+    self._test_EmbeddingBag(device, 'sum', False, wdtype=dtypes[2], dtype=dtypes[0], odtype=dtypes[1])
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 756, in _test_EmbeddingBag
+    self._test_EmbeddingBag_vs_Embedding(*p, max_norm=max_norm, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 671, in _test_EmbeddingBag_vs_Embedding
+    self.assertEqual(output, ref_output, atol=dtype2prec_DONTUSE[wdtype], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 2 (100.0%)
+Greatest absolute difference: 0.37223267555236816 at index (0, 0) (up to 0.001 allowed)
+Greatest relative difference: 0.16277882884846004 at index (0, 0) (up to 0 allowed)
+
+======================================================================
+FAIL: test_embedding_bag_device_xpu_xpu_int64_int32_float64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 773, in test_embedding_bag_device
+    self._test_EmbeddingBag(device, 'sum', False, wdtype=dtypes[2], dtype=dtypes[0], odtype=dtypes[1])
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 756, in _test_EmbeddingBag
+    self._test_EmbeddingBag_vs_Embedding(*p, max_norm=max_norm, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 671, in _test_EmbeddingBag_vs_Embedding
+    self.assertEqual(output, ref_output, atol=dtype2prec_DONTUSE[wdtype], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 2 (100.0%)
+Greatest absolute difference: 0.3722325646251221 at index (0, 0) (up to 0.001 allowed)
+Greatest relative difference: 0.16277879199673337 at index (0, 0) (up to 0 allowed)
+
+======================================================================
+FAIL: test_embedding_bag_device_xpu_xpu_int64_int64_float16 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 773, in test_embedding_bag_device
+    self._test_EmbeddingBag(device, 'sum', False, wdtype=dtypes[2], dtype=dtypes[0], odtype=dtypes[1])
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 756, in _test_EmbeddingBag
+    self._test_EmbeddingBag_vs_Embedding(*p, max_norm=max_norm, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 671, in _test_EmbeddingBag_vs_Embedding
+    self.assertEqual(output, ref_output, atol=dtype2prec_DONTUSE[wdtype], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 2 (100.0%)
+Greatest absolute difference: 0.373046875 at index (0, 1) (up to 0.01 allowed)
+Greatest relative difference: 0.16324786324786325 at index (0, 1) (up to 0 allowed)
+
+======================================================================
+FAIL: test_embedding_bag_device_xpu_xpu_int64_int64_float32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 773, in test_embedding_bag_device
+    self._test_EmbeddingBag(device, 'sum', False, wdtype=dtypes[2], dtype=dtypes[0], odtype=dtypes[1])
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 756, in _test_EmbeddingBag
+    self._test_EmbeddingBag_vs_Embedding(*p, max_norm=max_norm, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 671, in _test_EmbeddingBag_vs_Embedding
+    self.assertEqual(output, ref_output, atol=dtype2prec_DONTUSE[wdtype], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 2 (100.0%)
+Greatest absolute difference: 0.37223267555236816 at index (0, 0) (up to 0.001 allowed)
+Greatest relative difference: 0.16277882884846004 at index (0, 0) (up to 0 allowed)
+
+======================================================================
+FAIL: test_embedding_bag_device_xpu_xpu_int64_int64_float64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 773, in test_embedding_bag_device
+    self._test_EmbeddingBag(device, 'sum', False, wdtype=dtypes[2], dtype=dtypes[0], odtype=dtypes[1])
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 756, in _test_EmbeddingBag
+    self._test_EmbeddingBag_vs_Embedding(*p, max_norm=max_norm, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 671, in _test_EmbeddingBag_vs_Embedding
+    self.assertEqual(output, ref_output, atol=dtype2prec_DONTUSE[wdtype], rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2 / 2 (100.0%)
+Greatest absolute difference: 0.3722325646251221 at index (0, 0) (up to 0.001 allowed)
+Greatest relative difference: 0.16277879199673337 at index (0, 0) (up to 0 allowed)
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_max_xpu_float32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_max_xpu_float32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_max_xpu_float64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_max_xpu_float64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_mean_xpu_float32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_mean_xpu_float32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_mean_xpu_float64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_mean_xpu_float64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_sum_xpu_float32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_sum_xpu_float32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_sum_xpu_float64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_0_mode_sum_xpu_float64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_max_xpu_float32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_max_xpu_float32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_max_xpu_float64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_max_xpu_float64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_mean_xpu_float32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_mean_xpu_float32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_mean_xpu_float64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_mean_xpu_float64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_sum_xpu_float32_int32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_sum_xpu_float32_int64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_sum_xpu_float64_int32 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_embedding_bag_out_of_bounds_idx_padding_idx_None_mode_sum_xpu_float64_int64 (__main__.TestEmbeddingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_embedding.py", line 485, in test_embedding_bag_out_of_bounds_idx
+    torch.nn.functional.embedding_bag(idx, weight, per_sample_weights=p_s_weights, padding_idx=padding_idx, mode=mode)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+----------------------------------------------------------------------
+Ran 129 tests in 6.691s
+
+FAILED (failures=39, skipped=35)
+Raised CalledProcessError: return code 1.

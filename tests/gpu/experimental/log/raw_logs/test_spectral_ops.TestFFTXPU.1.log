@@ -1,0 +1,193 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_spectral_ops.py:26: DeprecationWarning: distutils Version classes are deprecated. Use packaging.version instead.
+  REFERENCE_NORM_MODES = (None, 'forward', 'backward', 'ortho') if LooseVersion(np.__version__) >= '1.20.0' and (not has_scipy_fft or LooseVersion(scipy.__version__) >= '1.6.0') else (None, 'ortho')
+test_batch_istft_xpu_xpu (__main__.TestFFTXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_complex_istft_real_equiv_xpu_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_complex_stft_definition_xpu_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_complex_stft_onesided_xpu_xpu (__main__.TestFFTXPU) ... ERROR
+test_complex_stft_real_equiv_xpu_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_complex_stft_roundtrip_xpu_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_complex_stft_roundtrip_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_cufft_plan_cache_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_fft2_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_fft2_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_fft_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_fft_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_fftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_fftn_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_hfft2_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_hfft2_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_hfft_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_hfft_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_hfftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_hfftn_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_ifft2_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_ifft2_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_ifft_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_ifft_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_ifftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_ifftn_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_ihfft2_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_ihfft_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_ihfftn_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_irfft2_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_irfft2_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_irfft_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_irfft_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_irfftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_irfftn_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_rfft2_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_rfft_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_fft_fft_rfftn_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_empty_ifft_xpu_xpu (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft2_fftn_equivalence_xpu_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft2_fftn_equivalence_xpu_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft2_invalid_xpu_xpu (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft2_numpy_xpu_xpu_complex128 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft2_numpy_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_fft2_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_fft2_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_fft_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_fft_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_fftn_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_fftn_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_hfft2_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_hfft2_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_hfft_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_hfft_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_hfftn_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_hfftn_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_ifft2_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_ifft2_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_ifft_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_ifft_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_ifftn_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_ifftn_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_ihfft2_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_ihfft2_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_ihfft_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_ihfft_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_ihfftn_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_ihfftn_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_irfft2_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_irfft2_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_irfft_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_irfft_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_irfftn_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_irfftn_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_rfft2_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_rfft2_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_rfft_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_rfft_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_rfftn_xpu_bfloat16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_half_and_bfloat16_errors_fft_rfftn_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_ifft_rfft_irfft_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_input_modification_xpu_xpu (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_invalid_dtypes_xpu_xpu (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_plan_repeatable_xpu_xpu (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_round_trip_xpu_xpu_complex128 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_round_trip_xpu_xpu_complex32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_round_trip_xpu_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_round_trip_xpu_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_round_trip_xpu_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_round_trip_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_type_promotion_xpu_xpu_complex128 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_type_promotion_xpu_xpu_complex32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_type_promotion_xpu_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_type_promotion_xpu_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_type_promotion_xpu_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_type_promotion_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fft_type_promotion_xpu_xpu_int8 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftfreq_numpy_xpu_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftfreq_numpy_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftfreq_out_xpu_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftfreq_out_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_invalid_fft_fftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_invalid_fft_fftn_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_invalid_fft_hfftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_invalid_fft_hfftn_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_invalid_fft_ifftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_invalid_fft_ifftn_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_invalid_fft_ihfftn_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_invalid_fft_irfftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_invalid_fft_irfftn_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_invalid_fft_rfftn_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_round_trip_xpu_xpu_complex128 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_round_trip_xpu_xpu_complex32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_round_trip_xpu_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_round_trip_xpu_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_round_trip_xpu_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftn_round_trip_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftshift_frequencies_xpu_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftshift_frequencies_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftshift_numpy_xpu_xpu_complex128 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftshift_numpy_xpu_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftshift_numpy_xpu_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_fftshift_numpy_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_hfftn_xpu_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_hfftn_xpu_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_hfftn_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_ihfftn_xpu_xpu_float16 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_ihfftn_xpu_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_ihfftn_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_istft_against_librosa_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_istft_linearity_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_istft_of_sine_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_istft_round_trip_simple_cases_xpu_xpu_float64 (__main__.TestFFTXPU)
+stft -> istft should recover the original signale ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_istft_round_trip_various_params_xpu_xpu_float64 (__main__.TestFFTXPU)
+stft -> istft should recover the original signale ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_istft_round_trip_with_padding_xpu_xpu_float64 (__main__.TestFFTXPU)
+long hop_length or not centered may cause length mismatch in the inversed signal ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_istft_throws_xpu_xpu (__main__.TestFFTXPU)
+istft should throw exception for invalid parameters ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_reference_1d_fft_fft_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_1d_fft_fft_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_1d_fft_hfft_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_1d_fft_hfft_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_1d_fft_ifft_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_1d_fft_ifft_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_1d_fft_ihfft_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_1d_fft_irfft_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_1d_fft_irfft_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_1d_fft_rfft_xpu_float32 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_nd_fft_fftn_xpu_complex128 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_nd_fft_fftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_nd_fft_hfftn_xpu_complex128 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_nd_fft_hfftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_nd_fft_ifftn_xpu_complex128 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_nd_fft_ifftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_nd_fft_irfftn_xpu_complex128 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_reference_nd_fft_irfftn_xpu_complex64 (__main__.TestFFTXPU) ... skipped "case has skip key and won't run on XPU"
+test_stft_requires_complex_xpu_xpu (__main__.TestFFTXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_stft_roundtrip_complex_window_xpu_xpu_complex128 (__main__.TestFFTXPU) ... skipped 'dtype not support on XPU'
+test_stft_roundtrip_complex_window_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_stft_window_device_xpu_xpu (__main__.TestFFTXPU) ... skipped 'Only runs on cuda'
+test_stft_xpu_xpu_float64 (__main__.TestFFTXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+
+======================================================================
+ERROR: test_complex_stft_onesided_xpu_xpu (__main__.TestFFTXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_spectral_ops.py", line 730, in test_complex_stft_onesided
+    y = x.stft(10, window=window, pad_mode='constant', onesided=True, return_complex=True)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_tensor.py", line 703, in stft
+    return torch.stft(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/functional.py", line 632, in stft
+    return _VF.stft(input, n_fft, hop_length, win_length, window,  # type: ignore[attr-defined]
+RuntimeError: Level-Zero error:78000011
+
+----------------------------------------------------------------------
+Ran 159 tests in 0.875s
+
+FAILED (errors=1, skipped=158)
+Raised CalledProcessError: return code 1.

@@ -1,0 +1,46 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_aten_overload_to_prims_xpu_xpu (__main__.TestPrimsXPU) ... ok
+test_batch_norm_backward_nvprims_xpu_xpu_float16 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_batch_norm_backward_nvprims_xpu_xpu_float32 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_broadcast_in_dim_sum_xpu_xpu_float32 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_broadcast_in_dim_xpu_xpu_float32 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_cbrt_prim_xpu_xpu_float64 (__main__.TestPrimsXPU) ... ok
+test_cbrt_prim_xpu_xpu_int64 (__main__.TestPrimsXPU) ... ok
+test_cpu_tensor_xpu_xpu_float16 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_cpu_tensor_xpu_xpu_float32 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_memory_format_strides_xpu_xpu_float32 (__main__.TestPrimsXPU) ... ok
+test_native_batch_norm_nvprims_xpu_xpu_float32 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_native_batch_norm_nvprims_xpu_xpu_float64 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_nvfuser_capability_context_xpu_xpu (__main__.TestPrimsXPU) ... ok
+test_nvfuser_constant_tensors_xpu_xpu (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_nvfuser_empty_fusion_xpu_xpu (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_nvfuser_executor_cached_noncontiguous_xpu_xpu (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_nvfuser_executor_parameters_xpu_xpu (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_nvfuser_executor_partitioned_no_partitions_error_xpu_xpu (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_nvfuser_executor_partitioned_xpu_xpu (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_nvfuser_impl_is_used_xpu_xpu (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_nvfuser_no_args_xpu_xpu (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_nvfuser_rand_like_fusion_xpu_xpu (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_nvprim_convert_element_type_xpu_xpu_float16 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_nvprim_convert_element_type_xpu_xpu_uint8 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_nvprims_xpu_xpu (__main__.TestPrimsXPU) ... ok
+test_pytree_input_output_xpu_xpu_float32 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_reshape_view_method_xpu_xpu_float32 (__main__.TestPrimsXPU) ... ok
+test_skip_ops_nvfuser_capability_mode_xpu_xpu (__main__.TestPrimsXPU) ... ok
+test_skip_ops_nvfuser_prims_mode_xpu_xpu (__main__.TestPrimsXPU) ... ok
+test_var_correction_0_xpu_float32 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_var_correction_1_xpu_float32 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_var_mean_correction_0_keepdim_False_xpu_float16 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_var_mean_correction_0_keepdim_False_xpu_float32 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_var_mean_correction_0_keepdim_True_xpu_float16 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_var_mean_correction_0_keepdim_True_xpu_float32 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_var_mean_correction_1_keepdim_False_xpu_float16 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_var_mean_correction_1_keepdim_False_xpu_float32 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_var_mean_correction_1_keepdim_True_xpu_float16 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+test_var_mean_correction_1_keepdim_True_xpu_float32 (__main__.TestPrimsXPU) ... skipped 'Only runs on cuda'
+
+----------------------------------------------------------------------
+Ran 39 tests in 1.506s
+
+OK (skipped=30)

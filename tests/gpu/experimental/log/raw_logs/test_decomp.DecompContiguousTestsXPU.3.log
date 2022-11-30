@@ -1,0 +1,9 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_contiguous_log_softmax_xpu_xpu (__main__.DecompContiguousTestsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_contiguous_softmax_xpu_xpu (__main__.DecompContiguousTestsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.008s
+
+OK (skipped=2)

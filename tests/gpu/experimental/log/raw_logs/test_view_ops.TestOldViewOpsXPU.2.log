@@ -1,0 +1,143 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_T_xpu_xpu (__main__.TestOldViewOpsXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_view_ops.py:1007: UserWarning: The use of `x.T` on tensors of dimension other than 2 to reverse their shape is deprecated and it will throw an error in a future release. Consider `x.mT` to transpose batches of matrices or `x.permute(*torch.arange(x.ndim - 1, -1, -1))` to reverse the dimensions of a tensor. (Triggered internally at /home/gta/xunsongh/pytorch/aten/src/ATen/native/TensorShape.cpp:3277.)
+  t1 = a.T
+ok
+test_atleast_gradient_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_atleast_xpu_xpu_complex128 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_atleast_xpu_xpu_complex64 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_atleast_xpu_xpu_float16 (__main__.TestOldViewOpsXPU) ... ok
+test_atleast_xpu_xpu_float32 (__main__.TestOldViewOpsXPU) ... ok
+test_atleast_xpu_xpu_float64 (__main__.TestOldViewOpsXPU) ... ok
+test_atleast_xpu_xpu_int16 (__main__.TestOldViewOpsXPU) ... ok
+test_atleast_xpu_xpu_int32 (__main__.TestOldViewOpsXPU) ... ok
+test_atleast_xpu_xpu_int64 (__main__.TestOldViewOpsXPU) ... ok
+test_atleast_xpu_xpu_int8 (__main__.TestOldViewOpsXPU) ... ok
+test_atleast_xpu_xpu_uint8 (__main__.TestOldViewOpsXPU) ... ok
+test_big_transpose_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_broadcast_shapes_xpu_xpu (__main__.TestOldViewOpsXPU) ... skipped 'Only runs on cpu'
+test_broadcast_tensors_xpu_xpu_float32 (__main__.TestOldViewOpsXPU) ... skipped 'Only runs on cpu'
+test_broadcast_to_xpu_xpu_bool (__main__.TestOldViewOpsXPU) ... /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py:599: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /home/gta/xunsongh/pytorch/torch/csrc/utils/tensor_numpy.cpp:199.)
+  return torch.as_tensor(tensor_like)
+ok
+test_broadcast_to_xpu_xpu_complex128 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_broadcast_to_xpu_xpu_complex64 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_broadcast_to_xpu_xpu_float16 (__main__.TestOldViewOpsXPU) ... ok
+test_broadcast_to_xpu_xpu_float32 (__main__.TestOldViewOpsXPU) ... ok
+test_broadcast_to_xpu_xpu_float64 (__main__.TestOldViewOpsXPU) ... ok
+test_broadcast_to_xpu_xpu_int16 (__main__.TestOldViewOpsXPU) ... ok
+test_broadcast_to_xpu_xpu_int32 (__main__.TestOldViewOpsXPU) ... ok
+test_broadcast_to_xpu_xpu_int64 (__main__.TestOldViewOpsXPU) ... ok
+test_broadcast_to_xpu_xpu_int8 (__main__.TestOldViewOpsXPU) ... ok
+test_broadcast_to_xpu_xpu_uint8 (__main__.TestOldViewOpsXPU) ... ok
+test_chunk_xpu_xpu (__main__.TestOldViewOpsXPU) ... skipped 'Only runs on cpu'
+test_conj_neg_view_numpy_error_xpu_xpu (__main__.TestOldViewOpsXPU) ... skipped 'Only runs on cpu'
+test_contiguous_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_crow_col_indices_xpu_xpu (__main__.TestOldViewOpsXPU) ... skipped 'Only runs on cpu'
+test_empty_reshape_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_expand_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_flatten_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_memory_format_resize__xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_memory_format_resize_as_xpu_xpu (__main__.TestOldViewOpsXPU) ... ERROR
+test_narrow_tensor_xpu_xpu (__main__.TestOldViewOpsXPU) ... skipped 'Only runs on cpu'
+test_narrow_xpu_xpu (__main__.TestOldViewOpsXPU) ... skipped 'Only runs on cpu'
+test_python_types_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_ravel_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_reshape_view_semantics_xpu_xpu_bfloat16 (__main__.TestOldViewOpsXPU) ... ok
+test_reshape_view_semantics_xpu_xpu_bool (__main__.TestOldViewOpsXPU) ... ok
+test_reshape_view_semantics_xpu_xpu_complex128 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_reshape_view_semantics_xpu_xpu_complex64 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_reshape_view_semantics_xpu_xpu_float16 (__main__.TestOldViewOpsXPU) ... ok
+test_reshape_view_semantics_xpu_xpu_float32 (__main__.TestOldViewOpsXPU) ... ok
+test_reshape_view_semantics_xpu_xpu_float64 (__main__.TestOldViewOpsXPU) ... ok
+test_reshape_view_semantics_xpu_xpu_int16 (__main__.TestOldViewOpsXPU) ... ok
+test_reshape_view_semantics_xpu_xpu_int32 (__main__.TestOldViewOpsXPU) ... ok
+test_reshape_view_semantics_xpu_xpu_int64 (__main__.TestOldViewOpsXPU) ... ok
+test_reshape_view_semantics_xpu_xpu_int8 (__main__.TestOldViewOpsXPU) ... ok
+test_reshape_view_semantics_xpu_xpu_uint8 (__main__.TestOldViewOpsXPU) ... ok
+test_reshape_xpu_xpu (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_resize_all_dtypes_and_devices_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_resize_as_all_dtypes_and_devices_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_resize_as_preserves_strides_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_resize_overflow_xpu_xpu (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_split_xpu_xpu (__main__.TestOldViewOpsXPU) ... skipped 'Only runs on cpu'
+test_t_xpu_xpu (__main__.TestOldViewOpsXPU) ... skipped 'Only runs on cpu'
+test_tensor_split_errors_xpu_xpu (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_indices_xpu_xpu_bool (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_indices_xpu_xpu_complex128 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_tensor_split_indices_xpu_xpu_complex64 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_tensor_split_indices_xpu_xpu_float16 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_indices_xpu_xpu_float32 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_indices_xpu_xpu_float64 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_indices_xpu_xpu_int16 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_indices_xpu_xpu_int32 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_indices_xpu_xpu_int64 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_indices_xpu_xpu_int8 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_indices_xpu_xpu_uint8 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_sections_xpu_xpu_bool (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_sections_xpu_xpu_complex128 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_tensor_split_sections_xpu_xpu_complex64 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_tensor_split_sections_xpu_xpu_float16 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_sections_xpu_xpu_float32 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_sections_xpu_xpu_float64 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_sections_xpu_xpu_int16 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_sections_xpu_xpu_int32 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_sections_xpu_xpu_int64 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_sections_xpu_xpu_int8 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_split_sections_xpu_xpu_uint8 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_transpose_invalid_xpu_xpu_complex128 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_transpose_invalid_xpu_xpu_float32 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_transpose_invalid_xpu_xpu_int64 (__main__.TestOldViewOpsXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_transpose_vs_numpy_xpu_xpu_complex128 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_transpose_vs_numpy_xpu_xpu_float32 (__main__.TestOldViewOpsXPU) ... ok
+test_transpose_vs_numpy_xpu_xpu_int64 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_errors_xpu_xpu_bfloat16 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_errors_xpu_xpu_bool (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_errors_xpu_xpu_complex128 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_transposes_errors_xpu_xpu_complex64 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_transposes_errors_xpu_xpu_float16 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_errors_xpu_xpu_float32 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_errors_xpu_xpu_float64 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_errors_xpu_xpu_int16 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_errors_xpu_xpu_int32 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_errors_xpu_xpu_int64 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_errors_xpu_xpu_int8 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_errors_xpu_xpu_uint8 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_xpu_xpu_bfloat16 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_xpu_xpu_bool (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_xpu_xpu_complex128 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_transposes_xpu_xpu_complex64 (__main__.TestOldViewOpsXPU) ... skipped 'dtype not support on XPU'
+test_transposes_xpu_xpu_float16 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_xpu_xpu_float32 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_xpu_xpu_float64 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_xpu_xpu_int16 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_xpu_xpu_int32 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_xpu_xpu_int64 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_xpu_xpu_int8 (__main__.TestOldViewOpsXPU) ... ok
+test_transposes_xpu_xpu_uint8 (__main__.TestOldViewOpsXPU) ... ok
+test_unsqueeze_xpu_xpu (__main__.TestOldViewOpsXPU) ... skipped 'Only runs on cpu'
+test_view_all_dtypes_and_devices_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_view_empty_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+test_view_xpu_xpu (__main__.TestOldViewOpsXPU) ... ok
+
+======================================================================
+ERROR: test_memory_format_resize_as_xpu_xpu (__main__.TestOldViewOpsXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_view_ops.py", line 1066, in test_memory_format_resize_as
+    test_helper((10, 3, 32, 32), torch.channels_last, device)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_view_ops.py", line 1064, in test_helper
+    flat.resize_as_(xc, memory_format=torch.preserve_format)
+RuntimeError: Unsupported memory formatPreserve
+
+----------------------------------------------------------------------
+Ran 115 tests in 8.065s
+
+FAILED (errors=1, skipped=49)
+Raised CalledProcessError: return code 1.

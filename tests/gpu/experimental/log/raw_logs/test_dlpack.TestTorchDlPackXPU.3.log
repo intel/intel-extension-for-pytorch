@@ -1,0 +1,102 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_dlpack_capsule_conversion_xpu_xpu_bfloat16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_capsule_conversion_xpu_xpu_complex128 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_dlpack_capsule_conversion_xpu_xpu_complex64 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_dlpack_capsule_conversion_xpu_xpu_float16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_capsule_conversion_xpu_xpu_float32 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_capsule_conversion_xpu_xpu_float64 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_capsule_conversion_xpu_xpu_int16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_capsule_conversion_xpu_xpu_int32 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_capsule_conversion_xpu_xpu_int64 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_capsule_conversion_xpu_xpu_int8 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_capsule_conversion_xpu_xpu_uint8 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_conversion_with_diff_streams_xpu_xpu_bfloat16 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_diff_streams_xpu_xpu_complex128 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_dlpack_conversion_with_diff_streams_xpu_xpu_complex64 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_dlpack_conversion_with_diff_streams_xpu_xpu_float16 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_diff_streams_xpu_xpu_float32 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_diff_streams_xpu_xpu_float64 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_diff_streams_xpu_xpu_int16 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_diff_streams_xpu_xpu_int32 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_diff_streams_xpu_xpu_int64 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_diff_streams_xpu_xpu_int8 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_diff_streams_xpu_xpu_uint8 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_streams_xpu_xpu_bfloat16 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_streams_xpu_xpu_complex128 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_dlpack_conversion_with_streams_xpu_xpu_complex64 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_dlpack_conversion_with_streams_xpu_xpu_float16 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_streams_xpu_xpu_float32 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_streams_xpu_xpu_float64 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_streams_xpu_xpu_int16 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_streams_xpu_xpu_int32 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_streams_xpu_xpu_int64 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_streams_xpu_xpu_int8 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_conversion_with_streams_xpu_xpu_uint8 (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_default_stream_xpu_xpu (__main__.TestTorchDlPackXPU) ... skipped 'Only runs on cuda'
+test_dlpack_error_on_bool_tensor_xpu_xpu (__main__.TestTorchDlPackXPU) ... ok
+test_dlpack_export_is_conj_xpu_xpu (__main__.TestTorchDlPackXPU) ... ok
+test_dlpack_export_non_strided_xpu_xpu (__main__.TestTorchDlPackXPU) ... ok
+test_dlpack_export_requires_grad_xpu_xpu (__main__.TestTorchDlPackXPU) ... ok
+test_dlpack_normalize_strides_xpu_xpu (__main__.TestTorchDlPackXPU) ... ok
+test_dlpack_protocol_conversion_xpu_xpu_bfloat16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_protocol_conversion_xpu_xpu_complex128 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_dlpack_protocol_conversion_xpu_xpu_complex64 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_dlpack_protocol_conversion_xpu_xpu_float16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_protocol_conversion_xpu_xpu_float32 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_protocol_conversion_xpu_xpu_float64 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_protocol_conversion_xpu_xpu_int16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_protocol_conversion_xpu_xpu_int32 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_protocol_conversion_xpu_xpu_int64 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_protocol_conversion_xpu_xpu_int8 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_protocol_conversion_xpu_xpu_uint8 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_shared_storage_xpu_xpu (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_tensor_invalid_stream_xpu_xpu_bfloat16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_tensor_invalid_stream_xpu_xpu_complex128 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_dlpack_tensor_invalid_stream_xpu_xpu_complex64 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_dlpack_tensor_invalid_stream_xpu_xpu_float16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_tensor_invalid_stream_xpu_xpu_float32 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_tensor_invalid_stream_xpu_xpu_float64 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_tensor_invalid_stream_xpu_xpu_int16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_tensor_invalid_stream_xpu_xpu_int32 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_tensor_invalid_stream_xpu_xpu_int64 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_tensor_invalid_stream_xpu_xpu_int8 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dlpack_tensor_invalid_stream_xpu_xpu_uint8 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_dtype_xpu_xpu_bfloat16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_dtype_xpu_xpu_complex128 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_from_dlpack_dtype_xpu_xpu_complex64 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_from_dlpack_dtype_xpu_xpu_float16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_dtype_xpu_xpu_float32 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_dtype_xpu_xpu_float64 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_dtype_xpu_xpu_int16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_dtype_xpu_xpu_int32 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_dtype_xpu_xpu_int64 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_dtype_xpu_xpu_int8 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_dtype_xpu_xpu_uint8 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_noncontinguous_xpu_xpu_bfloat16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_noncontinguous_xpu_xpu_complex128 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_from_dlpack_noncontinguous_xpu_xpu_complex64 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_from_dlpack_noncontinguous_xpu_xpu_float16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_noncontinguous_xpu_xpu_float32 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_noncontinguous_xpu_xpu_float64 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_noncontinguous_xpu_xpu_int16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_noncontinguous_xpu_xpu_int32 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_noncontinguous_xpu_xpu_int64 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_noncontinguous_xpu_xpu_int8 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_noncontinguous_xpu_xpu_uint8 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_xpu_xpu_bfloat16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_xpu_xpu_complex128 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_from_dlpack_xpu_xpu_complex64 (__main__.TestTorchDlPackXPU) ... skipped 'dtype not support on XPU'
+test_from_dlpack_xpu_xpu_float16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_xpu_xpu_float32 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_xpu_xpu_float64 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_xpu_xpu_int16 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_xpu_xpu_int32 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_xpu_xpu_int64 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_xpu_xpu_int8 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_from_dlpack_xpu_xpu_uint8 (__main__.TestTorchDlPackXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+
+----------------------------------------------------------------------
+Ran 95 tests in 0.031s
+
+OK (skipped=90)

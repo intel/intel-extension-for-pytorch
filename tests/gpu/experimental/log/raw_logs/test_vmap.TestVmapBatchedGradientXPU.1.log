@@ -1,0 +1,90 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_add_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_binary_cross_entropy_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py:689: UserWarning: Please use functorch.vmap instead of torch.vmap (https://github.com/pytorch/functorch). We've moved development on torch.vmap over to functorch; functorch's vmap has a multitude of significant performance and functionality improvements.
+  result = vmap(op, in_dims, out_dims)(*inputs)
+ok
+test_diagonal_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_div_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_expand_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_index_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py:689: UserWarning: Please use functorch.vmap instead of torch.vmap (https://github.com/pytorch/functorch). We've moved development on torch.vmap over to functorch; functorch's vmap has a multitude of significant performance and functionality improvements.
+  result = vmap(op, in_dims, out_dims)(*inputs)
+ok
+test_inplace_manyview_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_inplace_on_view_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_lgamma_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_log1p_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_log_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_logsumexp_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_max_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py:689: UserWarning: Please use functorch.vmap instead of torch.vmap (https://github.com/pytorch/functorch). We've moved development on torch.vmap over to functorch; functorch's vmap has a multitude of significant performance and functionality improvements.
+  result = vmap(op, in_dims, out_dims)(*inputs)
+ok
+test_median_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_min_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_mul_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_permute_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_reshape_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_select_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_sigmoid_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ERROR
+test_slice_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_stack_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_sub_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_symeig_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py:1730: UserWarning: torch.symeig is deprecated in favor of torch.linalg.eigh and will be removed in a future PyTorch release.
+The default behavior has changed from using the upper triangular portion of the matrix by default to using the lower triangular portion.
+L, _ = torch.symeig(A, upper=upper)
+should be replaced with
+L = torch.linalg.eigvalsh(A, UPLO='U' if upper else 'L')
+and
+L, V = torch.symeig(A, eigenvectors=True)
+should be replaced with
+L, V = torch.linalg.eigh(A, UPLO='U' if upper else 'L') (Triggered internally at /home/gta/xunsongh/pytorch/aten/src/ATen/native/BatchLinearAlgebra.cpp:2794.)
+  return torch.symeig(x, eigenvectors=True)[0]
+/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py:689: UserWarning: Please use functorch.vmap instead of torch.vmap (https://github.com/pytorch/functorch). We've moved development on torch.vmap over to functorch; functorch's vmap has a multitude of significant performance and functionality improvements.
+  result = vmap(op, in_dims, out_dims)(*inputs)
+ok
+test_threshold_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_trace_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... ok
+test_unrelated_output_multiple_grad_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py:1796: UserWarning: Please use functorch.vmap instead of torch.vmap (https://github.com/pytorch/functorch). We've moved development on torch.vmap over to functorch; functorch's vmap has a multitude of significant performance and functionality improvements.
+  result = vmap(vjp)(gy)
+ok
+test_unrelated_output_xpu_xpu (__main__.TestVmapBatchedGradientXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py:1782: UserWarning: Please use functorch.vmap instead of torch.vmap (https://github.com/pytorch/functorch). We've moved development on torch.vmap over to functorch; functorch's vmap has a multitude of significant performance and functionality improvements.
+  result = vmap(vjp)(gy)
+ok
+test_vmap_fallback_check (__main__.TestVmapBatchedGradientXPU) ... ok
+test_vmap_fallback_check_ok (__main__.TestVmapBatchedGradientXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py:741: UserWarning: Please use functorch.vmap instead of torch.vmap (https://github.com/pytorch/functorch). We've moved development on torch.vmap over to functorch; functorch's vmap has a multitude of significant performance and functionality improvements.
+  vmap(op_using_fallback)(torch.rand(3))
+ok
+
+======================================================================
+ERROR: test_sigmoid_xpu_xpu (__main__.TestVmapBatchedGradientXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py", line 733, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py", line 1698, in test_sigmoid
+    self._batched_grad_test(Tensor.sigmoid, (x,))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py", line 1572, in _batched_grad_test
+    self._vmap_test(vector_jacobian_product, batched_vectors, check_propagates_grad=False)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py", line 1561, in _vmap_test
+    return _vmap_test(self, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py", line 689, in _vmap_test
+    result = vmap(op, in_dims, out_dims)(*inputs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_vmap_internals.py", line 323, in wrapped
+    batched_outputs = func(*batched_inputs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_vmap.py", line 1571, in vector_jacobian_product
+    return torch.autograd.grad(outputs, differentiable(args), vectors, retain_graph=True)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 300, in grad
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+RuntimeError: different elements ...
+
+----------------------------------------------------------------------
+Ran 30 tests in 4.343s
+
+FAILED (errors=1)
+Raised CalledProcessError: return code 1.

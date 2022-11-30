@@ -1,0 +1,748 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_AdaptiveMaxPool1d_indices_xpu_xpu_bfloat16 (__main__.TestPoolingNNDeviceTypeXPU) ... FAIL
+test_AdaptiveMaxPool1d_indices_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU) ... FAIL
+test_AdaptiveMaxPool1d_indices_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... FAIL
+test_AdaptiveMaxPool1d_indices_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... ERROR
+test_AdaptiveMaxPool2d_indices_xpu_xpu_bfloat16 (__main__.TestPoolingNNDeviceTypeXPU) ... FAIL
+test_AdaptiveMaxPool2d_indices_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU) ... FAIL
+test_AdaptiveMaxPool2d_indices_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... FAIL
+test_AdaptiveMaxPool2d_indices_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... ERROR
+test_AdaptiveMaxPool3d_indices_xpu_xpu_bfloat16 (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_AdaptiveMaxPool3d_indices_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU) ... ERROR
+test_AdaptiveMaxPool3d_indices_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_AdaptiveMaxPool3d_indices_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... ERROR
+test_AdaptiveMaxPool_zero_batch_dim_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_AvgPool2d_empty_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_AvgPool3d_backward_after_cat_dim1_device_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_FractionalMaxPool2d_zero_batch_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_FractionalMaxPool2d_zero_out_size_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_FractionalMaxPool3d_zero_batch_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_FractionalMaxPool3d_zero_out_size_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_MaxPool1d_indices_xpu_xpu_bfloat16 (__main__.TestPoolingNNDeviceTypeXPU) ... FAIL
+test_MaxPool1d_indices_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU) ... FAIL
+test_MaxPool1d_indices_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... FAIL
+test_MaxPool1d_indices_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... ERROR
+test_MaxPool2d_indices_xpu_xpu_bfloat16 (__main__.TestPoolingNNDeviceTypeXPU) ... FAIL
+test_MaxPool2d_indices_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU) ... FAIL
+test_MaxPool2d_indices_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... FAIL
+test_MaxPool2d_indices_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... ERROR
+test_MaxPool3d_indices_xpu_xpu_bfloat16 (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_MaxPool3d_indices_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU) ... ERROR
+test_MaxPool3d_indices_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_MaxPool3d_indices_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... ERROR
+test_MaxPool_zero_batch_dim_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_MaxUnpool_index_errors_case10_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_MaxUnpool_index_errors_case1_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_MaxUnpool_index_errors_case2_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_MaxUnpool_index_errors_case3_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_MaxUnpool_index_errors_case4_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_MaxUnpool_index_errors_case5_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_MaxUnpool_index_errors_case6_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_MaxUnpool_index_errors_case7_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_MaxUnpool_index_errors_case8_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_MaxUnpool_index_errors_case9_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_MaxUnpool_zero_batch_dim_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_adaptive_avg_pool2d_output_size_one_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_adaptive_avg_pool3d_output_size_one_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_adaptive_pool_invalid_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_adaptive_pool_odd_size_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_adaptive_pooling_max_nhwc_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... ERROR
+test_adaptive_pooling_max_nhwc_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... ERROR
+test_adaptive_pooling_no_suppot_input_xpu_xpu_int16 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_adaptive_pooling_no_suppot_input_xpu_xpu_int32 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_adaptive_pooling_no_suppot_input_xpu_xpu_int64 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_adaptive_pooling_no_suppot_input_xpu_xpu_int8 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_adaptive_pooling_no_suppot_input_xpu_xpu_uint8 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_adaptive_pooling_zero_batch_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_adaptive_pooling_zero_batch_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_avg_pool2d_bfloat16_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped 'Only runs on cpu'
+test_avg_pool2d_nhwc_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_avg_pool2d_nhwc_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_avg_pool2d_nhwc_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_fractional_max_pool2d_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_fractional_max_pool3d_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_fractional_max_pool_nan_inf_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_fractional_max_pool_nan_inf_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_fractional_max_pool_nan_inf_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_max_pool1d_corner_cases_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped 'Only runs on cpu'
+test_max_pool1d_corner_cases_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped 'Only runs on cpu'
+test_max_pool1d_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped 'Only runs on cpu'
+test_max_pool1d_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped 'Only runs on cpu'
+test_max_pool2d_bfloat16_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped 'Only runs on cpu'
+test_max_pool2d_indices_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_max_pool2d_nhwc_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_max_pool2d_nhwc_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_max_pool2d_nhwc_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_max_pool2d_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_max_pool3d_ndhwc_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_max_pool3d_ndhwc_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_max_pool3d_ndhwc_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_max_pool_nan_inf_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_max_pool_nan_inf_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_max_pool_nan_inf_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_maxpool3d_non_square_backward_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_maxpool_indices_no_batch_dim_xpu_xpu_bfloat16 (__main__.TestPoolingNNDeviceTypeXPU)
+Check that indices with no batch dim is consistent with a single batch. ... ok
+test_maxpool_indices_no_batch_dim_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU)
+Check that indices with no batch dim is consistent with a single batch. ... FAIL
+test_maxpool_indices_no_batch_dim_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU)
+Check that indices with no batch dim is consistent with a single batch. ... ok
+test_maxpool_indices_no_batch_dim_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU)
+Check that indices with no batch dim is consistent with a single batch. ... ERROR
+test_pool3d_large_size_int64_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_pool3d_size_one_feature_dim_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_pool_invalid_size_xpu_xpu_bfloat16 (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_pool_invalid_size_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_pool_invalid_size_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_pool_invalid_size_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_pool_large_size_xpu_xpu_bfloat16 (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_pool_large_size_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_pool_large_size_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_pool_large_size_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... ERROR
+test_pooling_bfloat16_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_pooling_large_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_pooling_max_nhwc_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU) ... ERROR
+test_pooling_max_nhwc_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU) ... ERROR
+test_pooling_shape_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU)
+Test the output shape calculation for pooling functions ... ok
+test_pooling_size_empty_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... ok
+test_pooling_zero_stride_xpu_xpu (__main__.TestPoolingNNDeviceTypeXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+
+======================================================================
+ERROR: test_AdaptiveMaxPool1d_indices_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 969, in test_AdaptiveMaxPool1d_indices
+    self._test_maxpool_indices(1, adaptive=True, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 914, in _test_maxpool_indices
+    (output, indices) = module(input_var)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/pooling.py", line 1021, in forward
+    return F.adaptive_max_pool1d(input, self.output_size, self.return_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_jit_internal.py", line 483, in fn
+    return if_true(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 1080, in adaptive_max_pool1d_with_indices
+    return torch.adaptive_max_pool1d(input, output_size)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_AdaptiveMaxPool2d_indices_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 976, in test_AdaptiveMaxPool2d_indices
+    self._test_maxpool_indices(2, adaptive=True, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 914, in _test_maxpool_indices
+    (output, indices) = module(input_var)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/pooling.py", line 1063, in forward
+    return F.adaptive_max_pool2d(input, self.output_size, self.return_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_jit_internal.py", line 483, in fn
+    return if_true(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 1121, in adaptive_max_pool2d_with_indices
+    return torch._C._nn.adaptive_max_pool2d(input, output_size)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_AdaptiveMaxPool3d_indices_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 983, in test_AdaptiveMaxPool3d_indices
+    self._test_maxpool_indices(3, adaptive=True, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 924, in _test_maxpool_indices
+    output.backward(grad_output, retain_graph=True)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_tensor.py", line 487, in backward
+    torch.autograd.backward(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 197, in backward
+    Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+RuntimeError: "adaptive_max_pool3d_backward" not implemented for 'Half'
+
+======================================================================
+ERROR: test_AdaptiveMaxPool3d_indices_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 983, in test_AdaptiveMaxPool3d_indices
+    self._test_maxpool_indices(3, adaptive=True, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 914, in _test_maxpool_indices
+    (output, indices) = module(input_var)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/pooling.py", line 1106, in forward
+    return F.adaptive_max_pool3d(input, self.output_size, self.return_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_jit_internal.py", line 483, in fn
+    return if_true(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 1162, in adaptive_max_pool3d_with_indices
+    return torch._C._nn.adaptive_max_pool3d(input, output_size)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_MaxPool1d_indices_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 949, in test_MaxPool1d_indices
+    self._test_maxpool_indices(1, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 914, in _test_maxpool_indices
+    (output, indices) = module(input_var)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/pooling.py", line 92, in forward
+    return F.max_pool1d(input, self.kernel_size, self.stride,
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_jit_internal.py", line 483, in fn
+    return if_true(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 671, in max_pool1d_with_indices
+    return torch.max_pool1d_with_indices(input, kernel_size, stride, padding, dilation, ceil_mode)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_MaxPool2d_indices_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 955, in test_MaxPool2d_indices
+    self._test_maxpool_indices(2, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 914, in _test_maxpool_indices
+    (output, indices) = module(input_var)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/pooling.py", line 166, in forward
+    return F.max_pool2d(input, self.kernel_size, self.stride,
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_jit_internal.py", line 483, in fn
+    return if_true(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 757, in max_pool2d_with_indices
+    return torch._C._nn.max_pool2d_with_indices(input, kernel_size, stride, padding, dilation, ceil_mode)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_MaxPool3d_indices_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 962, in test_MaxPool3d_indices
+    self._test_maxpool_indices(3, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 924, in _test_maxpool_indices
+    output.backward(grad_output, retain_graph=True)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_tensor.py", line 487, in backward
+    torch.autograd.backward(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/__init__.py", line 197, in backward
+    Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+RuntimeError: oneDNN only supports pooling backward with fp32 and bf16 datatype
+
+======================================================================
+ERROR: test_MaxPool3d_indices_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 962, in test_MaxPool3d_indices
+    self._test_maxpool_indices(3, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 914, in _test_maxpool_indices
+    (output, indices) = module(input_var)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/pooling.py", line 244, in forward
+    return F.max_pool3d(input, self.kernel_size, self.stride,
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_jit_internal.py", line 483, in fn
+    return if_true(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 843, in max_pool3d_with_indices
+    return torch._C._nn.max_pool3d_with_indices(input, kernel_size, stride, padding, dilation, ceil_mode)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_adaptive_pooling_max_nhwc_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 796, in test_adaptive_pooling_max_nhwc
+    helper(4, 8, 10, 10, 7, 7, contig)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 784, in helper
+    (out, ind) = pool(input)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/pooling.py", line 1063, in forward
+    return F.adaptive_max_pool2d(input, self.output_size, self.return_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_jit_internal.py", line 483, in fn
+    return if_true(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 1121, in adaptive_max_pool2d_with_indices
+    return torch._C._nn.adaptive_max_pool2d(input, output_size)
+RuntimeError: could not create a descriptor for a pooling forward propagation primitive
+
+======================================================================
+ERROR: test_adaptive_pooling_max_nhwc_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 796, in test_adaptive_pooling_max_nhwc
+    helper(4, 8, 10, 10, 7, 7, contig)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 784, in helper
+    (out, ind) = pool(input)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/pooling.py", line 1063, in forward
+    return F.adaptive_max_pool2d(input, self.output_size, self.return_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_jit_internal.py", line 483, in fn
+    return if_true(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 1121, in adaptive_max_pool2d_with_indices
+    return torch._C._nn.adaptive_max_pool2d(input, output_size)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_maxpool_indices_no_batch_dim_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU)
+Check that indices with no batch dim is consistent with a single batch.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 993, in test_maxpool_indices_no_batch_dim
+    (_, indices_no_batch) = module(input)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/pooling.py", line 92, in forward
+    return F.max_pool1d(input, self.kernel_size, self.stride,
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_jit_internal.py", line 483, in fn
+    return if_true(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 671, in max_pool1d_with_indices
+    return torch.max_pool1d_with_indices(input, kernel_size, stride, padding, dilation, ceil_mode)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_pool_large_size_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 1111, in test_pool_large_size
+    res = fn(x, 1, stride=1, padding=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_jit_internal.py", line 485, in fn
+    return if_false(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 696, in _max_pool1d
+    return torch.max_pool1d(input, kernel_size, stride, padding, dilation, ceil_mode)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+ERROR: test_pooling_max_nhwc_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 830, in test_pooling_max_nhwc
+    helper(4, 8, 10, 10, (2, 2), (1, 1), (1, 1), (2, 2), contig, device)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 818, in helper
+    (out, ind) = pool(input)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/pooling.py", line 166, in forward
+    return F.max_pool2d(input, self.kernel_size, self.stride,
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_jit_internal.py", line 483, in fn
+    return if_true(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 757, in max_pool2d_with_indices
+    return torch._C._nn.max_pool2d_with_indices(input, kernel_size, stride, padding, dilation, ceil_mode)
+RuntimeError: could not create a descriptor for a pooling forward propagation primitive
+
+======================================================================
+ERROR: test_pooling_max_nhwc_xpu_xpu_float64 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 830, in test_pooling_max_nhwc
+    helper(4, 8, 10, 10, (2, 2), (1, 1), (1, 1), (2, 2), contig, device)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 818, in helper
+    (out, ind) = pool(input)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/modules/pooling.py", line 166, in forward
+    return F.max_pool2d(input, self.kernel_size, self.stride,
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/_jit_internal.py", line 483, in fn
+    return if_true(*args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nn/functional.py", line 757, in max_pool2d_with_indices
+    return torch._C._nn.max_pool2d_with_indices(input, kernel_size, stride, padding, dilation, ceil_mode)
+RuntimeError: Double is not supported in oneDNN!
+
+======================================================================
+FAIL: test_AdaptiveMaxPool1d_indices_xpu_xpu_bfloat16 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 969, in test_AdaptiveMaxPool1d_indices
+    self._test_maxpool_indices(1, adaptive=True, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 919, in _test_maxpool_indices
+    self.assertEqual(indices.data.squeeze(), expected_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 4 / 8 (50.0%)
+Greatest absolute difference: 2 at index (0, 0, 1) (up to 0.001 allowed)
+Greatest relative difference: 0.6666666865348816 at index (0, 0, 1) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_AdaptiveMaxPool1d_indices_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 969, in test_AdaptiveMaxPool1d_indices
+    self._test_maxpool_indices(1, adaptive=True, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 919, in _test_maxpool_indices
+    self.assertEqual(indices.data.squeeze(), expected_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 8 / 8 (100.0%)
+Greatest absolute difference: 3 at index (0, 0, 1) (up to 0.001 allowed)
+Greatest relative difference: 1.0 at index (0, 0, 0) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_AdaptiveMaxPool1d_indices_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 969, in test_AdaptiveMaxPool1d_indices
+    self._test_maxpool_indices(1, adaptive=True, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 919, in _test_maxpool_indices
+    self.assertEqual(indices.data.squeeze(), expected_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 4 / 8 (50.0%)
+Greatest absolute difference: 2 at index (0, 0, 1) (up to 0.001 allowed)
+Greatest relative difference: 0.6666666865348816 at index (0, 0, 1) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_AdaptiveMaxPool2d_indices_xpu_xpu_bfloat16 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 976, in test_AdaptiveMaxPool2d_indices
+    self._test_maxpool_indices(2, adaptive=True, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 919, in _test_maxpool_indices
+    self.assertEqual(indices.data.squeeze(), expected_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 16 / 16 (100.0%)
+Greatest absolute difference: 12 at index (0, 0, 1, 1) (up to 0.001 allowed)
+Greatest relative difference: 0.800000011920929 at index (0, 0, 1, 1) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_AdaptiveMaxPool2d_indices_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 976, in test_AdaptiveMaxPool2d_indices
+    self._test_maxpool_indices(2, adaptive=True, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 919, in _test_maxpool_indices
+    self.assertEqual(indices.data.squeeze(), expected_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 16 / 16 (100.0%)
+Greatest absolute difference: 15 at index (0, 0, 1, 1) (up to 0.001 allowed)
+Greatest relative difference: 1.0 at index (0, 0, 0, 0) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_AdaptiveMaxPool2d_indices_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 976, in test_AdaptiveMaxPool2d_indices
+    self._test_maxpool_indices(2, adaptive=True, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 919, in _test_maxpool_indices
+    self.assertEqual(indices.data.squeeze(), expected_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 16 / 16 (100.0%)
+Greatest absolute difference: 12 at index (0, 0, 1, 1) (up to 0.001 allowed)
+Greatest relative difference: 0.800000011920929 at index (0, 0, 1, 1) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_MaxPool1d_indices_xpu_xpu_bfloat16 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 949, in test_MaxPool1d_indices
+    self._test_maxpool_indices(1, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 919, in _test_maxpool_indices
+    self.assertEqual(indices.data.squeeze(), expected_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 4 / 8 (50.0%)
+Greatest absolute difference: 2 at index (0, 0, 1) (up to 0.001 allowed)
+Greatest relative difference: 0.6666666865348816 at index (0, 0, 1) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_MaxPool1d_indices_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 949, in test_MaxPool1d_indices
+    self._test_maxpool_indices(1, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 919, in _test_maxpool_indices
+    self.assertEqual(indices.data.squeeze(), expected_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 8 / 8 (100.0%)
+Greatest absolute difference: 3 at index (0, 0, 1) (up to 0.001 allowed)
+Greatest relative difference: 1.0 at index (0, 0, 0) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_MaxPool1d_indices_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 949, in test_MaxPool1d_indices
+    self._test_maxpool_indices(1, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 919, in _test_maxpool_indices
+    self.assertEqual(indices.data.squeeze(), expected_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 4 / 8 (50.0%)
+Greatest absolute difference: 2 at index (0, 0, 1) (up to 0.001 allowed)
+Greatest relative difference: 0.6666666865348816 at index (0, 0, 1) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_MaxPool2d_indices_xpu_xpu_bfloat16 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 955, in test_MaxPool2d_indices
+    self._test_maxpool_indices(2, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 919, in _test_maxpool_indices
+    self.assertEqual(indices.data.squeeze(), expected_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 16 / 16 (100.0%)
+Greatest absolute difference: 12 at index (0, 0, 1, 1) (up to 0.001 allowed)
+Greatest relative difference: 0.800000011920929 at index (0, 0, 1, 1) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_MaxPool2d_indices_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 955, in test_MaxPool2d_indices
+    self._test_maxpool_indices(2, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 919, in _test_maxpool_indices
+    self.assertEqual(indices.data.squeeze(), expected_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 16 / 16 (100.0%)
+Greatest absolute difference: 15 at index (0, 0, 1, 1) (up to 0.001 allowed)
+Greatest relative difference: 1.0 at index (0, 0, 0, 0) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_MaxPool2d_indices_xpu_xpu_float32 (__main__.TestPoolingNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 955, in test_MaxPool2d_indices
+    self._test_maxpool_indices(2, device=device, dtype=dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 919, in _test_maxpool_indices
+    self.assertEqual(indices.data.squeeze(), expected_indices)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 16 / 16 (100.0%)
+Greatest absolute difference: 12 at index (0, 0, 1, 1) (up to 0.001 allowed)
+Greatest relative difference: 0.800000011920929 at index (0, 0, 1, 1) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_maxpool_indices_no_batch_dim_xpu_xpu_float16 (__main__.TestPoolingNNDeviceTypeXPU)
+Check that indices with no batch dim is consistent with a single batch.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1061, in wrapper
+    fn(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_pooling.py", line 995, in test_maxpool_indices_no_batch_dim
+    self.assertEqual(indices_no_batch, indicies_single_batch.squeeze(0))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: The values for attribute 'shape' do not match: torch.Size([1, 3, 1]) != torch.Size([3, 1]).
+
+----------------------------------------------------------------------
+Ran 103 tests in 23.154s
+
+FAILED (failures=13, errors=14, skipped=58)
+Raised CalledProcessError: return code 1.

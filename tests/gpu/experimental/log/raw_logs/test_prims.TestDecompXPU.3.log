@@ -1,0 +1,13 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_decomposition_method_vararg_ones_xpu_float32 (__main__.TestDecompXPU) ... ok
+test_decomposition_method_vararg_permute_xpu_float32 (__main__.TestDecompXPU) ... ok
+test_decomposition_type_promotion_nvprim_amp_xpu_xpu_float16 (__main__.TestDecompXPU) ... skipped 'Only runs on cuda'
+test_decomposition_type_promotion_nvprim_amp_xpu_xpu_float32 (__main__.TestDecompXPU) ... skipped 'Only runs on cuda'
+test_masked_fill_decomposition_under_nvprim_context_xpu_xpu_float16 (__main__.TestDecompXPU) ... skipped 'Only runs on cuda'
+test_masked_fill_decomposition_under_nvprim_context_xpu_xpu_float32 (__main__.TestDecompXPU) ... skipped 'Only runs on cuda'
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.710s
+
+OK (skipped=4)

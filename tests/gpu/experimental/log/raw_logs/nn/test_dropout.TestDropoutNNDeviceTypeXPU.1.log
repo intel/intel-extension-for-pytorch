@@ -1,0 +1,79 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_Dropout1d_xpu_xpu (__main__.TestDropoutNNDeviceTypeXPU) ... FAIL
+test_Dropout2d_xpu_xpu (__main__.TestDropoutNNDeviceTypeXPU) ... ERROR
+test_Dropout3d_xpu_xpu (__main__.TestDropoutNNDeviceTypeXPU) ... FAIL
+test_Dropout_xpu_xpu (__main__.TestDropoutNNDeviceTypeXPU) ... ok
+test_empty_dropout_xpu_xpu (__main__.TestDropoutNNDeviceTypeXPU) ... ok
+
+======================================================================
+ERROR: test_Dropout2d_xpu_xpu (__main__.TestDropoutNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 958, in efail_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_dropout.py", line 192, in test_Dropout2d
+    self._test_dropoutNd_channel_zero(nn.Dropout2d(p=0.5), input)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_dropout.py", line 155, in _test_dropoutNd_channel_zero
+    self.assertTrue(result[b, c].count_nonzero() in (0, channel_numel))
+RuntimeError: Expected all tensors to be on the same device, but found at least two devices, xpu:0 and cpu!
+
+======================================================================
+FAIL: test_Dropout1d_xpu_xpu (__main__.TestDropoutNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 958, in efail_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_dropout.py", line 168, in test_Dropout1d
+    self._test_dropoutNd_no_batch(nn.Dropout1d(p=0.5), input)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_dropout.py", line 146, in _test_dropoutNd_no_batch
+    self.assertEqual(res_no_batch, res_batched)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 46 / 100 (46.0%)
+Greatest absolute difference: 1.965186649180965 at index (16, 1) (up to 0.001 allowed)
+Greatest relative difference: inf at index (3, 0) (up to 1e-07 allowed)
+
+======================================================================
+FAIL: test_Dropout3d_xpu_xpu (__main__.TestDropoutNNDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 958, in efail_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_dropout.py", line 211, in test_Dropout3d
+    self._test_dropoutNd_no_batch(nn.Dropout3d(p=0.5), input)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/nn/test_dropout.py", line 146, in _test_dropoutNd_no_batch
+    self.assertEqual(res_no_batch, res_batched)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 191 / 400 (47.8%)
+Greatest absolute difference: 1.9919006824493408 at index (1, 1, 0, 1) (up to 0.001 allowed)
+Greatest relative difference: inf at index (1, 0, 0, 0) (up to 1.3e-06 allowed)
+
+----------------------------------------------------------------------
+Ran 5 tests in 2.793s
+
+FAILED (failures=2, errors=1)
+Raised CalledProcessError: return code 1.

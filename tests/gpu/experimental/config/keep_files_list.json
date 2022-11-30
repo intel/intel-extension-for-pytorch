@@ -1,0 +1,8 @@
+[
+  "run_tests.py",
+  "common/*.py",
+  "config/*.json",
+  "env/vars.sh",
+  "tool/*.py",
+  "tool/*.sh"
+]

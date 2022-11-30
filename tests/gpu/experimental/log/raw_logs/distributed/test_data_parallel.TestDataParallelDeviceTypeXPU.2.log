@@ -1,0 +1,22 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_data_parallel_module_kwargs_only_empty_dict_xpu_xpu_float16 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_kwargs_only_empty_dict_xpu_xpu_float32 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_kwargs_only_empty_dict_xpu_xpu_float64 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_kwargs_only_empty_list_xpu_xpu_float16 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_kwargs_only_empty_list_xpu_xpu_float32 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_kwargs_only_empty_list_xpu_xpu_float64 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_kwargs_only_empty_tuple_xpu_xpu_float16 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_kwargs_only_empty_tuple_xpu_xpu_float32 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_kwargs_only_empty_tuple_xpu_xpu_float64 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_kwargs_only_xpu_xpu_float16 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_kwargs_only_xpu_xpu_float32 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_kwargs_only_xpu_xpu_float64 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_xpu_xpu_float16 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_xpu_xpu_float32 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+test_data_parallel_module_xpu_xpu_float64 (__main__.TestDataParallelDeviceTypeXPU) ... skipped 'Only runs on cuda'
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.010s
+
+OK (skipped=15)

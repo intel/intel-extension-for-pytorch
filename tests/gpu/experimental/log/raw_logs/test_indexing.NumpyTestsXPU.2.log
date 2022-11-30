@@ -1,0 +1,31 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_boolean_assignment_value_mismatch_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_boolean_indexing_alldims_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_boolean_indexing_onedim_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_boolean_indexing_twodim_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_boolean_indexing_weirdness_tensors_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_boolean_indexing_weirdness_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_boolean_list_indexing_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_boolean_shape_mismatch_xpu_xpu (__main__.NumpyTestsXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_indexing.py:954: UserWarning: indexing with dtype torch.uint8 is now deprecated, please use a dtype torch.bool instead. (Triggered internally at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/operators/IndexingUtils.h:39.)
+  self.assertRaisesRegex(IndexError, 'mask', lambda : arr[index])
+/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_indexing.py:955: UserWarning: indexing with dtype torch.uint8 is now deprecated, please use a dtype torch.bool instead. (Triggered internally at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/operators/IndexingUtils.h:39.)
+  self.assertRaisesRegex(IndexError, 'mask', lambda : arr[slice(None), index])
+ok
+test_broadcast_subspace_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_broaderrors_indexing_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_ellipsis_index_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_empty_fancy_index_xpu_xpu (__main__.NumpyTestsXPU) ... skipped 'not ready on XPU'
+test_empty_tuple_index_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_everything_returns_views_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_index_is_larger_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_index_no_floats_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_none_index_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_single_bool_index_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_single_int_index_xpu_xpu (__main__.NumpyTestsXPU) ... ok
+test_trivial_fancy_out_of_bounds_xpu_xpu (__main__.NumpyTestsXPU) ... skipped 'XPU asserts instead of raising an exception'
+
+----------------------------------------------------------------------
+Ran 20 tests in 1.165s
+
+OK (skipped=2)

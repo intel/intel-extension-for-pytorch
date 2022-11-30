@@ -1,0 +1,46 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_advancedindex_mixed_cpu_devices_xpu_xpu (__main__.TestDevicePrecisionXPU) ... ok
+test_advancedindex_mixed_devices_error_xpu_xpu (__main__.TestDevicePrecisionXPU) ... FAIL
+test_clamp_xpu_xpu_float32 (__main__.TestDevicePrecisionXPU) ... ok
+test_clamp_xpu_xpu_float64 (__main__.TestDevicePrecisionXPU) ... ok
+test_clamp_xpu_xpu_int64 (__main__.TestDevicePrecisionXPU) ... ok
+test_copy_broadcast_xpu_xpu (__main__.TestDevicePrecisionXPU) ... ok
+test_copy_noncontig_xpu_xpu (__main__.TestDevicePrecisionXPU) ... ok
+test_device_serialization_xpu_xpu (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_xpu_float16 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_xpu_float32 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_xpu_float64 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_xpu_int16 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_xpu_int32 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_xpu_int64 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_xpu_int8 (__main__.TestDevicePrecisionXPU) ... ok
+test_from_sequence_xpu_xpu_uint8 (__main__.TestDevicePrecisionXPU) ... ok
+test_index_add_bfloat16_xpu_xpu (__main__.TestDevicePrecisionXPU) ... skipped 'Only runs on cuda'
+test_multidevice_serialization_xpu_xpu (__main__.TestDevicePrecisionXPU) ... ok
+test_type_conversions_same_device_xpu_xpu (__main__.TestDevicePrecisionXPU) ... ok
+test_xpu_device_idx_xpu_xpu (__main__.TestDevicePrecisionXPU) ... skipped "not implemented: Could not run 'aten::_efficientzerotensor' with arguments from the 'XPU' backend. This could be because the operator doesn't exist for this backend, or was omitted during the selective/custom build process (if using custom build). If you are a Facebook employee using PyTorch on mobile, please visit https://fburl.com/ptmfixes for possible resolutions. 'aten::_efficientzerotensor' is only available for these backends: [CPU, BackendSelect, Python, FuncTorchDynamicLayerBackMode, Functionalize, Named, Conjugate, Negative, ZeroTensor, ADInplaceOrView, AutogradOther, AutogradCPU, AutogradCUDA, AutogradHIP, AutogradXLA, AutogradMPS, AutogradIPU, AutogradXPU, AutogradHPU, AutogradVE, AutogradLazy, AutogradMeta, AutogradPrivateUse1, AutogradPrivateUse2, AutogradPrivateUse3, AutogradNestedTensor, Tracer, AutocastCPU, AutocastXPU, AutocastCUDA, FuncTorchBatched, FuncTorchVmapMode, Batched, VmapMode, FuncTorchGradWrapper, PythonTLSSnapshot, FuncTorchDynamicLayerFrontMode, PythonDispatcher].\n\nCPU: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterCPU.cpp:30798 [kernel]\nBackendSelect: registered at /home/gta/xunsongh/pytorch/build/aten/src/ATen/RegisterBackendSelect.cpp:726 [kernel]\nPython: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:140 [backend fallback]\nFuncTorchDynamicLayerBackMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:488 [backend fallback]\nFunctionalize: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/FunctionalizeFallbackKernel.cpp:291 [backend fallback]\nNamed: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/NamedRegistrations.cpp:7 [backend fallback]\nConjugate: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ConjugateFallback.cpp:18 [backend fallback]\nNegative: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/native/NegateFallback.cpp:18 [backend fallback]\nZeroTensor: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/ZeroTensorFallback.cpp:86 [backend fallback]\nADInplaceOrView: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/VariableFallbackKernel.cpp:64 [backend fallback]\nAutogradOther: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradCPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradCUDA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradHIP: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradXLA: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradMPS: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradIPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradXPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradHPU: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradVE: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradLazy: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradMeta: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradPrivateUse1: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradPrivateUse2: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradPrivateUse3: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nAutogradNestedTensor: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/VariableType_4.cpp:14624 [autograd kernel]\nTracer: registered at /home/gta/xunsongh/pytorch/torch/csrc/autograd/generated/TraceType_4.cpp:12871 [kernel]\nAutocastCPU: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:482 [backend fallback]\nAutocastXPU: fallthrough registered at /home/gta/xunsongh/ipex-gpu/csrc/gpu/aten/amp/autocast_mode.cpp:233 [backend fallback]\nAutocastCUDA: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/autocast_mode.cpp:324 [backend fallback]\nFuncTorchBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/LegacyBatchingRegistrations.cpp:743 [backend fallback]\nFuncTorchVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/VmapModeRegistrations.cpp:28 [backend fallback]\nBatched: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/BatchingRegistrations.cpp:1064 [backend fallback]\nVmapMode: fallthrough registered at /home/gta/xunsongh/pytorch/aten/src/ATen/VmapModeRegistrations.cpp:33 [backend fallback]\nFuncTorchGradWrapper: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/TensorWrapper.cpp:189 [backend fallback]\nPythonTLSSnapshot: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:148 [backend fallback]\nFuncTorchDynamicLayerFrontMode: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/functorch/DynamicLayer.cpp:484 [backend fallback]\nPythonDispatcher: registered at /home/gta/xunsongh/pytorch/aten/src/ATen/core/PythonFallbackKernel.cpp:144 [backend fallback]\n"
+
+======================================================================
+FAIL: test_advancedindex_mixed_devices_error_xpu_xpu (__main__.TestDevicePrecisionXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 999, in multi_fn
+    return fn(slf, devices, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_torch.py", line 3919, in test_advancedindex_mixed_devices_error
+    test(x, ia, ib)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_torch.py", line 3901, in test
+    value = x[:, ia, None, ib, 0]
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 1889, in __exit__
+    return super().__exit__(exc_type, exc_value, tb)
+AssertionError: RuntimeError not raised
+
+----------------------------------------------------------------------
+Ran 20 tests in 2.278s
+
+FAILED (failures=1, skipped=2)
+Raised CalledProcessError: return code 1.

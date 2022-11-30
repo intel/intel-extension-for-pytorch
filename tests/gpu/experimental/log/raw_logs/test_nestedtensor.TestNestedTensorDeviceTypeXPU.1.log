@@ -1,0 +1,1533 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_bmm_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py:47: UserWarning: The PyTorch API of nested tensors is in prototype stage and will change in the near future. (Triggered internally at /home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp:175.)
+  nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+ERROR
+test_bmm_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_bmm_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_bmm_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_clone_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_clone_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_detach_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_detach_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_detach_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_device_checks_xpu_xpu (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_dropout_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_dropout_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_dropout_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_dropout_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_embedding_xpu_xpu (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_layer_norm_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_layer_norm_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_linear_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_linear_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_linear_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_linear_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_matmul_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_matmul_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_matmul_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_matmul_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_add_in_place_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_add_in_place_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_add_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_add_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_indexing_noncontiguous_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_indexing_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_indexing_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_indexing_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_indexing_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_indexing_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_mul_in_place_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_mul_in_place_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_mul_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_mul_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_nested_tensor_sum_dim_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... skipped 'Only runs on cpu'
+test_reshape_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_reshape_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_reshape_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_scaled_dot_product_attention_input_dim_3_xpu (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_scaled_dot_product_attention_input_dim_4_xpu (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_softmax_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_softmax_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_softmax_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_softmax_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_dim2_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_dim2_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_dim2_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_dim3_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_dim3_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_dim3_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_dim4_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_dim4_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_dim4_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_noncontiguous_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_output_size_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_output_size_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_simple_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_padded_tensor_simple_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_to_then_from_padded_tensor_no_transform0213_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_transpose_inference_mode_interaction_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_transpose_inference_mode_interaction_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_transpose_inference_mode_interaction_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_transpose_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_transpose_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_transpose_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_unbind_noncontiguous_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_unbind_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_unbind_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_view_inference_mode_interaction_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_view_inference_mode_interaction_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_view_inference_mode_interaction_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_view_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_view_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+test_view_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU) ... ERROR
+
+======================================================================
+ERROR: test_bmm_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 668, in test_bmm_noncontiguous
+    (nt0_contiguous, nt0_noncontiguous) = random_nt_noncontiguous_pair((2, 3), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_bmm_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 668, in test_bmm_noncontiguous
+    (nt0_contiguous, nt0_noncontiguous) = random_nt_noncontiguous_pair((2, 3), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_bmm_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 639, in test_bmm
+    nt = torch.nested.nested_tensor([torch.randn(2), torch.randn(3)], device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_bmm_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 639, in test_bmm
+    nt = torch.nested.nested_tensor([torch.randn(2), torch.randn(3)], device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_clone_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 540, in test_clone
+    nt1 = self.random_nt(device, dtype, 4, (4, 4), (1, 1))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_clone_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 540, in test_clone
+    nt1 = self.random_nt(device, dtype, 4, (4, 4), (1, 1))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_detach_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 243, in test_detach
+    x = torch.nested.nested_tensor([a, b], requires_grad=True)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_detach_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 243, in test_detach
+    x = torch.nested.nested_tensor([a, b], requires_grad=True)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_detach_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 243, in test_detach
+    x = torch.nested.nested_tensor([a, b], requires_grad=True)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_device_checks_xpu_xpu (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 401, in test_device_checks
+    nt = torch.nested.nested_tensor([], device=device)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_dropout_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 599, in test_dropout_noncontiguous
+    nt0 = self.random_nt(device, dtype, ntensors, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_dropout_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 599, in test_dropout_noncontiguous
+    nt0 = self.random_nt(device, dtype, ntensors, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_dropout_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 559, in test_dropout
+    nt = self.random_nt(device, dtype, ntensors, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_dropout_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 559, in test_dropout
+    nt = self.random_nt(device, dtype, ntensors, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_embedding_xpu_xpu (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 307, in test_embedding
+    x = torch.nested.nested_tensor(inputs, device=device, dtype=torch.int64)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_layer_norm_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 301, in test_layer_norm
+    _test(size)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 294, in _test
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_layer_norm_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 301, in test_layer_norm
+    _test(size)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 294, in _test
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_linear_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 755, in test_linear_noncontiguous
+    (nt_contiguous, nt_noncontiguous) = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_linear_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 755, in test_linear_noncontiguous
+    (nt_contiguous, nt_noncontiguous) = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_linear_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 728, in test_linear
+    nt = torch.nested.nested_tensor([a, b, c])
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_linear_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 728, in test_linear
+    nt = torch.nested.nested_tensor([a, b, c])
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_matmul_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 719, in test_matmul_noncontiguous
+    (nt0_contiguous, nt0_noncontiguous) = random_nt_noncontiguous_pair((2, 3), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_matmul_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 719, in test_matmul_noncontiguous
+    (nt0_contiguous, nt0_noncontiguous) = random_nt_noncontiguous_pair((2, 3), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_matmul_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 674, in test_matmul
+    nt = torch.nested.nested_tensor([torch.randn(2), torch.randn(3)], device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_matmul_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 674, in test_matmul
+    nt = torch.nested.nested_tensor([torch.randn(2), torch.randn(3)], device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_add_in_place_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 476, in test_nested_tensor_add_in_place
+    (nt1, nt2) = self.random_nt_pair(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 237, in random_nt_pair
+    return (torch.nested.nested_tensor(ts1, device=device, dtype=dtype), torch.nested.nested_tensor(ts2, device=device, dtype=dtype))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_add_in_place_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 476, in test_nested_tensor_add_in_place
+    (nt1, nt2) = self.random_nt_pair(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 237, in random_nt_pair
+    return (torch.nested.nested_tensor(ts1, device=device, dtype=dtype), torch.nested.nested_tensor(ts2, device=device, dtype=dtype))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_add_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 444, in test_nested_tensor_add
+    (nt1, nt2) = self.random_nt_pair(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 237, in random_nt_pair
+    return (torch.nested.nested_tensor(ts1, device=device, dtype=dtype), torch.nested.nested_tensor(ts2, device=device, dtype=dtype))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_add_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 444, in test_nested_tensor_add
+    (nt1, nt2) = self.random_nt_pair(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 237, in random_nt_pair
+    return (torch.nested.nested_tensor(ts1, device=device, dtype=dtype), torch.nested.nested_tensor(ts2, device=device, dtype=dtype))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_indexing_noncontiguous_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 434, in test_nested_tensor_indexing_noncontiguous
+    (nt_contiguous, nt_noncontiguous) = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_indexing_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 434, in test_nested_tensor_indexing_noncontiguous
+    (nt_contiguous, nt_noncontiguous) = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_indexing_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 434, in test_nested_tensor_indexing_noncontiguous
+    (nt_contiguous, nt_noncontiguous) = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_indexing_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 411, in test_nested_tensor_indexing
+    nt = torch.nested.nested_tensor([x0, x1])
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_indexing_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 411, in test_nested_tensor_indexing
+    nt = torch.nested.nested_tensor([x0, x1])
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_indexing_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 411, in test_nested_tensor_indexing
+    nt = torch.nested.nested_tensor([x0, x1])
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_mul_in_place_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 485, in test_nested_tensor_mul_in_place
+    (nt1, nt2) = self.random_nt_pair(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 237, in random_nt_pair
+    return (torch.nested.nested_tensor(ts1, device=device, dtype=dtype), torch.nested.nested_tensor(ts2, device=device, dtype=dtype))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_mul_in_place_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 485, in test_nested_tensor_mul_in_place
+    (nt1, nt2) = self.random_nt_pair(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 237, in random_nt_pair
+    return (torch.nested.nested_tensor(ts1, device=device, dtype=dtype), torch.nested.nested_tensor(ts2, device=device, dtype=dtype))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_mul_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 453, in test_nested_tensor_mul
+    (nt1, nt2) = self.random_nt_pair(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 237, in random_nt_pair
+    return (torch.nested.nested_tensor(ts1, device=device, dtype=dtype), torch.nested.nested_tensor(ts2, device=device, dtype=dtype))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_nested_tensor_mul_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 453, in test_nested_tensor_mul
+    (nt1, nt2) = self.random_nt_pair(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 237, in random_nt_pair
+    return (torch.nested.nested_tensor(ts1, device=device, dtype=dtype), torch.nested.nested_tensor(ts2, device=device, dtype=dtype))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_reshape_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 826, in test_reshape
+    nt = self.random_nt(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_reshape_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 826, in test_reshape
+    nt = self.random_nt(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_reshape_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 826, in test_reshape
+    nt = self.random_nt(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_scaled_dot_product_attention_input_dim_3_xpu (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 849, in test_scaled_dot_product_attention
+    query = torch.nested.nested_tensor([rand_tensor(2, E), rand_tensor(3, E), rand_tensor(4, E)])
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_scaled_dot_product_attention_input_dim_4_xpu (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 853, in test_scaled_dot_product_attention
+    query = torch.nested.nested_tensor([rand_tensor(2, 2, E), rand_tensor(3, 3, E), rand_tensor(4, 4, E)])
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_softmax_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 634, in test_softmax_noncontiguous
+    (nt_contiguous, nt_noncontiguous) = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_softmax_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 634, in test_softmax_noncontiguous
+    (nt_contiguous, nt_noncontiguous) = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_softmax_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 612, in test_softmax
+    nt = self.random_nt(device, dtype, ntensors, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_softmax_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 612, in test_softmax
+    nt = self.random_nt(device, dtype, ntensors, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_dim2_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 353, in test_to_padded_tensor_dim2
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_dim2_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 353, in test_to_padded_tensor_dim2
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_dim2_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 353, in test_to_padded_tensor_dim2
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_dim3_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 367, in test_to_padded_tensor_dim3
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_dim3_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 367, in test_to_padded_tensor_dim3
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_dim3_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 367, in test_to_padded_tensor_dim3
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_dim4_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 381, in test_to_padded_tensor_dim4
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_dim4_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 381, in test_to_padded_tensor_dim4
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_dim4_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 381, in test_to_padded_tensor_dim4
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_noncontiguous_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 395, in test_to_padded_tensor_noncontiguous
+    (nt_contiguous, nt_noncontiguous) = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 395, in test_to_padded_tensor_noncontiguous
+    (nt_contiguous, nt_noncontiguous) = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/autograd/grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 395, in test_to_padded_tensor_noncontiguous
+    (nt_contiguous, nt_noncontiguous) = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_output_size_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 337, in test_to_padded_tensor_output_size
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_output_size_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 337, in test_to_padded_tensor_output_size
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_simple_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 319, in test_to_padded_tensor_simple
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_padded_tensor_simple_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 319, in test_to_padded_tensor_simple
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_to_then_from_padded_tensor_no_transform0213_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 276, in test_to_then_from_padded_tensor_no_transform0213
+    nt = torch.nested.nested_tensor(ts, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_transpose_inference_mode_interaction_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 774, in test_transpose_inference_mode_interaction
+    nt = self.random_nt(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_transpose_inference_mode_interaction_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 774, in test_transpose_inference_mode_interaction
+    nt = self.random_nt(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_transpose_inference_mode_interaction_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 774, in test_transpose_inference_mode_interaction
+    nt = self.random_nt(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_transpose_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 761, in test_transpose
+    nt = self.random_nt(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_transpose_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 761, in test_transpose
+    nt = self.random_nt(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_transpose_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 761, in test_transpose
+    nt = self.random_nt(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_unbind_noncontiguous_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 262, in test_unbind_noncontiguous
+    (nt_contiguous, nt_noncontiguous) = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_unbind_noncontiguous_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 262, in test_unbind_noncontiguous
+    (nt_contiguous, nt_noncontiguous) = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_unbind_noncontiguous_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 262, in test_unbind_noncontiguous
+    (nt_contiguous, nt_noncontiguous) = random_nt_noncontiguous_pair((2, 3, 6, 7), device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 19, in random_nt_noncontiguous_pair
+    nt_contiguous = torch.nested.nested_tensor(ys)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_view_inference_mode_interaction_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 809, in test_view_inference_mode_interaction
+    nt = torch.nested.nested_tensor([torch.randn((2, 20)), torch.randn((3, 20))], device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_view_inference_mode_interaction_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 809, in test_view_inference_mode_interaction
+    nt = torch.nested.nested_tensor([torch.randn((2, 20)), torch.randn((3, 20))], device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_view_inference_mode_interaction_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 809, in test_view_inference_mode_interaction
+    nt = torch.nested.nested_tensor([torch.randn((2, 20)), torch.randn((3, 20))], device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_view_xpu_xpu_float16 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 791, in test_view
+    nt = self.random_nt(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_view_xpu_xpu_float32 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 791, in test_view
+    nt = self.random_nt(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+======================================================================
+ERROR: test_view_xpu_xpu_float64 (__main__.TestNestedTensorDeviceTypeXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 791, in test_view
+    nt = self.random_nt(device, dtype, 4, (4, 4))
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_nestedtensor.py", line 226, in random_nt
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/nested/__init__.py", line 47, in nested_tensor
+    nt = torch._nested_tensor_from_tensor_list(new_data, dtype, None, device, pin_memory)
+RuntimeError: storage_device.is_cpu() || storage_device.is_cuda() INTERNAL ASSERT FAILED at "/home/gta/xunsongh/pytorch/aten/src/ATen/NestedTensorImpl.cpp":179, please report a bug to PyTorch. NestedTensorImpl storage must be either CUDA or CPU but got xpu:0
+
+----------------------------------------------------------------------
+Ran 81 tests in 0.676s
+
+FAILED (errors=80, skipped=1)
+Raised CalledProcessError: return code 1.

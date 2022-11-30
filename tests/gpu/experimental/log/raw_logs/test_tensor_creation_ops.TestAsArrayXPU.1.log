@@ -1,0 +1,533 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_alias_from_buffer_xpu_xpu_bool (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_buffer_xpu_xpu_complex128 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_alias_from_buffer_xpu_xpu_complex64 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_alias_from_buffer_xpu_xpu_float16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_buffer_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_buffer_xpu_xpu_float64 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_buffer_xpu_xpu_int16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_buffer_xpu_xpu_int32 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_buffer_xpu_xpu_int64 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_buffer_xpu_xpu_int8 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_buffer_xpu_xpu_uint8 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_dlpack_xpu_xpu_bfloat16 (__main__.TestAsArrayXPU) ... ERROR
+test_alias_from_dlpack_xpu_xpu_complex128 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_alias_from_dlpack_xpu_xpu_complex64 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_alias_from_dlpack_xpu_xpu_float16 (__main__.TestAsArrayXPU) ... ERROR
+test_alias_from_dlpack_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... ERROR
+test_alias_from_dlpack_xpu_xpu_float64 (__main__.TestAsArrayXPU) ... ERROR
+test_alias_from_dlpack_xpu_xpu_int16 (__main__.TestAsArrayXPU) ... ERROR
+test_alias_from_dlpack_xpu_xpu_int32 (__main__.TestAsArrayXPU) ... ERROR
+test_alias_from_dlpack_xpu_xpu_int64 (__main__.TestAsArrayXPU) ... ERROR
+test_alias_from_dlpack_xpu_xpu_int8 (__main__.TestAsArrayXPU) ... ERROR
+test_alias_from_dlpack_xpu_xpu_uint8 (__main__.TestAsArrayXPU) ... ERROR
+test_alias_from_numpy_xpu_xpu_bool (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_numpy_xpu_xpu_complex128 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_alias_from_numpy_xpu_xpu_complex64 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_alias_from_numpy_xpu_xpu_float16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_numpy_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_numpy_xpu_xpu_float64 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_numpy_xpu_xpu_int16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_numpy_xpu_xpu_int32 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_numpy_xpu_xpu_int64 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_numpy_xpu_xpu_int8 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_numpy_xpu_xpu_uint8 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_alias_from_tensor_xpu_xpu_bfloat16 (__main__.TestAsArrayXPU) ... ok
+test_alias_from_tensor_xpu_xpu_bool (__main__.TestAsArrayXPU) ... ok
+test_alias_from_tensor_xpu_xpu_complex128 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_alias_from_tensor_xpu_xpu_complex64 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_alias_from_tensor_xpu_xpu_float16 (__main__.TestAsArrayXPU) ... ok
+test_alias_from_tensor_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... ok
+test_alias_from_tensor_xpu_xpu_float64 (__main__.TestAsArrayXPU) ... ok
+test_alias_from_tensor_xpu_xpu_int16 (__main__.TestAsArrayXPU) ... ok
+test_alias_from_tensor_xpu_xpu_int32 (__main__.TestAsArrayXPU) ... ok
+test_alias_from_tensor_xpu_xpu_int64 (__main__.TestAsArrayXPU) ... ok
+test_alias_from_tensor_xpu_xpu_int8 (__main__.TestAsArrayXPU) ... ok
+test_alias_from_tensor_xpu_xpu_uint8 (__main__.TestAsArrayXPU) ... ok
+test_astensor_consistency_xpu_xpu (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_buffer_xpu_xpu_bool (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_buffer_xpu_xpu_complex128 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_from_buffer_xpu_xpu_complex64 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_from_buffer_xpu_xpu_float16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_buffer_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_buffer_xpu_xpu_float64 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_buffer_xpu_xpu_int16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_buffer_xpu_xpu_int32 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_buffer_xpu_xpu_int64 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_buffer_xpu_xpu_int8 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_buffer_xpu_xpu_uint8 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_dlpack_mult_devices_xpu_xpu_bfloat16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_dlpack_mult_devices_xpu_xpu_complex128 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_from_dlpack_mult_devices_xpu_xpu_complex64 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_from_dlpack_mult_devices_xpu_xpu_float16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_dlpack_mult_devices_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_dlpack_mult_devices_xpu_xpu_float64 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_dlpack_mult_devices_xpu_xpu_int16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_dlpack_mult_devices_xpu_xpu_int32 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_dlpack_mult_devices_xpu_xpu_int64 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_dlpack_mult_devices_xpu_xpu_int8 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_dlpack_mult_devices_xpu_xpu_uint8 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_dlpack_xpu_xpu_bfloat16 (__main__.TestAsArrayXPU) ... ERROR
+test_copy_from_dlpack_xpu_xpu_complex128 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_from_dlpack_xpu_xpu_complex64 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_from_dlpack_xpu_xpu_float16 (__main__.TestAsArrayXPU) ... ERROR
+test_copy_from_dlpack_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... ERROR
+test_copy_from_dlpack_xpu_xpu_float64 (__main__.TestAsArrayXPU) ... ERROR
+test_copy_from_dlpack_xpu_xpu_int16 (__main__.TestAsArrayXPU) ... ERROR
+test_copy_from_dlpack_xpu_xpu_int32 (__main__.TestAsArrayXPU) ... ERROR
+test_copy_from_dlpack_xpu_xpu_int64 (__main__.TestAsArrayXPU) ... ERROR
+test_copy_from_dlpack_xpu_xpu_int8 (__main__.TestAsArrayXPU) ... ERROR
+test_copy_from_dlpack_xpu_xpu_uint8 (__main__.TestAsArrayXPU) ... ERROR
+test_copy_from_numpy_xpu_xpu_bool (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_numpy_xpu_xpu_complex128 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_from_numpy_xpu_xpu_complex64 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_from_numpy_xpu_xpu_float16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_numpy_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_numpy_xpu_xpu_float64 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_numpy_xpu_xpu_int16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_numpy_xpu_xpu_int32 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_numpy_xpu_xpu_int64 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_numpy_xpu_xpu_int8 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_numpy_xpu_xpu_uint8 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cpu'
+test_copy_from_tensor_mult_devices_xpu_xpu_bfloat16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_tensor_mult_devices_xpu_xpu_complex128 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_from_tensor_mult_devices_xpu_xpu_complex64 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_from_tensor_mult_devices_xpu_xpu_float16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_tensor_mult_devices_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_tensor_mult_devices_xpu_xpu_float64 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_tensor_mult_devices_xpu_xpu_int16 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_tensor_mult_devices_xpu_xpu_int32 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_tensor_mult_devices_xpu_xpu_int64 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_tensor_mult_devices_xpu_xpu_int8 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_from_tensor_mult_devices_xpu_xpu_uint8 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_copy_list_xpu_xpu_bfloat16 (__main__.TestAsArrayXPU) ... ok
+test_copy_list_xpu_xpu_bool (__main__.TestAsArrayXPU) ... ok
+test_copy_list_xpu_xpu_complex128 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_list_xpu_xpu_complex64 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_list_xpu_xpu_float16 (__main__.TestAsArrayXPU) ... ok
+test_copy_list_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... ok
+test_copy_list_xpu_xpu_float64 (__main__.TestAsArrayXPU) ... ok
+test_copy_list_xpu_xpu_int16 (__main__.TestAsArrayXPU) ... ok
+test_copy_list_xpu_xpu_int32 (__main__.TestAsArrayXPU) ... ok
+test_copy_list_xpu_xpu_int64 (__main__.TestAsArrayXPU) ... ok
+test_copy_list_xpu_xpu_int8 (__main__.TestAsArrayXPU) ... ok
+test_copy_list_xpu_xpu_uint8 (__main__.TestAsArrayXPU) ... ok
+test_copy_tensor_xpu_xpu_bfloat16 (__main__.TestAsArrayXPU) ... ok
+test_copy_tensor_xpu_xpu_bool (__main__.TestAsArrayXPU) ... ok
+test_copy_tensor_xpu_xpu_complex128 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_tensor_xpu_xpu_complex64 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_copy_tensor_xpu_xpu_float16 (__main__.TestAsArrayXPU) ... ok
+test_copy_tensor_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... ok
+test_copy_tensor_xpu_xpu_float64 (__main__.TestAsArrayXPU) ... ok
+test_copy_tensor_xpu_xpu_int16 (__main__.TestAsArrayXPU) ... ok
+test_copy_tensor_xpu_xpu_int32 (__main__.TestAsArrayXPU) ... ok
+test_copy_tensor_xpu_xpu_int64 (__main__.TestAsArrayXPU) ... ok
+test_copy_tensor_xpu_xpu_int8 (__main__.TestAsArrayXPU) ... ok
+test_copy_tensor_xpu_xpu_uint8 (__main__.TestAsArrayXPU) ... ok
+test_retain_autograd_history_xpu_xpu_complex64 (__main__.TestAsArrayXPU) ... skipped 'dtype not support on XPU'
+test_retain_autograd_history_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... ok
+test_unsupported_alias_mult_devices_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... skipped 'Only runs on cuda'
+test_unsupported_alias_xpu_xpu_float32 (__main__.TestAsArrayXPU) ... ok
+
+======================================================================
+ERROR: test_alias_from_dlpack_xpu_xpu_bfloat16 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2759, in test_alias_from_dlpack
+    self._test_alias_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2736, in _test_alias_with_cvt
+    check(copy=False)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2734, in check
+    self._check(original, cvt=cvt, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_alias_from_dlpack_xpu_xpu_float16 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2759, in test_alias_from_dlpack
+    self._test_alias_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2736, in _test_alias_with_cvt
+    check(copy=False)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2734, in check
+    self._check(original, cvt=cvt, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_alias_from_dlpack_xpu_xpu_float32 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2759, in test_alias_from_dlpack
+    self._test_alias_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2736, in _test_alias_with_cvt
+    check(copy=False)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2734, in check
+    self._check(original, cvt=cvt, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_alias_from_dlpack_xpu_xpu_float64 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2759, in test_alias_from_dlpack
+    self._test_alias_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2736, in _test_alias_with_cvt
+    check(copy=False)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2734, in check
+    self._check(original, cvt=cvt, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_alias_from_dlpack_xpu_xpu_int16 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2759, in test_alias_from_dlpack
+    self._test_alias_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2736, in _test_alias_with_cvt
+    check(copy=False)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2734, in check
+    self._check(original, cvt=cvt, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_alias_from_dlpack_xpu_xpu_int32 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2759, in test_alias_from_dlpack
+    self._test_alias_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2736, in _test_alias_with_cvt
+    check(copy=False)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2734, in check
+    self._check(original, cvt=cvt, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_alias_from_dlpack_xpu_xpu_int64 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2759, in test_alias_from_dlpack
+    self._test_alias_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2736, in _test_alias_with_cvt
+    check(copy=False)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2734, in check
+    self._check(original, cvt=cvt, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_alias_from_dlpack_xpu_xpu_int8 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2759, in test_alias_from_dlpack
+    self._test_alias_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2736, in _test_alias_with_cvt
+    check(copy=False)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2734, in check
+    self._check(original, cvt=cvt, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_alias_from_dlpack_xpu_xpu_uint8 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2759, in test_alias_from_dlpack
+    self._test_alias_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2736, in _test_alias_with_cvt
+    check(copy=False)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2734, in check
+    self._check(original, cvt=cvt, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_copy_from_dlpack_xpu_xpu_bfloat16 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2801, in test_copy_from_dlpack
+    self._test_copy_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2772, in _test_copy_with_cvt
+    check(copy=True)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2770, in check
+    self._check(original, cvt=cvt, is_alias=False, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_copy_from_dlpack_xpu_xpu_float16 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2801, in test_copy_from_dlpack
+    self._test_copy_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2772, in _test_copy_with_cvt
+    check(copy=True)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2770, in check
+    self._check(original, cvt=cvt, is_alias=False, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_copy_from_dlpack_xpu_xpu_float32 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2801, in test_copy_from_dlpack
+    self._test_copy_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2772, in _test_copy_with_cvt
+    check(copy=True)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2770, in check
+    self._check(original, cvt=cvt, is_alias=False, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_copy_from_dlpack_xpu_xpu_float64 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2801, in test_copy_from_dlpack
+    self._test_copy_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2772, in _test_copy_with_cvt
+    check(copy=True)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2770, in check
+    self._check(original, cvt=cvt, is_alias=False, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_copy_from_dlpack_xpu_xpu_int16 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2801, in test_copy_from_dlpack
+    self._test_copy_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2772, in _test_copy_with_cvt
+    check(copy=True)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2770, in check
+    self._check(original, cvt=cvt, is_alias=False, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_copy_from_dlpack_xpu_xpu_int32 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2801, in test_copy_from_dlpack
+    self._test_copy_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2772, in _test_copy_with_cvt
+    check(copy=True)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2770, in check
+    self._check(original, cvt=cvt, is_alias=False, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_copy_from_dlpack_xpu_xpu_int64 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2801, in test_copy_from_dlpack
+    self._test_copy_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2772, in _test_copy_with_cvt
+    check(copy=True)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2770, in check
+    self._check(original, cvt=cvt, is_alias=False, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_copy_from_dlpack_xpu_xpu_int8 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2801, in test_copy_from_dlpack
+    self._test_copy_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2772, in _test_copy_with_cvt
+    check(copy=True)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2770, in check
+    self._check(original, cvt=cvt, is_alias=False, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+======================================================================
+ERROR: test_copy_from_dlpack_xpu_xpu_uint8 (__main__.TestAsArrayXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_device_type.py", line 853, in dep_fn
+    return fn(slf, *args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2801, in test_copy_from_dlpack
+    self._test_copy_with_cvt(to_dlpack, device, dtype)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2772, in _test_copy_with_cvt
+    check(copy=True)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2770, in check
+    self._check(original, cvt=cvt, is_alias=False, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 2709, in _check
+    result = torch.asarray(cvt(original), **kwargs)
+RuntimeError: Cannot find device associated with USM allocation! -59 (CL_INVALID_OPERATION)
+
+----------------------------------------------------------------------
+Ran 129 tests in 1.237s
+
+FAILED (errors=18, skipped=79)
+Raised CalledProcessError: return code 1.

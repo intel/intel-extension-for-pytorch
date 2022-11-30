@@ -1,0 +1,54 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_assertEqual_longMessage_xpu_xpu (__main__.TestTestingXPU) ... ok
+test_assertEqual_numpy_xpu_xpu_bool (__main__.TestTestingXPU) ... ok
+test_assertEqual_numpy_xpu_xpu_complex128 (__main__.TestTestingXPU) ... skipped 'dtype not support on XPU'
+test_assertEqual_numpy_xpu_xpu_complex64 (__main__.TestTestingXPU) ... skipped 'dtype not support on XPU'
+test_assertEqual_numpy_xpu_xpu_float16 (__main__.TestTestingXPU) ... ok
+test_assertEqual_numpy_xpu_xpu_float32 (__main__.TestTestingXPU) ... ok
+test_assertEqual_numpy_xpu_xpu_float64 (__main__.TestTestingXPU) ... ok
+test_assertEqual_numpy_xpu_xpu_int16 (__main__.TestTestingXPU) ... ok
+test_assertEqual_numpy_xpu_xpu_int32 (__main__.TestTestingXPU) ... ok
+test_assertEqual_numpy_xpu_xpu_int64 (__main__.TestTestingXPU) ... ok
+test_assertEqual_numpy_xpu_xpu_int8 (__main__.TestTestingXPU) ... ok
+test_assertEqual_numpy_xpu_xpu_uint8 (__main__.TestTestingXPU) ... ok
+test_get_supported_dtypes_xpu_xpu (__main__.TestTestingXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_isclose_atol_rtol_greater_than_zero_xpu_xpu_bool (__main__.TestTestingXPU) ... ok
+test_isclose_atol_rtol_greater_than_zero_xpu_xpu_float16 (__main__.TestTestingXPU) ... ok
+test_isclose_atol_rtol_greater_than_zero_xpu_xpu_float32 (__main__.TestTestingXPU) ... ok
+test_isclose_atol_rtol_greater_than_zero_xpu_xpu_float64 (__main__.TestTestingXPU) ... ok
+test_isclose_atol_rtol_greater_than_zero_xpu_xpu_int16 (__main__.TestTestingXPU) ... ok
+test_isclose_atol_rtol_greater_than_zero_xpu_xpu_int32 (__main__.TestTestingXPU) ... ok
+test_isclose_atol_rtol_greater_than_zero_xpu_xpu_int64 (__main__.TestTestingXPU) ... ok
+test_isclose_atol_rtol_greater_than_zero_xpu_xpu_int8 (__main__.TestTestingXPU) ... ok
+test_isclose_atol_rtol_greater_than_zero_xpu_xpu_uint8 (__main__.TestTestingXPU) ... ok
+test_isclose_bool_xpu_xpu (__main__.TestTestingXPU) ... ok
+test_isclose_complex_xpu_xpu_complex128 (__main__.TestTestingXPU) ... skipped 'dtype not support on XPU'
+test_isclose_complex_xpu_xpu_complex64 (__main__.TestTestingXPU) ... skipped 'dtype not support on XPU'
+test_isclose_equality_shortcut_xpu_xpu (__main__.TestTestingXPU) ... ok
+test_isclose_float_xpu_xpu_float16 (__main__.TestTestingXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_isclose_float_xpu_xpu_float32 (__main__.TestTestingXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_isclose_float_xpu_xpu_float64 (__main__.TestTestingXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_isclose_integer_xpu_xpu_int16 (__main__.TestTestingXPU) ... ok
+test_isclose_integer_xpu_xpu_int32 (__main__.TestTestingXPU) ... ok
+test_isclose_integer_xpu_xpu_int64 (__main__.TestTestingXPU) ... ok
+test_isclose_integer_xpu_xpu_int8 (__main__.TestTestingXPU) ... ok
+test_isclose_integer_xpu_xpu_uint8 (__main__.TestTestingXPU) ... ok
+test_isclose_nan_equality_shortcut_xpu_xpu_complex128 (__main__.TestTestingXPU) ... skipped 'dtype not support on XPU'
+test_isclose_nan_equality_shortcut_xpu_xpu_complex64 (__main__.TestTestingXPU) ... skipped 'dtype not support on XPU'
+test_isclose_nan_equality_shortcut_xpu_xpu_float16 (__main__.TestTestingXPU) ... ok
+test_isclose_nan_equality_shortcut_xpu_xpu_float32 (__main__.TestTestingXPU) ... ok
+test_isclose_nan_equality_shortcut_xpu_xpu_float64 (__main__.TestTestingXPU) ... ok
+test_make_tensor_complex32_xpu_xpu (__main__.TestTestingXPU) ... skipped 'dtype not support on XPU'
+test_make_tensor_xpu_xpu_bool (__main__.TestTestingXPU) ... ok
+test_make_tensor_xpu_xpu_complex64 (__main__.TestTestingXPU) ... skipped 'dtype not support on XPU'
+test_make_tensor_xpu_xpu_float32 (__main__.TestTestingXPU) ... ok
+test_make_tensor_xpu_xpu_int64 (__main__.TestTestingXPU) ... ok
+test_xpu_assert_should_not_stop_common_distributed_test_suite_xpu_xpu (__main__.TestTestingXPU) ... skipped 'Only runs on cuda'
+test_xpu_assert_should_stop_common_device_type_test_suite_xpu_xpu (__main__.TestTestingXPU) ... skipped 'Only runs on cuda'
+test_xpu_assert_should_stop_common_utils_test_suite_xpu_xpu (__main__.TestTestingXPU) ... skipped 'Only runs on cuda'
+
+----------------------------------------------------------------------
+Ran 47 tests in 1.068s
+
+OK (skipped=15)

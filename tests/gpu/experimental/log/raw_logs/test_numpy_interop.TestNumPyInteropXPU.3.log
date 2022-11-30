@@ -1,0 +1,50 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_ctor_with_invalid_numpy_array_sequence_xpu_xpu (__main__.TestNumPyInteropXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_numpy_interop.py:186: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at /home/gta/xunsongh/pytorch/torch/csrc/utils/tensor_new.cpp:230.)
+  torch.tensor([np.random.random(size=(3, 3)), np.random.random(size=(3, 0))], device=device)
+ok
+test_ctor_with_numpy_scalar_ctor_xpu_xpu (__main__.TestNumPyInteropXPU) ... skipped 'Only runs on cpu'
+test_from_list_of_ndarray_warning_xpu_xpu (__main__.TestNumPyInteropXPU) ... ok
+test_from_numpy_xpu_xpu (__main__.TestNumPyInteropXPU) ... ok
+test_has_storage_numpy_xpu_xpu (__main__.TestNumPyInteropXPU) ... skipped 'not ready on XPU'
+test_multiplication_numpy_scalar_xpu_xpu (__main__.TestNumPyInteropXPU) ... skipped 'Only runs on cpu'
+test_numpy_array_interface_xpu_xpu (__main__.TestNumPyInteropXPU) ... skipped 'Only runs on cpu'
+test_numpy_index_xpu_xpu (__main__.TestNumPyInteropXPU) ... skipped 'Only runs on cpu'
+test_numpy_non_writeable_xpu_xpu (__main__.TestNumPyInteropXPU) ... skipped 'Only runs on cpu'
+test_numpy_scalar_cmp_xpu_xpu_bfloat16 (__main__.TestNumPyInteropXPU) ... ok
+test_numpy_scalar_cmp_xpu_xpu_bool (__main__.TestNumPyInteropXPU) ... ok
+test_numpy_scalar_cmp_xpu_xpu_complex128 (__main__.TestNumPyInteropXPU) ... skipped 'dtype not support on XPU'
+test_numpy_scalar_cmp_xpu_xpu_complex64 (__main__.TestNumPyInteropXPU) ... skipped 'dtype not support on XPU'
+test_numpy_scalar_cmp_xpu_xpu_float16 (__main__.TestNumPyInteropXPU) ... ok
+test_numpy_scalar_cmp_xpu_xpu_float32 (__main__.TestNumPyInteropXPU) ... ok
+test_numpy_scalar_cmp_xpu_xpu_float64 (__main__.TestNumPyInteropXPU) ... ok
+test_numpy_scalar_cmp_xpu_xpu_int16 (__main__.TestNumPyInteropXPU) ... ok
+test_numpy_scalar_cmp_xpu_xpu_int32 (__main__.TestNumPyInteropXPU) ... ok
+test_numpy_scalar_cmp_xpu_xpu_int64 (__main__.TestNumPyInteropXPU) ... ok
+test_numpy_scalar_cmp_xpu_xpu_int8 (__main__.TestNumPyInteropXPU) ... ok
+test_numpy_scalar_cmp_xpu_xpu_uint8 (__main__.TestNumPyInteropXPU) ... ok
+test_numpy_unresizable_xpu_xpu (__main__.TestNumPyInteropXPU) ... skipped 'Only runs on cpu'
+test_parse_numpy_int_xpu_xpu (__main__.TestNumPyInteropXPU) ... skipped 'Only runs on cpu'
+test_to_numpy_bool_xpu_xpu (__main__.TestNumPyInteropXPU) ... ok
+test_to_numpy_force_argument_xpu_xpu (__main__.TestNumPyInteropXPU) ... ERROR
+test_to_numpy_xpu_xpu (__main__.TestNumPyInteropXPU) ... skipped 'Only runs on cpu'
+
+======================================================================
+ERROR: test_to_numpy_force_argument_xpu_xpu (__main__.TestNumPyInteropXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_numpy_interop.py", line 126, in test_to_numpy_force_argument
+    x = x.to_sparse()
+RuntimeError: "indexSelect" not implemented for 'ComplexFloat'
+
+----------------------------------------------------------------------
+Ran 26 tests in 0.227s
+
+FAILED (errors=1, skipped=11)
+Raised CalledProcessError: return code 1.

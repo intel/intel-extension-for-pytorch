@@ -1,0 +1,68 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_advancedindex_big_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_advancedindex_xpu_xpu_float16 (__main__.TestIndexingXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_advancedindex_xpu_xpu_float64 (__main__.TestIndexingXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_basic_advanced_combined_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_bool_indices_accumulate_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_bool_indices_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_byte_mask2d_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_byte_mask_accumulate_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_byte_mask_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_byte_tensor_assignment_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_cpu_indices_xpu_xpu (__main__.TestIndexingXPU) ... skipped 'Only runs on cuda'
+test_ellipsis_tensor_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_empty_index_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_empty_ndim_index_bool_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_empty_ndim_index_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_empty_slice_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_gather_take_along_dim_cross_device_xpu_xpu_float32 (__main__.TestIndexingXPU) ... skipped 'Only runs on cuda'
+test_getitem_scalars_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_index_getitem_copy_bools_slices_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_index_put_accumulate_duplicate_indices_xpu_xpu (__main__.TestIndexingXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_index_put_accumulate_expanded_values_xpu_xpu (__main__.TestIndexingXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_index_put_accumulate_large_tensor_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_index_put_accumulate_non_contiguous_xpu_xpu (__main__.TestIndexingXPU) ... skipped 'Only runs on cuda'
+test_index_put_accumulate_with_optional_tensors_xpu_xpu (__main__.TestIndexingXPU) ... skipped 'Only runs on cuda'
+test_index_put_src_datatype_xpu_xpu_bfloat16 (__main__.TestIndexingXPU) ... ok
+test_index_put_src_datatype_xpu_xpu_bool (__main__.TestIndexingXPU) ... ok
+test_index_put_src_datatype_xpu_xpu_complex128 (__main__.TestIndexingXPU) ... skipped 'dtype not support on XPU'
+test_index_put_src_datatype_xpu_xpu_complex64 (__main__.TestIndexingXPU) ... skipped 'dtype not support on XPU'
+test_index_put_src_datatype_xpu_xpu_float16 (__main__.TestIndexingXPU) ... ok
+test_index_put_src_datatype_xpu_xpu_int64 (__main__.TestIndexingXPU) ... ok
+test_index_scalar_with_bool_mask_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_index_setitem_bools_slices_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_index_src_datatype_xpu_xpu_bfloat16 (__main__.TestIndexingXPU) ... ok
+test_index_src_datatype_xpu_xpu_bool (__main__.TestIndexingXPU) ... ok
+test_index_src_datatype_xpu_xpu_float16 (__main__.TestIndexingXPU) ... ok
+test_index_src_datatype_xpu_xpu_int64 (__main__.TestIndexingXPU) ... ok
+test_index_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_int_assignment_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_int_indices2d_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_int_indices_broadcast_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_int_indices_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_invalid_device_xpu_xpu (__main__.TestIndexingXPU) ... skipped 'Only runs on cuda'
+test_invalid_index_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_jit_indexing_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_multiple_bool_indices_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_multiple_byte_mask_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_multiple_int_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_none_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_out_of_bound_index_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_set_item_to_scalar_tensor_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_setitem_expansion_error_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_setitem_scalars_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_single_int_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_step_assignment_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_step_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_take_along_dim_invalid_xpu_xpu_float32 (__main__.TestIndexingXPU) ... ok
+test_take_along_dim_invalid_xpu_xpu_int64 (__main__.TestIndexingXPU) ... ok
+test_take_along_dim_xpu_xpu_float32 (__main__.TestIndexingXPU) ... ok
+test_take_along_dim_xpu_xpu_int64 (__main__.TestIndexingXPU) ... ok
+test_variable_slicing_xpu_xpu (__main__.TestIndexingXPU) ... ok
+test_zero_dim_index_xpu_xpu (__main__.TestIndexingXPU) ... ok
+
+----------------------------------------------------------------------
+Ran 61 tests in 1.828s
+
+OK (skipped=11)

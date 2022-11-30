@@ -1,0 +1,447 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_arange_bfloat16_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_arange_device_vs_cpu_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_arange_device_vs_cpu_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_arange_device_vs_cpu_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_arange_device_vs_cpu_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_arange_inference_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_arange_xpu_xpu (__main__.TestTensorCreationXPU) ... FAIL
+test_as_strided_neg_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_as_tensor_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_block_diag_scipy_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_block_diag_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cartesian_prod_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cat2_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_cat2_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_cat2_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_cat_all_dtypes_and_devices_xpu_xpu (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py:100: UserWarning: ComplexHalf support is experimental and many operators don't support it yet. (Triggered internally at /home/gta/xunsongh/pytorch/aten/src/ATen/EmptyTensor.cpp:31.)
+  x = torch.tensor([[1, 2], [3, 4]], dtype=dt, device=device)
+ERROR
+test_cat_big_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_cat_empty_legacy_xpu_xpu (__main__.TestTensorCreationXPU) ... ERROR
+test_cat_empty_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cat_in_channels_last_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_cat_mem_overlap_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cat_out_channels_last_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_cat_out_memory_format_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cuda'
+test_cat_out_xpu_xpu (__main__.TestTensorCreationXPU) ... FAIL
+test_cat_preserve_channels_last_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_cat_stack_cross_devices_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cuda'
+test_cat_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cuda'
+test_combinations_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_complex_type_conversions_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'real and imag not implemented for complex'
+test_constructor_device_legacy_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_constructor_dtypes_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_ctor_with_numpy_array_xpu_xpu (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py:1003: DeprecationWarning: `np.float` is a deprecated alias for the builtin `float`. To silence this warning, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+Deprecated in NumPy 1.20; for more details and guidance: https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+  correct_dtypes = [np.double, np.float, np.float16, np.int64, np.int32, np.int16, np.int8, np.uint8, np.bool]
+/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py:1003: DeprecationWarning: `np.bool` is a deprecated alias for the builtin `bool`. To silence this warning, use `bool` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.bool_` here.
+Deprecated in NumPy 1.20; for more details and guidance: https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+  correct_dtypes = [np.double, np.float, np.float16, np.int64, np.int32, np.int16, np.int8, np.uint8, np.bool]
+ok
+test_device_rounding_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cuda'
+test_device_rounding_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cuda'
+test_device_rounding_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cuda'
+test_diag_embed_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_diagflat_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_dsplit_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_dsplit_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dsplit_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dstack_xpu_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_dstack_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_dstack_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dstack_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dstack_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dstack_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dstack_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dstack_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dstack_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_dstack_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_empty_full_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_empty_overflow_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_empty_strided_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_empty_tensor_props_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_eye_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_fill_all_dtypes_and_devices_xpu_xpu (__main__.TestTensorCreationXPU) ... ERROR
+test_float_to_int_conversion_finite_xpu_xpu_bool (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_float_to_int_conversion_finite_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_float_to_int_conversion_finite_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_float_to_int_conversion_finite_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_float_to_int_conversion_finite_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_float_to_int_conversion_finite_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_float_to_int_conversion_nonfinite_xpu_xpu_bool (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_float_to_int_conversion_nonfinite_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_float_to_int_conversion_nonfinite_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_float_to_int_conversion_nonfinite_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_float_to_int_conversion_nonfinite_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_float_to_int_conversion_nonfinite_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_full_inference_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_full_inference_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_full_inference_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_full_out_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_hsplit_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_hsplit_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_hsplit_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_hstack_column_stack_xpu_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_hstack_column_stack_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_hstack_column_stack_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_hstack_column_stack_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_hstack_column_stack_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_hstack_column_stack_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_hstack_column_stack_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_hstack_column_stack_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_hstack_column_stack_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_hstack_column_stack_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_kaiser_window_xpu_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_kaiser_window_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_kaiser_window_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_kaiser_window_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_kaiser_window_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_large_linspace_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_large_linspace_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_like_fn_stride_proparation_vs_tensoriterator_unary_op_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_linlogspace_mem_overlap_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_linspace_deduction_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_linspace_device_vs_cpu_xpu_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_device_vs_cpu_xpu_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_device_vs_cpu_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_device_vs_cpu_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_device_vs_cpu_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_device_vs_cpu_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_special_steps_xpu_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_special_steps_xpu_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_special_steps_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_special_steps_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_special_steps_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_special_steps_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_vs_numpy_complex_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_vs_numpy_xpu_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_vs_numpy_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_vs_numpy_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_vs_numpy_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_linspace_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_linspace_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_base2_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_base2_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_base2_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_deduction_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_logspace_device_vs_cpu_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_device_vs_cpu_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_device_vs_cpu_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_special_steps_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_special_steps_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_special_steps_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_vs_numpy_complex_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_logspace_vs_numpy_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_vs_numpy_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py:2162: DeprecationWarning: an integer is required (got type float).  Implicit conversion to integers using __int__ is deprecated, and may be removed in a future version of Python.
+  self.assertEqual(torch.tensor([2.0 ** (i / 8.0) for i in range(49)], device=device, dtype=dtype), torch.logspace(0, 6, steps=49, base=2, device=device, dtype=dtype), atol=atol, rtol=rtol)
+ok
+test_logspace_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_logspace_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_default_indexing_xpu_xpu (__main__.TestTensorCreationXPU) ... /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /home/gta/xunsongh/pytorch/aten/src/ATen/native/TensorShape.cpp:3190.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+ok
+test_meshgrid_empty_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_ij_indexing_is_default_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_ij_indexing_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_inconsistent_device_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_inconsistent_dtype_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_non_1d_tensor_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_unsupported_indexing_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_vs_numpy_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_warns_if_no_indexing_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_meshgrid_xy_indexing_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_new_empty_strided_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_new_methods_requires_grad_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_new_tensor_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_offset_scalar_cast_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_ones_xpu_xpu (__main__.TestTensorCreationXPU) ... ERROR
+test_random_bool_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_random_default_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_bool_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_random_from_to_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_random_full_range_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_random_to_xpu_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py:1200: UserWarning: to - 1 is out of bounds [-(2^8), 2^8]. Due to precision limitations c10::BFloat16 can support discrete uniform distribution only within this range. This warning will become an error in version 1.7 release, please fix the code in advance (Triggered internally at /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/include/ATen/native/DistributionTemplates.h:95.)
+  t.random_(to_)
+ok
+test_random_to_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py:1200: UserWarning: to - 1 is out of bounds [-(2^11), 2^11]. Due to precision limitations c10::Half can support discrete uniform distribution only within this range. This warning will become an error in version 1.7 release, please fix the code in advance (Triggered internally at /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/include/ATen/native/DistributionTemplates.h:95.)
+  t.random_(to_)
+ok
+test_random_to_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py:1200: UserWarning: to - 1 is out of bounds [-(2^24), 2^24]. Due to precision limitations float can support discrete uniform distribution only within this range. This warning will become an error in version 1.7 release, please fix the code in advance (Triggered internally at /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/include/ATen/native/DistributionTemplates.h:95.)
+  t.random_(to_)
+ok
+test_random_to_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... /home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py:1200: UserWarning: to - 1 is out of bounds [-(2^53), 2^53]. Due to precision limitations double can support discrete uniform distribution only within this range. This warning will become an error in version 1.7 release, please fix the code in advance (Triggered internally at /home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/include/ATen/native/DistributionTemplates.h:95.)
+  t.random_(to_)
+ok
+test_random_to_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_random_to_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_random_to_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_random_to_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_random_to_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_random_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_random_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_random_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_random_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... ok
+test_random_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_random_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... ok
+test_range_factories_64bit_indexing_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cuda'
+test_range_warning_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_range_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_repeat_interleave_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_roll_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_signal_window_functions_window_bartlett_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_bartlett_xpu_float16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_bartlett_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_bartlett_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_bartlett_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_blackman_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_blackman_xpu_float16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_blackman_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_blackman_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_blackman_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_hamming_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_hamming_xpu_float16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_hamming_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_hamming_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_hamming_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_hann_xpu_bfloat16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_hann_xpu_float16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_hann_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_hann_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_signal_window_functions_window_hann_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_simple_scalar_cast_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_stack_out_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_stack_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_strided_mismatched_stride_shape_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_tensor_ctor_device_inference_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_device_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_tensor_factories_empty_xpu_xpu (__main__.TestTensorCreationXPU) ... ERROR
+test_tensor_factory_copy_var_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_tensor_factory_gpu_type_inference_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cuda'
+test_tensor_factory_gpu_type_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cuda'
+test_tensor_factory_type_inference_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_tensor_factory_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_tensor_from_non_writable_numpy_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_tensor_from_sequence_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped 'Only runs on cpu'
+test_torch_complex_floating_dtype_error_xpu_xpu_bool (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_complex_floating_dtype_error_xpu_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_torch_complex_floating_dtype_error_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_torch_complex_floating_dtype_error_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_complex_floating_dtype_error_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_complex_floating_dtype_error_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_complex_floating_dtype_error_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_complex_floating_dtype_error_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_complex_out_dtype_error_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_complex_out_dtype_error_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_complex_same_dtype_error_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_complex_same_dtype_error_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_complex_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_complex_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_complex_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_polar_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_torch_polar_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_unpack_double_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_unpack_double_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... ok
+test_vander_types_xpu_xpu_bool (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vander_types_xpu_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_vander_types_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_vander_types_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vander_types_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vander_types_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vander_types_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vander_types_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vander_types_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vander_types_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vander_xpu_xpu (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vsplit_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_vsplit_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vsplit_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vstack_row_stack_xpu_xpu_complex128 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_vstack_row_stack_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_vstack_row_stack_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vstack_row_stack_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vstack_row_stack_xpu_xpu_float64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vstack_row_stack_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vstack_row_stack_xpu_xpu_int32 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vstack_row_stack_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vstack_row_stack_xpu_xpu_int8 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_vstack_row_stack_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_zeros_dtype_layout_device_match_xpu_xpu_bool (__main__.TestTensorCreationXPU) ... ok
+test_zeros_dtype_layout_device_match_xpu_xpu_complex64 (__main__.TestTensorCreationXPU) ... skipped 'dtype not support on XPU'
+test_zeros_dtype_layout_device_match_xpu_xpu_float16 (__main__.TestTensorCreationXPU) ... ok
+test_zeros_dtype_layout_device_match_xpu_xpu_float32 (__main__.TestTensorCreationXPU) ... ok
+test_zeros_dtype_layout_device_match_xpu_xpu_int16 (__main__.TestTensorCreationXPU) ... ok
+test_zeros_dtype_layout_device_match_xpu_xpu_int64 (__main__.TestTensorCreationXPU) ... ok
+test_zeros_dtype_layout_device_match_xpu_xpu_uint8 (__main__.TestTensorCreationXPU) ... ok
+test_zeros_out_xpu_xpu (__main__.TestTensorCreationXPU) ... ok
+test_zeros_xpu_xpu (__main__.TestTensorCreationXPU) ... ERROR
+
+======================================================================
+ERROR: test_cat_all_dtypes_and_devices_xpu_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 102, in test_cat_all_dtypes_and_devices
+    self.assertEqual(torch.cat((x, x), 0), expected1)
+RuntimeError: "cat_dpcpp" not implemented for 'ComplexHalf'
+
+======================================================================
+ERROR: test_cat_empty_legacy_xpu_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 312, in test_cat_empty_legacy
+    res1 = torch.cat([x, empty], dim=1)
+RuntimeError: Tensors must have same number of dimensions
+
+======================================================================
+ERROR: test_fill_all_dtypes_and_devices_xpu_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 112, in test_fill_all_dtypes_and_devices
+    x.fill_(n)
+RuntimeError: "fill_dpcpp" not implemented for 'ComplexHalf'
+
+======================================================================
+ERROR: test_ones_xpu_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 1325, in test_ones
+    self.assertEqual(torch.ones(100, 100, device=device, dtype=torch.chalf), torch.ones(100, 100, device=device, dtype=torch.cfloat), exact_dtype=False)
+RuntimeError: "fill_dpcpp" not implemented for 'ComplexHalf'
+
+======================================================================
+ERROR: test_tensor_factories_empty_xpu_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 1938, in test_tensor_factories_empty
+    self.assertEqual(shape, torch.zeros(shape, device=device, dtype=dt).shape)
+RuntimeError: "fill_dpcpp" not implemented for 'ComplexHalf'
+
+======================================================================
+ERROR: test_zeros_xpu_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 435, in instantiated_test
+    raise rte
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 1301, in test_zeros
+    complexHalfTensor = torch.zeros(2, 2, device=device, dtype=torch.complex32)
+RuntimeError: "fill_dpcpp" not implemented for 'ComplexHalf'
+
+======================================================================
+FAIL: test_arange_xpu_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 1622, in test_arange
+    self.assertEqual(res.flatten(), torch.arange(0, 300000 * 3 * 3, device=device))
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 2699998 / 2700000 (100.0%)
+Greatest absolute difference: 2399992 at index (8,) (up to 0.001 allowed)
+Greatest relative difference: 299999.0 at index (1,) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_cat_out_xpu_xpu (__main__.TestTensorCreationXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_tensor_creation_ops.py", line 353, in test_cat_out
+    self.assertEqual(x, expected_x)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 32 / 100 (32.0%)
+Greatest absolute difference: 3.0 at index (0, 4, 0) (up to 0.001 allowed)
+Greatest relative difference: inf at index (0, 4, 0) (up to 1.3e-06 allowed)
+
+----------------------------------------------------------------------
+Ran 295 tests in 562.625s
+
+FAILED (failures=2, errors=6, skipped=155)
+Raised CalledProcessError: return code 1.

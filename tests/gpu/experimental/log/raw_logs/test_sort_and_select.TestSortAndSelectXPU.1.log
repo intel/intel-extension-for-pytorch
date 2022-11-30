@@ -1,0 +1,239 @@
+MESA: warning: Driver does not support the 0xbd5 PCI ID.
+No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_isin_different_devices_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... skipped 'Only runs on cuda'
+test_isin_different_devices_xpu_xpu_float64 (__main__.TestSortAndSelectXPU) ... skipped 'Only runs on cuda'
+test_isin_different_devices_xpu_xpu_int16 (__main__.TestSortAndSelectXPU) ... skipped 'Only runs on cuda'
+test_isin_different_devices_xpu_xpu_int32 (__main__.TestSortAndSelectXPU) ... skipped 'Only runs on cuda'
+test_isin_different_devices_xpu_xpu_int64 (__main__.TestSortAndSelectXPU) ... skipped 'Only runs on cuda'
+test_isin_different_devices_xpu_xpu_int8 (__main__.TestSortAndSelectXPU) ... skipped 'Only runs on cuda'
+test_isin_different_devices_xpu_xpu_uint8 (__main__.TestSortAndSelectXPU) ... skipped 'Only runs on cuda'
+test_isin_different_dtypes_xpu_xpu (__main__.TestSortAndSelectXPU) ... ok
+test_isin_xpu_xpu_float16 (__main__.TestSortAndSelectXPU) ... ok
+test_isin_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... ok
+test_isin_xpu_xpu_float64 (__main__.TestSortAndSelectXPU) ... ok
+test_isin_xpu_xpu_int16 (__main__.TestSortAndSelectXPU) ... ok
+test_isin_xpu_xpu_int32 (__main__.TestSortAndSelectXPU) ... ok
+test_isin_xpu_xpu_int64 (__main__.TestSortAndSelectXPU) ... ok
+test_isin_xpu_xpu_int8 (__main__.TestSortAndSelectXPU) ... ok
+test_isin_xpu_xpu_uint8 (__main__.TestSortAndSelectXPU) ... ok
+test_kthvalue_scalar_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_kthvalue_xpu_xpu_float64 (__main__.TestSortAndSelectXPU) ... FAIL
+test_msort_xpu_xpu_bfloat16 (__main__.TestSortAndSelectXPU) ... ok
+test_msort_xpu_xpu_float16 (__main__.TestSortAndSelectXPU) ... ok
+test_msort_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... ok
+test_msort_xpu_xpu_float64 (__main__.TestSortAndSelectXPU) ... ok
+test_msort_xpu_xpu_int16 (__main__.TestSortAndSelectXPU) ... ok
+test_msort_xpu_xpu_int32 (__main__.TestSortAndSelectXPU) ... ok
+test_msort_xpu_xpu_int64 (__main__.TestSortAndSelectXPU) ... ok
+test_msort_xpu_xpu_int8 (__main__.TestSortAndSelectXPU) ... ok
+test_msort_xpu_xpu_uint8 (__main__.TestSortAndSelectXPU) ... ok
+test_sort_1d_output_discontiguous_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... ok
+test_sort_discontiguous_slow_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... skipped 'Only runs on cpu'
+test_sort_discontiguous_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... skipped 'Only runs on cuda'
+test_sort_large_slice_xpu_xpu (__main__.TestSortAndSelectXPU) ... skipped 'Only runs on cuda'
+test_sort_large_xpu_xpu_uint8 (__main__.TestSortAndSelectXPU) ... skipped 'Only runs on cuda'
+test_sort_restride_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... ok
+test_sort_xpu_xpu (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_against_numpy_xpu_xpu_bfloat16 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_against_numpy_xpu_xpu_float16 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_against_numpy_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_against_numpy_xpu_xpu_float64 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_against_numpy_xpu_xpu_int16 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_against_numpy_xpu_xpu_int32 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_against_numpy_xpu_xpu_int64 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_against_numpy_xpu_xpu_int8 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_against_numpy_xpu_xpu_uint8 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_xpu_xpu_bfloat16 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_xpu_xpu_float16 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_xpu_xpu_float64 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_xpu_xpu_int16 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_xpu_xpu_int32 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_xpu_xpu_int64 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_xpu_xpu_int8 (__main__.TestSortAndSelectXPU) ... ok
+test_stable_sort_xpu_xpu_uint8 (__main__.TestSortAndSelectXPU) ... ok
+test_topk_1d_output_discontiguous_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... FAIL
+test_topk_4d_xpu_xpu (__main__.TestSortAndSelectXPU) ... ok
+test_topk_arguments_xpu_xpu (__main__.TestSortAndSelectXPU) ... ok
+test_topk_bfloat16_xpu_xpu_bfloat16 (__main__.TestSortAndSelectXPU) ... skipped 'Only runs on cuda'
+test_topk_integral_xpu_xpu_int16 (__main__.TestSortAndSelectXPU) ... ok
+test_topk_integral_xpu_xpu_int32 (__main__.TestSortAndSelectXPU) ... ok
+test_topk_integral_xpu_xpu_int64 (__main__.TestSortAndSelectXPU) ... ok
+test_topk_integral_xpu_xpu_int8 (__main__.TestSortAndSelectXPU) ... ok
+test_topk_integral_xpu_xpu_uint8 (__main__.TestSortAndSelectXPU) ... ok
+test_topk_noncontiguous_gpu_xpu_xpu (__main__.TestSortAndSelectXPU) ... skipped 'Only runs on cuda'
+test_topk_nonfinite_xpu_xpu_bfloat16 (__main__.TestSortAndSelectXPU) ... FAIL
+test_topk_nonfinite_xpu_xpu_float16 (__main__.TestSortAndSelectXPU) ... FAIL
+test_topk_nonfinite_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... FAIL
+test_topk_nonfinite_xpu_xpu_float64 (__main__.TestSortAndSelectXPU) ... FAIL
+test_topk_xpu_xpu (__main__.TestSortAndSelectXPU) ... ok
+test_topk_zero_xpu_xpu_bfloat16 (__main__.TestSortAndSelectXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_topk_zero_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_topk_zero_xpu_xpu_float64 (__main__.TestSortAndSelectXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_topk_zero_xpu_xpu_int16 (__main__.TestSortAndSelectXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_topk_zero_xpu_xpu_int32 (__main__.TestSortAndSelectXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_topk_zero_xpu_xpu_int64 (__main__.TestSortAndSelectXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_topk_zero_xpu_xpu_int8 (__main__.TestSortAndSelectXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_topk_zero_xpu_xpu_uint8 (__main__.TestSortAndSelectXPU) ... skipped "onlyNativeDeviceTypes: doesn't run on xpu"
+test_unique_consecutive_xpu_xpu_bool (__main__.TestSortAndSelectXPU) ... ok
+test_unique_consecutive_xpu_xpu_float16 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_consecutive_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_consecutive_xpu_xpu_float64 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_consecutive_xpu_xpu_int16 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_consecutive_xpu_xpu_int32 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_consecutive_xpu_xpu_int64 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_consecutive_xpu_xpu_int8 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_consecutive_xpu_xpu_uint8 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_dim_xpu_xpu (__main__.TestSortAndSelectXPU) ... FAIL
+test_unique_xpu_xpu_bool (__main__.TestSortAndSelectXPU) ... ok
+test_unique_xpu_xpu_float16 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_xpu_xpu_float32 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_xpu_xpu_float64 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_xpu_xpu_int16 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_xpu_xpu_int32 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_xpu_xpu_int64 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_xpu_xpu_int8 (__main__.TestSortAndSelectXPU) ... ok
+test_unique_xpu_xpu_uint8 (__main__.TestSortAndSelectXPU) ... ok
+
+======================================================================
+FAIL: test_kthvalue_xpu_xpu_float64 (__main__.TestSortAndSelectXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_sort_and_select.py", line 644, in test_kthvalue
+    self.assertEqual(expected_val, out_val, atol=0, rtol=0)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Scalars are not close!
+
+Absolute difference: 1.0 (up to 0.001 allowed)
+Relative difference: inf (up to 0 allowed)
+
+======================================================================
+FAIL: test_topk_1d_output_discontiguous_xpu_xpu_float32 (__main__.TestSortAndSelectXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_sort_and_select.py", line 185, in test_topk_1d_output_discontiguous
+    self.assertEqual(indices, indices_cont)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 4 / 6 (66.7%)
+Greatest absolute difference: 8 at index (0,) (up to 0.001 allowed)
+Greatest relative difference: 4.0 at index (4,) (up to 0.0 allowed)
+
+======================================================================
+FAIL: test_topk_nonfinite_xpu_xpu_bfloat16 (__main__.TestSortAndSelectXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_sort_and_select.py", line 473, in test_topk_nonfinite
+    self.assertEqual(val, expect)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 4 / 4 (100.0%)
+Greatest absolute difference: nan at index (0,) (up to 0.001 allowed)
+Greatest relative difference: nan at index (0,) (up to 0.016 allowed)
+
+======================================================================
+FAIL: test_topk_nonfinite_xpu_xpu_float16 (__main__.TestSortAndSelectXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_sort_and_select.py", line 473, in test_topk_nonfinite
+    self.assertEqual(val, expect)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 3 / 4 (75.0%)
+Greatest absolute difference: nan at index (0,) (up to 0.001 allowed)
+Greatest relative difference: nan at index (0,) (up to 0.001 allowed)
+
+======================================================================
+FAIL: test_topk_nonfinite_xpu_xpu_float32 (__main__.TestSortAndSelectXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_sort_and_select.py", line 473, in test_topk_nonfinite
+    self.assertEqual(val, expect)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 3 / 4 (75.0%)
+Greatest absolute difference: nan at index (0,) (up to 0.001 allowed)
+Greatest relative difference: nan at index (0,) (up to 1.3e-06 allowed)
+
+======================================================================
+FAIL: test_topk_nonfinite_xpu_xpu_float64 (__main__.TestSortAndSelectXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_sort_and_select.py", line 473, in test_topk_nonfinite
+    self.assertEqual(val, expect)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not close!
+
+Mismatched elements: 1 / 4 (25.0%)
+Greatest absolute difference: nan at index (0,) (up to 0.001 allowed)
+Greatest relative difference: nan at index (0,) (up to 1e-07 allowed)
+
+======================================================================
+FAIL: test_unique_dim_xpu_xpu (__main__.TestSortAndSelectXPU)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2004, in wrapper
+    method(*args, **kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/common/pytorch_test_base.py", line 430, in instantiated_test
+    result = test(self, **param_kwargs)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_sort_and_select.py", line 419, in test_unique_dim
+    run_test(device, torch.float)
+  File "/home/gta/xunsongh/ipex-gpu/tests/gpu/experimental/test/test_sort_and_select.py", line 383, in run_test
+    self.assertEqual(expected_unique_empty, x_unique)
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_internal/common_utils.py", line 2468, in assertEqual
+    assert_equal(
+  File "/home/gta/miniconda3/envs/xunsongh/lib/python3.9/site-packages/torch/testing/_comparison.py", line 1093, in assert_equal
+    raise error_metas[0].to_error(msg)
+AssertionError: The values for attribute 'shape' do not match: torch.Size([5, 0]) != torch.Size([0]).
+
+----------------------------------------------------------------------
+Ran 94 tests in 8.191s
+
+FAILED (failures=7, skipped=22)
+Raised CalledProcessError: return code 1.
