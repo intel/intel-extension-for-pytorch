@@ -44,12 +44,11 @@ void round_decimals_out(const Tensor& self, int64_t decimals, Tensor& out) {
           neg_flag = true;
         }
         ten_pow_decimals = static_cast<scalar_t>(std::pow(10, decimals));
-        dpcpp_kernel_for_tensor_iter(
-            iter, [ten_pow_decimals, neg_flag](scalar_t a) -> scalar_t {
-              return neg_flag
-                  ? dpl::nearbyint(a / ten_pow_decimals) * ten_pow_decimals
-                  : dpl::nearbyint(a * ten_pow_decimals) / ten_pow_decimals;
-            });
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
+          return neg_flag
+              ? dpl::nearbyint(a / ten_pow_decimals) * ten_pow_decimals
+              : dpl::nearbyint(a * ten_pow_decimals) / ten_pow_decimals;
+        });
       });
 }
 
