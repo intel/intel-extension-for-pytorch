@@ -629,6 +629,17 @@ Tensor empty(
   return empty(size, options, optional_memory_format);
 }
 
+Tensor empty_like(
+    const Tensor& self,
+    c10::optional<ScalarType> dtype = c10::nullopt,
+    c10::optional<Layout> layout = c10::nullopt,
+    c10::optional<Device> device = c10::nullopt,
+    c10::optional<bool> pin_memory = c10::nullopt,
+    c10::optional<c10::MemoryFormat> optional_memory_format = c10::nullopt) {
+  return at::native::empty_like_quantized(
+      self, dtype, layout, device, pin_memory, optional_memory_format);
+}
+
 Tensor empty_quantized(
     IntArrayRef size,
     const Tensor& qtensor,

@@ -161,21 +161,6 @@ inline Tensor empty_like_dpcpp(
   return convert_tensor_to_channels_last_1d(tmp);
 }
 
-inline Tensor empty_opaque_tensor_dpcpp(
-    at::AtenIpexTypeXPU::DPCPPTensorContext::Meta meta,
-    const TensorOptions& options,
-    c10::optional<MemoryFormat> optional_memory_format) {
-  auto ndim = meta.dims().size();
-  if (3 != ndim || CHANNELSLAST1D_DPCPP != optional_memory_format) {
-    return at::AtenIpexTypeXPU::empty_opaque_tensor(
-        meta, options, optional_memory_format);
-  }
-  // ipex gpu channels last 1d
-  Tensor tmp =
-      at::AtenIpexTypeXPU::empty_opaque_tensor(meta, options, c10::nullopt);
-  return convert_tensor_to_channels_last_1d(tmp);
-}
-
 inline bool is_channels_last(at::MemoryFormat fmt) {
   if (
 #ifdef USE_CHANNELS_LAST_1D

@@ -16,6 +16,7 @@ supported:
   - copy_
   - dequantize.self
   - empty.memory_format
+  - empty_like
   - empty_strided
   - equal
   - int_repr

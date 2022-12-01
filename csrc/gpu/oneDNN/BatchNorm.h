@@ -118,10 +118,10 @@ static std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> batch_normalization(
   auto dst_md = bn_fwd_pd.dst_desc();
   if (!dst.defined()) {
     if (!src_ctx.is_plain()) {
-      dst = using_channels_last_for_onednn_op(src)
-          ? xpu::dpcpp::empty_opaque_tensor_dpcpp(
-                dst_md, src.options(), src_cl_mfmt)
-          : empty_opaque_tensor(dst_md, src.options(), c10::nullopt);
+      auto dst_fmt = using_channels_last_for_onednn_op(src)
+          ? src_cl_mfmt
+          : at::MemoryFormat::Contiguous;
+      dst = empty_opaque_tensor(dst_md, src.options(), dst_fmt);
     } else {
       dst = using_channels_last_for_onednn_op(src)
           ? xpu::dpcpp::empty_like_dpcpp(src, src.options(), src_cl_mfmt)

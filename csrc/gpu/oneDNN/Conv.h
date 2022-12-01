@@ -306,16 +306,11 @@ static at::Tensor convolution(
   std::vector<float> wgh_scales, conv_scale = {1};
   int conv_zero_point = 0;
   if (src.is_quantized()) {
-    auto wgh_ctx = DPCPPTensorContext::get_tensor_ctx(wgh);
-    if (!wgh_ctx.is_plain()) {
-      wgh_scales = wgh_ctx.scales();
+    if (wgh.qscheme() == kPerTensorAffine) {
+      wgh_scales.push_back(static_cast<float>(wgh.q_scale()));
     } else {
-      if (wgh.qscheme() == kPerTensorAffine) {
-        wgh_scales.push_back(static_cast<float>(wgh.q_scale()));
-      } else {
-        for (int i = 0; i < oc; i++) {
-          wgh_scales.push_back(wgh.q_per_channel_scales()[i].item<float>());
-        }
+      for (int i = 0; i < oc; i++) {
+        wgh_scales.push_back(wgh.q_per_channel_scales()[i].item<float>());
       }
     }
 
@@ -475,8 +470,9 @@ static at::Tensor convolution(
     xpu::oneDNN::reorder(reshaped_wgh, wgh_);
 
     if (weight_cache_optimization) {
-      strm.wait();
       auto wgh_opt_ctx = DPCPPTensorContext::release_tensor_ctx(wgh_);
+      wgh_opt_ctx.set_aten_meta(
+          {reshaped_wgh.sizes().vec(), reshaped_wgh.strides().vec()});
       DPCPPTensorContext::set_tensor_ctx(wgh, std::move(wgh_opt_ctx));
     }
   }
@@ -737,8 +733,8 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   auto expected_diff_wgh_md = conv_bwd_w_pd.diff_weights_desc();
   auto diff_wgh_m = diff_wgh_usr_m;
   if (diff_wgh_usr_m.get_desc() != expected_diff_wgh_md) {
-    diff_wgh_ =
-        empty_opaque_tensor(expected_diff_wgh_md, diff_wgh.options(), smf);
+    diff_wgh_ = empty_opaque_tensor(
+        expected_diff_wgh_md, diff_wgh.options(), c10::nullopt);
     diff_wgh_m =
         dpcpp_onednn_memory(expected_diff_wgh_md, engine, diff_wgh_.data_ptr());
   }

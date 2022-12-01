@@ -1,4 +1,5 @@
 #include "Context.h"
+#include <QuantizedXPUNativeFunctions.h>
 #include <oneDNN/oneDNN.h>
 #include <operators/comm/Scalar.h>
 
@@ -11,63 +12,22 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from) {
   if (!is_opaque_tensor(from))
     return from;
 
+  // use native API to break recursive call resulted by opaque guard in aten itf
+  auto to = from.is_quantized()
+      ? at::AtenIpexTypeQuantizedXPU::empty_like(
+            from,
+            c10::nullopt,
+            c10::nullopt,
+            c10::nullopt,
+            c10::nullopt,
+            c10::nullopt) // TODO: generate declaration with default arguments
+      : at::empty_like(from);
   auto ctx = *(static_cast<DPCPPTensorContext*>(
       from.unsafeGetTensorImpl()->storage().data_ptr().get_context()));
-
-  // case-1. int32 opaque tensor in plain fmt
-  if (from.scalar_type() == at::ScalarType::Long) {
-    mem_desc_t opaque_md = {ctx.meta().data};
-    // FIXME: to decide AB or BA plain format
-    mem_desc_t plain_md = {
-        ctx.dims(),
-        ctx.dtype(),
-        xpu::oneDNN::get_dnnl_default_format(
-            ctx.dims().size(),
-            /*is_channels_last*/ false,
-            /*allow_undef*/ true)};
-    if (opaque_md == plain_md) {
-      // max_pooling3d bwd case 5D(oneDNN) -> 4D(PyTorch)
-      auto smf = is_smf_channels_last(from)
-          ? get_cl_tag_by_ndim(from.sizes().size())
-          : at::MemoryFormat::Contiguous;
-      Tensor to = at::empty(from.sizes(), from.options(), smf);
-      dtype_convert_by_scalar(
-          to.data_ptr<int64_t>(), (int32_t*)from.data_ptr(), from.numel());
-      return to;
-    }
-  }
-
-  auto options = from.options();
-  if (from.scalar_type() == at::ScalarType::Long)
-    options = options.dtype(kInt);
-
-  at::MemoryFormat smf = at::MemoryFormat::Contiguous;
-  if (is_smf_channels_last(from)) {
-    smf = get_cl_tag_by_ndim(from.ndimension());
-  }
-  // reorder to plain based on current shape
-  auto to = !from.is_quantized()
-      ? at::AtenIpexTypeXPU::empty(ctx.dims(), options, smf)
-      : at::AtenIpexTypeXPU::new_qtensor(ctx.dims(), options, from.quantizer());
-  xpu::oneDNN::reorder(from, to);
-
-  // permute shape to original shape
-  if (!ctx.permution().empty())
-    to = at::native::permute(to, IntArrayRef(ctx.permution())).contiguous(smf);
-
-  // group convolution case 5D(oneDNN) -> 4D(PyTorch)
-  if (from.ndimension() != ctx.dims().size()) {
-    to = to.reshape(from.sizes()).contiguous(smf);
-  }
-
-  // case-2. int32 opaque tensor in block fmt
-  // 1. convert to plain 2. copy to int64
-  if (from.scalar_type() == at::ScalarType::Long) {
-    Tensor to_ = at::empty(ctx.dims(), from.options(), smf);
-    dtype_convert_by_scalar(
-        to_.data_ptr<int64_t>(), to.data_ptr<int32_t>(), to.numel());
-    to = to_;
-  }
+  auto to_meta = ctx.aten_meta();
+  auto to_ = share_storage_and_set_strided_as(
+      to, to_meta.sizes_, to_meta.strides_, c10::nullopt);
+  xpu::oneDNN::reorder(from, to_);
 
   return to;
 }

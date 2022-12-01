@@ -312,14 +312,16 @@ static inline void matmul(
   if (m2_usr_m.get_desc() != expected_m2_md) {
     m2_ = empty_opaque_tensor(expected_m2_md, m2.options(), c10::nullopt);
     m2_m = dpcpp_onednn_memory(expected_m2_md, engine, m2_.data_ptr());
-    xpu::oneDNN::reorder(m2_trans ? m2 : m2.t(), m2_);
+    auto m2_onednn_matmul_shape_compatible = m2_trans ? m2 : m2.t();
+    xpu::oneDNN::reorder(m2_onednn_matmul_shape_compatible, m2_);
 
     if (weight_cache_optimization) {
-      strm.wait();
       auto ctx_ =
           at::AtenIpexTypeXPU::DPCPPTensorContext::release_tensor_ctx(m2_);
       // assume oneDNN.matmul.weight is the permution of torch.nn.Linear.weight
-      ctx_.set_permution({1, 0});
+      ctx_.set_aten_meta(
+          {m2_onednn_matmul_shape_compatible.sizes().vec(),
+           m2_onednn_matmul_shape_compatible.strides().vec()});
       at::AtenIpexTypeXPU::DPCPPTensorContext::set_tensor_ctx(
           m2, std::move(ctx_));
     }

@@ -24,43 +24,37 @@ at::Tensor empty(
     const at::TensorOptions& options,
     c10::optional<at::MemoryFormat> memory_format);
 
-// creating oneDNN memory object by these ctx data, when reorder is needed.
+// PyTorch XPU Tensor context.
+// #1. Work as the context instance of at::Storage/at::DataPtr.
+// #2. Record oneDNN opaque memory meta.
 struct DPCPPTensorContext {
  public:
   using Meta = meta_t;
+  using aten_meta_t = struct AtenMeta {
+    std::vector<int64_t> sizes_;
+    std::vector<int64_t> strides_;
+  };
 
  private:
   data_t data_;
   meta_t meta_;
-  std::vector<float> scales_;
-  std::vector<int> zero_points_;
-  std::vector<long> permution_;
+  aten_meta_t aten_meta_;
 
  public:
   DPCPPTensorContext() = delete;
 
   DPCPPTensorContext(const DPCPPTensorContext& ctx)
-      : data_(ctx.data()),
-        meta_(ctx.meta()),
-        scales_(ctx.scales()),
-        zero_points_(ctx.zero_points()),
-        permution_(ctx.permution()) {}
+      : data_(ctx.data()), meta_(ctx.meta()), aten_meta_(ctx.aten_meta()) {}
 
   // plain tensor
   DPCPPTensorContext(data_t data)
       : data_(data),
         meta_({}, mem_dtype_t::undef, mem_layout_tag_t::undef),
-        scales_({1.f}),
-        zero_points_({0}),
-        permution_({}) {}
+        aten_meta_({{}, {}}) {}
 
   // block or plain tensor
   DPCPPTensorContext(data_t data, const meta_t& meta)
-      : data_(data),
-        meta_(meta),
-        scales_({1.f}),
-        zero_points_({0}),
-        permution_({}) {}
+      : data_(data), meta_(meta), aten_meta_({{}, {}}) {}
 
   int64_t padded_size() {
     if (is_plain())
@@ -72,7 +66,6 @@ struct DPCPPTensorContext {
       size *= padded_dims[dim];
     return size;
   }
-
   bool is_plain() {
     if (meta_.dims().size() == 0 && meta_.data_type() == mem_dtype_t::undef) {
       return true;
@@ -84,28 +77,23 @@ struct DPCPPTensorContext {
       return false;
     }
   }
-
   void to_plain() {
     meta_ = meta_t({}, mem_dtype_t::undef, mem_layout_tag_t::undef);
   }
-
   void set_meta(meta_t meta) {
     meta_ = meta;
   }
-
-  void set_scales(std::vector<float> scales) {
-    scales_ = scales;
+  void set_aten_meta(const aten_meta_t& aten_meta) {
+    aten_meta_ = aten_meta;
   }
-
-  void set_zero_points(std::vector<int> zero_points) {
-    zero_points_ = zero_points;
-  }
-
   data_t data() const {
     return data_;
   }
   meta_t meta() const {
     return meta_;
+  }
+  aten_meta_t aten_meta() const {
+    return aten_meta_;
   }
   mem_dims_t dims() const {
     return meta_.dims();
@@ -121,18 +109,6 @@ struct DPCPPTensorContext {
       strd[i] = strd[i + 1] * dims[i + 1];
     return strd;
   }
-  std::vector<float> scales() const {
-    return scales_;
-  }
-  std::vector<int> zero_points() const {
-    return zero_points_;
-  }
-  void set_permution(const std::vector<long>& permution) {
-    permution_ = permution;
-  }
-  std::vector<long> permution() const {
-    return permution_;
-  }
 
  public:
   static bool is_plain(const at::Tensor& t) {
@@ -140,6 +116,27 @@ struct DPCPPTensorContext {
       return true;
     auto ctx = get_tensor_ctx(t);
     return ctx.is_plain();
+  }
+
+  static void set_aten_meta(
+      at::Tensor& t,
+      std::vector<int64_t> sizes,
+      std::vector<int64_t> strides) {
+    auto ctx = (DPCPPTensorContext*)t.unsafeGetTensorImpl()
+                   ->storage()
+                   .unsafeGetStorageImpl()
+                   ->data_ptr()
+                   .get_context();
+    ctx->set_aten_meta({sizes, strides});
+  }
+
+  static aten_meta_t get_aten_meta(at::Tensor& t) {
+    auto ctx = (DPCPPTensorContext*)t.unsafeGetTensorImpl()
+                   ->storage()
+                   .unsafeGetStorageImpl()
+                   ->data_ptr()
+                   .get_context();
+    return ctx->aten_meta();
   }
 
   static DPCPPTensorContext release_tensor_ctx(const at::Tensor& t) {
