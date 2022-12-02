@@ -4,6 +4,7 @@ project(${IPEX_PROJ_NAME} VERSION ${CMAKE_PROJECT_VERSION})
 set(IPEX_ROOT_DIR ${PROJECT_SOURCE_DIR})
 set(IPEX_CPU_ROOT_DIR ${IPEX_ROOT_DIR}/csrc/cpu)
 set(IPEX_GPU_ROOT_DIR ${IPEX_ROOT_DIR}/csrc/gpu)
+set(IPEX_FRONT_END_ROOT_DIR ${IPEX_ROOT_DIR}/intel_extension_for_pytorch/csrc)
 list(APPEND CMAKE_MODULE_PATH ${IPEX_ROOT_DIR}/cmake/Modules)
 
 set(LINUX TRUE)
@@ -27,7 +28,27 @@ if (BUILD_STATS)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_CUSTOM "time -v")
 endif()
 
+# Common options:
+set(_CXX11_ABI_FLAG 0)
+if(DEFINED GLIBCXX_USE_CXX11_ABI)
+  if(${GLIBCXX_USE_CXX11_ABI} EQUAL 1)
+    set(CXX_STANDARD_REQUIRED ON)
+    set(_CXX11_ABI_FLAG 1)
+  endif()
+endif()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=${_CXX11_ABI_FLAG}")
+
+if(DEFINED PYBIND11_CL_FLAGS)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PYBIND11_CL_FLAGS}")
+else()
+  message(FATAL_ERROR, "Cannot get pybind11 abi compiler flags")
+endif()
+
+
 # CPU options:
+if(BUILD_MODULE_TYPE STREQUAL "CPU")
+  include(${IPEX_ROOT_DIR}/cmake/cpu/BuildFlags.cmake)
+endif()
 
 # XPU options:
 if(BUILD_MODULE_TYPE STREQUAL "GPU")
@@ -58,5 +79,11 @@ message(STATUS "  BUILD_STRIPPED_BIN    : ${BUILD_STRIPPED_BIN}")
 
 message(STATUS "")
 
-add_subdirectory(${IPEX_ROOT_DIR}/csrc)
-add_subdirectory(${IPEX_ROOT_DIR}/intel_extension_for_pytorch/csrc)
+# Dispatch for build.
+if(BUILD_MODULE_TYPE STREQUAL "CPU" OR BUILD_MODULE_TYPE STREQUAL "GPU")
+  add_subdirectory(${IPEX_ROOT_DIR}/csrc)
+endif()
+
+if(BUILD_MODULE_TYPE STREQUAL "PYTHON")
+ add_subdirectory(${IPEX_ROOT_DIR}/intel_extension_for_pytorch/csrc)
+endif()
