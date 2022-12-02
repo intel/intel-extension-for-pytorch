@@ -1,18 +1,17 @@
 #include <ATen/ATen.h>
+#include <ATen/DeviceGuard.h>
 #include <ATen/Functions.h>
 #include <ATen/native/Activation.h>
 #include <ATen/record_function.h>
-#include <torch/library.h>
-
 #include <core/Memory.h>
 #include <runtime/Utils.h>
+#include <tensor/Context.h>
+#include <tensor/Tensor.h>
+#include <torch/library.h>
 #include <utils/DPCPP.h>
-
+#include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/ApplyUtils.h"
-#include "comm/Numerics.h"
-
-#include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 
 #include <aten/operators/MemoryAccess.h>
@@ -54,13 +53,18 @@ void launch_vec_kernel_sgdMW(
   vec_w_t* weight_vec = reinterpret_cast<vec_w_t*>(weight_ptr);
   vec_g_t* grad_vec = reinterpret_cast<vec_g_t*>(grad_ptr);
 
+  auto using_momentum = bool(momentum);
+  auto using_weight_decay = bool(weight_decay);
+  auto pre_dampening = static_cast<float>(1.0 - dampening);
+  auto negative_lr = static_cast<float>((-1.0) * lr);
+
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(sycl::range<1>{global_range}, [=](sycl::item<1> item) {
       auto id = item.get_id(0);
 
       auto remaining = total_element - id * vec_size;
 
-      if (!momentum) {
+      if (!using_momentum) {
         if (remaining < vec_size) {
           for (auto v_index = 0; v_index < remaining; ++v_index) {
             // kick out tail
@@ -73,13 +77,13 @@ void launch_vec_kernel_sgdMW(
             auto temp_master_weight_value = master_weight_ptr[linear_idx];
 
             // d_p = d_p.add(p.master_weight, alpha=weight_decay)
-            if (weight_decay != 0) {
+            if (using_weight_decay) {
               grad_elm += temp_master_weight_value * weight_decay;
             }
 
             // p.master_weight.add_(d_p, alpha=-group['lr'])
             auto res = static_cast<float>(
-                temp_master_weight_value + grad_elm * (-1.0) * lr);
+                temp_master_weight_value + grad_elm * negative_lr);
             master_weight_ptr[linear_idx] = res;
 
             // p.data.copy_(p.master_weight.data)
@@ -87,27 +91,26 @@ void launch_vec_kernel_sgdMW(
           }
         } else {
           // vector value
-          vec_g_t grad_value = grad_vec[id];
           vec_mw_t master_weight_value = master_weight_vec[id];
-
           vec_w_t temp_weight;
           vec_mw_t temp_master_weight;
 
-#pragma unroll
+#pragma unroll(vec_size)
           for (auto v_index = 0; v_index < vec_size; ++v_index) {
-            // grad should be fp32 to involve in computation to keep acc.
-            // d_p = p.grad.to(p.master_weight.dtype)
-            auto grad_elm = static_cast<float>(grad_value[v_index]);
+            // [watch out] here using these methods to read BF16
+            // grad vector to avoid omit for read instruction. external JIRA:
+            // https://jira.devtools.intel.com/browse/CMPLRLLVM-42194
+            auto grad_elm = static_cast<float>(grad_vec[id][v_index]);
 
             auto temp_master_weight_value = master_weight_value[v_index];
 
             // d_p = d_p.add(p.master_weight, alpha=weight_decay)
-            if (weight_decay != 0) {
+            if (using_weight_decay) {
               grad_elm += temp_master_weight_value * weight_decay;
             }
 
             // p.master_weight.add_(d_p, alpha=-group['lr'])
-            auto res = temp_master_weight_value + grad_elm * (-1.0) * lr;
+            auto res = temp_master_weight_value + grad_elm * negative_lr;
             temp_master_weight[v_index] = static_cast<float>(res);
 
             // p.data.copy_(p.master_weight.data)
@@ -131,7 +134,7 @@ void launch_vec_kernel_sgdMW(
             auto temp_master_weight_value = master_weight_ptr[linear_idx];
 
             // d_p = d_p.add(p.master_weight, alpha=weight_decay)
-            if (weight_decay != 0) {
+            if (using_weight_decay) {
               grad_elm += temp_master_weight_value * weight_decay;
             }
 
@@ -143,7 +146,7 @@ void launch_vec_kernel_sgdMW(
               temp_momentum_buffer_value = momentum_buffer_ptr[linear_idx];
               temp_momentum_buffer_value =
                   momentum * temp_momentum_buffer_value;
-              temp_momentum_buffer_value += grad_elm * (1.0 - dampening);
+              temp_momentum_buffer_value += grad_elm * pre_dampening;
             }
             momentum_buffer_ptr[linear_idx] =
                 static_cast<float>(temp_momentum_buffer_value);
@@ -159,7 +162,7 @@ void launch_vec_kernel_sgdMW(
 
             // p.master_weight.add_(d_p, alpha=-group['lr'])
             auto res = static_cast<float>(
-                temp_master_weight_value + grad_elm * (-1.0) * lr);
+                temp_master_weight_value + grad_elm * negative_lr);
             master_weight_ptr[linear_idx] = res;
 
             // p.data.copy_(p.master_weight.data)
@@ -167,7 +170,6 @@ void launch_vec_kernel_sgdMW(
           }
         } else {
           // vector value
-          vec_g_t grad_value = grad_vec[id];
           vec_mw_t master_weight_value = master_weight_vec[id];
           vec_mw_t* momentum_buffer_vec =
               reinterpret_cast<vec_mw_t*>(momentum_buffer_ptr);
@@ -178,16 +180,17 @@ void launch_vec_kernel_sgdMW(
           vec_mw_t temp_master_weight;
           vec_mw_t temp_momentum_buffer;
 
-#pragma unroll
+#pragma unroll(vec_size)
           for (auto v_index = 0; v_index < vec_size; ++v_index) {
-            // grad should be fp32 to involve in computation to keep acc.
-            // d_p = p.grad.to(p.master_weight.dtype)
-            auto grad_elm = static_cast<float>(grad_value[v_index]);
+            // [watch out] here using these methods to read BF16
+            // grad vector to avoid omit for read instruction. external JIRA:
+            // https://jira.devtools.intel.com/browse/CMPLRLLVM-42194
+            auto grad_elm = static_cast<float>(grad_vec[id][v_index]);
 
             auto temp_master_weight_value = master_weight_value[v_index];
 
             // d_p = d_p.add(p.master_weight, alpha=weight_decay)
-            if (weight_decay != 0) {
+            if (using_weight_decay) {
               grad_elm += temp_master_weight_value * weight_decay;
             }
 
@@ -199,7 +202,7 @@ void launch_vec_kernel_sgdMW(
               temp_momentum_buffer_value = momentum_buffer_value[v_index];
               temp_momentum_buffer_value =
                   momentum * temp_momentum_buffer_value;
-              temp_momentum_buffer_value += grad_elm * (1.0 - dampening);
+              temp_momentum_buffer_value += grad_elm * pre_dampening;
             }
             temp_momentum_buffer[v_index] =
                 static_cast<float>(temp_momentum_buffer_value);
@@ -215,7 +218,7 @@ void launch_vec_kernel_sgdMW(
 
             // p.master_weight.add_(d_p, alpha=-group['lr'])
             auto res = static_cast<float>(
-                temp_master_weight_value + grad_elm * (-1.0) * lr);
+                temp_master_weight_value + grad_elm * negative_lr);
             temp_master_weight[v_index] = res;
 
             // p.data.copy_(p.master_weight.data)
@@ -234,7 +237,7 @@ void launch_vec_kernel_sgdMW(
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
-template <int vec_size, typename scalar_t>
+template <int vec_size>
 void launch_vec_kernel_sgd(
     Tensor& weight,
     Tensor& grad,
@@ -249,18 +252,22 @@ void launch_vec_kernel_sgd(
     const int64_t global_range) {
   auto& queue = dpcppGetCurrentQueue();
 
-  scalar_t* weight_ptr = weight.data_ptr<scalar_t>();
-  scalar_t* grad_ptr = grad.data_ptr<scalar_t>();
-  scalar_t* momentum_buffer_ptr = momentum_buffer.defined()
-      ? momentum_buffer.data_ptr<scalar_t>()
-      : nullptr;
+  float* weight_ptr = weight.data_ptr<float>();
+  float* grad_ptr = grad.data_ptr<float>();
+  float* momentum_buffer_ptr =
+      momentum_buffer.defined() ? momentum_buffer.data_ptr<float>() : nullptr;
 
   // grad and original weight have same datatype
-  using vec_w_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
+  using vec_w_t = at::native::Memory::aligned_vector_loop<float, vec_size>;
   using vec_g_t = vec_w_t;
 
   vec_w_t* weight_vec = reinterpret_cast<vec_w_t*>(weight_ptr);
   vec_g_t* grad_vec = reinterpret_cast<vec_g_t*>(grad_ptr);
+
+  auto using_momentum = bool(momentum);
+  auto using_weight_decay = bool(weight_decay);
+  auto pre_dampening = static_cast<float>(1.0 - dampening);
+  auto negative_lr = static_cast<float>((-1.0) * lr);
 
   // no master weight
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -268,7 +275,7 @@ void launch_vec_kernel_sgd(
       auto id = item.get_id(0);
 
       auto remaining = total_element - id * vec_size;
-      if (!momentum) {
+      if (!using_momentum) {
         if (remaining < vec_size) {
           for (auto v_index = 0; v_index < remaining; ++v_index) {
             // kick out tail
@@ -278,13 +285,12 @@ void launch_vec_kernel_sgd(
             auto grad_elm = grad_ptr[linear_idx];
 
             // d_p = d_p.add(p.master_weight, alpha=weight_decay)
-            if (weight_decay != 0) {
+            if (using_weight_decay) {
               grad_elm += temp_weight_value * weight_decay;
             }
 
             // p.add_(d_p, alpha=-group['lr'])
-            auto res = static_cast<scalar_t>(
-                temp_weight_value + grad_elm * (-1.0) * lr);
+            auto res = temp_weight_value + grad_elm * negative_lr;
             weight_ptr[linear_idx] = res;
           }
         } else {
@@ -300,13 +306,12 @@ void launch_vec_kernel_sgd(
             auto temp_weight_value = weight_value[v_index];
 
             // d_p = d_p.add(p, alpha=weight_decay)
-            if (weight_decay != 0) {
+            if (using_weight_decay) {
               grad_elm += temp_weight_value * weight_decay;
             }
 
             // p.add_(d_p, alpha=-group['lr'])
-            auto res = static_cast<scalar_t>(
-                temp_weight_value + grad_elm * (-1.0) * lr);
+            auto res = temp_weight_value + grad_elm * negative_lr;
             temp_weight[v_index] = res;
           }
 
@@ -324,7 +329,7 @@ void launch_vec_kernel_sgd(
             auto temp_weight_value = weight_ptr[linear_idx];
 
             // d_p = d_p.add(p, alpha=weight_decay)
-            if (weight_decay != 0) {
+            if (using_weight_decay) {
               grad_elm += temp_weight_value * weight_decay;
             }
 
@@ -336,10 +341,9 @@ void launch_vec_kernel_sgd(
               temp_momentum_buffer_value = momentum_buffer_ptr[linear_idx];
               temp_momentum_buffer_value =
                   momentum * temp_momentum_buffer_value;
-              temp_momentum_buffer_value += grad_elm * (1.0 - dampening);
+              temp_momentum_buffer_value += grad_elm * pre_dampening;
             }
-            momentum_buffer_ptr[linear_idx] =
-                static_cast<scalar_t>(temp_momentum_buffer_value);
+            momentum_buffer_ptr[linear_idx] = temp_momentum_buffer_value;
 
             // nesterov
             if (nesterov) {
@@ -351,8 +355,7 @@ void launch_vec_kernel_sgd(
             }
 
             // p.add_(d_p, alpha=-group['lr'])
-            auto res = static_cast<scalar_t>(
-                temp_weight_value + grad_elm * (-1.0) * lr);
+            auto res = temp_weight_value + grad_elm * negative_lr;
 
             // write back
             weight_ptr[linear_idx] = res;
@@ -376,7 +379,7 @@ void launch_vec_kernel_sgd(
             auto temp_weight_value = weight_value[v_index];
 
             // d_p = d_p.add(p, alpha=weight_decay)
-            if (weight_decay != 0) {
+            if (using_weight_decay) {
               grad_elm += temp_weight_value * weight_decay;
             }
 
@@ -388,10 +391,9 @@ void launch_vec_kernel_sgd(
               temp_momentum_buffer_value = momentum_buffer_value[v_index];
               temp_momentum_buffer_value =
                   momentum * temp_momentum_buffer_value;
-              temp_momentum_buffer_value += grad_elm * (1.0 - dampening);
+              temp_momentum_buffer_value += grad_elm * pre_dampening;
             }
-            temp_momentum_buffer[v_index] =
-                static_cast<scalar_t>(temp_momentum_buffer_value);
+            temp_momentum_buffer[v_index] = temp_momentum_buffer_value;
 
             // nesterov
             if (nesterov) {
@@ -403,8 +405,7 @@ void launch_vec_kernel_sgd(
             }
 
             // p.add_(d_p, alpha=-group['lr'])
-            auto res = static_cast<scalar_t>(
-                temp_weight_value + grad_elm * (-1.0) * lr);
+            auto res = temp_weight_value + grad_elm * negative_lr;
 
             // p.data.copy_(p.data)
             temp_weight[v_index] = res;
@@ -451,12 +452,37 @@ static void ComputeSGDKernelMasterWeight(
       getDeviceIdOfCurrentQueue(),
       reinterpret_cast<char*>(weight.data_ptr<scalar_t>()));
 
+  auto vec_size_grad = at::native::Memory::can_vectorize_up_to_loop<scalar_t>(
+      getDeviceIdOfCurrentQueue(),
+      reinterpret_cast<char*>(grad.data_ptr<scalar_t>()));
+
   auto vec_size_master_weight =
       at::native::Memory::can_vectorize_up_to_loop<float>(
           getDeviceIdOfCurrentQueue(),
           reinterpret_cast<char*>(master_weight.data_ptr<float>()));
 
-  auto vec_size = std::min(vec_size_master_weight, vec_size_weight);
+  auto vec_size_momentum_buffer = vec_size_master_weight;
+  // deduce the vector size if need momentum buffer
+  if (momentum) {
+    vec_size_momentum_buffer =
+        at::native::Memory::can_vectorize_up_to_loop<float>(
+            getDeviceIdOfCurrentQueue(),
+            reinterpret_cast<char*>(momentum_buffer.data_ptr<float>()));
+  }
+
+  auto vec_size = vec_size_weight;
+  if (!master_weight.is_non_overlapping_and_dense() ||
+      !grad.is_non_overlapping_and_dense() ||
+      !weight.is_non_overlapping_and_dense() ||
+      (momentum && !momentum_buffer.is_non_overlapping_and_dense())) {
+    vec_size = 1;
+  } else {
+    vec_size = std::min(
+        {vec_size_weight,
+         vec_size_grad,
+         vec_size_master_weight,
+         vec_size_momentum_buffer});
+  }
 
   auto total_element = weight.numel();
 
@@ -508,7 +534,6 @@ static void ComputeSGDKernelMasterWeight(
 #undef VEC_SGDMW_KERNEL
 }
 
-template <typename scalar_t>
 static void ComputeSGDKernel(
     Tensor& weight,
     Tensor& grad,
@@ -531,9 +556,32 @@ static void ComputeSGDKernel(
 
   auto& queue = dpcppGetCurrentQueue();
 
-  auto vec_size = at::native::Memory::can_vectorize_up_to_loop<scalar_t>(
+  auto vec_size_weight = at::native::Memory::can_vectorize_up_to_loop<float>(
       getDeviceIdOfCurrentQueue(),
-      reinterpret_cast<char*>(weight.data_ptr<scalar_t>()));
+      reinterpret_cast<char*>(weight.data_ptr<float>()));
+
+  auto vec_size_grad = at::native::Memory::can_vectorize_up_to_loop<float>(
+      getDeviceIdOfCurrentQueue(),
+      reinterpret_cast<char*>(grad.data_ptr<float>()));
+
+  auto vec_size_momentum_buffer = vec_size_weight;
+  // deduce the vector size if need momentum buffer
+  if (momentum) {
+    vec_size_momentum_buffer =
+        at::native::Memory::can_vectorize_up_to_loop<float>(
+            getDeviceIdOfCurrentQueue(),
+            reinterpret_cast<char*>(momentum_buffer.data_ptr<float>()));
+  }
+
+  auto vec_size = vec_size_weight;
+  if (!grad.is_non_overlapping_and_dense() ||
+      !weight.is_non_overlapping_and_dense() ||
+      (momentum && !momentum_buffer.is_non_overlapping_and_dense())) {
+    vec_size = 1;
+  } else {
+    vec_size =
+        std::min({vec_size_weight, vec_size_grad, vec_size_momentum_buffer});
+  }
 
   auto total_element = weight.numel();
 
@@ -542,20 +590,20 @@ static void ComputeSGDKernel(
       ? (total_element / vec_size)
       : (total_element / vec_size + 1);
 
-#define VEC_SGD_KERNEL(vec_size)               \
-  {                                            \
-    launch_vec_kernel_sgd<vec_size, scalar_t>( \
-        weight,                                \
-        grad,                                  \
-        weight_decay,                          \
-        momentum_buf_initialized,              \
-        momentum_buffer,                       \
-        momentum,                              \
-        dampening,                             \
-        nesterov,                              \
-        lr,                                    \
-        total_element,                         \
-        global_range);                         \
+#define VEC_SGD_KERNEL(vec_size)     \
+  {                                  \
+    launch_vec_kernel_sgd<vec_size>( \
+        weight,                      \
+        grad,                        \
+        weight_decay,                \
+        momentum_buf_initialized,    \
+        momentum_buffer,             \
+        momentum,                    \
+        dampening,                   \
+        nesterov,                    \
+        lr,                          \
+        total_element,               \
+        global_range);               \
   }
 
   switch (vec_size) {
@@ -601,10 +649,16 @@ c10::optional<at::Tensor> sgd_fused_step(
   RECORD_FUNCTION(
       "sgd_fused_step",
       std::vector<c10::IValue>({fp32_weight, grad, momentum_buffer_, weight}));
+  const OptionalDeviceGuard device_guard(device_of(fp32_weight));
+
+  // after inference, the model weight in the next training epoch maybe cached
+  // block, so to plain now if needed
+  fp32_weight = to_plain_if_needed_(fp32_weight);
+  grad = to_plain_if_needed_(grad);
 
   at::Tensor momentum_buffer;
   bool momentum_buf_initialized;
-  if (momentum != 0) {
+  if (momentum) {
     if (!momentum_buffer_.has_value()) {
       momentum_buffer = at::empty_like(fp32_weight);
       momentum_buf_initialized = false;
@@ -617,6 +671,10 @@ c10::optional<at::Tensor> sgd_fused_step(
   // master weight mode, fp32_weight contains fp32 master weight, weight is
   // bf16 weight, grad is bf16
   if (weight.numel()) {
+    // after inference, the model weight in the next training epoch maybe cached
+    // block, so to plain now if needed
+    weight = to_plain_if_needed_(weight);
+
     auto memory_format = weight.suggest_memory_format();
     fp32_weight = fp32_weight.contiguous(memory_format);
 
@@ -657,22 +715,19 @@ c10::optional<at::Tensor> sgd_fused_step(
     grad = grad.contiguous(memory_format);
 
     // all Tensor are fp32
-    IPEX_DISPATCH_FLOATING_TYPES(
-        fp32_weight.scalar_type(), "fusion_sgd_no_master_weight", [&] {
-          impl::ComputeSGDKernel<scalar_t>(
-              fp32_weight,
-              grad,
-              momentum_buffer,
-              weight_decay,
-              momentum,
-              dampening,
-              nesterov,
-              lr,
-              momentum_buf_initialized);
-        });
+    impl::ComputeSGDKernel(
+        fp32_weight,
+        grad,
+        momentum_buffer,
+        weight_decay,
+        momentum,
+        dampening,
+        nesterov,
+        lr,
+        momentum_buf_initialized);
   }
 
-  if (momentum == 0) {
+  if (!momentum) {
     return c10::nullopt;
   } else {
     return momentum_buffer;
