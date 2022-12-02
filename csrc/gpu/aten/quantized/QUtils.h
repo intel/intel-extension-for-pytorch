@@ -12,8 +12,47 @@
 #include <utils/Macros.h>
 #include <oneapi/dpl/cmath>
 
+#include <operators/comm/Numerics.h>
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
+
+#include <oneDNN/oneDNN.h>
+
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
+
+bool is_opaque_u8(const Tensor& qx);
+
+at::Tensor u8tos8(const at::Tensor& u8);
+
+template <typename T>
+inline T Round(const T x) {
+  return oneapi::dpl::nearbyint(x);
+}
+
+template <typename T>
+T quantize_val(double scale, int64_t zero_point, float value) {
+  int64_t qvalue;
+  constexpr int64_t qmin = std::numeric_limits<typename T::underlying>::min();
+  constexpr int64_t qmax = std::numeric_limits<typename T::underlying>::max();
+
+  qvalue = static_cast<int64_t>(zero_point + Round(value / scale));
+  qvalue = std::max<int64_t>(qvalue, qmin);
+  qvalue = std::min<int64_t>(qvalue, qmax);
+  return static_cast<T>(qvalue);
+}
+
+template <typename T>
+T quantize_val(float scale, int64_t zero_point, float value) {
+  int64_t qvalue;
+  constexpr int64_t qmin = std::numeric_limits<T>::min();
+  constexpr int64_t qmax = std::numeric_limits<T>::max();
+
+  qvalue = static_cast<int64_t>(zero_point + Round(value / scale));
+  qvalue = std::max<int64_t>(qvalue, qmin);
+  qvalue = std::min<int64_t>(qvalue, qmax);
+  return static_cast<T>(qvalue);
+}
 
 template <int kSpatialDim>
 struct PackedConvWeightQDPCPP : public ConvPackedParamsBase<kSpatialDim> {
@@ -153,23 +192,6 @@ struct PackedLinearWeightQDPCPP : public LinearPackedParamsBase {
       at::Tensor weight,
       c10::optional<at::Tensor> bias);
 };
-
-template <typename T>
-inline T Round(const T x) {
-  return oneapi::dpl::nearbyint(x);
-}
-
-template <typename T>
-T quantize_val(double scale, int64_t zero_point, float value) {
-  int64_t qvalue;
-  constexpr int64_t qmin = std::numeric_limits<typename T::underlying>::min();
-  constexpr int64_t qmax = std::numeric_limits<typename T::underlying>::max();
-
-  qvalue = static_cast<int64_t>(zero_point + Round(value / scale));
-  qvalue = std::max<int64_t>(qvalue, qmin);
-  qvalue = std::min<int64_t>(qvalue, qmax);
-  return static_cast<T>(qvalue);
-}
 
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

@@ -54,17 +54,17 @@ enum DPCPP_STATUS {
 // Command group function implementation
 #define DPCPP_Q_CGF(h) [&](sycl::handler & h)
 
-#define DPCPP_E_SYNC_FOR_DEBUG(e)                                  \
-  {                                                                \
-    static auto force_sync = Settings::I().is_sync_mode_enabled(); \
-    if (force_sync) {                                              \
-      (e).wait_and_throw();                                        \
-    }                                                              \
+#define DPCPP_E_SYNC_FOR_DEBUG(e)                                              \
+  {                                                                            \
+    static auto force_sync = xpu::dpcpp::Settings::I().is_sync_mode_enabled(); \
+    if (force_sync) {                                                          \
+      (e).wait_and_throw();                                                    \
+    }                                                                          \
   }
 
 #define DPCPP_EXT_SUBMIT(q, str, ker_submit)                                  \
   {                                                                           \
-    static auto verbose = Settings::I().get_verbose_level();                  \
+    static auto verbose = xpu::dpcpp::Settings::I().get_verbose_level();      \
     if (verbose) {                                                            \
       IPEX_TIMER(t, verbose, __func__);                                       \
       auto start_evt = xpu::dpcpp::queue_barrier(q);                          \
@@ -75,7 +75,7 @@ enum DPCPP_STATUS {
       t.now("end barrier");                                                   \
       e.wait_and_throw();                                                     \
       t.now("event wait");                                                    \
-      dpcpp_log((str), start_evt, end_evt);                                   \
+      xpu::dpcpp::dpcpp_log((str), start_evt, end_evt);                       \
       start_evt.wait_and_throw();                                             \
       end_evt.wait_and_throw();                                               \
       auto se_end =                                                           \
@@ -98,14 +98,14 @@ enum DPCPP_STATUS {
 
 #define DPCPP_Q_SUBMIT(q, cgf, ...)                                            \
   {                                                                            \
-    static auto verbose = Settings::I().get_verbose_level();                   \
+    static auto verbose = xpu::dpcpp::Settings::I().get_verbose_level();       \
     if (verbose) {                                                             \
       IPEX_TIMER(t, verbose, __func__);                                        \
       auto e = (q).submit((cgf), ##__VA_ARGS__);                               \
       t.now("submit");                                                         \
       e.wait_and_throw();                                                      \
       t.now("event wait");                                                     \
-      dpcpp_log("dpcpp_kernel", e);                                            \
+      xpu::dpcpp::dpcpp_log("dpcpp_kernel", e);                                \
       auto e_start =                                                           \
           e.template get_profiling_info<dpcpp_event_profiling_start>();        \
       auto e_end = e.template get_profiling_info<dpcpp_event_profiling_end>(); \
@@ -113,7 +113,7 @@ enum DPCPP_STATUS {
     } else {                                                                   \
       auto e = (q).submit((cgf), ##__VA_ARGS__);                               \
       (q).throw_asynchronous();                                                \
-      dpcpp_log("dpcpp_kernel", e);                                            \
+      xpu::dpcpp::dpcpp_log("dpcpp_kernel", e);                                \
       DPCPP_E_SYNC_FOR_DEBUG(e);                                               \
     }                                                                          \
   }

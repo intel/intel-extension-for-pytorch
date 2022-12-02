@@ -29,7 +29,7 @@ struct ipex_timer {
   std::vector<uint64_t> event_duration_;
 };
 
-#define IPEX_TIMER(t, ...) struct ipex_timer t(__VA_ARGS__)
+#define IPEX_TIMER(t, ...) struct xpu::dpcpp::ipex_timer t(__VA_ARGS__)
 
 } // namespace dpcpp
 } // namespace xpu
