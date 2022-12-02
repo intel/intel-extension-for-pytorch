@@ -42,6 +42,12 @@
 #   TORCH_IPEX_VERSION
 #     specify the extension version literal
 #
+#   MAX_JOBS
+#     process for parallel compile, must be a Integer
+#
+#   VERBOSE
+#     more output when compile
+#
 
 ##############################################################
 # XPU Build options:
@@ -573,31 +579,41 @@ class IPEXCPPLibBuild(build_clib, object):
             'IPEX_PROJ_NAME'        : PACKAGE_NAME
         }
 
+        cmake_common_args = []
+
         use_ninja = False
         build_with_xpu = False
         sequential_build = False
         my_env = os.environ.copy()
+
         for var, val in my_env.items():
             if var.startswith(('BUILD_', 'USE_', 'CMAKE_')):
                 if var == 'CMAKE_PREFIX_PATH':
+                    # XXX: Do NOT overwrite CMAKE_PREFIX_PATH. Append into the list, instead!
                     build_option_common[var] = ';'.join([build_option_common[var], val.replace(':', ';')])
-                    continue # XXX: Do NOT overwrite CMAKE_PREFIX_PATH. Append into the list, instead!
-                if var == 'BUILD_STATS' and val.upper() in ON_ENV_VAL:
-                    sequential_build = True
-                if var == 'BUILD_WITH_XPU' and val.upper() in ON_ENV_VAL:
-                    build_with_xpu = True
+                    continue
                 if var == 'USE_NINJA' and val.upper() in ON_ENV_VAL:
                     use_ninja = True
+                    cmake_common_args.append('-GNinja')
+                    continue
+                if var == 'BUILD_STATS' and val.upper() in ON_ENV_VAL:
+                    sequential_build = True
+                    # fall through
+                if var == 'BUILD_WITH_XPU' and val.upper() in ON_ENV_VAL:
+                    build_with_xpu = True
+                    # fall through
                 build_option_common[var] = val
 
-        cmake_common_args = []
         defines(cmake_common_args, **build_option_common)
 
-        build_nproc = str(os.cpu_count())
+        nproc = min(int(os.environ.get('MAX_JOBS', os.cpu_count())), os.cpu_count())
         if sequential_build:
-            build_nproc = '1'
+            nproc = 1
             print("WARNING: Practice as sequential build with single process !")
-        build_args = ['-j', build_nproc, 'install']
+
+        build_args = ['-j', str(nproc), 'install']
+        if _check_env_flag('VERBOSE'):
+            build_args.append('-v' if use_ninja else '-d')
 
         # Build XPU module:
         if(build_with_xpu):
@@ -772,6 +788,7 @@ def make_relative_rpath(path):
         raise "Windows support is in the plan. Intel Extension for PyTorch supports Linux now."
     else:
         return '-Wl,-rpath,$ORIGIN/' + path
+
 
 def pyi_module():
     main_libraries = ['intel-ext-pt-python']
