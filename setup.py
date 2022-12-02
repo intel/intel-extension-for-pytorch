@@ -60,6 +60,7 @@
 # USE_MULTI_CONTEXT     - to create DPC++ runtime context per device
 # USE_AOT_DEVLIST       - to set device list for AOT build option, for example, bdw,tgl,ats,..."
 # USE_SYCL_ASSERT       - to enable assert in sycl kernel
+# USE_ITT_ANNOTATION    - to enable ITT annotation in sycl kernel
 # BUILD_STATS           - to count statistics for each component during build process
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)
 # BUILD_STRIPPED_BIN    - to strip all symbols after build
@@ -659,7 +660,8 @@ class IPEXCPPLibBuild(build_clib, object):
                 build_option_gpu = {
                     **build_option_gpu,
                     'BUILD_SEPARATE_OPS'    : 'ON',
-                    'USE_SYCL_ASSERT'       : 'ON'
+                    'USE_SYCL_ASSERT'       : 'ON',
+                    'USE_ITT_ANNOTATION'    : 'ON'
                 }
 
             cmake_args_gpu = copy.deepcopy(cmake_common_args)

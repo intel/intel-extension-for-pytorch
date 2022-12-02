@@ -135,9 +135,14 @@ if(USE_AOT_DEVLIST)
   set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -Xs '-device ${USE_AOT_DEVLIST}'")
 endif()
 
-# Make assert available in sycl kernel 
+# Make assert available in sycl kernel
 if(USE_SYCL_ASSERT)
   set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -DSYCL_FALLBACK_ASSERT=1")
+endif()
+
+# Disable ITT annotation instrument in sycl kernel
+if(NOT USE_ITT_ANNOTATION)
+  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fno-sycl-instrument-device-code")
 endif()
 
 # Since 2016 Debian start using RUNPATH instead of normally RPATH, which gave the annoy effect that
