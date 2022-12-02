@@ -2,10 +2,12 @@
 #include <c10/util/hash.h>
 #include <torch/csrc/jit/frontend/error_report.h>
 #include <torch/csrc/jit/ir/alias_analysis.h>
+#include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/pass_manager.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 #include <torch/csrc/jit/passes/tensorexpr_fuser.h>
+#include <torch/csrc/jit/runtime/graph_iterator.h>
 #include <torch/csrc/jit/runtime/operator.h>
 #include <iostream>
 #include <string>
@@ -461,6 +463,44 @@ class OpFuser {
     }
     return std::make_pair(++pos->iterator(), changed);
   }
+
+  bool isXPUValue(Value* v) {
+    // it is not a tensor type
+    if (!v->type()->isSubtypeOf(TensorType::get())) {
+      return false;
+    }
+
+    auto device = v->type()->expectRef<TensorType>().device();
+
+    if (!device) {
+      return false; // this tensor has not device info
+    }
+    return (device->is_xpu() ? true : false);
+  }
+
+  bool isXPUNode(Node* node) {
+    bool is_xpu = false;
+    for (const auto& output : node->outputs()) {
+      is_xpu = is_xpu || isXPUValue(output);
+      if (is_xpu)
+        return true;
+    }
+    for (const auto& input : node->inputs()) {
+      is_xpu = is_xpu || isXPUValue(input);
+      if (is_xpu)
+        return true;
+    }
+    return false;
+  }
+
+  bool hasXPUNodes() {
+    torch::jit::DepthFirstGraphNodeIterator it(graph_);
+    for (auto* node = it.next(); node != nullptr; node = it.next()) {
+      if (isXPUNode(node))
+        return true;
+    }
+    return false;
+  }
 };
 
 // TODO: These rules should be more scalable
@@ -616,7 +656,23 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   // Pattern based fusion was lack of alias analysis
   // ??? It may either be too conservative or too aggressive ???
   // getSubgraphRewriter().runOnGraph(graph);
-  OpFuser(graph->block(), graph).run();
+
+  auto xpu_fuser = OpFuser(graph->block(), graph);
+  if (!torch::jit::getProfilingMode()) {
+    // Case 1: Profiling mode is off, no device info can be touched,
+    // eanble fusion with warning.
+    TORCH_WARN(
+        "IPEX XPU dedicated fusion passes are enabled in ScriptGraph non profiling execution mode. "
+        "Please enable profiling execution mode to retrieve device guard. \n");
+    OpFuser(graph->block(), graph).run();
+  } else if (xpu_fuser.hasXPUNodes()) {
+    // Case 2: Profiling mode is on and XPU node exists in graph. Run fusion.
+    OpFuser(graph->block(), graph).run();
+  } else {
+    // Case 3: Profile is on, but no XPU node.
+    // Do nothing, since fusion is dangerous
+    return;
+  }
 
   // TODO: Some post processing?? ECS/EDC/Peephole???
   ConstantPropagation(graph);

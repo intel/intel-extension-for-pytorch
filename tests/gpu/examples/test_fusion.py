@@ -13,9 +13,6 @@ from torch.jit._recursive import wrap_cpp_module
 
 import pytest
 
-torch._C._jit_set_profiling_mode(False)
-torch._C._jit_set_profiling_executor(False)
-
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 print_graph = True
@@ -1204,8 +1201,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1222,8 +1220,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device), atol=1e-3, rtol=1.3e-6)
@@ -1240,8 +1239,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device), atol=1e-3, rtol=1.3e-6)
@@ -1258,8 +1258,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1276,8 +1277,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1294,8 +1296,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1312,8 +1315,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1330,8 +1334,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1348,8 +1353,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1366,8 +1372,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1384,8 +1391,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1402,8 +1410,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1420,8 +1429,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1439,8 +1449,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.script(model)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             print("jit model input: ", x)
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -1458,8 +1469,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1476,8 +1488,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x, check_trace=True)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1494,8 +1507,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1512,8 +1526,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1530,8 +1545,10 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.inlined_graph)
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1548,8 +1565,9 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x))
+            for i in range(3):
+                if print_graph and i==2:
+                    print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
