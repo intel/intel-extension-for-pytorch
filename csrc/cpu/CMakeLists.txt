@@ -48,9 +48,6 @@ include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/third_party/o
 
 include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/include)
 
-# Set installed MKL install dir
-include_directories(${MKL_INSTALL_DIR}/include)
-
 # Set installed PyTorch dir
 if(DEFINED PYTORCH_INSTALL_DIR)
   include_directories(${PYTORCH_INSTALL_DIR}/include)
@@ -135,18 +132,21 @@ if (DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
   endif()
 endif()
 
-find_library(MKL_LIBRARY libmkl_core.a PATHS "${MKL_INSTALL_DIR}/lib" "${MKL_INSTALL_DIR}/lib/intel64")
-if (NOT MKL_LIBRARY)
-  message(FATAL_ERROR "libmkl_core.a not found in ${MKL_INSTALL_DIR}")
+find_package(oneMKL QUIET)
+if (ONEMKL_FOUND)
+  target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${ONEMKL_INCLUDE_DIR})
+  if(BUILD_WITH_XPU)
+    target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${ONEMKL_CPU_LIBS})
+  else()
+    target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC
+      -Wl,--start-group
+      ${ONEMKL_CPU_LIBS}
+      -Wl,--end-group)
+  endif()
+else()
+  message(FATAL_ERROR "ERROR: Cannot find oneMKL!")
 endif()
-get_filename_component(MKL_LIBRARY_DIR ${MKL_LIBRARY} DIRECTORY)
-message(STATUS "Using MKL in ${MKL_LIBRARY_DIR}")
-target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC
-  -Wl,--start-group
-  ${MKL_LIBRARY_DIR}/libmkl_intel_lp64.a
-  ${MKL_LIBRARY_DIR}/libmkl_gnu_thread.a
-  ${MKL_LIBRARY_DIR}/libmkl_core.a
-  -Wl,--end-group)
+
 target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
 target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 

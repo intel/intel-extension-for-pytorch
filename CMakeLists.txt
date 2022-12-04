@@ -17,7 +17,7 @@ set(CMAKE_INSTALL_RPATH $ORIGIN)
 
 include(CMakeDependentOption)
 # General options:
-option(BUILD_WITH_XPU "Build XPU backend implementation" ON)
+option(BUILD_WITH_XPU "Build XPU backend implementation" OFF)
 option(BUILD_NO_CLANGFORMAT "Build without force clang-format" OFF)
 option(BUILD_STATS "Count statistics for each component during build process" OFF)
 option(BUILD_STRIPPED_BIN "Strip all symbols after build" OFF)

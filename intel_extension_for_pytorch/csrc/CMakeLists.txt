@@ -1,6 +1,8 @@
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhonor-nans")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhonor-infinities")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-associative-math")
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhonor-nans")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhonor-infinities")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-associative-math")
+endif()
 
 # Set installed PyTorch dir
 if(DEFINED PYTORCH_INSTALL_DIR)

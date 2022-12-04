@@ -5,10 +5,14 @@ project(IPEX_CPP_TEST)
 set(LINUX TRUE)
 set(CMAKE_INSTALL_MESSAGE NEVER)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../../../cmake/Modules)
 
 # specify the C++ standard
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 14)
+
+# relocatable binary with automatically rpath of depend libraries
+set(CMAKE_INSTALL_RPATH $ORIGIN)
 
 set(CPU_CPP_TEST_NAME ipex_cpp_test)
 
@@ -28,7 +32,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=${_CXX11_ABI_FL
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-Bsymbolic-functions")
 
 # Set the include dir
-include_directories(${MKL_INSTALL_DIR}/include)
 include_directories(${PYTORCH_INSTALL_DIR}/include)
 include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include/)
 include_directories(${THIRD_PARTY_ROOT}/googletest/googletest/include)
@@ -45,6 +48,21 @@ add_subdirectory(${THIRD_PARTY_ROOT}/googletest ${CPP_TEST_BUILD_DIR}/third_part
 set(IPEX_CPP_TEST_SOURCES test_runtime_api.cpp test_dyndisp_and_isa_api.cpp)
 
 add_executable(${CPU_CPP_TEST_NAME} ${IPEX_CPP_TEST_SOURCES})
+
+find_package(oneMKL QUIET)
+if (ONEMKL_FOUND)
+  target_include_directories(${CPU_CPP_TEST_NAME} PUBLIC ${ONEMKL_INCLUDE_DIR})
+  if(BUILD_WITH_XPU)
+    target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${ONEMKL_CPU_LIBS})
+  else()
+    target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC
+      -Wl,--start-group
+      ${ONEMKL_CPU_LIBS}
+      -Wl,--end-group)
+  endif()
+else()
+  message(FATAL_ERROR "ERROR: Cannot find oneMKL!")
+endif()
 
 target_link_directories(${CPU_CPP_TEST_NAME} PRIVATE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/)
 

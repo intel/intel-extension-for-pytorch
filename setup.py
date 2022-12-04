@@ -211,86 +211,11 @@ def parser_build_args():
 pytorch_install_dir, USE_CXX11_ABI, build_target = parser_build_args()
 
 
-# configure for MKL
-def get_mkl_config():
-    mkl_install_dir = os.getenv('MKLROOT', '')
-    if build_target != 'clean':
-        if mkl_install_dir:
-            mkl_header = glob.glob(f'{mkl_install_dir}/include/**/mkl_version.h', recursive = True)
-            if len(mkl_header) == 0:
-                raise RuntimeError(f'{mkl_install_dir} doesn\'t seem to be a valid MKL library directory.\n{" ":14}mkl_version.h not found.')
-            else:
-                mkl_header = mkl_header[0]
-                mkl_major = 0
-                mkl_minor = 0
-                mkl_patch = 0
-                with open(mkl_header) as fp:
-                    for line in fp:
-                        matches = re.match('#define __INTEL_MKL__ +(\d+)', line.strip())
-                        if matches:
-                            mkl_major = int(matches.groups()[0])
-                        matches = re.match('#define __INTEL_MKL_MINOR__ +(\d+)', line.strip())
-                        if matches:
-                            mkl_minor = int(matches.groups()[0])
-                        matches = re.match('#define __INTEL_MKL_UPDATE__ +(\d+)', line.strip())
-                        if matches:
-                            mkl_patch = int(matches.groups()[0])
-                mkl_version = f'{mkl_major}.{mkl_minor}.{mkl_patch}'
-                if pkg_ver.parse(mkl_version) < pkg_ver.parse('2021.0.0'):
-                    raise RuntimeError(f'MKL version({mkl_version}) is not supported. Please use MKL later than 2021.0.0.')
-                mkl_library = glob.glob(f'{mkl_install_dir}/lib/**/libmkl_core.a', recursive = True)
-                if len(mkl_library) == 0:
-                    raise RuntimeError(f'libmkl_core.a not found in {mkl_install_dir}/lib/intel64.')
-        if not mkl_install_dir:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'mkl-include>=2021.0.0'])
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-deps', 'mkl-static>=2021.0.0'])
-            mkl_install_dir = os.path.abspath(os.path.join(os.path.dirname(sys.executable), ".."))
-
-    # Find the oneMKL library path
-    mkl_lib_path = mkl_install_dir + "/lib/"
-    mkl_include_path = mkl_install_dir + "/include/"
-
-    return mkl_install_dir, mkl_include_path, mkl_lib_path
-
-
-# FIXME: MKL path should be handled in CMake, instead of here
-mkl_install_dir, mkl_include_path, mkl_lib_path = get_mkl_config()
-
-
 def _build_installation_dependency():
     install_requires = []
     install_requires.append('psutil')
     install_requires.append('numpy')
     return install_requires
-
-    # Disable PyTorch wheel binding temporarily
-    #TORCH_URL = 'torch @ https://download.pytorch.org/whl/cpu/torch-{0}%2Bcpu-cp{1}{2}-cp{1}{2}-linux_x86_64.whl'.format(TORCH_VERSION, PYTHON_VERSION.major, PYTHON_VERSION.minor)
-    #if IS_DARWIN:
-    #    TORCH_URL = 'torch=={}'.format(TORCH_VERSION)
-    #else:
-    #    OS_VER = 'linux_x86_64'
-    #    if IS_WINDOWS:
-    #        TORCH_URL = 'torch @ https://download.pytorch.org/whl/cpu/torch-{0}%2Bcpu-cp{1}{2}-cp{1}{2}-win_amd64.whl'.format(TORCH_VERSION, PYTHON_VERSION.major, PYTHON_VERSION.minor)
-    #        OS_VER = 'win_amd64'
-
-    #    try:
-    #        fp = urllib.request.urlopen('https://download.pytorch.org/whl/torch_stable.html', timeout=30)
-    #        cont_bytes = fp.read()
-    #        cont = cont_bytes.decode('utf8').replace('\n', '')
-    #        fp.close()
-
-    #        lines = re.split(r'<br>', cont)
-
-    #        for line in lines:
-    #            matches = re.match('<a href="(cpu\/torch-{0}.*cp{1}{2}.*{3}.*)">(.*)<\/a>'.format(TORCH_VERSION, PYTHON_VERSION.major, PYTHON_VERSION.minor, OS_VER), line)
-    #            if matches and len(matches.groups()) == 2:
-    #                TORCH_URL = 'torch @ https://download.pytorch.org/whl/{}'.format(matches.group(2))
-    #                break
-    #    except Exception:
-    #        pass
-
-    #install_requires.append(TORCH_URL)
-    #return install_requires
 
 
 def get_cmake_command():
@@ -598,7 +523,6 @@ class IPEXCPPLibBuild(build_clib, object):
             'PYTHON_EXECUTABLE'     : sys.executable,
             'PYTHON_PLATFORM_INFO'  : platform.platform(),
             'PYTORCH_INSTALL_DIR'   : pytorch_install_dir,
-            'MKL_INSTALL_DIR'       : mkl_install_dir,
             'PYBIND11_CL_FLAGS'     : get_pybind11_abi_compiler_flags(),
             'IPEX_PROJ_NAME'        : PACKAGE_NAME
         }
@@ -686,7 +610,7 @@ class IPEXCPPLibBuild(build_clib, object):
 
         defines(cmake_args_cpu, **build_option_cpp_test)
         _gen_build_cfg_from_cmake(cmake_exec, get_cpp_test_dir(), cmake_args_cpu, get_cpp_test_build_dir(), my_env)
-        
+
         # Generate cmake for common python module:
         build_option_python = {
             'BUILD_MODULE_TYPE' : 'PYTHON',
@@ -826,7 +750,6 @@ def pyi_module():
     include_dirs = [
         os.path.realpath("."),
         os.path.realpath(os.path.join(PACKAGE_NAME, "csrc")),
-        #os.path.join(mkl_include_path),
         os.path.join(pytorch_install_dir, "include"),
         os.path.join(pytorch_install_dir, "include", "torch", "csrc", "api", "include")]
 
