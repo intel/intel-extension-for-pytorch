@@ -65,7 +65,7 @@ void GroupNormKernelImplInternal(
       T_ACC mean_val;
       T_ACC rstd_val;
       std::tie(mean_val, rstd_val) =
-          at::native::utils::RowwiseMoments(X_ptr, inner_size);
+          at::native::CPU_CAPABILITY::RowwiseMoments(X_ptr, inner_size);
       rstd_val = T_ACC(1) / std::sqrt(std::max(rstd_val, T_ACC(0)) + eps);
       if (gamma_null && beta_null) {
         T* Y_ptr = Y_data + i * inner_size;
