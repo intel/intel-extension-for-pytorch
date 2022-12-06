@@ -159,6 +159,40 @@ class dists {
   };
 };
 
+template <int SG_SIZE, typename scalar_t, typename F, typename nd_item>
+DPCPP_DEVICE scalar_t subgroup_reduce_agg_impl(nd_item item, scalar_t value) {
+  const auto sg = item.get_sub_group();
+
+#pragma unroll
+  for (int offset = (SG_SIZE >> 1); offset > 0; offset >>= 1) {
+    F::agg(value, sg.shuffle_down(value, offset));
+  }
+  return value;
+}
+
+template <typename scalar_t, typename F, typename nd_item>
+DPCPP_DEVICE scalar_t
+subgroup_reduce_agg(nd_item item, scalar_t value, const int sg_size) {
+  scalar_t ret;
+  switch (sg_size) {
+    case 8:
+      ret = subgroup_reduce_agg_impl<8, scalar_t, F, nd_item>(item, value);
+      break;
+    case 16:
+      ret = subgroup_reduce_agg_impl<16, scalar_t, F, nd_item>(item, value);
+      break;
+    case 32:
+      ret = subgroup_reduce_agg_impl<32, scalar_t, F, nd_item>(item, value);
+      break;
+    case 64:
+      ret = subgroup_reduce_agg_impl<64, scalar_t, F, nd_item>(item, value);
+      break;
+    default:
+      SYCL_KERNEL_ASSERT(false);
+  }
+  return ret;
+}
+
 template <
     typename scalar_t,
     typename F,
@@ -168,19 +202,26 @@ static inline scalar_t reduce_agg(
     scalar_t agg,
     nd_item item,
     const local_shared& local_shared_mem) {
-  auto local_idx = item.get_local_id(0);
-  auto group_size = item.get_local_range(0);
+  const auto sg = item.get_sub_group();
+  const int sg_size = sg.get_local_range()[0];
 
-  local_shared_mem[local_idx] = agg;
+  const int group_size = item.get_local_range(0);
+  const int sg_num = group_size / sg_size;
 
-  for (int offset = group_size / 2; offset > 0; offset >>= 1) {
-    item.barrier(dpcpp_local_fence);
-    if (local_idx < offset && local_idx + offset < group_size) {
-      scalar_t other = local_shared_mem[local_idx + offset];
-      F::agg(agg, other);
-      local_shared_mem[local_idx] = agg;
-    }
+  const int local_id = item.get_local_id(0);
+  const int lane_id = local_id % sg_size;
+  const int sg_id = local_id / sg_size;
+  agg = subgroup_reduce_agg<scalar_t, F, nd_item>(item, agg, sg_size);
+  item.barrier(dpcpp_local_fence);
+  if (0 == lane_id) {
+    local_shared_mem[sg_id] = agg;
   }
+  item.barrier(dpcpp_local_fence);
+  agg = (local_id < sg_num) ? local_shared_mem[lane_id] : (scalar_t)0;
+  if (0 == sg_id) {
+    agg = subgroup_reduce_agg<scalar_t, F, nd_item>(item, agg, sg_size);
+  }
+
   return agg;
 }
 
@@ -191,9 +232,25 @@ Tensor _euclidean_dist(const Tensor& x1, const Tensor& x2) {
   Tensor x2_pad = at::ones_like(x2_norm, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   Tensor x1_ = at::cat({x1.mul(-2), x1_norm, x1_pad}, -1);
   Tensor x2_ = at::cat({x2, x2_pad, x2_norm}, -1);
-  Tensor result = x1_.matmul(x2_.mT());
+  Tensor result = x1_.matmul(x2_.transpose(-2, -1));
   result.clamp_min_(0).sqrt_();
   return result;
+}
+
+std::tuple<Tensor, Tensor> _euclidean_dist_backward(
+    const Tensor& grad,
+    const Tensor& x1,
+    const Tensor& x2,
+    const Tensor& res) {
+  if (!grad.defined()) {
+    return std::tuple<Tensor, Tensor>(Tensor(), Tensor());
+  }
+  // handle case at 0 where we return a subgradient containing 0
+  Tensor ratio = grad / res;
+  ratio.masked_fill_(res == 0, 0);
+  return std::tuple<Tensor, Tensor>{
+      x1 * ratio.sum(-1, true) - ratio.matmul(x2),
+      x2 * ratio.sum(-2, false).unsqueeze(-1) - ratio.mT().matmul(x1)};
 }
 
 template <typename scalar_t, typename F, int p_tpye>
@@ -459,26 +516,28 @@ static void cdist_forward_kernel_impl(
     const double p,
     const int64_t r1,
     const int64_t r2,
-    const int64_t c1,
-    const int64_t c2,
+    const int64_t m,
     const int64_t r_size,
     const int64_t l1_size,
     const int64_t l2_size) {
   const auto ngroups = result.numel();
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-
-  auto out_ptr = result.data_ptr<scalar_t>();
-  auto x1_ptr = x1.data_ptr<scalar_t>();
-  auto x2_ptr = x2.data_ptr<scalar_t>();
+  auto wgroup_size = 32;
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
+    auto out_data = result.data_ptr<scalar_t>();
+    auto x1_data = x1.data_ptr<scalar_t>();
+    auto x2_data = x2.data_ptr<scalar_t>();
     // Create the local shared memory for reducing
     sycl::accessor<scalar_t, 1, dpcpp_rw_mode, sycl::access::target::local>
         shared(wgroup_size, __cgh);
 
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
+      auto out_ptr = out_data;
+      auto x1_ptr = x1_data;
+      auto x2_ptr = x2_data;
+
       const int64_t group_id = item_id.get_group_linear_id();
       const int64_t local_id = item_id.get_local_linear_id();
       const int64_t l = group_id / r_size;
@@ -487,10 +546,10 @@ static void cdist_forward_kernel_impl(
       const int64_t j = k % r2;
       const size_t stride = item_id.get_local_range().size();
 
-      scalar_t* start = x1_ptr + l * l1_size + i * c1;
-      scalar_t* end = start + c1;
+      scalar_t* start = x1_ptr + l * l1_size + i * m;
+      scalar_t* end = start + m;
       scalar_t* a = start + local_id;
-      scalar_t* b = x2_ptr + l * l2_size + j * c2 + local_id;
+      scalar_t* b = x2_ptr + l * l2_size + j * m + local_id;
 
       scalar_t agg = 0.0;
       for (; a < end; a += stride, b += stride) {
@@ -519,46 +578,43 @@ static Tensor cdist_forward(
     const double p,
     c10::optional<int64_t> compute_mode) {
   int64_t mode = compute_mode.value_or(0);
-  TORCH_CHECK(
-      mode >= 0 && mode <= 2, "possible modes: 0, 1, 2, but was: ", mode);
-
-  int64_t c1 = x1.size(-1);
-  int64_t c2 = x2.size(-1);
   int64_t r1 = x1.size(-2);
   int64_t r2 = x2.size(-2);
+  int64_t m = x1.size(-1);
   int64_t dim1 = x1.dim();
   int64_t dim2 = x2.dim();
-  IntArrayRef batch_tensor1(x1.sizes().data(), dim1 - 2);
-  IntArrayRef batch_tensor2(x2.sizes().data(), dim2 - 2);
-  std::vector<int64_t> expand_batch_portion =
-      at::infer_size(batch_tensor1, batch_tensor2);
-  std::vector<int64_t> tensor1_expand_size(expand_batch_portion);
-  tensor1_expand_size.insert(tensor1_expand_size.end(), {r1, c1});
-  std::vector<int64_t> tensor2_expand_size(expand_batch_portion);
-  tensor2_expand_size.insert(tensor2_expand_size.end(), {r2, c2});
+  IntArrayRef batchsize1(x1.sizes().data(), dim1 - 2);
+  IntArrayRef batchsize2(x2.sizes().data(), dim2 - 2);
+  std::vector<int64_t> expand_batchsize =
+      at::infer_size(batchsize1, batchsize2);
+  std::vector<int64_t> x1_expand_size(expand_batchsize);
+  x1_expand_size.insert(x1_expand_size.end(), {r1, m});
+  std::vector<int64_t> x2_expand_size(expand_batchsize);
+  x2_expand_size.insert(x2_expand_size.end(), {r2, m});
 
-  const int64_t expand_batch_product =
-      c10::multiply_integers(expand_batch_portion);
-  std::vector<int64_t> tensor1_view{expand_batch_product, r1, c1};
-  std::vector<int64_t> tensor2_view{expand_batch_product, r2, c2};
+  int expand_batch_product = std::accumulate(
+      expand_batchsize.begin(),
+      expand_batchsize.end(),
+      1,
+      std::multiplies<int64_t>());
+  std::vector<int64_t> x1_view{expand_batch_product, r1, m};
+  std::vector<int64_t> x2_view{expand_batch_product, r2, m};
 
-  Tensor tensor1_expanded =
-      x1.expand(tensor1_expand_size).contiguous().view(tensor1_view);
-  Tensor tensor2_expanded =
-      x2.expand(tensor2_expand_size).contiguous().view(tensor2_view);
+  Tensor x1_expanded = x1.expand(x1_expand_size).contiguous().view(x1_view);
+  Tensor x2_expanded = x2.expand(x2_expand_size).contiguous().view(x2_view);
 
-  std::vector<int64_t> output_shape(expand_batch_portion);
+  std::vector<int64_t> output_shape(expand_batchsize);
   output_shape.insert(output_shape.end(), {r1, r2});
 
   Tensor result;
-  if (r1 == 0 || r2 == 0 || expand_batch_product == 0) {
+  if (r1 == 0 || r2 == 0) {
     result = at::empty(output_shape, x1.options());
-  } else if (c1 == 0) {
+  } else if (m == 0) {
     result = at::zeros(output_shape, x1.options());
   } else if (p == 2 && (mode == 1 || (mode == 0 && (r1 > 25 || r2 > 25)))) {
     Tensor dist = (expand_batch_product == 1)
         ? impl::_euclidean_dist(x1, x2)
-        : impl::_euclidean_dist(tensor1_expanded, tensor2_expanded);
+        : impl::_euclidean_dist(x1_expanded, x2_expanded);
     result = dist.view(output_shape);
   } else {
     result = at::empty(output_shape, x1.options());
@@ -571,68 +627,63 @@ static Tensor cdist_forward(
           if (p == 0.0) {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::zero, 0>(
                 result,
-                tensor1_expanded,
-                tensor2_expanded,
+                x1_expanded,
+                x2_expanded,
                 p,
                 r1,
                 r2,
-                c1,
-                c2,
+                m,
                 r1 * r2,
-                r1 * c1,
-                r2 * c2);
+                r1 * m,
+                r2 * m);
           } else if (p == 1.0) {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::one, 1>(
                 result,
-                tensor1_expanded,
-                tensor2_expanded,
+                x1_expanded,
+                x2_expanded,
                 p,
                 r1,
                 r2,
-                c1,
-                c2,
+                m,
                 r1 * r2,
-                r1 * c1,
-                r2 * c2);
+                r1 * m,
+                r2 * m);
           } else if (p == 2.0) {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
                 result,
-                tensor1_expanded,
-                tensor2_expanded,
+                x1_expanded,
+                x2_expanded,
                 p,
                 r1,
                 r2,
-                c1,
-                c2,
+                m,
                 r1 * r2,
-                r1 * c1,
-                r2 * c2);
+                r1 * m,
+                r2 * m);
           } else if (Numerics<scalar_t>::isinf(p)) {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
                 result,
-                tensor1_expanded,
-                tensor2_expanded,
+                x1_expanded,
+                x2_expanded,
                 p,
                 r1,
                 r2,
-                c1,
-                c2,
+                m,
                 r1 * r2,
-                r1 * c1,
-                r2 * c2);
+                r1 * m,
+                r2 * m);
           } else {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
                 result,
-                tensor1_expanded,
-                tensor2_expanded,
+                x1_expanded,
+                x2_expanded,
                 p,
                 r1,
                 r2,
-                c1,
-                c2,
+                m,
                 r1 * r2,
-                r1 * c1,
-                r2 * c2);
+                r1 * m,
+                r2 * m);
           }
         });
   }
@@ -655,33 +706,50 @@ static void cdist_backward_kernel_impl(
     const int64_t r_size,
     const int64_t l1_size,
     const int64_t l2_size) {
-  auto batch = (x1.dim() > 2) ? x1.size(0) : 1;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-  int64_t m_round = ((r_size * batch + wgroup_size - 1) / (wgroup_size));
-  sycl::range<2> global_range(
-      /**wgroup_size*/ wgroup_size, m_round * wgroup_size);
-  sycl::range<2> local_range(/*wgroup_size*/ 1, wgroup_size);
-  sycl::nd_range<2> work_load(global_range, local_range);
+  auto wgroup_size = dpcppGpuHWThreadsPerEU() * dpcppMaxSubGroupSize();
+  auto batch = (x1.dim() > 2) ? x1.size(0) : 1;
+  const int group_size_x = 256 > wgroup_size ? wgroup_size : 256;
+  const int group_size_y = wgroup_size / group_size_x;
+  const int group_num_x = (m + group_size_x * 32 - 1) / (group_size_x * 32);
 
-  auto buff_ptr = buffer.data_ptr<scalar_t>();
-  auto grad_ptr = grad.data_ptr<scalar_t>();
-  auto dist_ptr = dist.data_ptr<scalar_t>();
-  auto x1_ptr = x1.data_ptr<scalar_t>();
-  auto x2_ptr = x2.data_ptr<scalar_t>();
+  const int64_t group_num_temp = (count + group_size_y - 1) / group_size_y;
+
+  const int group_num_y = (group_num_temp - 1) / 65535 + 1;
+  const int group_num_z = (group_num_temp - 1) / group_num_y + 1;
+
+  sycl::range<3> global_range(
+      group_size_x * group_num_x, group_size_y * group_num_y, 1 * group_num_z);
+  sycl::range<3> local_range(group_size_x, group_size_y, 1);
+  sycl::nd_range<3> work_load(global_range, local_range);
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
-      const int64_t y = item_id.get_global_id(1);
-      const int64_t init = item_id.get_global_id(0);
+    auto buff_data = buffer.data_ptr<scalar_t>();
+    auto grad_data = grad.data_ptr<scalar_t>();
+    auto dist_data = dist.data_ptr<scalar_t>();
+    auto x1_data = x1.data_ptr<scalar_t>();
+    auto x2_data = x2.data_ptr<scalar_t>();
+
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
+      auto buff_ptr = buff_data;
+      auto grad_ptr = grad_data;
+      auto dist_ptr = dist_data;
+      auto x1_ptr = x1_data;
+      auto x2_ptr = x2_data;
+
+      const int y =
+          (item.get_group(1) * group_num_z + item.get_group(2)) * group_size_y +
+          item.get_local_id(1);
+      const int init = item.get_group(0) * group_size_x + item.get_local_id(0);
       if (y >= count || init >= m) {
         return;
       }
-      const int64_t l = y / r_size;
-      const int64_t k = y % r_size;
-      const size_t stride = item_id.get_local_range(0);
-      const int64_t l_size = r_size * m;
+
+      const int l = y / r_size;
+      const int k = y % r_size;
+      const int stride = group_size_x * group_num_x;
+      const int l_size = r_size * m;
 
       int64_t i = k / r2;
       int64_t j = k % r2;
@@ -689,8 +757,8 @@ static void cdist_backward_kernel_impl(
       const scalar_t grad_k = grad_ptr[y];
       const scalar_t dist_k = dist_ptr[y];
 
-      const scalar_t* start = x1_ptr + l * l1_size + i * m;
-      const scalar_t* end = start + m;
+      const scalar_t* const start = x1_ptr + l * l1_size + i * m;
+      const scalar_t* const end = start + m;
       const scalar_t* self_i = start + init;
       const scalar_t* self_j = x2_ptr + l * l2_size + j * m + init;
 
@@ -731,6 +799,14 @@ static Tensor cdist_backward(
     result.fill_(0);
     return result;
   }
+
+  if (2.0 == p && (r1 > 25 || r2 > 25)) {
+    std::tuple<Tensor, Tensor> edist_tuple;
+    edist_tuple = _euclidean_dist_backward(grad, x1, x2, cdist);
+    result = std::get<0>(edist_tuple);
+    return result;
+  }
+
   Tensor buffer = (x1.dim() > 2)
       ? at::empty({batch, r2, r1, m}, result.options())
       : at::empty({r2, r1, m}, result.options());
