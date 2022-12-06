@@ -166,15 +166,23 @@ PYTHON_VERSION = sys.version_info
 TORCH_IPEX_VERSION = gen_ipex_version_string()
 
 
-# build build_target
-def parser_build_args():
-    pytorch_install_dir = ''
-    USE_CXX11_ABI = 0
+def get_torch_glib_cxx11_abi_status():
+    return torch._C._GLIBCXX_USE_CXX11_ABI
+
+def _get_build_target():
     build_target = ''
     if len(sys.argv) > 1:
         if sys.argv[1] in ['build_clib', 'bdist_cppsdk']:
-            build_target = 'cppsdk'
-            # FIXME: Why we cannot find it by ourselves?
+            build_target = 'cppsdk'   
+        elif sys.argv[1] in ['clean']:
+            build_target = 'clean'
+        else:
+            build_target = 'python'
+    return build_target         
+
+def get_pytorch_install_dir():
+    pytorch_install_dir = ''
+    if len(sys.argv) > 2:
             if len(sys.argv) != 3:
                 raise RuntimeError("""Please set path of libtorch directory if "build_clib" or "bdist_cppsdk" is applied.\n
                         Usage: python setup.py [build_clib|bdist_cppsdk] <libtorch_path>""")
@@ -185,30 +193,11 @@ def parser_build_args():
 
             if not os.path.isfile(os.path.join(pytorch_install_dir, 'build-version')):
                 raise RuntimeError('{} doestn\'t seem to be a valid libtorch directory.'.format(pytorch_install_dir))
+    else:
+        pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
+    return pytorch_install_dir
 
-            # FIXME: It's ugly to use grep to fetch the flag, right?
-            # Or, there should be API in libtorch to get the flag? We can have a tiny executable to do that?
-            out = subprocess.check_output(['grep', 'GLIBCXX_USE_CXX11_ABI', \
-                    os.path.join(pytorch_install_dir, 'share', 'cmake', 'Torch', 'TorchConfig.cmake')]).decode('ascii').strip()
-            if out == '':
-                raise RuntimeError('Unable to get GLIBCXX_USE_CXX11_ABI setting from libtorch: 1')
-            matches = re.match('.*\"-D_GLIBCXX_USE_CXX11_ABI=(\d)\".*', out)
-            if matches:
-                USE_CXX11_ABI = int(matches.groups()[0])
-            else:
-                raise RuntimeError('Unable to get GLIBCXX_USE_CXX11_ABI setting from libtorch: 2')
-        elif sys.argv[1] in ['clean']:
-            build_target = 'clean'
-        else:
-            build_target = 'python'
-
-    pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
-    USE_CXX11_ABI = torch._C._GLIBCXX_USE_CXX11_ABI
-
-    return pytorch_install_dir, USE_CXX11_ABI, build_target
-
-
-pytorch_install_dir, USE_CXX11_ABI, build_target = parser_build_args()
+pytorch_install_dir = get_pytorch_install_dir()
 
 
 def _build_installation_dependency():
@@ -505,11 +494,6 @@ class IPEXCPPLibBuild(build_clib, object):
         ipex_xpu_build_dir = get_xpu_project_build_dir()
 
         cmake_prefix_path = torch.utils.cmake_prefix_path
-        try:
-            import pybind11
-            cmake_prefix_path = ';'.join([cmake_prefix_path, pybind11.get_cmake_dir()])
-        except ImportError as e:
-            print("Warning: Cannot find local pybind11 package.")
 
         build_option_common = {
             'CMAKE_BUILD_TYPE'      : get_build_type(),
@@ -517,7 +501,7 @@ class IPEXCPPLibBuild(build_clib, object):
             'CMAKE_PREFIX_PATH'     : cmake_prefix_path,
             'CMAKE_INSTALL_PREFIX'  : os.path.abspath(get_package_dir()),
             'IPEX_INSTALL_LIBDIR'   : os.path.abspath(output_lib_path),
-            'GLIBCXX_USE_CXX11_ABI': str(int(USE_CXX11_ABI)), # TODO: check if is must need in bdist_cppsdk build.
+            'GLIBCXX_USE_CXX11_ABI': str(int(get_torch_glib_cxx11_abi_status())), # TODO: check if is must need in bdist_cppsdk build.
             'CMAKE_PROJECT_VERSION' : get_version_num(),
             'PYTHON_INCLUDE_DIR'    : sysconfig.get_paths()['include'],
             'PYTHON_EXECUTABLE'     : sys.executable,
@@ -568,7 +552,7 @@ class IPEXCPPLibBuild(build_clib, object):
             if os.path.isdir(ipex_xpu_dir) is False:
                 raise RuntimeError('It maybe CPU only branch, and it is not contains XPU code.')
 
-            if not torch._C._GLIBCXX_USE_CXX11_ABI:
+            if not get_torch_glib_cxx11_abi_status():
                 print("Intel extension for pytorch only supports _GLIBCXX_USE_CXX11_ABI = 1,\
                      please install pytorch with cxx11abi enabled.")
                 sys.exit(1)
@@ -661,6 +645,7 @@ class IPEXBDistCPPSDK(Command):
         shutil.copyfile(os.path.join('cmake', 'Modules', 'FindIPEX.cmake.in'), os.path.join(tmp_dir, 'intel_ext_pt_cpuConfig.cmake'))
         shutil.copyfile(os.path.join('build', 'Release', 'packages', package_name, 'lib', 'libintel-ext-pt-cpu.so'), os.path.join(tmp_dir, 'libintel-ext-pt-cpu.so'))
 
+        USE_CXX11_ABI = get_torch_glib_cxx11_abi_status()
         if int(USE_CXX11_ABI) == 0:
             run_file_name = 'libintel-ext-pt-{}.run'.format(TORCH_IPEX_VERSION)
         if int(USE_CXX11_ABI) == 1:
@@ -791,9 +776,9 @@ cmdclass = {
     'clean': IPEXClean,
 }
 
-if build_target == 'cppsdk':
+if _get_build_target() == 'cppsdk':
     cmdclass['bdist_cppsdk'] = IPEXBDistCPPSDK
-elif build_target == 'python':
+elif _get_build_target() == 'python':
     cmdclass['build_ext'] = IPEXExtBuild
     cmdclass['build_py'] = IPEXPythonPackageBuild
     cmdclass['egg_info'] = IPEXEggInfoBuild
