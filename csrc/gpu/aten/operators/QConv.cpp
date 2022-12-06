@@ -393,7 +393,7 @@ at::Tensor q_conv2d_leaky_relu(
   return qconv_wrapper.call(input, att);
 }
 
-at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize(
+at::Tensor q_conv2d_mish_compound(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double output_scale,
@@ -422,7 +422,7 @@ at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize(
   return qconv_wrapper.call(input, att);
 }
 
-at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
+at::Tensor q_conv2d_mish_compound_add(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double output_scale,
@@ -477,7 +477,7 @@ Tensor softplus_tanh(
   return at::tanh(softplus_out);
 }
 
-Tensor softplus_tanh_mul(
+Tensor mish_compound(
     const Tensor& self,
     const Scalar& beta,
     const Scalar& threshold,
@@ -486,7 +486,7 @@ Tensor softplus_tanh_mul(
       self, at::AtenIpexTypeXPU::softplus_tanh(self, beta, threshold));
 }
 
-Tensor q_conv2d_dequantize_softplus_tanh_mul(
+Tensor q_conv2d_dequantize_mish_compound(
     const Tensor& input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double output_scale,
@@ -495,7 +495,7 @@ Tensor q_conv2d_dequantize_softplus_tanh_mul(
     const Scalar& threshold) {
   Tensor dequantize_out = at::AtenIpexTypeXPU::q_conv2d_dequantize(
       input, packed_weight, output_scale, output_zero_point);
-  return at::AtenIpexTypeXPU::softplus_tanh_mul(
+  return at::AtenIpexTypeXPU::mish_compound(
       dequantize_out, beta, threshold, input);
 }
 
@@ -931,11 +931,11 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_QCONV(sum);
   IPEX_OP_REGISTER_QCONV(sum_relu);
   IPEX_OP_REGISTER_QCONV(dequantize);
-  IPEX_OP_REGISTER_QCONV(dequantize_softplus_tanh_mul);
-  IPEX_OP_REGISTER_QCONV(dequantize_softplus_tanh_mul_quantize);
-  IPEX_OP_REGISTER_QCONV(dequantize_softplus_tanh_mul_quantize_add);
+  IPEX_OP_REGISTER_QCONV(dequantize_mish_compound);
+  IPEX_OP_REGISTER_QCONV(mish_compound);
+  IPEX_OP_REGISTER_QCONV(mish_compound_add);
   IPEX_OP_REGISTER_NEED_PLAIN("softplus_tanh", softplus_tanh);
-  IPEX_OP_REGISTER_NEED_PLAIN("softplus_tanh_mul", softplus_tanh_mul)
+  IPEX_OP_REGISTER_NEED_PLAIN("mish_compound", mish_compound)
 }
 
 } // namespace AtenIpexTypeXPU

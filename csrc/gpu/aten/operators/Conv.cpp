@@ -608,9 +608,9 @@ Attr get_onednn_conv_sum_attr(
     Tensor& accumu,
     double scale,
     Tensor& output,
-    bool& is_fused) {
+    bool& is_fused,
+    Attr attr = Attr()) {
   is_fused = true;
-  Attr attr;
   if (scale == 0.f)
     return attr;
 
@@ -1127,6 +1127,164 @@ Tensor _convolution_gelu(
       output_padding_,
       groups,
       att);
+}
+
+Tensor _convolution_mish_compound(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed_,
+    std::vector<int64_t> output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar beta,
+    Scalar threshold) {
+  return _convolution_mish(
+      input,
+      weight,
+      bias,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      benchmark,
+      deterministic,
+      cudnn_enabled,
+      allow_tf32);
+}
+
+Tensor convolution_mish_compound(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    int64_t groups_,
+    Scalar beta,
+    Scalar threshold) {
+  return convolution_mish(
+      input, weight, bias, stride_, padding_, dilation_, groups_);
+}
+
+Tensor _convolution_mish_compound_add(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed_,
+    std::vector<int64_t> output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Scalar beta,
+    Scalar threshold,
+    Tensor accumu,
+    Scalar scale) {
+  TORCH_CHECK(
+      scale.to<float>() == 1.f,
+      "only support convolution mish fusion with mish scale equals to 1, alpha equal to 1");
+  Attr attr;
+  attr.append_post_eltwise(
+      /* mish_scale */ 1.0,
+      /* alpha */ 1.f,
+      /* beta */ 0.f,
+      attr.kind_with_mish);
+  bool is_fused = true;
+  Tensor output;
+  attr = get_onednn_conv_sum_attr(
+      input,
+      weight,
+      stride_,
+      padding_,
+      dilation_,
+      accumu,
+      scale.to<float>(),
+      output,
+      is_fused,
+      attr);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  Tensor res = _convolution_out(
+      output,
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      attr);
+  if (!is_fused) {
+    res = at::AtenIpexTypeXPU::add_out(res, accumu, 1.f, accumu);
+  }
+  return res;
+}
+
+Tensor convolution_mish_compound_add(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    int64_t groups_,
+    Scalar beta,
+    Scalar threshold,
+    Tensor accumu,
+    Scalar scale) {
+  TORCH_CHECK(
+      scale.to<float>() == 1.f,
+      "only support convolution mish fusion with mish scale equals to 1, alpha equal to 1");
+  Attr attr;
+  attr.append_post_eltwise(
+      /* mish_scale */ 1.0,
+      /* alpha */ 1.f,
+      /* beta */ 0.f,
+      attr.kind_with_mish);
+  bool is_fused = true;
+  Tensor output;
+  attr = get_onednn_conv_sum_attr(
+      input,
+      weight,
+      stride_,
+      padding_,
+      dilation_,
+      accumu,
+      scale.to<float>(),
+      output,
+      is_fused,
+      attr);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  Tensor res = _convolution_out(
+      output,
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {0, 0},
+      groups_,
+      attr);
+  if (!is_fused) {
+    res = at::AtenIpexTypeXPU::add_out(res, accumu, 1.f, accumu);
+  }
+  return res;
 }
 
 Tensor convolution_silu(
@@ -1793,6 +1951,8 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_CONVOLUTION(elu);
   IPEX_OP_REGISTER_CONVOLUTION(sum);
   IPEX_OP_REGISTER_CONVOLUTION(sum_relu);
+  IPEX_OP_REGISTER_CONVOLUTION(mish_compound);
+  IPEX_OP_REGISTER_CONVOLUTION(mish_compound_add);
   IPEX_OP_REGISTER("pad_conv2d", pad_convolution);
   IPEX_OP_REGISTER("conv2d_binary_mul", convolution_binary_mul);
 }

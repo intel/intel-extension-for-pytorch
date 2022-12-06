@@ -97,7 +97,7 @@ namespace torch {
 namespace jit {
 namespace xpu {
 
-vector<c10::Symbol> not_check_uses_ops{xpu::softplus_tanh_mul_sym};
+vector<c10::Symbol> not_check_uses_ops{xpu::mish_compound_sym};
 
 //
 // The main goal of oneDNN fusion is to limit bandwidth wasting.
@@ -548,20 +548,36 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
       Symbol::fromQualString("aten::contiguous")},
      xpu::permute_contiguous_sym},
     // YOLOv4 INT8 For ATS-M: softplus_tanh + mul
-    {{xpu::softplus_tanh_sym, aten::mul}, xpu::softplus_tanh_mul_sym},
+    {{xpu::softplus_tanh_sym, aten::mul}, xpu::mish_compound_sym},
     {{xpu::softplus_tanh_sym, Symbol::fromQualString("aten::mul")},
-     xpu::softplus_tanh_mul_sym},
-    // YOLOv4 INT8 For ATS-M: q_conv2d_dequantize + softplus_tanh_mul
-    {{xpu::q_conv2d_dequantize_sym, xpu::softplus_tanh_mul_sym},
-     xpu::q_conv2d_dequantize_softplus_tanh_mul_sym},
-    // YOLOv4 INT8 For ATS-M: q_conv2d_dequantize_softplus_tanh_mul + quantize
-    {{xpu::q_conv2d_dequantize_softplus_tanh_mul_sym,
+     xpu::mish_compound_sym},
+    // YOLOv4 INT8 For ATS-M: q_conv2d_dequantize + mish_compound
+    {{xpu::q_conv2d_dequantize_sym, xpu::mish_compound_sym},
+     xpu::q_conv2d_dequantize_mish_compound_sym},
+    // YOLOv4
+    // INT8 For ATS-M: q_conv2d_mish_yolo
+    {{xpu::q_conv2d_dequantize_mish_compound_sym,
       Symbol::fromQualString("aten::quantize_per_tensor")},
-     xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_sym},
-    // YOLOv4 INT8 For ATS-M: q_conv2d_dequantize_softplus_tanh_mul_quantize_add
-    {{xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_sym,
+     xpu::q_conv2d_mish_compound_sym},
+    // FP16 For YOLOv4 _convolution_mish_yolo
+    {{aten::_convolution, xpu::mish_compound_sym},
+     xpu::_convolution_mish_compound_sym},
+    // FP32 For YOLOv4 conv2d_mish_yolo
+    {{aten::conv2d, xpu::mish_compound_sym}, xpu::conv2d_mish_compound_sym},
+    // INT8 For ATS-M: q_conv2d_mish_add_yolo
+    {{xpu::q_conv2d_mish_compound_sym,
       Symbol::fromQualString("quantized::add")},
-     xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_add_sym},
+     xpu::q_conv2d_mish_compound_add_sym},
+    // FP16 For YOLOv4 _conovlution_mish_add_yolo
+    {{xpu::_convolution_mish_compound_sym, aten::add_},
+     xpu::_convolution_mish_compound_add_sym},
+    {{xpu::_convolution_mish_compound_sym, aten::add},
+     xpu::_convolution_mish_compound_add_sym},
+    // FP32 For YOLOv4 conv2d_mish_add_yolo
+    {{xpu::conv2d_mish_compound_sym, aten::add_},
+     xpu::conv2d_mish_compound_add_sym},
+    {{xpu::conv2d_mish_compound_sym, aten::add},
+     xpu::conv2d_mish_compound_add_sym},
     // BERT: linear with bias + add
     {{aten::linear, aten::add}, xpu::linear_sum_sym},
     // BERT: linear no bias + add standalone bias + add
@@ -687,7 +703,7 @@ RegisterPreFusionPass::RegisterPreFusionPass(GraphPass p) {
 static RegisterPreFusionPass pass_3([](std::shared_ptr<Graph>& g) {
   RemoveProfileNodesAndSpecializeTypes(g);
   xpu::FusionPass(g);
-  RemoveTensorTypeSpecializations(g);
+  // RemoveTensorTypeSpecializations(g);
 });
 
 } // namespace jit

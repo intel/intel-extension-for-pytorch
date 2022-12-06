@@ -65,6 +65,8 @@ IPEX_GENERAL_CONV_SYMBOL_DECLARATION(hardtanh);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(sigmoid);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(leaky_relu);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(relu);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(mish_compound);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(mish_compound_add);
 
 // linear related symbol declaration
 IPEX_LINEAR_SYMBOL_DECLARATION(sigmoid);
@@ -119,17 +121,17 @@ static auto q_conv2d_dequantize_sym =
     Symbol::fromQualString("torch_ipex::q_conv2d_dequantize");
 static auto softplus_tanh_sym =
     Symbol::fromQualString("torch_ipex::softplus_tanh");
-static auto softplus_tanh_mul_sym =
-    Symbol::fromQualString("torch_ipex::softplus_tanh_mul");
-static auto q_conv2d_dequantize_softplus_tanh_mul_sym =
-    Symbol::fromQualString("torch_ipex::q_conv2d_dequantize_softplus_tanh_mul");
+static auto mish_compound_sym =
+    Symbol::fromQualString("torch_ipex::mish_compound");
+static auto q_conv2d_dequantize_mish_compound_sym =
+    Symbol::fromQualString("torch_ipex::q_conv2d_dequantize_mish_compound");
 static auto q_conv2d_sym = Symbol::fromQualString("quantized::conv2d");
-static auto q_conv2d_dequantize_softplus_tanh_mul_quantize_sym =
+static auto q_conv2d_dequantize_mish_compound_quantize_sym =
     Symbol::fromQualString(
-        "torch_ipex::q_conv2d_dequantize_softplus_tanh_mul_quantize");
-static auto q_conv2d_dequantize_softplus_tanh_mul_quantize_add_sym =
+        "torch_ipex::q_conv2d_dequantize_mish_compound_quantize");
+static auto q_conv2d_dequantize_mish_compound_quantize_add_sym =
     Symbol::fromQualString(
-        "torch_ipex::q_conv2d_dequantize_softplus_tanh_mul_quantize_add");
+        "torch_ipex::q_conv2d_dequantize_mish_compound_quantize_add");
 static auto linear_sum_sym = Symbol::fromQualString("torch_ipex::linear_sum");
 static auto dequant_pixelshuffle_sym =
     Symbol::fromQualString("torch_ipex::dequant_pixelshuffle");
