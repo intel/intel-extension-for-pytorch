@@ -9,7 +9,7 @@ typing_extensions
 expecttest
 hypothesis
 matplotlib
-numpy==1.21.6
+numpy
 pytest
 scipy
 # for cpu merge
