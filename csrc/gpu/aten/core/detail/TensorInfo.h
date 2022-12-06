@@ -223,10 +223,24 @@ TensorInfo<scalar, IndexType> getTensorInfo(const at::Tensor& t) {
   IndexType sz[MAX_TENSORINFO_DIMS];
   IndexType st[MAX_TENSORINFO_DIMS];
 
-  int dims = t.dim();
-  for (int i = 0; i < dims; ++i) {
-    sz[i] = t.size(i);
-    st[i] = t.stride(i);
+  TORCH_CHECK(
+      t.dim() <= MAX_TENSORINFO_DIMS,
+      "dim:",
+      t.dim(),
+      " exceed max allowed dim:",
+      MAX_TENSORINFO_DIMS);
+
+  int dims;
+  if (t.dim()) {
+    dims = t.dim();
+    for (int i = 0; i < dims; ++i) {
+      sz[i] = t.size(i);
+      st[i] = t.stride(i);
+    }
+  } else {
+    dims = 1;
+    sz[0] = 1;
+    st[0] = 1;
   }
 
   return TensorInfo<scalar, IndexType>(t.data_ptr<scalar>(), dims, sz, st);
