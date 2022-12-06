@@ -1,5 +1,6 @@
 #include <core/Event.h>
 #include <core/GuardImpl.h>
+#include <include/xpu/Stream.h>
 #include "Allocator.h"
 
 namespace xpu {
@@ -112,7 +113,7 @@ bool DPCPPGuardImpl::queryStream(const Stream& stream) const {
   // TODO: add work around to enable the queue query by tracking the last kernel
   // event.
   //  DPCPPStream dpcpp_stream{stream};
-  //  auto queue = dpcpp_stream.dpcpp_queue();
+  //  auto& queue = get_queue_from_stream(stream);
   //  queue.get_info<sycl::info::queue::>();
   //  return dpcpp_stream.query();
   return false;
@@ -130,8 +131,7 @@ Stream DPCPPGuardImpl::getStreamFromGlobalPool(
 }
 
 void DPCPPGuardImpl::synchronizeStream(const Stream& stream) const {
-  DPCPPStream dpcpp_stream{stream};
-  auto queue = dpcpp_stream.dpcpp_queue();
+  auto& queue = get_queue_from_stream(stream);
   queue.wait_and_throw();
   return;
 }

@@ -5,6 +5,7 @@
 #include "Stream.h"
 
 #include <core/Device.h>
+#include <core/Stream.h>
 #include <structmember.h>
 
 namespace xpu {
@@ -58,15 +59,11 @@ static PyObject* THDPStream_get_device(THDPStream* self, void* unused) {
 
 static PyObject* THDPStream_get_xpu_stream(THDPStream* self, void* unused) {
   HANDLE_TH_ERRORS
-  auto& dpcpp_queue = self->dpcpp_stream.dpcpp_queue();
   return PyCapsule_New(
-      reinterpret_cast<void*>(new sycl::queue(dpcpp_queue)),
-      "SyclQueueRef",
-      [](PyObject* cap) {
+      self->dpcpp_stream.opaque(), "SyclQueueRef", [](PyObject* cap) {
         if (PyCapsule_IsValid(cap, "SyclQueueRef")) {
-          void* ptr = PyCapsule_GetPointer(cap, "SyclQueueRef");
-          sycl::queue* q_ptr = reinterpret_cast<sycl::queue*>(ptr);
-          delete q_ptr;
+          // void* ptr = PyCapsule_GetPointer(cap,
+          // "SyclQueueRef"); Do NOTHING
         }
       });
   END_HANDLE_TH_ERRORS
@@ -98,7 +95,7 @@ static PyObject* THDPStream_query(THDPStream* self, PyObject* noargs) {
 static PyObject* THDPStream_synchronize(THDPStream* self, PyObject* noargs) {
   HANDLE_TH_ERRORS {
     pybind11::gil_scoped_release no_gil;
-    self->dpcpp_stream.dpcpp_queue().wait_and_throw();
+    self->dpcpp_stream.synchronize_and_throw();
   }
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS

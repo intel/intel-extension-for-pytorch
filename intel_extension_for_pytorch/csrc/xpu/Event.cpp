@@ -34,7 +34,7 @@ static PyObject* THDPEvent_pynew(
   //    (enable_timing ? xpuEventDefault : xpuEventDisableTiming) |
   //    (interprocess ? xpuEventInterprocess : xpuEventDefault);
 
-  new (&self->dpcpp_event) xpu::dpcpp::DPCPPEvent();
+  self->dpcpp_event = xpu::dpcpp::create_dpcpp_event();
 
   return (PyObject*)ptr.release();
   END_HANDLE_TH_ERRORS
@@ -69,26 +69,26 @@ static PyObject* THDPEvent_from_ipc_handle(
 
   //  xpuIpcEventHandle_t handle;
   //  std::memcpy(&handle, handle_string.c_str(), handle_string.size());
-  new (&self->dpcpp_event) xpu::dpcpp::DPCPPEvent();
+  self->dpcpp_event = xpu::dpcpp::create_dpcpp_event();
 
   return (PyObject*)ptr.release();
   END_HANDLE_TH_ERRORS
 }
 
 static void THDPEvent_dealloc(THDPEvent* self) {
-  self->dpcpp_event.~DPCPPEvent();
+  self->dpcpp_event.reset();
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 static PyObject* THDPEvent_get_dpcpp_event(THDPEvent* self, void* unused) {
   HANDLE_TH_ERRORS
-  return PyLong_FromVoidPtr(nullptr);
+  return PyLong_FromVoidPtr(self->dpcpp_event.get());
   END_HANDLE_TH_ERRORS
 }
 
 static PyObject* THDPEvent_get_device(THDPEvent* self, void* unused) {
   HANDLE_TH_ERRORS
-  at::optional<at::Device> device = self->dpcpp_event.device();
+  at::optional<at::Device> device = self->dpcpp_event->device();
   if (!device) {
     Py_RETURN_NONE;
   }
@@ -98,34 +98,35 @@ static PyObject* THDPEvent_get_device(THDPEvent* self, void* unused) {
 
 static PyObject* THDPEvent_record(THDPEvent* self, THDPStream* stream) {
   HANDLE_TH_ERRORS
-  self->dpcpp_event.record(stream->dpcpp_stream);
+  self->dpcpp_event->record(stream->dpcpp_stream);
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
 
 static PyObject* THDPEvent_wait(THDPEvent* self, THDPStream* stream) {
   HANDLE_TH_ERRORS
-  self->dpcpp_event.block(stream->dpcpp_stream);
+  self->dpcpp_event->block(stream->dpcpp_stream);
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
 
 static PyObject* THDPEvent_query(THDPEvent* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
-  return PyBool_FromLong(self->dpcpp_event.query());
+  return PyBool_FromLong(self->dpcpp_event->query());
   END_HANDLE_TH_ERRORS
 }
 
 static PyObject* THDPEvent_elapsed_time(THDPEvent* self, THDPEvent* other) {
   HANDLE_TH_ERRORS
-  return PyFloat_FromDouble(self->dpcpp_event.elapsed_time(other->dpcpp_event));
+  return PyFloat_FromDouble(
+      self->dpcpp_event->elapsed_time(other->dpcpp_event.get()));
   END_HANDLE_TH_ERRORS
 }
 
 static PyObject* THDPEvent_synchronize(THDPEvent* self, PyObject* noargs) {
   HANDLE_TH_ERRORS {
     pybind11::gil_scoped_release no_gil;
-    self->dpcpp_event.synchronize();
+    self->dpcpp_event->synchronize();
   }
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
@@ -134,7 +135,7 @@ static PyObject* THDPEvent_synchronize(THDPEvent* self, PyObject* noargs) {
 static PyObject* THDPEvent_ipc_handle(THDPEvent* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
   //  xpuIpcEventHandle_t handle;
-  //  self->dpcpp_event.ipc_handle(&handle);
+  //  self->dpcpp_event->ipc_handle(&handle);
   //  return PyBytes_FromStringAndSize((const char *)&handle, sizeof(handle));
   return PyFloat_FromDouble(0);
   END_HANDLE_TH_ERRORS

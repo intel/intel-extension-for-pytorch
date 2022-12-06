@@ -1,7 +1,7 @@
 #pragma once
 
-#include <core/DeviceProp.h>
-
+#include <core/DeviceInfo.h>
+#include <runtime/DeviceProp.h>
 #include <utils/DPCPP.h>
 #include <utils/Macros.h>
 
@@ -27,6 +27,10 @@ sycl::device dpcppGetRawDevice(DeviceId device_id);
 DeviceProp* dpcppGetCurrentDeviceProperties();
 
 DeviceProp* dpcppGetDeviceProperties(DeviceId device_id = -1);
+
+DeviceInfo* dpcppGetCurrentDeviceInfo();
+
+DeviceInfo* dpcppGetDeviceInfo(DeviceId device_id = -1);
 
 sycl::context dpcppGetDeviceContext(DeviceId device_id = -1);
 

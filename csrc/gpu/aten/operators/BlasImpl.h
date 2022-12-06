@@ -313,7 +313,7 @@ static void mkl_baddbmm(
   // specify c's conjugation in the gemm call
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(!c.is_conj());
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
       result.scalar_type(), "mkl_baddbmm", [&] {
         gemm_batch<scalar_t>(
@@ -454,7 +454,7 @@ static void mkl_matmul(
   // specify c's conjugation in the gemm call
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(!c.is_conj());
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   // use colum major
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
       result.scalar_type(), "mkl_matmul", [&] {

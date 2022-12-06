@@ -429,67 +429,66 @@ static struct PyMethodDef _THPModule_methods[] = {
      nullptr},
     {nullptr}};
 
-std::string get_dev_type(const DeviceProp& prop) {
+std::string get_dev_type(const DeviceInfo& info) {
   std::ostringstream stream;
-  switch (prop.dev_type) {
-    case sycl::info::device_type::cpu:
+  switch (info.dev_type) {
+    case xpu::dpcpp::device_type::cpu:
       stream << "cpu";
       break;
-    case sycl::info::device_type::gpu:
+    case xpu::dpcpp::device_type::gpu:
       stream << "gpu";
       break;
-    case sycl::info::device_type::accelerator:
+    case xpu::dpcpp::device_type::accelerator:
       stream << "accelerator";
+      break;
+    case xpu::dpcpp::device_type::host:
+      stream << "host";
       break;
     default:
       stream
           << "unknown device type:"
           << static_cast<
-                 typename std::underlying_type<sycl::info::device_type>::type>(
-                 prop.dev_type);
+                 typename std::underlying_type<xpu::dpcpp::device_type>::type>(
+                 info.dev_type);
       break;
   }
   return stream.str();
 }
 
-static void register_xpu_device_properties(PyObject* module) {
-  // Add _DeviceProperties class to intel_extension_for_pytorch._C
+static void register_xpu_device_info(PyObject* module) {
+  // Add _DeviceInfo class to intel_extension_for_pytorch._C
   auto m = py::handle(module).cast<py::module>();
-  py::class_<DeviceProp>(m, "_DeviceProperties")
-      .def_readonly("name", &DeviceProp::dev_name)
-      .def_readonly("platform_name", &DeviceProp::platform_name)
-      .def_readonly("total_memory", &DeviceProp::global_mem_size)
-      .def_readonly("max_compute_units", &DeviceProp::max_compute_units)
-      .def_readonly("max_sub_devices", &DeviceProp::max_sub_devices)
-      .def_readonly("support_fp64", &DeviceProp::support_fp64)
+  py::class_<DeviceInfo>(m, "_DeviceProperties")
+      .def_readonly("name", &DeviceInfo::dev_name)
+      .def_readonly("platform_name", &DeviceInfo::platform_name)
+      .def_readonly("total_memory", &DeviceInfo::global_mem_size)
+      .def_readonly("max_compute_units", &DeviceInfo::max_compute_units)
+      .def_readonly("support_fp64", &DeviceInfo::support_fp64)
       .def_property_readonly(
-          "dev_type", [](const DeviceProp& prop) { return get_dev_type(prop); })
-      .def("__repr__", [](const DeviceProp& prop) {
+          "dev_type", [](const DeviceInfo& info) { return get_dev_type(info); })
+      .def("__repr__", [](const DeviceInfo& info) {
         std::ostringstream stream;
-        stream << "_DeviceProperties(name='" << prop.dev_name
-               << "', platform_name='" << prop.platform_name << "', dev_type='"
-               << get_dev_type(prop)
-               << "', max_sub_devices=" << prop.max_sub_devices
-               << ", prop.support_fp64=" << prop.support_fp64
-               << ", total_memory=" << prop.global_mem_size / (1024 * 1024)
-               << "MB, max_compute_units=" << prop.max_compute_units << ")";
+        stream << "_DeviceProperties(name='" << info.dev_name
+               << "', platform_name='" << info.platform_name << "', dev_type='"
+               << get_dev_type(info) << ", support_fp64=" << info.support_fp64
+               << ", total_memory=" << info.global_mem_size / (1024 * 1024)
+               << "MB, max_compute_units=" << info.max_compute_units << ")";
         return stream.str();
       });
 }
 
-static void bindGetDeviceProperties(PyObject* module) {
+static void bindGetDeviceInfo(PyObject* module) {
   // Add method to intel_extension_for_pytorch._C
   auto m = py::handle(module).cast<py::module>();
   m.def(
       "_get_device_properties",
-      [](int device) -> DeviceProp* {
-        return xpu::dpcpp::getDeviceProperties(device);
+      [](int device) -> DeviceInfo* {
+        return xpu::dpcpp::getDeviceInfo(device);
       },
       py::return_value_policy::reference);
 
   m.def("_synchronize", [](const int& device_index) {
-    auto& dpcpp_queue = getCurrentDPCPPStream(device_index).dpcpp_queue();
-    dpcpp_queue.wait_and_throw();
+    getCurrentDPCPPStream(device_index).synchronize_and_throw();
   });
 }
 
@@ -517,8 +516,7 @@ at::Scalar scalar_slow(PyObject* object) {
 void init_xpu_module(pybind11::module& m) {
   // For Runtime API, still use pybind
   m.def("_synchronize", [](const int& device_index) {
-    auto& dpcpp_queue = getCurrentDPCPPStream(device_index).dpcpp_queue();
-    dpcpp_queue.wait();
+    getCurrentDPCPPStream(device_index).synchronize();
   });
 
   m.def("dump_memory_stat", [](const int& device_index) {
@@ -626,7 +624,7 @@ void init_xpu_module(pybind11::module& m) {
   THDPStream_init(module);
   THDPEvent_init(module);
   PyModule_AddFunctions(module, _THPModule_methods);
-  register_xpu_device_properties(module);
-  bindGetDeviceProperties(module);
+  register_xpu_device_info(module);
+  bindGetDeviceInfo(module);
 }
 } // namespace xpu

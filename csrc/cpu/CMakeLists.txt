@@ -139,9 +139,7 @@ if (ONEMKL_FOUND)
     target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${ONEMKL_CPU_LIBS})
   else()
     target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC
-      -Wl,--start-group
-      ${ONEMKL_CPU_LIBS}
-      -Wl,--end-group)
+      -Wl,--start-group ${ONEMKL_CPU_LIBS} -Wl,--end-group)
   endif()
 else()
   message(FATAL_ERROR "ERROR: Cannot find oneMKL!")

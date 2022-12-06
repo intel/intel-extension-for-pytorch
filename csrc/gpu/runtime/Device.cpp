@@ -16,6 +16,7 @@ namespace dpcpp {
 static std::once_flag init_device_flag;
 static std::once_flag init_prop_flag;
 static std::deque<std::once_flag> device_prop_flags;
+static std::vector<DeviceInfo> device_info;
 static std::vector<DeviceProp> device_properties;
 static thread_local DeviceId cur_dev_index = 0;
 
@@ -223,6 +224,7 @@ static void initDevPropVectors() {
   auto num_gpus = 0;
   AT_DPCPP_CHECK(dpcppGetDeviceCount(&num_gpus));
   device_prop_flags.resize(num_gpus);
+  device_info.resize(num_gpus);
   device_properties.resize(num_gpus);
 }
 
@@ -311,15 +313,34 @@ static void initDeviceProperty(DeviceId device_id) {
   device_prop.support_fp64 = device.has(dpcpp_dev_aspect_fp64);
 
   device_properties[device_id] = device_prop;
+
+  auto convert_dev_type = [&]() {
+    switch (device_prop.dev_type) {
+      case sycl::info::device_type::cpu:
+        return device_type::cpu;
+      case sycl::info::device_type::gpu:
+        return device_type::gpu;
+      case sycl::info::device_type::accelerator:
+        return device_type::accelerator;
+      case sycl::info::device_type::host:
+        return device_type::host;
+      default:
+        throw std::runtime_error("Unknown/unsupport sycl device type!");
+    }
+  };
+
+  DeviceInfo dev_info;
+  dev_info.dev_type = convert_dev_type();
+  dev_info.dev_name = device_prop.dev_name;
+  dev_info.platform_name = device_prop.platform_name;
+  dev_info.global_mem_size = device_prop.global_mem_size;
+  dev_info.max_compute_units = device_prop.max_compute_units;
+  dev_info.support_fp64 = device_prop.support_fp64;
+
+  device_info[device_id] = dev_info;
 }
 
-DeviceProp* dpcppGetCurrentDeviceProperties() {
-  DeviceId device = 0;
-  AT_DPCPP_CHECK(dpcppGetDevice(&device));
-  return dpcppGetDeviceProperties(device);
-}
-
-DeviceProp* dpcppGetDeviceProperties(DeviceId device) {
+static inline DeviceId init_device_prop(DeviceId device) {
   std::call_once(init_prop_flag, initDevPropVectors);
   DeviceId device_id = device;
   if (device_id == -1) {
@@ -329,7 +350,27 @@ DeviceProp* dpcppGetDeviceProperties(DeviceId device) {
   AT_DPCPP_CHECK(dpcppGetDeviceCount(&num_gpus));
   AT_ASSERT(device_id >= 0 && device_id < num_gpus);
   std::call_once(device_prop_flags[device_id], initDeviceProperty, device_id);
-  return &device_properties[device_id];
+  return device_id;
+}
+
+DeviceProp* dpcppGetCurrentDeviceProperties() {
+  DeviceId device = 0;
+  AT_DPCPP_CHECK(dpcppGetDevice(&device));
+  return dpcppGetDeviceProperties(device);
+}
+
+DeviceProp* dpcppGetDeviceProperties(DeviceId device) {
+  return &device_properties[init_device_prop(device)];
+}
+
+DeviceInfo* dpcppGetCurrentDeviceInfo() {
+  DeviceId device = 0;
+  AT_DPCPP_CHECK(dpcppGetDevice(&device));
+  return dpcppGetDeviceInfo(device);
+}
+
+DeviceInfo* dpcppGetDeviceInfo(DeviceId device_id) {
+  return &device_info[init_device_prop(device_id)];
 }
 
 // This function can be used to prefetch device count and no execption. It is

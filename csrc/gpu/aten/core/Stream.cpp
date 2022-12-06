@@ -2,6 +2,7 @@
 #include <include/xpu/Stream.h>
 #include <runtime/Device.h>
 #include <runtime/Queue.h>
+#include <utils/DPCPP.h>
 
 #include <c10/core/DeviceGuard.h>
 #include <c10/util/Exception.h>
@@ -76,7 +77,14 @@ StreamId DPCPPStream::id() const {
 
 void DPCPPStream::synchronize() const {
   DeviceGuard guard{stream_.device()};
-  dpcpp_queue().wait();
+  auto queue = DPCPPStreamToQueue(*this);
+  queue->getDpcppQueue().wait();
+}
+
+void DPCPPStream::synchronize_and_throw() const {
+  DeviceGuard guard{stream_.device()};
+  auto queue = DPCPPStreamToQueue(*this);
+  queue->getDpcppQueue().wait_and_throw();
 }
 
 Stream DPCPPStream::unwrap() const {
@@ -87,9 +95,9 @@ uint64_t DPCPPStream::pack() const noexcept {
   return stream_.pack();
 }
 
-sycl::queue& DPCPPStream::dpcpp_queue() const {
+void* DPCPPStream::opaque() const {
   auto queue = DPCPPStreamToQueue(*this);
-  return queue->getDpcppQueue();
+  return reinterpret_cast<void*>(&queue->getDpcppQueue());
 }
 
 static DPCPPStream QueueToDPCPPStream(const Queue* ptr) {
@@ -126,7 +134,8 @@ DPCPPStream getDPCPPStreamOnDevice(DeviceIndex device_index, int stream_index) {
 
 sycl::queue& get_queue_from_stream(c10::Stream stream) {
   dpcpp::DPCPPStream dpcpp_stream(stream);
-  return dpcpp_stream.dpcpp_queue();
+  auto queue = dpcpp::DPCPPStreamToQueue(dpcpp_stream);
+  return queue->getDpcppQueue();
 }
 
 } // namespace xpu

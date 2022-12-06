@@ -1,5 +1,7 @@
 #pragma once
 
+#include <mutex>
+
 #include <c10/core/Allocator.h>
 #include <c10/core/Device.h>
 
@@ -39,9 +41,6 @@ std::mutex* getFreeMutexOfDevAlloc();
 /// Host Allocator
 // Provide a caching allocator for host allocation by USM malloc_host
 Allocator* getHostAllocator();
-
-// Record the event on queue where the host allocation is using
-void recordEventInHostAlloc(void* ptr, sycl::event& e);
 
 // Releases all cached host memory allocations
 void emptyCacheInHostAlloc();

@@ -151,18 +151,6 @@ else() # BUILD_WITH_XPU
         message(FATAL_ERROR "oneMKL library mkl_core not found")
     endif()
 
-    find_library(ONEMKL_SEQUENTIAL_LIBRARY
-        NAMES "mkl_sequential"
-        HINTS
-            ${mkl_root_hint}
-        PATH_SUFFIXES
-            lib
-            lib/intel64
-        NO_DEFAULT_PATH)
-    if(NOT ONEMKL_SEQUENTIAL_LIBRARY)
-        message(FATAL_ERROR "oneMKL library mkl_sequential not found")
-    endif()
-
     find_library(ONEMKL_LP64_LIBRARY
         NAMES "mkl_intel_lp64"
         HINTS
@@ -187,8 +175,8 @@ else() # BUILD_WITH_XPU
         message(FATAL_ERROR "oneMKL library mkl_gnu_thread not found")
     endif()
 
-    list(APPEND ONEMKL_CPU_LIBS ${ONEMKL_LP64_LIBRARY} ${ONEMKL_CORE_LIBRARY} ${ONEMKL_GNU_THREAD_LIBRARY})
-    list(APPEND ONEMKL_GPU_LIBS ${ONEMKL_SYCL_LIBRARY} ${ONEMKL_ILP64_LIBRARY} ${ONEMKL_CORE_LIBRARY} ${ONEMKL_SEQUENTIAL_LIBRARY})
+    list(APPEND ONEMKL_CPU_LIBS ${ONEMKL_GNU_THREAD_LIBRARY} ${ONEMKL_LP64_LIBRARY} ${ONEMKL_CORE_LIBRARY})
+    list(APPEND ONEMKL_GPU_LIBS ${ONEMKL_GNU_THREAD_LIBRARY} ${ONEMKL_SYCL_LIBRARY} ${ONEMKL_ILP64_LIBRARY} ${ONEMKL_CORE_LIBRARY})
     set(ONEMKL_FOUND ON)
     message(STATUS "Intel oneMKL found.")
 endif()

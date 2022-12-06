@@ -1,9 +1,10 @@
 #pragma once
 
-#include <c10/core/Device.h>
+#include <memory>
 
-#include <core/DeviceProp.h>
-#include <utils/DPCPP.h>
+#include <ATen/TensorUtils.h>
+#include <c10/core/Device.h>
+#include <core/DeviceInfo.h>
 #include <utils/Macros.h>
 
 using namespace at;
@@ -21,9 +22,9 @@ void set_device(DeviceIndex device);
 
 DeviceIndex get_device_index_from_ptr(void* ptr);
 
-DeviceProp* getCurrentDeviceProperties();
+DeviceInfo* getCurrentDeviceInfo();
 
-DeviceProp* getDeviceProperties(DeviceIndex device);
+DeviceInfo* getDeviceInfo(DeviceIndex device);
 
 std::vector<int> prefetchDeviceIdListForCard(int card_id);
 

@@ -1,12 +1,13 @@
 #pragma once
 
-#include <core/Event.h>
+#include <core/EventBase.h>
 #include <torch/csrc/python_headers.h>
+#include <memory>
 
 namespace xpu {
 
 struct THDPEvent {
-  PyObject_HEAD xpu::dpcpp::DPCPPEvent dpcpp_event;
+  PyObject_HEAD std::shared_ptr<xpu::dpcpp::DPCPPEventBase> dpcpp_event;
 };
 extern PyObject* THDPEventClass;
 

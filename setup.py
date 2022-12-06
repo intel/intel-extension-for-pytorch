@@ -564,7 +564,7 @@ class IPEXCPPLibBuild(build_clib, object):
             build_args.append('-v' if use_ninja else '-d')
 
         # Generate cmake for XPU module:
-        if(build_with_xpu):
+        if build_with_xpu:
             if os.path.isdir(ipex_xpu_dir) is False:
                 raise RuntimeError('It maybe CPU only branch, and it is not contains XPU code.')
 
@@ -602,27 +602,21 @@ class IPEXCPPLibBuild(build_clib, object):
         defines(cmake_args_cpu, **build_option_cpu)
         _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_cpu, ipex_cpu_build_dir, my_env)
 
-        # Generate cmake for the CPP UT
-        build_option_cpp_test = {
-            'PROJECT_DIR'           : project_root_dir,
-            'CPP_TEST_BUILD_DIR'    : get_cpp_test_build_dir(),
-        }
+        if not build_with_xpu:
+            # Generate cmake for the CPP UT
+            build_option_cpp_test = {
+                'PROJECT_DIR'           : project_root_dir,
+                'CPP_TEST_BUILD_DIR'    : get_cpp_test_build_dir(),
+            }
 
-        defines(cmake_args_cpu, **build_option_cpp_test)
-        _gen_build_cfg_from_cmake(cmake_exec, get_cpp_test_dir(), cmake_args_cpu, get_cpp_test_build_dir(), my_env)
+            defines(cmake_args_cpu, **build_option_cpp_test)
+            _gen_build_cfg_from_cmake(cmake_exec, get_cpp_test_dir(), cmake_args_cpu, get_cpp_test_build_dir(), my_env)
 
         # Generate cmake for common python module:
         build_option_python = {
             'BUILD_MODULE_TYPE' : 'PYTHON',
         }
 
-        if(build_with_xpu):
-            gpu_cc, gpu_cxx = get_xpu_compliers()
-            build_option_python = {
-                **build_option_python,
-                'CMAKE_C_COMPILER'      : gpu_cc,
-                'CMAKE_CXX_COMPILER'    : gpu_cxx
-            }
         cmake_args_python = copy.deepcopy(cmake_common_args)
         defines(cmake_args_python, **build_option_python)
         _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_python, ipex_python_build_dir, my_env)
@@ -633,8 +627,10 @@ class IPEXCPPLibBuild(build_clib, object):
 
         # Build CPU module:
         _build_project(build_args, ipex_cpu_build_dir, my_env, use_ninja)
-        # Build the CPP UT
-        _build_project(build_args, get_cpp_test_build_dir(), my_env, use_ninja)
+
+        if not build_with_xpu:
+            # Build the CPP UT
+            _build_project(build_args, get_cpp_test_build_dir(), my_env, use_ninja)
 
         # Build common python module:
         _build_project(build_args, ipex_python_build_dir, my_env, use_ninja)

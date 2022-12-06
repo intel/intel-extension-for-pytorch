@@ -1,8 +1,10 @@
 #include <core/Event.h>
 
 #include <cstdint>
+#include <memory>
 #include <utility>
 
+#include <include/xpu/Stream.h>
 #include <utils/Helpers.h>
 
 namespace xpu {
@@ -91,7 +93,8 @@ void DPCPPEvent::record(const DPCPPStream& stream) {
         ".");
   }
 
-  events_.push_back(xpu::dpcpp::queue_barrier(stream.dpcpp_queue()));
+  events_.push_back(
+      xpu::dpcpp::queue_barrier(get_queue_from_stream(stream.unwrap())));
 }
 
 void DPCPPEvent::recordOnce(const DPCPPStream& stream) {
@@ -101,7 +104,7 @@ void DPCPPEvent::recordOnce(const DPCPPStream& stream) {
 
 void DPCPPEvent::block(const DPCPPStream& stream) {
   if (!events_.empty()) {
-    xpu::dpcpp::queue_barrier(stream.dpcpp_queue(), events_);
+    xpu::dpcpp::queue_barrier(get_queue_from_stream(stream.unwrap()), events_);
   }
 }
 
@@ -111,6 +114,11 @@ void DPCPPEvent::synchronize() {
       event.wait_and_throw();
     }
   }
+}
+
+float DPCPPEvent::elapsed_time(const DPCPPEventBase* other) {
+  auto* other_ptr = dynamic_cast<const DPCPPEvent*>(other);
+  return elapsed_time(*other_ptr);
 }
 
 float DPCPPEvent::elapsed_time(const DPCPPEvent& other) const {
@@ -140,6 +148,10 @@ void DPCPPEvent::ipc_handle(void* handle) {
 void DPCPPEvent::moveHelper(DPCPPEvent&& other) {
   std::swap(device_index_, other.device_index_);
   std::swap(events_, other.events_);
+}
+
+std::shared_ptr<DPCPPEventBase> create_dpcpp_event() {
+  return std::make_shared<DPCPPEvent>(DPCPPEvent());
 }
 
 } // namespace dpcpp

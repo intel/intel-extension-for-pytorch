@@ -2,7 +2,6 @@
 
 #include <c10/core/Stream.h>
 
-#include <utils/DPCPP.h>
 #include <utils/Macros.h>
 
 using namespace at;
@@ -33,6 +32,8 @@ class DPCPPStream {
 
   void synchronize() const;
 
+  void synchronize_and_throw() const;
+
   Stream unwrap() const;
 
   uint64_t pack() const noexcept;
@@ -41,7 +42,7 @@ class DPCPPStream {
     return DPCPPStream(Stream::unpack(bits));
   }
 
-  sycl::queue& dpcpp_queue() const;
+  void* opaque() const;
 
  private:
   Stream stream_;

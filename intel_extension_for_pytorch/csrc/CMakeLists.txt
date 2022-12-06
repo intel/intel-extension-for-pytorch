@@ -1,37 +1,3 @@
-if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhonor-nans")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhonor-infinities")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-associative-math")
-endif()
-
-# Set installed PyTorch dir
-if(DEFINED PYTORCH_INSTALL_DIR)
-  include_directories(${PYTORCH_INSTALL_DIR}/include)
-  include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include/)
-else()
-  message(FATAL_ERROR, "Cannot find installed PyTorch directory")
-endif()
-
-# Set Python include dir
-if(DEFINED PYTHON_INCLUDE_DIR)
-  include_directories(${PYTHON_INCLUDE_DIR})
-else()
-  message(FATAL_ERROR, "Cannot find installed Python head file directory")
-endif()
-
-
-find_package(pybind11)
-if(NOT pybind11_FOUND)
-    find_package(pybind11 CONFIG)
-    if(NOT pybind11_FOUND)
-        message(FATAL_ERROR "System pybind11 not found")
-    else()
-        message(STATUS "SYSTEM pybind11 found")
-    endif()
-else()
-    message(STATUS "pybind11 found")
-endif()
-
 add_subdirectory(cpu)
 list(APPEND PY_CPP_OBJS $<TARGET_OBJECTS:PY_CPU_OBJ>)
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <c10/util/Optional.h>
+#include <core/EventBase.h>
 #include <core/Stream.h>
 #include <utils/DPCPP.h>
 
@@ -17,12 +18,12 @@ namespace dpcpp {
  * is called before the event is ever recorded, it will use the current device.
  * Later streams that record the event must match this device.
  */
-struct DPCPPEvent {
+struct DPCPPEvent : public DPCPPEventBase {
   // Constructors
   DPCPPEvent() {}
   DPCPPEvent(sycl::event);
 
-  ~DPCPPEvent() {}
+  ~DPCPPEvent() override {}
 
   DPCPPEvent(const DPCPPEvent&) = delete;
   DPCPPEvent& operator=(const DPCPPEvent&) = delete;
@@ -31,29 +32,31 @@ struct DPCPPEvent {
 
   DPCPPEvent& operator=(DPCPPEvent&& other);
 
-  at::optional<at::Device> device() const;
+  at::optional<at::Device> device() const override;
 
   bool isCreated() const;
 
-  DeviceIndex device_index() const;
+  DeviceIndex device_index() const override;
 
   std::vector<sycl::event> event() const;
 
-  bool query() const;
+  bool query() const override;
 
-  void record();
+  void record() override;
 
-  void record(const DPCPPStream& stream);
+  void record(const DPCPPStream& stream) override;
 
-  void recordOnce(const DPCPPStream& stream);
+  void recordOnce(const DPCPPStream& stream) override;
 
-  void block(const DPCPPStream& stream);
+  void block(const DPCPPStream& stream) override;
 
-  void synchronize();
+  void synchronize() override;
+
+  float elapsed_time(const DPCPPEventBase* other) override;
 
   float elapsed_time(const DPCPPEvent& other) const;
 
-  void ipc_handle(void* handle);
+  void ipc_handle(void* handle) override;
 
  private:
   DeviceIndex device_index_ = -1;

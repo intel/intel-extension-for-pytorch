@@ -1,5 +1,8 @@
+#include <core/Device.h>
 #include <runtime/Device.h>
+#include <runtime/DeviceProp.h>
 #include <runtime/Exception.h>
+#include <utils/DPCPP.h>
 #include "PreInitHook.h"
 
 using namespace at;
@@ -70,14 +73,14 @@ DeviceIndex get_device_index_from_ptr(void* ptr) {
   return device_index;
 }
 
-DeviceProp* getCurrentDeviceProperties() {
+DeviceInfo* getCurrentDeviceInfo() {
   do_pre_init_hook();
-  return dpcppGetCurrentDeviceProperties();
+  return dpcppGetCurrentDeviceInfo();
 }
 
-DeviceProp* getDeviceProperties(DeviceIndex device) {
+DeviceInfo* getDeviceInfo(DeviceIndex device) {
   do_pre_init_hook();
-  return dpcppGetDeviceProperties(device);
+  return dpcppGetDeviceInfo(device);
 }
 
 std::vector<int> prefetchDeviceIdListForCard(int card_id) {

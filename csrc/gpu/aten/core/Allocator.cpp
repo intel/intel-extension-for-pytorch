@@ -216,10 +216,6 @@ Allocator* getHostAllocator() {
   return HostAllocator::Instance();
 }
 
-void recordEventInHostAlloc(void* ptr, sycl::event& e) {
-  HostAllocator::Instance()->recordEvent(ptr, e);
-}
-
 void emptyCacheInHostAlloc() {
   HostAllocator::Instance()->emptyCache();
 }
