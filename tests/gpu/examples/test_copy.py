@@ -23,7 +23,12 @@ class TestTorchMethod(TestCase):
         output_xpu.contiguous()
         self.assertEqual(output, output_xpu.cpu())
 
+    def test_copy_quantize_tensor(self, dtype=torch.qint8):
+        qtensor1 = torch.quantize_per_tensor(torch.tensor([-1.0, 0.0, 1.0, 2.0], device=dpcpp_device), 0.1, 10, dtype=dtype)
+        qtensor2 = qtensor1.clone()
+        self.assertEqual(qtensor1.to(cpu_device), qtensor2.to(cpu_device))
+
     def test_copy_big_numel(self, dtype=torch.float):
-        tensor1 = torch.rand([8, 2048, 50304], device=dpcpp_device)
+        tensor1 = torch.rand([8, 2048, 50304], dtype=dtype, device=dpcpp_device)
         tensor2 = tensor1.clone()
         self.assertEqual(tensor1.to(cpu_device), tensor2.to(cpu_device))

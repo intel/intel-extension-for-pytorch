@@ -83,18 +83,29 @@ static bool maybe_enable_p2p_access(Device dst_device, Device src_device) {
 #endif
 }
 
-inline void loops_memcpy(TensorIterator& iter, int64_t numel) {
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-      kBool, kBFloat16, kHalf, iter.dtype(), "loops_memcpy", [&] {
-        at::detail::Array<char*, 2> data;
-        data[0] = (char*)iter.data_ptr(0);
-        data[1] = (char*)iter.data_ptr(1);
-        auto fn = [](scalar_t a) -> scalar_t { return a; };
-        int vec_size = at::native::Memory::can_vectorize_up_to_loop<scalar_t>(
-            getDeviceIdOfCurrentQueue(), data[0]);
-        auto ic = TrivialOffsetCalculator<1>();
-        launch_vectorized_kernel(numel, fn, data, ic, vec_size);
-      });
+template <typename func_t>
+void dpcpp_loops_memcpy_kernel(TensorIteratorBase& iter, const func_t& f) {
+  xpu::dpcpp::Array<char*, 2> data;
+  data[0] = (char*)iter.data_ptr(0);
+  data[1] = (char*)iter.data_ptr(1);
+  int vec_size = at::native::Memory::can_vectorize_up_to_loop<func_t>(
+      getDeviceIdOfCurrentQueue(), data);
+  auto ic = TrivialOffsetCalculator<1>();
+  launch_vectorized_kernel(iter.numel(), f, data, ic, vec_size);
+}
+
+template <typename func_t>
+void dpcpp_kernel_loops_memcpy_for_tensor_iter(
+    TensorIteratorBase& iter,
+    const func_t& f) {
+  if (!iter.can_use_32bit_indexing()) {
+    for (auto& sub_iter : iter.with_32bit_indexing()) {
+      dpcpp_kernel_loops_memcpy_for_tensor_iter<func_t>(sub_iter, f);
+    }
+    return;
+  }
+
+  dpcpp_loops_memcpy_kernel<func_t>(iter, f);
 }
 
 void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
@@ -136,7 +147,19 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
     // SYCL queue.memcpy performance is worse than SYCL copy kernel
     // implementation. JIRA:
     // https://jira.devtools.intel.com/browse/CMPLRLLVM-41292
-    loops_memcpy(iter, numel);
+    auto dtype = iter.dtype(0);
+    if (isQIntType(dtype)) {
+      IPEX_DISPATCH_QINT_TYPES(dtype, "copy_loops_memcpy", [&] {
+        dpcpp_kernel_loops_memcpy_for_tensor_iter(
+            iter, [=](scalar_t src_val) { return src_val; });
+      });
+    } else {
+      IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+          kBool, kHalf, kBFloat16, dtype, "copy_loops_memcpy", [&] {
+            dpcpp_kernel_loops_memcpy_for_tensor_iter(
+                iter, [=](scalar_t src_val) { return src_val; });
+          });
+    }
   } else {
     auto dtype = iter.dtype(0);
     if (isQIntType(dtype)) {
