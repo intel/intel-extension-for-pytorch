@@ -502,7 +502,7 @@ void _fft_with_size(
     complex_type = complex_output ? true : false;
   }
 
-  Tensor input = self;
+  Tensor input = input_;
   if (input.scalar_type() == ScalarType::Float ||
       input.scalar_type() == ScalarType::ComplexFloat) {
     if (complex_type) {
@@ -754,7 +754,7 @@ Tensor _fft_r2c(
   auto sorted_dims = impl::_sort_dims(self, dim, /*exclude_last=*/true);
   auto out = at::empty(
       out_sizes, self.options().dtype(c10::toComplexType(self.scalar_type())));
-  return impl::_exec_fft(
+  impl::_exec_fft(
       out,
       self,
       out_sizes,
