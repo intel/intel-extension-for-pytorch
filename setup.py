@@ -181,20 +181,7 @@ def _get_build_target():
     return build_target         
 
 def get_pytorch_install_dir():
-    pytorch_install_dir = ''
-    if len(sys.argv) > 2:
-            if len(sys.argv) != 3:
-                raise RuntimeError("""Please set path of libtorch directory if "build_clib" or "bdist_cppsdk" is applied.\n
-                        Usage: python setup.py [build_clib|bdist_cppsdk] <libtorch_path>""")
-            pytorch_install_dir = sys.argv[2]
-            if pytorch_install_dir.startswith('.'):
-                pytorch_install_dir = os.path.join(os.getcwd(), pytorch_install_dir)
-            sys.argv.pop()
-
-            if not os.path.isfile(os.path.join(pytorch_install_dir, 'build-version')):
-                raise RuntimeError('{} doestn\'t seem to be a valid libtorch directory.'.format(pytorch_install_dir))
-    else:
-        pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
+    pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
     return pytorch_install_dir
 
 pytorch_install_dir = get_pytorch_install_dir()
