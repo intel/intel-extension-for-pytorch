@@ -6,7 +6,7 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 template <typename T>
-DPCPP_DEVICE static inline TensorOptions map_options() {
+static inline TensorOptions map_options() {
   if (std::is_same<T, uint8_t>::value)
     return at::TensorOptions().dtype(kByte).device(kXPU).memory_format(
         LEGACY_CONTIGUOUS_MEMORY_FORMAT);

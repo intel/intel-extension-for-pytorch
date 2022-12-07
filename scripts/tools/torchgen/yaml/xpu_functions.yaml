@@ -765,6 +765,8 @@ supported:
   - _standard_gamma
   - where.self_out
   - where.self
+  - _weight_norm_interface_backward
+  - _weight_norm_interface
 autograd:
   - cdist
   - lstm.input
