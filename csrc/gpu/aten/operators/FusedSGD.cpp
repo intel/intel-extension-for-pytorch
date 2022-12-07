@@ -24,7 +24,7 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <int vec_size, typename scalar_t>
-void launch_vec_kernel_sgdMW(
+void launch_vec_kernel_SGDMasterWeight(
     Tensor& master_weight,
     Tensor& weight,
     Tensor& grad,
@@ -45,6 +45,7 @@ void launch_vec_kernel_sgdMW(
   float* momentum_buffer_ptr =
       momentum_buffer.defined() ? momentum_buffer.data_ptr<float>() : nullptr;
 
+  using accscalar_t = acc_type<scalar_t>;
   using vec_mw_t = at::native::Memory::aligned_vector_loop<float, vec_size>;
   using vec_w_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
   using vec_g_t = vec_w_t;
@@ -55,8 +56,10 @@ void launch_vec_kernel_sgdMW(
 
   auto using_momentum = bool(momentum);
   auto using_weight_decay = bool(weight_decay);
-  auto pre_dampening = static_cast<float>(1.0 - dampening);
-  auto negative_lr = static_cast<float>((-1.0) * lr);
+  auto weight_decay_value = static_cast<accscalar_t>(weight_decay);
+  auto momentum_value = static_cast<accscalar_t>(momentum);
+  auto pre_dampening = static_cast<accscalar_t>(1.0 - dampening);
+  auto negative_lr = static_cast<accscalar_t>((-1.0) * lr);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(sycl::range<1>{global_range}, [=](sycl::item<1> item) {
@@ -78,7 +81,7 @@ void launch_vec_kernel_sgdMW(
 
             // d_p = d_p.add(p.master_weight, alpha=weight_decay)
             if (using_weight_decay) {
-              grad_elm += temp_master_weight_value * weight_decay;
+              grad_elm += temp_master_weight_value * weight_decay_value;
             }
 
             // p.master_weight.add_(d_p, alpha=-group['lr'])
@@ -106,7 +109,7 @@ void launch_vec_kernel_sgdMW(
 
             // d_p = d_p.add(p.master_weight, alpha=weight_decay)
             if (using_weight_decay) {
-              grad_elm += temp_master_weight_value * weight_decay;
+              grad_elm += temp_master_weight_value * weight_decay_value;
             }
 
             // p.master_weight.add_(d_p, alpha=-group['lr'])
@@ -135,7 +138,7 @@ void launch_vec_kernel_sgdMW(
 
             // d_p = d_p.add(p.master_weight, alpha=weight_decay)
             if (using_weight_decay) {
-              grad_elm += temp_master_weight_value * weight_decay;
+              grad_elm += temp_master_weight_value * weight_decay_value;
             }
 
             // 'momentum_buffer' in param_state,
@@ -145,7 +148,7 @@ void launch_vec_kernel_sgdMW(
               // buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
               temp_momentum_buffer_value = momentum_buffer_ptr[linear_idx];
               temp_momentum_buffer_value =
-                  momentum * temp_momentum_buffer_value;
+                  momentum_value * temp_momentum_buffer_value;
               temp_momentum_buffer_value += grad_elm * pre_dampening;
             }
             momentum_buffer_ptr[linear_idx] =
@@ -154,7 +157,7 @@ void launch_vec_kernel_sgdMW(
             // nesterov
             if (nesterov) {
               // d_p = d_p.add(buf, alpha=momentum)
-              grad_elm += momentum * temp_momentum_buffer_value;
+              grad_elm += momentum_value * temp_momentum_buffer_value;
             } else {
               // d_p = buf
               grad_elm = temp_momentum_buffer_value;
@@ -191,7 +194,7 @@ void launch_vec_kernel_sgdMW(
 
             // d_p = d_p.add(p.master_weight, alpha=weight_decay)
             if (using_weight_decay) {
-              grad_elm += temp_master_weight_value * weight_decay;
+              grad_elm += temp_master_weight_value * weight_decay_value;
             }
 
             // 'momentum_buffer' in param_state,
@@ -201,7 +204,7 @@ void launch_vec_kernel_sgdMW(
               // buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
               temp_momentum_buffer_value = momentum_buffer_value[v_index];
               temp_momentum_buffer_value =
-                  momentum * temp_momentum_buffer_value;
+                  momentum_value * temp_momentum_buffer_value;
               temp_momentum_buffer_value += grad_elm * pre_dampening;
             }
             temp_momentum_buffer[v_index] =
@@ -210,7 +213,7 @@ void launch_vec_kernel_sgdMW(
             // nesterov
             if (nesterov) {
               // d_p = d_p.add(buf, alpha=momentum)
-              grad_elm += momentum * temp_momentum_buffer_value;
+              grad_elm += momentum_value * temp_momentum_buffer_value;
             } else {
               // d_p = buf
               grad_elm = temp_momentum_buffer_value;
@@ -238,7 +241,7 @@ void launch_vec_kernel_sgdMW(
 }
 
 template <int vec_size>
-void launch_vec_kernel_sgd(
+void launch_vec_kernel_SGD(
     Tensor& weight,
     Tensor& grad,
     const double weight_decay,
@@ -266,6 +269,8 @@ void launch_vec_kernel_sgd(
 
   auto using_momentum = bool(momentum);
   auto using_weight_decay = bool(weight_decay);
+  auto weight_decay_value = static_cast<float>(weight_decay);
+  auto momentum_value = static_cast<float>(momentum);
   auto pre_dampening = static_cast<float>(1.0 - dampening);
   auto negative_lr = static_cast<float>((-1.0) * lr);
 
@@ -286,7 +291,7 @@ void launch_vec_kernel_sgd(
 
             // d_p = d_p.add(p.master_weight, alpha=weight_decay)
             if (using_weight_decay) {
-              grad_elm += temp_weight_value * weight_decay;
+              grad_elm += temp_weight_value * weight_decay_value;
             }
 
             // p.add_(d_p, alpha=-group['lr'])
@@ -307,7 +312,7 @@ void launch_vec_kernel_sgd(
 
             // d_p = d_p.add(p, alpha=weight_decay)
             if (using_weight_decay) {
-              grad_elm += temp_weight_value * weight_decay;
+              grad_elm += temp_weight_value * weight_decay_value;
             }
 
             // p.add_(d_p, alpha=-group['lr'])
@@ -330,7 +335,7 @@ void launch_vec_kernel_sgd(
 
             // d_p = d_p.add(p, alpha=weight_decay)
             if (using_weight_decay) {
-              grad_elm += temp_weight_value * weight_decay;
+              grad_elm += temp_weight_value * weight_decay_value;
             }
 
             // 'momentum_buffer' in param_state,
@@ -340,7 +345,7 @@ void launch_vec_kernel_sgd(
               // buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
               temp_momentum_buffer_value = momentum_buffer_ptr[linear_idx];
               temp_momentum_buffer_value =
-                  momentum * temp_momentum_buffer_value;
+                  momentum_value * temp_momentum_buffer_value;
               temp_momentum_buffer_value += grad_elm * pre_dampening;
             }
             momentum_buffer_ptr[linear_idx] = temp_momentum_buffer_value;
@@ -348,7 +353,7 @@ void launch_vec_kernel_sgd(
             // nesterov
             if (nesterov) {
               // d_p = d_p.add(buf, alpha=momentum)
-              grad_elm += momentum * temp_momentum_buffer_value;
+              grad_elm += momentum_value * temp_momentum_buffer_value;
             } else {
               // d_p = buf
               grad_elm = temp_momentum_buffer_value;
@@ -380,7 +385,7 @@ void launch_vec_kernel_sgd(
 
             // d_p = d_p.add(p, alpha=weight_decay)
             if (using_weight_decay) {
-              grad_elm += temp_weight_value * weight_decay;
+              grad_elm += temp_weight_value * weight_decay_value;
             }
 
             // 'momentum_buffer' in param_state,
@@ -390,7 +395,7 @@ void launch_vec_kernel_sgd(
               // buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
               temp_momentum_buffer_value = momentum_buffer_value[v_index];
               temp_momentum_buffer_value =
-                  momentum * temp_momentum_buffer_value;
+                  momentum_value * temp_momentum_buffer_value;
               temp_momentum_buffer_value += grad_elm * pre_dampening;
             }
             temp_momentum_buffer[v_index] = temp_momentum_buffer_value;
@@ -398,7 +403,7 @@ void launch_vec_kernel_sgd(
             // nesterov
             if (nesterov) {
               // d_p = d_p.add(buf, alpha=momentum)
-              grad_elm += momentum * temp_momentum_buffer_value;
+              grad_elm += momentum_value * temp_momentum_buffer_value;
             } else {
               // d_p = buf
               grad_elm = temp_momentum_buffer_value;
@@ -491,21 +496,21 @@ static void ComputeSGDKernelMasterWeight(
       ? (total_element / vec_size)
       : (total_element / vec_size + 1);
 
-#define VEC_SGDMW_KERNEL(vec_size)               \
-  {                                              \
-    launch_vec_kernel_sgdMW<vec_size, scalar_t>( \
-        master_weight,                           \
-        weight,                                  \
-        grad,                                    \
-        weight_decay,                            \
-        momentum_buf_initialized,                \
-        momentum_buffer,                         \
-        momentum,                                \
-        dampening,                               \
-        nesterov,                                \
-        lr,                                      \
-        total_element,                           \
-        global_range);                           \
+#define VEC_SGDMW_KERNEL(vec_size)                         \
+  {                                                        \
+    launch_vec_kernel_SGDMasterWeight<vec_size, scalar_t>( \
+        master_weight,                                     \
+        weight,                                            \
+        grad,                                              \
+        weight_decay,                                      \
+        momentum_buf_initialized,                          \
+        momentum_buffer,                                   \
+        momentum,                                          \
+        dampening,                                         \
+        nesterov,                                          \
+        lr,                                                \
+        total_element,                                     \
+        global_range);                                     \
   }
 
   switch (vec_size) {
@@ -528,7 +533,7 @@ static void ComputeSGDKernelMasterWeight(
     default:
       TORCH_INTERNAL_ASSERT(
           false,
-          "Unexpected vectorization size for launch_vec_kernel_sgdMW kernel. vec size ",
+          "Unexpected vectorization size for launch_vec_kernel_SGDMasterWeight kernel. vec size ",
           vec_size);
   }
 #undef VEC_SGDMW_KERNEL
@@ -592,7 +597,7 @@ static void ComputeSGDKernel(
 
 #define VEC_SGD_KERNEL(vec_size)     \
   {                                  \
-    launch_vec_kernel_sgd<vec_size>( \
+    launch_vec_kernel_SGD<vec_size>( \
         weight,                      \
         grad,                        \
         weight_decay,                \
@@ -622,7 +627,7 @@ static void ComputeSGDKernel(
     default:
       TORCH_INTERNAL_ASSERT(
           false,
-          "Unexpected vectorization size for launch_vec_kernel_sgd kernel. vec size ",
+          "Unexpected vectorization size for launch_vec_kernel_SGD kernel. vec size ",
           vec_size);
   }
 #undef VEC_SGD_KERNEL
