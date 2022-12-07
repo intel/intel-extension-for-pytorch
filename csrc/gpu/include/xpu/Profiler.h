@@ -18,7 +18,13 @@
 
 #pragma once
 
+#if __has_include(<sycl/sycl.hpp>)
+#include <sycl/sycl.hpp>
+#elif __has_include(<CL/sycl.hpp>)
 #include <CL/sycl.hpp>
+#else
+#error "Unsupported compiler"
+#endif
 #include <c10/core/Device.h>
 #include "Macros.h"
 
