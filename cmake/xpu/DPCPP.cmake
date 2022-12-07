@@ -145,18 +145,16 @@ if(NOT USE_ITT_ANNOTATION)
   set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fno-sycl-instrument-device-code")
 endif()
 
+# Handle huge binary issue for multi-target AOT build
+if(NOT BUILD_SEPARATE_OPS)
+  if(BUILD_BY_PER_KERNEL OR USE_AOT_DEVLIST)
+    set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-link-huge-device-code")
+  endif()
+endif()
+
 # Since 2016 Debian start using RUNPATH instead of normally RPATH, which gave the annoy effect that
 # allow LD_LIBRARY_PATH to override dynamic linking path. Depends on intention of linking priority,
 # change below for best outcome: disable, using RPATH, enable, using RUNPATH
 set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl,--disable-new-dtags")
-
-if(BUILD_BY_PER_KERNEL)
-  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl,-T ${PROJECT_SOURCE_DIR}/cmake/xpu/per_ker.ld")
-elseif(USE_AOT_DEVLIST)
-  if(NOT BUILD_SEPARATE_OPS)
-    # Use customized link script to workaround huge binary issue for multi-target AOT build
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl,-T ${PROJECT_SOURCE_DIR}/cmake/xpu/single_aot.ld")
-  endif()
-endif()
 
 message(STATUS "DPCPP found. Compiling with SYCL support")
