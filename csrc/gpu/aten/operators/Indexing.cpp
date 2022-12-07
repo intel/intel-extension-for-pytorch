@@ -1360,6 +1360,31 @@ Tensor& put_(
   return self;
 }
 
+void check_indices_on_cpu_or_selfdevice(
+    const Tensor& self,
+    const c10::List<c10::optional<Tensor>>& indices) {
+  auto dev = self.device();
+  bool indices_on_cpu_or_dev = std::all_of(
+      indices.begin(), indices.end(), [=](const c10::optional<Tensor>& opt) {
+        if (opt.has_value()) {
+          // for optional<Undefined tensor> cases
+          if (!opt->defined()) {
+            return true;
+          }
+          return (opt->is_cpu() || opt->device() == dev);
+        } else {
+          return true;
+        }
+      });
+  TORCH_CHECK(
+      indices_on_cpu_or_dev,
+      "indices should be either on ",
+      at::kCPU,
+      " or on the same device as the indexed tensor (",
+      dev,
+      ")");
+}
+
 Tensor index(
     const Tensor& self,
     const c10::List<c10::optional<Tensor>>& indices) {
@@ -1371,6 +1396,7 @@ Tensor index(
       indices.size(),
       ")");
 
+  check_indices_on_cpu_or_selfdevice(self, indices);
   auto info = make_info(self, indices);
   auto iter = make_index_iterator(info);
   impl::index(
