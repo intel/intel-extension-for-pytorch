@@ -3,7 +3,6 @@
 #include <ATen/core/DistributionsHelper.h>
 #include <ATen/core/MT19937RNGEngine.h>
 #include <ATen/core/PhiloxRNGEngine.h>
-#include <CL/sycl.hpp>
 #include <aten/operators/MemoryAccess.h>
 #include <utils/DPCPP.h>
 

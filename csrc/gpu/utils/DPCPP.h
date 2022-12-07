@@ -7,6 +7,7 @@
 #else
 #error "Unsupported compiler"
 #endif
+
 #include <ext/oneapi/atomic_enums.hpp>
 #include <utils/Helpers.h>
 #include <utils/Macros.h>

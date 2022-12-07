@@ -1,11 +1,3 @@
-#if __has_include(<sycl/sycl.hpp>)
-#include <sycl/sycl.hpp>
-#elif __has_include(<CL/sycl.hpp>)
-#include <CL/sycl.hpp>
-#else
-#error "Unsupported compiler"
-#endif
-
 #include <ATen/ATen.h>
 #include <ATen/record_function.h>
 
@@ -13,6 +5,7 @@
 #include <core/detail/TensorInfo.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 #include "comm/RegistrationDeclarations.h"
 
 #include <aten/operators/MemoryAccess.h>

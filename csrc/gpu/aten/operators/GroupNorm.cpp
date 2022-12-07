@@ -1,15 +1,8 @@
-#if __has_include(<sycl/sycl.hpp>)
-#include <sycl/sycl.hpp>
-#elif __has_include(<CL/sycl.hpp>)
-#include <CL/sycl.hpp>
-#else
-#error "Unsupported compiler"
-#endif
-
 #include <ATen/ATen.h>
 
 #include <core/MemoryFormat.h>
 #include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
