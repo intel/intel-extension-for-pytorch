@@ -312,9 +312,9 @@ void dispatch_softmax_forward_kernel(
   sycl::range<1> local_range{local_size_row * local_size};
   sycl::range<1> global_range{global_size_row * local_size_row * local_size};
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto local_max = dpcpp_local_acc_t<accscalar_t, dpcpp_rw_mode, 2>(
+    auto local_max = dpcpp_local_acc_t<accscalar_t, 2>(
         sycl::range<2>{local_size_row, sub_group_num}, cgh);
-    auto local_sum = dpcpp_local_acc_t<accscalar_t, dpcpp_rw_mode, 2>(
+    auto local_sum = dpcpp_local_acc_t<accscalar_t, 2>(
         sycl::range<2>{local_size_row, sub_group_num}, cgh);
     cgh.parallel_for(
         sycl::nd_range<1>{global_range, local_range},
@@ -544,7 +544,7 @@ void spatial_softmax_forward(
   sycl::range<3> global_range{outer_size, block_row, group_num * local_size};
   sycl::range<3> local_range{1, block_row, local_size};
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto local_data = dpcpp_local_acc_t<accscalar_t, dpcpp_rw_mode, 3>(
+    auto local_data = dpcpp_local_acc_t<accscalar_t, 3>(
         sycl::range<3>{block_row, local_size, vec_size}, cgh);
     cgh.parallel_for(
         sycl::nd_range<3>(global_range, local_range),
@@ -691,7 +691,7 @@ void dispatch_softmax_backward_kernel(
   sycl::range<1> global_range{global_size_row * local_size_row * local_size};
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto local_sum = dpcpp_local_acc_t<accscalar_t, dpcpp_rw_mode, 2>(
+    auto local_sum = dpcpp_local_acc_t<accscalar_t, 2>(
         sycl::range<2>{local_size_row, sub_group_num}, cgh);
     cgh.parallel_for(
         sycl::nd_range<1>(global_range, local_range),
@@ -894,7 +894,7 @@ void spatial_softmax_backward_kernel(
   sycl::range<3> local_range{1, block_row, local_size};
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto local_data = dpcpp_local_acc_t<accscalar_t, dpcpp_rw_mode, 3>(
+    auto local_data = dpcpp_local_acc_t<accscalar_t, 3>(
         sycl::range<3>{block_row, local_size, vec_size}, cgh);
     cgh.parallel_for(
         sycl::nd_range<3>(global_range, local_range),

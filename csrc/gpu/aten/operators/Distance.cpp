@@ -274,8 +274,7 @@ static void pdist_kernel_impl(
     auto out_data = result.data_ptr<scalar_t>();
     auto in_data = self.data_ptr<scalar_t>();
     // Create the local shared memory for reducing
-    sycl::accessor<scalar_t, 1, dpcpp_rw_mode, sycl::access::target::local>
-        shared(wgroup_size, __cgh);
+    dpcpp_local_acc_t<scalar_t, 1> shared(wgroup_size, __cgh);
 
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       auto out_ptr = out_data;
@@ -530,8 +529,7 @@ static void cdist_forward_kernel_impl(
     auto x1_data = x1.data_ptr<scalar_t>();
     auto x2_data = x2.data_ptr<scalar_t>();
     // Create the local shared memory for reducing
-    sycl::accessor<scalar_t, 1, dpcpp_rw_mode, sycl::access::target::local>
-        shared(wgroup_size, __cgh);
+    dpcpp_local_acc_t<scalar_t, 1> shared(wgroup_size, __cgh);
 
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       auto out_ptr = out_data;

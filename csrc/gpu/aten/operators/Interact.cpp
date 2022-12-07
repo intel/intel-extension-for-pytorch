@@ -54,12 +54,9 @@ void interaction_kernel(
   auto& queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(h) {
     // Local Memory Management
-    auto in_local_data =
-        sycl::accessor<float, 3, dpcpp_rw_mode, sycl::access::target::local>(
-            sycl::range<3>{TILE_BN, 32, TILE_INPUT_COL_FLOAT}, h);
-    auto index =
-        sycl::accessor<char, 1, dpcpp_rw_mode, sycl::access::target::local>(
-            sycl::range<1>{local_size * 2}, h);
+    dpcpp_local_acc_t<float, 3> in_local_data(
+        sycl::range<3>{TILE_BN, 32, TILE_INPUT_COL_FLOAT}, h);
+    dpcpp_local_acc_t<char, 1> index(sycl::range<1>{local_size * 2}, h);
     float* in_mlp_ptr = reinterpret_cast<float*>(input_mlp);
     float* in_ptr = reinterpret_cast<float*>(input);
 

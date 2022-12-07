@@ -511,13 +511,7 @@ void dpcpp_small_index_kernel_impl(
       index_ptrs[i] = (char*)iter.data_ptr(i + 2);
     }
 
-    using local_accessor_t = sycl::accessor<
-        int64_t,
-        1,
-        sycl::access::mode::read_write,
-        sycl::access::target::local>;
-    auto local_offset = local_accessor_t(indices_size, __cgh);
-
+    dpcpp_local_acc_t<int64_t, 1> local_offset(indices_size, __cgh);
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       auto local_id = item_id.get_local_id(0);
       auto group_id = item_id.get_group(0);

@@ -582,10 +582,8 @@ void spatial_class_nll_criterion_update_output_kernel(
     auto self_data = self.data_ptr<scalar_t>();
     auto target_data = target.data_ptr<long>();
     auto weight_data = weight.data_ptr<scalar_t>();
-    sycl::accessor<accscalar_t, 1, dpcpp_rw_mode, sycl::access::target::local>
-        partial_sums(wgroup_size, cgh);
-    sycl::accessor<accscalar_t, 1, dpcpp_rw_mode, sycl::access::target::local>
-        partial_weight(wgroup_size, cgh);
+    dpcpp_local_acc_t<accscalar_t, 1> partial_sums(wgroup_size, cgh);
+    dpcpp_local_acc_t<accscalar_t, 1> partial_weight(wgroup_size, cgh);
 
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
       auto out_ptr = out_data;

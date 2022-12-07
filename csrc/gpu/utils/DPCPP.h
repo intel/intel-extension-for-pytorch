@@ -412,9 +412,9 @@ using dpcpp_dev_native_vec_width_half =
 
 // intel extensions
 using dpcpp_dev_ext_intel_gpu_eu_simd_width =
-    sycl::info::device::ext_intel_gpu_eu_simd_width;
+    sycl::ext::intel::info::device::gpu_eu_simd_width;
 using dpcpp_dev_ext_intel_gpu_hw_threads_per_eu =
-    sycl::info::device::ext_intel_gpu_hw_threads_per_eu;
+    sycl::ext::intel::info::device::gpu_hw_threads_per_eu;
 
 // aspects for extensions
 static constexpr auto dpcpp_dev_aspect_gpu_eu_simd_width =
@@ -454,8 +454,6 @@ static constexpr auto dpcpp_discard_rw_mode =
 // dpcpp access address space
 static constexpr auto dpcpp_priv_space =
     sycl::access::address_space::private_space;
-static constexpr auto dpcpp_const_space =
-    sycl::access::address_space::constant_space;
 static constexpr auto dpcpp_local_space =
     sycl::access::address_space::local_space;
 static constexpr auto dpcpp_global_space =
@@ -472,7 +470,6 @@ static constexpr auto dpcpp_global_and_local_fence =
 // dpcpp access target
 static constexpr auto dpcpp_host_buf = sycl::access::target::host_buffer;
 static constexpr auto dpcpp_const_buf = sycl::access::target::constant_buffer;
-static constexpr auto dpcpp_local_buf = sycl::access::target::local;
 static constexpr auto dpcpp_device_buf = sycl::access::target::device;
 
 // dpcpp memory ordering
@@ -584,12 +581,8 @@ DPCPP_DEVICE using dpcpp_multi_ptr_crt =
     typename dpcpp_multi_ptr<T, Space>::const_reference_t;
 
 // dpcpp accessor type
-template <
-    typename ScalarType,
-    sycl::access::mode Mode = dpcpp_rw_mode,
-    int Dims = 1>
-DPCPP_DEVICE using dpcpp_local_acc_t =
-    sycl::accessor<ScalarType, Dims, Mode, dpcpp_local_buf>;
+template <typename ScalarType, int Dims = 1>
+DPCPP_DEVICE using dpcpp_local_acc_t = sycl::local_accessor<ScalarType, Dims>;
 
 template <
     typename ScalarType,
