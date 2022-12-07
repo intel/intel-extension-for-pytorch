@@ -28,11 +28,6 @@
 #     Make sure this directory contains include and lib directories.
 #     By default, the MKL library installed with pip/conda is used.
 #
-# Environment variables for feature toggles:
-#
-#   IPEX_DISP_OP=1
-#     output the extension operators name for debug purpose
-#
 # Environment variables we respect (these environment variables are
 # conventional and are often understood/set by other software.)
 #
@@ -565,8 +560,7 @@ class IPEXCPPLibBuild(build_clib, object):
 
         # Generate cmake for CPU module:
         build_option_cpu = {
-            'BUILD_MODULE_TYPE' : 'CPU',
-            'IPEX_DISP_OP'      : 1 if _check_env_flag("IPEX_DISP_OP") else 0,
+            'BUILD_MODULE_TYPE' : 'CPU'
         }
 
         cmake_args_cpu = copy.deepcopy(cmake_common_args)

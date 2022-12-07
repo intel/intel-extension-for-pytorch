@@ -1,3 +1,7 @@
+if(NOT BUILD_MODULE_TYPE STREQUAL "PYTHON")
+  return()
+endif()
+
 add_subdirectory(cpu)
 list(APPEND PY_CPP_OBJS $<TARGET_OBJECTS:PY_CPU_OBJ>)
 
@@ -28,8 +32,8 @@ if(BUILD_WITH_XPU)
 endif()
 
 function (print_python_config_summary)
-  message(STATUS "")
 
+  print_config_summary()
   message(STATUS "******** Summary on Python ********")
   message(STATUS "General:")
 
@@ -46,6 +50,7 @@ function (print_python_config_summary)
   message(STATUS "  pybind11 include      : ${pybind11_INCLUDE_DIRS}")
 
   message(STATUS "")
+  message(STATUS "***********************************")
 endfunction()
 
 install(TARGETS intel-ext-pt-python

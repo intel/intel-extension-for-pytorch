@@ -23,7 +23,7 @@ endif()
 add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn cpu_third_party/ideep/mkl-dnn EXCLUDE_FROM_ALL)
 # add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/mkl-dnn cpu_third_party/mkl-dnn)
 
-IF("${IPEX_DISP_OP}" STREQUAL "1")
+IF(IPEX_DISP_OP)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIPEX_DISP_OP")
 ENDIF()
 
@@ -110,6 +110,8 @@ list(REMOVE_ITEM IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_ISA_SRCS_ORIGIN})
 
 add_library(${PLUGIN_NAME_CPU} SHARED ${IPEX_CPU_CPP_SRCS})
 
+set_target_properties(${PLUGIN_NAME_CPU} PROPERTIES ONEDNN_INCLUDE_DIR "${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include")
+
 include(${IPEX_ROOT_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)
   file(GLOB_RECURSE ALL_NATIVE_CSRC_FILES ${IPEX_CPU_ROOT_DIR}/**.[ch] ${IPEX_CPU_ROOT_DIR}/**.[ch]pp)
@@ -135,6 +137,7 @@ endif()
 find_package(oneMKL QUIET)
 if (ONEMKL_FOUND)
   target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${ONEMKL_INCLUDE_DIR})
+  set_target_properties(${PLUGIN_NAME_CPU} PROPERTIES ONEMKL_INCLUDE_DIR "${ONEMKL_INCLUDE_DIR}")
   if(BUILD_WITH_XPU)
     target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${ONEMKL_CPU_LIBS})
   else()

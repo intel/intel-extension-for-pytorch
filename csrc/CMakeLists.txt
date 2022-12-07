@@ -7,5 +7,5 @@ endif()
 
 if(BUILD_MODULE_TYPE STREQUAL "CPU")
   add_subdirectory(${IPEX_CSRC_ROOT_DIR}/cpu)
-# print_cpu_config_summary()
+  print_cpu_config_summary()
 endif()

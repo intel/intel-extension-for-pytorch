@@ -25,9 +25,6 @@ option(BUILD_SIMPLE_TRACE "Build simple trace for each registered operator" ON)
 set(BUILD_OPT_LEVEL "" CACHE STRING "Add build option -Ox, accept values: 0/1")
 option(BUILD_JIT_QUANTIZATION_SAVE "Support jit quantization model save and load" OFF)
 
-include(${IPEX_ROOT_DIR}/cmake/xpu/BuildFlags.cmake)
-include(${IPEX_ROOT_DIR}/cmake/xpu/DPCPP.cmake)
-
 function (print_xpu_config_summary)
   # Fetch configurations of intel-ext-pt-gpu
   get_target_property(NATIVE_DEFINITIONS intel-ext-pt-gpu COMPILE_DEFINITIONS)
@@ -36,8 +33,7 @@ function (print_xpu_config_summary)
   get_target_property(ONEMKL_INCLUDE_DIR intel-ext-pt-gpu ONEMKL_INCLUDE_DIR)
   get_target_property(ONEDPL_INCLUDE_DIR intel-ext-pt-gpu ONEDPL_INCLUDE_DIR)
 
-    message(STATUS "")
-
+    print_config_summary()
     message(STATUS "******** Summary on XPU ********")
     message(STATUS "General:")
 
@@ -101,4 +97,5 @@ function (print_xpu_config_summary)
     message(STATUS "  BUILD_JIT_QUANTIZATION_SAVE : ${BUILD_JIT_QUANTIZATION_SAVE}")
 
     message(STATUS "")
+    message(STATUS "********************************")
 endfunction()
