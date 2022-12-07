@@ -3,12 +3,14 @@
 #include <ATen/native/quantized/PackedParams.h>
 #include <oneDNN/oneDNN.h>
 #include <oneapi/dnnl/dnnl.hpp>
+#include <thread>
+#include "ATen/core/dispatch/Dispatcher.h"
+#include "ATen/core/dispatch/OperatorEntry.h"
 #include "aten/tensor/OpaqueTensorFactories.h"
 #include "torch/library.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
-
 namespace {
 template <typename T, int N>
 struct TypeSelector {
@@ -108,8 +110,12 @@ struct IpexFunctionWarpper {
       typename guts::function_traits<Signature>::return_type,
       typename guts::function_traits<Signature>::parameter_types>;
 };
+
 template <typename Func>
-c10::FunctionSchema constructFunctionSchema(const char* name, Func&& func) {
+void construct_function_schema_and_register(
+    const char* name,
+    Func&& func,
+    torch::Library& m) {
   std::unique_ptr<c10::FunctionSchema> infer_schema =
       c10::detail::inferFunctionSchemaFromFunctor<std::decay_t<Func>>();
   auto parse_name = torch::jit::parseSchemaOrName(name);
@@ -117,7 +123,11 @@ c10::FunctionSchema constructFunctionSchema(const char* name, Func&& func) {
   c10::FunctionSchema s = infer_schema->cloneWithName(
       std::move(op_name.name), std::move(op_name.overload_name));
   s.setAliasAnalysis(c10::AliasAnalysisKind::CONSERVATIVE);
-  return s;
+  c10::OperatorName find_name = s.operator_name();
+  const auto found = c10::Dispatcher::singleton().findOp(find_name);
+  if (found == c10::nullopt) {
+    m.def(std::move(s));
+  }
 }
 /*
 *************************************************
@@ -190,19 +200,37 @@ macro IPEX_OP_REGISTER_NEED_PLAIN. In this way, all the tensor passed to this
 operator will automatically convert to normal tensor layout when execution.
 
 */
+
 #define IPEX_OP_REGISTER(NAME, Func)                                      \
-  m.def(AtenIpexTypeXPU::constructFunctionSchema(NAME, Func));            \
+  construct_function_schema_and_register("torch_ipex::" NAME, Func, m);   \
   m.impl(                                                                 \
       TORCH_SELECTIVE_NAME("torch_ipex::" NAME),                          \
       &AtenIpexTypeXPU::                                                  \
           IpexFunctionWarpper<decltype(Func), &Func, false, true>::type:: \
               call);
 
-#define IPEX_OP_REGISTER_NEED_PLAIN(NAME, Func)                \
-  m.def(AtenIpexTypeXPU::constructFunctionSchema(NAME, Func)); \
-  m.impl(                                                      \
-      TORCH_SELECTIVE_NAME("torch_ipex::" NAME),               \
-      &AtenIpexTypeXPU::                                       \
+#define IPEX_OP_REGISTER_NEED_PLAIN(NAME, Func)                         \
+  construct_function_schema_and_register("torch_ipex::" NAME, Func, m); \
+  m.impl(                                                               \
+      TORCH_SELECTIVE_NAME("torch_ipex::" NAME),                        \
+      &AtenIpexTypeXPU::                                                \
+          IpexFunctionWarpper<decltype(Func), &Func, true, true>::type::call);
+
+#define IPEX_OP_REGISTER_DISPATCH(NAME, Func, DispatchKey)                \
+  construct_function_schema_and_register("torch_ipex::" NAME, Func, m);   \
+  m.impl(                                                                 \
+      TORCH_SELECTIVE_NAME("torch_ipex::" NAME),                          \
+      DispatchKey,                                                        \
+      &AtenIpexTypeXPU::                                                  \
+          IpexFunctionWarpper<decltype(Func), &Func, false, true>::type:: \
+              call);
+
+#define IPEX_OP_REGISTER_DISPATCH_NEED_PLAIN(NAME, Func, DispatchKey)   \
+  construct_function_schema_and_register("torch_ipex::" NAME, Func, m); \
+  m.impl(                                                               \
+      TORCH_SELECTIVE_NAME("torch_ipex::" NAME),                        \
+      DispatchKey,                                                      \
+      &AtenIpexTypeXPU::                                                \
           IpexFunctionWarpper<decltype(Func), &Func, true, true>::type::call);
 
 #define IPEX_LIBRARY_FRAGMENT() TORCH_LIBRARY_FRAGMENT(torch_ipex, m)

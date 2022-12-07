@@ -16,6 +16,7 @@
 #include "comm/TensorOptions.h"
 
 #include <aten/operators/MemoryAccess.h>
+#include "utils/CustomOperatorRegistration.h"
 
 using namespace xpu::dpcpp;
 using namespace xpu::dpcpp::detail;
@@ -197,8 +198,7 @@ at::Tensor nms_kernel(
 } // namespace at
 
 namespace {
-TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def("nms(Tensor dets, Tensor scores, float iou_threshold) -> Tensor");
-  m.impl("nms", c10::DispatchKey::XPU, at::AtenIpexTypeXPU::nms_kernel);
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER("nms.xpu", at::AtenIpexTypeXPU::nms_kernel);
 }
 } // namespace
