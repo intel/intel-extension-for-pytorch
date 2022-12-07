@@ -38,7 +38,7 @@ void MultiMarginCriterion_updateOutput(
       input.sizes());
 
   const int p_ = p.toInt();
-  const double margin_ = margin.toDouble();
+  const scalar_t margin_ = margin.to<scalar_t>();
   TORCH_CHECK(p_ == 1 || p_ == 2, "only p == 1 and p == 2 supported");
 
   int64_t nframe, dim;
@@ -177,7 +177,7 @@ void MultiMarginCriterion_updateGradInput(
       input.sizes());
 
   const int p_ = p.toInt();
-  const double margin_ = margin.toDouble();
+  const scalar_t margin_ = margin.to<scalar_t>();
   TORCH_CHECK(p_ == 1 || p_ == 2, "only p == 1 and p == 2 supported");
 
   int64_t nframe, dim;
