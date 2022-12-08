@@ -25,7 +25,6 @@ class TestNNMethod(TestCase):
         output_dpcpp = cos_dpcpp(input1_dpcpp, input2_dpcpp)
         self.assertEqual(output, output_dpcpp.cpu())
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_pdist(self, dtype=torch.float):
         for p in (0, 1, 2, 3, float('inf')):
             a = torch.randn([10, 15], requires_grad=True)
@@ -46,7 +45,6 @@ class TestNNMethod(TestCase):
             self.assertEqual(y, y_xpu)
             self.assertEqual(grad_cpu, grad_xpu)
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_cdist(self, dtype=torch.float):
         for p in (0, 1, 2, 3, float('inf')):
 

@@ -7,6 +7,7 @@
 #include <utils/DPCPP.h>
 #include "BatchKernel.h"
 #include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
@@ -32,10 +33,10 @@ class dists {
 
   // Zero norm
   struct zero {
-    static void inc(scalar_t& agg, const scalar_t diff, const double p) {
+    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
       agg += diff != 0.0;
     }
-    static scalar_t finish(const scalar_t agg, const double p) {
+    static scalar_t finish(const scalar_t agg, const scalar_t p) {
       return agg;
     }
     static void agg(scalar_t& update, const scalar_t other) {
@@ -45,10 +46,10 @@ class dists {
 
   // One norm
   struct one {
-    static void inc(scalar_t& agg, const scalar_t diff, const double p) {
+    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
       agg += diff;
     }
-    static scalar_t finish(const scalar_t agg, const double p) {
+    static scalar_t finish(const scalar_t agg, const scalar_t p) {
       return agg;
     }
     static void agg(scalar_t& update, const scalar_t other) {
@@ -58,7 +59,7 @@ class dists {
         const scalar_t diff,
         const scalar_t grad,
         const scalar_t dist,
-        const double p) {
+        const scalar_t p) {
       return grad * sign(diff);
     }
   };
@@ -69,7 +70,7 @@ class dists {
         const scalar_t diff,
         const scalar_t grad,
         const scalar_t dist,
-        const double p) {
+        const scalar_t p) {
       return dist == 0.0 ? static_cast<scalar_t>(0)
                          : sign(diff) *
               Numerics<scalar_t>::pow(Numerics<scalar_t>::abs(diff), p - 1) *
@@ -79,10 +80,10 @@ class dists {
 
   // Two norm
   struct two {
-    static void inc(scalar_t& agg, const scalar_t diff, const double p) {
+    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
       agg += diff * diff;
     }
-    static scalar_t finish(const scalar_t agg, const double p) {
+    static scalar_t finish(const scalar_t agg, const scalar_t p) {
       return device_sqrt<scalar_t>(agg);
     }
     static void agg(scalar_t& update, const scalar_t other) {
@@ -92,14 +93,14 @@ class dists {
         const scalar_t diff,
         const scalar_t grad,
         const scalar_t dist,
-        const double p) {
-      return dist == 0.0 ? static_cast<scalar_t>(0) : grad * diff / dist;
+        const scalar_t p) {
+      return dist == 0.0f ? static_cast<scalar_t>(0) : grad * diff / dist;
     }
   };
 
   // General p norm
   struct p {
-    static void inc(scalar_t& agg, const scalar_t diff, const double p) {
+    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
       // TODO:
       // Here had an unknown bug which affected other code segments
       // unexpectedly. See Jira:
@@ -107,9 +108,9 @@ class dists {
       // is what code we wrote before and will trigger the bug
       //
       // agg += Numerics<scalar_t>::pow(diff, p);
-      agg += static_cast<scalar_t>(std::pow(static_cast<double>(diff), p));
+      agg += static_cast<scalar_t>(std::pow(static_cast<scalar_t>(diff), p));
     }
-    static scalar_t finish(const scalar_t agg, const double p) {
+    static scalar_t finish(const scalar_t agg, const scalar_t p) {
       // TODO:
       // Here had an unknown bug which affected other code segments
       // unexpectedly. See Jira:
@@ -117,7 +118,8 @@ class dists {
       // is what code we wrote before and will trigger the bug
       //
       // return Numerics<scalar_t>::pow(agg, static_cast<scalar_t>(1) / p);
-      return static_cast<scalar_t>(std::pow(static_cast<double>(agg), 1. / p));
+      return static_cast<scalar_t>(
+          std::pow(static_cast<scalar_t>(agg), 1.0f / p));
     }
     static void agg(scalar_t& update, const scalar_t other) {
       update += other;
@@ -126,7 +128,7 @@ class dists {
         const scalar_t diff,
         const scalar_t grad,
         const scalar_t dist,
-        const double p) {
+        const scalar_t p) {
       return dist == 0.0 ? static_cast<scalar_t>(0)
                          : diff *
               Numerics<scalar_t>::pow(Numerics<scalar_t>::abs(diff), p - 2) *
@@ -136,12 +138,12 @@ class dists {
 
   // Inf norm
   struct inf {
-    static void inc(scalar_t& agg, const scalar_t diff, const double p) {
+    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
       if (diff > agg) {
         agg = diff;
       }
     }
-    static scalar_t finish(const scalar_t agg, const double p) {
+    static scalar_t finish(const scalar_t agg, const scalar_t p) {
       return agg;
     }
     static void agg(scalar_t& update, const scalar_t other) {
@@ -153,7 +155,7 @@ class dists {
         const scalar_t diff,
         const scalar_t grad,
         const scalar_t dist,
-        const double p) {
+        const scalar_t p) {
       return grad * sign(diff) * (Numerics<scalar_t>::abs(diff) == dist);
     }
   };
@@ -217,7 +219,7 @@ static inline scalar_t reduce_agg(
     local_shared_mem[sg_id] = agg;
   }
   item.barrier(dpcpp_local_fence);
-  agg = (local_id < sg_num) ? local_shared_mem[lane_id] : (scalar_t)0;
+  agg = (local_id < sg_num) ? local_shared_mem[lane_id] : (scalar_t)0.0f;
   if (0 == sg_id) {
     agg = subgroup_reduce_agg<scalar_t, F, nd_item>(item, agg, sg_size);
   }
@@ -269,6 +271,10 @@ static void pdist_kernel_impl(
   while (wgroup_size >> 1 >= m && wgroup_size >> 1 >= 32 /* sg_size */) {
     wgroup_size >>= 1;
   }
+  using accscalar_t = acc_type<scalar_t>;
+  auto p_val = static_cast<accscalar_t>(p);
+  auto n2_val = static_cast<accscalar_t>(n2);
+  auto n2_squared_minus_1_val = static_cast<accscalar_t>(n2_squared_minus_1);
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto out_data = result.data_ptr<scalar_t>();
@@ -284,25 +290,25 @@ static void pdist_kernel_impl(
       const size_t stride = item_id.get_local_range().size();
 
       int64_t i = static_cast<int64_t>(
-          (n2 - device_sqrt<double>(n2_squared_minus_1 - 2 * k)));
+          (n2_val - device_sqrt<accscalar_t>(n2_squared_minus_1_val - 2 * k)));
       int64_t j = k - n * i + i * (i + 1) / 2 + i + 1;
 
       const scalar_t* const start = in_ptr + i * m;
       const scalar_t* const end = start + m;
       const scalar_t* a = start + item_id.get_local_linear_id();
       const scalar_t* b = in_ptr + j * m + item_id.get_local_linear_id();
-      scalar_t agg = 0.0;
+      scalar_t agg = 0.0f;
       for (; a < end; a += stride, b += stride) {
         F::inc(
             agg,
             Numerics<scalar_t>::abs(
                 static_cast<scalar_t>(*a) - static_cast<scalar_t>(*b)),
-            p);
+            p_val);
       }
 
       agg = reduce_agg<scalar_t, F>(agg, item_id, shared);
       if (item_id.get_local_linear_id() == 0) {
-        out_ptr[k] = F::finish(agg, p);
+        out_ptr[k] = F::finish(agg, p_val);
       }
     };
 
@@ -330,6 +336,10 @@ static void pdist_backward_kernel_impl(
   static constexpr int val_per_wi = 8;
   BatchKernelConfig cfg = {dist.numel(), m / val_per_wi, 1, dist.numel(), true};
   sycl::nd_range<2> work_load(cfg.global_size(), cfg.group_size());
+  using accscalar_t = acc_type<scalar_t>;
+  auto p_val = static_cast<accscalar_t>(p);
+  auto n2_val = static_cast<accscalar_t>(n2);
+  auto n2_squared_minus_1_val = static_cast<accscalar_t>(n2_squared_minus_1);
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto out_ptr = buffer.data_ptr<scalar_t>();
@@ -349,7 +359,7 @@ static void pdist_backward_kernel_impl(
 
       // select row i, j depending on k
       int64_t i = static_cast<int64_t>(
-          (n2 - device_sqrt<double>(n2_squared_minus_1 - 2 * k)));
+          (n2_val - device_sqrt<accscalar_t>(n2_squared_minus_1_val - 2 * k)));
       int64_t j = k - n * i + i * (i + 1) / 2 + i + 1;
       int64_t ib = j - i - 1;
       int64_t jb = n - 2 - i;
@@ -368,7 +378,8 @@ static void pdist_backward_kernel_impl(
                            self_j += stride,
                            buff_i += stride,
                            buff_j += stride) {
-        const scalar_t res = F::backward(*self_i - *self_j, grad_k, dist_k, p);
+        const scalar_t res =
+            F::backward(*self_i - *self_j, grad_k, dist_k, p_val);
         *buff_i = res;
         *buff_j = -res;
       }
@@ -523,6 +534,8 @@ static void cdist_forward_kernel_impl(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   auto wgroup_size = 32;
+  using accscalar_t = acc_type<scalar_t>;
+  auto p_val = static_cast<accscalar_t>(p);
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto out_data = result.data_ptr<scalar_t>();
@@ -549,17 +562,17 @@ static void cdist_forward_kernel_impl(
       scalar_t* a = start + local_id;
       scalar_t* b = x2_ptr + l * l2_size + j * m + local_id;
 
-      scalar_t agg = 0.0;
+      scalar_t agg = 0.0f;
       for (; a < end; a += stride, b += stride) {
         F::inc(
             agg,
             Numerics<scalar_t>::abs(
                 static_cast<scalar_t>(*a) - static_cast<scalar_t>(*b)),
-            p);
+            p_val);
       }
       agg = reduce_agg<scalar_t, F>(agg, item_id, shared);
       if (local_id == 0) {
-        out_ptr[group_id] = F::finish(agg, p);
+        out_ptr[group_id] = F::finish(agg, p_val);
       }
     };
 
@@ -711,6 +724,8 @@ static void cdist_backward_kernel_impl(
   const int group_size_x = 256 > wgroup_size ? wgroup_size : 256;
   const int group_size_y = wgroup_size / group_size_x;
   const int group_num_x = (m + group_size_x * 32 - 1) / (group_size_x * 32);
+  using accscalar_t = acc_type<scalar_t>;
+  auto p_val = static_cast<accscalar_t>(p);
 
   const int64_t group_num_temp = (count + group_size_y - 1) / group_size_y;
 
@@ -768,7 +783,7 @@ static void cdist_backward_kernel_impl(
             static_cast<scalar_t>(*self_i) - static_cast<scalar_t>(*self_j),
             grad_k,
             dist_k,
-            p);
+            p_val);
         *buff_i = res;
       }
     };
