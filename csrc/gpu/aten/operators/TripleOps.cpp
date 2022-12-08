@@ -379,12 +379,11 @@ namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mul_add", mul_add);
   IPEX_OP_REGISTER("mul_add.Scalar", mul_add_scalar);
-  m.def(
-      "packed_add(Tensor top_half, Tensor bot_half, Tensor grad, float alpha) -> Tensor");
-  m.impl("packed_add", c10::DispatchKey::XPU, at::AtenIpexTypeXPU::packed_add);
-  m.impl(
+  IPEX_OP_REGISTER_DISPATCH(
+      "packed_add", at::AtenIpexTypeXPU::packed_add, c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH(
       "packed_add",
-      c10::DispatchKey::SparseXPU,
-      at::AtenIpexTypeXPU::packed_add);
+      at::AtenIpexTypeXPU::packed_add,
+      c10::DispatchKey::SparseXPU)
 }
 } // namespace

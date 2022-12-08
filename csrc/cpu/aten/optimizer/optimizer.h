@@ -42,7 +42,7 @@ c10::optional<at::Tensor> sgd_fused_step_kernel_impl(
     double dampening,
     bool nesterov);
 
-void packed_add_kernel_impl(
+at::Tensor packed_add_kernel_impl(
     at::Tensor& top_half,
     at::Tensor& bot_half,
     const at::Tensor& grad,
@@ -105,7 +105,7 @@ using sgd_fused_step_kernel_fn = c10::optional<at::Tensor> (*)(
 DECLARE_DISPATCH(sgd_fused_step_kernel_fn, sgd_fused_step_kernel_stub);
 
 using packed_add_kernel_fn =
-    void (*)(at::Tensor&, at::Tensor&, const at::Tensor&, double);
+    at::Tensor (*)(at::Tensor&, at::Tensor&, const at::Tensor&, double);
 DECLARE_DISPATCH(packed_add_kernel_fn, packed_add_kernel_stub);
 
 using adam_fused_step_kernel_fn = void (*)(

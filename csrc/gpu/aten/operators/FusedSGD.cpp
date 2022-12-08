@@ -13,6 +13,7 @@
 #include "comm/AccumulateType.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
+#include "utils/CustomOperatorRegistration.h"
 
 #include <aten/operators/MemoryAccess.h>
 
@@ -643,14 +644,14 @@ static void ComputeSGDKernel(
 // casted latey's weight)
 c10::optional<at::Tensor> sgd_fused_step(
     at::Tensor& fp32_weight,
-    at::Tensor& grad,
+    const at::Tensor& grad,
     const c10::optional<at::Tensor>& momentum_buffer_,
     at::Tensor& weight,
-    const double momentum,
-    const double lr,
-    const double weight_decay,
-    const double dampening,
-    const bool nesterov) {
+    double momentum,
+    double lr,
+    double weight_decay,
+    double dampening,
+    bool nesterov) {
   RECORD_FUNCTION(
       "sgd_fused_step",
       std::vector<c10::IValue>({fp32_weight, grad, momentum_buffer_, weight}));
@@ -659,7 +660,7 @@ c10::optional<at::Tensor> sgd_fused_step(
   // after inference, the model weight in the next training epoch maybe cached
   // block, so to plain now if needed
   fp32_weight = to_plain_if_needed_(fp32_weight);
-  grad = to_plain_if_needed_(grad);
+  Tensor grad_ = to_plain_if_needed(grad);
 
   at::Tensor momentum_buffer;
   bool momentum_buf_initialized;
@@ -688,7 +689,7 @@ c10::optional<at::Tensor> sgd_fused_step(
     }
 
     weight = weight.contiguous(memory_format);
-    grad = grad.contiguous(memory_format);
+    grad_ = grad_.contiguous(memory_format);
 
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
@@ -698,7 +699,7 @@ c10::optional<at::Tensor> sgd_fused_step(
         [&] {
           impl::ComputeSGDKernelMasterWeight<scalar_t>(
               fp32_weight,
-              grad,
+              grad_,
               momentum_buffer,
               weight,
               weight_decay,
@@ -717,12 +718,12 @@ c10::optional<at::Tensor> sgd_fused_step(
       momentum_buffer = momentum_buffer.contiguous(memory_format);
     }
 
-    grad = grad.contiguous(memory_format);
+    grad_ = grad_.contiguous(memory_format);
 
     // all Tensor are fp32
     impl::ComputeSGDKernel(
         fp32_weight,
-        grad,
+        grad_,
         momentum_buffer,
         weight_decay,
         momentum,
@@ -743,14 +744,10 @@ c10::optional<at::Tensor> sgd_fused_step(
 } // namespace at
 
 namespace {
-TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      "sgd_fused_step(Tensor fp32_weight, Tensor grad, Tensor? momentum_buffer_, "
-      "Tensor weight, float momentum, float lr, float weight_decay, "
-      "float dampening, bool nesterov) -> Tensor?");
-  m.impl(
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
       "sgd_fused_step",
-      c10::DispatchKey::XPU,
-      at::AtenIpexTypeXPU::sgd_fused_step);
+      at::AtenIpexTypeXPU::sgd_fused_step,
+      c10::DispatchKey::XPU);
 }
 } // namespace

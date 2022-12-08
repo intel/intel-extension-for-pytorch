@@ -1,14 +1,11 @@
 #pragma once
 #include <ATen/ATen.h>
 #include <ATen/native/quantized/PackedParams.h>
-#include <oneapi/dnnl/dnnl.hpp>
 #include "ATen/core/dispatch/Dispatcher.h"
 #include "ATen/core/dispatch/OperatorEntry.h"
-#include "aten/tensor/OpaqueTensorFactories.h"
 #include "torch/library.h"
 
-namespace at {
-namespace AtenIpexTypeXPU {
+namespace torch_ipex {
 namespace {
 template <typename T, int N>
 struct TypeSelector {
@@ -34,80 +31,8 @@ struct TypeSelector {
 
   at::SmallVector<T, N> container_;
 };
+
 } // namespace
-
-template <
-    typename Signature,
-    Signature* Func,
-    bool to_plain,
-    bool device_guard,
-    typename Ret,
-    typename TypeList>
-struct IpexFunctionWarpper_ {};
-
-template <
-    typename Signature,
-    Signature* Func,
-    bool to_plain,
-    typename Ret,
-    typename... Args>
-struct IpexFunctionWarpper_<
-    Signature,
-    Func,
-    to_plain,
-    false,
-    Ret,
-    guts::typelist::typelist<Args...>> {
-  static Ret call(Args... args) {
-    if constexpr (to_plain) {
-      TypeSelector<at::Tensor, sizeof...(args)> selector;
-      selector.extract_type(args...);
-      std::for_each(
-          selector.retrive_types().begin(),
-          selector.retrive_types().end(),
-          AtenIpexTypeXPU::to_plain_if_needed_);
-    }
-    return (*Func)(args...);
-  }
-};
-
-template <
-    typename Signature,
-    Signature* Func,
-    bool to_plain,
-    typename Ret,
-    typename... Args>
-struct IpexFunctionWarpper_<
-    Signature,
-    Func,
-    to_plain,
-    true,
-    Ret,
-    guts::typelist::typelist<Args...>> {
-  static Ret call(Args... args) {
-    TypeSelector<at::Tensor, sizeof...(args)> selector;
-    selector.extract_type(args...);
-    const OptionalDeviceGuard dev_guard(device_of(selector.retrive_types()));
-    if constexpr (to_plain) {
-      std::for_each(
-          selector.retrive_types().begin(),
-          selector.retrive_types().end(),
-          AtenIpexTypeXPU::to_plain_if_needed_);
-    }
-    return (*Func)(args...);
-  }
-};
-
-template <typename Signature, Signature* Func, bool to_plain, bool device_guard>
-struct IpexFunctionWarpper {
-  using type = IpexFunctionWarpper_<
-      Signature,
-      Func,
-      to_plain,
-      device_guard,
-      typename guts::function_traits<Signature>::return_type,
-      typename guts::function_traits<Signature>::parameter_types>;
-};
 
 template <typename Func>
 void construct_function_schema_and_register(
@@ -199,43 +124,26 @@ operator will automatically convert to normal tensor layout when execution.
 
 */
 
-#define IPEX_OP_REGISTER(NAME, Func)                                      \
-  at::AtenIpexTypeXPU::construct_function_schema_and_register(            \
-      "torch_ipex::" NAME, Func, m);                                      \
-  m.impl(                                                                 \
-      TORCH_SELECTIVE_NAME("torch_ipex::" NAME),                          \
-      &AtenIpexTypeXPU::                                                  \
-          IpexFunctionWarpper<decltype(Func), &Func, false, true>::type:: \
-              call);
+#define IPEX_OP_REGISTER(NAME, Func)                  \
+  torch_ipex::construct_function_schema_and_register( \
+      "torch_ipex::" NAME, Func, m);                  \
+  m.impl(TORCH_SELECTIVE_NAME("torch_ipex::" NAME), Func);
 
-#define IPEX_OP_REGISTER_NEED_PLAIN(NAME, Func)                \
-  at::AtenIpexTypeXPU::construct_function_schema_and_register( \
-      "torch_ipex::" NAME, Func, m);                           \
-  m.impl(                                                      \
-      TORCH_SELECTIVE_NAME("torch_ipex::" NAME),               \
-      &AtenIpexTypeXPU::                                       \
-          IpexFunctionWarpper<decltype(Func), &Func, true, true>::type::call);
+#define IPEX_OP_REGISTER_NEED_PLAIN(NAME, Func)       \
+  torch_ipex::construct_function_schema_and_register( \
+      "torch_ipex::" NAME, Func, m);                  \
+  m.impl(TORCH_SELECTIVE_NAME("torch_ipex::" NAME), Func);
 
-#define IPEX_OP_REGISTER_DISPATCH(NAME, Func, DispatchKey)                \
-  at::AtenIpexTypeXPU::construct_function_schema_and_register(            \
-      "torch_ipex::" NAME, Func, m);                                      \
-  m.impl(                                                                 \
-      TORCH_SELECTIVE_NAME("torch_ipex::" NAME),                          \
-      DispatchKey,                                                        \
-      &AtenIpexTypeXPU::                                                  \
-          IpexFunctionWarpper<decltype(Func), &Func, false, true>::type:: \
-              call);
+#define IPEX_OP_REGISTER_DISPATCH(NAME, Func, DispatchKey) \
+  torch_ipex::construct_function_schema_and_register(      \
+      "torch_ipex::" NAME, Func, m);                       \
+  m.impl(TORCH_SELECTIVE_NAME("torch_ipex::" NAME), DispatchKey, Func);
 
 #define IPEX_OP_REGISTER_DISPATCH_NEED_PLAIN(NAME, Func, DispatchKey) \
-  at::AtenIpexTypeXPU::construct_function_schema_and_register(        \
+  torch_ipex::construct_function_schema_and_register(                 \
       "torch_ipex::" NAME, Func, m);                                  \
-  m.impl(                                                             \
-      TORCH_SELECTIVE_NAME("torch_ipex::" NAME),                      \
-      DispatchKey,                                                    \
-      &AtenIpexTypeXPU::                                              \
-          IpexFunctionWarpper<decltype(Func), &Func, true, true>::type::call);
+  m.impl(TORCH_SELECTIVE_NAME("torch_ipex::" NAME), DispatchKey, Func);
 
 #define IPEX_LIBRARY_FRAGMENT() TORCH_LIBRARY_FRAGMENT(torch_ipex, m)
 
-} // namespace AtenIpexTypeXPU
-} // namespace at
+} // namespace torch_ipex
