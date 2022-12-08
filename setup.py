@@ -273,7 +273,7 @@ def create_version_files(base_dir, ipex_build_version, ipex_git_sha, torch_git_s
         py_buffer += "# {}\n\n".format(current_code_fingerprint)
         py_buffer += "__version__ = '{}'\n".format(ipex_build_version)
         py_buffer += "__ipex_gitrev__ = '{}'\n".format(ipex_git_sha)
-        py_buffer += "__torch_gitrev__ = '{}'\n".format(torch_git_sha)
+        py_buffer += "__torch_gitrev__ = '{}'\n".format('' if build_type_str == 'Release' else torch_git_sha)
         py_buffer += "__gpu_onednn_gitrev__ = '{}'\n".format(gpu_onednn_sha)
         py_buffer += "__cpu_ideep_gitrev__ = '{}'\n".format(cpu_ideep_sha)
         py_buffer += "__build_type__ = '{}'\n".format(build_type_str)
