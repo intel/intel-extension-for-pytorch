@@ -20,6 +20,10 @@ class Settings final {
  public:
   Settings();
 
+  bool has_fp64_dtype(int device_id = -1);
+  bool has_2d_block_array(int device_id = -1);
+  bool has_atomic64(int device_id = -1);
+
   static Settings& I(); // Singleton
 
   int get_verbose_level() const;

@@ -136,6 +136,20 @@ Settings::Settings() {
   }
 } // namespace dpcpp
 
+bool Settings::has_fp64_dtype(int device_id) {
+  return dpcppGetDeviceProperties(device_id)->support_fp64;
+}
+
+bool Settings::has_2d_block_array(int device_id) {
+  // FIXME: No avialble query to check 2d_block_array in sycl so far.
+  // Therefore, we check FP64 capability to guess the platform status.
+  return has_fp64_dtype(device_id);
+}
+
+bool Settings::has_atomic64(int device_id) {
+  return dpcppGetDeviceProperties(device_id)->support_atomic64;
+}
+
 int Settings::get_verbose_level() const {
   std::lock_guard<std::mutex> lock(s_mutex);
   return static_cast<int>(verbose_level);

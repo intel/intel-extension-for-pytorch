@@ -534,6 +534,14 @@ void init_xpu_module(pybind11::module& m) {
     return Settings::I().is_channels_last_1d_enabled();
   });
 
+  m.def("_has_fp64_dtype", [](int device) {
+    return Settings::I().has_fp64_dtype(device);
+  });
+
+  m.def("_has_2d_block_array", [](int device) {
+    return Settings::I().has_2d_block_array(device);
+  });
+
   m.def(
       "_get_verbose_level", []() { return Settings::I().get_verbose_level(); });
 

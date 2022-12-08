@@ -5,6 +5,7 @@ import torch
 import torch.fx.experimental.optimization as optimization
 from torch.jit._trace import TracerWarning
 import warnings
+from enum import IntFlag
 
 from .nn import utils
 from .optim._optimizer_utils import optimizer_fusion, IPEX_FUSED_OPTIMIZER_LIST_CPU, IPEX_FUSED_OPTIMIZER_LIST_XPU
@@ -38,17 +39,24 @@ def _copy_model_and_optimizer(model, optimizer):
         return new_model, new_optimizer
 
 
-auto_channels_last = True
+# TODO: need discussion design here with CPU
+class auto_channels_last_flag(IntFlag):
+    AUTO = -1
+    DISABLE = 0
+    ENABLE = 1
+
+
+auto_channels_last = auto_channels_last_flag.AUTO
 
 
 def enable_auto_channels_last():
     global auto_channels_last
-    auto_channels_last = True
+    auto_channels_last = auto_channels_last_flag.ENABLE
 
 
 def disable_auto_channels_last():
     global auto_channels_last
-    auto_channels_last = False
+    auto_channels_last = auto_channels_last_flag.DISABLE
 
 
 class _Properties(object):
@@ -68,9 +76,8 @@ class _Properties(object):
         self.auto_kernel_selection = None
         self.graph_mode = None
 
+
 # O0 properties
-
-
 class _O0:
     def __call__(self, properties):
         properties.opt_level = "O0"
@@ -366,15 +373,26 @@ def optimize(
         opt_properties = opt_levels[level](opt_properties)
 
     device_type = 'cpu'
-    if len(list(model.parameters())) and list(model.parameters())[0].device.type == 'xpu':
-        if not all([param.device.type == 'xpu' for param in list(model.parameters())]):
+    model_parameters_list = list(model.parameters())
+    if len(model_parameters_list) and model_parameters_list[0].device.type == 'xpu':
+        if not all([param.device.type == 'xpu' for param in model_parameters_list]):
             raise RuntimeError("The model is mixed with different device type")
         else:
             device_type = 'xpu'
 
-    # auto model channels_last memory format conversion
-    # TODO: for xpu, the auto channels last is temp disabled
-    if auto_channels_last and device_type == 'cpu':
+    global auto_channels_last
+    def xpu_check_channel_last():
+        global auto_channels_last
+        if auto_channels_last.value == auto_channels_last_flag.ENABLE:
+            return True
+        elif auto_channels_last.value == auto_channels_last_flag.AUTO and torch.xpu.has_2d_block_array():
+            return True
+        else:
+            return False
+
+    if device_type == 'cpu' and (auto_channels_last.value != auto_channels_last_flag.DISABLE):
+        _convert_convNd_weight_memory_format(model)
+    elif device_type == 'xpu' and xpu_check_channel_last():
         _convert_convNd_weight_memory_format(model)
 
     if level is not None:

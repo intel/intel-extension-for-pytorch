@@ -60,7 +60,12 @@ def has_channels_last_1d():
 
 def has_fp64_dtype(device: int = -1) -> bool:
     r"""Returns a bool indicating if the current XPU device supports dtype float64"""
-    return _C._get_device_properties(device).support_fp64
+    return _C._has_fp64_dtype(device)
+
+
+def has_2d_block_array(device: int = -1) -> bool:
+    r"""Returns a bool indicating if the platform supports 2d block array load/store"""
+    return _C._has_2d_block_array(device)
 
 
 # Basic OnOff
