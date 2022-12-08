@@ -55,6 +55,18 @@ static inline int64_t dpcppMaxSubGroupSize(
   return max_val;
 }
 
+static inline int64_t dpcppMinSubGroupSize(
+    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  auto subgroup_sizes = dev_prop->subgroup_sizes;
+  int64_t min_val = dev_prop->max_work_group_size;
+  for (auto i : subgroup_sizes) {
+    if (i < min_val)
+      min_val = i;
+  }
+  return min_val;
+}
+
 static inline int64_t dpcppMaxComputeUnitSize(
     DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);

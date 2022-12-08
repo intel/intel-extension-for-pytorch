@@ -615,7 +615,8 @@ static inline void launch_segment_scan(const SSConfig& cfg) {
     // SLM for sub group cumsum/cumprod in one workgroup. Allow that
     // min sub_group_size is 8, herein we use wg_size / 8 to allocate
     // enough share local memory for simd32, simd16 and simd8.
-    int carrier_size = (cfg.problem_wg_range_ + MIN_SG_SIZE - 1) / MIN_SG_SIZE;
+    int min_sg_size = dpcppMinSubGroupSize();
+    int carrier_size = (cfg.problem_wg_range_ + min_sg_size - 1) / min_sg_size;
     int wg_size = cfg.wg_range_x_ * cfg.wg_range_y_;
 #ifndef SG_SCAN
     int slm_size = wg_size;

@@ -1,10 +1,14 @@
 #pragma once
 #include <utils/DPCPP.h>
 
-#define DEFAULT_SG_SIZE 32
-#define MIN_SG_SIZE 8
-
 class BatchKernelConfig {
+ public:
+  enum class Policy : uint8_t {
+    pSegment = 0,
+    pLoop,
+    /* pVector */
+  };
+
  public:
   BatchKernelConfig() = delete;
   BatchKernelConfig(
@@ -12,20 +16,23 @@ class BatchKernelConfig {
       int64_t problem,
       int64_t stride,
       int64_t problem_batch,
-      bool problem_along_x)
+      bool problem_along_x,
+      Policy policy = Policy::pSegment)
       : batch_(batch),
         problem_(problem),
         stride_(stride),
         problem_batch_(problem_batch),
         problem_along_x_(problem_along_x),
+        policy_(policy),
         problem_wg_range_(0),
         problem_glb_range_(0),
         glb_range_x_(0),
         glb_range_y_(0),
         wg_range_x_(0),
         wg_range_y_(0) {
-    int64_t wg_size = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
-    wg_range_x_ = DEFAULT_SG_SIZE;
+    int64_t wg_size = dpcppMaxWorkGroupSize();
+    int64_t sg_size = dpcppMaxSubGroupSize();
+    wg_range_x_ = sg_size;
     wg_range_y_ = wg_size / wg_range_x_;
 
     // ensure assigning successive work items along contiguous (small stride)
@@ -37,23 +44,24 @@ class BatchKernelConfig {
       wg_range_x_ = wg_size / wg_range_y_;
     }
 
-    while (range_bound_x <= wg_range_x_ >> 1 &&
-           DEFAULT_SG_SIZE <= wg_range_x_ >> 1) {
+    while (range_bound_x <= wg_range_x_ >> 1 && sg_size <= wg_range_x_ >> 1) {
       wg_range_x_ = wg_range_x_ >> 1;
     }
 
     if (problem_batch_ == 0)
       problem_batch_ = batch_ * stride_;
     if (problem_along_x_) {
-      glb_range_x_ =
-          int64_t((problem_ + wg_range_x_ - 1) / wg_range_x_) * wg_range_x_;
+      glb_range_x_ = policy_ == Policy::pLoop
+          ? wg_range_x_
+          : int64_t((problem_ + wg_range_x_ - 1) / wg_range_x_) * wg_range_x_;
       glb_range_y_ = int64_t((problem_batch_ + wg_range_y_ - 1) / wg_range_y_) *
           wg_range_y_;
     } else {
       glb_range_x_ = int64_t((problem_batch_ + wg_range_x_ - 1) / wg_range_x_) *
           wg_range_x_;
-      glb_range_y_ =
-          int64_t((problem_ + wg_range_y_ - 1) / wg_range_y_) * wg_range_y_;
+      glb_range_y_ = policy_ == Policy::pLoop
+          ? wg_range_y_
+          : int64_t((problem_ + wg_range_y_ - 1) / wg_range_y_) * wg_range_y_;
     }
 
     problem_wg_range_ = problem_along_x_ ? wg_range_x_ : wg_range_y_;
@@ -89,11 +97,31 @@ class BatchKernelConfig {
     auto gx = item.get_group(1);
     auto gy = item.get_group(0);
 
+    // ItemDesc::glb_problem is meaningless, if policy is loop for all.
     if (problem_along_x_) {
       return {gx, lrx, lix, wgrx, giy, gix};
     } else {
       return {gy, lry, liy, wgry, gix, giy};
     }
+  }
+
+  static Policy suggest_policy(
+      int64_t batch,
+      int64_t problem,
+      int64_t stride,
+      bool problem_along_x) {
+    BatchKernelConfig cfg_ = {
+        batch, problem, stride, batch * stride, problem_along_x, Policy::pLoop};
+    int64_t wg_num = (cfg_.glb_range_x_ / cfg_.wg_range_x_) *
+        (cfg_.glb_range_y_ / cfg_.wg_range_y_);
+    int64_t wg_size = cfg_.wg_range_x_ * cfg_.wg_range_y_;
+
+    auto target_wi_num = dpcppMaxWorkItemsPerTile();
+    if (wg_size * (wg_num + 1) > target_wi_num) {
+      return Policy::pLoop;
+    }
+
+    return Policy::pSegment;
   }
 
  public:
@@ -102,6 +130,7 @@ class BatchKernelConfig {
   /* logical shape desc */ int64_t stride_;
   /* logical active batch */ int64_t problem_batch_;
   bool problem_along_x_;
+  Policy policy_;
   int problem_wg_range_;
   int problem_glb_range_;
   int glb_range_x_;

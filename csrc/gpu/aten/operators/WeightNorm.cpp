@@ -176,6 +176,116 @@ static inline void segment_weight_norm_(
   return;
 }
 
+template <class ScalarTypeInfo, class AccTypeInfo>
+static inline void weight_norm_(
+    ScalarTypeInfo& vinfo,
+    ScalarTypeInfo& ginfo,
+    ScalarTypeInfo& winfo,
+    AccTypeInfo& ninfo,
+    int dim_after_collapse) {
+  int64_t batch = vinfo.outerSize(dim_after_collapse);
+  int64_t problem = vinfo.sizes[dim_after_collapse];
+  int64_t stride = vinfo.innerSize(dim_after_collapse);
+  bool problem_along_x = vinfo.strides[dim_after_collapse] == 1 ? true : false;
+
+  BatchKernelConfig cfg = {
+      batch,
+      problem,
+      stride,
+      batch * stride,
+      problem_along_x,
+      BatchKernelConfig::Policy::pLoop};
+
+  using scalar_t = typename ScalarTypeInfo::scalar_t;
+  using accscalar_t = typename AccTypeInfo::scalar_t;
+  using vec_t = at::detail::Array<accscalar_t, 1>;
+  auto cgf = DPCPP_Q_CGF(__cgh) {
+    int wg_size = cfg.group_size().size();
+    int batch_wg_range = wg_size / cfg.problem_wg_range_;
+    dpcpp_local_acc_t<accscalar_t> shared(wg_size, __cgh);
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
+      auto id = cfg.get_item_desc(item);
+
+      int64_t n_lid, n_off, g_off;
+      n_lid = id.glb_batch;
+
+      g_off = IndexToOffset<scalar_t, int64_t>::get(
+          n_lid,
+          ginfo,
+          IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+      n_off = IndexToOffset<accscalar_t, int64_t>::get(
+          n_lid,
+          ninfo,
+          IndexToOffset<accscalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+      int64_t si = id.glb_batch % cfg.stride_;
+      int64_t bi = id.glb_batch / cfg.stride_;
+      int64_t pi = id.chunk_off;
+      bi = si + bi * cfg.problem_ * cfg.stride_;
+
+      accscalar_t value = 0;
+      if (id.glb_batch < cfg.problem_batch_) {
+        for (int pi_ = pi; pi_ < cfg.problem_; pi_ += cfg.problem_wg_range_) {
+          int64_t v_lid, v_off;
+          v_lid = bi + pi_ * cfg.stride_;
+
+          v_off = IndexToOffset<scalar_t, int64_t>::get(
+              v_lid,
+              vinfo,
+              IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+          accscalar_t v = (accscalar_t)vinfo.data[v_off];
+          value += v * v;
+        }
+      }
+
+      if (cfg.problem_along_x_) {
+        value = group_x_reduce(
+            item, shared, vec_t(value), ReduceAdd<accscalar_t>())[0];
+      } else {
+        value = group_y_reduce(
+            item, shared, vec_t(value), ReduceAdd<accscalar_t>())[0];
+      }
+
+      int n_slid = (int)id.glb_batch % batch_wg_range;
+      if (id.glb_batch < cfg.problem_batch_ && id.chunk_off == 0) {
+        value = sqrtf(value);
+        ninfo.data[n_off] = value;
+        shared[n_slid] = value;
+      }
+      // Here using slm instead. If using ugm, need fence w/
+      // order:acq_rel & scope:workgroup & space:global_mem.
+      item.barrier(dpcpp_local_fence);
+
+      if (id.glb_batch < cfg.problem_batch_) {
+        for (int pi_ = pi; pi_ < cfg.problem_; pi_ += cfg.problem_wg_range_) {
+          int64_t v_lid, v_off, w_off;
+          v_lid = bi + pi_ * cfg.stride_;
+
+          v_off = IndexToOffset<scalar_t, int64_t>::get(
+              v_lid,
+              vinfo,
+              IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+          w_off = IndexToOffset<scalar_t, int64_t>::get(
+              v_lid,
+              winfo,
+              IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+          winfo.data[w_off] =
+              (1.f / shared[n_slid]) * vinfo.data[v_off] * ginfo.data[g_off];
+        }
+      }
+    };
+    __cgh.parallel_for(
+        cl::sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
+
+  return;
+}
+
 template <
     bool is_first,
     class ScalarType1Info,
@@ -385,6 +495,140 @@ static inline void segment_weight_norm_backward_(
   return;
 }
 
+template <class ScalarTypeInfo, class AccTypeInfo>
+static inline void weight_norm_backward_(
+    ScalarTypeInfo& vinfo,
+    ScalarTypeInfo& ginfo,
+    ScalarTypeInfo& gwinfo,
+    AccTypeInfo& ninfo,
+    ScalarTypeInfo& gvinfo,
+    ScalarTypeInfo& gginfo,
+    int dim_after_collapse) {
+  int64_t batch = vinfo.outerSize(dim_after_collapse);
+  int64_t problem = vinfo.sizes[dim_after_collapse];
+  int64_t stride = vinfo.innerSize(dim_after_collapse);
+  bool problem_along_x = vinfo.strides[dim_after_collapse] == 1 ? true : false;
+
+  BatchKernelConfig cfg = {
+      batch,
+      problem,
+      stride,
+      batch * stride,
+      problem_along_x,
+      BatchKernelConfig::Policy::pLoop};
+
+  using scalar_t = typename ScalarTypeInfo::scalar_t;
+  using accscalar_t = typename AccTypeInfo::scalar_t;
+  using vec_t = at::detail::Array<accscalar_t, 1>;
+  auto cgf = DPCPP_Q_CGF(__cgh) {
+    int wg_size = cfg.group_size().size();
+    int batch_wg_range = wg_size / cfg.problem_wg_range_;
+    dpcpp_local_acc_t<accscalar_t> shared(wg_size, __cgh);
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
+      auto id = cfg.get_item_desc(item);
+
+      int64_t n_lid, n_off, g_off, gg_off;
+      n_lid = id.glb_batch;
+
+      g_off = IndexToOffset<scalar_t, int64_t>::get(
+          n_lid,
+          ginfo,
+          IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+      gg_off = IndexToOffset<scalar_t, int64_t>::get(
+          n_lid,
+          gginfo,
+          IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+      n_off = IndexToOffset<accscalar_t, int64_t>::get(
+          n_lid,
+          ninfo,
+          IndexToOffset<accscalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+      int64_t si = id.glb_batch % cfg.stride_;
+      int64_t bi = id.glb_batch / cfg.stride_;
+      int64_t pi = id.chunk_off;
+      bi = si + bi * cfg.problem_ * cfg.stride_;
+
+      accscalar_t value = 0;
+      if (id.glb_batch < cfg.problem_batch_) {
+        for (int pi_ = pi; pi_ < cfg.problem_; pi_ += cfg.problem_wg_range_) {
+          int64_t v_lid, v_off, gw_off;
+          v_lid = bi + pi_ * cfg.stride_;
+
+          v_off = IndexToOffset<scalar_t, int64_t>::get(
+              v_lid,
+              vinfo,
+              IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+          gw_off = IndexToOffset<scalar_t, int64_t>::get(
+              v_lid,
+              gwinfo,
+              IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+          accscalar_t v = (accscalar_t)vinfo.data[v_off];
+          accscalar_t gw = (accscalar_t)gwinfo.data[gw_off];
+          value += v * gw;
+        }
+      }
+
+      if (cfg.problem_along_x_) {
+        value = group_x_reduce(
+            item, shared, vec_t(value), ReduceAdd<accscalar_t>())[0];
+      } else {
+        value = group_y_reduce(
+            item, shared, vec_t(value), ReduceAdd<accscalar_t>())[0];
+      }
+
+      int n_slid = (int)id.glb_batch % batch_wg_range;
+      if (id.glb_batch < cfg.problem_batch_ && id.chunk_off == 0) {
+        shared[n_slid] = value;
+      }
+      item.barrier(dpcpp_local_fence);
+
+      if (id.glb_batch < cfg.problem_batch_) {
+        for (int pi_ = pi; pi_ < cfg.problem_; pi_ += cfg.problem_wg_range_) {
+          int64_t v_lid, v_off, gw_off, gv_off;
+          v_lid = bi + pi_ * cfg.stride_;
+
+          v_off = IndexToOffset<scalar_t, int64_t>::get(
+              v_lid,
+              vinfo,
+              IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+          gw_off = IndexToOffset<scalar_t, int64_t>::get(
+              v_lid,
+              gwinfo,
+              IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+          gv_off = IndexToOffset<scalar_t, int64_t>::get(
+              v_lid,
+              gvinfo,
+              IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+          accscalar_t g = ginfo.data[g_off];
+          accscalar_t gw = gwinfo.data[gw_off];
+          accscalar_t v = vinfo.data[v_off];
+          accscalar_t n = 1.f / ninfo.data[n_off];
+          accscalar_t r = shared[n_slid];
+          accscalar_t gg = r * n;
+          accscalar_t n3 = n * n * n;
+          accscalar_t gv = g * (n * gw - n3 * v * r);
+
+          gvinfo.data[gv_off] = static_cast<scalar_t>(gv);
+          if (id.chunk_off == 0)
+            gginfo.data[gg_off] = static_cast<scalar_t>(gg);
+        }
+      }
+    };
+    __cgh.parallel_for(
+        cl::sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
+
+  return;
+}
+
 } // namespace
 
 std::tuple<Tensor, Tensor> _weight_norm_interface(
@@ -422,7 +666,19 @@ std::tuple<Tensor, Tensor> _weight_norm_interface(
         ninfo.collapseDims();
 
         dim_after_collapse = 1 - dim_after_collapse; // remain dim
-        segment_weight_norm_(vinfo, ginfo, winfo, ninfo, dim_after_collapse);
+
+        int64_t batch = vinfo.outerSize(dim_after_collapse);
+        int64_t problem = vinfo.sizes[dim_after_collapse];
+        int64_t stride = vinfo.innerSize(dim_after_collapse);
+        bool problem_along_x =
+            vinfo.strides[dim_after_collapse] == 1 ? true : false;
+        if (BatchKernelConfig::Policy::pSegment ==
+            BatchKernelConfig::suggest_policy(
+                batch, problem, stride, problem_along_x)) {
+          segment_weight_norm_(vinfo, ginfo, winfo, ninfo, dim_after_collapse);
+        } else {
+          weight_norm_(vinfo, ginfo, winfo, ninfo, dim_after_collapse);
+        }
       });
 
   return {w, norms};
@@ -442,7 +698,6 @@ std::tuple<Tensor, Tensor> _weight_norm_interface_backward(
       "fused kernels can only be applied for first or last dim")
   auto grad_v = at::empty_like(saved_v, c10::get_contiguous_memory_format());
   auto grad_g = at::empty_like(saved_g, c10::get_contiguous_memory_format());
-  auto reduce = at::empty_like(saved_g, c10::get_contiguous_memory_format());
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -469,20 +724,35 @@ std::tuple<Tensor, Tensor> _weight_norm_interface_backward(
         auto gginfo = getTensorInfo<scalar_t, int64_t>(grad_g);
         gginfo.collapseDims();
 
-        auto rinfo =
-            getTensorInfo<AccumulateType<scalar_t>::type, int64_t>(reduce);
-        rinfo.collapseDims();
-
         dim_after_collapse = 1 - dim_after_collapse; // remain dim
-        segment_weight_norm_backward_(
-            vinfo,
-            ginfo,
-            gwinfo,
-            ninfo,
-            gvinfo,
-            gginfo,
-            rinfo,
-            dim_after_collapse);
+
+        int64_t batch = vinfo.outerSize(dim_after_collapse);
+        int64_t problem = vinfo.sizes[dim_after_collapse];
+        int64_t stride = vinfo.innerSize(dim_after_collapse);
+        bool problem_along_x =
+            vinfo.strides[dim_after_collapse] == 1 ? true : false;
+        if (BatchKernelConfig::Policy::pSegment ==
+            BatchKernelConfig::suggest_policy(
+                batch, problem, stride, problem_along_x)) {
+          auto reduce =
+              at::empty_like(saved_g, c10::get_contiguous_memory_format());
+          auto rinfo =
+              getTensorInfo<AccumulateType<scalar_t>::type, int64_t>(reduce);
+          rinfo.collapseDims();
+
+          segment_weight_norm_backward_(
+              vinfo,
+              ginfo,
+              gwinfo,
+              ninfo,
+              gvinfo,
+              gginfo,
+              rinfo,
+              dim_after_collapse);
+        } else {
+          weight_norm_backward_(
+              vinfo, ginfo, gwinfo, ninfo, gvinfo, gginfo, dim_after_collapse);
+        }
       });
 
   return {grad_v, grad_g};
