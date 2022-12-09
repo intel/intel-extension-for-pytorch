@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import copy
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 
@@ -110,3 +111,109 @@ class TestNNMethod(TestCase):
         self.assertEqual(output_cpu, output_xpu.cpu())
         self.assertEqual(hy_cpu, hy_xpu.cpu())
         self.assertEqual(cy_cpu, cy_xpu.cpu())
+
+    def test_lstm_rnnt(self, dtype=torch.float):
+        rnn = nn.LSTM(240, 1024, num_layers=2)
+        rnn_xpu = copy.deepcopy(rnn).to("xpu")
+        input = torch.randn(464, 2, 240)
+        h0 = torch.randn(2, 2, 1024)
+        c0 = torch.randn(2, 2, 1024)
+        input_xpu = input.to("xpu")
+        h0_xpu = h0.to("xpu")
+        c0_xpu = c0.to("xpu")
+        grad_output = torch.randn(464, 2, 1024)
+        grad_output_xpu = grad_output.to("xpu")
+
+        input.requires_grad = True
+        h0.requires_grad = True
+        c0.requires_grad = True
+        output, (hn, cn) = rnn(input, (h0, c0))
+
+        grad_output.requires_grad = True
+        output.backward(grad_output)
+
+        input_xpu.requires_grad = True
+        h0_xpu.requires_grad = True
+        c0_xpu.requires_grad = True
+        output_xpu, (hn_xpu, cn_xpu) = rnn_xpu(input_xpu, (h0_xpu, c0_xpu))
+
+        grad_output_xpu.requires_grad = True
+        output_xpu.backward(grad_output_xpu)
+
+        self.assertEqual(output, output_xpu.cpu())
+        self.assertEqual(hn, hn_xpu.cpu())
+        self.assertEqual(cn, cn_xpu.cpu())
+        self.assertEqual(input.grad, input_xpu.grad.cpu())
+        self.assertEqual(h0.grad, h0_xpu.grad.cpu())
+        self.assertEqual(c0.grad, c0_xpu.grad.cpu())
+
+    def test_lstm_rnnt_onednn(self, dtype=torch.float):
+        with torch.xpu.force_onednn_primitive():
+            rnn = nn.LSTM(240, 1024, num_layers=2)
+            rnn_xpu = copy.deepcopy(rnn).to("xpu")
+            input = torch.randn(128, 2, 240)
+            h0 = torch.randn(2, 2, 1024)
+            c0 = torch.randn(2, 2, 1024)
+            input_xpu = input.to("xpu")
+            h0_xpu = h0.to("xpu")
+            c0_xpu = c0.to("xpu")
+            grad_output = torch.randn(128, 2, 1024)
+            grad_output_xpu = grad_output.to("xpu")
+
+            input.requires_grad = True
+            h0.requires_grad = True
+            c0.requires_grad = True
+            output, (hn, cn) = rnn(input, (h0, c0))
+
+            grad_output.requires_grad = True
+            output.backward(grad_output)
+
+            input_xpu.requires_grad = True
+            h0_xpu.requires_grad = True
+            c0_xpu.requires_grad = True
+            output_xpu, (hn_xpu, cn_xpu) = rnn_xpu(input_xpu, (h0_xpu, c0_xpu))
+
+            grad_output_xpu.requires_grad = True
+            output_xpu.backward(grad_output_xpu)
+
+            self.assertEqual(output, output_xpu.cpu())
+            self.assertEqual(hn, hn_xpu.cpu())
+            self.assertEqual(cn, cn_xpu.cpu())
+            self.assertEqual(input.grad, input_xpu.grad.cpu())
+            self.assertEqual(h0.grad, h0_xpu.grad.cpu())
+            self.assertEqual(c0.grad, c0_xpu.grad.cpu())
+
+    def test_lstm_bf16(self, dtype=torch.bfloat16):
+        rnn = nn.LSTM(320, 320, num_layers=2)
+        rnn_xpu = copy.deepcopy(rnn).to("xpu").to(torch.bfloat16)
+        input = torch.randn(511, 2, 320)
+        h0 = torch.randn(2, 2, 320)
+        c0 = torch.randn(2, 2, 320)
+        input_xpu = input.to("xpu").to(torch.bfloat16)
+        h0_xpu = h0.to("xpu").to(torch.bfloat16)
+        c0_xpu = c0.to("xpu").to(torch.bfloat16)
+        grad_output = torch.randn(511, 2, 320)
+        grad_output_xpu = grad_output.to("xpu").to(torch.bfloat16)
+
+        input.requires_grad = True
+        h0.requires_grad = True
+        c0.requires_grad = True
+        output, (hn, cn) = rnn(input, (h0, c0))
+
+        grad_output.requires_grad = True
+        output.backward(grad_output)
+
+        input_xpu.requires_grad = True
+        h0_xpu.requires_grad = True
+        c0_xpu.requires_grad = True
+        output_xpu, (hn_xpu, cn_xpu) = rnn_xpu(input_xpu, (h0_xpu, c0_xpu))
+
+        grad_output_xpu.requires_grad = True
+        output_xpu.backward(grad_output_xpu)
+
+        self.assertEqual(output, output_xpu.float().cpu(), atol=3e-2, rtol=8e-3)
+        self.assertEqual(hn, hn_xpu.float().cpu(), atol=3e-2, rtol=8e-3)
+        self.assertEqual(cn, cn_xpu.float().cpu(), atol=3e-2, rtol=8e-3)
+        self.assertEqual(input.grad, input_xpu.grad.float().cpu(), atol=3e-2, rtol=8e-3)
+        self.assertEqual(h0.grad, h0_xpu.grad.float().cpu(), atol=3e-2, rtol=8e-3)
+        self.assertEqual(c0.grad, c0_xpu.grad.float().cpu(), atol=3e-2, rtol=8e-3)
