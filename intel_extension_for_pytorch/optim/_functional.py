@@ -379,6 +379,9 @@ def sgd(params: List[Tensor],
     See :class:`~torch.optim.SGD` for details.
     """
 
+    if params[0].device == torch.device('xpu') and maximize:
+        raise RuntimeError('For xpu, the maximize is unsupported for now')
+
     if foreach is None:
         # Placeholder for more complex foreach logic to be added when value is not set
         foreach = False
@@ -452,9 +455,9 @@ def sgd_step(self, closure=None):
             lr=group['lr'],
             dampening=group['dampening'],
             nesterov=group['nesterov'],
-            maximize=False,
+            maximize=group['maximize'],
             has_sparse_grad=has_sparse_grad,
-            foreach=False,
+            foreach=group['foreach'],
             fused=self.fused)
 
         # update momentum_buffers in state
@@ -673,8 +676,8 @@ def adam_step(self, closure=None):
              lr=group['lr'],
              weight_decay=group['weight_decay'],
              eps=group['eps'],
-             maximize=False,
-             foreach=False)
+             maximize=group['maximize'],
+             foreach=group['foreach'])
 
     return loss
 
@@ -815,7 +818,7 @@ def _multi_tensor_adam(params: List[Tensor],
         lr=lr,
         weight_decay=weight_decay,
         eps=eps,
-        maximize=False
+        maximize=maximize
     )
 
 
@@ -840,6 +843,9 @@ def adamw(params: List[Tensor],
     r"""Functional API that performs Adam algorithm computation.
     See :class:`~torch.optim.Adam` for details.
     """
+
+    if params[0].device == torch.device('xpu') and maximize:
+        raise RuntimeError('For xpu, the maximize is unsupported for now')
 
     if not all([isinstance(t, torch.Tensor) for t in state_steps]):
         raise RuntimeError("API has changed, `state_steps` argument must contain a list of singleton tensors")
@@ -954,7 +960,7 @@ def _multi_tensor_adamw(params: List[Tensor],
         lr=lr,
         weight_decay=weight_decay,
         eps=eps,
-        maximize=False
+        maximize=maximize
     )
 
 
@@ -1034,7 +1040,7 @@ def adamw_step(self, closure=None):
               lr=group['lr'],
               weight_decay=group['weight_decay'],
               eps=group['eps'],
-              maximize=False,
-              foreach=False)
+              maximize=group['maximize'],
+              foreach=group['foreach'])
 
     return loss

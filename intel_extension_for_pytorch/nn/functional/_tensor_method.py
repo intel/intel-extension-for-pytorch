@@ -9,5 +9,5 @@ def _numpy(x):
     else:
         return torch._C._TensorBase.numpy(x)
 
-# FIXME: comment off it now to avoid impact on XPU
-# torch.Tensor.numpy = _numpy
+
+torch.Tensor.numpy = _numpy

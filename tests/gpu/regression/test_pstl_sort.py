@@ -2,7 +2,7 @@ import torch
 import intel_extension_for_pytorch  # noqa
 import copy
 from torch.testing._internal.common_utils import TestCase
-
+from intel_extension_for_pytorch.nn.functional._embeddingbag import torch_embedding_bag
 
 class TestTorchMethod(TestCase):
     def test_pstl_sort(self):
@@ -10,8 +10,14 @@ class TestTorchMethod(TestCase):
         input = torch.tensor([3, 1, 1, 1, 4, 0], dtype=torch.int)
         offsets = torch.tensor([0, 0, 3, 3, 6], dtype=torch.int)
         grad = torch.randn([5, 2])
-        output = es(input, offsets)
-        output.backward(grad)
+
+        # FIXME: here using torch_embedding_bag to call original torch embeddingbag forward
+        # because merge cpu frontend code will globally replace the torch embedding bag in 
+        # intel_extension_for_pytorch/nn/functional/_embeddingbag.py and it only support int64
+        # input and indices. It is miss aligned with torch(torch supports int32 and int64
+        # input and indices). Thus here use torch_embedding_bag.
+        output_tuple = torch_embedding_bag(es.weight, input, offsets)
+        output_tuple[0].backward(grad)
         grad_weight_cpu = copy.deepcopy(es.weight.grad.data)
 
         input_xpu = input.to("xpu")

@@ -18,5 +18,5 @@ def disable_autocast_cache(f):
         return traced
     return wrapper
 
-# FIXME: comment off it now to avoid impact on XPU
-# torch.jit.trace = disable_autocast_cache(torch.jit.trace)
+
+torch.jit.trace = disable_autocast_cache(torch.jit.trace)

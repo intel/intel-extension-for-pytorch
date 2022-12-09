@@ -1,4 +1,8 @@
 # coding: utf-8
+from . import cpu
+from . import quantization
+from . import nn
+from . import jit
 from . import optim
 import intel_extension_for_pytorch.xpu
 from .frontend import optimize, enable_onednn_fusion
@@ -13,11 +17,11 @@ try:
 except ImportError:
     pass  # skip if torchvision is not available
 from . import _C
-# TODO: will uniform here after setup.py is uniformed
 from ._version import (__version__, __ipex_gitrev__, __torch_gitrev__, 
             __gpu_onednn_gitrev__, __cpu_ideep_gitrev__, __build_type__)
 from .utils import _cpu_isa, _custom_fx_tracer
 _cpu_isa.check_minimal_isa_support()
+
 
 def version():
     print("intel_extension_for_pytorch version:          {}".format(__version__))

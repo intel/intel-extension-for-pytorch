@@ -5,6 +5,8 @@ from torch import nn, Tensor
 from torch.nn.modules.utils import _pair # noqa F401
 from torch.jit.annotations import BroadcastingList2
 
+from .. import functional as F
+
 
 class RoIAlign(nn.Module):
     """

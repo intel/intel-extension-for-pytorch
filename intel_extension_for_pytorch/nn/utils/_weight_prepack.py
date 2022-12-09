@@ -271,6 +271,7 @@ IPEX_WEIGHT_PREPACK_MODULE_CPU = {
     torch.nn.ConvTranspose3d: _IPEXConvTranspose3d,
 }
 
+
 IPEX_WEIGHT_PREPACK_MODULE_XPU = {
     torch.nn.Linear: torch.ops.torch_ipex.convert_linear_weight_layout,
     torch.nn.Conv1d: torch.ops.torch_ipex.convert_conv_weight_layout,
@@ -357,8 +358,7 @@ def weight_prepack_with_ipex_xpu(module):
 
 def weight_prepack_with_ipex(module, optimizer, params_attr, device_type='cpu'):
     def convert(m, optimizer, params_attr):
-        if _should_prepack(m) and (m.weight.dtype == torch.float32 or m.weight.dtype ==
-                                   torch.bfloat16 or m.weight.dtype == torch.half):
+        if _should_prepack(m, is_training=(optimizer is not None)) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16 or m.weight.dtype == torch.half): # noqa B950
             weight = m.master_weight if hasattr(m, "master_weight") else m.weight
             if weight not in params_attr:
                 params_attr[weight] = {}

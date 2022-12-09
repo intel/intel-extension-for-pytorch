@@ -26,9 +26,7 @@ from ._trap_module import *
 
 from torch._utils import _get_device_index
 import intel_extension_for_pytorch.optim as optim
-
-from intel_extension_for_pytorch._version import (__version__, __ipex_gitrev__,
-                    __torch_gitrev__, __gpu_onednn_gitrev__, __build_type__)
+from intel_extension_for_pytorch._version import (__version__, __ipex_gitrev__, __torch_gitrev__, __gpu_onednn_gitrev__, __build_type__) # noqa B950
 
 default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]

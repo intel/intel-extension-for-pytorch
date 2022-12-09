@@ -1,3 +1,4 @@
+import torch
 import intel_extension_for_pytorch._C
 
 
@@ -15,6 +16,11 @@ def _register_trap(module: str):
         intel_extension_for_pytorch._C.__dict__[module] = _trap_module(module)
 
 
+def _register_trap_ops(module: str):
+    if not hasattr(torch.ops.torch_ipex, module):
+        torch.ops.torch_ipex.__dict__[module] = _trap_module(module)
+
+
 _register_trap('ShortStorageBase')
 _register_trap('CharStorageBase')
 _register_trap('IntStorageBase')
@@ -30,3 +36,8 @@ _register_trap('QInt8StorageBase')
 
 _register_trap('_XPUStreamBase')
 _register_trap('_XPUEventBase')
+
+
+_register_trap_ops('convert_linear_weight_layout')
+_register_trap_ops('convert_conv_weight_layout')
+_register_trap_ops('convert_convtranspose_weight_layout')

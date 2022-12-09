@@ -221,8 +221,7 @@ class MultiStreamModule(nn.Module):
             # So we change it to list for next recursion and change it back to tuple.
             temp = list(stream_input_object[idx_or_key])
             for i in range(hint_object[idx_or_key].__len__()):
-                self._do_get_input_for_each_stream(
-                    hint_object[idx_or_key], input_object[idx_or_key], temp, i, stream_id)
+                self._do_get_input_for_each_stream(hint_object[idx_or_key], input_object[idx_or_key], temp, i, stream_id)
             stream_input_object[idx_or_key] = tuple(temp)
         elif type_arg in [dict]:
             for key in hint_object[idx_or_key]:
@@ -387,8 +386,8 @@ class MultiStreamModule(nn.Module):
             self._generate_outputs([results_raw_future[stream_id].get()], stream_id)\
                 if self.concat_output else\
                 results_raw.append(results_raw_future[stream_id].get())
-        # If we need to concat the output, for each position, we will concat the
-        # result in the list (generate in self._generate_outputs).
+        # If we need to concat the output, for each position, 
+        # we will concat the result in the list (generate in self._generate_outputs).
         return self._concat_output_for_each_stream() if self.concat_output else results_raw
 
     def get_stream_number(self):
