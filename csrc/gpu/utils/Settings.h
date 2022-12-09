@@ -55,6 +55,7 @@ class Settings final {
   bool set_onemkl_verbose(int level);
 
   bool is_onemkl_enabled() const;
+  bool is_multi_context_enabled() const;
 
   bool is_channels_last_1d_enabled() const;
   bool is_jit_quantization_save_enabled() const;

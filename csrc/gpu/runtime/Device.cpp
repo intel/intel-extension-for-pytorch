@@ -24,9 +24,10 @@ struct DPCPPDevicePool {
   std::vector<std::unique_ptr<sycl::device>> devices;
   // Record all device ids for each card
   std::vector<std::vector<int>> deviceids_card;
-#if defined(USE_MULTI_CONTEXT)
+  // If macro USE_MULTI_CONTEXT is enabled, contexts will be constructed by SYCL
+  // runtime API sycl::context. Otherwise, contexts will be initialized by
+  // default context that shared by all GPU devices.
   std::vector<std::unique_ptr<sycl::context>> contexts;
-#endif
   std::mutex devices_mutex;
 } gDevPool;
 
@@ -125,6 +126,10 @@ static void initGlobalDevicePoolState() {
     gDevPool.contexts[i] = std::make_unique<sycl::context>(
         sycl::context({*gDevPool.devices[i]}, dpcppAsyncHandler));
   }
+#else
+  gDevPool.contexts.resize(1);
+  gDevPool.contexts[0] = std::make_unique<sycl::context>(
+      gDevPool.devices[0]->get_platform().ext_oneapi_get_default_context());
 #endif
 }
 
@@ -202,15 +207,14 @@ bool dpcppIsDevPoolInit() {
 
 sycl::context dpcppGetDeviceContext(DeviceId device) {
   initDevicePoolCallOnce();
+#if defined(USE_MULTI_CONTEXT)
   DeviceId device_id = device;
   if (device_id == -1) {
     AT_DPCPP_CHECK(dpcppGetDevice(&device_id));
   }
-#if defined(USE_MULTI_CONTEXT)
   return *gDevPool.contexts[device_id];
 #else
-  auto dev = dpcppGetRawDevice(device_id);
-  return dev.get_platform().ext_oneapi_get_default_context();
+  return *gDevPool.contexts[0];
 #endif
 }
 

@@ -6,6 +6,7 @@
 #include <ATen/autocast_mode.h>
 
 #include <core/Allocator.h>
+#include <core/Convertor.h>
 #include <core/Device.h>
 #include <core/Generator.h>
 #include <include/xpu/Settings.h>
@@ -366,6 +367,45 @@ static PyObject* get_autocast_xpu_dtype(PyObject* _unused, PyObject* arg) {
   return THPDtype_New(current_dtype, scalarTypeName(current_dtype));
   END_HANDLE_TH_ERRORS
 }
+
+PyObject* THPModule_fromUSM(PyObject* _unused, PyObject* args) {
+  using namespace torch::autograd;
+  HANDLE_TH_ERRORS
+  Py_ssize_t num_args = args ? (Py_ssize_t)PyTuple_Size(args) : 0;
+  THPUtils_assert(num_args == 5, "expected exactly 5 arguments");
+
+  PyObject* arg0 = PyTuple_GET_ITEM(args, 0);
+  PyObject* arg1 = PyTuple_GET_ITEM(args, 1);
+  THPUtils_assert(THPDtype_Check(arg1), "expected a torch.dtype as argument 1");
+  PyObject* arg2 = PyTuple_GET_ITEM(args, 2);
+  PyObject* arg3 = PyTuple_GET_ITEM(args, 3);
+  PyObject* arg4 = PyTuple_GET_ITEM(args, 4);
+  THPUtils_assert(THPUtils_checkLong(arg4), "expected a int as argument 4");
+
+  void* src = PyCapsule_GetPointer(arg0, "USMtensor");
+  auto stype = reinterpret_cast<THPDtype*>(arg1)->scalar_type;
+  auto shape = THPUtils_unpackLongs(arg2);
+  auto strides = (arg3 != Py_None)
+      ? c10::optional<IntArrayRef>(THPUtils_unpackLongs(arg3))
+      : c10::nullopt;
+  auto device_id = (int)THPUtils_unpackLong(arg4);
+
+  // Here, it is not necessary to add lazy_init repeatedly. It will be called
+  // automatically.
+  auto tensor =
+      xpu::dpcpp::fromUSM((void*)src, stype, shape, strides, device_id);
+  return THPVariable_Wrap(tensor);
+  END_HANDLE_TH_ERRORS
+}
+
+PyObject* THPModule_toUSM(PyObject* _unused, PyObject* data) {
+  HANDLE_TH_ERRORS
+  THPUtils_assert(THPVariable_Check(data), "data must be a Tensor");
+  auto usm = xpu::dpcpp::toUSM(THPVariable_Unpack(data));
+  return PyCapsule_New(usm, "USMtensor", NULL);
+  END_HANDLE_TH_ERRORS
+}
+
 static struct PyMethodDef _THPModule_methods[] = {
     {"_initExtension",
      (PyCFunction)THPModule_initExtension,
@@ -427,6 +467,8 @@ static struct PyMethodDef _THPModule_methods[] = {
      castPyCFunctionWithKeywords(THPGenerator_New),
      METH_VARARGS | METH_KEYWORDS,
      nullptr},
+    {"_from_usm", THPModule_fromUSM, METH_VARARGS, nullptr},
+    {"_to_usm", THPModule_toUSM, METH_O, nullptr},
     {nullptr}};
 
 std::string get_dev_type(const DeviceInfo& info) {
@@ -525,6 +567,10 @@ void init_xpu_module(pybind11::module& m) {
 
   m.def(
       "_is_onemkl_enabled", []() { return Settings::I().is_onemkl_enabled(); });
+
+  m.def("_is_multi_context_enabled", []() {
+    return Settings::I().is_multi_context_enabled();
+  });
 
   m.def("_is_jit_quantization_save_enabled", []() {
     return Settings::I().is_jit_quantization_save_enabled();

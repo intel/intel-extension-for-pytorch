@@ -7,6 +7,34 @@ import intel_extension_for_pytorch  # noqa
 import intel_extension_for_pytorch._C as core
 
 
+def from_usm(src, dtype, shape, stride = None, device_id: int = -1) -> torch.Tensor:
+    """from_usm(src, dtype, shape, stride=None, device_d=-1) -> Tensor
+
+    Converts a tensor allocated in USM(United Shared Memory) into a ``torch.Tensor``.
+
+    The returned PyTorch tensor will share the memory with the input tensor
+    (which may have come from another library). Note that in-place operations
+    will therefore also affect the data of the input tensor. And this API doesn't
+    manage USM tensor src's lifetime. Please take care it carefully.
+
+    Args:
+        src: A capsule of USM pointer to convert, the name stored in the capsule
+            is 'USMtensor'.
+        dtype: the desired data type of returned tensor.
+        shape: the desired shape of returned tensor.
+        stride: the desired stride of returned tensor. Default: if None,
+            returned tensor is contiguous.
+        device_id: the root device id where the USM pointer is allocated. Default: -1,
+            if the user is not sure.
+    """
+
+    return _C._from_usm(src, dtype, shape, stride, device_id)
+
+
+def to_usm(src: torch.Tensor):
+    return _C._to_usm(src)
+
+
 def to_channels_last_1d(t):
     if isinstance(t, torch.nn.Module):
         for m in t.modules():
@@ -52,6 +80,10 @@ def is_contiguous_channels_last_1d(input):
 
 def has_onemkl():
     return _C._is_onemkl_enabled()
+
+
+def has_multi_context():
+    return _C._is_multi_context_enabled()
 
 
 def has_channels_last_1d():
@@ -270,9 +302,8 @@ class sync_mode(OnOff):
 def using_tile_as_device():
     return _C._is_tile_as_device_enabled()
 
+
 # Only work before lazy init
-
-
 def enable_tile_as_device():
     _C._enable_tile_as_device()
 
