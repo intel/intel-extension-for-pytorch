@@ -459,6 +459,13 @@ static at::Tensor convolution(
     auto reshaped_wgh = wgh;
     // reshape for group convolution weight
     if (wgh_.ndimension() == 5 && wgh.ndimension() == 4) {
+      // for groups conv case:
+      // wgh_ will be 5-D Tensor based on expected_wgh_md:
+      // g/o/i/h/w or g/o/h/w/i
+      // wgh will be 4-D Tensor based on PyTorch
+      // (g)o/i/h/w or (g)o/h/w/i
+      // we need to manually reshape 4-D wgh to 5-D,
+      // consistent with expected_wgh
       reshaped_wgh = share_storage_and_set_strided_as(
           wgh,
           wgh_.sizes(),
@@ -786,7 +793,22 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     // onednn_layout_enabled or not. Thus, we
     // need one additional reorder here to make
     // diff_wgh plain.
-    xpu::oneDNN::reorder(diff_wgh_, diff_wgh);
+    auto reshaped_diff_wgh = diff_wgh;
+    if (diff_wgh_.ndimension() == 5 && diff_wgh.ndimension() == 4) {
+      // for groups conv case:
+      // diff_wgh_ will be 5-D Tensor based on expected_diff_wgh_md:
+      // g/o/i/h/w or g/o/h/w/i
+      // diff_wgh will be 4-D Tensor based on PyTorch
+      // (g)o/i/h/w or (g)o/h/w/i
+      // we need to manually reshape 4-D wgh to 5-D,
+      // consistent with expected_diff_wgh
+      reshaped_diff_wgh = share_storage_and_set_strided_as(
+          diff_wgh,
+          diff_wgh_.sizes(),
+          compatible_groups_conv_strides(diff_wgh, diff_wgh_),
+          c10::nullopt);
+    }
+    xpu::oneDNN::reorder(diff_wgh_, reshaped_diff_wgh);
   }
 
   return std::tuple<at::Tensor, at::Tensor>{diff_wgh, diff_bia};
