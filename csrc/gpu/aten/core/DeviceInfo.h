@@ -1,6 +1,6 @@
 #pragma once
 
-#include <memory>
+#include <string>
 
 namespace xpu {
 namespace dpcpp {
