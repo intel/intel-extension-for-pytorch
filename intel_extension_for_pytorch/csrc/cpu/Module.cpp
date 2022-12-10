@@ -1,4 +1,4 @@
-#include "init_python_bindings.h"
+#include "Module.h"
 
 #include "interface.h"
 #include "isa_help.h"
@@ -232,7 +232,7 @@ void InitIpexModuleBindings(py::module m) {
 
 using namespace torch::jit;
 
-void InitIpexCpuBindings(py::module m) {
+void init_cpu_module(py::module m) {
   torch_ipex::InitIpexModuleBindings(m);
 }
 } // namespace torch_ipex

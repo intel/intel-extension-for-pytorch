@@ -187,4 +187,5 @@ void THDPStream_init(PyObject* module) {
     throw python_error();
   }
 }
+
 } // namespace xpu

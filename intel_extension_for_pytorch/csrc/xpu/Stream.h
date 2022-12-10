@@ -17,4 +17,5 @@ void THDPStream_init(PyObject* module);
 inline bool THDPStream_Check(PyObject* obj) {
   return THDPStreamClass && PyObject_IsInstance(obj, THDPStreamClass);
 }
+
 } // namespace xpu

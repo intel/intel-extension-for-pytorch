@@ -681,4 +681,5 @@ void init_xpu_module(pybind11::module& m) {
   register_xpu_device_info(module);
   bindGetDeviceInfo(module);
 }
+
 } // namespace xpu

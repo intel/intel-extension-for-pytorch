@@ -5,4 +5,5 @@
 namespace xpu {
 
 void init_xpu_module(pybind11::module& m);
-}
+
+} // namespace xpu

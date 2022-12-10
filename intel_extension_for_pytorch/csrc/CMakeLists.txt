@@ -26,7 +26,7 @@ if(BUILD_WITH_XPU)
   list(APPEND PY_CPP_OBJS $<TARGET_OBJECTS:PY_XPU_OBJ>)
 endif()
 
-add_library(intel-ext-pt-python SHARED ${PY_CPP_OBJS})
+add_library(intel-ext-pt-python SHARED ${PY_CPP_OBJS} init_python_bindings.cpp)
 
 include(${IPEX_ROOT_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)
@@ -34,6 +34,10 @@ if(CLANG_FORMAT)
   add_custom_target(CL_FORMAT_FRONT_END_NATIVE_CSRC COMMAND ${CLANG_FORMAT_EXEC} -i -style=file ${ALL_NATIVE_CSRC_FILES})
   add_dependencies(intel-ext-pt-python CL_FORMAT_FRONT_END_NATIVE_CSRC)
 endif()
+
+target_include_directories(intel-ext-pt-python PUBLIC ${TORCH_INCLUDE_DIRS})
+target_include_directories(intel-ext-pt-python PUBLIC ${PYTHON_INCLUDE_DIR})
+target_include_directories(intel-ext-pt-python PUBLIC ${pybind11_INCLUDE_DIRS})
 
 target_link_directories(intel-ext-pt-python PRIVATE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
 
@@ -44,6 +48,7 @@ endif()
 target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-cpu)
 
 if(BUILD_WITH_XPU)
+  target_compile_definitions(intel-ext-pt-python PUBLIC "BUILD_WITH_XPU")
   target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-gpu)
 endif()
 

@@ -16,4 +16,5 @@ void THDPEvent_init(PyObject* module);
 inline bool THDPEvent_Check(PyObject* obj) {
   return THDPEventClass && PyObject_IsInstance(obj, THDPEventClass);
 }
+
 } // namespace xpu

@@ -3,6 +3,7 @@
 #include <torch/csrc/THP.h>
 #include <torch/csrc/utils/python_arg_parser.h>
 
+namespace xpu {
 // This is a temp solution. We will submit a PR to stock-PyTorch
 //  and make XPU backend supported in torch.Generator() API.
 // TO DO: remove this file and submit a PR to stock-PyTorch. We should move
@@ -29,3 +30,5 @@ PyObject* THPGenerator_New(PyObject* _self, PyObject* args, PyObject* kwargs) {
   return (PyObject*)self.release();
   END_HANDLE_TH_ERRORS
 }
+
+} // namespace xpu
