@@ -67,36 +67,43 @@ python3 -m pip install -r requirements.txt
 
 ```
 Code organization
-    ├── cmake                       // cmake files for build process and dependencies
-    ├── csrc                        // IPEX native source code
-    │   ├── aten                    // XPU aten implementations
-    |   |   ├── amp                 // Auto mixed precision implementations 
-    │   │   ├── core                // [Export] aten integration layer
-    │   │   │   └── detail          // Mutable implementations
-    │   │   ├── operators           // aten operator implementations
-    │   │   │   └── comm            // [Header only] Common code for operators
-    │   │   └── quantized           // Quantization utilities
-    │   ├── intrinsic               // IPEX intrinsic
-    │   ├── jit                     // JIT passes and patterns
-    │   ├── oneDNN                  // [Header only] oneDNN integration layer
-    │   ├── runtime                 // DPCPP runtime intergation & utilities
-    │   ├── tensor                  // IPEX tensor details
-    │   └── utils                   // [Export] IPEX utilities
-    ├── intel_extension_for_pytorch // IPEX Python layer
-    │   ├── autograd                // IPEX autograd implementation for Python
-    │   ├── csrc                    // IPEX native implementation for Python
-    │   │   └── gpu                 // IPEX gpu Python API implementation
-    │   ├── optim                   // Customized optimizer implementation for Python
-    |   └── xpu                     // XPU Python API implementation  
-    ├── scripts                     // Build scripts
-    ├── tests                       // IPEX test suites
-    │   └── gpu                     // IPEX gpu test suites
-    │       ├── examples            // IPEX gpu examples and unit tests
-    │       ├── experimental        // Test suites ported from PyTorch 1.10   
-    │       ├── pytorch             // Test suites ported from PyTorch proper
-    │       └── regression          // unit tests for regression issues
-    ├── third_party                 // third party modules
-    │   └── oneDNN                  // oneAPI Deep Neural Network Library
+    ├── cmake                       // Cmake files for build process and dependencies
+    │   ├── cpu                     // CPU build flags and options
+    │   ├── gpu                     // GPU build flags and options
+    │   └── Modules                 // Cmake dependency modules
+    ├── csrc                        // Native layer implementations
+    │   ├── cpu                     // CPU native layer
+    │   │   ├── aten                // CPU Aten instance
+    │   │   ├── autocast            // CPU autocast optimization
+    │   │   ├── dyndisp             // CPU native dynamic dispatcher
+    │   │   ├── quantization        // CPU quantization optimization
+    │   │   ├── runtime             // CPU runtime and utilities
+    │   │   └── vec                 // CPU vectorization
+    │   ├── gpu                     // GPU native layer
+    │   │   ├── aten                // GPU aten instance
+    │   │   ├── include             // GPU public headers
+    │   │   ├── jit                 // GPU JIT passes and patterns
+    │   │   ├── oneDNN              // GPU oneDNN integration layer
+    │   │   └── runtime             // SYCL runtime intergation & utilities
+    │   └── jit                     // Common JIT paths
+    │       ├── cpu                 // CPU JIT passes and patterns
+    │       ├── gpu                 // GPU JIT passes and patterns
+    │       └── passes              // Common passes
+    ├── docs                        // Documentation
+    │   ├── images                  // Document inline images 
+    │   └── tutorials               // Tutorials, guideline and feature documents
+    ├── intel_extension_for_pytorch // Frontend Python layer
+    │   ├── cpu                     // CPU frontend APIs
+    │   ├── csrc                    // Native implementation for Python APIs
+    │   ├── nn                      // NN modules and functionals
+    │   ├── optim                   // Optimizer implementations
+    │   ├── quantization            // IPEX quantization frontend APIs
+    │   └── xpu                     // XPU frontend APIs
+    │       └── amp                 // XPU autocast
+    ├── tests                       // Test suites
+    │   ├── cpu                     // CPU test cases
+    │   └── gpu                     // GPU test cases
+    ├── third_party                 // Third-party dependencies
     └── torch_patches               // Remaining patches for PyTorch proper
 ```
 
@@ -128,7 +135,8 @@ please update ${PATH_To_Your_Compiler} to where you install DPC++ compiler with 
 - Environment Variables Setting for oneMKL:
 
 ```bash
-export MKL_DPCPP_ROOT=${PATH_To_Your_oneMKL}/__release_lnx/mkl
+export MKL_DPCPP_ROOT=${PATH_To_Your_oneMKL}/mkl
+export LD_LIBRARY_PATH=${MKL_DPCPP_ROOT}/lib/intel64:$LD_LIBRARY_PATH
 ```
 
 **Note:**
@@ -155,7 +163,6 @@ When PyTorch is built with oneMKL library while Intel® Extension for PyTorch\* 
 
 ```bash
 export USE_ONEMKL=OFF
-export MKL_DPCPP_ROOT=${PATH_To_Your_oneMKL}/__release_lnx/mkl
 ```
 
 #### undefined symbol: mkl_lapack_dspevd. Intel MKL FATAL ERROR: cannot load libmkl_vml_avx512.so.2 or libmkl_vml_def.so.2 <br>

@@ -2,6 +2,8 @@ if(NOT BUILD_MODULE_TYPE STREQUAL "PYTHON")
   return()
 endif()
 
+include(${IPEX_ROOT_DIR}/cmake/BuildFlags.cmake)
+
 find_package(pybind11)
 if(NOT pybind11_FOUND)
     find_package(pybind11 CONFIG)

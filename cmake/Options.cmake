@@ -23,7 +23,7 @@ if(BUILD_MODULE_TYPE STREQUAL "CPU")
 endif()
 
 if(BUILD_MODULE_TYPE STREQUAL "GPU")
-  include(${IPEX_ROOT_DIR}/cmake/xpu/Options.cmake)
+  include(${IPEX_ROOT_DIR}/cmake/gpu/Options.cmake)
 endif()
 
 function (print_config_summary)

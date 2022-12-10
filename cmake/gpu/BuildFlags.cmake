@@ -101,5 +101,5 @@ set(MKL_THREADING "sequential" CACHE STRING "set mkl threading (for example, seq
 message(STATUS "To avoid link with TBB, we force to set MKL_THREADING=sequential here!")
 
 if(BUILD_MODULE_TYPE STREQUAL "GPU")
-  include(${IPEX_ROOT_DIR}/cmake/xpu/DPCPP.cmake)
+  include(${IPEX_ROOT_DIR}/cmake/gpu/DPCPP.cmake)
 endif()

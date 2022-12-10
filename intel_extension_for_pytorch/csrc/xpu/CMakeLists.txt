@@ -1,4 +1,4 @@
-include(${IPEX_ROOT_DIR}/cmake/xpu/BuildFlags.cmake)
+include(${IPEX_ROOT_DIR}/cmake/gpu/BuildFlags.cmake)
 
 FILE(GLOB IPEX_PYTHON_CPP_XPU_SRCS *.cpp)
 add_library(PY_XPU_OBJ OBJECT ${IPEX_PYTHON_CPP_XPU_SRCS})

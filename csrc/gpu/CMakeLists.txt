@@ -8,7 +8,7 @@ set(IPEX_GPU_INCLUDE_DIR "${IPEX_GPU_ROOT_DIR}/include")
 set(IPEX_GPU_GEN_FILES)
 set(IPEX_GPU_GEN_TARGET)
 set(BUILD_IPEX_GPU_ATEN_GENERATED)
-include(${PROJECT_SOURCE_DIR}/cmake/xpu/Codegen.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/gpu/Codegen.cmake)
 
 set(IPEX_ATEN_CORE_SRCS)
 set(IPEX_ATEN_OPS_SRCS)
