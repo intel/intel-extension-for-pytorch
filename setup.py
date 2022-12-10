@@ -523,6 +523,7 @@ class IPEXCPPLibBuild(build_clib, object):
             'CMAKE_INSTALL_PREFIX'  : os.path.abspath(get_package_dir()),
             'IPEX_INSTALL_LIBDIR'   : os.path.abspath(output_lib_path),
             'CMAKE_PROJECT_VERSION' : get_version_num(),
+            'PYTHON_PLATFORM_INFO'  : platform.platform(),
             'PYTHON_INCLUDE_DIR'    : sysconfig.get_paths()['include'],
             'PYTHON_EXECUTABLE'     : sys.executable,
             'IPEX_PROJ_NAME'        : PACKAGE_NAME

@@ -19,12 +19,6 @@ target_include_directories(PY_CPU_OBJ PUBLIC ${IPEX_CPU_ROOT_DIR}/utils)
 target_include_directories(PY_CPU_OBJ PUBLIC ${TORCH_INCLUDE_DIRS})
 target_include_directories(PY_CPU_OBJ PUBLIC ${TORCH_INCLUDE_DIRS}/torch/csrc/api/include/)
 
-if(PYBIND11_CL_FLAGS)
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PYBIND11_CL_FLAGS}")
-else()
-  message(FATAL_ERROR, "Cannot get pybind11 abi compiler flags")
-endif()
-
 # Set Python include dir
 if(PYTHON_INCLUDE_DIR)
   target_include_directories(PY_CPU_OBJ PUBLIC ${PYTHON_INCLUDE_DIR})

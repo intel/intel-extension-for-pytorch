@@ -2,6 +2,20 @@ if(NOT BUILD_MODULE_TYPE STREQUAL "PYTHON")
   return()
 endif()
 
+find_package(pybind11)
+if(NOT pybind11_FOUND)
+    find_package(pybind11 CONFIG)
+    if(NOT pybind11_FOUND)
+        message(FATAL_ERROR "System pybind11 not found")
+    else()
+        message(STATUS "SYSTEM pybind11 found")
+    endif()
+else()
+    message(STATUS "pybind11 found")
+endif()
+
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PYBIND11_CL_FLAGS}")
+
 add_subdirectory(cpu)
 list(APPEND PY_CPP_OBJS $<TARGET_OBJECTS:PY_CPU_OBJ>)
 
