@@ -174,7 +174,7 @@ then clean build PyTorch to solve this issue.
 Wrong MKL library is used when multiple MKL libraries exist in system. To solve this issue, preload oneMKL by:
 
 ```bash
-export LD_PRELOAD=${MKL_DPCPP_ROOT}/lib/intel64/libmkl_intel_lp64.so.1:${MKL_DPCPP_ROOT}/lib/intel64/libmkl_intel_ilp64.so.1:${MKL_DPCPP_ROOT}/lib/intel64/libmkl_sequential.so.1:${MKL_DPCPP_ROOT}/lib/intel64/libmkl_core.so.1:${MKL_DPCPP_ROOT}/lib/intel64/libmkl_sycl.so.1
+export LD_PRELOAD=${MKL_DPCPP_ROOT}/lib/intel64/libmkl_intel_lp64.so.2:${MKL_DPCPP_ROOT}/lib/intel64/libmkl_intel_ilp64.so.2:${MKL_DPCPP_ROOT}/lib/intel64/libmkl_gnu_thread.so.2:${MKL_DPCPP_ROOT}/lib/intel64/libmkl_core.so.2:${MKL_DPCPP_ROOT}/lib/intel64/libmkl_sycl.so.2
 ```
 
 If you still meet the similar issue which cannot open shared object file not listed above, please add corresponding files under ${MKL_DPCPP_ROOT}/lib/intel64/ to LD_PRELOAD. Please also note that the suffix of the libraries may change (e.g. from .1 to .2), if more than one oneMKL libraries are installed to the system.
