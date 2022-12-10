@@ -71,14 +71,13 @@ from __future__ import print_function
 from distutils.command.build_py import build_py
 from distutils.command.install import install
 from distutils.cmd import Command
-import pkg_resources
+from functools import lru_cache
+from subprocess import check_call, check_output
 from setuptools.command.build_clib import build_clib
 from setuptools.command.egg_info import egg_info
-
-from subprocess import check_call, check_output
 from setuptools import setup, distutils
+from pathlib import Path
 
-import torch
 import sysconfig
 import distutils.ccompiler
 import distutils.command.clean
@@ -91,10 +90,9 @@ import shutil
 import subprocess
 import sys
 import copy
-from pathlib import Path
-from torch.utils.cpp_extension import BuildExtension, CppExtension
 import re
 import errno
+
 
 #FIXME: always set BUILD_WITH_XPU = ON in XPU repo
 os.environ['BUILD_WITH_XPU'] = 'ON'
@@ -112,11 +110,30 @@ IS_DARWIN   = (platform.system() == 'Darwin')
 IS_WINDOWS  = (platform.system() == 'Windows')
 
 
-try:
-    from packaging import version as pkg_ver
-except Exception:
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'packaging'])
-    from packaging import version as pkg_ver
+@lru_cache(maxsize = 128)
+def _get_build_target():
+    build_target = ''
+    if len(sys.argv) > 1:
+        if sys.argv[1] in ['build_clib', 'bdist_cppsdk']:
+            build_target = 'cppsdk'
+        elif sys.argv[1] in ['clean']:
+            build_target = 'clean'
+        else:
+            build_target = 'python'
+    return build_target
+
+
+torch_install_prefix = None
+if _get_build_target() == 'cppsdk':
+    torch_install_prefix = os.environ.get('TORCH_INSTALL_PREFIX', None)
+    if torch_install_prefix is None or not os.path.exists(torch_install_prefix):
+        raise RuntimeError("Can not find libtorch from env TORCH_INSTALL_PREFIX!")
+elif _get_build_target() == 'python':
+    try:
+        import torch
+        from torch.utils.cpp_extension import BuildExtension, CppExtension
+    except ImportError as e:
+        raise RuntimeError("Fail to import torch!")
 
 
 def _check_env_flag(name, default=''):
@@ -161,23 +178,14 @@ PYTHON_VERSION = sys.version_info
 TORCH_IPEX_VERSION = gen_ipex_version_string()
 
 
-def get_torch_glib_cxx11_abi_status():
-    return torch._C._GLIBCXX_USE_CXX11_ABI
-
-def _get_build_target():
-    build_target = ''
-    if len(sys.argv) > 1:
-        if sys.argv[1] in ['build_clib', 'bdist_cppsdk']:
-            build_target = 'cppsdk'   
-        elif sys.argv[1] in ['clean']:
-            build_target = 'clean'
-        else:
-            build_target = 'python'
-    return build_target         
-
 def get_pytorch_install_dir():
-    pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
-    return pytorch_install_dir
+    if _get_build_target() == 'clean':
+        return None
+    if _get_build_target() == 'cppsdk':
+        return torch_install_prefix
+    else:
+        return os.path.dirname(os.path.abspath(torch.__file__))
+
 
 pytorch_install_dir = get_pytorch_install_dir()
 
@@ -190,30 +198,49 @@ def _build_installation_dependency():
 
 
 def get_cmake_command():
-    def _get_version(cmd):
-        for line in check_output([cmd, '--version']).decode('utf-8').split('\n'):
-            if 'version' in line:
-                return pkg_ver.parse(line.strip().split(' ')[2])
-        raise RuntimeError('no version found')
-    "Returns cmake command."
-    cmake_command = 'cmake'
     if platform.system() == 'Windows':
-        return cmake_command
-    cmake3 = shutil.which('cmake3')
-    cmake = shutil.which('cmake')
-    if cmake3 is not None and _get_version(cmake3) >= pkg_ver.parse("3.13.0"):
-        cmake_command = 'cmake3'
-        return cmake_command
-    elif cmake is not None and _get_version(cmake) >= pkg_ver.parse("3.13.0"):
-        return cmake_command
+        return 'cmake'
+    if shutil.which('cmake3') is not None:
+        return 'cmake3'
+    if shutil.which('cmake') is not None:
+        return 'cmake'
     else:
-        raise RuntimeError('no cmake or cmake3 with version >= 3.13.0 found')
+        raise RuntimeError('no cmake or cmake3 found')
 
 
-def get_git_head_sha(base_dir):
+def get_cpack_command():
+    if platform.system() == 'Windows':
+        return 'cpack'
+    if shutil.which('cpack3') is not None:
+        return 'cpack3'
+    if shutil.which('cpack') is not None:
+        return 'cpack'
+    else:
+        raise RuntimeError('no cpack or cpack3 found')
+
+
+def get_ipex_git_head_sha(base_dir):
     ipex_git_sha = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=base_dir).decode('ascii').strip()
-    torch_git_sha = torch.version.git_version
-    return ipex_git_sha, torch_git_sha
+    return ipex_git_sha
+
+
+def get_torch_git_head_sha():
+    if _get_build_target() == 'clean':
+        return None
+    if _get_build_target() == 'cppsdk':
+        libtorch_hash_file = os.path.join(torch_install_prefix, 'build-hash')
+        if not os.path.exists(libtorch_hash_file):
+            raise RuntimeError('can not find build-hash at {}'.format(libtorch_hash_file))
+        with open(libtorch_hash_file, 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                line = line.strip()
+                if line.isalnum():
+                    return line
+        raise RuntimeError('can not get libtorch hash in {}'.format(libtorch_hash_file))
+    else:
+        torch_git_sha = torch.version.git_version
+        return torch_git_sha
 
 
 def get_submodule_commit(base_dir, submodule_dir):
@@ -244,6 +271,7 @@ def get_code_fingerprint(ipex_build_version, ipex_git_sha, torch_git_sha, build_
     fingerprint = "{}_{}_{}_{}".format(ipex_build_version, ipex_git_sha, torch_git_sha, build_type)
     return fingerprint
 
+
 def check_code_fingerprint_in_file(file_path, fingerprint):
     b_exist = os.path.isfile(file_path)
     if b_exist is False:
@@ -257,6 +285,7 @@ def check_code_fingerprint_in_file(file_path, fingerprint):
             return True
         else:
             return False
+
 
 def create_version_files(base_dir, ipex_build_version, ipex_git_sha, torch_git_sha, gpu_onednn_sha, cpu_ideep_sha):
     print('Building Intel Extension for PyTorch. Version: {}'.format(ipex_build_version))
@@ -302,14 +331,13 @@ def create_version_files(base_dir, ipex_build_version, ipex_git_sha, torch_git_s
         write_buffer_to_file(cpp_version_path, c_buffer)
 
 
-def get_build_dir():
-    project_root_dir = os.path.dirname(__file__)
-    return os.path.join(project_root_dir, 'build')
-
-
 def get_project_dir():
     project_root_dir = os.path.dirname(__file__)
     return os.path.abspath(project_root_dir)
+
+
+def get_build_dir():
+    return os.path.join(get_project_dir(), 'build')
 
 
 def get_build_type_dir():
@@ -333,8 +361,7 @@ def get_package_lib_dir():
 
 
 def get_ipex_cpu_dir():
-    project_root_dir = os.path.dirname(__file__)
-    cpu_root_dir = os.path.join(project_root_dir, 'csrc', 'cpu')
+    cpu_root_dir = os.path.join(get_project_dir(), 'csrc', 'cpu')
     return os.path.abspath(cpu_root_dir)
 
 
@@ -373,13 +400,20 @@ def get_ipex_python_build_dir():
     return python_build_dir
 
 
+def get_ipex_cppsdk_build_dir():
+    cppsdk_build_dir = os.path.join(get_build_type_dir(), 'csrc', 'cppsdk')
+    create_if_not_exist(cppsdk_build_dir)
+    return cppsdk_build_dir
+
+
 base_dir = os.path.dirname(os.path.abspath(__file__))
 # Generate version info (ipex.__version__)
-ipex_git_sha, torch_git_sha = get_git_head_sha(base_dir)
+torch_git_sha = get_torch_git_head_sha()
+ipex_git_sha = get_ipex_git_head_sha(base_dir)
 ipex_build_version = get_build_version(ipex_git_sha)
 ipex_gpu_onednn_git_sha = get_submodule_commit(base_dir, "third_party/oneDNN")
 ipex_cpu_ideep_git_sha = get_submodule_commit(base_dir, "third_party/ideep")
-create_version_files(base_dir, ipex_build_version, ipex_git_sha, torch_git_sha, 
+create_version_files(base_dir, ipex_build_version, ipex_git_sha, torch_git_sha,
     ipex_gpu_onednn_git_sha, ipex_cpu_ideep_git_sha)
 
 
@@ -443,18 +477,18 @@ def _build_project(build_args, build_dir, build_env, use_ninja = False):
         check_call(['make'] + build_args, cwd=build_dir, env=build_env)
 
 
+def define_build_options(args, **kwargs):
+    for key, value in sorted(kwargs.items()):
+        if value is not None:
+            args.append('-D{}={}'.format(key, value))
+
+
 class IPEXCPPLibBuild(build_clib, object):
     def run(self):
         self.build_lib = os.path.relpath(get_package_dir())
         self.build_temp = os.path.relpath(get_build_type_dir())
 
-        def defines(args, **kwargs):
-            for key, value in sorted(kwargs.items()):
-                if value is not None:
-                    args.append('-D{}={}'.format(key, value))
-
         cmake_exec = get_cmake_command()
-
         if cmake_exec is None:
             raise RuntimeError(
                 "CMake must be installed to build the following extensions: " +
@@ -471,11 +505,16 @@ class IPEXCPPLibBuild(build_clib, object):
         output_lib_path = get_package_lib_dir()
         ipex_python_dir = get_ipex_python_dir()
         ipex_python_build_dir = get_ipex_python_build_dir()
+        ipex_cppsdk_build_dir = get_ipex_cppsdk_build_dir()
 
         ipex_xpu_dir = get_xpu_project_dir()
         ipex_xpu_build_dir = get_xpu_project_build_dir()
 
-        cmake_prefix_path = torch.utils.cmake_prefix_path
+        cpack_out_file = os.path.abspath(os.path.join(build_type_dir, 'IPEXCPackConfig.cmake'))
+        if _get_build_target() == 'cppsdk':
+            cmake_prefix_path = torch_install_prefix
+        else:
+            cmake_prefix_path = torch.utils.cmake_prefix_path
 
         build_option_common = {
             'CMAKE_BUILD_TYPE'      : get_build_type(),
@@ -483,15 +522,14 @@ class IPEXCPPLibBuild(build_clib, object):
             'CMAKE_PREFIX_PATH'     : cmake_prefix_path,
             'CMAKE_INSTALL_PREFIX'  : os.path.abspath(get_package_dir()),
             'IPEX_INSTALL_LIBDIR'   : os.path.abspath(output_lib_path),
-            'GLIBCXX_USE_CXX11_ABI': str(int(get_torch_glib_cxx11_abi_status())), # TODO: check if is must need in bdist_cppsdk build.
             'CMAKE_PROJECT_VERSION' : get_version_num(),
             'PYTHON_INCLUDE_DIR'    : sysconfig.get_paths()['include'],
             'PYTHON_EXECUTABLE'     : sys.executable,
-            'PYTHON_PLATFORM_INFO'  : platform.platform(),
-            'PYTORCH_INSTALL_DIR'   : pytorch_install_dir,
-            'PYBIND11_CL_FLAGS'     : get_pybind11_abi_compiler_flags(),
             'IPEX_PROJ_NAME'        : PACKAGE_NAME
         }
+
+        if _get_build_target() != 'cppsdk':
+            build_option_common['PYBIND11_CL_FLAGS'] = get_pybind11_abi_compiler_flags()
 
         cmake_common_args = []
 
@@ -518,7 +556,7 @@ class IPEXCPPLibBuild(build_clib, object):
                     # fall through
                 build_option_common[var] = val
 
-        defines(cmake_common_args, **build_option_common)
+        define_build_options(cmake_common_args, **build_option_common)
 
         nproc = min(int(os.environ.get('MAX_JOBS', os.cpu_count())), os.cpu_count())
         if sequential_build:
@@ -533,11 +571,6 @@ class IPEXCPPLibBuild(build_clib, object):
         if build_with_xpu:
             if os.path.isdir(ipex_xpu_dir) is False:
                 raise RuntimeError('It maybe CPU only branch, and it is not contains XPU code.')
-
-            if not get_torch_glib_cxx11_abi_status():
-                print("Intel extension for pytorch only supports _GLIBCXX_USE_CXX11_ABI = 1,\
-                     please install pytorch with cxx11abi enabled.")
-                sys.exit(1)
 
             gpu_cc, gpu_cxx = get_xpu_compliers()
             build_option_gpu = {
@@ -555,7 +588,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 }
 
             cmake_args_gpu = copy.deepcopy(cmake_common_args)
-            defines(cmake_args_gpu, **build_option_gpu)
+            define_build_options(cmake_args_gpu, **build_option_gpu)
             _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_gpu, ipex_xpu_build_dir, my_env)
 
         # Generate cmake for CPU module:
@@ -564,27 +597,40 @@ class IPEXCPPLibBuild(build_clib, object):
         }
 
         cmake_args_cpu = copy.deepcopy(cmake_common_args)
-        defines(cmake_args_cpu, **build_option_cpu)
+        define_build_options(cmake_args_cpu, **build_option_cpu)
         _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_cpu, ipex_cpu_build_dir, my_env)
 
         if not build_with_xpu:
             # Generate cmake for the CPP UT
             build_option_cpp_test = {
                 'PROJECT_DIR'           : project_root_dir,
+                'PYTORCH_INSTALL_DIR'   : pytorch_install_dir,
                 'CPP_TEST_BUILD_DIR'    : get_cpp_test_build_dir(),
             }
 
-            defines(cmake_args_cpu, **build_option_cpp_test)
+            define_build_options(cmake_args_cpu, **build_option_cpp_test)
             _gen_build_cfg_from_cmake(cmake_exec, get_cpp_test_dir(), cmake_args_cpu, get_cpp_test_build_dir(), my_env)
 
-        # Generate cmake for common python module:
-        build_option_python = {
-            'BUILD_MODULE_TYPE' : 'PYTHON',
-        }
+        if _get_build_target() == 'python':
+            # Generate cmake for common python module:
+            build_option_python = {
+                'BUILD_MODULE_TYPE' : 'PYTHON',
+            }
 
-        cmake_args_python = copy.deepcopy(cmake_common_args)
-        defines(cmake_args_python, **build_option_python)
-        _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_python, ipex_python_build_dir, my_env)
+            cmake_args_python = copy.deepcopy(cmake_common_args)
+            define_build_options(cmake_args_python, **build_option_python)
+            _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_python, ipex_python_build_dir, my_env)
+
+        elif _get_build_target() == 'cppsdk':
+            build_option_cppsdk = {
+                'BUILD_MODULE_TYPE' : 'CPPSDK',
+                'CPACK_CONFIG_FILE' : cpack_out_file,
+                'CPACK_OUTPUT_DIR'  : build_type_dir
+            }
+
+            cmake_args_cppsdk = copy.deepcopy(cmake_common_args)
+            define_build_options(cmake_args_cppsdk, **build_option_cppsdk)
+            _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_cppsdk, ipex_cppsdk_build_dir, my_env)
 
         # Build XPU module:
         if(build_with_xpu):
@@ -597,52 +643,13 @@ class IPEXCPPLibBuild(build_clib, object):
             # Build the CPP UT
             _build_project(build_args, get_cpp_test_build_dir(), my_env, use_ninja)
 
-        # Build common python module:
-        _build_project(build_args, ipex_python_build_dir, my_env, use_ninja)
-
-
-
-# cppsdk specific setup modules
-class IPEXBDistCPPSDK(Command):
-    description = "Description of the command"
-    user_options = []
-
-    # This method must be implemented
-    def initialize_options(self):
-        pass
-
-    # This method must be implemented
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        self.run_command('build_clib')
-
-        tmp_dir = 'tmp'
-        if os.path.exists(tmp_dir):
-            shutil.rmtree(tmp_dir)
-        os.makedirs(tmp_dir)
-        shutil.copyfile(os.path.join('tools', 'install_c++_sdk.sh.in'), os.path.join(tmp_dir, 'install_c++_sdk.sh'))
-        shutil.copyfile(os.path.join('cmake', 'Modules', 'FindIPEX.cmake.in'), os.path.join(tmp_dir, 'intel_ext_pt_cpuConfig.cmake'))
-        shutil.copyfile(os.path.join('build', 'Release', 'packages', package_name, 'lib', 'libintel-ext-pt-cpu.so'), os.path.join(tmp_dir, 'libintel-ext-pt-cpu.so'))
-
-        USE_CXX11_ABI = get_torch_glib_cxx11_abi_status()
-        if int(USE_CXX11_ABI) == 0:
-            run_file_name = 'libintel-ext-pt-{}.run'.format(TORCH_IPEX_VERSION)
-        if int(USE_CXX11_ABI) == 1:
-            run_file_name = 'libintel-ext-pt-cxx11-abi-{}.run'.format(TORCH_IPEX_VERSION)
-        dist_dir = 'dist'
-        if not os.path.exists(dist_dir):
-            os.makedirs(dist_dir)
-        # TODO: check if we need rename 'intel-ext-pt-cpu.run.in' after merge CPU and GPU.
-        shutil.copyfile(os.path.join('tools', 'intel-ext-pt-cpu.run.in'), os.path.join(dist_dir, run_file_name))
-        subprocess.check_call(['sed', '-i', 's/<IPEX_VERSION>/{}/'.format(TORCH_IPEX_VERSION), os.path.join(dist_dir, run_file_name)])
-        subprocess.check_call(['tar', 'czf', '-', '-C', tmp_dir, '.'],
-            stdout=open(os.path.join(dist_dir, run_file_name), 'a'))
-        shutil.rmtree(tmp_dir)
-
-        if os.path.isfile(os.path.join(dist_dir, run_file_name)):
-            print('\n{} is generated in folder "{}"'.format(run_file_name, dist_dir))
+        if _get_build_target() == 'python':
+            # Build common python module:
+            _build_project(build_args, ipex_python_build_dir, my_env, use_ninja)
+        elif _get_build_target() == 'cppsdk':
+            _build_project(build_args, ipex_cppsdk_build_dir, my_env, use_ninja)
+            cpack_exec = get_cpack_command()
+            check_call([cpack_exec, '--config', cpack_out_file])
 
 
 def get_src_py_and_dst():
@@ -684,16 +691,6 @@ class IPEXPythonPackageBuild(build_py, object):
         for src, dst in ret:
             self.copy_file(src, dst)
         super(IPEXPythonPackageBuild, self).finalize_options()
-
-
-class IPEXExtBuild(BuildExtension):
-    def run(self):
-        self.run_command('build_clib')
-
-        self.build_lib = os.path.relpath(get_package_base_dir())
-        self.build_temp = os.path.relpath(get_build_type_dir())
-        self.library_dirs.append(os.path.relpath(get_package_lib_dir()))
-        super(IPEXExtBuild, self).run()
 
 
 def make_relative_rpath(path):
@@ -753,18 +750,32 @@ def pyi_module():
 
 ext_modules=[]
 cmdclass = {
-    'build_clib': IPEXCPPLibBuild,
+    'build_clib'  : IPEXCPPLibBuild,
+    'bdist_cppsdk': IPEXCPPLibBuild,
     'clean': IPEXClean,
 }
 
-if _get_build_target() == 'cppsdk':
-    cmdclass['bdist_cppsdk'] = IPEXBDistCPPSDK
-elif _get_build_target() == 'python':
+
+def fill_python_target_cmd(cmdclass, ext_modules):
+    class IPEXExtBuild(BuildExtension):
+        def run(self):
+            self.run_command('build_clib')
+
+            self.build_lib = os.path.relpath(get_package_base_dir())
+            self.build_temp = os.path.relpath(get_build_type_dir())
+            self.library_dirs.append(os.path.relpath(get_package_lib_dir()))
+            super(IPEXExtBuild, self).run()
+
     cmdclass['build_ext'] = IPEXExtBuild
     cmdclass['build_py'] = IPEXPythonPackageBuild
     cmdclass['egg_info'] = IPEXEggInfoBuild
     cmdclass['install'] = IPEXInstallCmd
     ext_modules.append(pyi_module())
+
+
+if _get_build_target() == 'python':
+    fill_python_target_cmd(cmdclass, ext_modules)
+
 
 long_description = ''
 this_directory = os.path.abspath(os.path.dirname(__file__))

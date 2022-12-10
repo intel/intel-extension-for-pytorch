@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
 project(${IPEX_PROJ_NAME} VERSION ${CMAKE_PROJECT_VERSION})
 
 set(IPEX_ROOT_DIR ${PROJECT_SOURCE_DIR})

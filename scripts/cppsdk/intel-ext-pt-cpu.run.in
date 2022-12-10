@@ -1,0 +1,31 @@
+#!/bin/bash
+
+MODE=""
+LIBTORCH_PATH=""
+IPEX_VERSION="<IPEX_VERSION>"
+
+if [ $# == 2 ]; then
+    MODE=$1
+    LIBTORCH_PATH=$2
+else
+    echo "Usage: bash $0 [install|uninstall] <libtorch_path>"
+    exit 1
+fi
+
+if [[ ! ${MODE} == "install" ]] && [[ ! ${MODE} == "uninstall" ]]; then
+    echo "Unrecognized execution mode: ${MODE}"
+    exit 2
+fi
+
+if [ ! -f ${LIBTORCH_PATH}/build-version ]; then
+    echo "${LIBTORCH_PATH} doesn't seem to be directory of libtorch."
+    exit 3
+fi
+
+if [[ ! ${LIBTORCH_PATH:0:1} == '/' ]] && [[ ! ${LIBTORCH_PATH:0:1} == '~' ]]; then
+    LIBTORCH_PATH=`pwd`/${LIBTORCH_PATH}
+fi
+
+mkdir ipex_installer
+sed -e '1,/^exit$/d' "$0" | tar xzf - -C ipex_installer && cd ipex_installer && bash ./install_c++_sdk.sh ${MODE} ${LIBTORCH_PATH} ${IPEX_VERSION} && cd .. && rm -rf ipex_installer
+exit

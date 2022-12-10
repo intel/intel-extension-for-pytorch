@@ -31,44 +31,6 @@ ENDIF()
 # include mkl-dnn before PyTorch
 # Otherwise, path_to_pytorch/torch/include/dnnl.hpp will be used as the header
 
-# includes
-include_directories(${IPEX_ROOT_DIR})
-include_directories(${IPEX_CPU_ROOT_DIR})
-include_directories(${IPEX_CPU_ROOT_DIR}/aten)
-include_directories(${IPEX_CPU_ROOT_DIR}/utils)
-
-include_directories(${IPEX_JIT_CPP_ROOT})
-include_directories(${IPEX_UTLIS_CPP_ROOT})
-
-include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include)
-include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/third_party/oneDNN/include)
-# TODO: once llga is merged into oneDNN, use oneDNN directly as the third_party instead of using that inside llga
-# include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
-# include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
-
-include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/include)
-
-# Set installed PyTorch dir
-if(DEFINED PYTORCH_INSTALL_DIR)
-  include_directories(${PYTORCH_INSTALL_DIR}/include)
-  include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include/)
-else()
-  message(FATAL_ERROR, "Cannot find installed PyTorch directory")
-endif()
-
-if(DEFINED PYBIND11_CL_FLAGS)
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PYBIND11_CL_FLAGS}")
-else()
-  message(FATAL_ERROR, "Cannot get pybind11 abi compiler flags")
-endif()
-
-# Set Python include dir
-if(DEFINED PYTHON_INCLUDE_DIR)
-  include_directories(${PYTHON_INCLUDE_DIR})
-else()
-  message(FATAL_ERROR, "Cannot find installed Python head file directory")
-endif()
-
 # generate cpu isa sources
 set(IPEX_CPU_CPP_ISA_SRCS_GEN)
 set(IPEX_CPU_CPP_ISA_SRCS_ORIGIN)
@@ -112,6 +74,24 @@ add_library(${PLUGIN_NAME_CPU} SHARED ${IPEX_CPU_CPP_SRCS})
 
 set_target_properties(${PLUGIN_NAME_CPU} PROPERTIES ONEDNN_INCLUDE_DIR "${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include")
 
+# includes
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_ROOT_DIR})
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR})
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR}/aten)
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR}/utils)
+
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_JIT_CPP_ROOT})
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_UTLIS_CPP_ROOT})
+
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include)
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/third_party/oneDNN/include)
+# TODO: once llga is merged into oneDNN, use oneDNN directly as the third_party instead of using that inside llga
+# target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
+# target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
+
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/include)
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${PYTHON_INCLUDE_DIR})
+
 include(${IPEX_ROOT_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)
   file(GLOB_RECURSE ALL_NATIVE_CSRC_FILES ${IPEX_CPU_ROOT_DIR}/**.[ch] ${IPEX_CPU_ROOT_DIR}/**.[ch]pp)
@@ -119,7 +99,6 @@ if(CLANG_FORMAT)
   add_dependencies(${PLUGIN_NAME_CPU} CL_FORMAT_CPU_NATIVE_CSRC)
 endif()
 
-link_directories(${PYTORCH_INSTALL_DIR}/lib)
 add_dependencies(${PLUGIN_NAME_CPU} dnnl_graph)
 # If Graph Compiler is built, then it should link to its LLVM dependencies,
 # and not the LLVM symbols exposed by PyTorch.
@@ -148,8 +127,8 @@ else()
   message(FATAL_ERROR "ERROR: Cannot find oneMKL!")
 endif()
 
-target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
-target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${TORCH_INCLUDE_DIRS})
+target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${TORCH_LIBRARIES})
 
 set(ATEN_THREADING "OMP" CACHE STRING "ATen parallel backend")
 message(STATUS "Using ATen parallel backend: ${ATEN_THREADING}")

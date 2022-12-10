@@ -221,12 +221,3 @@ install(TARGETS intel-ext-pt-gpu
 
 # install IPEX GPU public header files
 install(DIRECTORY ${IPEX_GPU_INCLUDE_DIR} DESTINATION .)
-
-# CMake config file for the external project.
-configure_file(
-        ${IPEX_ROOT_DIR}/cmake/IntelExtensionPytorchConfig.cmake.in
-        ${PROJECT_BINARY_DIR}/IntelExtensionPytorchConfig.cmake
-        @ONLY)
-install(FILES
-        ${PROJECT_BINARY_DIR}/IntelExtensionPytorchConfig.cmake
-        DESTINATION share/cmake/IntelExtensionPytorch)
