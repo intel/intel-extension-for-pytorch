@@ -52,14 +52,7 @@ add_executable(${CPU_CPP_TEST_NAME} ${IPEX_CPP_TEST_SOURCES})
 find_package(oneMKL QUIET)
 if (ONEMKL_FOUND)
   target_include_directories(${CPU_CPP_TEST_NAME} PUBLIC ${ONEMKL_INCLUDE_DIR})
-  if(BUILD_WITH_XPU)
-    target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${ONEMKL_CPU_LIBS})
-  else()
-    target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC
-      -Wl,--start-group
-      ${ONEMKL_CPU_LIBS}
-      -Wl,--end-group)
-  endif()
+  target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${ONEMKL_CPU_LIBS})
 else()
   message(FATAL_ERROR "ERROR: Cannot find oneMKL!")
 endif()
