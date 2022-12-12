@@ -49,6 +49,7 @@ set(IPEX_CPP_TEST_SOURCES test_runtime_api.cpp test_dyndisp_and_isa_api.cpp)
 
 add_executable(${CPU_CPP_TEST_NAME} ${IPEX_CPP_TEST_SOURCES})
 
+set(BUILD_STATIC_ONEMKL ON)
 find_package(oneMKL QUIET)
 if (ONEMKL_FOUND)
   target_include_directories(${CPU_CPP_TEST_NAME} PUBLIC ${ONEMKL_INCLUDE_DIR})

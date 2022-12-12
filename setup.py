@@ -602,16 +602,15 @@ class IPEXCPPLibBuild(build_clib, object):
         define_build_options(cmake_args_cpu, **build_option_cpu)
         _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_cpu, ipex_cpu_build_dir, my_env)
 
-        if not build_with_xpu:
-            # Generate cmake for the CPP UT
-            build_option_cpp_test = {
-                'PROJECT_DIR'           : project_root_dir,
-                'PYTORCH_INSTALL_DIR'   : pytorch_install_dir,
-                'CPP_TEST_BUILD_DIR'    : get_cpp_test_build_dir(),
-            }
+        # Generate cmake for the CPP UT
+        build_option_cpp_test = {
+            'PROJECT_DIR'           : project_root_dir,
+            'PYTORCH_INSTALL_DIR'   : pytorch_install_dir,
+            'CPP_TEST_BUILD_DIR'    : get_cpp_test_build_dir(),
+        }
 
-            define_build_options(cmake_args_cpu, **build_option_cpp_test)
-            _gen_build_cfg_from_cmake(cmake_exec, get_cpp_test_dir(), cmake_args_cpu, get_cpp_test_build_dir(), my_env)
+        define_build_options(cmake_args_cpu, **build_option_cpp_test)
+        _gen_build_cfg_from_cmake(cmake_exec, get_cpp_test_dir(), cmake_args_cpu, get_cpp_test_build_dir(), my_env)
 
         if _get_build_target() == 'python':
             # Generate cmake for common python module:
@@ -641,9 +640,8 @@ class IPEXCPPLibBuild(build_clib, object):
         # Build CPU module:
         _build_project(build_args, ipex_cpu_build_dir, my_env, use_ninja)
 
-        if not build_with_xpu:
-            # Build the CPP UT
-            _build_project(build_args, get_cpp_test_build_dir(), my_env, use_ninja)
+        # Build the CPP UT
+        _build_project(build_args, get_cpp_test_build_dir(), my_env, use_ninja)
 
         if _get_build_target() == 'python':
             # Build common python module:
