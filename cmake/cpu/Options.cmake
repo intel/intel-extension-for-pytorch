@@ -11,8 +11,10 @@ cmake_dependent_option(BUILD_STATIC_ONEMKL "Static link with oneMKL" OFF "BUILD_
 
 function (print_cpu_config_summary)
   # Fetch configurations of intel-ext-pt-cpu
+  get_target_property(CPU_NATIVE_DEFINITIONS intel-ext-pt-cpu COMPILE_DEFINITIONS)
   get_target_property(ONEDNN_INCLUDE_DIR intel-ext-pt-cpu ONEDNN_INCLUDE_DIR)
   get_target_property(ONEMKL_INCLUDE_DIR intel-ext-pt-cpu ONEMKL_INCLUDE_DIR)
+  get_target_property(CPU_LINK_LIBRARIES intel-ext-pt-cpu LINK_LIBRARIES)
 
     print_config_summary()
     message(STATUS "******** Summary on CPU ********")
@@ -25,7 +27,9 @@ function (print_cpu_config_summary)
     message(STATUS "  C++ compiler version  : ${CMAKE_CXX_COMPILER_VERSION}")
 
     message(STATUS "  CXX flags             : ${CMAKE_CXX_FLAGS}")
+    message(STATUS "  Compile definitions   : ${CPU_NATIVE_DEFINITIONS}")
     message(STATUS "  CXX Linker options    : ${CMAKE_SHARED_LINKER_FLAGS}")
+    message(STATUS "  Link libraries        : ${CPU_LINK_LIBRARIES}")
 
     message(STATUS "  Torch include         : ${TORCH_INCLUDE_DIRS}")
 

@@ -53,6 +53,7 @@ if(BUILD_WITH_XPU)
 endif()
 
 function (print_python_config_summary)
+  get_target_property(PYTHON_LINK_LIBRARIES intel-ext-pt-python LINK_LIBRARIES)
 
   print_config_summary()
   message(STATUS "******** Summary on Python ********")
@@ -66,6 +67,7 @@ function (print_python_config_summary)
 
   message(STATUS "  CXX flags             : ${CMAKE_CXX_FLAGS}")
   message(STATUS "  CXX Linker options    : ${CMAKE_SHARED_LINKER_FLAGS}")
+  message(STATUS "  Link libraries        : ${PYTHON_LINK_LIBRARIES}")
 
   message(STATUS "  Python include        : ${PYTHON_INCLUDE_DIR}")
   message(STATUS "  pybind11 include      : ${pybind11_INCLUDE_DIRS}")

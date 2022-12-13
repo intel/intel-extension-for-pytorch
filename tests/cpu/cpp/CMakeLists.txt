@@ -21,14 +21,9 @@ set(IPEX_PROJECT_TOP_DIR "${PROJECT_SOURCE_DIR}/../../../")
 
 set(THIRD_PARTY_ROOT "${IPEX_PROJECT_TOP_DIR}/third_party")
 
-set(_CXX11_ABI_FLAG 0)
-if(DEFINED GLIBCXX_USE_CXX11_ABI)
-  if(${GLIBCXX_USE_CXX11_ABI} EQUAL 1)
-    set(CXX_STANDARD_REQUIRED ON)
-    set(_CXX11_ABI_FLAG 1)
-  endif()
-endif()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=${_CXX11_ABI_FLAG}")
+# Need the torch package
+find_package(Torch REQUIRED)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-Bsymbolic-functions")
 
 # Set the include dir
@@ -42,7 +37,7 @@ link_directories(${PYTORCH_INSTALL_DIR}/lib)
 link_directories(${CPP_TEST_BUILD_DIR}/lib)
 
 # add gtest cmake path
-add_subdirectory(${THIRD_PARTY_ROOT}/googletest ${CPP_TEST_BUILD_DIR}/third_party/googletest)
+add_subdirectory(${THIRD_PARTY_ROOT}/googletest ${CPP_TEST_BUILD_DIR}/third_party/googletest EXCLUDE_FROM_ALL)
 
 # Add the Test Files
 set(IPEX_CPP_TEST_SOURCES test_runtime_api.cpp test_dyndisp_and_isa_api.cpp)
@@ -53,9 +48,6 @@ set(BUILD_STATIC_ONEMKL ON)
 find_package(oneMKL QUIET)
 if (ONEMKL_FOUND)
   target_include_directories(${CPU_CPP_TEST_NAME} PUBLIC ${ONEMKL_INCLUDE_DIR})
-  target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${ONEMKL_CPU_LIBS})
-else()
-  message(FATAL_ERROR "ERROR: Cannot find oneMKL!")
 endif()
 
 target_link_directories(${CPU_CPP_TEST_NAME} PRIVATE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/)
@@ -65,8 +57,10 @@ target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest_main)
 target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest)
 
 # Link Pytorch
-target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
-target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${TORCH_LIBRARIES})
 
 # Link IPEX
 target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib/libintel-ext-pt-cpu.so)
+
+install(TARGETS ${CPU_CPP_TEST_NAME}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -530,9 +530,6 @@ class IPEXCPPLibBuild(build_clib, object):
             'IPEX_PROJ_NAME'        : PACKAGE_NAME
         }
 
-        if _get_build_target() != 'cppsdk':
-            build_option_common['PYBIND11_CL_FLAGS'] = get_pybind11_abi_compiler_flags()
-
         cmake_common_args = []
 
         use_ninja = False
@@ -576,6 +573,7 @@ class IPEXCPPLibBuild(build_clib, object):
 
             gpu_cc, gpu_cxx = get_xpu_compliers()
             build_option_gpu = {
+                **build_option_common,
                 'BUILD_MODULE_TYPE'     :'GPU',
                 'CMAKE_C_COMPILER'      : gpu_cc,
                 'CMAKE_CXX_COMPILER'    : gpu_cxx
@@ -589,47 +587,53 @@ class IPEXCPPLibBuild(build_clib, object):
                     'USE_ITT_ANNOTATION'    : 'ON'
                 }
 
-            cmake_args_gpu = copy.deepcopy(cmake_common_args)
+            cmake_args_gpu = []
             define_build_options(cmake_args_gpu, **build_option_gpu)
             _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_gpu, ipex_xpu_build_dir, my_env)
 
         # Generate cmake for CPU module:
         build_option_cpu = {
+            **build_option_common,
             'BUILD_MODULE_TYPE' : 'CPU'
         }
 
-        cmake_args_cpu = copy.deepcopy(cmake_common_args)
+        cmake_args_cpu = []
         define_build_options(cmake_args_cpu, **build_option_cpu)
         _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_cpu, ipex_cpu_build_dir, my_env)
 
         # Generate cmake for the CPP UT
         build_option_cpp_test = {
+            **build_option_common,
             'PROJECT_DIR'           : project_root_dir,
             'PYTORCH_INSTALL_DIR'   : pytorch_install_dir,
             'CPP_TEST_BUILD_DIR'    : get_cpp_test_build_dir(),
         }
 
-        define_build_options(cmake_args_cpu, **build_option_cpp_test)
-        _gen_build_cfg_from_cmake(cmake_exec, get_cpp_test_dir(), cmake_args_cpu, get_cpp_test_build_dir(), my_env)
+        cmake_args_cpp_test = []
+        define_build_options(cmake_args_cpp_test, **build_option_cpp_test)
+        _gen_build_cfg_from_cmake(cmake_exec, get_cpp_test_dir(), cmake_args_cpp_test, get_cpp_test_build_dir(), my_env)
 
         if _get_build_target() == 'python':
             # Generate cmake for common python module:
             build_option_python = {
+                **build_option_common,
                 'BUILD_MODULE_TYPE' : 'PYTHON',
+                'PYBIND11_CL_FLAGS' : get_pybind11_abi_compiler_flags(),
             }
 
-            cmake_args_python = copy.deepcopy(cmake_common_args)
+            cmake_args_python = []
             define_build_options(cmake_args_python, **build_option_python)
             _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_python, ipex_python_build_dir, my_env)
 
         elif _get_build_target() == 'cppsdk':
             build_option_cppsdk = {
+                **build_option_common,
                 'BUILD_MODULE_TYPE' : 'CPPSDK',
                 'CPACK_CONFIG_FILE' : cpack_out_file,
                 'CPACK_OUTPUT_DIR'  : build_type_dir
             }
 
-            cmake_args_cppsdk = copy.deepcopy(cmake_common_args)
+            cmake_args_cppsdk = []
             define_build_options(cmake_args_cppsdk, **build_option_cppsdk)
             _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_cppsdk, ipex_cppsdk_build_dir, my_env)
 
