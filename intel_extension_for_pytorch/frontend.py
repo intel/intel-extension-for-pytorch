@@ -444,8 +444,8 @@ def optimize(
         # for XPU, weight prepack is unsupported, so sample input is useless
         if opt_properties.weights_prepack:
             warnings.warn(
-                "For XPU, the weight prepack and sample input are disabled. For onednn layout, \
-                    IPEX_XPU_ONEDNN_LAYOUT is recommended to use")
+                "For XPU, the weight prepack and sample input are disabled. The onednn layout \
+                    is automatically chosen to use")
             opt_properties.weights_prepack = False
             sample_input = None
 
