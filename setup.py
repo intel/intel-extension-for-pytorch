@@ -566,8 +566,8 @@ class IPEXCPPLibBuild(build_clib, object):
             print("WARNING: Practice as sequential build with single process !")
 
         build_args = ['-j', str(nproc), 'install']
-        if _check_env_flag('VERBOSE'):
-            build_args.append('-v' if use_ninja else '-d')
+        if _check_env_flag('VERBOSE') and use_ninja:
+            build_args.append('-v')
 
         # Generate cmake for XPU module:
         if build_with_xpu:

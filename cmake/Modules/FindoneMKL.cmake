@@ -21,14 +21,16 @@
 #  ONEMKL_CPU_LIBS         : list of oneMKL libraries for CPU
 #===============================================================================
 
-if (ONEMKL_FOUND)
+if(ONEMKL_FOUND)
   return()
 endif()
 
 set(ONEMKL_FOUND OFF)
+set(ONEMKL_INCLUDE_DIR)
+set(ONEMKL_GPU_LIBS)
+set(ONEMKL_CPU_LIBS)
 
 set(mkl_root_hint)
-
 if(BUILD_WITH_XPU)
   if(DEFINED ENV{MKL_DPCPP_ROOT})
     set(mkl_root_hint $ENV{MKL_DPCPP_ROOT})
@@ -112,10 +114,10 @@ set(START_GROUP "-Wl,--start-group")
 set(END_GROUP "-Wl,--end-group")
 endif()
 
-list(APPEND ONEMKL_CPU_LIBS ${START_GROUP} ${MKL_LIB_LP64} ${MKL_LIB_CORE} ${MKL_LIB_THREAD} ${END_GROUP})
+set(ONEMKL_CPU_LIBS ${START_GROUP} ${MKL_LIB_LP64} ${MKL_LIB_CORE} ${MKL_LIB_THREAD} ${END_GROUP})
 
 if(BUILD_WITH_XPU)
-  list(APPEND ONEMKL_GPU_LIBS ${START_GROUP} ${MKL_LIB_LP64} ${MKL_LIB_CORE} ${MKL_LIB_THREAD} ${MKL_LIB_SYCL} ${END_GROUP})
+  set(ONEMKL_GPU_LIBS ${START_GROUP} ${MKL_LIB_LP64} ${MKL_LIB_CORE} ${MKL_LIB_THREAD} ${MKL_LIB_SYCL} ${END_GROUP})
 endif()
 
 set(ONEMKL_FOUND ON)

@@ -1,8 +1,5 @@
 # - Try to find oneDNN
 #
-# The following variables are optionally searched for defaults
-#  MKL_FOUND             : set to true if a library implementing the CBLAS interface is found
-#
 # The following are set after configuration is done:
 #  ONEDNN_FOUND          : set to true if oneDNN is found.
 #  ONEDNN_INCLUDE_DIR    : path to oneDNN include dir.

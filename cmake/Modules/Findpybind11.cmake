@@ -2,6 +2,7 @@
 #  pybind11_FOUND        - system has pybind11
 #  pybind11_INCLUDE_DIRS - the pybind11 include directory
 
+set(pybind11_INCLUDE_DIRS)
 set(torch_pybind11_root_hint)
 
 if(TORCH_FOUND)
