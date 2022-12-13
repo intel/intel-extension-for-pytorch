@@ -431,21 +431,21 @@ def optimize(
             opt_properties.split_master_weight_for_bf16 = False
         if opt_properties.graph_mode:
             warnings.warn(
-                "For XPU, the oob solution for inference is to trace model outside of the torch.xpu.optimize, so \
-                    temp to disable the graph mode")
+                "For XPU, the oob solution for inference is to trace model outside of the torch.xpu.optimize,"
+                + " so temp to disable the graph mode")
             # TODO: for xpu now, the oob solution for inference is to trace model outside of the torch.xpu.optimize.
             opt_properties.graph_mode = False
         if not inplace:
             warnings.warn(
-                "For XPU device to save valuable device memory, temp to do optimization on inplaced model, so \
-                    make inplace to be true")
+                "For XPU device to save valuable device memory, temp to do optimization on inplaced model,"
+                + " so make inplace to be true")
             # TODO: for xpu, inplace is true will add device memory pressure, so set inplace to be true
             inplace = True
         # for XPU, weight prepack is unsupported, so sample input is useless
         if opt_properties.weights_prepack:
             warnings.warn(
-                "For XPU, the weight prepack and sample input are disabled. The onednn layout \
-                    is automatically chosen to use")
+                "For XPU, the weight prepack and sample input are disabled. The onednn layout"
+                + " is automatically chosen to use")
             opt_properties.weights_prepack = False
             sample_input = None
 
