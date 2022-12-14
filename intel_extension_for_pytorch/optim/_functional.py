@@ -309,7 +309,7 @@ def _single_tensor_sgd(params: List[Tensor],
             momentum == 0
         ):
             # packed_add can support sparse tensor
-            torch.ops.torch_ipex.packed_add(param, params2[i], grad, alpha=-lr)
+            torch.ops.torch_ipex.packed_add(param, params2[i], grad, -lr)
         else:
             # no special optimize for other non fused case, fall back to naive implementation
             grad = grad.to(param.dtype)
