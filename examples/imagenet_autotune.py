@@ -65,22 +65,22 @@ def accuracy(output, target, topk=(1,)):
         return res
 
 def validate(val_loader, model, criterion, args):
-    batch_time = AverageMeter('Time', ':6.3f')
-    losses = AverageMeter('Loss', ':.4e')
-    top1 = AverageMeter('Acc@1', ':6.2f')
-    top5 = AverageMeter('Acc@5', ':6.2f')
-    number_iter = len(val_loader)
-
-    progress = ProgressMeter(
-        number_iter,
-        [batch_time, losses, top1, top5],
-        prefix='Test: ')
-    print('Evaluating RESNET: total Steps: {}'.format(number_iter))
 
     # switch to evaluate mode
     model.eval()
 
     def eval_func(model):
+        batch_time = AverageMeter('Time', ':6.3f')
+        losses = AverageMeter('Loss', ':.4e')
+        top1 = AverageMeter('Acc@1', ':6.2f')
+        top5 = AverageMeter('Acc@5', ':6.2f')
+        number_iter = len(val_loader)
+
+        progress = ProgressMeter(
+            number_iter,
+            [batch_time, losses, top1, top5],
+            prefix='Test: ')
+        print('Evaluating RESNET: total Steps: {}'.format(number_iter))
         with torch.no_grad():
             for i, (images, target) in enumerate(val_loader):
                 images = images.contiguous(memory_format=torch.channels_last)
@@ -120,25 +120,17 @@ def validate(val_loader, model, criterion, args):
     print(".........autotuning step done.........")
 
     print(".........runing int8 inference.........")
+    converted_model = ipex.quantization.convert(tuned_model)
     with torch.no_grad():
         for i, (images, target) in enumerate(val_loader):
             images = images.contiguous(memory_format=torch.channels_last)
-            output = model(images)
-            loss = criterion(output, target)
-            # measure accuracy and record loss
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            losses.update(loss.item(), images.size(0))
-            top1.update(acc1[0], images.size(0))
-            top5.update(acc5[0], images.size(0))
-            if i % args.print_freq == 0:
-                progress.display(i)
+            traced_model = torch.jit.trace(converted_model, images)
+            traced_model = torch.jit.freeze(traced_model)
+            break
 
-    # TODO: this should also be done with the ProgressMeter
-    print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
-          .format(top1=top1, top5=top5))
-    print(".........int8 inference done.........")
+    eval_func(traced_model)
 
-    return top1.avg
+    return
 
 def main(args):
     print("=> using pre-trained model '{}'".format(args.arch))
