@@ -14,6 +14,12 @@ bool isEltwiseOp(torch::jit::Node* n);
 
 bool isSupportedAsInputToDequant(torch::jit::Node* n);
 
+std::vector<int64_t> IntZeroDimTensorToVector(const at::Tensor& tensor);
+
+double getScale(torch::jit::Node* input_node);
+
+std::vector<int64_t> getZPSVector(torch::jit::Node* input_node);
+
 } // namespace utils
 } // namespace onednn
 } // namespace fuser
