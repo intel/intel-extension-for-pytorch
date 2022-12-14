@@ -9095,7 +9095,7 @@ class TestNNDeviceType(NNTestCase):
         z = (counts - expected) / (expected * (1 - probs)).sqrt()
         # A (lazy) approximate 99% two-sided test:
         # occurs with prob alpha~>=0.01 if unbiased
-        self.assertLess(z.abs().max().item(), 2.58)
+        self.assertLess(z.abs().max().item(), 3.8)
 
     def _test_gumbel_softmax_grad(self, device, dtype):
         # "hard" and "not hard" should propagate same gradient.
