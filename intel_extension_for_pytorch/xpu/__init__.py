@@ -8,6 +8,7 @@ import sys
 from typing import List, Optional, Tuple, Union
 import torch
 import intel_extension_for_pytorch
+from ._trap_module import *
 from .lazy_init import _lazy_init, _lazy_call
 from torch import device as _device
 from torch._utils import classproperty
@@ -22,7 +23,6 @@ from .memory import *
 from .overrides import set_default_tensor_type as set_default_tensor_type
 from .overrides import enable_cl_to as enable_cl_to
 from .generator import Generator
-from ._trap_module import *
 
 from torch._utils import _get_device_index
 import intel_extension_for_pytorch.optim as optim

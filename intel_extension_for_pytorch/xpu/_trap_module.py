@@ -7,7 +7,8 @@ def _trap_module(name: str) -> type:
     def init_err(self):
         class_name = self.__class__.__name__
         raise RuntimeError(
-            "Tried to instantiate trap base class {}".format(class_name))
+            "Tried to instantiate trap base class {}.".format(class_name)
+            + "\nIntel_extension_for_pytorch not compiled with XPU enabled.")
     return type(name, (object,), {"__init__": init_err})
 
 

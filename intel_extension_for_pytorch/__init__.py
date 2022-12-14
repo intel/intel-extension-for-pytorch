@@ -1,10 +1,11 @@
 # coding: utf-8
 from . import cpu
+from . import xpu
 from . import quantization
 from . import nn
 from . import jit
 from . import optim
-import intel_extension_for_pytorch.xpu
+
 from .frontend import optimize, enable_onednn_fusion
 from .frontend import enable_auto_channels_last, disable_auto_channels_last
 from .frontend import set_fp32_math_mode, get_fp32_math_mode, FP32MathMode
