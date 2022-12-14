@@ -17,6 +17,9 @@ set(CMAKE_INSTALL_RPATH $ORIGIN)
 
 # Need the torch package
 find_package(Torch REQUIRED)
+if(NOT EXISTS ${TORCH_INSTALL_PREFIX})
+  message(FATAL_ERROR "Can NOT find torch install path at ${TORCH_INSTALL_PREFIX}!")
+endif()
 
 include(${IPEX_ROOT_DIR}/cmake/BuildFlags.cmake)
 include(${IPEX_ROOT_DIR}/cmake/Options.cmake)

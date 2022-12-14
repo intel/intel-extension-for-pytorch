@@ -23,7 +23,11 @@ set(THIRD_PARTY_ROOT "${IPEX_PROJECT_TOP_DIR}/third_party")
 
 # Need the torch package
 find_package(Torch REQUIRED)
+if(NOT EXISTS ${TORCH_INSTALL_PREFIX})
+  message(FATAL_ERROR "Can NOT find torch install path at ${TORCH_INSTALL_PREFIX}!")
+endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-Bsymbolic-functions")
 
 # Set the include dir
@@ -57,7 +61,8 @@ target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest_main)
 target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest)
 
 # Link Pytorch
-target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${TORCH_LIBRARIES})
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${TORCH_INSTALL_PREFIX}/lib/libtorch_cpu.so)
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${TORCH_INSTALL_PREFIX}/lib/libc10.so)
 
 # Link IPEX
 target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib/libintel-ext-pt-cpu.so)
