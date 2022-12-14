@@ -513,8 +513,7 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{xpu::_convolution_sum_sym, Symbol::fromQualString("aten::relu_")},
      xpu::_convolution_sum_relu_sym},
     // RN50/RCAN: conv + add
-    // note: sum post op can only used in inplace scenario
-    // {{aten::conv2d, aten::add}, xpu::conv2d_sum_sym},
+    {{aten::conv2d, aten::add}, xpu::conv2d_sum_sym},
     {{aten::conv2d, aten::add_}, xpu::conv2d_sum_sym},
     // RCAN: mul + add
     {{aten::mul, aten::add_}, xpu::mul_add_sym},
