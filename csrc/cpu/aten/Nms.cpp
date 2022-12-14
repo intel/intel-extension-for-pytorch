@@ -254,8 +254,6 @@ std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(
 }
 } // namespace torch_ipex
 
-#if 0
-// FIX_ME_WA
 namespace {
 static auto dispatch =
     torch::RegisterOperators()
@@ -266,7 +264,6 @@ static auto dispatch =
         .op("torch_ipex::parallel_scale_back_batch",
             &torch_ipex::parallel_scale_back_batch);
 }
-#endif
 
 namespace torch_ipex {
 namespace autocast {
@@ -367,8 +364,6 @@ std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(
       scale_wh);
 }
 
-#if 0
-// FIX_ME_WA
 TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
   m.impl("nms", torch_ipex::autocast::nms);
   m.impl("batch_score_nms", torch_ipex::autocast::batch_score_nms);
@@ -378,7 +373,6 @@ TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
       "parallel_scale_back_batch",
       torch_ipex::autocast::parallel_scale_back_batch);
 }
-#endif
 
 } // namespace autocast
 } // namespace torch_ipex
