@@ -458,7 +458,7 @@ std::vector<at::Tensor> IPEXLSTMOp::_forward(
     double scale,
     int64_t zp,
     int64_t dtype) {
-  at::AutoNonVariableTypeMode g;
+  at::AutoDispatchBelowADInplaceOrView g;
 #if defined(IPEX_DISP_OP)
   printf("IPEXLSTMOp::_forward\n");
 #endif

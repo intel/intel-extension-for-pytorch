@@ -178,7 +178,7 @@ class NewCumSumOp : public torch::autograd::Function<NewCumSumOp> {
       c10::optional<at::ScalarType> dtype) {
     RECORD_FUNCTION("IPEXCumSumOp::forward", c10::ArrayRef<c10::IValue>({}));
 
-    at::AutoNonVariableTypeMode g;
+    at::AutoDispatchBelowADInplaceOrView g;
     ctx->saved_data["dim"] = dim;
     auto ret = _forward(result, self, dim, dtype);
     return ret;
@@ -189,7 +189,7 @@ class NewCumSumOp : public torch::autograd::Function<NewCumSumOp> {
       torch::autograd::tensor_list grad_outputs) {
     RECORD_FUNCTION("IPEXCumSumOp::backward", c10::ArrayRef<c10::IValue>({}));
 
-    at::AutoNonVariableTypeMode g;
+    at::AutoDispatchBelowADInplaceOrView g;
     int64_t dim = ctx->saved_data["dim"].toInt();
 
     at::Tensor grad_out = grad_outputs[0];

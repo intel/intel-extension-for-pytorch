@@ -52,7 +52,7 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
     RECORD_FUNCTION(
         "IPEXEmbeddingBagOp::forward", c10::ArrayRef<c10::IValue>({}));
 
-    at::AutoNonVariableTypeMode g;
+    at::AutoDispatchBelowADInplaceOrView g;
     ctx->saved_data["sparse"] = sparse;
     auto ret = _forward(weight, indices, offsets, sparse, include_last_offset);
     ctx->save_for_backward({weight, indices, offsets});
@@ -65,7 +65,7 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
     RECORD_FUNCTION(
         "IPEXEmbeddingBagOp::backward", c10::ArrayRef<c10::IValue>({}));
 
-    at::AutoNonVariableTypeMode g;
+    at::AutoDispatchBelowADInplaceOrView g;
     auto saved = ctx->get_saved_variables();
     at::Tensor weight = saved[0];
     at::Tensor indices = saved[1];
