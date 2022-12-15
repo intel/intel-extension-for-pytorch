@@ -78,11 +78,12 @@ static inline void matmul(
         b = b.expand({1, n}).contiguous();
     } else if (b.dim() == 3) {
       TORCH_CHECK(
-          (b.size(0) == mb && b.size(1) == m && b.size(2) == n) ||
-              (b.size(0) == 1 && b.size(1) == 1 && b.size(2) == 1),
-          "matmul supports [mb, m, n] or [1, 1, 1] when bias dim is 3 ...");
-      if (b.size(0) == 1 && b.size(1) == 1 && b.size(2) == 1)
-        b = b.expand({mb, m, n}).contiguous();
+          are_expandable({mb, m, n}, b.sizes()),
+          "matmul bias must be expandable to:",
+          dst.sizes(),
+          " but got:",
+          b.sizes());
+      b = b.expand({mb, m, n}).contiguous();
     } else if (b.dim() == 0) {
       TORCH_CHECK(
           b.numel() == 1, "matmul supports 1 numel when bias dim is [] ...");
