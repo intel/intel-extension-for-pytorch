@@ -170,7 +170,9 @@ at::Tensor layer_norm(
   // onednn path for inference.
   // TODO: enable training path ??
   if (weight_opt.has_value() && weight_opt.value().defined() &&
-      bias_opt.has_value() && bias_opt.value().defined() &&
+      weight_opt.value().scalar_type() == at::kFloat && bias_opt.has_value() &&
+      bias_opt.value().defined() &&
+      bias_opt.value().scalar_type() == at::kFloat &&
       !at::GradMode::is_enabled() && input.dim() >= 2 && input.dim() <= 5) {
     return layer_norm_forward(
         input, normalized_shape, weight_opt.value(), bias_opt.value(), eps);
