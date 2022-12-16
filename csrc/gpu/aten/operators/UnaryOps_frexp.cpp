@@ -2,7 +2,6 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
-#include <oneapi/dpl/tuple>
 #include "Loops.h"
 #include "comm/LoopsMeta.h"
 #include "comm/RegistrationDeclarations.h"
@@ -23,7 +22,7 @@ void frexp_kernel_dpcpp(TensorIteratorBase& iter) {
       "frexp_dpcpp",
       [&]() {
         dpcpp_kernel_multiple_outputs_for_tensor_iter(
-            iter, [=](scalar_t a) -> dpl::tuple<scalar_t, int32_t> {
+            iter, [=](scalar_t a) -> std::tuple<scalar_t, int32_t> {
               int32_t exponent;
               scalar_t mantissa = std::frexp(a, &exponent);
               return {mantissa, exponent};

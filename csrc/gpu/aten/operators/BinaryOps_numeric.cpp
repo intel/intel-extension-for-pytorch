@@ -21,7 +21,7 @@ Tensor& remainder_out(const Tensor& self, const Tensor& other, Tensor& out) {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.common_dtype(), "remainder_xpu", [&]() {
       dpcpp_kernel_with_scalars(iter, [](scalar_t a, scalar_t b) -> scalar_t {
         scalar_t r = a % b;
-        if (!dpl::is_unsigned<scalar_t>::value && (r != 0) &&
+        if (!std::is_unsigned<scalar_t>::value && (r != 0) &&
             ((r < 0) != (b < 0))) {
           r += b;
         }
@@ -34,7 +34,7 @@ Tensor& remainder_out(const Tensor& self, const Tensor& other, Tensor& out) {
           dpcpp_kernel_with_scalars(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
                 auto mod = Numerics<scalar_t>::fmod(a, b);
-                if (!dpl::is_unsigned<scalar_t>::value && (mod != 0) &&
+                if (!std::is_unsigned<scalar_t>::value && (mod != 0) &&
                     ((b < 0) != (mod < 0))) {
                   mod += b;
                 }

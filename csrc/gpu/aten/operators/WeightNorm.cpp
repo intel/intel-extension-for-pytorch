@@ -1,7 +1,6 @@
 #include <ATen/ATen.h>
 #include <oneDNN/oneDNN.h>
 #include <cmath>
-#include <oneapi/dpl/tuple>
 #include "BatchKernel.h"
 #include "Loops.h"
 #include "Reduce.h"

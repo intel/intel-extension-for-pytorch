@@ -10,9 +10,7 @@
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
 
-#include <oneapi/dpl/limits>
 #include "Loops.h"
-namespace dpl = oneapi::dpl;
 
 using namespace xpu::dpcpp;
 
@@ -84,7 +82,7 @@ at::Tensor& logit_backward_out(
                 const T_ACC dy_acc = static_cast<T_ACC>(dy);
                 const T_ACC x_acc = static_cast<T_ACC>(x);
                 return (x_acc < T_ACC(0) || x_acc > T_ACC(1))
-                    ? dpl::numeric_limits<T_ACC>::quiet_NaN()
+                    ? std::numeric_limits<T_ACC>::quiet_NaN()
                     : dy_acc / (x_acc * (T_ACC(1) - x_acc));
               });
         } else {

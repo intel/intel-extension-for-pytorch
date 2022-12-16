@@ -1,6 +1,5 @@
 #include <ATen/ATen.h>
 #include <oneDNN/oneDNN.h>
-#include <oneapi/dpl/tuple>
 #include "Loops.h"
 #include "Resize.h"
 #include "comm/AccumulateType.h"
@@ -65,9 +64,9 @@ void batch_norm_update_stats(
             [=](acc_t mean,
                 acc_t var,
                 scalar_t running_mean,
-                scalar_t running_var) -> dpl::tuple<scalar_t, scalar_t> {
+                scalar_t running_var) -> std::tuple<scalar_t, scalar_t> {
               const auto unbiased_var = var * bessel_correction_factor;
-              return dpl::tuple<scalar_t, scalar_t>{
+              return std::tuple<scalar_t, scalar_t>{
                   mean * momentum + (1 - momentum) * running_mean,
                   unbiased_var * momentum + (1 - momentum) * running_var,
               };

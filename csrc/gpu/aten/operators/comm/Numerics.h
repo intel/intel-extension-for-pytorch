@@ -8,14 +8,7 @@
 #include <c10/util/complex.h>
 #include <utils/DPCPP.h>
 
-#include <oneapi/dpl/algorithm>
-#include <oneapi/dpl/cmath>
-#include <oneapi/dpl/complex>
-#include <oneapi/dpl/limits>
-#include <oneapi/dpl/type_traits>
 #include "General.h"
-
-namespace dpl = oneapi::dpl;
 
 template <typename T>
 struct Numerics {};
@@ -99,10 +92,10 @@ DPCPP_BOTH inline constexpr T pi_i() {
 template <>
 struct Numerics<uint8_t> {
   static inline uint8_t lower_bound() {
-    return dpl::numeric_limits<uint8_t>::lowest();
+    return std::numeric_limits<uint8_t>::lowest();
   }
   static inline uint8_t upper_bound() {
-    return dpl::numeric_limits<uint8_t>::max();
+    return std::numeric_limits<uint8_t>::max();
   }
   static inline constexpr uint8_t pi() {
     return pi_i<uint8_t>();
@@ -155,20 +148,20 @@ struct Numerics<uint8_t> {
     return false;
   }
   static inline uint8_t min(uint8_t a, uint8_t b) {
-    return dpl::min(a, b);
+    return sycl::min(a, b);
   }
   static inline uint8_t max(uint8_t a, uint8_t b) {
-    return dpl::max(a, b);
+    return sycl::max(a, b);
   }
 };
 
 template <>
 struct Numerics<bool> {
   static inline bool lower_bound() {
-    return dpl::numeric_limits<bool>::lowest();
+    return std::numeric_limits<bool>::lowest();
   }
   static inline bool upper_bound() {
-    return dpl::numeric_limits<bool>::max();
+    return std::numeric_limits<bool>::max();
   }
   static inline constexpr bool pi() {
     return pi_i<bool>();
@@ -218,10 +211,10 @@ struct Numerics<bool> {
 template <>
 struct Numerics<int8_t> {
   static inline int8_t lower_bound() {
-    return dpl::numeric_limits<int8_t>::lowest();
+    return std::numeric_limits<int8_t>::lowest();
   }
   static inline int8_t upper_bound() {
-    return dpl::numeric_limits<int8_t>::max();
+    return std::numeric_limits<int8_t>::max();
   }
   static inline constexpr int8_t pi() {
     return pi_i<int8_t>();
@@ -262,7 +255,7 @@ struct Numerics<int8_t> {
     return a / b;
   }
   static inline int8_t abs(int8_t a) {
-    return dpl::abs((int)a);
+    return std::abs((int)a);
   }
   static inline int8_t pow(int8_t a, int8_t b) {
     return powi<int8_t>(a, b);
@@ -274,20 +267,20 @@ struct Numerics<int8_t> {
     return false;
   }
   static inline int8_t min(int8_t a, int8_t b) {
-    return dpl::min(a, b);
+    return sycl::min(a, b);
   }
   static inline int8_t max(int8_t a, int8_t b) {
-    return dpl::max(a, b);
+    return sycl::max(a, b);
   }
 };
 
 template <>
 struct Numerics<int16_t> {
   static inline int16_t lower_bound() {
-    return dpl::numeric_limits<int16_t>::lowest();
+    return std::numeric_limits<int16_t>::lowest();
   }
   static inline int16_t upper_bound() {
-    return dpl::numeric_limits<int16_t>::max();
+    return std::numeric_limits<int16_t>::max();
   }
   static inline constexpr int16_t pi() {
     return pi_i<int16_t>();
@@ -328,7 +321,7 @@ struct Numerics<int16_t> {
     return a / b;
   }
   static inline int16_t abs(int16_t a) {
-    return dpl::abs(a);
+    return std::abs(a);
   }
   static inline int16_t pow(int16_t a, int16_t b) {
     return powi<int16_t>(a, b);
@@ -343,20 +336,20 @@ struct Numerics<int16_t> {
     return sgni<int16_t>(a);
   }
   static inline int16_t min(int16_t a, int16_t b) {
-    return dpl::min(a, b);
+    return sycl::min(a, b);
   }
   static inline int16_t max(int16_t a, int16_t b) {
-    return dpl::max(a, b);
+    return sycl::max(a, b);
   }
 };
 
 template <>
 struct Numerics<int32_t> {
   static inline int32_t lower_bound() {
-    return dpl::numeric_limits<int32_t>::lowest();
+    return std::numeric_limits<int32_t>::lowest();
   }
   static inline int32_t upper_bound() {
-    return dpl::numeric_limits<int32_t>::max();
+    return std::numeric_limits<int32_t>::max();
   }
   static inline constexpr int32_t pi() {
     return pi_i<int32_t>();
@@ -397,7 +390,7 @@ struct Numerics<int32_t> {
     return a / b;
   }
   static inline int32_t abs(int32_t a) {
-    return dpl::abs(a);
+    return std::abs(a);
   }
   static inline int32_t pow(int32_t a, int32_t b) {
     return powi<int32_t>(a, b);
@@ -412,20 +405,20 @@ struct Numerics<int32_t> {
     return sgni<int32_t>(a);
   }
   static inline int32_t min(int32_t a, int32_t b) {
-    return dpl::min(a, b);
+    return sycl::min(a, b);
   }
   static inline int32_t max(int32_t a, int32_t b) {
-    return dpl::max(a, b);
+    return sycl::max(a, b);
   }
 };
 
 template <>
 struct Numerics<int64_t> {
   static inline int64_t lower_bound() {
-    return dpl::numeric_limits<int64_t>::lowest();
+    return std::numeric_limits<int64_t>::lowest();
   }
   static inline int64_t upper_bound() {
-    return dpl::numeric_limits<int64_t>::max();
+    return std::numeric_limits<int64_t>::max();
   }
   static inline constexpr int64_t pi() {
     return pi_i<int64_t>();
@@ -466,7 +459,7 @@ struct Numerics<int64_t> {
     return a / b;
   }
   static inline int64_t abs(int64_t a) {
-    return dpl::abs(a);
+    return std::abs(a);
   }
   static inline int64_t pow(int64_t a, int64_t b) {
     return powi<int64_t>(a, b);
@@ -481,10 +474,10 @@ struct Numerics<int64_t> {
     return sgni<int64_t>(a);
   }
   static inline int64_t min(int64_t a, int64_t b) {
-    return dpl::min(a, b);
+    return sycl::min(a, b);
   }
   static inline int64_t max(int64_t a, int64_t b) {
-    return dpl::max(a, b);
+    return sycl::max(a, b);
   }
 };
 
@@ -520,101 +513,101 @@ struct Numerics<at::Half> {
   }
 
   static inline at::Half exp(at::Half a) {
-    return dpl::exp(float(a));
+    return std::exp(float(a));
   }
   static inline at::Half exp2(at::Half a) {
-    return dpl::exp2(float(a));
+    return std::exp2(float(a));
   }
   static inline at::Half log(at::Half a) {
-    return dpl::log(float(a));
+    return std::log(float(a));
   }
   static inline at::Half log10(at::Half a) {
-    return dpl::log10(float(a));
+    return std::log10(float(a));
   }
   static inline at::Half log1p(at::Half a) {
-    return dpl::log1p(float(a));
+    return std::log1p(float(a));
   }
   static inline at::Half log2(at::Half a) {
-    return dpl::log2(float(a));
+    return std::log2(float(a));
   }
   static inline at::Half expm1(at::Half a) {
-    return dpl::expm1(float(a));
+    return std::expm1(float(a));
   }
 
   static inline at::Half neg(at::Half a) {
     return -a;
   }
   static inline at::Half sin(at::Half a) {
-    return dpl::sin(float(a));
+    return std::sin(float(a));
   }
   static inline at::Half cos(at::Half a) {
-    return dpl::cos(float(a));
+    return std::cos(float(a));
   }
   static inline at::Half sqrt(at::Half a) {
-    return dpl::sqrt(float(a));
+    return std::sqrt(float(a));
   }
   static inline at::Half rsqrt(at::Half a) {
     return sycl::rsqrt(float(a));
   }
   static inline at::Half ceil(at::Half a) {
-    return dpl::ceil(float(a));
+    return std::ceil(float(a));
   }
   static inline at::Half floor(at::Half a) {
-    return dpl::floor(float(a));
+    return std::floor(float(a));
   }
   static inline at::Half trunc(at::Half a) {
-    return dpl::trunc(float(a));
+    return std::trunc(float(a));
   }
   static inline at::Half acos(at::Half a) {
-    return dpl::acos(float(a));
+    return std::acos(float(a));
   }
   static inline at::Half cosh(at::Half a) {
-    return dpl::cosh(float(a));
+    return std::cosh(float(a));
   }
   static inline at::Half acosh(at::Half a) {
-    return dpl::acosh(float(a));
+    return std::acosh(float(a));
   }
   static inline at::Half asin(at::Half a) {
-    return dpl::asin(float(a));
+    return std::asin(float(a));
   }
   static inline at::Half sinh(at::Half a) {
-    return dpl::sinh(float(a));
+    return std::sinh(float(a));
   }
   static inline at::Half asinh(at::Half a) {
-    return dpl::asinh(float(a));
+    return std::asinh(float(a));
   }
   static inline at::Half tan(at::Half a) {
-    return dpl::tan(float(a));
+    return std::tan(float(a));
   }
   static inline at::Half atan(at::Half a) {
-    return dpl::atan(float(a));
+    return std::atan(float(a));
   }
   static inline at::Half lgamma(at::Half a) {
-    return dpl::lgamma(float(a));
+    return std::lgamma(float(a));
   }
   static inline at::Half tanh(float a) {
-    return dpl::tanh(float(a));
+    return std::tanh(float(a));
   }
   static inline at::Half atanh(float a) {
-    return dpl::atanh(float(a));
+    return std::atanh(float(a));
   }
   static inline at::Half erf(float a) {
-    return dpl::erf(float(a));
+    return std::erf(float(a));
   }
   static inline at::Half erfc(float a) {
-    return dpl::erfc(float(a));
+    return std::erfc(float(a));
   }
   static inline at::Half round(float a) {
-    return dpl::round(float(a));
+    return std::round(float(a));
   }
   static inline at::Half frac(at::Half a) {
-    return a - dpl::trunc(float(a));
+    return a - std::trunc(float(a));
   }
   static inline at::Half atan2(at::Half a, at::Half b) {
-    return dpl::atan2(float(a), float(b));
+    return std::atan2(float(a), float(b));
   }
   static inline at::Half hypot(at::Half a, at::Half b) {
-    return dpl::hypot(float(a), float(b));
+    return std::hypot(float(a), float(b));
   }
   static inline at::Half cinv(at::Half a) {
     return 1.0f / a;
@@ -625,7 +618,7 @@ struct Numerics<at::Half> {
     } else if (b != b) {
       return b;
     } else {
-      return dpl::fmin(float(a), float(b));
+      return std::fmin(float(a), float(b));
     }
   }
   static inline at::Half add(at::Half a, at::Half b) {
@@ -642,7 +635,7 @@ struct Numerics<at::Half> {
   }
 
   static inline at::Half pow(at::Half a, at::Half b) {
-    return dpl::pow(float(a), float(b));
+    return std::pow(float(a), float(b));
   }
   static inline at::Half max(at::Half a, at::Half b) {
     if (a != a) {
@@ -650,32 +643,32 @@ struct Numerics<at::Half> {
     } else if (b != b) {
       return b;
     } else {
-      return dpl::fmax(float(a), float(b));
+      return std::fmax(float(a), float(b));
     }
   }
   static inline float fmin(at::Half a, at::Half b) {
-    return dpl::fmin((float)a, (float)b);
+    return std::fmin((float)a, (float)b);
   }
   static inline float fmax(at::Half a, at::Half b) {
-    return dpl::fmax((float)a, (float)b);
+    return std::fmax((float)a, (float)b);
   }
   static inline at::Half abs(at::Half a) {
-    return dpl::fabs(float(a));
+    return std::fabs(float(a));
   }
   static inline at::Half fabs(at::Half a) {
-    return dpl::fabs(float(a));
+    return std::fabs(float(a));
   }
   static inline bool isnan(at::Half a) {
-    return dpl::isnan((float)a);
+    return std::isnan((float)a);
   }
   static inline bool isinf(at::Half a) {
-    return dpl::isinf((float)a);
+    return std::isinf((float)a);
   }
   static inline at::Half copysign(at::Half a, at::Half b) {
-    return dpl::copysign((float)a, (float)b);
+    return std::copysign((float)a, (float)b);
   }
   static inline at::Half fmod(at::Half a, at::Half b) {
-    return dpl::fmod((float)a, (float)b);
+    return std::fmod((float)a, (float)b);
   }
 };
 
@@ -714,92 +707,92 @@ struct Numerics<at::BFloat16> {
   }
 
   static inline at::BFloat16 exp(at::BFloat16 a) {
-    return dpl::exp(float(a));
+    return std::exp(float(a));
   }
   static inline at::BFloat16 exp2(at::BFloat16 a) {
-    return dpl::exp2(float(a));
+    return std::exp2(float(a));
   }
   static inline at::BFloat16 log(at::BFloat16 a) {
-    return dpl::log(float(a));
+    return std::log(float(a));
   }
   static inline at::BFloat16 log10(at::BFloat16 a) {
-    return dpl::log10(float(a));
+    return std::log10(float(a));
   }
   static inline at::BFloat16 log1p(at::BFloat16 a) {
-    return dpl::log1p(float(a));
+    return std::log1p(float(a));
   }
   static inline at::BFloat16 log2(at::BFloat16 a) {
-    return dpl::log2(float(a));
+    return std::log2(float(a));
   }
   static inline at::BFloat16 expm1(at::BFloat16 a) {
-    return dpl::expm1(float(a));
+    return std::expm1(float(a));
   }
 
   static inline at::BFloat16 neg(at::BFloat16 a) {
     return -a;
   }
   static inline at::BFloat16 sin(at::BFloat16 a) {
-    return dpl::sin(float(a));
+    return std::sin(float(a));
   }
   static inline at::BFloat16 cos(at::BFloat16 a) {
-    return dpl::cos(float(a));
+    return std::cos(float(a));
   }
   static inline at::BFloat16 sqrt(at::BFloat16 a) {
-    return dpl::sqrt(float(a));
+    return std::sqrt(float(a));
   }
   static inline at::BFloat16 rsqrt(at::BFloat16 a) {
     return sycl::rsqrt(float(a));
   }
   static inline at::BFloat16 ceil(at::BFloat16 a) {
-    return dpl::ceil(float(a));
+    return std::ceil(float(a));
   }
   static inline at::BFloat16 floor(at::BFloat16 a) {
-    return dpl::floor(float(a));
+    return std::floor(float(a));
   }
   static inline at::BFloat16 trunc(at::BFloat16 a) {
-    return dpl::trunc(float(a));
+    return std::trunc(float(a));
   }
   static inline at::BFloat16 acos(at::BFloat16 a) {
-    return dpl::acos(float(a));
+    return std::acos(float(a));
   }
   static inline at::BFloat16 cosh(at::BFloat16 a) {
-    return dpl::cosh(float(a));
+    return std::cosh(float(a));
   }
   static inline at::BFloat16 acosh(at::BFloat16 a) {
-    return dpl::acosh(float(a));
+    return std::acosh(float(a));
   }
   static inline at::BFloat16 asin(at::BFloat16 a) {
-    return dpl::asin(float(a));
+    return std::asin(float(a));
   }
   static inline at::BFloat16 sinh(at::BFloat16 a) {
-    return dpl::sinh(float(a));
+    return std::sinh(float(a));
   }
   static inline at::BFloat16 asinh(at::BFloat16 a) {
-    return dpl::asinh(float(a));
+    return std::asinh(float(a));
   }
   static inline at::BFloat16 tan(at::BFloat16 a) {
-    return dpl::tan(float(a));
+    return std::tan(float(a));
   }
   static inline at::BFloat16 atan(at::BFloat16 a) {
-    return dpl::atan(float(a));
+    return std::atan(float(a));
   }
   static inline at::BFloat16 tanh(float a) {
-    return dpl::tanh(float(a));
+    return std::tanh(float(a));
   }
   static inline at::BFloat16 atanh(float a) {
-    return dpl::atanh(float(a));
+    return std::atanh(float(a));
   }
   static inline at::BFloat16 erf(float a) {
-    return dpl::erf(float(a));
+    return std::erf(float(a));
   }
   static inline at::BFloat16 erfc(float a) {
-    return dpl::erfc(float(a));
+    return std::erfc(float(a));
   }
   static inline at::BFloat16 lgamma(at::BFloat16 a) {
-    return dpl::lgamma(float(a));
+    return std::lgamma(float(a));
   }
   static inline at::BFloat16 round(float a) {
-    return dpl::round(float(a));
+    return std::round(float(a));
   }
   static inline at::BFloat16 min(at::BFloat16 a, at::BFloat16 b) {
     if (a != a) {
@@ -807,7 +800,7 @@ struct Numerics<at::BFloat16> {
     } else if (b != b) {
       return b;
     } else {
-      return dpl::fmin(float(a), float(b));
+      return std::fmin(float(a), float(b));
     }
   }
   static inline at::BFloat16 max(at::BFloat16 a, at::BFloat16 b) {
@@ -816,23 +809,23 @@ struct Numerics<at::BFloat16> {
     } else if (b != b) {
       return b;
     } else {
-      return dpl::fmax(float(a), float(b));
+      return std::fmax(float(a), float(b));
     }
   }
   static inline float fmin(at::BFloat16 a, at::BFloat16 b) {
-    return dpl::fmin((float)a, (float)b);
+    return std::fmin((float)a, (float)b);
   }
   static inline float fmax(at::BFloat16 a, at::BFloat16 b) {
-    return dpl::fmax((float)a, (float)b);
+    return std::fmax((float)a, (float)b);
   }
   static inline at::BFloat16 frac(at::BFloat16 a) {
-    return a - dpl::trunc(float(a));
+    return a - std::trunc(float(a));
   }
   static inline at::BFloat16 atan2(at::BFloat16 a, at::BFloat16 b) {
-    return dpl::atan2(float(a), float(b));
+    return std::atan2(float(a), float(b));
   }
   static inline at::BFloat16 hypot(at::BFloat16 a, at::BFloat16 b) {
-    return dpl::hypot(float(a), float(b));
+    return std::hypot(float(a), float(b));
   }
   static inline at::BFloat16 nextafter(at::BFloat16 a, at::BFloat16 b) {
     return nextafteri(a, b);
@@ -855,51 +848,51 @@ struct Numerics<at::BFloat16> {
   }
 
   static inline at::BFloat16 pow(at::BFloat16 a, at::BFloat16 b) {
-    return dpl::pow(float(a), float(b));
+    return std::pow(float(a), float(b));
   }
   static inline at::BFloat16 abs(at::BFloat16 a) {
-    return dpl::fabs(float(a));
+    return std::fabs(float(a));
   }
   static inline at::BFloat16 fabs(at::BFloat16 a) {
-    return dpl::fabs(float(a));
+    return std::fabs(float(a));
   }
   static inline bool isnan(at::BFloat16 a) {
-    return dpl::isnan((float)a);
+    return std::isnan((float)a);
   }
   static inline bool isinf(at::BFloat16 a) {
-    return dpl::isinf((float)a);
+    return std::isinf((float)a);
   }
   static inline at::BFloat16 copysign(at::BFloat16 a, at::BFloat16 b) {
-    return dpl::copysign((float)a, (float)b);
+    return std::copysign((float)a, (float)b);
   }
   static inline at::BFloat16 fmod(at::BFloat16 a, at::BFloat16 b) {
-    return dpl::fmod((float)a, (float)b);
+    return std::fmod((float)a, (float)b);
   }
 };
 
 template <>
 struct Numerics<float> {
   static inline float lower_bound() {
-    return -dpl::numeric_limits<float>::infinity();
+    return -std::numeric_limits<float>::infinity();
   }
   static inline float upper_bound() {
-    return dpl::numeric_limits<float>::infinity();
+    return std::numeric_limits<float>::infinity();
   }
   static inline constexpr float pi() {
     return pi_i<float>();
   }
 
   static inline bool lt(float a, float b) {
-    return dpl::isless(a, b);
+    return std::isless(a, b);
   }
   static inline bool le(float a, float b) {
-    return dpl::islessequal(a, b);
+    return std::islessequal(a, b);
   }
   static inline bool gt(float a, float b) {
-    return dpl::isgreater(a, b);
+    return std::isgreater(a, b);
   }
   static inline bool ge(float a, float b) {
-    return dpl::isgreaterequal(a, b);
+    return std::isgreaterequal(a, b);
   }
   static inline bool eq(float a, float b) {
     return a == b;
@@ -909,97 +902,97 @@ struct Numerics<float> {
   }
 
   static inline float exp(float a) {
-    return dpl::exp(a);
+    return std::exp(a);
   }
   static inline float exp2(float a) {
-    return dpl::exp2(a);
+    return std::exp2(a);
   }
   static inline float log(float a) {
-    return dpl::log(a);
+    return std::log(a);
   }
   static inline float log10(float a) {
-    return dpl::log10(a);
+    return std::log10(a);
   }
   static inline float log1p(float a) {
-    return dpl::log1p(a);
+    return std::log1p(a);
   }
   static inline float log2(float a) {
-    return dpl::log2(a);
+    return std::log2(a);
   }
   static inline float expm1(float a) {
-    return dpl::expm1(a);
+    return std::expm1(a);
   }
 
   static inline float neg(float a) {
     return -a;
   }
   static inline float sin(float a) {
-    return dpl::sin(a);
+    return std::sin(a);
   }
   static inline float cos(float a) {
-    return dpl::cos(a);
+    return std::cos(a);
   }
   static inline float sqrt(float a) {
-    return dpl::sqrt(a);
+    return std::sqrt(a);
   }
   static inline float rsqrt(float a) {
     return sycl::rsqrt(a);
   }
   static inline float ceil(float a) {
-    return dpl::ceil(a);
+    return std::ceil(a);
   }
   static inline float floor(float a) {
-    return dpl::floor(a);
+    return std::floor(a);
   }
   static inline float trunc(float a) {
-    return dpl::trunc(a);
+    return std::trunc(a);
   }
 
   static inline float acos(float a) {
-    return dpl::acos(a);
+    return std::acos(a);
   }
   static inline float cosh(float a) {
-    return dpl::cosh(a);
+    return std::cosh(a);
   }
   static inline float acosh(float a) {
-    return dpl::acosh(a);
+    return std::acosh(a);
   }
   static inline float asin(float a) {
-    return dpl::asin(a);
+    return std::asin(a);
   }
   static inline float sinh(float a) {
-    return dpl::sinh(a);
+    return std::sinh(a);
   }
   static inline float asinh(float a) {
-    return dpl::asinh(a);
+    return std::asinh(a);
   }
   static inline float tan(float a) {
-    return dpl::tan(a);
+    return std::tan(a);
   }
   static inline float atan(float a) {
-    return dpl::atan(a);
+    return std::atan(a);
   }
   static inline float tanh(float a) {
-    return dpl::tanh(a);
+    return std::tanh(a);
   }
   static inline float atanh(float a) {
-    return dpl::atanh(a);
+    return std::atanh(a);
   }
   static inline float erf(float a) {
-    return dpl::erf(a);
+    return std::erf(a);
   }
   static inline float erfc(float a) {
-    return dpl::erfc(a);
+    return std::erfc(a);
   }
   static inline float lgamma(float a) {
-    return dpl::lgamma(a);
+    return std::lgamma(a);
   }
   static inline float round(float a) {
-    return dpl::round(a);
+    return std::round(a);
   }
 
   static inline float frac(float a) {
-    return a - dpl::trunc(a);
+    return a - std::trunc(a);
   }
   static inline float cinv(float a) {
     return 1.0f / a;
@@ -1017,16 +1010,16 @@ struct Numerics<float> {
     return a - b;
   }
   static inline float pow(float a, float b) {
-    return dpl::pow(a, b);
+    return std::pow(a, b);
   }
   static inline float atan2(float a, float b) {
-    return dpl::atan2(a, b);
+    return std::atan2(a, b);
   }
   static inline float hypot(float a, float b) {
-    return dpl::hypot(a, b);
+    return std::hypot(a, b);
   }
   static inline float nextafter(float a, float b) {
-    return dpl::nextafter(a, b);
+    return std::nextafter(a, b);
   }
   static inline float min(float a, float b) {
     if (a != a) {
@@ -1034,7 +1027,7 @@ struct Numerics<float> {
     } else if (b != b) {
       return b;
     } else {
-      return dpl::fmin(a, b);
+      return std::fmin(a, b);
     }
   }
   static inline float max(float a, float b) {
@@ -1043,58 +1036,58 @@ struct Numerics<float> {
     } else if (b != b) {
       return b;
     } else {
-      return dpl::fmax(a, b);
+      return std::fmax(a, b);
     }
   }
   static inline float fmin(float a, float b) {
-    return dpl::fmin(a, b);
+    return std::fmin(a, b);
   }
   static inline float fmax(float a, float b) {
-    return dpl::fmax(a, b);
+    return std::fmax(a, b);
   }
   static inline float abs(float a) {
-    return dpl::fabs(a);
+    return std::fabs(a);
   }
   static inline float fabs(float a) {
-    return dpl::fabs(a);
+    return std::fabs(a);
   }
   static inline bool isnan(float a) {
-    return dpl::isnan(a);
+    return std::isnan(a);
   }
   static inline bool isinf(float a) {
-    return dpl::isinf(a);
+    return std::isinf(a);
   }
   static inline float copysign(float a, float b) {
-    return dpl::copysign(a, b);
+    return std::copysign(a, b);
   }
   static inline float fmod(float a, float b) {
-    return dpl::fmod(a, b);
+    return std::fmod(a, b);
   }
 };
 
 template <>
 struct Numerics<double> {
   static inline double lower_bound() {
-    return -dpl::numeric_limits<double>::infinity();
+    return -std::numeric_limits<double>::infinity();
   }
   static inline double upper_bound() {
-    return dpl::numeric_limits<double>::infinity();
+    return std::numeric_limits<double>::infinity();
   }
   static inline constexpr double pi() {
     return pi_i<double>();
   }
 
   static inline bool lt(double a, double b) {
-    return dpl::isless(a, b);
+    return std::isless(a, b);
   }
   static inline bool le(double a, double b) {
-    return dpl::islessequal(a, b);
+    return std::islessequal(a, b);
   }
   static inline bool gt(double a, double b) {
-    return dpl::isgreater(a, b);
+    return std::isgreater(a, b);
   }
   static inline bool ge(double a, double b) {
-    return dpl::isgreaterequal(a, b);
+    return std::isgreaterequal(a, b);
   }
   static inline bool eq(double a, double b) {
     return a == b;
@@ -1104,96 +1097,96 @@ struct Numerics<double> {
   }
 
   static inline double exp(double a) {
-    return dpl::exp(a);
+    return std::exp(a);
   }
   static inline double exp2(double a) {
-    return dpl::exp2(a);
+    return std::exp2(a);
   }
   static inline double log(double a) {
-    return dpl::log(a);
+    return std::log(a);
   }
   static inline double log10(double a) {
-    return dpl::log10(a);
+    return std::log10(a);
   }
   static inline double log1p(double a) {
-    return dpl::log1p(a);
+    return std::log1p(a);
   }
   static inline double log2(double a) {
-    return dpl::log2(a);
+    return std::log2(a);
   }
   static inline double expm1(double a) {
-    return dpl::expm1(a);
+    return std::expm1(a);
   }
 
   static inline double neg(double a) {
     return -a;
   }
   static inline double sin(double a) {
-    return dpl::sin(a);
+    return std::sin(a);
   }
   static inline double cos(double a) {
-    return dpl::cos(a);
+    return std::cos(a);
   }
   static inline double sqrt(double a) {
-    return dpl::sqrt(a);
+    return std::sqrt(a);
   }
   static inline double rsqrt(double a) {
     return sycl::rsqrt(a);
   }
   static inline double ceil(double a) {
-    return dpl::ceil(a);
+    return std::ceil(a);
   }
   static inline double floor(double a) {
-    return dpl::floor(a);
+    return std::floor(a);
   }
   static inline double trunc(double a) {
-    return dpl::trunc(a);
+    return std::trunc(a);
   }
   static inline double acos(double a) {
-    return dpl::acos(a);
+    return std::acos(a);
   }
   static inline double cosh(double a) {
-    return dpl::cosh(a);
+    return std::cosh(a);
   }
   static inline double acosh(double a) {
-    return dpl::acosh(a);
+    return std::acosh(a);
   }
   static inline double asin(double a) {
-    return dpl::asin(a);
+    return std::asin(a);
   }
   static inline double sinh(double a) {
-    return dpl::sinh(a);
+    return std::sinh(a);
   }
   static inline double asinh(double a) {
-    return dpl::asinh(a);
+    return std::asinh(a);
   }
   static inline double tan(double a) {
-    return dpl::tan(a);
+    return std::tan(a);
   }
   static inline double atan(double a) {
-    return dpl::atan(a);
+    return std::atan(a);
   }
   static inline double tanh(double a) {
-    return dpl::tanh(a);
+    return std::tanh(a);
   }
   static inline double atanh(double a) {
-    return dpl::atanh(a);
+    return std::atanh(a);
   }
   static inline double erf(double a) {
-    return dpl::erf(a);
+    return std::erf(a);
   }
   static inline double erfc(double a) {
-    return dpl::erfc(a);
+    return std::erfc(a);
   }
   static inline double lgamma(double a) {
-    return dpl::lgamma(a);
+    return std::lgamma(a);
   }
   static inline double round(double a) {
-    return dpl::round(a);
+    return std::round(a);
   }
 
   static inline double frac(double a) {
-    return a - dpl::trunc(a);
+    return a - std::trunc(a);
   }
   static inline double cinv(double a) {
     return 1.0f / a;
@@ -1211,16 +1204,16 @@ struct Numerics<double> {
     return a - b;
   }
   static inline double pow(double a, double b) {
-    return dpl::pow(a, b);
+    return std::pow(a, b);
   }
   static inline double atan2(double a, double b) {
-    return dpl::atan2(a, b);
+    return std::atan2(a, b);
   }
   static inline double hypot(double a, double b) {
-    return dpl::hypot(a, b);
+    return std::hypot(a, b);
   }
   static inline double nextafter(double a, double b) {
-    return dpl::nextafter(a, b);
+    return std::nextafter(a, b);
   }
   static inline double min(double a, double b) {
     if (a != a) {
@@ -1228,7 +1221,7 @@ struct Numerics<double> {
     } else if (b != b) {
       return b;
     } else {
-      return dpl::fmin(a, b);
+      return std::fmin(a, b);
     }
   }
   static inline double max(double a, double b) {
@@ -1237,32 +1230,32 @@ struct Numerics<double> {
     } else if (b != b) {
       return b;
     } else {
-      return dpl::fmax(a, b);
+      return std::fmax(a, b);
     }
   }
   static inline double fmin(double a, double b) {
-    return dpl::fmin(a, b);
+    return std::fmin(a, b);
   }
   static inline double fmax(double a, double b) {
-    return dpl::fmax(a, b);
+    return std::fmax(a, b);
   }
   static inline double abs(double a) {
-    return dpl::fabs(a);
+    return std::fabs(a);
   }
   static inline double fabs(double a) {
-    return dpl::fabs(a);
+    return std::fabs(a);
   }
   static inline bool isnan(double a) {
-    return dpl::isnan(a);
+    return std::isnan(a);
   }
   static inline bool isinf(double a) {
-    return dpl::isinf(a);
+    return std::isinf(a);
   }
   static inline double copysign(double a, double b) {
-    return dpl::copysign(a, b);
+    return std::copysign(a, b);
   }
   static inline double fmod(double a, double b) {
-    return dpl::fmod(a, b);
+    return std::fmod(a, b);
   }
 };
 
@@ -1270,62 +1263,62 @@ template <>
 struct Numerics<c10::complex<float>> {
   static inline c10::complex<float> acos(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::acos(static_cast<dpl::complex<float>>(a)));
+        std::acos(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> sin(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::sin(static_cast<dpl::complex<float>>(a)));
+        std::sin(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> cosh(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::cosh(static_cast<dpl::complex<float>>(a)));
+        std::cosh(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> acosh(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::acosh(static_cast<dpl::complex<float>>(a)));
+        std::acosh(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> sinh(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::sinh(static_cast<dpl::complex<float>>(a)));
+        std::sinh(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> asinh(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::asinh(static_cast<dpl::complex<float>>(a)));
+        std::asinh(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> asin(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::asin(static_cast<dpl::complex<float>>(a)));
+        std::asin(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> cos(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::cos(static_cast<dpl::complex<float>>(a)));
+        std::cos(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> atan(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::atan(static_cast<dpl::complex<float>>(a)));
+        std::atan(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> tan(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::tan(static_cast<dpl::complex<float>>(a)));
+        std::tan(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> tanh(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::tanh(static_cast<dpl::complex<float>>(a)));
+        std::tanh(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> atanh(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::atanh(static_cast<dpl::complex<float>>(a)));
+        std::atanh(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> neg(c10::complex<float> a) {
@@ -1334,27 +1327,27 @@ struct Numerics<c10::complex<float>> {
 
   static inline c10::complex<float> sqrt(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::sqrt(static_cast<dpl::complex<float>>(a)));
+        std::sqrt(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> rsqrt(c10::complex<float> a) {
     return c10::complex<float>(1.0, 0) /
         static_cast<c10::complex<float>>(
-               dpl::sqrt(static_cast<dpl::complex<float>>(a)));
+               std::sqrt(static_cast<std::complex<float>>(a)));
   }
 
   static inline float abs(c10::complex<float> a) {
-    return dpl::abs(a);
+    return std::abs(a);
   }
 
   static inline float fabs(c10::complex<float> a) {
-    // dpl::abs will return corresponding float type when arg is complex<float>
-    return dpl::abs(a);
+    // std::abs will return corresponding float type when arg is complex<float>
+    return std::abs(a);
   }
 
   static inline c10::complex<float> exp(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::exp(static_cast<dpl::complex<float>>(a)));
+        std::exp(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> add(
@@ -1381,14 +1374,14 @@ struct Numerics<c10::complex<float>> {
   static inline c10::complex<float> pow(
       c10::complex<float> a,
       c10::complex<float> b) {
-    return static_cast<c10::complex<float>>(dpl::pow(
-        static_cast<dpl::complex<float>>(a),
-        static_cast<dpl::complex<float>>(b)));
+    return static_cast<c10::complex<float>>(std::pow(
+        static_cast<std::complex<float>>(a),
+        static_cast<std::complex<float>>(b)));
   }
 
   static inline c10::complex<float> log(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::log(static_cast<dpl::complex<float>>(a)));
+        std::log(static_cast<std::complex<float>>(a)));
   }
 
   static inline c10::complex<float> log2(c10::complex<float> a) {
@@ -1397,7 +1390,7 @@ struct Numerics<c10::complex<float>> {
 
   static inline c10::complex<float> log10(c10::complex<float> a) {
     return static_cast<c10::complex<float>>(
-        dpl::log10(static_cast<dpl::complex<float>>(a)));
+        std::log10(static_cast<std::complex<float>>(a)));
   }
 
   static inline bool eq(c10::complex<float> a, c10::complex<float> b) {
@@ -1417,62 +1410,62 @@ template <>
 struct Numerics<c10::complex<double>> {
   static inline c10::complex<double> acos(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::acos(static_cast<dpl::complex<double>>(a)));
+        std::acos(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> sin(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::sin(static_cast<dpl::complex<double>>(a)));
+        std::sin(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> cosh(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::cosh(static_cast<dpl::complex<double>>(a)));
+        std::cosh(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> acosh(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::acosh(static_cast<dpl::complex<double>>(a)));
+        std::acosh(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> sinh(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::sinh(static_cast<dpl::complex<double>>(a)));
+        std::sinh(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> asinh(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::asinh(static_cast<dpl::complex<double>>(a)));
+        std::asinh(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> asin(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::asin(static_cast<dpl::complex<double>>(a)));
+        std::asin(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> cos(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::cos(static_cast<dpl::complex<double>>(a)));
+        std::cos(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> atan(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::atan(static_cast<dpl::complex<double>>(a)));
+        std::atan(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> tan(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::tan(static_cast<dpl::complex<double>>(a)));
+        std::tan(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> tanh(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::tanh(static_cast<dpl::complex<double>>(a)));
+        std::tanh(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> atanh(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::atanh(static_cast<dpl::complex<double>>(a)));
+        std::atanh(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> neg(c10::complex<double> a) {
@@ -1481,28 +1474,28 @@ struct Numerics<c10::complex<double>> {
 
   static inline c10::complex<double> sqrt(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::sqrt(static_cast<dpl::complex<double>>(a)));
+        std::sqrt(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> rsqrt(c10::complex<double> a) {
     return c10::complex<double>(1.0, 0) /
         static_cast<c10::complex<double>>(
-               dpl::sqrt(static_cast<dpl::complex<double>>(a)));
+               std::sqrt(static_cast<std::complex<double>>(a)));
   }
 
   static inline double abs(c10::complex<double> a) {
-    return dpl::abs(a);
+    return std::abs(a);
   }
 
   static inline double fabs(c10::complex<double> a) {
-    // dpl::abs will return corresponding double type when arg is
+    // std::abs will return corresponding double type when arg is
     // complex<double>
-    return dpl::abs(a);
+    return std::abs(a);
   }
 
   static inline c10::complex<double> exp(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::exp(static_cast<dpl::complex<double>>(a)));
+        std::exp(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> add(
@@ -1529,14 +1522,14 @@ struct Numerics<c10::complex<double>> {
   static inline c10::complex<double> pow(
       c10::complex<double> a,
       c10::complex<double> b) {
-    return static_cast<c10::complex<double>>(dpl::pow(
-        static_cast<dpl::complex<double>>(a),
-        static_cast<dpl::complex<double>>(b)));
+    return static_cast<c10::complex<double>>(std::pow(
+        static_cast<std::complex<double>>(a),
+        static_cast<std::complex<double>>(b)));
   }
 
   static inline c10::complex<double> log(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::log(static_cast<dpl::complex<double>>(a)));
+        std::log(static_cast<std::complex<double>>(a)));
   }
 
   static inline c10::complex<double> log2(c10::complex<double> a) {
@@ -1545,7 +1538,7 @@ struct Numerics<c10::complex<double>> {
 
   static inline c10::complex<double> log10(c10::complex<double> a) {
     return static_cast<c10::complex<double>>(
-        dpl::log10(static_cast<dpl::complex<double>>(a)));
+        std::log10(static_cast<std::complex<double>>(a)));
   }
 
   static inline bool eq(c10::complex<double> a, c10::complex<double> b) {

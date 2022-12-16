@@ -5,7 +5,6 @@
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
-#include <oneapi/dpl/tuple>
 #include "Loops.h"
 
 using namespace xpu::dpcpp;
@@ -53,7 +52,7 @@ void fake_quantize_per_channel_cachemask_dpcpp(
             [=](scalar_t input_val, float scale, int64_t zero_point) -> bool {
               float inv_scale = 1.0f / scale;
               const auto qval = static_cast<int64_t>(
-                  dpl::nearbyint(input_val * inv_scale) + zero_point);
+                  std::nearbyint(input_val * inv_scale) + zero_point);
               return ((quant_min <= qval) && (qval <= quant_max));
             });
 
@@ -69,7 +68,7 @@ void fake_quantize_per_channel_cachemask_dpcpp(
                           Numerics<int64_t>::max(
                               quant_min,
                               static_cast<int64_t>(
-                                  dpl::nearbyint(input_val * inv_scale) +
+                                  std::nearbyint(input_val * inv_scale) +
                                   zero_point))) -
                       zero_point) *
                   scale;
@@ -99,13 +98,13 @@ void _fake_quantize_grad_learnable_channel_dpcpp(
       [=](float x_input,
           float dy_input,
           float scale_input,
-          float zero_point_input) -> dpl::tuple<float, float, float> {
+          float zero_point_input) -> std::tuple<float, float, float> {
         float dx_output, dscale_output, dzero_point_output;
         float inv_scale = 1.0f / scale_input;
         float dscale_small = quant_min - zero_point_input;
         float dscale_big = quant_max - zero_point_input;
         // Calculate gradients for X.
-        int64_t xqi = dpl::nearbyint(x_input * inv_scale) +
+        int64_t xqi = std::nearbyint(x_input * inv_scale) +
             static_cast<int64_t>(zero_point_input);
         dx_output = dy_input * (xqi >= quant_min && xqi <= quant_max);
         // Calculate gradients for scale and zero point.

@@ -2,7 +2,6 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
-#include <oneapi/dpl/limits>
 #include "Loops.h"
 #include "comm/AccumulateType.h"
 #include "comm/LoopsMeta.h"
@@ -11,7 +10,6 @@
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
 #include "comm/zmath.h"
-namespace dpl = oneapi::dpl;
 
 using namespace xpu::dpcpp;
 
@@ -41,8 +39,8 @@ static inline c10::complex<T> reciprocal_wrapper(c10::complex<T> v) {
   if (either_nan(v.real(), v.imag()) || both_inf(v.real(), v.imag())) {
     // If either is Nan or both are infinite, return {nan, nan}
     return {
-        dpl::numeric_limits<T>::quiet_NaN(),
-        dpl::numeric_limits<T>::quiet_NaN()};
+        std::numeric_limits<T>::quiet_NaN(),
+        std::numeric_limits<T>::quiet_NaN()};
   } else if (either_inf(v.real(), v.imag())) {
     // If either is Inf, return {0, 0}
     return {0, 0};

@@ -10,7 +10,6 @@
 
 #include <torch/custom_class.h>
 #include <utils/Macros.h>
-#include <oneapi/dpl/cmath>
 
 #include <operators/comm/Numerics.h>
 #include <runtime/Utils.h>
@@ -27,7 +26,7 @@ at::Tensor u8tos8(const at::Tensor& u8);
 
 template <typename T>
 inline T Round(const T x) {
-  return oneapi::dpl::nearbyint(x);
+  return std::nearbyint(x);
 }
 
 template <typename T>

@@ -5,7 +5,6 @@
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
-#include <oneapi/dpl/tuple>
 #include "Loops.h"
 
 using namespace xpu::dpcpp;
@@ -90,9 +89,9 @@ void fake_quantize_tensor_cachemask_dpcpp(
       "fake_quantize_tensor_cachemask_dpcpp",
       [&] {
         dpcpp_kernel_multiple_outputs_for_tensor_iter(
-            iter, [=](scalar_t input_val) -> dpl::tuple<scalar_t, bool> {
+            iter, [=](scalar_t input_val) -> std::tuple<scalar_t, bool> {
               const auto qval = static_cast<int64_t>(
-                  dpl::nearbyint(input_val * inv_scale) + zero_point);
+                  std::nearbyint(input_val * inv_scale) + zero_point);
               return {// fake_quantized value
                       (Numerics<int64_t>::min(
                            quant_max, Numerics<int64_t>::max(quant_min, qval)) -
@@ -116,9 +115,9 @@ void _fake_quantize_grad_learnable_tensor_dpcpp(
   float dscale_big = quant_max - zero_point;
   dpcpp_kernel_multiple_outputs_for_tensor_iter(
       iter,
-      [=](float XInput, float dYInput) -> dpl::tuple<float, float, float> {
+      [=](float XInput, float dYInput) -> std::tuple<float, float, float> {
         float dXOutput, dZeroPointOutput, dScaleOutput;
-        int64_t xq = dpl::nearbyint(XInput * inv_scale) + zero_point;
+        int64_t xq = std::nearbyint(XInput * inv_scale) + zero_point;
         dXOutput = dYInput * (xq >= quant_min && xq <= quant_max);
         float xfq = static_cast<float>(
             (Numerics<int64_t>::max(
@@ -163,13 +162,13 @@ void _fake_quantize_tensor_cachemask_tensor_qparams_dpcpp(
       "fake_quantize_tensor_cachemask_tensor_qparams_dpcpp",
       [&] {
         dpcpp_kernel_multiple_outputs_for_tensor_iter(
-            iter, [=](scalar_t input_val) -> dpl::tuple<scalar_t, bool> {
+            iter, [=](scalar_t input_val) -> std::tuple<scalar_t, bool> {
               if (*fake_quant_on == 0) {
                 return {input_val, 1};
               }
               float inv_scale = 1.0f / (*scale_ptr);
               const auto qval = static_cast<int64_t>(
-                  dpl::nearbyint(input_val * inv_scale) + (*zp_ptr));
+                  std::nearbyint(input_val * inv_scale) + (*zp_ptr));
               return {// fake_quantized value
                       (Numerics<int64_t>::min(
                            quant_max, Numerics<int64_t>::max(quant_min, qval)) -

@@ -8,7 +8,6 @@
 #include <runtime/Utils.h>
 #include <tensor/TensorMeta.h>
 #include <utils/oneMKLUtils.h>
-#include <oneapi/dpl/utility>
 #include "Loops.h"
 #include "Resize.h"
 #include "comm/ATDispatch.h"
@@ -688,8 +687,7 @@ void _unpack_pivots_internal_kernel_dpcpp(
 
     // QUESTION: can we mix 64bit offsets with 32bit Iterator indexing?
     for (int64_t i = 0; i < dim_size; ++i) {
-      oneapi::dpl::swap(
-          unpacked_pivots_data[i], unpacked_pivots_data[pivots_data[i]]);
+      std::swap(unpacked_pivots_data[i], unpacked_pivots_data[pivots_data[i]]);
     }
   };
 

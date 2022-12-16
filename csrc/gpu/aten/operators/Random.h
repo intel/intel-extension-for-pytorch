@@ -6,9 +6,7 @@
 #include <aten/operators/MemoryAccess.h>
 #include <utils/DPCPP.h>
 
-#include <oneapi/dpl/cmath>
 #include "comm/Numerics.h"
-namespace dpl = oneapi::dpl;
 
 // TODO: move this into the GeneratorImpl in pytorch-1.7 or later
 using Philox4_32_10 = at::Philox4_32;
