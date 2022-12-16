@@ -296,23 +296,14 @@ at::Tensor avg_pool3d_out_cpu(
   const int padW =
       padding.size() == 1 ? padT : safe_downcast<int, int64_t>(padding[2]);
 
-  // FIXME: https://jira.devtools.intel.com/browse/IPB-1421
-  // [watch out] Here for merging CPU and XPU code, the CPU avgpool3d here is
-  // miss-aligned with torch. The channels last input(4D) can also be computed
-  // instead of fail, so i plan to change here.
-  at::Tensor input_ = input;
-  if (input_.ndimension() == 4) {
-    input_ = input.contiguous();
-  }
-  const auto memory_format = input_.suggest_memory_format();
-
+  const auto memory_format = input.suggest_memory_format();
   if (memory_format == at::MemoryFormat::ChannelsLast3d) {
     TORCH_CHECK(
-        input_.ndimension() == 5,
+        input.ndimension() == 5,
         "non-empty 5D (batch mode) tensor expected for input with channels_last_3d layout");
   } else if (memory_format == at::MemoryFormat::Contiguous) {
     TORCH_CHECK(
-        (input_.ndimension() == 4 || input_.ndimension() == 5),
+        (input.ndimension() == 4 || input.ndimension() == 5),
         "non-empty 4D or 5D (batch mode) tensor expected for input");
   } else {
     TORCH_CHECK(
@@ -325,11 +316,11 @@ at::Tensor avg_pool3d_out_cpu(
       "divisor must be not zero");
 
   /* sizes */
-  const int64_t nbatch = input_.size(0);
-  const int64_t nslices = input_.size(-4);
-  const int64_t itime = input_.size(-3);
-  const int64_t iheight = input_.size(-2);
-  const int64_t iwidth = input_.size(-1);
+  const int64_t nbatch = input.size(0);
+  const int64_t nslices = input.size(-4);
+  const int64_t itime = input.size(-3);
+  const int64_t iheight = input.size(-2);
+  const int64_t iwidth = input.size(-1);
   const int64_t otime = at::native::pooling_output_shape<int64_t>(
       itime, kT, padT, dT, 1, ceil_mode);
   const int64_t oheight = at::native::pooling_output_shape<int64_t>(
@@ -338,7 +329,7 @@ at::Tensor avg_pool3d_out_cpu(
       iwidth, kW, padW, dW, 1, ceil_mode);
 
   at::native::pool3d_shape_check(
-      input_,
+      input,
       nslices,
       kT,
       kH,
@@ -363,12 +354,12 @@ at::Tensor avg_pool3d_out_cpu(
 
   /* resize output */
   at::Tensor output;
-  if (input_.ndimension() == 4) {
-    output = at::empty({nslices, otime, oheight, owidth}, input_.options());
+  if (input.ndimension() == 4) {
+    output = at::empty({nslices, otime, oheight, owidth}, input.options());
   } else {
     output = at::empty(
         {nbatch, nslices, otime, oheight, owidth},
-        input_.options().memory_format(memory_format));
+        input.options().memory_format(memory_format));
   }
 
   /*
@@ -390,7 +381,7 @@ at::Tensor avg_pool3d_out_cpu(
   avg_pool3d_kernel_stub(
       kCPU,
       output,
-      input_,
+      input,
       kW,
       kH,
       kT,
@@ -456,25 +447,14 @@ at::Tensor avg_pool3d_backward_out_cpu(
   const int padW =
       padding.size() == 1 ? padT : safe_downcast<int, int64_t>(padding[2]);
 
-  // FIXME: https://jira.devtools.intel.com/browse/IPB-1421
-  // [watch out] Here for merging CPU and XPU code, the CPU avgpool3d here is
-  // miss-aligned with torch. The channels last input(4D) can also be computed
-  // instead of fail, so i plan to change here.
-  at::Tensor input_ = input;
-  at::Tensor gradOutput_ = gradOutput;
-  if (input_.ndimension() == 4) {
-    input_ = input.contiguous();
-    gradOutput_ = gradOutput.contiguous();
-  }
-  const auto memory_format = input_.suggest_memory_format();
-
+  const auto memory_format = input.suggest_memory_format();
   if (memory_format == at::MemoryFormat::ChannelsLast3d) {
     TORCH_CHECK(
-        input_.ndimension() == 5,
+        input.ndimension() == 5,
         "non-empty 5D (batch mode) tensor expected for input with channels_last_3d layout");
   } else if (memory_format == at::MemoryFormat::Contiguous) {
     TORCH_CHECK(
-        (input_.ndimension() == 4 || input_.ndimension() == 5),
+        (input.ndimension() == 4 || input.ndimension() == 5),
         "non-empty 4D or 5D (batch mode) tensor expected for input");
   } else {
     TORCH_CHECK(
@@ -487,10 +467,10 @@ at::Tensor avg_pool3d_backward_out_cpu(
       "divisor must be not zero");
 
   /* sizes */
-  const int64_t nslices = input_.size(-4);
-  const int64_t itime = input_.size(-3);
-  const int64_t iheight = input_.size(-2);
-  const int64_t iwidth = input_.size(-1);
+  const int64_t nslices = input.size(-4);
+  const int64_t itime = input.size(-3);
+  const int64_t iheight = input.size(-2);
+  const int64_t iwidth = input.size(-1);
   /* XXX shape check behavior from TH */
   const int64_t otime_for_shape_check =
       at::native::pooling_output_shape<int64_t>(
@@ -503,8 +483,8 @@ at::Tensor avg_pool3d_backward_out_cpu(
           iwidth, kW, padW, dW, 1, ceil_mode);
 
   at::native::avg_pool3d_backward_shape_check(
-      input_,
-      gradOutput_,
+      input,
+      gradOutput,
       nslices,
       kT,
       kH,
@@ -527,15 +507,15 @@ at::Tensor avg_pool3d_backward_out_cpu(
   // TODO: This is a workaround for the bug that 'at::zeros' does not recognize
   // the memory format tag.
   at::Tensor gradInput =
-      at::empty(input_.sizes(), input_.options().memory_format(memory_format))
+      at::empty(input.sizes(), input.options().memory_format(memory_format))
           .zero_();
 
   TORCH_CHECK(
-      input_.dtype() == gradOutput_.dtype(),
+      input.dtype() == gradOutput.dtype(),
       "expected dtype ",
-      input_.dtype(),
+      input.dtype(),
       " for `gradOutput` but got dtype ",
-      gradOutput_.dtype());
+      gradOutput.dtype());
 
   /*
   pointer to avg_pool3d_backward_kernel_impl(
@@ -556,7 +536,7 @@ at::Tensor avg_pool3d_backward_out_cpu(
   avg_pool3d_backward_kernel_stub(
       kCPU,
       gradInput,
-      gradOutput_,
+      gradOutput,
       kW,
       kH,
       kT,

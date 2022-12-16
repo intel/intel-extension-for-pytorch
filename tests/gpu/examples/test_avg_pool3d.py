@@ -92,18 +92,18 @@ class TestNNMethod(TestCase):
         self.assertEqual(output_cpu, output_xpu.to(cpu_device))
         self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
 
-        # 4D channel_last input
+        # 4D strided input - (C,D,H,W) -> (C,H,W,D)
         # CPU
-        input_cpu = x.clone().contiguous(memory_format=mem_format)
+        input_cpu = x.clone().permute(0,2,3,1)
         input_cpu.requires_grad_(True)
-        grad_cpu = grad.clone().contiguous(memory_format=mem_format)
+        grad_cpu = grad.clone().permute(0,2,3,1)
         output_cpu = m(input_cpu)
         output_cpu.backward(grad_cpu)
 
         # XPU
-        input_xpu = x.clone().contiguous(memory_format=mem_format).to(dpcpp_device)
+        input_xpu = x.clone().permute(0,2,3,1).to(dpcpp_device)
         input_xpu.requires_grad_(True)
-        grad_xpu = grad.clone().contiguous(memory_format=mem_format).to(dpcpp_device)
+        grad_xpu = grad.clone().permute(0,2,3,1).to(dpcpp_device)
         output_xpu = m(input_xpu)
         output_xpu.backward(grad_xpu)
 
