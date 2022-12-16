@@ -4,6 +4,7 @@ import copy
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 
+import pytest
 import intel_extension_for_pytorch # noqa
 
 cpu_device = torch.device('cpu')
