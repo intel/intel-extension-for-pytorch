@@ -32,7 +32,7 @@ void signbit_kernel(TensorIteratorBase& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
       kBFloat16, ScalarType::Half, iter.input_dtype(), "signbit_dpcpp", [&]() {
         dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> bool {
-          return !dpl::is_unsigned<scalar_t>::value && a < 0;
+          return !std::is_unsigned<scalar_t>::value && a < 0;
         });
       });
 }

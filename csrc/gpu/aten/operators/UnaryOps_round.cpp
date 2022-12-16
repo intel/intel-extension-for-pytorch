@@ -9,8 +9,6 @@
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
 #include "comm/zmath.h"
-#include "oneapi/dpl/cmath"
-namespace dpl = oneapi::dpl;
 
 #include "Loops.h"
 
@@ -25,7 +23,7 @@ IPEX_OUT_FLOAT_UNARY_FUNC_OPS(ceil_out, Numerics<scalar_t>::ceil, Real);
 IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL(
     round_out,
     [](scalar_t a) -> scalar_t {
-      return dpl::nearbyintf(static_cast<float>(a));
+      return std::nearbyintf(static_cast<float>(a));
     },
     unary_op);
 
@@ -46,8 +44,8 @@ void round_decimals_out(const Tensor& self, int64_t decimals, Tensor& out) {
         ten_pow_decimals = static_cast<scalar_t>(std::pow(10, decimals));
         dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
           return neg_flag
-              ? dpl::nearbyint(a / ten_pow_decimals) * ten_pow_decimals
-              : dpl::nearbyint(a * ten_pow_decimals) / ten_pow_decimals;
+              ? std::nearbyint(a / ten_pow_decimals) * ten_pow_decimals
+              : std::nearbyint(a * ten_pow_decimals) / ten_pow_decimals;
         });
       });
 }

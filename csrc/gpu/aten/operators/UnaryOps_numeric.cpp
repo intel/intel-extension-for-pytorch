@@ -9,10 +9,8 @@
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
 
-#include <oneapi/dpl/limits>
 #include "Loops.h"
 #include "Resize.h"
-namespace dpl = oneapi::dpl;
 
 using namespace xpu::dpcpp;
 
@@ -96,10 +94,10 @@ void nan_to_num_kernel(
         scalar_t nan_replacement = static_cast<scalar_t>(nan.value_or(0.));
         scalar_t pos_inf_replacement = pos_inf.has_value()
             ? static_cast<scalar_t>(pos_inf.value())
-            : dpl::numeric_limits<scalar_t>::max();
+            : std::numeric_limits<scalar_t>::max();
         scalar_t neg_inf_replacement = neg_inf.has_value()
             ? static_cast<scalar_t>(neg_inf.value())
-            : dpl::numeric_limits<scalar_t>::lowest();
+            : std::numeric_limits<scalar_t>::lowest();
         dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
           return (
               at::_isnan(a) ? nan_replacement

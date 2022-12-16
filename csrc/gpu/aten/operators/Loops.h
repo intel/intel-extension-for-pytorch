@@ -9,7 +9,6 @@
 
 #include <core/Memory.h>
 #include <runtime/Utils.h>
-#include <oneapi/dpl/tuple>
 #include "MemoryAccess.h"
 #include "comm/Load.h"
 
@@ -659,7 +658,7 @@ void dpcpp_loops_multiple_outputs_kernel(
     const func_t& f) {
   using traits = function_traits<func_t>;
   using output_t = typename traits::result_type;
-  constexpr int num_outputs = dpl::tuple_size<output_t>::value;
+  constexpr int num_outputs = std::tuple_size<output_t>::value;
   constexpr int num_inputs = traits::arity;
   constexpr int ntensors = num_outputs + num_inputs;
 

@@ -8,7 +8,6 @@
 #include <c10/util/TypeCast.h>
 #include <core/Array.h>
 #include <cstdint>
-#include <oneapi/dpl/tuple>
 #include <type_traits>
 
 namespace at {

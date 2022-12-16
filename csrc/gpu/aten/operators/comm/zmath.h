@@ -5,11 +5,6 @@
 #include <c10/util/MathConstants.h>
 #include <c10/util/complex.h>
 #include <c10/util/math_compat.h>
-#include <oneapi/dpl/cmath>
-#include <oneapi/dpl/complex>
-#include <oneapi/dpl/limits>
-#include <oneapi/dpl/type_traits>
-namespace dpl = oneapi::dpl;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -57,23 +52,23 @@ inline VALUE_TYPE angle_impl(SCALAR_TYPE z) {
 template <>
 inline c10::complex<float> angle_impl<c10::complex<float>>(
     c10::complex<float> z) {
-  return c10::complex<float>(dpl::arg(z), 0.0);
+  return c10::complex<float>(std::arg(z), 0.0);
 }
 
 template <>
 inline float angle_impl<c10::complex<float>, float>(c10::complex<float> z) {
-  return dpl::arg(z);
+  return std::arg(z);
 }
 
 template <>
 inline c10::complex<double> angle_impl<c10::complex<double>>(
     c10::complex<double> z) {
-  return c10::complex<double>(dpl::arg(z), 0.0);
+  return c10::complex<double>(std::arg(z), 0.0);
 }
 
 template <>
 inline double angle_impl<c10::complex<double>, double>(c10::complex<double> z) {
-  return dpl::arg(z);
+  return std::arg(z);
 }
 
 template <typename SCALAR_TYPE, typename VALUE_TYPE = SCALAR_TYPE>
@@ -190,19 +185,19 @@ inline c10::complex<double> floor_impl(c10::complex<double> z) {
 
 template <typename TYPE>
 inline TYPE round_impl(TYPE z) {
-  return dpl::nearbyint(z);
+  return std::nearbyint(z);
 }
 
 template <>
 inline c10::complex<float> round_impl(c10::complex<float> z) {
   return c10::complex<float>(
-      dpl::nearbyint(z.real()), dpl::nearbyint(z.imag()));
+      std::nearbyint(z.real()), std::nearbyint(z.imag()));
 }
 
 template <>
 inline c10::complex<double> round_impl(c10::complex<double> z) {
   return c10::complex<double>(
-      dpl::nearbyint(z.real()), dpl::nearbyint(z.imag()));
+      std::nearbyint(z.real()), std::nearbyint(z.imag()));
 }
 
 template <typename TYPE>
@@ -222,10 +217,10 @@ inline c10::complex<double> trunc_impl(c10::complex<double> z) {
 
 template <
     typename TYPE,
-    dpl::enable_if_t<!c10::is_complex<TYPE>::value, int> = 0>
+    std::enable_if_t<!c10::is_complex<TYPE>::value, int> = 0>
 inline TYPE max_impl(TYPE a, TYPE b) {
   if (_isnan<TYPE>(a) || _isnan<TYPE>(b)) {
-    return dpl::numeric_limits<TYPE>::quiet_NaN();
+    return std::numeric_limits<TYPE>::quiet_NaN();
   } else {
     return std::max(a, b);
   }
@@ -233,7 +228,7 @@ inline TYPE max_impl(TYPE a, TYPE b) {
 
 template <
     typename TYPE,
-    dpl::enable_if_t<c10::is_complex<TYPE>::value, int> = 0>
+    std::enable_if_t<c10::is_complex<TYPE>::value, int> = 0>
 inline TYPE max_impl(TYPE a, TYPE b) {
   if (_isnan<TYPE>(a)) {
     return a;
@@ -246,10 +241,10 @@ inline TYPE max_impl(TYPE a, TYPE b) {
 
 template <
     typename TYPE,
-    dpl::enable_if_t<!c10::is_complex<TYPE>::value, int> = 0>
+    std::enable_if_t<!c10::is_complex<TYPE>::value, int> = 0>
 inline TYPE min_impl(TYPE a, TYPE b) {
   if (_isnan<TYPE>(a) || _isnan<TYPE>(b)) {
-    return dpl::numeric_limits<TYPE>::quiet_NaN();
+    return std::numeric_limits<TYPE>::quiet_NaN();
   } else {
     return std::min(a, b);
   }
@@ -257,7 +252,7 @@ inline TYPE min_impl(TYPE a, TYPE b) {
 
 template <
     typename TYPE,
-    dpl::enable_if_t<c10::is_complex<TYPE>::value, int> = 0>
+    std::enable_if_t<c10::is_complex<TYPE>::value, int> = 0>
 inline TYPE min_impl(TYPE a, TYPE b) {
   if (_isnan<TYPE>(a)) {
     return a;

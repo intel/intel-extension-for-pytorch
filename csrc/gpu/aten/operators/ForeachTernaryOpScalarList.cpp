@@ -3,7 +3,6 @@
 #include <ATen/native/ForeachUtils.h>
 #include <ATen/native/TensorIterator.h>
 #include <aten/core/detail/IndexUtils.h>
-#include "oneapi/dpl/functional"
 
 #include <runtime/Utils.h>
 #include "ATen/OpMathType.h"
@@ -223,10 +222,10 @@ std::vector<Tensor> foreach_pointwise_op(
                                                                           \
     foreach_pointwise_op_<OP>(input, tensors1, tensors2, scalars);        \
   }
-FOREACH_POINTWISE_OP_SCALAR(addcmul, oneapi::dpl::multiplies);
-FOREACH_POINTWISE_OP_SCALAR(addcdiv, oneapi::dpl::divides);
-FOREACH_POINTWISE_OP_SCALARLIST(addcmul, oneapi::dpl::multiplies);
-FOREACH_POINTWISE_OP_SCALARLIST(addcdiv, oneapi::dpl::divides);
+FOREACH_POINTWISE_OP_SCALAR(addcmul, std::multiplies);
+FOREACH_POINTWISE_OP_SCALAR(addcdiv, std::divides);
+FOREACH_POINTWISE_OP_SCALARLIST(addcmul, std::multiplies);
+FOREACH_POINTWISE_OP_SCALARLIST(addcdiv, std::divides);
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

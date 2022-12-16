@@ -13,9 +13,6 @@
 #include "comm/Numerics.h"
 #include "comm/zmath.h"
 
-#include "oneapi/dpl/cmath"
-namespace dpl = oneapi::dpl;
-
 using namespace xpu::dpcpp;
 
 namespace at {

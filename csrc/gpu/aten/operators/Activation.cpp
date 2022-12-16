@@ -257,7 +257,7 @@ inline void launch_prelu_backward_kernel_share_weights(
         dpcpp_kernel_multiple_outputs_for_tensor_iter(
             iter,
             [=](scalar_t input,
-                scalar_t grad_out) -> dpl::tuple<scalar_t, bool> {
+                scalar_t grad_out) -> std::tuple<scalar_t, bool> {
               scalar_t input_grad =
                   input > 0 ? grad_out : (*weight_data) * grad_out;
               scalar_t weight_grad_collector =
