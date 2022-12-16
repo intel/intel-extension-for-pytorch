@@ -589,7 +589,17 @@ void Topk(
   TORCH_CHECK(k >= 0 && k <= sliceSize, "k not in range for dimension");
 
   auto input = input_.contiguous();
+  // Build the output size, which is the dim being selected set to
+  // size k
+  std::vector<int64_t> topKSize = {1};
+  if (input.dim() != 0)
+    topKSize = input.sizes().vec();
+  topKSize[dim] = k;
+  at::AtenIpexTypeXPU::resize_(topK, topKSize, c10::nullopt);
+  at::AtenIpexTypeXPU::resize_(indices, topKSize, c10::nullopt);
 
+  if (k == 0)
+    return;
 // static_cast is required to ensure that the correct type (INDEX_T)
 // is provided to the kernel for the arguments.
 #define RUN_K(INDEX_T, DIM, DIR)                                 \
@@ -692,7 +702,9 @@ void Topk(
 #undef RUN_K
   // Sort the results if the user wants them sorted, since our
   // selection routine does not ensure sorting
-  if (sorted && topK.numel() > 1) {
+  // We don't need topK.numel() > 0 in if(...), because topKInfo is used
+  // in gatherTopK instaed of topK
+  if (sorted) {
     int64_t prb_size = topK.size(dim);
     int64_t stride = topK.stride(dim);
     int64_t batch_size = topK.numel() / prb_size / stride;
