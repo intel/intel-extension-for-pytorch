@@ -10,7 +10,7 @@ Examples
 There are only a few lines of code change required to use Intel® Extension for PyTorch\* on training, as shown:
 1. `torch.xpu.optimize` function applies optimizations against the model object, as well as an optimizer object.
 2.  Use Auto Mixed Precision (AMP) with BFloat16 data type.
-3.  Convert both tensors and models to XPU.
+3.  Convert both input tensors, loss criterion and model to XPU.
 
 The complete examples for Float32 and BFloat16 training on single-instance are illustrated in the sections.
 
@@ -72,6 +72,7 @@ optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
 model.train()
 #################################### code changes ####################################
 model = model.to("xpu")
+criterion = criterion.to("xpu")
 model, optimizer = torch.xpu.optimize(model, optimizer=optimizer, dtype=torch.float32)
 #################################### code changes ####################################
 
@@ -127,6 +128,7 @@ optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
 model.train()
 ##################################### code changes ####################################
 model = model.to("xpu")
+criterion = criterion.to("xpu")
 model, optimizer = torch.xpu.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
 ##################################### code changes ####################################
 
@@ -148,13 +150,28 @@ torch.save({
      }, 'checkpoint.pth')
 ```
 
+#### Complete - Model checkpoint load Example
+
+```
+model = torchvision.models.resnet50()
+optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
+model.train()
+##################################### code changes ####################################
+model = model.to("xpu")
+##################################### code changes ####################################
+
+checkpoint = torch.load('checkpoint.pth', map_location="xpu")
+model.load_state_dict(checkpoint['model_state_dict'])
+optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+##################################### code changes ####################################
+model, optimizer = torch.xpu.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
+##################################### code changes ####################################
+```
+
 ## Inference
 
-Channels last is a memory layout format that runs well on Intel Architecture. We recommend using this memory layout format for computer vision workloads by invoking `to(memory_format=torch.channels_last)` function against the model object and input data. Refer to [Channels Last](./features/nhwc.md) documentation for more usages such as Channels last 3D and Channels last 1D.
-
 The `optimize` function of Intel® Extension for PyTorch\* applies optimizations to the model, bringing additional performance boosts. For both computer vision workloads and NLP workloads, we recommend applying the `optimize` function against the model object.
-
-`with torch.no_grad():` is used in all examples below. It can be replaced with `with torch.inference_mode():` without a negative performance impact in these examples.
 
 ### Float32
 
@@ -173,9 +190,6 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-model = model.to(memory_format=torch.channels_last)
-data = data.to(memory_format=torch.channels_last)
-
 #################### code changes ####################
 model = model.to("xpu")
 data = data.to("xpu")
@@ -183,7 +197,7 @@ model = torch.xpu.optimize(model, dtype=torch.float32)
 ######################################################
 
 with torch.no_grad():
-  model(data)
+    model(data)
 ```
 
 ##### BERT
@@ -210,7 +224,7 @@ model = torch.xpu.optimize(model, dtype=torch.float32)
 ######################################################
 
 with torch.no_grad():
-  model(data)
+    model(data)
 ```
 
 #### TorchScript Mode
@@ -230,9 +244,6 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-model = model.to(memory_format=torch.channels_last)
-data = data.to(memory_format=torch.channels_last)
-
 #################### code changes ####################
 model = model.to("xpu")
 data = data.to("xpu")
@@ -240,14 +251,14 @@ model = torch.xpu.optimize(model, dtype=torch.float32)
 ######################################################
 
 with torch.no_grad():
-  d = torch.rand(1, 3, 224, 224)
-  ##### code changes #####  
-  d = d.to("xpu")
-  ##### code changes #####  
-  model = torch.jit.trace(model, d)
-  model = torch.jit.freeze(model)
+    d = torch.rand(1, 3, 224, 224)
+    ##### code changes #####  
+    d = d.to("xpu")
+    ##### code changes #####  
+    model = torch.jit.trace(model, d)
+    model = torch.jit.freeze(model)
 
-  model(data)
+    model(data)
 ```
 
 ##### BERT
@@ -274,14 +285,14 @@ model = torch.xpu.optimize(model, dtype=torch.float32)
 ######################################################
 
 with torch.no_grad():
-  d = torch.randint(vocab_size, size=[batch_size, seq_length])
-  ##### code changes #####
-  d = d.to("xpu")
-  ##### code changes #####
-  model = torch.jit.trace(model, (d,), check_trace=False, strict=False)
-  model = torch.jit.freeze(model)
+    d = torch.randint(vocab_size, size=[batch_size, seq_length])
+    ##### code changes #####
+    d = d.to("xpu")
+    ##### code changes #####
+    model = torch.jit.trace(model, (d,), strict=False)
+    model = torch.jit.freeze(model)
 
-  model(data)
+    model(data)
 ```
 
 ### BFloat16
@@ -304,9 +315,6 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-model = model.to(memory_format=torch.channels_last)
-data = data.to(memory_format=torch.channels_last)
-
 #################### code changes ####################
 model = model.to("xpu")
 data = data.to("xpu")
@@ -314,10 +322,10 @@ model = torch.xpu.optimize(model, dtype=torch.bfloat16)
 ######################################################
 
 with torch.no_grad():
-  ################################# code changes ######################################
-  with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16, cache_enabled=False):    
-  ################################# code changes ######################################
-    model(data)
+    ################################# code changes ######################################
+    with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):    
+    ################################# code changes ######################################
+        model(data)
 ```
 
 ##### BERT
@@ -344,10 +352,10 @@ model = torch.xpu.optimize(model, dtype=torch.bfloat16)
 ######################################################
 
 with torch.no_grad():
-  ################################# code changes ######################################
-  with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16, cache_enabled=False):    
-  ################################# code changes ######################################
-    model(data)
+    ################################# code changes ######################################
+    with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):    
+    ################################# code changes ######################################
+        model(data)
 ```
 
 #### TorchScript Mode
@@ -367,9 +375,6 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-model = model.to(memory_format=torch.channels_last)
-data = data.to(memory_format=torch.channels_last)
-
 #################### code changes ####################
 model = model.to("xpu")
 data = data.to("xpu")
@@ -377,13 +382,14 @@ model = torch.xpu.optimize(model, dtype=torch.bfloat16)
 ######################################################
 
 with torch.no_grad():
-  d = torch.rand(1, 3, 224, 224)
-  ################################# code changes ######################################
-  d = d.to("xpu")
-  with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16, cache_enabled=False):     
-  ################################# code changes ######################################
-    model = torch.jit.trace(model, d)
-    model = torch.jit.freeze(model)
+    d = torch.rand(1, 3, 224, 224)
+    ################################# code changes ######################################
+    d = d.to("xpu")
+    with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+    ################################# code changes ######################################
+        model = torch.jit.trace(model, d)
+        model = torch.jit.freeze(model)
+
     model(data)
 ```
 
@@ -411,14 +417,14 @@ model = torch.xpu.optimize(model, dtype=torch.bfloat16)
 ######################################################
 
 with torch.no_grad():
-  d = torch.randint(vocab_size, size=[batch_size, seq_length])
-  ################################# code changes ######################################
-  d = d.to("xpu")
-  with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16, cache_enabled=False):     
-  ################################# code changes ######################################
-    model = torch.jit.trace(model, (d,), check_trace=False, strict=False)
-    model = torch.jit.freeze(model)
-    
+    d = torch.randint(vocab_size, size=[batch_size, seq_length])
+    ################################# code changes ######################################
+    d = d.to("xpu")
+    with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):     
+    ################################# code changes ######################################
+        model = torch.jit.trace(model, (d,), strict=False)
+        model = torch.jit.freeze(model)
+
     model(data)
 ```
 ### Float16
@@ -441,9 +447,6 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-model = model.to(memory_format=torch.channels_last)
-data = data.to(memory_format=torch.channels_last)
-
 #################### code changes ####################
 model = model.to("xpu")
 data = data.to("xpu")
@@ -451,10 +454,10 @@ model = torch.xpu.optimize(model, dtype=torch.float16)
 ######################################################
 
 with torch.no_grad():
-  ################################# code changes ######################################
-  with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16, cache_enabled=False):    
-  ################################# code changes ######################################
-    model(data)
+    ################################# code changes ######################################
+    with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16):    
+    ################################# code changes ######################################
+        model(data)
 ```
 
 ##### BERT
@@ -481,10 +484,10 @@ model = torch.xpu.optimize(model, dtype=torch.float16)
 ######################################################
 
 with torch.no_grad():
-  ################################# code changes ######################################
-  with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16, cache_enabled=False):    
-  ################################# code changes ######################################
-    model(data)
+    ################################# code changes ######################################
+    with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16):    
+    ################################# code changes ######################################
+        model(data)
 ```
 
 #### TorchScript Mode
@@ -504,9 +507,6 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-model = model.to(memory_format=torch.channels_last)
-data = data.to(memory_format=torch.channels_last)
-
 #################### code changes ####################
 model = model.to("xpu")
 data = data.to("xpu")
@@ -514,13 +514,14 @@ model = torch.xpu.optimize(model, dtype=torch.float16)
 ######################################################
 
 with torch.no_grad():
-  d = torch.rand(1, 3, 224, 224)
-  ################################# code changes ######################################
-  d = d.to("xpu")
-  with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16, cache_enabled=False):
-  ################################# code changes ######################################
-    model = torch.jit.trace(model, d)
-    model = torch.jit.freeze(model)
+    d = torch.rand(1, 3, 224, 224)
+    ################################# code changes ######################################
+    d = d.to("xpu")
+    with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16):
+    ################################# code changes ######################################
+        model = torch.jit.trace(model, d)
+        model = torch.jit.freeze(model)
+
     model(data)
 ```
 
@@ -548,14 +549,14 @@ model = torch.xpu.optimize(model, dtype=torch.float16)
 ######################################################
 
 with torch.no_grad():
-  d = torch.randint(vocab_size, size=[batch_size, seq_length])
-  ################################# code changes ######################################
-  d = d.to("xpu")
-  with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16, cache_enabled=False):
-  ################################# code changes ######################################
-    model = torch.jit.trace(model, (d,), check_trace=False, strict=False)
-    model = torch.jit.freeze(model)
-    
+    d = torch.randint(vocab_size, size=[batch_size, seq_length])
+    ################################# code changes ######################################
+    d = d.to("xpu")
+    with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16):
+    ################################# code changes ######################################
+        model = torch.jit.trace(model, (d,), strict=False)
+        model = torch.jit.freeze(model)
+
     model(data)
 ```
 
