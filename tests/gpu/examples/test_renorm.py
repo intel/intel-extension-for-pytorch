@@ -5,6 +5,7 @@ import pytest
 
 
 class TestNNMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_renorm_float32(self, dtype=torch.float32):
         x_cpu = torch.ones(3, 3).to(dtype=dtype)
 

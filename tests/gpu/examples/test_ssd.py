@@ -1,10 +1,12 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
+import pytest
 import intel_extension_for_pytorch  # noqa
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_locations_to_boxes(self, dtype=torch.float):
         """
         Small ops fusion for location box conversion in SSD-MobileNetv1.

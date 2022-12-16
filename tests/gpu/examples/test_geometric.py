@@ -6,6 +6,7 @@ from torch.testing._internal.common_dtype import (
    get_all_fp_dtypes, get_all_int_dtypes)
 from torch.testing._internal.common_device_type import dtypes
 
+import pytest
 import intel_extension_for_pytorch  # noqa
 import numpy as np
 
@@ -38,11 +39,12 @@ class TestTorchMethod(TestCase):
         self.assertEqual(a.dtype, dtype)
         self.assertEqual(a.size(), torch.Size([1]))
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     @dtypes(torch.float)
     def test_geometric_kstest(self, dtype=torch.int8):
 
         device = sycl_device
-        # Add the manual_seed, for tests in experiment folder, this 
+        # Add the manual_seed, for tests in experiment folder, this
         # seed would be set globally.
         torch.xpu.manual_seed(1234)
         from scipy import stats

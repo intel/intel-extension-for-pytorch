@@ -4,6 +4,7 @@ import copy
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 
+import pytest
 import intel_extension_for_pytorch # noqa
 
 cpu_device = torch.device('cpu')
@@ -11,6 +12,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_lstm(self, dtype=torch.float):
         rnn = nn.LSTM(2, 4, 2, bidirectional=True)
 
@@ -111,7 +113,8 @@ class TestNNMethod(TestCase):
         self.assertEqual(output_cpu, output_xpu.cpu())
         self.assertEqual(hy_cpu, hy_xpu.cpu())
         self.assertEqual(cy_cpu, cy_xpu.cpu())
-
+    
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_lstm_rnnt(self, dtype=torch.float):
         rnn = nn.LSTM(240, 1024, num_layers=2)
         rnn_xpu = copy.deepcopy(rnn).to("xpu")
@@ -182,7 +185,8 @@ class TestNNMethod(TestCase):
             self.assertEqual(input.grad, input_xpu.grad.cpu())
             self.assertEqual(h0.grad, h0_xpu.grad.cpu())
             self.assertEqual(c0.grad, c0_xpu.grad.cpu())
-
+    
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_lstm_bf16(self, dtype=torch.bfloat16):
         rnn = nn.LSTM(320, 320, num_layers=2)
         rnn_xpu = copy.deepcopy(rnn).to("xpu").to(torch.bfloat16)
