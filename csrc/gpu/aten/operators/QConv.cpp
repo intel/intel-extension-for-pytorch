@@ -56,36 +56,54 @@ struct QuantizeConvConverter {
 
   template <typename Func>
   at::Tensor call(const at::Tensor& input, Func func) {
+    // make sure input/weight/output are contiguous or ChannelsLast congituous
+    at::MemoryFormat mfmt = get_tensor_format_for_conv(input, weight_);
+    auto input_ctx = DPCPPTensorContext::get_tensor_ctx(input);
+    auto weight_ctx = DPCPPTensorContext::get_tensor_ctx(weight_);
+    Tensor input_ = input_ctx.is_plain() ? input.contiguous(mfmt) : input;
+    weight_ = weight_ctx.is_plain() ? weight_.contiguous(mfmt) : weight_;
+    at::Tensor output_ = quantizedEmptyTensorFromInput(input_);
+
     Attr att = func();
-    at::Tensor output = quantizedEmptyTensorFromInput(input);
-    output = convolution(
-        output,
-        input,
+    output_ = quantized_convolution(
+        output_,
+        input_,
         weight_,
-        Tensor(),
         padding_.vec(),
         padding_.vec(),
         stride_.vec(),
         dilation_.vec(),
         groups_,
         att);
-    return output;
+    return output_;
   }
 
   template <typename Func>
   at::Tensor call(const at::Tensor& input, at::Tensor& output, Func func) {
+    // make sure input/weight are contiguous or ChannelsLast congituous
+    at::MemoryFormat mfmt = get_tensor_format_for_conv(input, weight_);
+    auto input_ctx = DPCPPTensorContext::get_tensor_ctx(input);
+    auto weight_ctx = DPCPPTensorContext::get_tensor_ctx(weight_);
+    Tensor input_ = input_ctx.is_plain() ? input.contiguous(mfmt) : input;
+    weight_ = weight_ctx.is_plain() ? weight_.contiguous(mfmt) : weight_;
+    Tensor output_ = output.is_contiguous(mfmt)
+        ? output
+        : quantizedEmptyTensorFromInput(input_);
+
     Attr att = func();
-    output = convolution(
-        output,
-        input,
+    output = quantized_convolution(
+        output_,
+        input_,
         weight_,
-        Tensor(),
         padding_.vec(),
         padding_.vec(),
         stride_.vec(),
         dilation_.vec(),
         groups_,
         att);
+    if (!output.is_same(output_)) {
+      output.copy_(output_);
+    }
     set_quantizer_(
         output,
         dpcpp_make_per_tensor_affine_quantizer(
@@ -94,25 +112,6 @@ struct QuantizeConvConverter {
   }
 
   at::Tensor quantizedEmptyTensorFromInput(const at::Tensor& input) {
-    at::MemoryFormat channel_last_fmt;
-    switch (N) {
-      // ChannelsLast1d flag seems not visible in IPEX pre-ci
-      // case 1:
-      //   channel_last_fmt = at::MemoryFormat::ChannelsLast1d;
-      //   break;
-      case 2:
-        channel_last_fmt = at::MemoryFormat::ChannelsLast;
-        break;
-      case 3:
-        channel_last_fmt = at::MemoryFormat::ChannelsLast3d;
-        break;
-      default:
-        AT_ERROR(
-            "QConv.cpp: IPEX dose not support quantized convolution have dimension more than 3.");
-    }
-    mfmt_ = using_channels_last_for_conv(input, weight_)
-        ? channel_last_fmt
-        : at::MemoryFormat::Contiguous;
     return at::_empty_affine_quantized(
         conv_dst_tz(
             input.ndimension(),
@@ -125,7 +124,7 @@ struct QuantizeConvConverter {
         device(at::kXPU).dtype(dtype_),
         q_scale_,
         q_zero_point_,
-        mfmt_);
+        input.suggest_memory_format());
   }
   at::Tensor weight_;
   at::Tensor output_;

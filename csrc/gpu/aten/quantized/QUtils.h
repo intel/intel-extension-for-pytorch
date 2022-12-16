@@ -3,7 +3,6 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
-#include <ATen/cpp_custom_type_hack.h>
 #include <ATen/native/quantized/PackedParams.h>
 #include <torch/custom_class.h>
 #include <torch/custom_class_detail.h>
@@ -11,18 +10,14 @@
 #include <torch/custom_class.h>
 #include <utils/Macros.h>
 
+#include <oneapi/dnnl/dnnl.hpp>
 #include <operators/comm/Numerics.h>
 #include <runtime/Utils.h>
+#include <tensor/Tensor.h>
 #include <utils/DPCPP.h>
-
-#include <oneDNN/oneDNN.h>
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
-
-bool is_opaque_u8(const Tensor& qx);
-
-at::Tensor u8tos8(const at::Tensor& u8);
 
 template <typename T>
 inline T Round(const T x) {
@@ -51,6 +46,50 @@ T quantize_val(float scale, int64_t zero_point, float value) {
   qvalue = std::max<int64_t>(qvalue, qmin);
   qvalue = std::min<int64_t>(qvalue, qmax);
   return static_cast<T>(qvalue);
+}
+
+static at::Tensor u8tos8(const at::Tensor& u8) {
+  auto s8 = at::_empty_affine_quantized(
+      u8.sizes(),
+      ScalarType::QInt8,
+      c10::nullopt,
+      u8.device(),
+      c10::nullopt,
+      u8.q_scale(),
+      0,
+      u8.suggest_memory_format());
+
+  auto& dpcpp_queue = xpu::dpcpp::dpcppGetCurrentQueue();
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    uint8_t* u8_ptr = (uint8_t*)u8.data_ptr();
+    int8_t* s8_ptr = (int8_t*)s8.data_ptr();
+    cgh.parallel_for(
+        cl::sycl::range<1>(u8.numel()), [=](cl::sycl::item<1> item) {
+          auto id = item.get_linear_id();
+          auto s8_val = (float)Round(static_cast<float>(u8_ptr[id]) / 2.f);
+          s8_val =
+              Numerics<float>::min(Numerics<float>::max(s8_val, -128.f), 127.f);
+          s8_ptr[id] = static_cast<int8_t>(s8_val);
+        });
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+  return s8;
+}
+
+// Note: [Opaque u8 tensor]
+// Due to the difference between oneDNN and PyTorch u8 quantization, we quant
+// tensor with kQUint8 and 128 zp to memory::data_type::s8 and 0 zp inside. This
+// utils is used for checking this kind of QTensor. More details can see
+// Quantization.cpp quantizer_tensor_per_tenser_affine function.
+static bool is_opaque_u8(const Tensor& qx) {
+  auto qx_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(qx);
+  if (!qx_ctx.is_plain()) {
+    return (
+        (qx.scalar_type() == kQUInt8) &&
+        (qx_ctx.meta().data_type() == dnnl::memory::data_type::s8));
+  } else {
+    return false;
+  }
 }
 
 template <int kSpatialDim>

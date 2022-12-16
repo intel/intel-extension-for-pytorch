@@ -526,6 +526,59 @@ static inline bool using_channels_last_for_conv(
   return (is_smf_channels_last(src) || is_smf_channels_last(weight));
 }
 
+enum MEMORY_LAYOUT_FOR_CONV {
+  ChannelsFirst = 0, // using channels_first for conv computation.
+  ChannelsLast = 1, /// using channels_last for conv computation.
+  Blocked = 2, // using blocked format for conv computation.
+};
+
+static inline int get_memory_layout_for_conv(
+    const at::Tensor& src,
+    const at::Tensor& weight) {
+  if (!src.defined() || src.is_sparse()) {
+    // suggest channels_first
+    return MEMORY_LAYOUT_FOR_CONV::ChannelsFirst;
+  }
+
+  if (Settings::I().is_onednn_layout_enabled()) {
+    // suggest blocked
+    return MEMORY_LAYOUT_FOR_CONV::Blocked;
+  }
+
+  auto suggest_channels_last_format =
+      (is_smf_channels_last(src) || is_smf_channels_last(weight));
+  if (suggest_channels_last_format) {
+    // suggest channels_last
+    return MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
+  }
+
+  // inference workloads on ATSM platform, the conv will use blocked format
+  // used double support to distinguish is atsm or not
+  auto suggest_block_format = !dpcppSupportFP64() // on ATSM platform
+      && (c10::InferenceMode::is_enabled() ||
+          !at::GradMode::is_enabled()); // for inference workload
+  if (suggest_block_format) {
+    // suggest blocked
+    return MEMORY_LAYOUT_FOR_CONV::Blocked;
+  }
+
+  // suggest channels_last
+  return MEMORY_LAYOUT_FOR_CONV::ChannelsFirst;
+}
+
+static inline at::MemoryFormat get_tensor_format_for_conv(
+    const at::Tensor& src,
+    const at::Tensor& weight) {
+  at::MemoryFormat mfmt;
+  if (get_memory_layout_for_conv(src, weight) ==
+      MEMORY_LAYOUT_FOR_CONV::ChannelsLast) {
+    mfmt = get_cl_tag_by_ndim(src.ndimension());
+  } else {
+    mfmt = at::MemoryFormat::Contiguous;
+  }
+  return mfmt;
+}
+
 static inline bool using_channels_last_for_onednn_op(const at::Tensor& input) {
   const auto ndim = input.ndimension();
   if (ndim == 2) {
