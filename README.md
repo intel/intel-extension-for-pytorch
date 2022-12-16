@@ -90,7 +90,7 @@ Code organization
     │       ├── gpu                 // GPU JIT passes and patterns
     │       └── passes              // Common passes
     ├── docs                        // Documentation
-    │   ├── images                  // Document inline images 
+    │   ├── images                  // Document inline images
     │   └── tutorials               // Tutorials, guideline and feature documents
     ├── intel_extension_for_pytorch // Frontend Python layer
     │   ├── cpu                     // CPU frontend APIs
@@ -191,7 +191,7 @@ If you still meet the similar issue which cannot open shared object file not lis
 1.  Download source code of corresponding PyTorch
 
 ```bash
-git clone https://github.com/intel-innersource/frameworks.ai.pytorch.private-gpu -b pytorch-1.10
+git clone https://github.com/intel-innersource/frameworks.ai.pytorch.private-gpu -b pytorch-1.13
 cd frameworks.ai.pytorch.private-gpu
 git submodule update --init --recursive
 ```
@@ -406,7 +406,7 @@ This release uses clang-format and flake8 to enhance the code in Intel® Extensi
 ResNet50, BERT, CosmicTagger training are verified with DDP on PVC B4. For supporting this scenario, oneCCL Bindings for PyTorch\* based on oneCCL 2021.8-eng02 version shall be built and used.
 
 ```bash
-git clone -b torch-ccl-xpu-1.10-rc2 https://github.com/intel-innersource/frameworks.ai.pytorch.torch-ccl.git
+git clone -b torch-ccl-xpu-1.13.100-rc1 https://github.com/intel-innersource/frameworks.ai.pytorch.torch-ccl.git
 git submodule update --init --recursive
 COMPUTE_BACKEND=dpcpp python setup.py install
 ```
@@ -554,16 +554,16 @@ The output from BERT training model looks like (omitting some columns and rows):
 
 ```bash
 #---------------------------- ----------  ----------    ----------    ----------  ------------  ----------     ----------     ---------   ------------   ------------
-# Name                         Self CPU %  Self CPU       CPU total %  CPU total  CPU time avg    Self XPU       Self XPU %     XPU total  XPU time avg    # of Calls  
+# Name                         Self CPU %  Self CPU       CPU total %  CPU total  CPU time avg    Self XPU       Self XPU %     XPU total  XPU time avg    # of Calls
 #---------------------------- ----------  ----------    ----------    ----------  ------------  ----------     ----------     ---------   ------------   ------------
-# aten::mm                      15.06%     122.520ms        15.49%     126.016ms     431.563us     172.356ms        24.70%     172.356ms     590.262us           292  
-# aten::bmm                     5.35%      43.484ms         5.58%      45.342ms     314.877us      70.894ms        10.16%      70.894ms     492.318us           144  
-# aten::addmm                   5.00%      40.692ms         5.16%      41.965ms     285.478us      64.013ms         9.17%      64.013ms     435.461us           147  
-# bernoulliDistr                0.28%       2.303ms         0.28%       2.303ms      31.541us      36.179ms         5.18%      36.179ms     495.599us            73  
-# aten::_fused_dropout          0.85%       6.915ms         1.23%      10.004ms     137.045us      35.081ms         5.03%      71.260ms     976.164us            73  
-# dnnl_reorder                  7.01%      57.012ms         7.06%      57.433ms     297.579us      30.084ms         4.31%      30.084ms     155.876us           193  
-# transformer_adamWMasterWeight 2.01%      16.347ms         2.07%      16.874ms      42.827us      25.825ms         3.70%      25.825ms      65.546us           394  
-# aten::norm                    5.31%      43.159ms         5.55%      45.163ms     114.337us      22.140ms         3.17%      22.140ms      56.051us           395  
+# aten::mm                     15.06%     122.520ms        15.49%     126.016ms     431.563us     172.356ms        24.70%     172.356ms     590.262us           292
+# aten::bmm                     5.35%      43.484ms         5.58%      45.342ms     314.877us      70.894ms        10.16%      70.894ms     492.318us           144
+# aten::addmm                   5.00%      40.692ms         5.16%      41.965ms     285.478us      64.013ms         9.17%      64.013ms     435.461us           147
+# bernoulliDistr                0.28%       2.303ms         0.28%       2.303ms      31.541us      36.179ms         5.18%      36.179ms     495.599us            73
+# aten::_fused_dropout          0.85%       6.915ms         1.23%      10.004ms     137.045us      35.081ms         5.03%      71.260ms     976.164us            73
+# dnnl_reorder                  7.01%      57.012ms         7.06%      57.433ms     297.579us      30.084ms         4.31%      30.084ms     155.876us           193
+# transformer_adamWMasterWeight 2.01%      16.347ms         2.07%      16.874ms      42.827us      25.825ms         3.70%      25.825ms      65.546us           394
+# aten::norm                    5.31%      43.159ms         5.55%      45.163ms     114.337us      22.140ms         3.17%      22.140ms      56.051us           395
 #---------------------------- ----------  ----------    ----------    ----------  ------------  ----------     ----------     ---------   ------------   ------------
 # Self CPU time total: 813.282ms
 # XPU time total: 697.936ms
@@ -617,20 +617,14 @@ This issue appears when Intel® Extension for PyTorch\* is compiled with \_GLIBC
 
 User shall update PyTorch CMAKE file to set \_GLIBCXX_USE_CXX11_ABI=1 and compile PyTorch with particular compiler which supports \_GLIBCXX_USE_CXX11_ABI=1. We recommend to use gcc version 9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04) on ubuntu 20.04 which is validated by us. <br>
 
-This issue won't exist with future version of PyTorch as community agrees to provide \_GLIBCXX_USE_CXX11_ABI=1 binary for versions after PyTorch 1.10. 
+This issue won't exist with future version of PyTorch as community agrees to provide \_GLIBCXX_USE_CXX11_ABI=1 binary for versions after PyTorch 1.13.
 
 ### 3. Distributed Training Issues:
 
 #### ResNet50 training with Horovod
 
-Explicit scaling of ResNet50 training with Horovod hang on 2-cards PVC B4 (XDEPS-4646). This was identified as driver issue. 
+Explicit scaling of ResNet50 training with Horovod hang on 2-cards PVC B4 (XDEPS-4646). This was identified as driver issue.
 
 #### BERT training with DDP
 
 Explicit scaling of BERT training with DDP hang on 2-cards PVC B4 (PYTORCHDGQ-1768). This issue disappeared when roll back driver from agama-ci-prerelease-522 to agama-ci-prerelease-438. The root cause is still under investigation.
-
-### 4. UT failures:
-
-#### test_groupnorm_channels_last.py AssertionError
-
-test_groupnorm_channels_last.py AssertionError (MFDNN-8290) was identified as HW bug related to alignment for 2D messages and was fixed in oneDNN master. We will uplift oneDNN in IPEX master to get such fix.
