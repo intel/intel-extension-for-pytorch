@@ -91,11 +91,9 @@ void PrepareDequantForLLGA(std::shared_ptr<Graph>& graph) {
 void addInformationForDequant(Node* node, Node* input_node) {
   if (input_node->kind() == Symbol::aten("quantize_per_tensor")) {
     node->s_(Symbol::attr("qtype"), std::string("per_tensor"));
-
-    std::vector<int64_t> zps_vector = Operator::IntToVector(input_node, 2);
+    auto zps_vector = utils::getZPSVector(input_node);
     node->is_(Symbol::attr("zps"), zps_vector);
-
-    double scale = Operator::Float(input_node, 1);
+    auto scale = utils::getScale(input_node);
     node->fs_(Symbol::attr("scales"), {scale});
   } else if (input_node->kind() == Symbol::aten("quantize_per_channel")) {
     node->s_(Symbol::attr("qtype"), std::string("per_channel"));

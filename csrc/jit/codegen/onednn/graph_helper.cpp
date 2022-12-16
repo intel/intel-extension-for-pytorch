@@ -38,16 +38,24 @@ c10::optional<size_t> getDimensions(Value* v) {
 // contiguous
 std::vector<float> FloatTensorToVector(const at::Tensor& tensor) {
   std::vector<float> vectors;
-  for (int i = 0; i < tensor.numel(); i++) {
-    vectors.push_back(tensor[i].item().toFloat());
+  if (tensor.numel() == 1) {
+    vectors.push_back(tensor.item().toFloat());
+  } else {
+    for (int i = 0; i < tensor.numel(); i++) {
+      vectors.push_back(tensor[i].item().toFloat());
+    }
   }
   return vectors;
 }
 
 std::vector<int64_t> IntTensorToVector(const at::Tensor& tensor) {
   std::vector<int64_t> vectors;
-  for (int i = 0; i < tensor.numel(); i++) {
-    vectors.push_back(tensor[i].item().toInt());
+  if (tensor.numel() == 1) {
+    vectors.push_back(tensor.item().toInt());
+  } else {
+    for (int i = 0; i < tensor.numel(); i++) {
+      vectors.push_back(tensor[i].item().toInt());
+    }
   }
   return vectors;
 }
@@ -88,18 +96,16 @@ Operator makeBinaryOp(Node* node, opkind kind) {
 Operator makeDequantOp(Node* node, Node* input_node) {
   if (input_node->kind() == Symbol::aten("quantize_per_tensor")) {
     node->s_(Symbol::attr("qtype"), std::string("per_tensor"));
-
-    std::vector<int64_t> zps_vector = Operator::IntToVector(input_node, 2);
+    auto zps_vector = utils::getZPSVector(input_node);
     node->is_(Symbol::attr("zps"), zps_vector);
-
-    double scale = Operator::Float(input_node, 1);
+    auto scale = utils::getScale(input_node);
     node->fs_(Symbol::attr("scales"), {scale});
     return Operator(node, opkind::Dequantize)
         .setInput(0)
         .setOutput(0)
-        .setAttr("scales", Operator::FloatToVector(input_node, 1))
-        .setAttr("zps", Operator::IntToVector(input_node, 2))
-        .setAttr("qtype", std::string("per_tensor"));
+        .setAttr("qtype", std::string("per_tensor"))
+        .setAttr("scales", std::vector<float>{scale})
+        .setAttr("zps", zps_vector);
   } else if (input_node->kind() == Symbol::aten("quantize_per_channel")) {
     node->s_(Symbol::attr("qtype"), std::string("per_channel"));
     node->t_(Symbol::attr("zps"), Operator::Tensor(input_node, 2));
