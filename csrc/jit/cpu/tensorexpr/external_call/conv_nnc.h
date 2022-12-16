@@ -81,11 +81,11 @@ void nncConv(
   c10::ScalarType output_dtype =
       static_cast<c10::ScalarType>(buf_dtypes[output_buf_idx]);
   ideep::memory::data_type dst_dtype =
-      op_context->get_context().conv_params_.pd.dst_desc().data_type();
+      op_context->get_context().conv_params_.pd.dst_desc().get_data_type();
 
   bool use_fast_path = false;
   if (input_buf_dims_vec ==
-          op_context->get_context().conv_params_.pd.src_desc().dims() &&
+          op_context->get_context().conv_params_.pd.src_desc().get_dims() &&
       omp_get_max_threads() ==
           op_context->get_context().conv_params_.pd_use_threads &&
       ((output_dtype == at::ScalarType::BFloat16 &&

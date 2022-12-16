@@ -136,7 +136,7 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor>& input) {
   op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 
   auto pd = ideep::matmul_forward::primitive_desc(
-      {lhs_desc, rhs_desc, res_desc}, op_attr, ideep::engine::cpu_engine());
+      ideep::engine::cpu_engine(), lhs_desc, rhs_desc, res_desc, op_attr);
 
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
     T cat_buf[feature_nums * feature_size] __attribute__((aligned(64)));
@@ -210,7 +210,7 @@ inline std::vector<at::Tensor> _interaction_backward(
   op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 
   auto pd = ideep::matmul_forward::primitive_desc(
-      {lhs_desc, rhs_desc, res_desc}, op_attr, ideep::engine::cpu_engine());
+      ideep::engine::cpu_engine(), lhs_desc, rhs_desc, res_desc, op_attr);
 
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
     auto mm_elems = feature_nums * feature_nums;

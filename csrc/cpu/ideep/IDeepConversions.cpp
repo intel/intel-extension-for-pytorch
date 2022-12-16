@@ -222,12 +222,13 @@ at::Tensor mkldnn_to_dense(
 at::Tensor empty_aten_tensor_from_desc(
     const ideep::tensor::desc& desc,
     const at::TensorOptions& options) {
-  auto ndims = desc.data.ndims;
-  auto nblks = desc.blocking_desc().inner_nblks;
+  auto ndims = dynamic_cast<const dnnl::memory::desc*>(&desc)
+                   ->get_ndims(); // desc.data.ndims;
+  auto nblks = desc.get_inner_nblks(); // desc.blocking_desc().inner_nblks;
   std::vector<int64_t> at_sizes(ndims + nblks);
-  auto padded_dims = desc.padded_dims();
-  auto blk_sizes = desc.blocking_desc().inner_blks;
-  auto blk_idxs = desc.blocking_desc().inner_idxs;
+  auto padded_dims = desc.get_padded_dims();
+  auto blk_sizes = desc.get_inner_blks(); // desc.blocking_desc().inner_blks;
+  auto blk_idxs = desc.get_inner_idxs(); // desc.blocking_desc().inner_idxs;
   std::vector<int64_t> blk_size_per_dim(ndims, 1);
   for (auto i = 0; i < nblks; i++) {
     at_sizes[i + ndims] = blk_sizes[i];
