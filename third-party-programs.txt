@@ -17,6 +17,8 @@ below.
    dlpack
    Copyright 2017 by Contributors
 
+   flatbuffers
+
    gemmlowp
 
    Horovod
@@ -238,7 +240,7 @@ below.
 2. llvm
    Copyright (c) 2003-2019 University of Illinois at Urbana-Champaign.
    All rights reserved.
-
+   
 ==============================================================================
 The LLVM Project is under the Apache License v2.0 with LLVM Exceptions:
 ==============================================================================
@@ -519,7 +521,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH THE
 SOFTWARE.
 
 -------------------------------------------------------------
-3. oneAPI DPC++ Library (oneDPL)
+3. oneAPI DPC++ Library (oneDPL) 
 
                                  Apache License
                            Version 2.0, January 2004
@@ -751,15 +753,15 @@ Software.
    Copyright (c) 2015-2017, Georgia Institute of Technology
    All rights reserved.
 
-   pythreadpool
+   pythreadpool    
    Copyright 2019 Google LLC
    Copyright (c) 2017 Facebook Inc.
    Copyright (c) 2015-2017 Georgia Institute of Technology
    All rights reserved.
 
    python-peachpy
-   Copyright (c) 2017, Facebook Inc.
-   Copyright (c) 2013-2017, Georgia Institute of Technology
+   Copyright (c) 2017, Facebook Inc. 
+   Copyright (c) 2013-2017, Georgia Institute of Technology 
    All rights reserved.
 
 
@@ -786,7 +788,10 @@ Software.
    OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -------------------------------------------------------------
-5. ios-cmake
+5. cutlass
+   Copyright (c) 2017 - 2022 NVIDIA CORPORATION & AFFILIATES.
+
+   ios-cmake
    Copyright (c) 2011-2014, Andrew Fischer <andrew@ltengsoft.com>
    Copyright (c) 2016, Bogdan Cristea <cristeab@gmail.com>
    Copyright (c) 2017, Yangqing Jia <me@daggerfs.com>
@@ -799,7 +804,7 @@ Software.
    Copyright (C) 2010-2018 Max-Planck-Society All rights reserved.
 
    torchvision
-   Copyright (c) Soumith Chintala 2016,
+   Copyright (c) Soumith Chintala 2016, 
    All rights reserved.
 
 
@@ -829,7 +834,7 @@ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
 SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.   
 
 -------------------------------------------------------------
 6. Facebook pytorch
@@ -852,23 +857,23 @@ Copyright (c) 2016-present, Facebook Inc. All rights reserved.
 
 All contributions by Facebook:
 Copyright (c) 2016 Facebook Inc.
-
+ 
 All contributions by Google:
 Copyright (c) 2015 Google Inc.
 All rights reserved.
-
+ 
 All contributions by Yangqing Jia:
 Copyright (c) 2015 Yangqing Jia
 All rights reserved.
-
+ 
 All contributions from Caffe:
 Copyright(c) 2013, 2014, 2015, the respective contributors
 All rights reserved.
-
+ 
 All other contributions:
 Copyright(c) 2015, 2016 the respective contributors
 All rights reserved.
-
+ 
 Caffe2 uses a copyright model similar to Caffe: each contributor holds
 copyright over their contributions to Caffe2. The project versioning records
 all such contribution and copyright details. If a contributor wants to further
@@ -920,14 +925,14 @@ POSSIBILITY OF SUCH DAMAGE.
    Copyright (c) Microsoft Corporation. (The Azure AI Platform team)
 
    QNNPACK
-   Copyright (c) Facebook, Inc. and its affiliates.
+   Copyright (c) Facebook, Inc. and its affiliates. 
    All rights reserved.
 
    tensorpipe
    Copyright (c) Facebook, Inc. and its affiliates. All rights reserved.
 
    XNNPACK
-   Copyright (c) Facebook, Inc. and its affiliates.
+   Copyright (c) Facebook, Inc. and its affiliates. 
    All rights reserved.
    Copyright 2019 Google LLC
 
@@ -1305,7 +1310,7 @@ external contributions to this project including patches, pull requests, etc.
 
 -------------------------------------------------------------
 15. neon2sse
-
+   
    created by Victoria Zhislina, the Senior Application Engineer, Intel Corporation,  victoria.zhislina@intel.com
 
    *** Copyright (C) 2012-2020 Intel Corporation.  All rights reserved.
@@ -1337,7 +1342,7 @@ external contributions to this project including patches, pull requests, etc.
    the use of this software, even if advised of the possibility of such damage.
 
 -------------------------------------------------------------
-16. sleef
+16. sleef   
     Boost Software License - Version 1.0 - August 17th, 2003
 
    Permission is hereby granted, free of charge, to any person or organization
@@ -1367,27 +1372,23 @@ external contributions to this project including patches, pull requests, etc.
 17. oneAPI Math Kernel Library (oneMKL)
     Copyright Intel Corporation
 
-Intel Simplified Software License (Version August 2021)
+Intel Simplified Software License (Version October 2022)
 
-Use and Redistribution.  You may use and redistribute the software (the “Software”), without modification, provided the following conditions are met:
+Use and Redistribution.  You may use and redistribute the software, which is provided in binary form only, (the “Software”), without modification, provided the following conditions are met:
 
-* Redistributions must reproduce the above copyright notice and the
-following terms of use in the Software and in the documentation and/or other materials provided with the distribution.
-* Neither the name of Intel nor the names of its suppliers may be used to
-  endorse or promote products derived from this Software without specific
-  prior written permission.
-* No reverse engineering, decompilation, or disassembly of this Software
-  is permitted.
+* 	Redistributions must reproduce the above copyright notice and these terms of use in the Software and in the documentation and/or other materials provided with the distribution.
+* 	Neither the name of Intel nor the names of its suppliers may be used to endorse or promote products derived from this Software without specific prior written permission.
+* 	No reverse engineering, decompilation, or disassembly of the Software is permitted, nor any modification or alteration of the Software or its operation at any time, including during execution.
 
 No other licenses.  Except as provided in the preceding section, Intel grants no licenses or other rights by implication, estoppel or otherwise to, patent, copyright, trademark, trade name, service mark or other intellectual property licenses or rights of Intel.
 
-Third party software.  The Software may contain Third Party Software. “Third Party Software” is open source software, third party software, or other Intel software that may be identified in the Software itself or in the files (if any) listed in the “third-party-software.txt” or similarly named text file included with the Software. Third Party Software, even if included with the distribution of the Software, may be governed by separate license terms, including without limitation, open source software license terms, third party software license terms, and other Intel software license terms. Those separate license terms solely govern your use of the Third Party Software, and nothing in this license limits any rights under, or grants rights that supersede, the terms of the applicable license terms.
+Third party software.  “Third Party Software” means the files (if any) listed in the “third-party-software.txt” or other similarly-named text file that may be included with the Software. Third Party Software, even if included with the distribution of the Software, may be governed by separate license terms, including without limitation, third party license terms, open source software notices and terms, and/or other Intel software license terms. These separate license terms solely govern Your use of the Third Party Software.
 
 DISCLAIMER.  THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT ARE DISCLAIMED. THIS SOFTWARE IS NOT INTENDED FOR USE IN SYSTEMS OR APPLICATIONS WHERE FAILURE OF THE SOFTWARE MAY CAUSE PERSONAL INJURY OR DEATH AND YOU AGREE THAT YOU ARE FULLY RESPONSIBLE FOR ANY CLAIMS, COSTS, DAMAGES, EXPENSES, AND ATTORNEYS’ FEES ARISING OUT OF ANY SUCH USE, EVEN IF ANY CLAIM ALLEGES THAT INTEL WAS NEGLIGENT REGARDING THE DESIGN OR MANUFACTURE OF THE SOFTWARE.
 
 LIMITATION OF LIABILITY. IN NO EVENT WILL INTEL BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-No support.  Intel may make changes to the Software, at any time without notice, and is not obligated to support, update or provide training for the Software.
+No support.  Intel may make changes to the Software, at any time without notice, and is not obligated to support, update or provide training for the Software. 
 
 Termination. Your right to use the Software is terminated in the event of your breach of this license.
 
@@ -1395,8 +1396,7 @@ Feedback.  Should you provide Intel with comments, modifications, corrections, e
 
 Compliance with laws.  You agree to comply with all relevant laws and regulations governing your use, transfer, import or export (or prohibition thereof) of the Software.
 
-Governing law.  All disputes will be governed by the laws of the United States of America and the State of Delaware without reference to conflict of law principles and subject to the exclusive jurisdiction of the state or federal courts sitting in the State of Delaware, and each party agrees that it submits to the personal jurisdiction and venue of those courts and waives any objections. The United Nations Convention on Contracts for the International Sale of Goods (1980) is specifically excluded and will not apply to the Software.
-
+Governing law.  All disputes will be governed by the laws of the United States of America and the State of Delaware without reference to conflict of law principles and subject to the exclusive jurisdiction of the state or federal courts sitting in the State of Delaware, and each party agrees that it submits to the personal jurisdiction and venue of those courts and waives any objections. THE UNITED NATIONS CONVENTION ON CONTRACTS FOR THE INTERNATIONAL SALE OF GOODS (1980) IS SPECIFICALLY EXCLUDED AND WILL NOT APPLY TO THE SOFTWARE.
 
 
 -------------------------------------------------------------
@@ -1418,7 +1418,10 @@ Governing law.  All disputes will be governed by the laws of the United States o
    ideep
    Copyright (c) 2018 Intel Corporation.
 
-   miniz-2.0.8
+   json
+   Copyright (c) 2013-2022 Niels Lohmann
+
+   miniz-2.1.0
    Copyright 2013-2014 RAD Game Tools and Valve Software
    Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
    All Rights Reserved.
@@ -1431,7 +1434,11 @@ Governing law.  All disputes will be governed by the laws of the United States o
    python-six
    Copyright (c) 2010-2020 Benjamin Peterson
 
-   Permission is hereby granted, free of charge, to any person obtaining a copy of
+   VulkanMemoryAllocator
+   Copyright (c) 2017-2022 Advanced Micro Devices, Inc. 
+   All rights reserved.
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy of  
    this software and associated documentation files (the "Software"), to deal in
    the Software without restriction, including without limitation the rights to
    use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
@@ -1448,7 +1455,7 @@ Governing law.  All disputes will be governed by the laws of the United States o
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
--------------------------------------------------------------
+------------------------------------------------------------- 
 19. fmt
     Copyright (c) 2012 - present, Victor Zverovich
 
