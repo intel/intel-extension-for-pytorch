@@ -47,7 +47,8 @@ class TestNNMethod(TestCase):
         self.assertEqual(x.is_contiguous(), x_rep.is_contiguous())
         self.assertEqual(
             torch.xpu.is_contiguous_channels_last_1d(x), torch.xpu.is_contiguous_channels_last_1d(x_rep))
-
+    
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_memory_format_operators(self):
         def _chunk_op(x, y):
             x1, x2 = x.chunk(2, dim=1)
@@ -239,7 +240,8 @@ class TestNNMethod(TestCase):
             random.shuffle(permutation)
             x = x.permute(permutation)
             self.assertEqual(x.stride(), transformation_fn(x, memory_format=torch.preserve_format).stride())
-
+    
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_memory_format_to(self):
         def get_generator(shape):
             def input_generator_fn():
@@ -253,6 +255,7 @@ class TestNNMethod(TestCase):
         self._test_memory_format_transformations(
             get_generator(shape), transformation_fn, default_is_preserve=True)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_memory_format_type(self):
         def get_generator(shape):
             def input_generator_fn():
@@ -278,7 +281,8 @@ class TestNNMethod(TestCase):
         shape = (4, 3, 8)
         self._test_memory_format_transformations(
             get_generator(shape), transformation_fn, default_is_preserve=True)
-
+    
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_memory_format_type_shortcuts(self):
         def get_generator(shape, dtype):
             def input_generator_fn():

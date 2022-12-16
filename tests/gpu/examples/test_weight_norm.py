@@ -50,7 +50,7 @@ class TestNNMethod(TestCase):
         check_weight_norm(torch.nn.LSTM(32, 32).to("xpu"), 'weight_ih_l0', 4)
         check_weight_norm(torch.nn.LSTM(32, 32, proj_size=16).to("xpu"), 'weight_hr_l0', 5)
 
-
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_weight_norm(self):
         input = torch.randn(3, 5).to('xpu')
         m = nn.Linear(5, 7).to('xpu')

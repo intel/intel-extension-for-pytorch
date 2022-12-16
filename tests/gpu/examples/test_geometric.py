@@ -37,7 +37,8 @@ class TestTorchMethod(TestCase):
         a = torch.tensor([10], dtype=dtype, device=device).geometric_(0.5)
         self.assertEqual(a.dtype, dtype)
         self.assertEqual(a.size(), torch.Size([1]))
-
+    
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     @dtypes(torch.float)
     def test_geometric_kstest(self, dtype=torch.int8):
 

@@ -8,6 +8,7 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_lgamma(self, dtype=torch.float):
         a = np.array([[0.5, 1, 1.5],
                       [2.5, 3, 3.5]])
@@ -26,7 +27,8 @@ class TestTorchMethod(TestCase):
         x_dpcpp.lgamma_()
 
         self.assertEqual(x, x_dpcpp.cpu())
-
+    
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_lgamma_bf16(self, dtype=torch.bfloat16):
         a = np.array([[0.5, 1, 1.5],
                       [2.5, 3, 3.5]])
@@ -45,7 +47,8 @@ class TestTorchMethod(TestCase):
         x_dpcpp.lgamma_()
 
         self.assertEqual(x, x_dpcpp.cpu())
-
+    
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_lgamma_out(self, dtype=torch.float):
         a = np.array([[0.5, 1, 1.5],
                       [2.5, 3, 3.5]])
@@ -77,7 +80,8 @@ class TestTorchMethod(TestCase):
         x.mvlgamma_(2)
         x_dpcpp.mvlgamma_(2)
         self.assertEqual(x, x_dpcpp.cpu())
-
+    
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_mvlgamma_out(self, dtype=torch.float):
         a = np.array([[4.5, 2, 1.5],
                       [2.5, 3, 3.5]])

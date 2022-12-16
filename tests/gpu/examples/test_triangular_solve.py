@@ -29,7 +29,8 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(c, c_xpu.cpu())
         self.assertEqual(d, d_xpu.cpu())
-
+    
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_triangular_solve_double(self, dtype=torch.double):
         a = torch.randn([3, 3, 3]).double()
