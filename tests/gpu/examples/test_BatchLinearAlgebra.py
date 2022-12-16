@@ -238,12 +238,12 @@ class TestTorchMethod(TestCase):
     def test_qr(self, dtype=torch.float):
         def _validate(A, Q, R):
             if Q.size(0) != 0:
-                self.assertEqual(Q @ R, A)
+                self.assertEqual((Q @ R).cpu(), A.cpu())
                 q_size = list(Q.size())
                 q_size[-2] = q_size[-1]
                 diag_tensor = torch.eye(q_size[-1]).expand(q_size)
                 valid_tensor = (Q.transpose(-2, -1) @ Q).round()
-                self.assertEqual(valid_tensor, diag_tensor)
+                self.assertEqual(valid_tensor.cpu(), diag_tensor.cpu())
 
         for size in [(3, 3), (2, 5, 3), (2, 3, 5), (128, 64, 64)]:
             for mode in ["reduced", "r", "complete"]:
