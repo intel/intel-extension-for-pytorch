@@ -379,9 +379,6 @@ def sgd(params: List[Tensor],
     See :class:`~torch.optim.SGD` for details.
     """
 
-    if params[0].device == torch.device('xpu') and maximize:
-        raise RuntimeError('For xpu, the maximize is unsupported for now')
-
     if foreach is None:
         # Placeholder for more complex foreach logic to be added when value is not set
         foreach = False
@@ -445,7 +442,6 @@ def sgd_step(self, closure=None):
                 param2 = get_param2(p, self.params_attr)
                 params2.append(param2)
 
-        # TODO: for torch 1.10, the group['maximize'] and group['foreach'] are temp set False
         sgd(params_with_grad,
             params2,
             d_p_list,
@@ -843,9 +839,6 @@ def adamw(params: List[Tensor],
     r"""Functional API that performs Adam algorithm computation.
     See :class:`~torch.optim.Adam` for details.
     """
-
-    if params[0].device == torch.device('xpu') and maximize:
-        raise RuntimeError('For xpu, the maximize is unsupported for now')
 
     if not all([isinstance(t, torch.Tensor) for t in state_steps]):
         raise RuntimeError("API has changed, `state_steps` argument must contain a list of singleton tensors")
