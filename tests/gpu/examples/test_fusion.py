@@ -388,7 +388,7 @@ class PermuteContiguous(torch.nn.Module):
     def __init__(self) -> None:
         super(PermuteContiguous, self).__init__()
         self.block = nn.Sequential(
-            nn.Conv2d(32, 126, (1, 1))
+            nn.Conv2d(2, 2, (1, 1))
         )
 
     def forward(self, x):
@@ -1173,10 +1173,9 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
 
-    @pytest.mark.skip("quantize convolution have some misalignment with pytorch")
     def test_permute_contiguous_fusion(self, dtype=torch.float):
         model = PermuteContiguous()
-        input_cpu = torch.rand([1, 32, 128, 128])
+        input_cpu = torch.rand([1, 2, 9, 9])
         input_xpu = input_cpu.clone().to("xpu")
 
         torch._C._jit_set_profiling_mode(True)
