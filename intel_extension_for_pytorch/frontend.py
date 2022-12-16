@@ -240,7 +240,7 @@ def optimize(
     perspective it has drawbacks. Running with the ``blocked layout``, oneDNN
     splits one or several dimensions of data into blocks with fixed size each
     time the operator is executed. More details information about oneDNN data
-    mermory format is available at `oneDNN manual 
+    mermory format is available at `oneDNN manual
     <https://oneapi-src.github.io/oneDNN/dev_guide_understanding_memory_formats.html>`_.
     To reduce this overhead, data will be converted to predefined block shapes
     prior to the execution of oneDNN operator execution. In runtime, if the data
@@ -325,8 +325,9 @@ def optimize(
 
     .. warning::
 
-        Please invoke ``optimize`` function AFTER loading weights to model via
-        ``model.load_state_dict(torch.load(PATH))``.
+        Please invoke this ``optimize`` utility AFTER loading state_dict and its
+        optimizer for original model by ``model.load_state_dict(torch.load(PATH))`` and
+        ``optimizer.load_state_dict(torch.load(PATH))``.
 
     .. warning::
 
@@ -399,6 +400,7 @@ def optimize(
             device_type = 'xpu'
 
     global auto_channels_last
+
     def xpu_check_channel_last():
         global auto_channels_last
         if auto_channels_last.value == auto_channels_last_flag.ENABLE:
