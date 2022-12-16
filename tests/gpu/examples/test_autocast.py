@@ -2,6 +2,7 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch # noqa
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -52,6 +53,7 @@ class TestTorchMethod(TestCase):
         print(y_xpu.to('cpu'))
         self.assertEqual(y_xpu.dtype, torch.float16)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_autocast_simple_backward_bf16(self):
         model = TestNet()
         x = torch.ones([2, 3, 8, 6], dtype=torch.float)
