@@ -97,9 +97,6 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
 set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -v")
 set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer")
 
-set(MKL_THREADING "sequential" CACHE STRING "set mkl threading (for example, sequential, tbb_thread)")
-message(STATUS "To avoid link with TBB, we force to set MKL_THREADING=sequential here!")
-
 if(BUILD_MODULE_TYPE STREQUAL "GPU")
   include(${IPEX_ROOT_DIR}/cmake/gpu/DPCPP.cmake)
 endif()

@@ -41,7 +41,7 @@ endif()
 
 find_package_handle_standard_args(IntelExtensionPytorch DEFAULT_MSG IPEX_LIBRARIES IPEX_INCLUDE_DIRS)
 
-# When we build libipex_gpu_core with the old GCC ABI, dependent libraries must too.
+# When we build ipex with the old GCC ABI, dependent libraries must too.
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   set(IPEX_CXX_FLAGS "-D_GLIBCXX_USE_CXX11_ABI=@GLIBCXX_USE_CXX11_ABI@")
 endif()
