@@ -31,6 +31,7 @@ function (print_cpu_config_summary)
     message(STATUS "  CXX Linker options    : ${CMAKE_SHARED_LINKER_FLAGS}")
     message(STATUS "  Link libraries        : ${CPU_LINK_LIBRARIES}")
 
+    message(STATUS "  Torch version         : ${Torch_VERSION}")
     message(STATUS "  Torch include         : ${TORCH_INCLUDE_DIRS}")
 
     message(STATUS "  oneDNN include        : ${ONEDNN_INCLUDE_DIR}")

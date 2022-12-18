@@ -1,4 +1,5 @@
 # coding: utf-8
+from .utils._trap_module import *
 from . import cpu
 from . import xpu
 from . import quantization

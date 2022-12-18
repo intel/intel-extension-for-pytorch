@@ -4,7 +4,6 @@ from .. import _C
 from enum import Enum
 from .. import frontend
 import intel_extension_for_pytorch  # noqa
-import intel_extension_for_pytorch._C as core
 
 
 def from_usm(src, dtype, shape, stride = None, device_id: int = -1) -> torch.Tensor:
@@ -250,17 +249,17 @@ def optimize(model, dtype=None, optimizer=None, level="O1",
 
 
 class FP32MathMode(EnumBase):
-    FP32 = int(core.FP32MathMode.FP32)
-    TF32 = int(core.FP32MathMode.TF32)
-    BF32 = int(core.FP32MathMode.BF32)
+    FP32 = intel_extension_for_pytorch._C.XPUFP32MathMode.FP32
+    TF32 = intel_extension_for_pytorch._C.XPUFP32MathMode.TF32
+    BF32 = intel_extension_for_pytorch._C.XPUFP32MathMode.BF32
 
 
 def get_fp32_math_mode():
-    return FP32MathMode.get_value(core._get_fp32_math_mode)
+    return FP32MathMode.get_value(intel_extension_for_pytorch._C._get_fp32_math_mode)
 
 
 def set_fp32_math_mode(mode):
-    st = FP32MathMode.set_value(core._set_fp32_math_mode, mode)
+    st = FP32MathMode.set_value(intel_extension_for_pytorch._C._set_fp32_math_mode, mode)
     assert bool(st), "WARNING: Failed to set FP32 math mode!"
 
 

@@ -18,8 +18,10 @@ endif()
 
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PYBIND11_CL_FLAGS}")
 
-add_subdirectory(cpu)
-list(APPEND PY_CPP_OBJS $<TARGET_OBJECTS:PY_CPU_OBJ>)
+if(BUILD_WITH_CPU)
+  add_subdirectory(cpu)
+  list(APPEND PY_CPP_OBJS $<TARGET_OBJECTS:PY_CPU_OBJ>)
+endif()
 
 if(BUILD_WITH_XPU)
   add_subdirectory(xpu)
@@ -45,7 +47,10 @@ if(BUILD_STRIPPED_BIN)
   set_target_properties(intel-ext-pt-python PROPERTIES LINK_FLAGS_RELEASE -s)
 endif()
 
-target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-cpu)
+if(BUILD_WITH_CPU)
+  target_compile_definitions(intel-ext-pt-python PUBLIC "BUILD_WITH_CPU")
+  target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-cpu)
+endif()
 
 if(BUILD_WITH_XPU)
   target_compile_definitions(intel-ext-pt-python PUBLIC "BUILD_WITH_XPU")
@@ -68,6 +73,9 @@ function (print_python_config_summary)
   message(STATUS "  CXX flags             : ${CMAKE_CXX_FLAGS}")
   message(STATUS "  CXX Linker options    : ${CMAKE_SHARED_LINKER_FLAGS}")
   message(STATUS "  Link libraries        : ${PYTHON_LINK_LIBRARIES}")
+
+  message(STATUS "  Torch version         : ${Torch_VERSION}")
+  message(STATUS "  Torch include         : ${TORCH_INCLUDE_DIRS}")
 
   message(STATUS "  Python include        : ${PYTHON_INCLUDE_DIR}")
   message(STATUS "  pybind11 include      : ${pybind11_INCLUDE_DIRS}")

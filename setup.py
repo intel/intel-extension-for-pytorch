@@ -500,18 +500,21 @@ class IPEXCPPLibBuild(build_clib, object):
             raise RuntimeError("Intel Extension for PyTorch only supports Linux now.")
 
         project_root_dir = get_project_dir()
-        ipex_cpu_dir = get_ipex_cpu_dir()
-        ipex_cpu_build_dir = get_ipex_cpu_build_dir()
         build_type_dir = get_build_type_dir()
         output_lib_path = get_package_lib_dir()
+
         ipex_python_dir = get_ipex_python_dir()
         ipex_python_build_dir = get_ipex_python_build_dir()
-        ipex_cppsdk_build_dir = get_ipex_cppsdk_build_dir()
+
+        ipex_cpu_dir = get_ipex_cpu_dir()
+        ipex_cpu_build_dir = get_ipex_cpu_build_dir()
 
         ipex_xpu_dir = get_xpu_project_dir()
         ipex_xpu_build_dir = get_xpu_project_build_dir()
 
+        ipex_cppsdk_build_dir = get_ipex_cppsdk_build_dir()
         cpack_out_file = os.path.abspath(os.path.join(build_type_dir, 'IPEXCPackConfig.cmake'))
+
         if _get_build_target() == 'cppsdk':
             cmake_prefix_path = torch_install_prefix
         else:
@@ -530,11 +533,13 @@ class IPEXCPPLibBuild(build_clib, object):
             'IPEX_PROJ_NAME'        : PACKAGE_NAME
         }
 
-        cmake_common_args = []
+        build_with_cpu = True   # Default ON
+        build_with_xpu = False  # Default OFF
 
         use_ninja = False
-        build_with_xpu = False
         sequential_build = False
+
+        cmake_common_args = []
         my_env = os.environ.copy()
 
         for var, val in my_env.items():
@@ -553,6 +558,9 @@ class IPEXCPPLibBuild(build_clib, object):
                 if var == 'BUILD_WITH_XPU' and val.upper() in ON_ENV_VAL:
                     build_with_xpu = True
                     # fall through
+                if var == 'BUILD_WITH_CPU' and val.upper() in OFF_ENV_VAL:
+                    build_with_cpu = False
+                    # fall through
                 build_option_common[var] = val
 
         define_build_options(cmake_common_args, **build_option_common)
@@ -566,8 +574,8 @@ class IPEXCPPLibBuild(build_clib, object):
         if _check_env_flag('VERBOSE') and use_ninja:
             build_args.append('-v')
 
-        # Generate cmake for XPU module:
         if build_with_xpu:
+            # Generate cmake for XPU module:
             if os.path.isdir(ipex_xpu_dir) is False:
                 raise RuntimeError('It maybe CPU only branch, and it is not contains XPU code.')
 
@@ -591,27 +599,28 @@ class IPEXCPPLibBuild(build_clib, object):
             define_build_options(cmake_args_gpu, **build_option_gpu)
             _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_gpu, ipex_xpu_build_dir, my_env)
 
-        # Generate cmake for CPU module:
-        build_option_cpu = {
-            **build_option_common,
-            'BUILD_MODULE_TYPE' : 'CPU'
-        }
+        if build_with_cpu:
+            # Generate cmake for CPU module:
+            build_option_cpu = {
+                **build_option_common,
+                'BUILD_MODULE_TYPE' : 'CPU'
+            }
 
-        cmake_args_cpu = []
-        define_build_options(cmake_args_cpu, **build_option_cpu)
-        _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_cpu, ipex_cpu_build_dir, my_env)
+            cmake_args_cpu = []
+            define_build_options(cmake_args_cpu, **build_option_cpu)
+            _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_cpu, ipex_cpu_build_dir, my_env)
 
-        # Generate cmake for the CPP UT
-        build_option_cpp_test = {
-            **build_option_common,
-            'PROJECT_DIR'           : project_root_dir,
-            'PYTORCH_INSTALL_DIR'   : pytorch_install_dir,
-            'CPP_TEST_BUILD_DIR'    : get_cpp_test_build_dir(),
-        }
+            # Generate cmake for the CPP UT
+            build_option_cpp_test = {
+                **build_option_common,
+                'PROJECT_DIR'           : project_root_dir,
+                'PYTORCH_INSTALL_DIR'   : pytorch_install_dir,
+                'CPP_TEST_BUILD_DIR'    : get_cpp_test_build_dir(),
+            }
 
-        cmake_args_cpp_test = []
-        define_build_options(cmake_args_cpp_test, **build_option_cpp_test)
-        _gen_build_cfg_from_cmake(cmake_exec, get_cpp_test_dir(), cmake_args_cpp_test, get_cpp_test_build_dir(), my_env)
+            cmake_args_cpp_test = []
+            define_build_options(cmake_args_cpp_test, **build_option_cpp_test)
+            _gen_build_cfg_from_cmake(cmake_exec, get_cpp_test_dir(), cmake_args_cpp_test, get_cpp_test_build_dir(), my_env)
 
         if _get_build_target() == 'python':
             # Generate cmake for common python module:
@@ -626,6 +635,7 @@ class IPEXCPPLibBuild(build_clib, object):
             _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_python, ipex_python_build_dir, my_env)
 
         elif _get_build_target() == 'cppsdk':
+            # Generate cmake for CPPSDK package:
             build_option_cppsdk = {
                 **build_option_common,
                 'BUILD_MODULE_TYPE' : 'CPPSDK',
@@ -637,20 +647,23 @@ class IPEXCPPLibBuild(build_clib, object):
             define_build_options(cmake_args_cppsdk, **build_option_cppsdk)
             _gen_build_cfg_from_cmake(cmake_exec, project_root_dir, cmake_args_cppsdk, ipex_cppsdk_build_dir, my_env)
 
-        # Build XPU module:
-        if(build_with_xpu):
+        if build_with_xpu:
+            # Build XPU module:
             _build_project(build_args, ipex_xpu_build_dir, my_env, use_ninja)
 
-        # Build CPU module:
-        _build_project(build_args, ipex_cpu_build_dir, my_env, use_ninja)
+        if build_with_cpu:
+            # Build CPU module:
+            _build_project(build_args, ipex_cpu_build_dir, my_env, use_ninja)
 
-        # Build the CPP UT
-        _build_project(build_args, get_cpp_test_build_dir(), my_env, use_ninja)
+            # Build the CPP UT
+            _build_project(build_args, get_cpp_test_build_dir(), my_env, use_ninja)
 
         if _get_build_target() == 'python':
             # Build common python module:
             _build_project(build_args, ipex_python_build_dir, my_env, use_ninja)
+
         elif _get_build_target() == 'cppsdk':
+            # Build CPPSDK package:
             _build_project(build_args, ipex_cppsdk_build_dir, my_env, use_ninja)
             cpack_exec = get_cpack_command()
             check_call([cpack_exec, '--config', cpack_out_file])

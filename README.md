@@ -406,7 +406,7 @@ This release uses clang-format and flake8 to enhance the code in Intel® Extensi
 ResNet50, BERT, CosmicTagger training are verified with DDP on PVC B4. For supporting this scenario, oneCCL Bindings for PyTorch\* based on oneCCL 2021.8-eng02 version shall be built and used.
 
 ```bash
-git clone -b torch-ccl-xpu-1.13.100-rc1 https://github.com/intel-innersource/frameworks.ai.pytorch.torch-ccl.git
+git clone -b internal_master https://github.com/intel-innersource/frameworks.ai.pytorch.torch-ccl.git
 git submodule update --init --recursive
 COMPUTE_BACKEND=dpcpp python setup.py install
 ```

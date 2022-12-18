@@ -13,19 +13,19 @@ endif()
 include(CMakePackageConfigHelpers)
 # CMake config file for the external project.
 configure_package_config_file(
-  ${IPEX_ROOT_DIR}/cmake/IntelExtensionPytorchConfig.cmake.in
-  ${PROJECT_BINARY_DIR}/IntelExtensionPytorchConfig.cmake
-  INSTALL_DESTINATION share/cmake/IntelExtensionPytorch)
+  ${IPEX_ROOT_DIR}/cmake/IPEXConfig.cmake.in
+  ${PROJECT_BINARY_DIR}/IPEXConfig.cmake
+  INSTALL_DESTINATION share/cmake/IPEX)
 
 write_basic_package_version_file(
-  ${PROJECT_BINARY_DIR}/IntelExtensionPytorchVersionConfig.cmake
+  ${PROJECT_BINARY_DIR}/IPEXVersionConfig.cmake
   VERSION ${CMAKE_PROJECT_VERSION}
   COMPATIBILITY SameMinorVersion)
 
 install(FILES
-        ${PROJECT_BINARY_DIR}/IntelExtensionPytorchConfig.cmake
-        ${PROJECT_BINARY_DIR}/IntelExtensionPytorchVersionConfig.cmake
-        DESTINATION share/cmake/IntelExtensionPytorch)
+  ${PROJECT_BINARY_DIR}/IPEXConfig.cmake
+  ${PROJECT_BINARY_DIR}/IPEXVersionConfig.cmake
+  DESTINATION share/cmake/IPEX)
 
 if(BUILD_MODULE_TYPE STREQUAL "CPPSDK")
   install(PROGRAMS "${IPEX_ROOT_DIR}/scripts/cppsdk/install_c++_sdk.sh.in"

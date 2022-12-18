@@ -16,15 +16,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_INSTALL_RPATH $ORIGIN)
 
 # Need the torch package
-set(TORCH_COMP_VERION "${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}")
-find_package(Torch ${TORCH_COMP_VERION} REQUIRED)
+set(Torch_COMP_VERION "${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}")
+find_package(Torch ${Torch_COMP_VERION} REQUIRED)
 
 if(NOT EXISTS ${TORCH_INSTALL_PREFIX})
   message(FATAL_ERROR "Can NOT find torch install path at ${TORCH_INSTALL_PREFIX}!")
 endif()
 
-if(NOT ${TORCH_COMP_VERION} VERSION_EQUAL "${Torch_VERSION_MAJOR}.${Torch_VERSION_MINOR}")
-  message(FATAL_ERROR "Not compatible Torch version ${Torch_VERSION} at ${TORCH_INSTALL_PREFIX}!\nTorch ${TORCH_COMP_VERION} is needed!")
+if(NOT ${Torch_COMP_VERION} VERSION_EQUAL "${Torch_VERSION_MAJOR}.${Torch_VERSION_MINOR}")
+  message(FATAL_ERROR "Not compatible Torch version ${Torch_VERSION} at ${TORCH_INSTALL_PREFIX}!\nTorch ${Torch_COMP_VERION} is needed!")
 endif()
 
 include(${IPEX_ROOT_DIR}/cmake/BuildFlags.cmake)

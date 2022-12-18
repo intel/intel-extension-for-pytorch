@@ -657,12 +657,17 @@ void init_xpu_module(pybind11::module& m) {
     return Settings::I().set_onemkl_verbose(level);
   });
 
+  py::enum_<FP32_MATH_MODE>(m, "XPUFP32MathMode")
+      .value("FP32", FP32_MATH_MODE::FP32)
+      .value("TF32", FP32_MATH_MODE::TF32)
+      .value("BF32", FP32_MATH_MODE::BF32)
+      .export_values();
+
   m.def("_get_fp32_math_mode", []() {
-    return static_cast<int>(Settings::I().get_fp32_math_mode());
+    return Settings::I().get_fp32_math_mode();
   });
-  m.def("_set_fp32_math_mode", [](const int mode) {
-    return Settings::I().set_fp32_math_mode(
-        static_cast<xpu::FP32_MATH_MODE>(mode));
+  m.def("_set_fp32_math_mode", [](const FP32_MATH_MODE mode) {
+    return Settings::I().set_fp32_math_mode(mode);
   });
 
   m.def("_enable_simple_trace", []() { Settings::I().enable_simple_trace(); });

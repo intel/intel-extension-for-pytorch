@@ -7,6 +7,7 @@ set(Options_cmake_included true)
 # The options to build xpu
 include(CMakeDependentOption)
 # General options:
+option(BUILD_WITH_CPU "Build CPU backend implementation" ON)
 option(BUILD_WITH_XPU "Build XPU backend implementation" OFF)
 option(BUILD_NO_CLANGFORMAT "Build without force clang-format" OFF)
 option(BUILD_STATS "Count statistics for each component during build process" OFF)
@@ -39,7 +40,9 @@ function (print_config_summary)
   message(STATUS "  Target version        : ${CMAKE_PROJECT_VERSION}")
   message(STATUS "  Install path          : ${CMAKE_INSTALL_PREFIX}")
   message(STATUS "  Build type            : ${CMAKE_BUILD_TYPE}")
+
   message(STATUS "Options:")
+  message(STATUS "  BUILD_WITH_CPU        : ${BUILD_WITH_CPU}")
   message(STATUS "  BUILD_WITH_XPU        : ${BUILD_WITH_XPU}")
   message(STATUS "  BUILD_NO_CLANGFORMAT  : ${BUILD_NO_CLANGFORMAT}")
   message(STATUS "  BUILD_STATS           : ${BUILD_STATS}")
