@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, get_eltwise_fn
 from torch.testing._internal.common_utils import TEST_SCIPY
 from torch.quantization.quantize_fx import prepare_fx, convert_fx
+from torch.ao.quantization.quantize_fx import convert_to_reference_fx, prepare_qat_fx
 
 import intel_extension_for_pytorch as ipex
 from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserver, QConfig
@@ -1003,6 +1004,31 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::_convolution', 'aten::quantize_per_channel', 'aten::dequantize'])
                 self.checkPatterns(graph, patterns)
 
+    def test_conv2d_hardsigmoid_mul_(self):
+        class M(nn.Module):
+            def __init__(self, in_channels, out_channels, kernel_size, image_size):
+                super(M, self).__init__()
+                self.conv = torch.nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+                self.activation = torch.nn.Hardsigmoid()
+
+            def forward(self, x):
+                a = self.conv(x)
+                b = self.activation(a)
+                res = a.mul_(b)
+                return res
+
+        for memory_format in [torch.contiguous_format, torch.channels_last]:
+            m = M(3, 16, 3, 224).eval()
+            x = torch.rand(1, 3, 224, 224, requires_grad=False).to(memory_format=memory_format)
+            patterns = [
+                ["aten::dequantize", "aten::_convolution", "aten::hardsigmoid", "aten::mul"],
+            ]
+            for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+                graph = self.checkQuantizeTrace(m, [x])
+                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+                self.assertFused(graph, ['aten::_convolution', 'aten::hardsigmoid', 'aten::mul', 'aten::quantize_per_channel', 'aten::dequantize'])
+                self.checkPatterns(graph, patterns)
+
     def test_linear_dropout_sum(self):
         class M(nn.Module):
             def __init__(self):
@@ -1681,6 +1707,28 @@ class TestFusionPattern(JitLlgaTestCase):
         m = convert_fx(m)
         graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+
+    def test_fx_ao_qat_converted_model(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = nn.Linear(15, 20)
+
+            def forward(self, x):
+                x = self.linear(x)
+                return x
+        
+        x = x = torch.randn(2, 15)
+        m = M()
+        m.eval()
+        
+        qconfig_dict = {'': static_qconfig[0]}
+        
+        m = prepare_qat_fx(m, qconfig_dict, x)
+        m = convert_to_reference_fx(m)
+        graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
+        # dequant -> linear should be mapped to LLGA
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)        
 
     def test_ffn_residual(self):
         class FFN_Residual(nn.Module):

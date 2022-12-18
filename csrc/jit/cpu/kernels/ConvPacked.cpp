@@ -337,7 +337,7 @@ at::Tensor& convolution_bottleneck_run(
   auto& context1 = op_context1->get_context();
   auto& context2 = op_context2->get_context();
   auto& context3 = op_context3->get_context();
-  if (input.sizes().vec() == context1.conv_params_.pd.src_desc().dims() &&
+  if (input.sizes().vec() == context1.conv_params_.pd.src_desc().get_dims() &&
       omp_get_max_threads() == context1.conv_params_.pd_use_threads) {
     auto mkldnn_input = dnnl::memory(
         context1.conv_params_.pd.src_desc(),
@@ -408,7 +408,7 @@ at::Tensor convolution_bottleneck_run(
   auto& context4 = op_context4->get_context();
   auto& context3 = op_context3->get_context();
 
-  if (input_.sizes().vec() == context1.conv_params_.pd.src_desc().dims() &&
+  if (input_.sizes().vec() == context1.conv_params_.pd.src_desc().get_dims() &&
       omp_get_max_threads() == context1.conv_params_.pd_use_threads) {
     auto mkldnn_input = dnnl::memory(
         context1.conv_params_.pd.src_desc(),
@@ -421,7 +421,7 @@ at::Tensor convolution_bottleneck_run(
         context2.conv_params_.pd.dst_desc(), ideep::engine::cpu_engine());
 
     auto result = at::empty(
-        context3.conv_params_.pd.dst_desc().dims(),
+        context3.conv_params_.pd.dst_desc().get_dims(),
         input_.options().memory_format(input_.suggest_memory_format()));
 
     auto ouput3 = dnnl::memory(
@@ -652,12 +652,11 @@ at::Tensor run(
       context.dilation_,
       context.groups_);
 
-  if (input_.sizes().vec() == context.conv_params_.pd.src_desc().dims() &&
+  if (input_.sizes().vec() == context.conv_params_.pd.src_desc().get_dims() &&
       attr.has_same_postop_as(context.conv_params_.op_attr) &&
-      attr.get_output_scales() ==
-          context.conv_params_.op_attr.get_output_scales() &&
+      attr.get_all_scales() == context.conv_params_.op_attr.get_all_scales() &&
       omp_get_max_threads() == context.conv_params_.pd_use_threads) {
-    auto output_sizes = context.conv_params_.pd.dst_desc().dims();
+    auto output_sizes = context.conv_params_.pd.dst_desc().get_dims();
     auto output = at::empty(
         output_sizes,
         input_.options().memory_format(input_.suggest_memory_format()));
@@ -742,7 +741,7 @@ at::Tensor& run(
       context.dilation_,
       context.groups_);
 
-  if (input_.sizes().vec() == context.conv_params_.pd.src_desc().dims() &&
+  if (input_.sizes().vec() == context.conv_params_.pd.src_desc().get_dims() &&
       attr == context.conv_params_.op_attr &&
       omp_get_max_threads() == context.conv_params_.pd_use_threads) {
     const ideep::tensor mkldnn_input = itensor_view_from_dense(input_);

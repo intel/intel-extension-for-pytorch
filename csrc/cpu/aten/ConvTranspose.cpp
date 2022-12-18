@@ -208,7 +208,7 @@ at::Tensor IPEXConvTransposeOp::_forward(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
     const at::Tensor& op_context) {
-  at::AutoNonVariableTypeMode g;
+  at::AutoDispatchBelowADInplaceOrView g;
   RECORD_FUNCTION(
       "IPEXConvTransposeOp::_forward", c10::ArrayRef<c10::IValue>({}));
 
