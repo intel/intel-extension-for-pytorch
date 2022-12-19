@@ -285,6 +285,10 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     return makeEltwiseOp(node, opkind::Clamp)
         .setAttr("min", clamp_min_value)
         .setAttr("max", clamp_max_value);
+  } else if (nodeKind == Symbol::aten("hardsigmoid")) {
+    return makeEltwiseOp(node, opkind::HardSigmoid)
+        .setAttr("alpha", 1.0f / 6)
+        .setAttr("beta", 0.5f);
   } else if (nodeKind == Symbol::aten("hardtanh")) {
     return makeEltwiseOp(node, opkind::Clamp)
         .setAttr("min", Operator::ScalarToFloat, 1)
