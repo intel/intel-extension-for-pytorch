@@ -187,7 +187,18 @@ static void mkl_baddbmm(
   auto batch2_sizes = batch2.sizes();
   auto batch1_strides = batch1.strides();
   auto batch2_strides = batch2.strides();
-  auto self_sizes = self.sizes();
+
+  TORCH_CHECK(
+      batch2_sizes[0] == batch1_sizes[0] && batch2_sizes[1] == batch1_sizes[2],
+      "Expected size for first two dimensions of batch2 tensor to be: [",
+      batch1_sizes[0],
+      ", ",
+      batch1_sizes[2],
+      "] but got: [",
+      batch2_sizes[0],
+      ", ",
+      batch2_sizes[1],
+      "].");
 
   if (beta.toComplexDouble() != 0.0 && !self.is_same(result)) {
     auto b_self = expand_size(
@@ -205,18 +216,6 @@ static void mkl_baddbmm(
         {batch1.size(0), batch1.size(1), batch2.size(2)},
         at::MemoryFormat::Contiguous);
   }
-
-  TORCH_CHECK(
-      self_sizes[0] == batch1_sizes[0], "self dim 0 must match batch1 dim 0");
-  TORCH_CHECK(
-      self_sizes[0] == batch2_sizes[0], "self dim 0 must match batch2 dim 0");
-  TORCH_CHECK(
-      self_sizes[1] == batch1_sizes[1], "self dim 1 must match batch1 dim 1");
-  TORCH_CHECK(
-      self_sizes[2] == batch2_sizes[2], "self dim 2 must match batch2 dim 2");
-  TORCH_CHECK(
-      batch1_sizes[2] == batch2_sizes[1],
-      "batch1 dim 2 must match batch2 dim 1");
 
   const auto result_strides = result.strides();
   const auto result_sizes = result.sizes();
