@@ -196,7 +196,7 @@ at::Tensor IPEXLinearOp::_forward(
     const c10::optional<at::Tensor>& bias,
     const int64_t eltwise,
     const at::Tensor& op_context) {
-  at::AutoNonVariableTypeMode g;
+  at::AutoDispatchBelowADInplaceOrView g;
   RECORD_FUNCTION("IPEXLinearOp::_forward", c10::ArrayRef<c10::IValue>({}));
 
   if (eltwise == NotFused) {
@@ -222,7 +222,7 @@ at::Tensor IPEXLinearOp::forward(
     const at::Tensor& op_context) {
   RECORD_FUNCTION("IPEXLinearOp::forward", c10::ArrayRef<c10::IValue>({}));
 
-  at::AutoNonVariableTypeMode g;
+  at::AutoDispatchBelowADInplaceOrView g;
   ctx->saved_data["op_context"] = op_context;
   ctx->saved_data["input_requires_grad"] = input.requires_grad();
   ctx->saved_data["weight_requires_grad"] = weight.requires_grad();
