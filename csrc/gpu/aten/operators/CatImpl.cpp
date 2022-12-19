@@ -15,6 +15,7 @@
 #include <tensor/Context.h>
 #include "CatImpl.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 #include "comm/zmath.h"
 
 using namespace dnnl;
@@ -446,7 +447,7 @@ static void cat(
         continue;
       int64_t dimSize = inputs[j].get().size(dimension);
       Tensor nt = at::narrow(result, dimension, offset, dimSize);
-      nt.copy_(inputs[j]);
+      at::AtenIpexTypeXPU::copy_(nt, inputs[j], false);
       offset += dimSize;
     }
   }
