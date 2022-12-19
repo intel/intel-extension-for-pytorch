@@ -11,7 +11,7 @@ from .frontend import optimize, enable_onednn_fusion
 from .frontend import enable_auto_channels_last, disable_auto_channels_last
 from .frontend import set_fp32_math_mode, get_fp32_math_mode, FP32MathMode
 from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl
-from .utils.verbose import verbose
+from .cpu.utils.verbose import verbose
 import os
 import torch
 try:
@@ -21,7 +21,7 @@ except ImportError:
 from . import _C
 from ._version import (__version__, __ipex_gitrev__, __torch_gitrev__, 
             __gpu_onednn_gitrev__, __cpu_ideep_gitrev__, __build_type__)
-from .utils import _cpu_isa, _custom_fx_tracer
+from .cpu.utils import _cpu_isa, _custom_fx_tracer
 _cpu_isa.check_minimal_isa_support()
 
 

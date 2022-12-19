@@ -3,7 +3,7 @@ from common_utils import TestCase
 import torch
 import torch.nn as nn
 import intel_extension_for_pytorch as ipex
-from intel_extension_for_pytorch.utils.channels_last_1d import is_contiguous_channels_last_1d
+from intel_extension_for_pytorch.cpu.utils.channels_last_1d import is_contiguous_channels_last_1d
 
 try:
     import torchvision

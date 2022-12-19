@@ -10,10 +10,10 @@ from enum import IntFlag
 from .nn import utils
 from .optim._optimizer_utils import optimizer_fusion, IPEX_FUSED_OPTIMIZER_LIST_CPU, IPEX_FUSED_OPTIMIZER_LIST_XPU
 import intel_extension_for_pytorch._C as core
-from intel_extension_for_pytorch.utils.channels_last_1d import to_channels_last_1d
-from intel_extension_for_pytorch.utils.linear_bn_folding import linear_bn_fuse
+from .cpu.utils.channels_last_1d import to_channels_last_1d
+from .cpu.utils.linear_bn_folding import linear_bn_fuse
 from enum import IntEnum
-from intel_extension_for_pytorch.cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl
+from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl
 
 from typing import List
 import functools
