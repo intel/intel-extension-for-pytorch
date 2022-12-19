@@ -142,7 +142,7 @@ class TransFreeMHATester(TestCase):
                 vit_mha_graph = vit_mha_ipex.graph_for(mat)
 
 
-                self.assertTrue(any(n.kind() == "ipex::transfree_mha" for n in mha_graph.nodes()))
+                self.assertTrue(any(n.kind() == "ipex::mha_scores_calc" for n in mha_graph.nodes()))
                 self.assertTrue(any(n.kind() == "ipex::transfree_vit_mha" for n in vit_mha_graph.nodes()))
 
             for fill_value in [-float("inf"), torch.tensor(torch.finfo(float).min)]:
@@ -158,7 +158,7 @@ class TransFreeMHATester(TestCase):
                     distil_mha_ref = distil_mha_model(mat, mask_distil)
                     self.assertEqual(distil_mha_ref, distil_mha_jit, prec=1e-2)
                     distil_mha_graph = distil_mha_ipex.graph_for(mat, mask_distil)
-                    self.assertTrue(any(n.kind() == "ipex::transfree_distil_mha" for n in distil_mha_graph.nodes()))
+                    self.assertTrue(any(n.kind() == "ipex::distil_mha_scores_calc" for n in distil_mha_graph.nodes()))
 
     def test_fake_mha_bf16(self):
         mat = torch.randn(16, 16, 256).to(torch.bfloat16)
@@ -197,7 +197,7 @@ class TransFreeMHATester(TestCase):
                 fake_mha_jit.append(fake_mha_ipex[i](mat, mask_base))
                 fake_mha_ref.append(fake_mha_model[i](mat, mask_base))
                 fake_mha_graph = fake_mha_ipex[i].graph_for(mat, mask_base)
-                self.assertFalse(any(n.kind() == "ipex::transfree_mha" for n in fake_mha_graph.nodes()))
+                self.assertTrue(any(n.kind() == "ipex::mha_scores_calc" for n in fake_mha_graph.nodes()))
             
             for i in range(2, 4):
                 fake_mha_ipex[i] = torch.jit.trace(fake_mha_ipex[i], (mat, mask_distil, ))
@@ -207,7 +207,7 @@ class TransFreeMHATester(TestCase):
                 fake_mha_jit.append(fake_mha_ipex[i](mat, mask_distil))
                 fake_mha_ref.append(fake_mha_model[i](mat, mask_distil))
                 fake_mha_graph = fake_mha_ipex[i].graph_for(mat, mask_distil)
-                self.assertFalse(any(n.kind() == "ipex::transfree_distil_mha" for n in fake_mha_graph.nodes()))
+                self.assertTrue(any(n.kind() == "ipex::distil_mha_scores_calc" for n in fake_mha_graph.nodes()))
 
             for i in range(4, 7):
                 fake_mha_ipex[i] = torch.jit.trace(fake_mha_ipex[i], mat)

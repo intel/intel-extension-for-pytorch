@@ -1130,6 +1130,21 @@ class ModMultLinear(nn.Module):
          res4 = self.linear4(res1)
          return res1, res2, res3, res4
 
+class ModMultLinearWithOrWithoutBias(nn.Module):
+    def __init__(self):
+         super(ModMultLinearWithOrWithoutBias, self).__init__()
+         self.linear1 = nn.Linear(10, 32, bias=False)
+         self.linear2 = nn.Linear(10, 32, bias=True)
+         self.linear3 = nn.Linear(10, 32, bias=True)
+         self.linear4 = nn.Linear(10, 32, bias=False)
+
+    def forward(self, x):
+         res1 = self.linear1(x)
+         res2 = self.linear2(x)
+         res3 = self.linear3(x)
+         res4 = self.linear4(x)
+         return res1, res2, res3, res4
+
 class LinearSwishNaive(nn.Module):
     def __init__(self, in_feature, out_feature):
         super(LinearSwishNaive, self).__init__()
@@ -1461,6 +1476,39 @@ class Tester(TestCase):
             self.assertEqual(ori_res[1], jit_res[1])
             linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::linear_run"])
             self.assertEqual(linear_count_ori, 2)
+
+        origin_model_v1 = ModMultLinearWithOrWithoutBias().eval()
+
+        test_val1 = torch.rand([40, 10])
+        #Only verify Concat Linear OPs w/ or w/o bias, so use the default packed MKL path
+        model_v1 = ipex.optimize(origin_model_v1, dtype=torch.float32)
+        with torch.no_grad():
+            ori_res_v1 = model_v1(test_val1)
+            model_jit_v1 = torch.jit.trace(model_v1,(test_val1))
+            graph_ori_v1 = str(model_jit_v1.graph_for(test_val1))
+            linear_count_ori_v1 = check_op_count(graph_ori_v1, ["torch_ipex::ipex_MKLSGEMM"])
+            self.assertEqual(linear_count_ori_v1, 4)
+            model_jit_v1 = torch.jit.freeze(model_jit_v1)
+            jit_res_v1 = model_jit_v1(test_val1)
+            self.assertEqual(ori_res_v1, jit_res_v1)
+            graph_opt_v1 = str(model_jit_v1.graph_for(test_val1))
+            linear_count_ori_v1 = check_op_count(graph_opt_v1, ["ipex_prepack::mkl_sgemm_run"])
+            self.assertEqual(linear_count_ori_v1, 2)
+
+        model_v1 = ipex.optimize(origin_model_v1, dtype=torch.bfloat16)
+        test_val1 = test_val1.bfloat16()
+        with torch.cpu.amp.autocast(), torch.no_grad():
+            ori_res_v1 = model_v1(test_val1)
+            model_jit_v1 = torch.jit.trace(model_v1,(test_val1))
+            graph_ori_v1 = str(model_jit_v1.graph_for(test_val1))
+            linear_count_ori_v1 = check_op_count(graph_ori_v1, ["torch_ipex::ipex_linear"])
+            self.assertEqual(linear_count_ori_v1, 4)
+            model_jit_v1 = torch.jit.freeze(model_jit_v1)
+            jit_res_v1 = model_jit_v1(test_val1)
+            self.assertEqual(ori_res_v1, jit_res_v1)
+            graph_opt_v1 = str(model_jit_v1.graph_for(test_val1))
+            linear_count_ori_v1 = check_op_count(graph_opt_v1, ["ipex_prepack::linear_run"])
+            self.assertEqual(linear_count_ori_v1, 2)
 
     def test_add_layernorm(self):
         for dim in [768, 100]:
