@@ -4,6 +4,11 @@ if(CPU_BUILD_OPTIONS_cmake_included)
 endif()
 set(CPU_BUILD_OPTIONS_cmake_included true)
 
+if(BuildFlags_CPU_cmake_included)
+    return()
+endif()
+set(BuildFlags_CPU_cmake_included true)
+
 # check and set CMAKE_CXX_STANDARD
 string(FIND "${CMAKE_CXX_FLAGS}" "-std=c++" env_cxx_standard)
 if(env_cxx_standard GREATER -1)

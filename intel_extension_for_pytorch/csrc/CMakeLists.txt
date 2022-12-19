@@ -67,7 +67,7 @@ function (print_python_config_summary)
   message(STATUS "  C compiler            : ${CMAKE_C_COMPILER}")
 
   message(STATUS "  C++ compiler          : ${CMAKE_CXX_COMPILER}")
-  message(STATUS "  C++ compiler id       : ${CMAKE_CXX_COMPILER_ID}")
+  message(STATUS "  C++ compiler ID       : ${CMAKE_CXX_COMPILER_ID}")
   message(STATUS "  C++ compiler version  : ${CMAKE_CXX_COMPILER_VERSION}")
 
   message(STATUS "  CXX flags             : ${CMAKE_CXX_FLAGS}")

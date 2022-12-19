@@ -46,14 +46,14 @@ static PyObject* THDPEvent_from_ipc_handle(
     PyObject* kwargs) {
   HANDLE_TH_ERRORS
 
-  static torch::PythonArgParser parser({
-      "from_ipc_handle(Device device, std::string ipc_handle)",
-  });
-  torch::ParsedArgs<2> parsed_args;
-  auto r = parser.parse(args, kwargs, parsed_args);
+  // static torch::PythonArgParser parser({
+  //     "from_ipc_handle(Device device, std::string ipc_handle)",
+  // });
+  // torch::ParsedArgs<2> parsed_args;
+  // auto r = parser.parse(args, kwargs, parsed_args);
 
-  at::Device device = r.device(0);
-  std::string handle_string = r.string(1);
+  // at::Device device = r.device(0);
+  // std::string handle_string = r.string(1);
 
   //  TORCH_CHECK(handle_string.size() == sizeof(xpuIpcEventHandle_t),
   //    "xpuIpcEventHandle_t expects byte-like object of size ",

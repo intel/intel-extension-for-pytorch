@@ -1,3 +1,8 @@
+if(Codegen_GPU_cmake_included)
+    return()
+endif()
+set(Codegen_GPU_cmake_included true)
+
 set(SIMPLE_TRACE)
 if(BUILD_SIMPLE_TRACE)
         set(SIMPLE_TRACE "--simple_trace")
