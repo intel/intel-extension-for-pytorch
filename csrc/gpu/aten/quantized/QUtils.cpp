@@ -29,7 +29,7 @@ at::Tensor u8tos8(const at::Tensor& u8) {
     uint8_t* u8_ptr = (uint8_t*)u8.data_ptr();
     int8_t* s8_ptr = (int8_t*)s8.data_ptr();
     cgh.parallel_for(
-        cl::sycl::range<1>(u8.numel()), [=](cl::sycl::item<1> item) {
+        sycl::range<1>(u8.numel()), [=](sycl::item<1> item) {
           auto id = item.get_linear_id();
           auto s8_val = (float)Round(static_cast<float>(u8_ptr[id]) / 2.f);
           s8_val =

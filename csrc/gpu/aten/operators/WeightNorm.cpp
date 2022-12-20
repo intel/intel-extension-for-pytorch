@@ -75,7 +75,7 @@ static inline void launch_weight_norm_reduce_kernel_(
       }
     };
     __cgh.parallel_for(
-        cl::sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
+        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
 }
@@ -168,7 +168,7 @@ static inline void segment_weight_norm_(
       }
     };
     __cgh.parallel_for(
-        cl::sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
+        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
 
@@ -278,7 +278,7 @@ static inline void weight_norm_(
       }
     };
     __cgh.parallel_for(
-        cl::sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
+        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
 
@@ -355,7 +355,7 @@ static inline void launch_weight_norm_backward_reduce_kernel_(
       }
     };
     __cgh.parallel_for(
-        cl::sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
+        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
 }
@@ -487,7 +487,7 @@ static inline void segment_weight_norm_backward_(
       }
     };
     __cgh.parallel_for(
-        cl::sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
+        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
 
@@ -621,7 +621,7 @@ static inline void weight_norm_backward_(
       }
     };
     __cgh.parallel_for(
-        cl::sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
+        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
 

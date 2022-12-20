@@ -63,7 +63,7 @@ Tensor q_add_relu(Tensor qa, Tensor qb, double scale, int64_t zero_point) {
     int8_t* qb_ptr = (int8_t*)qb_.data_ptr();
     uint8_t* o_ptr = (uint8_t*)out.data_ptr();
     cgh.parallel_for(
-        cl::sycl::range<1>(qa_.numel()), [=](cl::sycl::item<1> item) {
+        sycl::range<1>(qa_.numel()), [=](sycl::item<1> item) {
           auto i = item.get_linear_id();
           o_ptr[i] = func(qa_ptr[i], qb_ptr[i]);
         });
