@@ -66,6 +66,22 @@ class TrainingModel(nn.Module):
         x = self.fc(x)
         return x
 
+AUTO_CHANNELS_LAST_SCOPE = [torch.nn.Conv1d,
+                            torch.nn.Conv2d,
+                            torch.nn.Conv3d,
+                            torch.nn.ConvTranspose1d,
+                            torch.nn.ConvTranspose2d,
+                            torch.nn.ConvTranspose3d]
+
+class ChannelsLastModel(nn.Module):
+    def __init__(self):
+        super(ChannelsLastModel, self).__init__()
+        self.conv1d = nn.Conv1d(input_channel, hidden_channel, kernel_size=(1))
+        self.conv2d = nn.Conv2d(input_channel, hidden_channel, kernel_size=(1, 1))
+        self.conv3d = nn.Conv3d(input_channel, hidden_channel, kernel_size=(1, 1, 1))
+        self.deconv1d = nn.ConvTranspose1d(input_channel, hidden_channel, kernel_size=(1))
+        self.deconv2d = nn.ConvTranspose2d(input_channel, hidden_channel, kernel_size=(1, 1))
+        self.deconv3d = nn.ConvTranspose3d(input_channel, hidden_channel, kernel_size=(1, 1, 1))
 
 class TestTorchMethod(TestCase):
     def test_convert_module_data_type(self):
@@ -282,3 +298,18 @@ class TestTorchMethod(TestCase):
                                                      layer2.bias.cpu(),
                                                      atol=checking_atol,
                                                      rtol=checking_rtol)
+
+    def test_xpu_auto_channels_last(self):
+        def check_layout_for_module(module):
+            if module in AUTO_CHANNELS_LAST_SCOPE:
+                if torch.xpu.utils.has_fp64_dtype():
+                    self.assertTrue(module.weight.is_contiguous(memory_format=torch.channels_last))
+                else:
+                    self.assertFalse(module.weight.is_contiguous(memory_format=torch.channels_last))
+            for child in module.children():
+                check_layout_for_module(child)
+
+        module = ChannelsLastModel().to(device=device).train()
+        optimizer_xpu = torch.optim.SGD(module.parameters(), lr=0.1)
+        optimized_module, optimizer_xpu = torch.xpu.optimize(model=module, optimizer=optimizer_xpu, dtype=torch.float32)
+        check_layout_for_module(optimized_module)
