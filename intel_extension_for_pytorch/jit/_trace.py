@@ -54,7 +54,7 @@ def jit_trace_wrapper(f):
 
         # For running XPU workload and the platform unsupports 2d block,
         # the check_trace is here disabled in jit trace to avoid double computing
-        if need_to_disable_check_trace_for_XPU(*args, **kwargs):
+        if torch.xpu.is_available() and need_to_disable_check_trace_for_XPU(*args, **kwargs):
             kwargs['check_trace'] = False
 
         traced = f(*args, **kwargs)
