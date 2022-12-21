@@ -48,6 +48,9 @@ def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight
     def cast_attr(m, attr, master_weight_split, params_attr, optimizer):
         # cast weight/bias for BF16 or FP16 dtype
         float_param = getattr(m, attr)
+        assert float_param.dtype == torch.float32, "The original " + attr + " of the " + str(m) \
+            + " should be kept float and the associated float master " + attr + " will be created for you"
+
         params_attr[float_param] = {}
         if master_weight_split:
             assert convert_dtype == torch.bfloat16, "master_weight_split is only support for bf16 now"
