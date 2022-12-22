@@ -268,8 +268,10 @@ static at::Tensor convolution(
 
   // plain combination
   auto src_md = memory::desc(src_tz, src_data_t, fmt_src);
-  auto wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
-  if (src.is_quantized() && is_channels_last_suggested) {
+  memory::desc wgh_md;
+  if (!dpcppSupportFP64() && !src.is_quantized()) {
+    wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
+  } else {
     wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
   }
   auto dst_md = memory::desc(dst_tz, dst_data_t, fmt_src);
