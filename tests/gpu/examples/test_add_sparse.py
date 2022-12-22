@@ -17,14 +17,14 @@ class TestTorchMethod(TestCase):
         x_xpu = x_cpu.to(dpcpp_device)
 
         print("s_cpu = ", s_cpu)
-        print("s_xpu = ", s_xpu)
+        print("s_xpu = ", s_xpu.to(cpu_device))
         print("x_cpu = ", x_cpu)
-        print("x_xpu = ", x_xpu)
+        print("x_xpu = ", x_xpu.to(cpu_device))
 
         y_cpu = torch.add(x_cpu, s_cpu)
         y_xpu = torch.add(x_xpu, s_xpu)
 
         print("sum cpu = ", y_cpu)
-        print("sum xpu = ", y_xpu)
+        print("sum xpu = ", y_xpu.to(cpu_device))
 
         self.assertEqual(y_cpu, y_xpu.cpu())

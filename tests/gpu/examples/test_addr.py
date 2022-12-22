@@ -4,6 +4,7 @@ from torch.testing import make_tensor
 from torch.testing._internal.common_utils import TestCase
 from torch.testing._internal.common_dtype import get_all_fp_dtypes, get_all_complex_dtypes
 import numpy as np
+import pytest
 
 class TestTorchMethod(TestCase):
 
@@ -68,6 +69,7 @@ class TestTorchMethod(TestCase):
             m[1][10] = m[11][10] = m[21][20] = float('nan')
         check(m, a, b, 0, alpha)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_addr_type_promotion(self, device="xpu", dtypes=torch.float32):
         dtypes = [torch.float64, torch.float32, torch.bfloat16]
         device = "xpu"

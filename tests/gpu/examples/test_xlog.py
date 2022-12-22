@@ -1,6 +1,6 @@
 import torch
 import intel_extension_for_pytorch # noqa
-import scipy
+from scipy import special
 from functools import partial
 from torch.testing._internal.common_utils import TestCase
 from torch.testing import make_tensor
@@ -14,7 +14,7 @@ class TestTorchMethod(TestCase):
             expected = torch_fn(x, y)
             out = torch.empty_like(expected)
             torch_fn(x, y, out=out)
-            self.assertEqual(expected, out)
+            self.assertEqual(expected.cpu(), out.cpu())
 
         def xlogy_inplace_variant_helper(x, y):
             if x.dtype in get_all_int_dtypes() + [torch.bool]:
@@ -25,7 +25,7 @@ class TestTorchMethod(TestCase):
                 expected = torch.empty_like(x)
                 torch.xlogy(x, y, out=expected)
                 inplace_out = x.clone().xlogy_(y)
-                self.assertEqual(expected, inplace_out)
+                self.assertEqual(expected.cpu(), inplace_out.cpu())
 
         def test_helper(torch_fn, reference_fn, inputs, scalar=None):
             x, y, z = inputs
@@ -49,8 +49,8 @@ class TestTorchMethod(TestCase):
         y_1p = make_tensor((3, 2, 4, 5), device=device, dtype=y_dtype, low=-0.5, high=1000)
         z_1p = make_tensor((4, 5), device=device, dtype=y_dtype, low=-0.5, high=1000)
 
-        xlogy_fns = torch.xlogy, scipy.special.xlogy
-        xlog1py_fns = torch.special.xlog1py, scipy.special.xlog1py
+        xlogy_fns = torch.xlogy, special.xlogy
+        xlog1py_fns = torch.special.xlog1py, special.xlog1py
 #
         test_helper(*xlogy_fns, (x, y, z))
         xlogy_inplace_variant_helper(x, x)
