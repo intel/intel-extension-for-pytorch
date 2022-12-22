@@ -82,4 +82,4 @@ class TestNNMethod(TestCase):
         y_int8 = trace_int8_model(M, "xpu", x_input)
         y_fp32 = M(x_input)
 
-        self.assertEqual(y_int8, y_fp32, atol=3e-2, rtol=3e-2)
+        self.assertEqual(y_int8.cpu(), y_fp32, atol=3e-2, rtol=3e-2)

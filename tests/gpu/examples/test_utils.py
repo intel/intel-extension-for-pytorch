@@ -71,6 +71,7 @@ class TestDevicdeListForCard(TestCase):
 
 
 class TestHasDtypes(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_has_fp64_dtype(self):
         y = (torch.tensor(1, device="xpu", dtype=torch.double)**2).cpu().numpy() == np.array(1)
         assert (y == has_fp64_dtype()), "This Device Not Support FP64"

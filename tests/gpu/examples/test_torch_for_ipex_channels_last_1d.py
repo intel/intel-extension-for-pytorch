@@ -270,6 +270,7 @@ class TestNNMethod(TestCase):
         self._test_memory_format_transformations(
             get_generator(shape), transformation_fn, default_is_preserve=True)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_memory_format_clone(self):
         def get_generator(shape):
             def input_generator_fn():

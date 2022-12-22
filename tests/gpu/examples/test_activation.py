@@ -101,6 +101,7 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_activation_rrelu(self, dtype=torch.float):
         #  Will not check the result due to different random seeds on cpu and xpu
         RReLU = torch.nn.RReLU(0.1, 0.3)

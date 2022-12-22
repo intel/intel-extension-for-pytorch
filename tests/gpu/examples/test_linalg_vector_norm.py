@@ -13,9 +13,9 @@ class TestNNMethod(TestCase):
 
         a_xpu = torch.linalg.vector_norm(a.to('xpu'), ord=3.5)
         b_xpu = torch.linalg.vector_norm(b.to('xpu'), ord=3.5)
-        self.assertEqual(a_xpu, b_xpu)
-        self.assertEqual(a_cpu, b_xpu)
+        self.assertEqual(a_xpu, b_xpu.cpu())
+        self.assertEqual(a_cpu, b_xpu.cpu())
         print('a_cpu', a_cpu)
         print('b_cpu', b_cpu)
-        print('a_xpu', a_xpu)
-        print('a_xpu', a_xpu)
+        print('a_xpu', a_xpu.cpu())
+        print('a_xpu', a_xpu.cpu())

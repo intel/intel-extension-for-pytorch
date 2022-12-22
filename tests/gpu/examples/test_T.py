@@ -14,8 +14,8 @@ class TestTensorMethod(TestCase):
         print('x_cpu.T = ', x_cpu.T)
 
         x_dpcpp = x_cpu.to(dpcpp_device)
-        print('x_cpu = ', x_dpcpp)
-        print('x_cpu.T = ', x_dpcpp.T)
+        print('x_cpu = ', x_dpcpp.to(cpu_device))
+        print('x_cpu.T = ', x_dpcpp.T.to(cpu_device))
         self.assertEqual(x_cpu.T, x_dpcpp.T.to(cpu_device))
 
         x_cpu_t = x_cpu.t()

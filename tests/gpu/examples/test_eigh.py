@@ -62,6 +62,7 @@ class TestTorchMethod(TestCase):
             run_test(3, (2, 2), uplo)
 
     @dtypes(torch.float32, torch.float64)
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_eigh_errors_and_warnings(self, dtype=torch.float64, device=dpcpp_device):
 
         # eigh requires a square matrix
@@ -223,6 +224,7 @@ class TestTorchMethod(TestCase):
             run_test(shape, symmetric=True)
 
     @dtypes(torch.float32, torch.float64)
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_eigvalsh_errors_and_warnings(self, device=dpcpp_device, dtype=torch.float64):
         # eigvalsh requires a square matrix
         t = torch.randn(2, 3, device=device, dtype=dtype)

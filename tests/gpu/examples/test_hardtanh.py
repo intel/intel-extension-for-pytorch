@@ -41,7 +41,7 @@ class TestNNMethod(TestCase):
         print("y_dpcpp", y_dpcpp.cpu())
         y_dpcpp.backward(grad_output_dpcpp)
         linear_weight_grad_dpcpp = linear.weight.grad.clone()
-        print("dpcpp linear grad", linear_weight_grad_dpcpp)
+        print("dpcpp linear grad", linear_weight_grad_dpcpp.cpu())
         linear_dpcpp.zero_grad()
 
         self.assertEqual(z_cpu, z_dpcpp)

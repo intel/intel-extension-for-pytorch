@@ -878,6 +878,7 @@ class TestNNMethod(TestCase):
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
         self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_conv_mish_yolo_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
@@ -894,6 +895,7 @@ class TestNNMethod(TestCase):
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
         self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_conv_mish_add_yolo_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
@@ -1519,7 +1521,7 @@ class TestNNMethod(TestCase):
             for i in range(3):
                 if print_graph and i==2:
                     print(modelJit.graph_for(x))
-            print("jit model input: ", x)
+            print("jit model input: ", x.cpu())
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
@@ -1544,6 +1546,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_linear_tanh_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
         model = LinearTanh(4, 4)

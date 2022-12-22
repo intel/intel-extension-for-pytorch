@@ -18,7 +18,6 @@ class TestAddcdivAddcmul(TestCase):
         t1_xpu = t1.to(xpu_device)
         t2_xpu = t2.to(xpu_device)
         res_xpu = torch._foreach_addcdiv((t_xpu, ), (t1_xpu, ), (t2_xpu, ), value=0.1)
-        print(res_xpu)
         self.assertEqual(res, res_xpu)
 
 
@@ -34,5 +33,4 @@ class TestAddcdivAddcmul(TestCase):
         t1_xpu = t1.to(xpu_device)
         t2_xpu = t2.to(xpu_device)
         res_xpu = torch._foreach_addcmul((t_xpu, ), (t1_xpu, ), (t2_xpu, ), value=0.1)
-        print(res_xpu)
         self.assertEqual(res, res_xpu)

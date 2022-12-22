@@ -2,7 +2,7 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch # noqa
-
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -85,6 +85,7 @@ class TestTensorMethod(TestCase):
         print("addcmul_ dpcpp:", x_dpcpp.cpu())
         # self.assertEqual(x, x_dpcpp.cpu(), prec=0.1)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_lerp(self, dtype=torch.float):
         x = torch.tensor([[0.6580, -1.0969, -0.4614],
                           [-0.1034, -0.5790, 0.1497]], device=cpu_device)

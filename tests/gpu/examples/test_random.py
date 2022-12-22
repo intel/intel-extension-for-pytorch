@@ -75,8 +75,8 @@ class TestNNMethod(TestCase):
                         t.random_(from_, to_)
                         range_ = to_ - from_
                         delta = 1
-                        self.assertTrue(from_ <= t.to(torch.int).min() < (from_ + delta))
-                        self.assertTrue((to_ - delta) <= t.to(torch.int).max() < to_)
+                        self.assertTrue(from_ <= t.to(torch.int).min().cpu() < (from_ + delta))
+                        self.assertTrue((to_ - delta) <= t.to(torch.int).max().cpu() < to_)
                 else:
                     self.assertRaisesRegex(
                         RuntimeError,
@@ -110,8 +110,8 @@ class TestNNMethod(TestCase):
 
         t.random_(from_, None)
         delta = max(1, alpha * range_)
-        self.assertTrue(from_ <= t.to(torch.double).min() < (from_ + delta))
-        self.assertTrue((to_inc_ - delta) < t.to(torch.double).max() <= to_inc_)
+        self.assertTrue(from_ <= t.cpu().to(torch.double).min() < (from_ + delta))
+        self.assertTrue((to_inc_ - delta) < t.cpu().to(torch.double).max() <= to_inc_)
 
     def test_random_from_to(self):
         # TODO: https://github.com/pytorch/pytorch/issues/33793
@@ -171,11 +171,11 @@ class TestNNMethod(TestCase):
                         if dtype == torch.bfloat16:
                             # Less strict checks because of rounding errors
                             # TODO investigate rounding errors
-                            self.assertTrue(from_ <= t.to(torch.double).min() < (from_ + delta))
-                            self.assertTrue((to_ - delta) < t.to(torch.double).max() <= to_)
+                            self.assertTrue(from_ <= t.cpu().to(torch.double).min() < (from_ + delta))
+                            self.assertTrue((to_ - delta) < t.cpu().to(torch.double).max() <= to_)
                         else:
-                            self.assertTrue(from_ <= t.to(torch.double).min() < (from_ + delta))
-                            self.assertTrue((to_ - delta) <= t.to(torch.double).max() < to_)
+                            self.assertTrue(from_ <= t.cpu().to(torch.double).min() < (from_ + delta))
+                            self.assertTrue((to_ - delta) <= t.cpu().to(torch.double).max() < to_)
                 else:
                     self.assertRaisesRegex(
                         RuntimeError,
@@ -231,11 +231,11 @@ class TestNNMethod(TestCase):
                     if dtype == torch.bfloat16:
                         # Less strict checks because of rounding errors
                         # TODO investigate rounding errors
-                        self.assertTrue(from_ <= t.to(torch.double).min() < (from_ + delta))
-                        self.assertTrue((to_ - delta) < t.to(torch.double).max() <= to_)
+                        self.assertTrue(from_ <= t.cpu().to(torch.double).min() < (from_ + delta))
+                        self.assertTrue((to_ - delta) < t.cpu().to(torch.double).max() <= to_)
                     else:
-                        self.assertTrue(from_ <= t.to(torch.double).min() < (from_ + delta))
-                        self.assertTrue((to_ - delta) <= t.to(torch.double).max() < to_)
+                        self.assertTrue(from_ <= t.cpu().to(torch.double).min() < (from_ + delta))
+                        self.assertTrue((to_ - delta) <= t.cpu().to(torch.double).max() < to_)
             else:
                 self.assertRaisesRegex(
                     RuntimeError,
@@ -243,6 +243,7 @@ class TestNNMethod(TestCase):
                     lambda: t.random_(from_, to_)
                 )
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_random_default(self):
         # TODO: https://github.com/pytorch/pytorch/issues/33793
         dtype = torch.double

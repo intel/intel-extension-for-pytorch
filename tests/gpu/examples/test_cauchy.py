@@ -3,7 +3,7 @@ import math
 import torch
 from torch.distributions import Cauchy
 from torch.testing._internal.common_utils import TestCase
-
+import pytest
 import intel_extension_for_pytorch # noqa
 
 
@@ -19,6 +19,7 @@ def is_all_nan(tensor):
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_cauchy(self):
         loc = torch.zeros(5, 5, requires_grad=True, device=sycl_device)
         scale = torch.ones(5, 5, requires_grad=True, device=sycl_device)

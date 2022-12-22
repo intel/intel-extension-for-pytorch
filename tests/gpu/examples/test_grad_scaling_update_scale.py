@@ -66,7 +66,7 @@ class TestTorchMethod(TestCase):
             else:
                 self.assertEqual(found_inf, 0.0)
                 for grad in grads:
-                    self.assertEqual(grad, torch.ones_like(grad), rtol=1e-5, atol=1e-7)
+                    self.assertEqual(grad.cpu(), torch.ones_like(grad), rtol=1e-5, atol=1e-7)
 
         # When passing lists with mismatched dtypes to a raw
         # _amp_foreach_non_finite_check_and_unscale_ call,
@@ -74,4 +74,4 @@ class TestTorchMethod(TestCase):
         grads = [g.clone(), g.to(dtype=torch.float16)]
         torch._amp_foreach_non_finite_check_and_unscale_(grads, found_inf, inv_scale)
         for grad in grads:
-            self.assertEqual(grad, torch.ones_like(grad), rtol=1e-5, atol=1e-7)
+            self.assertEqual(grad.cpu(), torch.ones_like(grad), rtol=1e-5, atol=1e-7)

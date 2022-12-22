@@ -337,7 +337,7 @@ class TestDistributions(TestCase):
         s_cpu = torch._standard_gamma(alpha_cpu)
         s_xpu = torch._standard_gamma(alpha_xpu)
         print("s_cpu: ", s_cpu)
-        print("s_xpu: ", s_xpu)
+        print("s_xpu: ", s_xpu.to("cpu"))
 
         grad_cpu = Variable(torch.sum(s_cpu), requires_grad=True)
         grad_cpu.backward()
@@ -345,7 +345,7 @@ class TestDistributions(TestCase):
 
         grad_xpu = Variable(torch.sum(s_xpu), requires_grad=True)
         grad_xpu.backward()
-        print("grad_xpu: ", grad_xpu.grad)
+        print("grad_xpu: ", grad_xpu.grad.to("cpu"))
         self.assertEqual(grad_xpu.grad.to("cpu"), grad_cpu.grad)
 
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
