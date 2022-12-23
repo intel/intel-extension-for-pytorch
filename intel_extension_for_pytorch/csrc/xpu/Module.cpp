@@ -528,10 +528,6 @@ static void bindGetDeviceInfo(PyObject* module) {
         return xpu::dpcpp::getDeviceInfo(device);
       },
       py::return_value_policy::reference);
-
-  m.def("_synchronize", [](const int& device_index) {
-    getCurrentDPCPPStream(device_index).synchronize_and_throw();
-  });
 }
 
 at::Scalar scalar_slow(PyObject* object) {
