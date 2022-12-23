@@ -218,7 +218,7 @@ at::Tensor run(
       "Check the shapes of mat1 and mat2, they cannot be multiplied!");
   auto input_ = input.contiguous();
   c10::MaybeOwned<at::Tensor> bias_maybe_owned =
-      at::borrow_from_optional_tensor(context.bias_);
+      at::borrow_from_optional_tensor(context.at_bias_);
   const at::Tensor& bias = *bias_maybe_owned;
   return linear_kernel(input_, context.weight_packed_, bias, attr);
 }
@@ -233,7 +233,7 @@ at::Tensor& run(
       "Check the shapes of mat1 and mat2, they cannot be multiplied!");
   auto input_ = input.contiguous();
   c10::MaybeOwned<at::Tensor> bias_maybe_owned =
-      at::borrow_from_optional_tensor(context.bias_);
+      at::borrow_from_optional_tensor(context.at_bias_);
   const at::Tensor& bias = *bias_maybe_owned;
   linear_kernel_output(input_, context.weight_packed_, bias, accumu, attr);
   return accumu;
@@ -250,8 +250,8 @@ void run_core(
   TORCH_CHECK(
       input.size(input.dim() - 1) == context.weight_packed_.get_dims()[1],
       "Check the shapes of mat1 and mat2, they cannot be multiplied!");
-  if (context.bias_) {
-    auto mkl_bias = itensor_view_from_dense(*context.bias_);
+  if (context.at_bias_) {
+    auto mkl_bias = itensor_view_from_dense(*context.at_bias_);
     ideep::inner_product_forward::prepare(
         param,
         mkldnn_input,
@@ -280,7 +280,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
       context.at_weight_,
       output_mask,
       context.weight_packed_,
-      context.bias_);
+      context.at_bias_);
 }
 
 at::Tensor pack(ContextLinear& context, const at::Tensor& tensor) {

@@ -352,7 +352,7 @@ at::Tensor run(
   check_shape_forward(
       input_.sizes(),
       context.origin_weight_dims_,
-      context.bias_,
+      context.at_bias_,
       context.padding_,
       context.stride_,
       context.dilation_,
@@ -361,7 +361,7 @@ at::Tensor run(
   return conv_transpose_kernel_impl(
       input_,
       context.weight_packed_,
-      context.bias_,
+      context.at_bias_,
       context.stride_,
       context.padding_,
       context.output_padding_,
@@ -397,7 +397,7 @@ at::Tensor& run(
   check_shape_forward(
       input_.sizes(),
       context.origin_weight_dims_,
-      context.bias_,
+      context.at_bias_,
       context.padding_,
       context.stride_,
       context.dilation_,
@@ -406,7 +406,7 @@ at::Tensor& run(
   conv_transpose_out_kernel_impl(
       input_,
       context.weight_packed_,
-      context.bias_,
+      context.at_bias_,
       accumu,
       context.stride_,
       context.padding_,

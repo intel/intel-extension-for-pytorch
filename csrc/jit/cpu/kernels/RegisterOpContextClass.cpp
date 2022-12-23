@@ -40,7 +40,10 @@ TORCH_LIBRARY(ipex_prepack, m) {
       .def("to_public", &torch_ipex::cpu::ConvolutionOpContext::to_public)
       .def(
           "get_data_handle",
-          &torch_ipex::cpu::ConvolutionOpContext::get_data_handle);
+          &torch_ipex::cpu::ConvolutionOpContext::get_data_handle)
+      .def(
+          "load_from_ctx",
+          &torch_ipex::cpu::ConvolutionOpContext::load_from_ctx);
   m.class_<LinearOpContext>("LinearOpContext")
       .def_pickle(
           [](const c10::intrusive_ptr<LinearOpContext>& op_context)
@@ -59,8 +62,8 @@ TORCH_LIBRARY(ipex_prepack, m) {
       .def("pack", &torch_ipex::cpu::LinearOpContext::pack)
       .def("to_public", &torch_ipex::cpu::LinearOpContext::to_public)
       .def(
-          "get_data_handle",
-          &torch_ipex::cpu::LinearOpContext::get_data_handle);
+          "get_data_handle", &torch_ipex::cpu::LinearOpContext::get_data_handle)
+      .def("load_from_ctx", &torch_ipex::cpu::LinearOpContext::load_from_ctx);
   m.class_<MKLOpContext>("MKLOpContext")
       .def_pickle(
           [](const c10::intrusive_ptr<MKLOpContext>& op_context)
@@ -77,7 +80,8 @@ TORCH_LIBRARY(ipex_prepack, m) {
       .def("get_weight", &torch_ipex::cpu::MKLOpContext::get_at_packed_weight)
       .def("pack", &torch_ipex::cpu::MKLOpContext::pack)
       .def("to_public", &torch_ipex::cpu::MKLOpContext::to_public)
-      .def("get_data_handle", &torch_ipex::cpu::MKLOpContext::get_data_handle);
+      .def("get_data_handle", &torch_ipex::cpu::MKLOpContext::get_data_handle)
+      .def("load_from_ctx", &torch_ipex::cpu::MKLOpContext::load_from_ctx);
   m.class_<ConvTransposeOpContext>("ConvTransposeOpContext")
       .def_pickle(
           [](const c10::intrusive_ptr<ConvTransposeOpContext>& op_context)
@@ -104,7 +108,10 @@ TORCH_LIBRARY(ipex_prepack, m) {
       .def("to_public", &torch_ipex::cpu::ConvTransposeOpContext::to_public)
       .def(
           "get_data_handle",
-          &torch_ipex::cpu::ConvTransposeOpContext::get_data_handle);
+          &torch_ipex::cpu::ConvTransposeOpContext::get_data_handle)
+      .def(
+          "load_from_ctx",
+          &torch_ipex::cpu::ConvTransposeOpContext::load_from_ctx);
   m.def(
       "convolution_prepack(Tensor W, Tensor? B, int[] stride, "
       "int[] padding, int[] dilation, int groups, "

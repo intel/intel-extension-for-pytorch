@@ -13,7 +13,7 @@ struct ContextLinear final {
   // at_weight will share same memory with weight_packed_
   // at_weight is used for autograd and optimizer update
   at::Tensor at_weight_;
-  c10::optional<at::Tensor> bias_;
+  c10::optional<at::Tensor> at_bias_;
 
   ContextLinear() = delete;
 
@@ -25,7 +25,7 @@ struct ContextLinear final {
       : original_desc_(std::move(original_desc)),
         weight_packed_(std::move(weight_packed)),
         at_weight_(std::move(at_weight)),
-        bias_(std::move(bias)) {}
+        at_bias_(std::move(bias)) {}
 
   ContextLinear(ContextLinear&&) = default;
   ContextLinear& operator=(ContextLinear&&) = default;

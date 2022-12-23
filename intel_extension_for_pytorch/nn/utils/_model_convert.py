@@ -1,6 +1,7 @@
 import torch
 import copy
 import warnings
+import types
 
 from torch.nn.utils.rnn import PackedSequence
 
@@ -92,6 +93,20 @@ def replace_dropout_with_identity(model):
             else:
                 replace_dropout_with_identity(child)
 
+def _save_to_state_dict(self, destination, prefix, keep_vars):
+    # convert weights(bias) of module to float while saving check point
+    param_dict = {}
+    for name, para in self.named_parameters():
+        if not hasattr(self, name):
+            continue
+        param_dict.update({name: para})
+        temp_param = torch.nn.Parameter(para.to(torch.float), requires_grad=para.requires_grad)
+        setattr(self, name, temp_param)
+    super(type(self), self)._save_to_state_dict(destination, prefix, keep_vars)
+    for p in param_dict:
+        origin_param = param_dict[p]
+        setattr(self, p, origin_param)
+
 def convert_module_data_type(module, dtype):
     # convert weights(bias) of module to dtype to reduce dtype reorder
     module_convert_list = [torch.nn.Conv2d,
@@ -103,6 +118,7 @@ def convert_module_data_type(module, dtype):
                            torch.nn.LSTM]
     for module_cls in module_convert_list:
         if isinstance(module, module_cls):
+            setattr(module, '_save_to_state_dict', types.MethodType(_save_to_state_dict, module))
             if module_cls is torch.nn.LSTM:
                 for name, param in module.named_parameters():
                     ori_data = getattr(getattr(module, name), "data")
