@@ -40,25 +40,6 @@ at::Tensor dil_maskedfill_softmax(
     const at::IntArrayRef& mask_qk_reshp,
     const at::Scalar& fill);
 
-at::Tensor dil_transfree_mha(
-    const at::Tensor& qkv,
-    const at::Tensor& rel_kv,
-    const at::Scalar& alpha,
-    const at::Scalar& dim_per_head,
-    const int64_t& softmax_dim,
-    const at::IValue& dtype,
-    const int64_t& head_num,
-    const int64_t& head_size);
-
-at::Tensor dil_transfree_distil_mha(
-    const at::Tensor& qkv,
-    const at::Tensor& mask_qk,
-    const at::IntArrayRef& mask_qk_reshp,
-    const at::Scalar& fill,
-    const at::Scalar& dim_per_head,
-    const int64_t& head_num,
-    const int64_t& head_size);
-
 at::Tensor dil_transfree_vit_mha(
     const at::Tensor& qkv,
     const at::Tensor& dim_per_head,
@@ -80,8 +61,13 @@ at::Tensor dil_mha_matmul_trans(
     const at::Tensor& right);
 
 template <typename T>
-std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_qkv_split(
-    const at::Tensor& qkv);
+std::vector<at::Tensor> dil_mat_split(
+    const at::Tensor& qkv,
+    const at::IntArrayRef& split_list);
+
+c10::List<at::Tensor> dil_split_tensor(
+    const at::Tensor& mat,
+    const at::IntArrayRef& split_list);
 
 } // namespace cpu
 } // namespace torch_ipex
