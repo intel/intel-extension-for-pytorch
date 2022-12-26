@@ -44,6 +44,23 @@ def _save_to_state_dict(self, destination, prefix, keep_vars):
         origin_param = param_dict[p]
         setattr(self, p, origin_param)
 
+def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
+                            missing_keys, unexpected_keys, error_msgs):
+    for name, para in self.named_parameters():
+        if not hasattr(self, name):
+            continue
+        para_name = prefix + name
+        with torch.no_grad():
+            if para_name in state_dict:
+                fp32_param = state_dict[para_name]
+                if hasattr(self, 'master_' + name):
+                    getattr(self, 'master_' + name).copy_(fp32_param)
+                    getattr(self, name).copy_(fp32_param.bfloat16())
+                elif hasattr(self, name + '_trail'):
+                    top, bot = torch.ops.torch_ipex.split_float_bfloat16(fp32_param)
+                    getattr(self, name).copy_(top)
+                    getattr(self, name + '_trail').copy_(bot)
+
 def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight_split, convert_dtype=torch.bfloat16):
     
     def cast_attr(m, attr, master_weight_split, params_attr, optimizer):
@@ -81,10 +98,12 @@ def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight
             # for resume training reason, we always save float tensors
             # replace module method to ensure return float params while call "state_dict()"
             setattr(m, '_save_to_state_dict', types.MethodType(_save_to_state_dict, m))
+            setattr(m, '_load_from_state_dict', types.MethodType(_load_from_state_dict, m))
             for name, sub_m in m.named_children():
                 if isinstance(sub_m, torch.nn.ParameterList):
                     setattr(sub_m, 'master_weight_split', master_weight_split)
                     setattr(sub_m, '_save_to_state_dict', types.MethodType(_save_to_state_dict, sub_m))
+                    setattr(sub_m, '_load_from_state_dict', types.MethodType(_load_from_state_dict, sub_m))
                     for name, para in sub_m.named_parameters():
                         cast_attr(sub_m, name, master_weight_split, params_attr, optimizer)
         return m

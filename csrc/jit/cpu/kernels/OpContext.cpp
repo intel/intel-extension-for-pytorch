@@ -8,6 +8,32 @@
 namespace torch_ipex {
 namespace cpu {
 
+template <typename T1, typename T2>
+void load_from_ctx_template(T1* self, c10::intrusive_ptr<T2> other) {
+  auto& other_ctx_ = other->get_context();
+  auto loaded_weight = other_ctx_.at_weight_;
+  auto loaded_bias = other_ctx_.at_bias_;
+  self->get_context().at_weight_.copy_(loaded_weight);
+  if (loaded_bias.has_value()) {
+    self->get_context().at_bias_.value().copy_(loaded_bias.value());
+  }
+  return;
+}
+
+template <>
+void load_from_ctx_template<IpexLinearMKLOpContext, MKLOpContext>(
+    IpexLinearMKLOpContext* self,
+    c10::intrusive_ptr<MKLOpContext> other) {
+  auto& other_ctx_ = other->get_context();
+  auto loaded_weight = other_ctx_.at_weight_;
+  auto loaded_bias = other_ctx_.at_bias_;
+  self->get_context().at_weight_.copy_(loaded_weight);
+  if (loaded_bias.has_value()) {
+    self->get_context().at_bias_.value().copy_(loaded_bias.value());
+  }
+  self->get_context().ori_weight_.copy_(other->get_context().ori_weight_);
+  return;
+}
 c10::intrusive_ptr<ConvolutionOpContext> IpexConvolutionOpContext::
     create_context(
         at::Tensor&& weight,
@@ -99,6 +125,11 @@ at::Tensor IpexConvolutionOpContext::get_data_handle() {
   return ptr;
 }
 
+void IpexConvolutionOpContext::load_from_ctx(
+    c10::intrusive_ptr<ConvolutionOpContext> other) {
+  load_from_ctx_template(this, other);
+}
+
 c10::intrusive_ptr<LinearOpContext> IpexLinearOpContext::create_context(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
@@ -153,6 +184,11 @@ at::Tensor IpexLinearOpContext::to_public(const at::Tensor& tensor) {
   return torch_ipex::cpu::detail::linear::unpack(op_context_, tensor);
 }
 
+void IpexLinearOpContext::load_from_ctx(
+    c10::intrusive_ptr<LinearOpContext> other) {
+  load_from_ctx_template(this, other);
+}
+
 c10::intrusive_ptr<ConvTransposeOpContext> IpexConvTransposeOpContext::
     create_context(
         at::Tensor&& weight,
@@ -194,7 +230,7 @@ c10::intrusive_ptr<MKLOpContext> IpexLinearMKLOpContext::create_context(
 }
 
 at::Tensor IpexLinearMKLOpContext::get_at_packed_weight() {
-  return op_context_.mkl_weight_;
+  return op_context_.at_weight_;
 }
 
 at::Tensor IpexLinearMKLOpContext::get_data_handle() {
@@ -221,7 +257,7 @@ at::Tensor IpexLinearMKLOpContext::to_public(const at::Tensor& tensor) {
   return op_context_.ori_weight_.clone();
 }
 
-detail::ContextLinearMKL& IpexLinearMKLOpContext::get_mkl_context() {
+detail::ContextLinearMKL& IpexLinearMKLOpContext::get_context() {
   return op_context_;
 }
 
@@ -231,6 +267,11 @@ int64_t IpexLinearMKLOpContext::get_out_features() {
 
 int64_t IpexLinearMKLOpContext::get_in_features() {
   return op_context_.sgemm_sizes_[1];
+}
+
+void IpexLinearMKLOpContext::load_from_ctx(
+    c10::intrusive_ptr<MKLOpContext> other) {
+  load_from_ctx_template(this, other);
 }
 
 at::Tensor IpexConvTransposeOpContext::run(
@@ -286,6 +327,11 @@ at::Tensor IpexConvTransposeOpContext::get_data_handle() {
 
 detail::ContextConvTranspose& IpexConvTransposeOpContext::get_context() {
   return op_context_;
+}
+
+void IpexConvTransposeOpContext::load_from_ctx(
+    c10::intrusive_ptr<ConvTransposeOpContext> other) {
+  load_from_ctx_template(this, other);
 }
 
 } // namespace cpu
