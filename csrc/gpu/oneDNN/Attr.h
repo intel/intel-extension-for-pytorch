@@ -79,7 +79,6 @@ to oneDNN doc.
    // TODO:
    fusion_dst = Convdw(Conv1x1(...))
 */
-
 using kind_t = dnnl::primitive::kind;
 struct PostOpParam {
   // eltwise post op constructor
@@ -88,8 +87,17 @@ struct PostOpParam {
   // sum post op constructor
   PostOpParam(float scale, kind_t kind) : scale_(scale), kind_(kind) {}
   // binary post op constructor
-  PostOpParam(void* binary_ptr, meta_t& binary_md, algorithm algo, kind_t kind)
-      : binary_ptr_(binary_ptr), meta_(binary_md), algo_(algo), kind_(kind) {}
+  PostOpParam(
+      Tensor& binary,
+      meta_t& binary_md,
+      meta_t& expected_md,
+      algorithm algo,
+      kind_t kind)
+      : binary_(binary),
+        meta_(binary_md),
+        expected_meta_(expected_md),
+        algo_(algo),
+        kind_(kind) {}
   // prelu post op constructor
   PostOpParam(int mask, kind_t kind) : mask_(mask), kind_(kind) {}
 
@@ -99,8 +107,10 @@ struct PostOpParam {
   float alpha_;
   float beta_;
   // for binary
-  data_t binary_ptr_;
+  Tensor binary_;
   meta_t meta_;
+  Tensor expected_binary_;
+  meta_t expected_meta_;
   // for prelu
   int mask_;
   // common
@@ -164,24 +174,40 @@ class Attr {
 
   // append binary post op
   Attr& append_post_binary(algorithm algo, const Tensor& binary) {
-    auto _binary = binary.is_quantized() ? at::dequantize(binary) : binary;
-    void* binary_ptr = _binary.data_ptr();
-    auto ctx = DPCPPTensorContext::get_tensor_ctx(_binary);
-    auto binary_md = ctx.is_plain() ? memory::desc(
-                                          get_onednn_dims(_binary),
-                                          get_onednn_dtype(_binary),
-                                          get_onednn_strides(_binary))
-                                    : ctx.meta();
+    auto binary_ = binary.is_quantized() ? at::dequantize(binary) : binary;
+    auto ctx = DPCPPTensorContext::get_tensor_ctx(binary_);
+    memory::desc md;
+    if (ctx.is_plain()) {
+      binary_ = binary_.contiguous();
+      md = memory::desc(
+          get_onednn_dims(binary_),
+          get_onednn_dtype(binary_),
+          get_onednn_strides(binary_));
+    } else {
+      md = ctx.meta();
+    }
+    auto expected_md =
+        memory::desc(md.dims(), md.data_type(), memory::format_tag::any);
     ops_params_.push_back(
-        PostOpParam(binary_ptr, binary_md, algo, kind_t::binary));
+        PostOpParam(binary_, md, expected_md, algo, kind_t::binary));
     return *this;
   }
 
-  // append bias with binary_add method
+  // append bias with binary_add method (only used for QConv now)
   template <int N>
   Attr& append_bias(const Tensor& binary) {
+    // In PyTorch, bias are in shape of [OC],
+    // we expand its shape according to Conv dimension
+    // Conv1d [OC, 1, 1], Conv2d [1, OC, 1, ,1], Conv3d [1, OC, 1, 1, 1]
+    Tensor binary_ = binary.contiguous();
     memory::desc binary_md;
     switch (N) {
+      case 1:
+        binary_md = memory::desc(
+            {binary.size(0), 1, 1},
+            memory::data_type::f32,
+            memory::format_tag::abc);
+        break;
       case 2:
         binary_md = memory::desc(
             {1, binary.size(0), 1, 1},
@@ -195,10 +221,12 @@ class Attr {
             memory::format_tag::abcde);
         break;
       default:
-        AT_ERROR("IPEX only supports append_bias for Conv2d and Conv3d.");
+        AT_ERROR(
+            "IPEX only supports append_bias for Conv1d, Conv2d and Conv3d.");
     }
+    // In this case, expected_md = binary_md
     ops_params_.push_back(PostOpParam(
-        binary.data_ptr(), binary_md, kind_with_binary_add, kind_t::binary));
+        binary_, binary_md, binary_md, kind_with_binary_add, kind_t::binary));
     return *this;
   }
 
@@ -242,20 +270,15 @@ class Attr {
         }
         case kind_t::binary: {
           algorithm algo = ops_params_[i].algo_;
-          auto binary_md = ops_params_[i].meta_;
+          auto expected_md = ops_params_[i].expected_meta_;
           // In this case user may create src1 memory descriptor with
           // format_tag::any or set a specific tag. However, in later case if
           // tags mismatch with dst, it would result in suboptimal performance.
           // So here we use format_tag::any to make sure the fast can be
           // selected.
-          auto md = binary_md;
-          if (binary_md.dims() == get_onednn_dims(dst)) {
-            md = memory::desc(
-                binary_md.dims(),
-                binary_md.data_type(),
-                memory::format_tag::any);
-          }
-          dnnl_post_ops.append_binary(algo, md);
+          // Thus we use expected_md (with format_any) here to create pd instead
+          // of original md
+          dnnl_post_ops.append_binary(algo, expected_md);
           break;
         }
         default:
@@ -306,7 +329,6 @@ class Attr {
   void construct_post_binary(
       primitive_desc& pd,
       post_ops& dnnl_post_ops,
-      memory::desc& dst_md,
       std::unordered_map<int, memory>& args) {
     // This function is used to construct binary memory desc in binary post ops.
     // According to oneDNN doc, the binary tensor can be in shape of
@@ -318,41 +340,25 @@ class Attr {
     for (int i = 0; i < ops_params_.size(); ++i) {
       kind_t kind = ops_params_[i].kind_;
       if (kind == kind_t::binary) {
-        auto binary_md = ops_params_[i].meta_;
-        auto binary_ptr = ops_params_[i].binary_ptr_;
-        auto binary_memory = dpcpp_onednn_memory(binary_md, engine, binary_ptr);
-        auto expected_binary_memory = binary_memory;
+        memory binary_m;
+        auto binary = ops_params_[i].binary_;
+        auto md = ops_params_[i].meta_;
+        // qeury expected_md to achieve peak performance
+        auto expected_md = pd.query_md(
+            query::exec_arg_md,
+            DNNL_ARG_ATTR_MULTIPLE_POST_OP(i) | DNNL_ARG_SRC_1);
 
-        // How to set expected_md for binary need more discussion with oneDNN.
-        // if (binary_md.dims() == dst_md.dims()) {
-        //   // for non-int8 case, expected_binary should in the same datatype
-        //   and
-        //   // fmt as dst
-        //   // for int8 case, expected_binary should in the same fmt as dst
-        //   while
-        //   // in fp32 datatype
-        //   auto expected_md = dst_md;
-        //   if (dst_md.data_type() == memory::data_type::u8 ||
-        //       dst_md.data_type() == memory::data_type::s8) {
-        //     expected_md.data.data_type =
-        //         static_cast<dnnl_data_type_t>(binary_md.data_type());
-        //   }
-
-        //   // if binary_md is not equal to expected_md, reorder is needed.
-        //   if (binary_md != expected_md) {
-        //     expected_binary_memory =
-        //         dpcpp_onednn_memory(expected_md, engine, nullptr);
-        //     auto strm = GpuStreamManager::Instance().get_stream();
-        //     DPCPP_ONEDNN_EXEC(
-        //         dnnl::reorder(binary_memory, expected_binary_memory),
-        //         strm,
-        //         {{DNNL_ARG_FROM, binary_memory},
-        //          {DNNL_ARG_TO, expected_binary_memory}});
-        //   }
-        // }
+        if (md != expected_md) {
+          ops_params_[i].expected_binary_ =
+              empty_opaque_tensor(expected_md, binary.options(), c10::nullopt);
+          binary_m = dpcpp_onednn_memory(
+              expected_md, engine, ops_params_[i].expected_binary_.data_ptr());
+          xpu::oneDNN::reorder(binary, ops_params_[i].expected_binary_);
+        } else {
+          binary_m = dpcpp_onednn_memory(md, engine, binary.data_ptr());
+        }
         args.insert(
-            {DNNL_ARG_ATTR_MULTIPLE_POST_OP(i) | DNNL_ARG_SRC_1,
-             expected_binary_memory});
+            {DNNL_ARG_ATTR_MULTIPLE_POST_OP(i) | DNNL_ARG_SRC_1, binary_m});
       }
     }
   }

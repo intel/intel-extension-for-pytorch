@@ -506,7 +506,7 @@ static at::Tensor convolution(
   }
 
   if (attr.with_binary())
-    attr.construct_post_binary(conv_fwd_pd, po, expected_dst_md, args);
+    attr.construct_post_binary(conv_fwd_pd, po, args);
 
   memory bia_m = memory({{}, bia_data_t, fmt_bia}, engine);
   if (bia.defined()) {

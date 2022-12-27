@@ -408,7 +408,7 @@ static at::Tensor quantized_convolution(
   std::unordered_map<int, memory> args;
   auto expected_dst_md = conv_fwd_pd.dst_desc();
   if (attr.with_binary())
-    attr.construct_post_binary(conv_fwd_pd, po, expected_dst_md, args);
+    attr.construct_post_binary(conv_fwd_pd, po, args);
 
 #ifdef USE_PRIMITIVE_CACHE
   auto conv_forward =

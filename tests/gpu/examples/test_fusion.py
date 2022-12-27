@@ -1151,9 +1151,10 @@ class TestNNMethod(TestCase):
             model_xpu = copy.deepcopy(model).to("xpu")
             modelJit = torch.jit.script(model_xpu)
             with torch.no_grad():
-                y_dpcpp = modelJit(x_xpu, a_xpu)
-                # print(modelJit.graph_for(x, a))
-                # print("fusion:", y_dpcpp.cpu())
+                for i in range(3):
+                    y_dpcpp = modelJit(x_xpu, a_xpu)
+                    # print(modelJit.graph_for(x, a))
+                    # print("fusion:", y_dpcpp.cpu())
             self.assertEqual(y, y_dpcpp.to(cpu_device))
             del modelJit
 

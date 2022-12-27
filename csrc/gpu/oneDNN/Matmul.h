@@ -336,7 +336,7 @@ static inline void matmul(
       xpu::oneDNN::reorder(dst, dst_);
   }
   if (attr.with_binary())
-    attr.construct_post_binary(matmul_pd, po, expected_dst_md, args);
+    attr.construct_post_binary(matmul_pd, po, args);
 
   args.insert({DNNL_ARG_SRC, m1_m});
   args.insert({DNNL_ARG_WEIGHTS, m2_m});
