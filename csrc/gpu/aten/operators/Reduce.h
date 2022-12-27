@@ -23,6 +23,48 @@
 #include "comm/Numerics.h"
 
 template <class arg_t, class item_t, class ReduceOp, int out_vec_sz = 1>
+DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_reduce(
+    item_t item,
+    int wg_size,
+    dpcpp_local_ptr<void> shared,
+    at::detail::Array<arg_t, out_vec_sz> value,
+    ReduceOp reduce) {
+  using vec_t = at::detail::Array<arg_t, out_vec_sz>;
+  dpcpp_local_ptr<vec_t> shared_(shared);
+  int l_x = item.get_local_linear_id();
+  int dim_x = wg_size;
+  auto sg = item.get_sub_group();
+  int sg_size = sg.get_local_range()[0];
+
+  if (dim_x > sg_size) {
+    int base = l_x;
+    shared_[base] = value;
+    for (int offset = dim_x / 2; offset >= sg_size; offset >>= 1) {
+      item.barrier(dpcpp_local_fence);
+      if (l_x < offset && l_x + offset < wg_size) {
+        vec_t other = shared_[base + offset];
+#pragma unroll(out_vec_sz)
+        for (int i = 0; i < out_vec_sz; ++i) {
+          value[i] = reduce(value[i], other[i]);
+        }
+        shared_[base] = value;
+      }
+    }
+    dim_x = sg_size;
+  }
+
+  // sub-group reduction
+  for (int offset = 1; offset < dim_x; offset <<= 1) {
+#pragma unroll(out_vec_sz)
+    for (int i = 0; i < out_vec_sz; ++i) {
+      arg_t other = sg.shuffle_down(value[i], offset);
+      value[i] = reduce(value[i], other);
+    }
+  }
+  return value;
+}
+
+template <class arg_t, class item_t, class ReduceOp, int out_vec_sz = 1>
 DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_x_reduce(
     item_t item,
     dpcpp_local_ptr<void> shared,

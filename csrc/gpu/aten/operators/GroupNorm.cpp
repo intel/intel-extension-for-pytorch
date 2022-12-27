@@ -1,9 +1,11 @@
 #include <ATen/ATen.h>
+#include <ATen/core/Array.h>
 
 #include <core/MemoryFormat.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 
+#include "Reduce.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
@@ -14,6 +16,15 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+namespace {
+template <typename T>
+struct ReduceAdd {
+  T operator()(const T a, const T b) const {
+    return a + b;
+  }
+};
+} // namespace
 
 template <typename T>
 static void RowwiseMomentsDPCPPKernel(
@@ -29,6 +40,7 @@ static void RowwiseMomentsDPCPPKernel(
   auto local_size = dpcppMaxWorkGroupSize(dev_id);
   auto global_size = total_size * local_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
+    dpcpp_local_acc_t<T_ACC> shared(local_size, cgh);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(global_size), sycl::range<1>(local_size)),
@@ -44,8 +56,13 @@ static void RowwiseMomentsDPCPPKernel(
             sum1 += static_cast<T_ACC>(X[index]);
             sum2 += static_cast<T_ACC>(X[index]) * static_cast<T_ACC>(X[index]);
           }
-          sum1 = sycl::reduce_over_group(g, sum1, sycl::ext::oneapi::plus<>());
-          sum2 = sycl::reduce_over_group(g, sum2, sycl::ext::oneapi::plus<>());
+
+          using vec_t = at::detail::Array<T_ACC, 1>;
+          sum1 = group_reduce(
+              item_id, local_size, shared, vec_t(sum1), ReduceAdd<T_ACC>())[0];
+          sum2 = group_reduce(
+              item_id, local_size, shared, vec_t(sum2), ReduceAdd<T_ACC>())[0];
+
           if (local_id == 0) {
             const T_ACC scale = T_ACC(1) / static_cast<T_ACC>(N);
             sum1 *= scale;
@@ -200,6 +217,7 @@ void ComputeInternalGradientsDPCPPKernel(
   auto local_size = dpcppMaxWorkGroupSize(dev_id);
   auto global_size = total_size * local_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
+    dpcpp_local_acc_t<T_ACC> shared(local_size, cgh);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(global_size), sycl::range<1>(local_size)),
@@ -215,8 +233,13 @@ void ComputeInternalGradientsDPCPPKernel(
                 static_cast<T_ACC>(dY[index]) * static_cast<T_ACC>(X[index]);
             sum2 += static_cast<T_ACC>(dY[index]);
           }
-          sum1 = sycl::reduce_over_group(g, sum1, sycl::ext::oneapi::plus<>());
-          sum2 = sycl::reduce_over_group(g, sum2, sycl::ext::oneapi::plus<>());
+
+          using vec_t = at::detail::Array<T_ACC, 1>;
+          sum1 = group_reduce(
+              item_id, local_size, shared, vec_t(sum1), ReduceAdd<T_ACC>())[0];
+          sum2 = group_reduce(
+              item_id, local_size, shared, vec_t(sum2), ReduceAdd<T_ACC>())[0];
+
           if (local_id == 0) {
             ds[nc] = sum1;
             db[nc] = sum2;
@@ -268,12 +291,13 @@ void ComputeBackwardFusedParamsDPCPPKernel(
   auto local_size = dpcppMaxWorkGroupSize(dev_id);
   auto total_threads = N * local_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
+    using T_ACC = acc_type<T>;
+    dpcpp_local_acc_t<T_ACC> shared(local_size, cgh);
     cgh.parallel_for(
         sycl::nd_range<2>(
             sycl::range<2>(total_threads, group),
             sycl::range<2>(local_size, 1)),
         [=](sycl::nd_item<2> itemId) {
-          using T_ACC = acc_type<T>;
           auto G = group;
           auto D = C / G;
           auto local_id = itemId.get_local_id(0);
@@ -291,10 +315,13 @@ void ComputeBackwardFusedParamsDPCPPKernel(
             sum1 += ds[index] * gamma_v;
             sum2 += db[index] * gamma_v;
           }
-          sum1 = sycl::reduce_over_group(
-              group_id, sum1, sycl::ext::oneapi::plus<>());
-          sum2 = sycl::reduce_over_group(
-              group_id, sum2, sycl::ext::oneapi::plus<>());
+
+          using vec_t = at::detail::Array<T_ACC, 1>;
+          sum1 = group_reduce(
+              itemId, local_size, shared, vec_t(sum1), ReduceAdd<T_ACC>())[0];
+          sum2 = group_reduce(
+              itemId, local_size, shared, vec_t(sum2), ReduceAdd<T_ACC>())[0];
+
           if (local_id == 0) {
             const T_ACC s = T_ACC(1) / static_cast<T_ACC>(D * HxW);
             const T_ACC x = (sum2 * static_cast<T_ACC>(mean[ng]) - sum1) *
