@@ -13,42 +13,31 @@
 #include <oneapi/dnnl/dnnl.hpp>
 #include <operators/comm/Numerics.h>
 #include <runtime/Utils.h>
-#include <tensor/Tensor.h>
+#include <tensor/Context.h>
 #include <utils/DPCPP.h>
 
-namespace at {
-namespace AtenIpexTypeQuantizedXPU {
+// Note: [Opaque u8 tensor]
+// Due to the difference between oneDNN and PyTorch u8 quantization, we quant
+// tensor with kQUint8 and 128 zp to memory::data_type::s8 and 0 zp inside. This
+// utils is used for checking this kind of QTensor. More details can see
+// Quantization.cpp quantizer_tensor_per_tenser_affine function.
+static inline bool is_opaque_u8(const Tensor& qx) {
+  auto qx_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(qx);
+  if (!qx_ctx.is_plain()) {
+    return (
+        (qx.scalar_type() == kQUInt8) &&
+        (qx_ctx.meta().data_type() == dnnl::memory::data_type::s8));
+  } else {
+    return false;
+  }
+}
 
 template <typename T>
-inline T Round(const T x) {
+DPCPP_DEVICE inline T Round(const T x) {
   return std::nearbyint(x);
 }
 
-template <typename T>
-T quantize_val(double scale, int64_t zero_point, float value) {
-  int64_t qvalue;
-  constexpr int64_t qmin = std::numeric_limits<typename T::underlying>::min();
-  constexpr int64_t qmax = std::numeric_limits<typename T::underlying>::max();
-
-  qvalue = static_cast<int64_t>(zero_point + Round(value / scale));
-  qvalue = std::max<int64_t>(qvalue, qmin);
-  qvalue = std::min<int64_t>(qvalue, qmax);
-  return static_cast<T>(qvalue);
-}
-
-template <typename T>
-T quantize_val(float scale, int64_t zero_point, float value) {
-  int64_t qvalue;
-  constexpr int64_t qmin = std::numeric_limits<T>::min();
-  constexpr int64_t qmax = std::numeric_limits<T>::max();
-
-  qvalue = static_cast<int64_t>(zero_point + Round(value / scale));
-  qvalue = std::max<int64_t>(qvalue, qmin);
-  qvalue = std::min<int64_t>(qvalue, qmax);
-  return static_cast<T>(qvalue);
-}
-
-static at::Tensor u8tos8(const at::Tensor& u8) {
+static inline at::Tensor u8tos8(const at::Tensor& u8) {
   auto s8 = at::_empty_affine_quantized(
       u8.sizes(),
       ScalarType::QInt8,
@@ -75,21 +64,32 @@ static at::Tensor u8tos8(const at::Tensor& u8) {
   return s8;
 }
 
-// Note: [Opaque u8 tensor]
-// Due to the difference between oneDNN and PyTorch u8 quantization, we quant
-// tensor with kQUint8 and 128 zp to memory::data_type::s8 and 0 zp inside. This
-// utils is used for checking this kind of QTensor. More details can see
-// Quantization.cpp quantizer_tensor_per_tenser_affine function.
-static bool is_opaque_u8(const Tensor& qx) {
-  auto qx_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(qx);
-  if (!qx_ctx.is_plain()) {
-    return (
-        (qx.scalar_type() == kQUInt8) &&
-        (qx_ctx.meta().data_type() == dnnl::memory::data_type::s8));
-  } else {
-    return false;
-  }
+template <typename T>
+DPCPP_DEVICE T quantize_val(double scale, int64_t zero_point, float value) {
+  int64_t qvalue;
+  constexpr int64_t qmin = std::numeric_limits<typename T::underlying>::min();
+  constexpr int64_t qmax = std::numeric_limits<typename T::underlying>::max();
+
+  qvalue = static_cast<int64_t>(zero_point + Round(value / scale));
+  qvalue = std::max<int64_t>(qvalue, qmin);
+  qvalue = std::min<int64_t>(qvalue, qmax);
+  return static_cast<T>(qvalue);
 }
+
+template <typename T>
+DPCPP_DEVICE T quantize_val(float scale, int64_t zero_point, float value) {
+  float qvalue;
+  constexpr float qmin = (float)std::numeric_limits<T>::min();
+  constexpr float qmax = (float)std::numeric_limits<T>::max();
+
+  qvalue = (float)zero_point + Round(value / scale);
+  qvalue = std::max<float>(qvalue, qmin);
+  qvalue = std::min<float>(qvalue, qmax);
+  return static_cast<T>(qvalue);
+}
+
+namespace at {
+namespace AtenIpexTypeQuantizedXPU {
 
 template <int kSpatialDim>
 struct PackedConvWeightQDPCPP : public ConvPackedParamsBase<kSpatialDim> {

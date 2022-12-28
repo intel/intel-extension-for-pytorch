@@ -10,7 +10,6 @@
 
 #include <oneapi/dnnl/dnnl.hpp>
 #include <quantized/QUtils.h>
-#include <tensor/Tensor.h>
 
 #ifdef BUILD_JIT_QUANTIZATION_SAVE
 // Following code is not in any namespace. This is due to

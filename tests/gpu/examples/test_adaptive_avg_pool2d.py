@@ -179,3 +179,79 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(output_cpu, output_xpu.to(cpu_device))
         self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
+
+    def test_adaptive_avg_pool2d_general_fwd(self, dtype=torch.float):
+        x_cpu = torch.randn([1, 3, 5, 5], device=cpu_device)
+        output_sz = [2, 2]
+        y_cpu = torch._C._nn.adaptive_avg_pool2d(x_cpu, output_sz)
+
+        x_xpu = x_cpu.to(dpcpp_device)
+        y_xpu = torch._C._nn.adaptive_avg_pool2d(x_xpu, output_sz)
+
+        self.assertEqual(y_cpu, y_xpu.to(cpu_device))
+
+        x_cpu = torch.randn([4, 3, 512, 512], device=cpu_device)
+        output_sz = [308, 308]
+        y_cpu = torch._C._nn.adaptive_avg_pool2d(x_cpu, output_sz)
+
+        x_xpu = x_cpu.to(dpcpp_device)
+        y_xpu = torch._C._nn.adaptive_avg_pool2d(x_xpu, output_sz)
+
+        self.assertEqual(y_cpu, y_xpu.to(cpu_device))
+
+        x_cpu = torch.randn([4, 3, 512, 512], device=cpu_device).to(memory_format=torch.channels_last)
+        output_sz = [308, 308]
+        y_cpu = torch._C._nn.adaptive_avg_pool2d(x_cpu, output_sz)
+
+        x_xpu = x_cpu.to(dpcpp_device).to(memory_format=torch.channels_last)
+        y_xpu = torch._C._nn.adaptive_avg_pool2d(x_xpu, output_sz)
+
+        self.assertEqual(y_cpu, y_xpu.to(cpu_device))
+        self.assertEqual(y_xpu.is_contiguous(memory_format=torch.channels_last), True)
+
+    ''' Using quant XPU v.s float CPU to validate adpative_avg_pool2d quantization implementation
+        Quant CPU is using int32_t accumulation and mutilple requant scale at last, like,
+        avg = ((int)hw1 + (int)hw2 + ... (int)hw9) * in_scale / out_scale / ker_sz;
+        We are using fused dequantization and quantization implementation, like,
+        avg = ((float)hw1 * in_scale + (float)hw2 * in_scale + ...) / out_scale / ker_sz;
+        XPU results may approach real float results.
+    '''
+    def test_adaptive_avg_pool2d_quantized_general_fwd(self, dtype=torch.float):
+        x_cpu = torch.randn([4, 3, 512, 512], device=cpu_device)
+        scale = torch.abs(x_cpu).max() / 127.0
+        output_sz = [508, 508] # increase spatio to reduce accumulation error.
+        y_cpu = torch._C._nn.adaptive_avg_pool2d(x_cpu, output_sz)
+        print(y_cpu)
+
+        x_xpu = x_cpu.to(dpcpp_device)
+        q_xpu = torch.quantize_per_tensor(x_xpu, scale, 0, torch.qint8)
+        q_xpu = torch._C._nn.adaptive_avg_pool2d(q_xpu, output_sz)
+
+        print(torch.dequantize(q_xpu).cpu())
+        self.assertEqual(y_cpu, torch.dequantize(q_xpu).to(cpu_device), atol=1e-1, rtol=1e-3)
+
+    def test_adaptive_avg_pool2d_general_bwd(self, dtype=torch.float):
+        x_cpu = torch.randn([4, 3, 512, 512], device=cpu_device).requires_grad_(True)
+        x_xpu = x_cpu.detach().clone().to(dpcpp_device).requires_grad_(True)
+        output_sz = [308, 308]
+
+        y_cpu = torch._C._nn.adaptive_avg_pool2d(x_cpu, output_sz)
+        gy_cpu = torch.randn(y_cpu.shape, device=cpu_device)
+        y_cpu.backward(gy_cpu)
+        y_xpu = torch._C._nn.adaptive_avg_pool2d(x_xpu, output_sz)
+        y_xpu.backward(gy_cpu.to("xpu"))
+
+        self.assertEqual(x_cpu.grad, x_xpu.grad.to(cpu_device))
+
+        x_cpu = torch.randn([4, 3, 512, 512], device=cpu_device).to(memory_format=torch.channels_last).requires_grad_(True)
+        x_xpu = x_cpu.detach().clone().to(dpcpp_device).to(memory_format=torch.channels_last).requires_grad_(True)
+        output_sz = [308, 308]
+
+        y_cpu = torch._C._nn.adaptive_avg_pool2d(x_cpu, output_sz)
+        gy_cpu = torch.randn(y_cpu.shape, device=cpu_device).to(memory_format=torch.channels_last)
+        y_cpu.backward(gy_cpu)
+        y_xpu = torch._C._nn.adaptive_avg_pool2d(x_xpu, output_sz)
+        y_xpu.backward(gy_cpu.to("xpu").to(memory_format=torch.channels_last))
+
+        self.assertEqual(x_cpu.grad, x_xpu.grad.to(cpu_device))
+        self.assertEqual(x_xpu.grad.is_contiguous(memory_format=torch.channels_last), True)

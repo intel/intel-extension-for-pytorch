@@ -20,6 +20,20 @@ using namespace at::AtenIpexTypeQuantizedXPU;
 namespace xpu {
 namespace oneDNN {
 
+static inline bool is_valid_pooling(
+    std::vector<int64_t> src,
+    std::vector<int64_t> dst,
+    std::vector<int64_t> ker,
+    std::vector<int64_t> str,
+    std::vector<int64_t> pad) {
+  for (int i = 0; i < 2; i++) {
+    if ((src[i] - ker[i] + pad[i] + pad[i]) / str[i] + 1 != dst[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 using alg = dnnl::algorithm;
 
 template <alg alg_kind>

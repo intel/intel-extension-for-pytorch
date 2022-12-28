@@ -670,3 +670,15 @@
         AT_ERROR(#NAME, " not implemented for '", TYPE, "'");               \
     }                                                                       \
   }()
+
+#define IPEX_DISPATCH_QTYPE_ONLY_WITH_UNDERLYING(TYPE, NAME, SUFFIX, ...)   \
+  [&] {                                                                     \
+    switch (TYPE) {                                                         \
+      IPEX_QINT_PRIVATE_CASE_TYPE_WITH_UNDERLYING(                          \
+          at::kQInt8, at::qint8, at::kChar, int8_t, SUFFIX, __VA_ARGS__)    \
+      IPEX_QINT_PRIVATE_CASE_TYPE_WITH_UNDERLYING(                          \
+          at::kQUInt8, at::quint8, at::kByte, uint8_t, SUFFIX, __VA_ARGS__) \
+      default:                                                              \
+        AT_ERROR(#NAME, " not implemented for '", TYPE, "'");               \
+    }                                                                       \
+  }()
