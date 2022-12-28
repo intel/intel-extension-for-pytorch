@@ -86,6 +86,270 @@ class MatmulSum(torch.nn.Module):
         y += a
         return y
 
+class MatmulSqrt(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulSqrt, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.sqrt(torch.matmul(m1, m2))
+
+class TMatmulSqrt(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulSqrt, self).__init__()
+
+    def forward(self, m1, m2):
+        return torch.sqrt(torch.matmul(m1, m2.t()))
+class MatmulAbs(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulAbs, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.abs(torch.matmul(m1, m2))
+
+class TMatmulAbs(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulAbs, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.abs(torch.matmul(m1, m2.t()))
+
+class MatmulTanh(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulTanh, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.tanh(torch.matmul(m1, m2))
+
+class TMatmulTanh(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulTanh, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.tanh(torch.matmul(m1, m2.t()))
+
+class MatmulSquare(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulSquare, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.square(torch.matmul(m1, m2))
+
+class TMatmulSquare(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulSquare, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.square(torch.matmul(m1, m2.t()))
+
+class MatmulRelu(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulRelu, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.relu(torch.matmul(m1, m2))
+
+class TMatmulRelu(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulRelu, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.relu(torch.matmul(m1, m2.t()))
+
+class MatmulSigmoid(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulSigmoid, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.sigmoid(torch.matmul(m1, m2))
+
+class TMatmulSigmoid(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulSigmoid, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.sigmoid(torch.matmul(m1, m2.t()))
+
+class MatmulExp(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulExp, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.exp(torch.matmul(m1, m2))
+
+class TMatmulExp(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulExp, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.exp(torch.matmul(m1, m2.t()))
+
+class MatmulLog(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulLog, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.log(torch.matmul(m1, m2))
+
+class TMatmulLog(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulLog, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.log(torch.matmul(m1, m2.t()))
+
+class MatmulRound(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulRound, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.round(torch.matmul(m1, m2))
+
+class TMatmulRound(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulRound, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.round(torch.matmul(m1, m2.t()))
+
+class MatmulLogsigmoid(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulLogsigmoid, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.logsigmoid(torch.matmul(m1, m2))
+
+class TMatmulLogsigmoid(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulLogsigmoid, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.logsigmoid(torch.matmul(m1, m2.t()))
+
+class MatmulHardsiwsh(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulHardsiwsh, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.hardswish(torch.matmul(m1, m2))
+
+class TMatmulHardswish(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulHardswish, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.hardswish(torch.matmul(m1, m2.t()))
+
+class MatmulMish(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulMish, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.mish(torch.matmul(m1, m2))
+
+class TMatmulMish(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulMish, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.mish(torch.matmul(m1, m2.t()))
+
+class MatmulSilu(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulSilu, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.silu(torch.matmul(m1, m2))
+
+class TMatmulSilu(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulSilu, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.silu(torch.matmul(m1, m2.t()))
+
+class MatmulGelu(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulGelu, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.gelu(torch.matmul(m1, m2))
+
+class TMatmulGelu(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulGelu, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.gelu(torch.matmul(m1, m2.t()))
+
+class MatmulHardsigmoid(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulHardsigmoid, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.hardsigmoid(torch.matmul(m1, m2))
+
+class TMatmulHardsigmoid(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulHardsigmoid, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.hardsigmoid(torch.matmul(m1, m2.t()))
+
+class MatmulElu(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulElu, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.elu(torch.matmul(m1, m2))
+
+class TMatmulElu(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulElu, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.elu(torch.matmul(m1, m2.t()))
+
+class MatmulPow(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulPow, self).__init__()
+
+    def forward(self, m1, m2):
+        return  torch.pow(torch.matmul(m1, m2), 2.0)
+
+class TMatmulPow(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulPow, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.elu(torch.matmul(m1, m2.t()), 2.0)
+
+class MatmulLeakyrelu(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulLeakyrelu, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.leaky_relu(torch.matmul(m1, m2), 0.01)
+
+class TMatmulLeakyrelu(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulLeakyrelu, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.leaky_relu(torch.matmul(m1, m2.t()), 0.01)
+
+class MatmulRelu6(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MatmulRelu6, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.relu6(torch.matmul(m1, m2))
+
+class TMatmulRelu6(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TMatmulRelu6, self).__init__()
+
+    def forward(self, m1, m2):
+        return  F.relu6(torch.matmul(m1, m2.t()))
 
 class TransMatmul(torch.nn.Module):
     def __init__(self):
@@ -588,6 +852,28 @@ class LinearElu(torch.nn.Module):
         return x
 
 class TestNNMethod(TestCase):
+
+    def matmul_fusion(self, model, t_model, m1, m2):
+        raw = model(m1, m2)
+        raw_t = t_model(m1, m2)
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+        model = model.to(dpcpp_device)
+        t_model = t_model.to(dpcpp_device)
+        modelJit = torch.jit.script(model)
+        tmodelJit = torch.jit.script(t_model)
+        for i in range(2):
+            modelJit(m1_dpcpp, m2_dpcpp)
+            tmodelJit(m1_dpcpp, m2_dpcpp)
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(m1_dpcpp, m2_dpcpp))
+                print(tmodelJit.graph_for(m1_dpcpp, m2_dpcpp))
+            real = modelJit(m1_dpcpp, m2_dpcpp)
+            t_real = tmodelJit(m1_dpcpp, m2_dpcpp)
+        self.assertEqual(raw, real.to(cpu_device))
+        self.assertEqual(raw_t, t_real.to(cpu_device))
+
     def test_matmul_sum_fusion(self, dtype=torch.float):
         m1 = torch.randn([4, 2], device=cpu_device)
         m2 = torch.randn([2, 2], device=cpu_device)
@@ -605,6 +891,162 @@ class TestNNMethod(TestCase):
             print("real: ", real.cpu())
         self.assertEqual(raw, real.to(cpu_device))
         del modelJit
+    
+    def test_matmul_sqrt_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+        model = MatmulSqrt()
+        t_model = TMatmulSqrt()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    def test_matmul_square_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulSquare()
+        t_model = TMatmulSquare()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+
+    def test_matmul_abs_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulAbs()
+        t_model = TMatmulAbs()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+
+    def test_matmul_exp_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulExp()
+        t_model = TMatmulExp()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    def test_matmul_log_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulLog()
+        t_model = TMatmulLog()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    def test_matmul_round_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulRound()
+        t_model = TMatmulRound()
+        self.matmul_fusion(model, t_model, m1, m2)
+        
+    # result incorrect
+    def test_matmul_silu_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulSilu()
+        t_model = TMatmulSilu()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    # result incorrect
+    def test_matmul_gelu_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulGelu()
+        t_model = TMatmulGelu()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    def test_matmul_log_sigmoid_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulLogsigmoid()
+        t_model = TMatmulLogsigmoid()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    def test_matmul_hardswish_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulHardsiwsh()
+        t_model = TMatmulHardswish()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    def test_matmul_mish_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulMish()
+        t_model = TMatmulMish()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    def test_matmul_hardsigmoid_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulHardsigmoid()
+        t_model = TMatmulHardsigmoid()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    def test_matmul_tanh_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulTanh()
+        t_model = TMatmulTanh()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    def test_matmul_leaky_relu_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulLeakyrelu()
+        t_model = TMatmulLeakyrelu()
+        self.matmul_fusion(model, t_model, m1, m2)  
+
+    def test_matmul_pow_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulPow()
+        t_model = TMatmulPow()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    def test_matmul_elu_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulElu()
+        t_model = TMatmulElu()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    # op different 
+    def test_matmul_hardtanh_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulRelu6()
+        t_model = TMatmulRelu6()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    def test_matmul_sigmoid_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulSigmoid()
+        t_model = TMatmulSigmoid()
+        self.matmul_fusion(model, t_model, m1, m2)
+
+    def test_matmul_relu_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+
+        model = MatmulRelu()
+        t_model = TMatmulRelu()
+        self.matmul_fusion(model, t_model, m1, m2)
 
     def test_trans_baddbmm_fusion(self, dtype=torch.float):
         m1 = torch.randn((2, 2, 3), device=cpu_device)

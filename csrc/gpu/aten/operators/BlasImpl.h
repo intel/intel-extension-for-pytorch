@@ -751,6 +751,7 @@ static at::Tensor matmul_fusion_variants(
   fallback = false;
   if (dim_tensor1 == 2 && dim_tensor2 == 2) {
     onednn_matmul(result, tensor1, tensor2, bias, accumul, trans, attr);
+    return result;
   } else if (dim_tensor1 >= 3 && (dim_tensor2 == 1 || dim_tensor2 == 2)) {
     Tensor t1 = tensor1;
     std::vector<int64_t> t1_shape, r_shape;

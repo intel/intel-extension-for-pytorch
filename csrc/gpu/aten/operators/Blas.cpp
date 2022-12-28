@@ -480,6 +480,234 @@ Tensor& tensordot_out(
 }
 
 /************************** matmul fusion path **************************/
+#define IPEX_MATMUL_DEFINATION(func)                                      \
+  at::Tensor matmul_##func(                                               \
+      const at::Tensor& tensor1, const at::Tensor& tensor2) {             \
+    RECORD_FUNCTION(                                                      \
+        "matmul_" #func, std::vector<c10::IValue>({tensor1, tensor2}));   \
+    Attr attr;                                                            \
+    attr.append_post_eltwise(                                             \
+        /* scale */ 1.f,                                                  \
+        /* alpha */ 0.f,                                                  \
+        /* beta */ 0.f,                                                   \
+        attr.kind_with_##func);                                           \
+    Tensor bias, accumul;                                                 \
+    bool fallback = false;                                                \
+    Tensor result = at::empty({0}, tensor1.options());                    \
+    result = matmul_fusion_variants(                                      \
+        result, tensor1, tensor2, bias, accumul, true, fallback, attr);   \
+    if (fallback) {                                                       \
+      result = at::native::matmul(tensor1, tensor2);                      \
+      result = at::func(result);                                          \
+    }                                                                     \
+    return result;                                                        \
+  }                                                                       \
+  at::Tensor t_matmul_##func(                                             \
+      const at::Tensor& tensor2, const at::Tensor& tensor1) {             \
+    RECORD_FUNCTION(                                                      \
+        "t_matmul_" #func, std::vector<c10::IValue>({tensor1, tensor2})); \
+    Attr attr;                                                            \
+    attr.append_post_eltwise(                                             \
+        /* scale */ 1.f,                                                  \
+        /* alpha */ 0.f,                                                  \
+        /* beta */ 0.f,                                                   \
+        attr.kind_with_##func);                                           \
+    Tensor bias, accumul;                                                 \
+    bool fallback = false;                                                \
+    Tensor result = at::empty({0}, tensor1.options());                    \
+    result = matmul_fusion_variants(                                      \
+        result, tensor1, tensor2, bias, accumul, false, fallback, attr);  \
+    if (fallback) {                                                       \
+      result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));    \
+      result = at::func(result);                                          \
+    }                                                                     \
+    return result;                                                        \
+  }
+
+IPEX_MATMUL_DEFINATION(sqrt)
+IPEX_MATMUL_DEFINATION(abs)
+IPEX_MATMUL_DEFINATION(tanh)
+IPEX_MATMUL_DEFINATION(square)
+IPEX_MATMUL_DEFINATION(exp)
+IPEX_MATMUL_DEFINATION(log)
+IPEX_MATMUL_DEFINATION(round)
+IPEX_MATMUL_DEFINATION(sigmoid)
+IPEX_MATMUL_DEFINATION(relu)
+IPEX_MATMUL_DEFINATION(log_sigmoid)
+IPEX_MATMUL_DEFINATION(hardswish)
+IPEX_MATMUL_DEFINATION(mish)
+
+at::Tensor matmul_silu(const at::Tensor& tensor1, const at::Tensor& tensor2) {
+  RECORD_FUNCTION("matmul_silu", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ 1.f,
+      /* beta */ 0.f,
+      attr.kind_with_swish);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2);
+    result = at::silu(result);
+  }
+  return result;
+}
+
+at::Tensor matmul_gelu(
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2,
+    c10::string_view approximate) {
+  RECORD_FUNCTION("matmul_gelu", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  algorithm algo;
+  if (approximate == "none") {
+    algo = attr.kind_with_gelu_erf;
+  } else if (approximate == "tanh") {
+    algo = attr.kind_with_gelu_tanh;
+  } else {
+    TORCH_INTERNAL_ASSERT(false, "Unsupported gelu algorithm: ", approximate);
+  }
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ 0.f,
+      /* beta */ 0.f,
+      algo);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2);
+    result = at::gelu(result, approximate);
+  }
+  return result;
+}
+
+at::Tensor matmul_hardsigmoid(
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2) {
+  RECORD_FUNCTION(
+      "matmul_hardsigmoid", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ 1.f / 6.,
+      /* beta */ 1.f / 2.,
+      attr.kind_with_hardsigmoid);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2);
+    result = at::hardsigmoid(result);
+  }
+  return result;
+}
+
+at::Tensor matmul_pow(
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2,
+    Scalar exponent) {
+  RECORD_FUNCTION("matmul_pow", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ 1.f,
+      /* beta */ exponent.toFloat(),
+      attr.kind_with_pow);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2);
+    result = at::pow(result, exponent);
+  }
+  return result;
+}
+
+at::Tensor matmul_leaky_relu(
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2,
+    Scalar negative_slope) {
+  RECORD_FUNCTION(
+      "matmul_leaky_relu", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ negative_slope.toFloat(),
+      /* beta */ 0.f,
+      attr.kind_with_relu);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2);
+    result = at::leaky_relu(result, negative_slope);
+  }
+  return result;
+}
+
+at::Tensor matmul_hardtanh(
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2,
+    Scalar minval,
+    Scalar maxval) {
+  RECORD_FUNCTION(
+      "matmul_hardtanh", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ minval.toFloat(),
+      /* beta */ maxval.toFloat(),
+      attr.kind_with_clip);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2);
+    result = at::hardtanh(result, minval, maxval);
+  }
+  return result;
+}
+
+at::Tensor matmul_elu(
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2,
+    Scalar alpha,
+    Scalar scale,
+    Scalar input_scale) {
+  RECORD_FUNCTION("matmul_elu", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ alpha.toFloat(),
+      /* beta */ 1.f,
+      attr.kind_with_elu);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2);
+    result = at::elu(result, alpha, scale, input_scale);
+  }
+  return result;
+}
+
 // res = m1 * m2 + beta * accumu
 at::Tensor matmul_add(
     const at::Tensor& tensor1,
@@ -666,6 +894,179 @@ at::Tensor trans_matmul_div(
       result, tensor1, tensor2, bias, accumul, trans, fallback, attr);
 }
 
+at::Tensor t_matmul_silu(const at::Tensor& tensor2, const at::Tensor& tensor1) {
+  RECORD_FUNCTION(
+      "t_matmul_silu", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ 1.f,
+      /* beta */ 0.f,
+      attr.kind_with_swish);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
+    result = at::silu(result);
+  }
+  return result;
+}
+
+at::Tensor t_matmul_hardsigmoid(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1) {
+  RECORD_FUNCTION(
+      "t_matmul_hardsigmoid", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ 1.f / 6.,
+      /* beta */ 1.f / 2.,
+      attr.kind_with_hardsigmoid);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
+    result = at::hardsigmoid(result);
+  }
+  return result;
+}
+
+at::Tensor t_matmul_pow(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    Scalar exponent) {
+  RECORD_FUNCTION("t_matmul_pow", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ 1.f,
+      /* beta */ exponent.toFloat(),
+      attr.kind_with_pow);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
+    result = at::pow(result, exponent);
+  }
+  return result;
+}
+
+at::Tensor t_matmul_leaky_relu(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    Scalar negative_slope) {
+  RECORD_FUNCTION(
+      "t_matmul_leaky_relu", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ negative_slope.toFloat(),
+      /* beta */ 0.f,
+      attr.kind_with_relu);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
+    result = at::leaky_relu(result, negative_slope);
+  }
+  return result;
+}
+
+at::Tensor t_matmul_hardtanh(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    Scalar minval,
+    Scalar maxval) {
+  RECORD_FUNCTION(
+      "t_matmul_hardtanh", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ minval.toFloat(),
+      /* beta */ maxval.toFloat(),
+      attr.kind_with_clip);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
+    result = at::hardtanh(result, minval, maxval);
+  }
+  return result;
+}
+
+at::Tensor t_matmul_elu(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    Scalar alpha,
+    Scalar scale,
+    Scalar input_scale) {
+  RECORD_FUNCTION("t_matmul_elu", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ alpha.toFloat(),
+      /* beta */ 1.f,
+      attr.kind_with_elu);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
+    result = at::elu(result, alpha, scale, input_scale);
+  }
+  return result;
+}
+
+at::Tensor t_matmul_gelu(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1,
+    c10::string_view approximate) {
+  RECORD_FUNCTION(
+      "t_matmul_gelu", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  algorithm algo;
+  if (approximate == "none") {
+    algo = attr.kind_with_gelu_erf;
+  } else if (approximate == "tanh") {
+    algo = attr.kind_with_gelu_tanh;
+  } else {
+    TORCH_INTERNAL_ASSERT(false, "Unsupported gelu algorithm: ", approximate);
+  }
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ 0.f,
+      /* beta */ 0.f,
+      algo);
+  Tensor bias, accumul;
+  bool fallback = false;
+  Tensor result = at::empty({0}, tensor1.options());
+  result = matmul_fusion_variants(
+      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
+  if (fallback) {
+    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
+    result = at::gelu(result, approximate);
+  }
+  return result;
+}
+
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
@@ -697,6 +1098,10 @@ Tensor addmm(
   return result;
 }
 
+#define IPEX_OP_REGISTER_MATMUL(op)             \
+  IPEX_OP_REGISTER("matmul_" #op, matmul_##op); \
+  IPEX_OP_REGISTER("t_matmul_" #op, t_matmul_##op);
+
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("matmul_add", matmul_add);
   IPEX_OP_REGISTER("trans_matmul", trans_matmul);
@@ -705,6 +1110,25 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("t_matmul_add_gelu", t_matmul_add_gelu);
   IPEX_OP_REGISTER("t_matmul_add_add", t_matmul_add_add);
   IPEX_OP_REGISTER("trans_matmul_div", trans_matmul_div);
+  IPEX_OP_REGISTER_MATMUL(sqrt);
+  IPEX_OP_REGISTER_MATMUL(abs);
+  IPEX_OP_REGISTER_MATMUL(tanh);
+  IPEX_OP_REGISTER_MATMUL(square);
+  IPEX_OP_REGISTER_MATMUL(exp);
+  IPEX_OP_REGISTER_MATMUL(log);
+  IPEX_OP_REGISTER_MATMUL(round);
+  IPEX_OP_REGISTER_MATMUL(sigmoid);
+  IPEX_OP_REGISTER_MATMUL(relu);
+  IPEX_OP_REGISTER_MATMUL(log_sigmoid);
+  IPEX_OP_REGISTER_MATMUL(hardswish);
+  IPEX_OP_REGISTER_MATMUL(mish);
+  IPEX_OP_REGISTER_MATMUL(silu);
+  IPEX_OP_REGISTER_MATMUL(gelu);
+  IPEX_OP_REGISTER_MATMUL(hardsigmoid);
+  IPEX_OP_REGISTER_MATMUL(pow);
+  IPEX_OP_REGISTER_MATMUL(leaky_relu);
+  IPEX_OP_REGISTER_MATMUL(hardtanh);
+  IPEX_OP_REGISTER_MATMUL(elu);
 }
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

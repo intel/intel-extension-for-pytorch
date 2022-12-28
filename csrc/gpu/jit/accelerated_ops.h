@@ -39,6 +39,12 @@ generate the rule of pots-op fusion.
   static auto linear_##func##_sym =          \
       Symbol::fromQualString("torch_ipex::linear_" #func)
 
+#define IPEX_MATMUL_SYMBOL_DECLARATION(func)               \
+  static auto matmul_##func##_sym =                        \
+      Symbol::fromQualString("torch_ipex::matmul_" #func); \
+  static auto t_matmul_##func##_sym =                      \
+      Symbol::fromQualString("torch_ipex::t_matmul_" #func);
+
 #define IPEX_GENERAL_CONV_SYMBOL_DECLARATION(func) \
   IPEX_QCONV_SYMBOL_DECLARATION(func);             \
   IPEX_CONV_SYMBOL_DECLARATION(func);              \
@@ -88,6 +94,27 @@ IPEX_LINEAR_SYMBOL_DECLARATION(elu);
 IPEX_LINEAR_SYMBOL_DECLARATION(pow);
 IPEX_LINEAR_SYMBOL_DECLARATION(hardtanh);
 IPEX_LINEAR_SYMBOL_DECLARATION(leaky_relu);
+
+// matmul related symbol declaration
+IPEX_MATMUL_SYMBOL_DECLARATION(sigmoid);
+IPEX_MATMUL_SYMBOL_DECLARATION(relu);
+IPEX_MATMUL_SYMBOL_DECLARATION(sqrt);
+IPEX_MATMUL_SYMBOL_DECLARATION(tanh);
+IPEX_MATMUL_SYMBOL_DECLARATION(square);
+IPEX_MATMUL_SYMBOL_DECLARATION(abs);
+IPEX_MATMUL_SYMBOL_DECLARATION(exp);
+IPEX_MATMUL_SYMBOL_DECLARATION(log);
+IPEX_MATMUL_SYMBOL_DECLARATION(round);
+IPEX_MATMUL_SYMBOL_DECLARATION(log_sigmoid);
+IPEX_MATMUL_SYMBOL_DECLARATION(hardswish);
+IPEX_MATMUL_SYMBOL_DECLARATION(mish);
+IPEX_MATMUL_SYMBOL_DECLARATION(silu);
+IPEX_MATMUL_SYMBOL_DECLARATION(gelu);
+IPEX_MATMUL_SYMBOL_DECLARATION(hardsigmoid);
+IPEX_MATMUL_SYMBOL_DECLARATION(elu);
+IPEX_MATMUL_SYMBOL_DECLARATION(pow);
+IPEX_MATMUL_SYMBOL_DECLARATION(hardtanh);
+IPEX_MATMUL_SYMBOL_DECLARATION(leaky_relu);
 
 static auto _conv_sym = Symbol::fromQualString("aten::_convolution");
 static auto reorder_sym = Symbol::fromQualString("torch_ipex::reorder");

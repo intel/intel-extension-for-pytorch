@@ -685,7 +685,7 @@ at::Tensor q_conv2d_log_sigmoid(
         /* eltwise_scale */ 1.f,
         /* alpha */ 0.f,
         /* beta */ 0.f,
-        attr.kind_with_logsigmoid);
+        attr.kind_with_log_sigmoid);
   };
   return qconv_wrapper.call(input, att);
 }

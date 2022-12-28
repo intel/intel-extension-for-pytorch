@@ -93,6 +93,7 @@ IPEX_LINEAR_DEFINATION(sigmoid)
 IPEX_LINEAR_DEFINATION(relu)
 IPEX_LINEAR_DEFINATION(hardswish)
 IPEX_LINEAR_DEFINATION(mish)
+IPEX_LINEAR_DEFINATION(log_sigmoid)
 
 Tensor linear_silu(
     const Tensor& input,
@@ -143,30 +144,6 @@ Tensor linear_gelu(
   linear_wrapper.call(input, weight, bias, output, post_op);
   if (!linear_wrapper.is_fused()) {
     output = at::AtenIpexTypeXPU::gelu_out(output, approximate, output);
-  }
-  return output;
-}
-
-Tensor linear_log_sigmoid(
-    const Tensor& input,
-    const Tensor& weight,
-    const Tensor& bias) {
-  RECORD_FUNCTION(
-      "linear_logsigmoid", std::vector<c10::IValue>({input, weight, bias}));
-  auto linear_wrapper = LinearConverter();
-  auto post_op = [=]() {
-    Attr attr;
-    attr.append_post_eltwise(
-        /* gelu_scale */ 1.f,
-        /* alpha */ 1.f,
-        /* beta */ 0.f,
-        attr.kind_with_logsigmoid);
-    return attr;
-  };
-  Tensor output;
-  linear_wrapper.call(input, weight, bias, output, post_op);
-  if (!linear_wrapper.is_fused()) {
-    output = at::log_sigmoid(output);
   }
   return output;
 }

@@ -138,7 +138,7 @@ class Attr {
   algorithm kind_with_exp = algorithm::eltwise_exp;
   algorithm kind_with_log = algorithm::eltwise_log;
   algorithm kind_with_round = algorithm::eltwise_round;
-  algorithm kind_with_logsigmoid = algorithm::eltwise_logsigmoid;
+  algorithm kind_with_log_sigmoid = algorithm::eltwise_logsigmoid;
   algorithm kind_with_hardswish = algorithm::eltwise_hardswish;
   algorithm kind_with_soft_relu = algorithm::eltwise_soft_relu;
   algorithm kind_with_elu = algorithm::eltwise_elu;

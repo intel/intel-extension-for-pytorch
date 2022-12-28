@@ -91,6 +91,18 @@ kind of cases which will automatically fuse the aten::dequantize.
         xpu::linear_##func##_sym                                \
   }
 
+#define IPEX_DEFINE_MATMUL_FUSION(func)                              \
+  {{aten::matmul, Symbol::fromQualString("aten::" #func)},           \
+   xpu::matmul_##func##_sym},                                        \
+      {{aten::matmul, Symbol::fromQualString("aten::" #func "_")},   \
+       xpu::matmul_##func##_sym},                                    \
+      {{xpu::t_matmul_sym, Symbol::fromQualString("aten::" #func)},  \
+       xpu::t_matmul_##func##_sym},                                  \
+  {                                                                  \
+    {xpu::t_matmul_sym, Symbol::fromQualString("aten::" #func "_")}, \
+        xpu::t_matmul_##func##_sym                                   \
+  }
+
 } // namespace
 
 namespace torch {
@@ -665,6 +677,26 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     IPEX_DEFINE_LINEAR_FUSION(elu),
     IPEX_DEFINE_LINEAR_FUSION(hardtanh),
 
+    // define matmul related fusion pattern
+    IPEX_DEFINE_MATMUL_FUSION(sqrt),
+    IPEX_DEFINE_MATMUL_FUSION(square),
+    IPEX_DEFINE_MATMUL_FUSION(abs),
+    IPEX_DEFINE_MATMUL_FUSION(exp),
+    IPEX_DEFINE_MATMUL_FUSION(log),
+    IPEX_DEFINE_MATMUL_FUSION(round),
+    IPEX_DEFINE_MATMUL_FUSION(silu),
+    IPEX_DEFINE_MATMUL_FUSION(gelu),
+    IPEX_DEFINE_MATMUL_FUSION(log_sigmoid),
+    IPEX_DEFINE_MATMUL_FUSION(hardswish),
+    IPEX_DEFINE_MATMUL_FUSION(mish),
+    IPEX_DEFINE_MATMUL_FUSION(hardsigmoid),
+    IPEX_DEFINE_MATMUL_FUSION(tanh),
+    IPEX_DEFINE_MATMUL_FUSION(leaky_relu),
+    IPEX_DEFINE_MATMUL_FUSION(pow),
+    IPEX_DEFINE_MATMUL_FUSION(elu),
+    IPEX_DEFINE_MATMUL_FUSION(hardtanh),
+    IPEX_DEFINE_MATMUL_FUSION(sigmoid),
+    IPEX_DEFINE_MATMUL_FUSION(relu),
 };
 
 void FusionPass(std::shared_ptr<Graph>& graph) {
