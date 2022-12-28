@@ -126,9 +126,10 @@ def _get_build_target():
 
 torch_install_prefix = None
 if _get_build_target() == 'cppsdk':
-    torch_install_prefix = os.environ.get('TORCH_INSTALL_PREFIX', None)
+    torch_install_prefix = os.environ.get('LIBTORCH_PATH', None)
     if torch_install_prefix is None or not os.path.exists(torch_install_prefix):
-        raise RuntimeError("Can not find libtorch from env TORCH_INSTALL_PREFIX!")
+        raise RuntimeError("Can not find libtorch from env LIBTORCH_PATH!")
+    torch_install_prefix = os.path.abspath(torch_install_prefix)
 elif _get_build_target() == 'python':
     try:
         import torch

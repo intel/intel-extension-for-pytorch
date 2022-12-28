@@ -29,6 +29,7 @@ install(FILES
 
 if(BUILD_MODULE_TYPE STREQUAL "CPPSDK")
   install(PROGRAMS "${IPEX_ROOT_DIR}/scripts/cppsdk/install_c++_sdk.sh.in"
+    RENAME "install_c++_sdk.sh"
     DESTINATION scripts)
 
   set(RUN_SCRIPT "libintel-ext-pt-${CMAKE_PROJECT_VERSION}.run")

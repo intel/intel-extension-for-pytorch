@@ -1,5 +1,8 @@
 #!/bin/bash
 
+SCRIPT=$(realpath "$0")
+SCRIPTPATH=$(dirname "$SCRIPT")
+
 MODE=""
 LIBTORCH_PATH=""
 IPEX_VERSION=""
@@ -37,41 +40,44 @@ if [[ ${MODE} == "install" ]]; then
 
     while IFS= read -r lib
     do
-        if [ -f ${LIBTORCH_PATH}/lib/${lib} ]; then
+        lib_fn=$(basename $lib)
+        if [ -f ${LIBTORCH_PATH}/lib/${lib_fn} ]; then
             echo "Installation failed."
-            echo "${lib} already exists in ${LIBTORCH_PATH}."
+            echo "${lib_fn} already exists in ${LIBTORCH_PATH}."
             exit
         fi
-    done < <(ls -1 *.so)
-    cp *.so ${LIBTORCH_PATH}/lib
+    done < <(ls -1 ${SCRIPTPATH}/../lib/*.so)
+    cp ${SCRIPTPATH}/../lib/*.so ${LIBTORCH_PATH}/lib
     if [ $? -gt 0 ]; then
         echo "Installation failed."
         echo "Please check if ${LIBTORCH_PATH}/lib exists or if you have privileges to write in ${LIBTORCH_PATH}/lib."
         exit
     fi
 
-    mkdir -p ${LIBTORCH_PATH}/share/cmake/intel_ext_pt_cpu
+    mkdir -p ${LIBTORCH_PATH}/share/cmake/IPEX
     if [ $? -gt 0 ]; then
         echo "Installation failed."
         echo "Please check if ${LIBTORCH_PATH}/share/cmake exists or if you have privileges to write in ${LIBTORCH_PATH}/share/cmake."
         exit
     fi
-    cp intel_ext_pt_cpuConfig.cmake ${LIBTORCH_PATH}/share/cmake/intel_ext_pt_cpu
+    cp ${SCRIPTPATH}/../share/cmake/IPEX/IPEXConfig.cmake ${LIBTORCH_PATH}/share/cmake/IPEX
+    cp ${SCRIPTPATH}/../share/cmake/IPEX/IPEXVersionConfig.cmake ${LIBTORCH_PATH}/share/cmake/IPEX
 
-    echo $IPEX_VERSION > ${LIBTORCH_PATH}/build-version-libintel-ext-pt-cpu
+    echo $IPEX_VERSION > ${LIBTORCH_PATH}/build-version-ipex
     echo "Installation successed!"
 elif [[ ${MODE} == "uninstall" ]]; then
     while IFS= read -r lib
     do
-        if [ -f ${LIBTORCH_PATH}/lib/${lib} ]; then
-            rm ${LIBTORCH_PATH}/lib/${lib}
+        lib_fn=$(basename $lib)
+        if [ -f ${LIBTORCH_PATH}/lib/${lib_fn} ]; then
+            rm ${LIBTORCH_PATH}/lib/${lib_fn}
         fi
-    done < <(ls -1 *.so)
-    if [ -d ${LIBTORCH_PATH}/share/cmake/intel_ext_pt_cpu ]; then
-        rm -rf ${LIBTORCH_PATH}/share/cmake/intel_ext_pt_cpu
+    done < <(ls -1 ${SCRIPTPATH}/../lib/*.so)
+    if [ -d ${LIBTORCH_PATH}/share/cmake/IPEX ]; then
+        rm -rf ${LIBTORCH_PATH}/share/cmake/IPEX
     fi
-    if [ -f ${LIBTORCH_PATH}/build-version-libintel-ext-pt-cpu ]; then
-        rm ${LIBTORCH_PATH}/build-version-libintel-ext-pt-cpu
+    if [ -f ${LIBTORCH_PATH}/build-version-ipex ]; then
+        rm ${LIBTORCH_PATH}/build-version-ipex
     fi
     echo "Uninstallation successed!"
 fi
