@@ -60,7 +60,7 @@ project(lltm_xpu)
 
 find_package(Python COMPONENTS Interpreter Development)
 find_package(Torch REQUIRED)
-find_package(IntelExtensionPytorch REQUIRED)
+find_package(IPEX REQUIRED)
 
 #The SYCL kernel should be compiled with "-fsycl"
 set_source_files_properties(lltm_xpu_kernel.cpp PROPERTIES COMPILE_FLAGS "-fsycl")
