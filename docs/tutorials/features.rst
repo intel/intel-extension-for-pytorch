@@ -64,6 +64,18 @@ For more detailed information, check `DDP <features/DDP.md>`_ and `Horovod <feat
 GPU-Specific
 ************
 
+DLPack Solution
+---------------
+
+DLPack defines a stable in-memory data structure for sharing tensors among frameworks. It allows to share tensor data without copy when interoparate with other libraries. Intel® Extension for PyTorch* extends DLPack support in PyTorch* for XPU device particularly.
+
+For more detailed information, check `DLPack Solution <features/DLPack.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/DLPack
 
 DPC++ Extension
 ---------------
@@ -92,6 +104,19 @@ For more detailed information, check `Advanced Configuration <features/advanced_
 
    features/advanced_configuration
 
+
+Legacy Profiler Tool
+-----------------
+
+The legacy profiler tool is an extension of PyTorch* legacy profiler for profiling operators' overhead on XPU devices. With this tool, users can get the information in many fields of the run models or code scripts. User should build Intel® Extension for PyTorch* with profiler support as default and enable this tool by a `with` statement before the code segment.
+
+For more detailed information, check `Legacy Profiler Tool <features/profiler_legacy.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/profiler_legacy
 
 Simple Trace Tool
 -----------------
