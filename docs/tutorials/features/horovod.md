@@ -3,34 +3,11 @@
 Horovod is a distributed deep learning training framework for TensorFlow, Keras, PyTorch, and Apache MXNet. The goal of Horovod is to make distributed deep learning fast and easy to use. Horovod core principles are based on MPI concepts such as size, rank, local rank, allreduce, allgather, broadcast, and alltoall. To use Horovod with PyTorch, you need to install Horovod with Pytorch first, and make specific change for Horovod in your training script.
 
 ## Install Horovod with PyTorch
-### Set Compiler and CCL (assume you already install oneAPI basekit)
+### Dependency
+- [Intel® Optimization for Horovod*](https://pypi.org/project/intel-extension-for-horovod)
 
-```bash
-source ${HOME}/intel/oneapi/compiler/latest/compiler/env/vars.sh
-source ${HOME}/intel/oneapi/ccl/latest/env/vars.sh
-```
-
-### Build Horovod with PyTorch
-
-```bash
-git clone -b xpu --depth=1 https://github.com/intel-innersource/frameworks.ai.horovod
-cd frameworks.ai.horovod
-git submodule sync
-git submodule update --init --recursive
-
-I_MPI_CXX=dpcpp \
-CXX=mpicxx \
-LDSHARED="dpcpp -shared -fPIC" \
-CC=icx \
-HOROVOD_GPU=DPCPP \
-HOROVOD_WITHOUT_MXNET=1 \
-HOROVOD_WITHOUT_PYTORCH=0 \
-HOROVOD_WITHOUT_TENSORFLOW=1 \
-HOROVOD_WITHOUT_GLOO=1 \
-HOROVOD_GPU_OPERATIONS=CCL \
-HOROVOD_CPU_OPERATIONS=CCL \
-HOROVOD_WITH_MPI=1 python setup.py install
-```
+You can use normal pip command to install the package:
+```python -m pip install intel-extension-for-horovod```
 
 ## Horovod with PyTorch Usage
 To use Horovod with PyTorch for XPU backend, make the following modifications to your training script:
