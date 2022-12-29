@@ -449,6 +449,33 @@ class Conv2dSigmoid(torch.nn.Module):
         return torch.sigmoid(self.conv(x))
 
 
+class Conv2dSigmoidBinaryMul(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dSigmoidBinaryMul, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        ret = torch.sigmoid(self.conv(x))
+        return ret * a
+
+class Conv2dSigmoidBinaryMulAdd(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dSigmoidBinaryMulAdd, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        ret = torch.sigmoid(self.conv(x))
+        return ret * a + x
+
+class Conv2dSigmoidBinaryMulAddRelu(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dSigmoidBinaryMulAddRelu, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        ret = torch.sigmoid(self.conv(x))
+        return torch.relu(ret * a + x)
+
 class Conv2dSqrt(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
         super(Conv2dSqrt, self).__init__()
@@ -634,7 +661,96 @@ class Conv2dBinaryMul(torch.nn.Module):
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return torch.mul(self.conv(x), a)
+        return torch.mul(self.conv(x), x)
+
+class Conv2dBinaryMulAdd(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryMulAdd, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.mul(self.conv(x), a) + a
+
+
+class Conv2dBinaryDiv(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryDiv, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.div(self.conv(x), x)
+
+class Conv2dBinarySub(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinarySub, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return self.conv(x) - a
+
+class Conv2dBinaryEqual(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryEqual, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.eq(self.conv(x), a)
+
+class Conv2dBinaryNotEqual(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryNotEqual, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.ne(self.conv(x), a)
+
+class Conv2dBinaryMin(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryMin, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.min(self.conv(x), a)
+
+class Conv2dBinaryMax(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryMax, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.max(self.conv(x), a)
+
+class Conv2dBinaryGE(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryGE, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.ge(self.conv(x), a)
+
+class Conv2dBinaryGT(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryGT, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.gt(self.conv(x), a)
+
+class Conv2dBinaryLE(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryLE, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.le(self.conv(x), a)
+
+class Conv2dBinaryLT(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryLT, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.lt(self.conv(x), a)
 
 
 class PadConv2d(torch.nn.Module):
@@ -850,6 +966,134 @@ class LinearElu(torch.nn.Module):
     def forward(self, x):
         x = F.elu(self.linear(x), 1.2)
         return x
+
+class LinearBinaryMul(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryMul, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.mul(self.linear(x), a)
+
+class LinearBinaryMulScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryMulScalar, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.mul(self.linear(x), 3.0)
+
+class LinearBinaryDiv(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryDiv, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.div(self.linear(x), a)
+
+class LinearBinaryDivScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryDivScalar, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.div(self.linear(x), 3.0)
+
+class LinearBinarySub(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinarySub, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return self.linear(x) - a
+
+class LinearBinarySubScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinarySubScalar, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return self.linear(x) - 3.0
+
+class LinearBinaryAdd(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryAdd, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return self.linear(x) + a
+
+class LinearBinaryAddScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryAddScalar, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return self.linear(x) + 3.0
+
+class LinearBinaryEqual(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryEqual, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.eq(self.linear(x), a)
+
+class LinearBinaryNotEqual(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryNotEqual, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.ne(self.linear(x), a)
+
+class LinearBinaryMin(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryMin, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.min(self.linear(x), a)
+
+class LinearBinaryMax(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryMax, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.max(self.linear(x), a)
+
+class LinearBinaryGE(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryGE, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.ge(self.linear(x), a)
+
+class LinearBinaryGT(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryGT, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.gt(self.linear(x), a)
+
+class LinearBinaryLE(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryLE, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.le(self.linear(x), a)
+
+class LinearBinaryLT(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearBinaryLT, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.lt(self.linear(x), a)
 
 class TestNNMethod(TestCase):
 
@@ -1304,6 +1548,55 @@ class TestNNMethod(TestCase):
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
         self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
+
+    def test_conv_sigmoid_binary_mul_add_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 3, 3], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dSigmoidBinaryMulAdd(2, 2, kernel_size=1, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_sigmoid_binary_mul_add_relu_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 3, 3], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dSigmoidBinaryMulAddRelu(2, 2, kernel_size=1, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_sigmoid_binary_mul_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dSigmoidBinaryMul(2, 2, kernel_size=1, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
     def test_conv_leaky_relu_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
@@ -1578,27 +1871,197 @@ class TestNNMethod(TestCase):
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
         self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
-    def test_conv_binary_mul(self, dtype=torch.float):
-        x = torch.randn([1, 64, 512, 512], device=cpu_device)
-        a1 = torch.randn([1, 64, 512, 512], device=cpu_device)
-        a2 = torch.randn([1, 64, 1, 1], device=cpu_device)
-        a3 = torch.randn([1, 1, 1, 1], device=cpu_device)
-        model = Conv2dBinaryMul(64, 64, kernel_size=3, stride=1, padding=(1, 1), bias=True)
-        other = [a1, a2, a3]
-        for a in other:
-            y = model(x, a)
+    def test_conv_binary_mul_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
 
-            x_xpu = x.clone().to("xpu")
-            a_xpu = a.clone().to("xpu")
-            model_xpu = copy.deepcopy(model).to("xpu")
-            modelJit = torch.jit.script(model_xpu)
-            with torch.no_grad():
-                for i in range(3):
-                    y_dpcpp = modelJit(x_xpu, a_xpu)
-                    # print(modelJit.graph_for(x, a))
-                    # print("fusion:", y_dpcpp.cpu())
-            self.assertEqual(y, y_dpcpp.to(cpu_device))
-            del modelJit
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dBinaryMul(2, 2, kernel_size=1, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_binary_mul_add_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dBinaryMulAdd(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_binary_sub_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dBinarySub(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_binary_div_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dBinaryDiv(2, 2, kernel_size=1, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_binary_eq_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dBinaryEqual(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script.bool())
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
+
+    def test_conv_binary_ne_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dBinaryNotEqual(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script.bool())
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
+
+    def test_conv_binary_max_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dBinaryMax(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_binary_min_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dBinaryMin(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+
+    def test_conv_binary_gt_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dBinaryGT(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script.bool())
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
+
+    def test_conv_binary_ge_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dBinaryGE(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script.bool())
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
+
+    def test_conv_binary_lt_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dBinaryLT(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script.bool())
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
+
+    def test_conv_binary_le_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 8, 8], device=cpu_device)
+        a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
+        a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+        a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
+
+        a1.fill_(2)
+        a3.fill_(2)
+
+        model = Conv2dBinaryLE(2, 2, kernel_size=3, stride=1, bias=True)
+        model1 = copy.deepcopy(model)
+        y, y_script = conv2d_fusion(x, a1, model, print_graph)
+        self.assertEqual(y, y_script.bool())
+        y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
 
     def test_pad_conv_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
@@ -2084,4 +2547,296 @@ class TestNNMethod(TestCase):
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+
+    def test_linear_binary_mul_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        a = torch.randn([2, 4], device=cpu_device)
+        model = LinearBinaryMul(4, 4)
+        model_scalar = LinearBinaryMulScalar(4, 4)
+        y = model(x, a)
+        y_scalar = model_scalar(x, a)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        a = a.to("xpu")
+        model.to("xpu")
+        model_scalar.to("xpu")
+        modelJit = torch.jit.script(model)
+        modelJit_scalar = torch.jit.script(model_scalar)
+
+        with torch.no_grad(): 
+            for i in range(2):
+                modelJit(x, a)
+                modelJit_scalar(x, a)
+            if print_graph:
+                print(modelJit.graph_for(x, a))
+                print(modelJit_scalar.graph_for(x, a))
+            y_dpcpp = modelJit(x, a)
+            y_dpcpp_scalar = modelJit_scalar(x, a)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        self.assertEqual(y_scalar, y_dpcpp_scalar.to(cpu_device))
+        del modelJit
+
+    def test_linear_binary_sub_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        a = torch.randn([2, 4], device=cpu_device)
+        model = LinearBinarySub(4, 4)
+        model_scalar = LinearBinarySubScalar(4, 4)
+        y = model(x, a)
+        y_scalar = model_scalar(x, a)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        a = a.to("xpu")
+        a_ = a.clone()
+        model.to("xpu")
+        model_scalar.to("xpu")
+        modelJit = torch.jit.script(model)
+        modelJit_scalar = torch.jit.script(model_scalar)
+
+        with torch.no_grad(): 
+            for i in range(2):
+                modelJit(x, a)
+                modelJit_scalar(x, a)
+            if print_graph:
+                print(modelJit.graph_for(x, a))
+                print(modelJit_scalar.graph_for(x, a))
+            y_dpcpp = modelJit(x, a_)
+            y_dpcpp_scalar = modelJit_scalar(x, a_)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        self.assertEqual(y_scalar, y_dpcpp_scalar.to(cpu_device))
+        del modelJit
+
+    def test_linear_binary_div_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        a = torch.randn([2, 4], device=cpu_device)
+        model = LinearBinaryDiv(4, 4)
+        model_scalar = LinearBinaryDivScalar(4, 4)
+        y = model(x, a)
+        y_scalar = model_scalar(x, a)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        a = a.to("xpu")
+        model.to("xpu")
+        model_scalar.to("xpu")
+        modelJit = torch.jit.script(model)
+        modelJit_scalar = torch.jit.script(model_scalar)
+
+        with torch.no_grad(): 
+            for i in range(2):
+                modelJit(x, a)
+                modelJit_scalar(x, a)
+            if print_graph:
+                print(modelJit.graph_for(x, a))
+                print(modelJit_scalar.graph_for(x, a))
+            y_dpcpp = modelJit(x, a)
+            y_dpcpp_scalar = modelJit_scalar(x, a)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        self.assertEqual(y_scalar, y_dpcpp_scalar.to(cpu_device))
+        del modelJit
+
+    def test_linear_binary_add_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        a = torch.randn([2, 4], device=cpu_device)
+        model = LinearBinaryAdd(4, 4)
+        model_scalar = LinearBinaryAddScalar(4, 4)
+        y = model(x, a)
+        y_scalar = model_scalar(x, a)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        a = a.to("xpu")
+        a_ = a.clone()
+        model.to("xpu")
+        model_scalar.to("xpu")
+        modelJit = torch.jit.script(model)
+        modelJit_scalar = torch.jit.script(model_scalar)
+
+        with torch.no_grad(): 
+            for i in range(2):
+                modelJit(x, a)
+                modelJit_scalar(x, a)
+            if print_graph:
+                print(modelJit.graph_for(x, a))
+                print(modelJit_scalar.graph_for(x, a))
+            y_dpcpp = modelJit(x, a_)
+            y_dpcpp_scalar = modelJit_scalar(x, a_)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        self.assertEqual(y_scalar, y_dpcpp_scalar.to(cpu_device))
+        del modelJit
+
+    @pytest.mark.skip("oneDNN not implement yet") 
+    def test_linear_binary_eq_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        a = torch.randn([2, 4], device=cpu_device)
+        model = LinearBinaryEqual(4, 4)
+        y = model(x, a)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        a = a.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, (x, a))
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x, a))
+            y_dpcpp = modelJit(x, a)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
+        del modelJit
+
+
+    @pytest.mark.skip("oneDNN not implement yet") 
+    def test_linear_binary_ne_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        a = torch.randn([2, 4], device=cpu_device)
+        model = LinearBinaryNotEqual(4, 4)
+        y = model(x, a)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        a = a.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, (x, a))
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x, a))
+            y_dpcpp = modelJit(x, a)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
+        del modelJit
+
+
+    def test_linear_binary_max_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        a = torch.randn([2, 4], device=cpu_device)
+        model = LinearBinaryMax(4, 4)
+        y = model(x, a)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        a = a.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, (x, a))
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x, a))
+            y_dpcpp = modelJit(x, a)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+
+    def test_linear_binary_min_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        a = torch.randn([2, 4], device=cpu_device)
+        model = LinearBinaryMin(4, 4)
+        y = model(x, a)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        a = a.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, (x, a))
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x, a))
+            y_dpcpp = modelJit(x, a)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    @pytest.mark.skip("oneDNN not implement yet") 
+    def test_linear_binary_ge_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        a = torch.randn([2, 4], device=cpu_device)
+        model = LinearBinaryGE(4, 4)
+        y = model(x, a)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        a = a.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.script(model)
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x, a))
+            y_dpcpp = modelJit(x, a)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
+        del modelJit
+
+    @pytest.mark.skip("oneDNN not implement yet") 
+    def test_linear_binary_gt_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        a = torch.randn([2, 4], device=cpu_device)
+        model = LinearBinaryGT(4, 4)
+        y = model(x, a)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        a = a.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, (x, a))
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x, a))
+            y_dpcpp = modelJit(x, a)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
+        del modelJit
+
+    @pytest.mark.skip("oneDNN not implement yet") 
+    def test_linear_binary_le_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        a = torch.randn([2, 4], device=cpu_device)
+        model = LinearBinaryLE(4, 4)
+        y = model(x, a)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        a = a.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, (x, a))
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x, a))
+            y_dpcpp = modelJit(x, a)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
+        del modelJit
+
+    @pytest.mark.skip("oneDNN not implement yet") 
+    def test_linear_binary_lt_fusion(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        a = torch.randn([2, 4], device=cpu_device)
+        model = LinearBinaryLT(4, 4)
+        y = model(x, a)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        a = a.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, (x, a))
+
+        with torch.no_grad():
+            if print_graph:
+                print(modelJit.graph_for(x, a))
+            y_dpcpp = modelJit(x, a)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
         del modelJit

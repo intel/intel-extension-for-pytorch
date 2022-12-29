@@ -49,9 +49,19 @@ generate the rule of pots-op fusion.
   IPEX_QCONV_SYMBOL_DECLARATION(func);             \
   IPEX_CONV_SYMBOL_DECLARATION(func);              \
   IPEX__CONV_SYMBOL_DECLARATION(func);
+
+#define IPEX_CONV_BINARY_SYMBOL_DECLARATION(func) \
+  IPEX_QCONV_SYMBOL_DECLARATION(binary_##func);   \
+  IPEX_CONV_SYMBOL_DECLARATION(binary_##func);    \
+  IPEX__CONV_SYMBOL_DECLARATION(binary_##func);
+
+#define IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(func) \
+  static auto linear_binary_##func##_sym =          \
+      Symbol::fromQualString("torch_ipex::linear_binary_" #func)
 } // namespace
 
 // convolution related symbol declaration
+// eltwise
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(sqrt);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(tanh);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(square);
@@ -73,8 +83,26 @@ IPEX_GENERAL_CONV_SYMBOL_DECLARATION(leaky_relu);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(relu);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(mish_compound);
 IPEX_GENERAL_CONV_SYMBOL_DECLARATION(mish_compound_add);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(sigmoid_binary_mul);
+IPEX_GENERAL_CONV_SYMBOL_DECLARATION(sigmoid_binary_mul_add);
+
+// binary
+IPEX_CONV_BINARY_SYMBOL_DECLARATION(add);
+IPEX_CONV_BINARY_SYMBOL_DECLARATION(mul);
+IPEX_CONV_BINARY_SYMBOL_DECLARATION(sub);
+IPEX_CONV_BINARY_SYMBOL_DECLARATION(div);
+IPEX_CONV_BINARY_SYMBOL_DECLARATION(max);
+IPEX_CONV_BINARY_SYMBOL_DECLARATION(min);
+IPEX_CONV_BINARY_SYMBOL_DECLARATION(eq);
+IPEX_CONV_BINARY_SYMBOL_DECLARATION(ne);
+IPEX_CONV_BINARY_SYMBOL_DECLARATION(ge);
+IPEX_CONV_BINARY_SYMBOL_DECLARATION(gt);
+IPEX_CONV_BINARY_SYMBOL_DECLARATION(le);
+IPEX_CONV_BINARY_SYMBOL_DECLARATION(lt);
+IPEX_CONV_BINARY_SYMBOL_DECLARATION(mul_add);
 
 // linear related symbol declaration
+// eltwise
 IPEX_LINEAR_SYMBOL_DECLARATION(sigmoid);
 IPEX_LINEAR_SYMBOL_DECLARATION(relu);
 IPEX_LINEAR_SYMBOL_DECLARATION(sqrt);
@@ -94,6 +122,20 @@ IPEX_LINEAR_SYMBOL_DECLARATION(elu);
 IPEX_LINEAR_SYMBOL_DECLARATION(pow);
 IPEX_LINEAR_SYMBOL_DECLARATION(hardtanh);
 IPEX_LINEAR_SYMBOL_DECLARATION(leaky_relu);
+
+// binary
+IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(mul);
+IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(sub);
+IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(div);
+IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(max);
+IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(min);
+
+// IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(eq);
+// IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(ne);
+// IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(ge);
+// IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(gt);
+// IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(le);
+// IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(lt);
 
 // matmul related symbol declaration
 IPEX_MATMUL_SYMBOL_DECLARATION(sigmoid);
@@ -168,8 +210,6 @@ static auto permute_contiguous_sym =
     Symbol::fromQualString("torch_ipex::permute_contiguous");
 static auto convolution_silu_sym =
     Symbol::fromQualString("torch_ipex::_convolution_silu");
-static auto conv2d_binary_mul_sym =
-    Symbol::fromQualString("torch_ipex::conv2d_binary_mul");
 static auto q_cat_dequantize_sym =
     Symbol::fromQualString("torch_ipex::q_cat_dequantize");
 

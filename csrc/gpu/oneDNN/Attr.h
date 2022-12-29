@@ -150,6 +150,16 @@ class Attr {
   /***** binary *****/
   algorithm kind_with_binary_mul = algorithm::binary_mul;
   algorithm kind_with_binary_add = algorithm::binary_add;
+  algorithm kind_with_binary_sub = algorithm::binary_sub;
+  algorithm kind_with_binary_div = algorithm::binary_div;
+  algorithm kind_with_binary_eq = algorithm::binary_eq;
+  algorithm kind_with_binary_ne = algorithm::binary_ne;
+  algorithm kind_with_binary_ge = algorithm::binary_ge;
+  algorithm kind_with_binary_gt = algorithm::binary_gt;
+  algorithm kind_with_binary_le = algorithm::binary_le;
+  algorithm kind_with_binary_lt = algorithm::binary_lt;
+  algorithm kind_with_binary_max = algorithm::binary_max;
+  algorithm kind_with_binary_min = algorithm::binary_min;
 
   // append sum post op
   Attr& append_post_sum(

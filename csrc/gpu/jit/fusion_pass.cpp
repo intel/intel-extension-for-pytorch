@@ -66,6 +66,17 @@ kind of cases which will automatically fuse the aten::dequantize.
   //   {q_conv2d_sym, Symbol::fromQualString("aten::" #func)}, \
   //       xpu::q_conv2d_##func##_sym                          \
   // }
+#define IPEX_DEFINE_CONV_BINARY_FUSION(func)                       \
+  {{aten::conv2d, Symbol::fromQualString("aten::" #func)},         \
+   xpu::conv2d_binary_##func##_sym},                               \
+      {{_conv_sym, Symbol::fromQualString("aten::" #func)},        \
+       xpu::_convolution_binary_##func##_sym},                     \
+      {{aten::conv2d, Symbol::fromQualString("aten::" #func "_")}, \
+       xpu::conv2d_binary_##func##_sym},                           \
+  {                                                                \
+    {_conv_sym, Symbol::fromQualString("aten::" #func "_")},       \
+        xpu::_convolution_binary_##func##_sym                      \
+  }
 
 #define IPEX_DEFINE_CONV_FUSION_WITH_DEQUANTIZE(func)              \
   {{aten::conv2d, Symbol::fromQualString("aten::" #func)},         \
@@ -101,6 +112,14 @@ kind of cases which will automatically fuse the aten::dequantize.
   {                                                                  \
     {xpu::t_matmul_sym, Symbol::fromQualString("aten::" #func "_")}, \
         xpu::t_matmul_##func##_sym                                   \
+  }
+
+#define IPEX_DEFINE_LINEAR_BINARY_FUSION(func)                  \
+  {{aten::linear, Symbol::fromQualString("aten::" #func)},      \
+   xpu::linear_binary_##func##_sym},                            \
+  {                                                             \
+    {aten::linear, Symbol::fromQualString("aten::" #func "_")}, \
+        xpu::linear_binary_##func##_sym                         \
   }
 
 } // namespace
@@ -654,6 +673,19 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     IPEX_DEFINE_CONV_FUSION(relu),
     // IPEX_DEFINE_CONV_FUSION(soft_relu),
 
+    // IPEX_DEFINE_CONV_BINARY_FUSION(add),
+    IPEX_DEFINE_CONV_BINARY_FUSION(mul),
+    IPEX_DEFINE_CONV_BINARY_FUSION(sub),
+    IPEX_DEFINE_CONV_BINARY_FUSION(div),
+    IPEX_DEFINE_CONV_BINARY_FUSION(max),
+    IPEX_DEFINE_CONV_BINARY_FUSION(min),
+    IPEX_DEFINE_CONV_BINARY_FUSION(eq),
+    IPEX_DEFINE_CONV_BINARY_FUSION(ne),
+    IPEX_DEFINE_CONV_BINARY_FUSION(ge),
+    IPEX_DEFINE_CONV_BINARY_FUSION(gt),
+    IPEX_DEFINE_CONV_BINARY_FUSION(le),
+    IPEX_DEFINE_CONV_BINARY_FUSION(lt),
+
     // define linear related fusion pattern
     IPEX_DEFINE_LINEAR_FUSION(sigmoid),
     IPEX_DEFINE_LINEAR_FUSION(relu),
@@ -677,6 +709,21 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     IPEX_DEFINE_LINEAR_FUSION(elu),
     IPEX_DEFINE_LINEAR_FUSION(hardtanh),
 
+    // IPEX_DEFINE_LINEAR_BINARY_FUSION(add),
+    IPEX_DEFINE_LINEAR_BINARY_FUSION(mul),
+    IPEX_DEFINE_LINEAR_BINARY_FUSION(sub),
+    IPEX_DEFINE_LINEAR_BINARY_FUSION(div),
+    IPEX_DEFINE_LINEAR_BINARY_FUSION(max),
+    IPEX_DEFINE_LINEAR_BINARY_FUSION(min),
+
+    // Note: oneDNN not implement linear + binary_compare_ops
+    // IPEX_DEFINE_LINEAR_BINARY_FUSION(eq),
+    // IPEX_DEFINE_LINEAR_BINARY_FUSION(ne),
+    // IPEX_DEFINE_LINEAR_BINARY_FUSION(ge),
+    // IPEX_DEFINE_LINEAR_BINARY_FUSION(gt),
+    // IPEX_DEFINE_LINEAR_BINARY_FUSION(le),
+    // IPEX_DEFINE_LINEAR_BINARY_FUSION(lt),
+
     // define matmul related fusion pattern
     IPEX_DEFINE_MATMUL_FUSION(sqrt),
     IPEX_DEFINE_MATMUL_FUSION(square),
@@ -696,7 +743,8 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     IPEX_DEFINE_MATMUL_FUSION(elu),
     IPEX_DEFINE_MATMUL_FUSION(hardtanh),
     IPEX_DEFINE_MATMUL_FUSION(sigmoid),
-    IPEX_DEFINE_MATMUL_FUSION(relu),
+    IPEX_DEFINE_MATMUL_FUSION(relu)
+
 };
 
 void FusionPass(std::shared_ptr<Graph>& graph) {
