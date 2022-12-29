@@ -53,6 +53,7 @@ class TestTorchMethod(TestCase):
                                                                     channel_zero_point_xpu, 1, quant_min, quant_max, grad_factor)
         self.assertEqual(dst_cpu, dst_xpu.cpu())
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_fake_quantize_learnable_per_channel_affine_backward(self, dtype=torch.float):
         x_cpu = torch.randn([1, 3, 2, 2], requires_grad=True)
         x_xpu = x_cpu.clone().detach().to("xpu")
