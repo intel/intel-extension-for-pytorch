@@ -85,6 +85,16 @@ class ConvolutionOpContext : public torch::jit::CustomClassHolder {
   virtual detail::ContextConvolution& get_context() = 0;
 
   virtual at::Tensor get_data_handle() = 0;
+
+  // The load_state_dict behavior for nn.Modules are inplace copy weight from
+  // state_dict So the load_state_dict for optimizer can only handle the states
+  // and keep parameter groups un-changed Thus we need this method to apply
+  // inplace copy on weight/bias for IPEX modules with op context The process
+  // is:
+  //         new_ctx = create_ctx(state_dict[weight])
+  //         self.ctx.load_from_ctx(new_ctx)
+  virtual void load_from_ctx(
+      c10::intrusive_ptr<ConvolutionOpContext> other) = 0;
 };
 
 class IpexConvolutionOpContext final : public ConvolutionOpContext {
@@ -128,6 +138,9 @@ class IpexConvolutionOpContext final : public ConvolutionOpContext {
 
   virtual at::Tensor get_data_handle() override;
 
+  virtual void load_from_ctx(
+      c10::intrusive_ptr<ConvolutionOpContext> other) override;
+
   static c10::intrusive_ptr<ConvolutionOpContext> create_context(
       at::Tensor&& weight,
       c10::optional<at::Tensor>&& bias,
@@ -151,7 +164,7 @@ class LinearOpContext : public torch::jit::CustomClassHolder {
  public:
   SerializationTypeLinearPrePack unpack() {
     auto orig_weight_ = this->to_public(this->get_at_packed_weight());
-    auto orig_bias_ = this->get_context().bias_;
+    auto orig_bias_ = this->get_context().at_bias_;
     return std::make_tuple(orig_weight_, orig_bias_, batch_size_);
   }
 
@@ -184,6 +197,15 @@ class LinearOpContext : public torch::jit::CustomClassHolder {
   virtual at::Tensor to_public(const at::Tensor& tensor) = 0;
 
   virtual detail::ContextLinear& get_context() = 0;
+
+  // The load_state_dict behavior for nn.Modules are inplace copy weight from
+  // state_dict So the load_state_dict for optimizer can only handle the states
+  // and keep parameter groups un-changed Thus we need this method to apply
+  // inplace copy on weight/bias for IPEX modules with op context The process
+  // is:
+  //         new_ctx = create_ctx(state_dict[weight])
+  //         self.ctx.load_from_ctx(new_ctx)
+  virtual void load_from_ctx(c10::intrusive_ptr<LinearOpContext> other) = 0;
 };
 
 class IpexLinearOpContext final : public LinearOpContext {
@@ -225,6 +247,9 @@ class IpexLinearOpContext final : public LinearOpContext {
       at::Tensor&& weight,
       c10::optional<at::Tensor>&& bias,
       c10::optional<int64_t> batch_size);
+
+  virtual void load_from_ctx(
+      c10::intrusive_ptr<LinearOpContext> other) override;
 };
 
 using SerializationTypeMKLPrePack =
@@ -237,7 +262,7 @@ class MKLOpContext : public torch::jit::CustomClassHolder {
  public:
   SerializationTypeMKLPrePack unpack() {
     auto orig_weight = this->to_public(this->get_at_packed_weight());
-    auto orig_bias = this->get_mkl_context().bias_;
+    auto orig_bias = this->get_context().at_bias_;
     return std::make_tuple(orig_weight, orig_bias, batch_size_);
   }
 
@@ -258,9 +283,18 @@ class MKLOpContext : public torch::jit::CustomClassHolder {
 
   virtual int64_t get_in_features() = 0;
 
-  virtual detail::ContextLinearMKL& get_mkl_context() = 0;
+  virtual detail::ContextLinearMKL& get_context() = 0;
 
   c10::optional<int64_t> get_batchsize();
+
+  // The load_state_dict behavior for nn.Modules are inplace copy weight from
+  // state_dict So the load_state_dict for optimizer can only handle the states
+  // and keep parameter groups un-changed Thus we need this method to apply
+  // inplace copy on weight/bias for IPEX modules with op context The process
+  // is:
+  //         new_ctx = create_ctx(state_dict[weight])
+  //         self.ctx.load_from_ctx(new_ctx)
+  virtual void load_from_ctx(c10::intrusive_ptr<MKLOpContext> other) = 0;
 };
 
 class IpexLinearMKLOpContext final : public MKLOpContext {
@@ -287,7 +321,7 @@ class IpexLinearMKLOpContext final : public MKLOpContext {
 
   virtual at::Tensor to_public(const at::Tensor& tensor) override;
 
-  virtual detail::ContextLinearMKL& get_mkl_context() override;
+  virtual detail::ContextLinearMKL& get_context() override;
 
   virtual int64_t get_out_features() override;
 
@@ -297,6 +331,8 @@ class IpexLinearMKLOpContext final : public MKLOpContext {
       at::Tensor&& weight,
       c10::optional<at::Tensor>&& bias,
       c10::optional<int64_t> batch_size);
+
+  virtual void load_from_ctx(c10::intrusive_ptr<MKLOpContext> other) override;
 };
 
 // deconv op
@@ -323,7 +359,7 @@ class ConvTransposeOpContext : public torch::jit::CustomClassHolder {
  public:
   SerializationTypeConvTransposePrePack unpack() {
     auto orig_weight_ = this->to_public(this->get_at_packed_weight());
-    auto orig_bias_ = this->get_context().bias_;
+    auto orig_bias_ = this->get_context().at_bias_;
     auto groups_ = this->get_context().groups_;
     auto weight_is_channels_last_ =
         this->get_context().weight_is_channels_last_;
@@ -371,6 +407,16 @@ class ConvTransposeOpContext : public torch::jit::CustomClassHolder {
   virtual at::Tensor get_data_handle() = 0;
 
   virtual detail::ContextConvTranspose& get_context() = 0;
+
+  // The load_state_dict behavior for nn.Modules are inplace copy weight from
+  // state_dict So the load_state_dict for optimizer can only handle the states
+  // and keep parameter groups un-changed Thus we need this method to apply
+  // inplace copy on weight/bias for IPEX modules with op context The process
+  // is:
+  //         new_ctx = create_ctx(state_dict[weight])
+  //         self.ctx.load_from_ctx(new_ctx)
+  virtual void load_from_ctx(
+      c10::intrusive_ptr<ConvTransposeOpContext> other) = 0;
 };
 
 class IpexConvTransposeOpContext final : public ConvTransposeOpContext {
@@ -428,6 +474,9 @@ class IpexConvTransposeOpContext final : public ConvTransposeOpContext {
       int64_t groups,
       bool weight_is_channels_last,
       std::vector<int64_t>&& input_size);
+
+  virtual void load_from_ctx(
+      c10::intrusive_ptr<ConvTransposeOpContext> other) override;
 };
 
 } // namespace cpu

@@ -363,6 +363,171 @@ class TestOptimizeCases(TestCase):
             ipex_model_state = ipex_model.state_dict()
             for var_name in origin_model_state:
                 self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
-    
+
+    def test_partial_model_update(self):
+        class M(torch.nn.Module):
+
+            def __init__(self):
+                super(M, self).__init__()
+                self.L1 = torch.nn.Linear(10, 10)
+                self.L2 = torch.nn.Linear(10, 10)
+
+            def forward(self, x):
+                return (self.L1(x), self.L2(x))
+
+        model = M()
+        optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5, eps=1e-8)
+        model.train()
+        model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
+
+        with torch.cpu.amp.autocast():
+            loss = model(torch.rand(10, 10))[0].sum()
+
+        loss.backward()
+        optimizer.step()
+
+    def _test_load_after_ipex_optimize_inference(self, model_class, dtype, optimizer_class, level, inplace):
+        model = model_class().train()
+        input = model.input
+        if optimizer_class == SGD:
+            optimizer = optimizer_class(model.parameters(), lr=10.01, momentum=0.1)
+        else:
+            optimizer = optimizer_class(model.parameters(), lr=10.01)
+        ipex_model, ipex_optimizer = ipex.optimize(
+            model, dtype=dtype, optimizer=optimizer, sample_input=input, level=level, inplace=inplace
+        )
+        # train 2 iters to save something in optimizer's state
+        for _ in range(2):
+            with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
+                y = ipex_model(*input).sum()
+            ipex_optimizer.zero_grad()
+            y.backward()
+            ipex_optimizer.step()
+
+        inf_model = model_class().eval()
+        inf_model_state = inf_model.state_dict()
+        ipex_inf_model = ipex.optimize(inf_model,  dtype=dtype, sample_input=input, level=level, inplace=inplace)
+        # check parameters are not same before load
+        ipex_model_state = ipex_model.state_dict()
+        for var_name in ipex_model_state:
+            self.assertNotEqual(ipex_model_state[var_name], inf_model_state[var_name])
+        for p1 in ipex_model.named_parameters():
+            prefix, attr = p1[0].split('.')
+            sub_m = getattr(ipex_inf_model, prefix)
+            param = getattr(sub_m, attr)
+            self.assertNotEqual(p1[1], param)
+
+        # check parameters are same after load
+        ipex_inf_model.load_state_dict(ipex_model_state)
+        inf_model_state = ipex_inf_model.state_dict()
+        for var_name in ipex_model_state:
+            self.assertEqual(ipex_model_state[var_name].to(dtype).float(), inf_model_state[var_name])
+        for p1 in ipex_model.named_parameters():
+            if p1[0] == 'linear.weight':
+                # Do not compare linear.weight with block format since
+                # linear.weight in ipex_model(training model) is plain
+                continue
+            prefix, attr = p1[0].split('.')
+            sub_m = getattr(ipex_inf_model, prefix)
+            param = getattr(sub_m, attr)
+            self.assertEqual(p1[1], param)
+
+    def _test_load_after_ipex_optimize_training(self, model_class, dtype, optimizer_class, level, inplace):
+        model = model_class().train()
+        input = model.input
+        if optimizer_class == SGD:
+            optimizer = optimizer_class(model.parameters(), lr=10.01, momentum=0.1)
+        else:
+            optimizer = optimizer_class(model.parameters(), lr=10.01)
+        ipex_model, ipex_optimizer = ipex.optimize(
+            model, dtype=dtype, optimizer=optimizer, sample_input=input, level=level, inplace=inplace
+        )
+        # train 2 iters to save something in optimizer's state
+        for _ in range(2):
+            with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
+                y = ipex_model(*input).sum()
+            ipex_optimizer.zero_grad()
+            y.backward()
+            ipex_optimizer.step()
+        ref_ipex_model = copy.deepcopy(ipex_model)
+        ref_ipex_optimizer = copy.deepcopy(ipex_optimizer)
+        ref_ipex_model_state = copy.deepcopy(ipex_model.state_dict())
+        ref_ipex_optimizer_state = copy.deepcopy(ipex_optimizer.state_dict())
+
+        # train 2 iters to change model/optimizer state
+        for _ in range(2):
+            with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
+                y = ipex_model(*input).sum()
+            ipex_optimizer.zero_grad()
+            y.backward()
+            ipex_optimizer.step()
+        # check state changed (with public formt)
+        ipex_model_state = ipex_model.state_dict()
+        ipex_optimizer_state = ipex_optimizer.state_dict()
+        for var_name in ipex_model_state:
+            self.assertNotEqual(ipex_model_state[var_name], ref_ipex_model_state[var_name])
+        for var_name in ipex_optimizer_state:
+            if var_name == 'state':
+                self.assertNotEqual(ipex_optimizer_state[var_name], ref_ipex_optimizer_state[var_name])
+        # check values before load (with block format)
+        for p1, p2 in zip(ipex_model.named_parameters(), ref_ipex_model.named_parameters()):
+            self.assertNotEqual(p1[1], p2[1])
+        for (_, v1), (_, v2) in zip(ipex_optimizer.state.items(), ref_ipex_optimizer.state.items()):
+            self.assertNotEqual(v1, v2)
+        ipex_model.load_state_dict(ref_ipex_model_state)
+        ipex_optimizer.load_state_dict(ref_ipex_optimizer_state)
+        # check values same after load (with block format)
+        for p1, p2 in zip(ipex_model.named_parameters(), ref_ipex_model.named_parameters()):
+            self.assertEqual(p1[1], p2[1])
+        for (_, v1), (_, v2) in zip(ipex_optimizer.state.items(), ref_ipex_optimizer.state.items()):
+            if 'step_size' in v1:
+                # For Rprop, there is a "clamp" operation on step_size which will change the "zero"
+                # attribute for packed position.
+                # The zero pos will be changed after "clamp", and will be zero again after pack and
+                # repack it. So in ipex_optimizer, the packed pos of "step_size" will be zero but in
+                # ref_ipex_optimizer, the packed pos of "step_size" will not be zero. Thus the
+                # assertEqual will be failed.
+                #    step_sizes=(1e-6, 50)
+                #    step_size_min, step_size_max = group['step_sizes']
+                #    step_size.mul_(sign).clamp_(step_size_min, step_size_max)
+                #    param.addcmul_(grad.sign(), step_size, value=-1)
+                #    (param = param - grad.sign() * step_size)
+                # but this step_size will not have impact since grad are zero
+                v1 = copy.deepcopy(v1)
+                v1.pop('step_size')
+                v2 = copy.deepcopy(v2)
+                v2.pop('step_size')
+                self.assertEqual(v1, v2)
+
+        # check state same after load (with plain format)
+        ipex_model_state = ipex_model.state_dict()
+        ipex_optimizer_state = ipex_optimizer.state_dict()
+        for var_name in ipex_model_state:
+            self.assertEqual(ipex_model_state[var_name], ref_ipex_model_state[var_name])
+        for var_name in ipex_optimizer_state:
+            self.assertEqual(ipex_optimizer_state[var_name], ref_ipex_optimizer_state[var_name])
+
+    def test_load_after_optimize(self):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super(Model, self).__init__()
+                self.input = (torch.randn(1, 3, 224, 224), torch.randn(100, 100), torch.randn(5, 5, 3, 3))
+                self.conv = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3))
+                self.linear = torch.nn.Linear(100, 100)
+                self.conv_transpose2d = torch.nn.ConvTranspose2d(5, 5, (3 ,3))
+
+            def forward(self, x1, x2, x3):
+                return self.conv(x1).sum() + self.linear(x2).sum() + self.conv_transpose2d(x3)
+
+        params_dict = {
+            "dtype": [torch.float, torch.bfloat16],
+            "optimizer": [Lamb, Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD],
+            "level": ['O0', 'O1'],
+            "inplace": [True, False],
+        }
+        for dtype, optimizer, level, inplace in list(itertools.product(*params_dict.values())):
+            self._test_load_after_ipex_optimize_training(Model, dtype, optimizer, level, inplace)
+            self._test_load_after_ipex_optimize_inference(Model, dtype, optimizer, level, inplace)
+
 if __name__ == '__main__':
     test = unittest.main()

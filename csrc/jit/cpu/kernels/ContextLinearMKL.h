@@ -9,9 +9,9 @@ namespace cpu {
 namespace detail {
 struct ContextLinearMKL final {
   std::vector<int64_t> sgemm_sizes_ = {0, 0, 0};
-  at::Tensor mkl_weight_;
-  at::Tensor ori_weight_;
-  c10::optional<at::Tensor> bias_;
+  at::Tensor at_weight_; // packed at weight
+  at::Tensor ori_weight_; // non-packed at weight
+  c10::optional<at::Tensor> at_bias_;
 
   ContextLinearMKL() = delete;
 
@@ -21,9 +21,9 @@ struct ContextLinearMKL final {
       at::Tensor&& ori_weight,
       c10::optional<at::Tensor>&& bias)
       : sgemm_sizes_(std::move(sgemm_sizes)),
-        mkl_weight_(std::move(mkl_weight)),
+        at_weight_(std::move(mkl_weight)),
         ori_weight_(std::move(ori_weight)),
-        bias_(std::move(bias)) {}
+        at_bias_(std::move(bias)) {}
 
   ContextLinearMKL(ContextLinearMKL&&) = default;
   ContextLinearMKL& operator=(ContextLinearMKL&&) = default;
