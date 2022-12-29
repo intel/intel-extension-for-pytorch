@@ -17,16 +17,24 @@ For more detailed information, check [installation guide](../installation.md).
 
 Install from source:
 ```bash
-git clone https://github.com/intel/torch-ccl.git
+git clone https://github.com/intel/torch-ccl.git -b v1.13.100+gpu
 cd torch-ccl
 git submodule sync 
 git submodule update --init --recursive
-python setup.py install
+BUILD_NO_ONECCL_PACKAGE=ON COMPUTE_BACKEND=dpcpp python setup.py install
 ```
 
 Install from prebuilt wheel:
 
-Download the prebuilt wheel from http://mlpc.intel.com/downloads/gpu-new/releases/PVC_NDA_2022ww45/IPEX/RC2/ and use the `pip install` to install it.
+Download the prebuilt wheel from https://developer.intel.com/ipex-whl-stable-xpu and use the `pip install` to install it.
+
+### Use oneCCL in the basekit
+
+Make sure you have installed basekit from https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit
+
+```bash
+source $basekit_root/ccl/latest/env/vars.sh
+```
 
 ## DDP usage for XPU in model training 
 
@@ -64,6 +72,12 @@ Note: For single-device modules, `device_ids` can contain exactly one device id,
 
 ## Example Usage (MPI launch for single node):
 Intel® oneCCL Bindings for Pytorch\* recommends MPI as the launcher to start multiple processes.  Here's an example to illustrate such usage.
+
+Use MPI from basekit:
+
+```bash
+source $basekit_root/mpi/latest/env/vars.sh
+```
 
 `Example_DDP.py`
 
