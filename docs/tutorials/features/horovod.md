@@ -4,10 +4,10 @@ Horovod is a distributed deep learning training framework for TensorFlow, Keras,
 
 ## Install Horovod with PyTorch
 ### Dependency
-- [Intel® Optimization for Horovod*](https://pypi.org/project/intel-extension-for-horovod)
+- [Intel® Optimization for Horovod*](https://pypi.org/project/intel-optimization-for-horovod/)
 
 You can use normal pip command to install the package:
-```python -m pip install intel-extension-for-horovod```
+```python -m pip install intel-optimization-for-horovod```
 
 ## Horovod with PyTorch Usage
 To use Horovod with PyTorch for XPU backend, make the following modifications to your training script:
