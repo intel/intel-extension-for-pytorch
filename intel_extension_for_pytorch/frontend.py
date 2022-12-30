@@ -164,10 +164,10 @@ class GraphCapture(object):
                                 # Try JIT trace.
                                 # Tracing only records operations done when the given function is run on the given tensors.
                                 # Therefore, the returned ScriptModule will always run the same traced graph on any input.
-                                # This has some important implications when your module is expected to run different 
-                                # sets of operations, depending on the input and/or the module state. In cases like these, 
-                                # tracing would not be appropriate, and the tracer will try to emit warnings when doing 
-                                # something that may cause an incorrect trace to be produced. Therefore, we catch these 
+                                # This has some important implications when your module is expected to run different
+                                # sets of operations, depending on the input and/or the module state. In cases like these,
+                                # tracing would not be appropriate, and the tracer will try to emit warnings when doing
+                                # something that may cause an incorrect trace to be produced. Therefore, we catch these
                                 # warnings and treat them as errors, and let TorchDynamo handle such models appropriately.
                                 with warnings.catch_warnings():
                                     warnings.filterwarnings('error', category=TracerWarning)
@@ -240,7 +240,7 @@ def optimize(
     perspective it has drawbacks. Running with the ``blocked layout``, oneDNN
     splits one or several dimensions of data into blocks with fixed size each
     time the operator is executed. More details information about oneDNN data
-    mermory format is available at `oneDNN manual 
+    mermory format is available at `oneDNN manual
     <https://oneapi-src.github.io/oneDNN/dev_guide_understanding_memory_formats.html>`_.
     To reduce this overhead, data will be converted to predefined block shapes
     prior to the execution of oneDNN operator execution. In runtime, if the data
@@ -353,8 +353,8 @@ def optimize(
         >>> optimized_model, optimized_optimizer = ipex.optimize(model, dtype=torch.bfloat16, optimizer=optimizer)
         >>> # running training step.
 
-    torch.xpu.optimize is an alternative of optimize API in Intel® Extension for PyTorch*, 
-    to provide identical usage for XPU device only. The motivation of adding this alias is 
+    `torch.xpu.optimize()` is an alternative of optimize API in Intel® Extension for PyTorch*,
+    to provide identical usage for XPU device only. The motivation of adding this alias is
     to unify the coding style in user scripts base on torch.xpu modular.
 
     Examples:
@@ -523,7 +523,7 @@ def optimize(
     params_attr = {}
     if dtype == torch.bfloat16 and model.training:
         optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
-            optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16, 
+            optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16,
             convert_dtype=torch.bfloat16)
     if dtype == torch.half and model.training:
         assert device_type != 'xpu', "For now, XPU device does not support model training with half precision"
@@ -617,22 +617,34 @@ class FP32MathMode(IntEnum):
 def set_fp32_math_mode(mode=FP32MathMode.FP32, device="cpu"):
     r"""
     Enable or disable implicit data type conversion.
-    If mode is FP32MathMode.FP32 which means to disable the oneDNN fpmath mode.
-    If mode is FP32MathMode.BF32 which means to enable the oneDNN fpmath mode by down convert to bfloat16 implicitly.
 
     Args:
-        mode (FP32MathMode): Only works for ``FP32MathMode.FP32`` and ``FP32MathMode.BF32``.
-            oneDNN fpmath mode will be disabled by default if dtype is set to ``FP32MathMode.FP32``.
-            The implicit FP32 to BF16 data type conversion will be enabled if dtype is set to ``FP32MathMode.BF32`.
-        device (string): Only "cpu" is supported right now.
+        mode (FP32MathMode): ``FP32MathMode.FP32``, ``FP32MathMode.BF32`` or
+            ``FP32MathMode.TF32`` (GPU ONLY). oneDNN fpmath mode will be disabled by default if dtype
+            is set to ``FP32MathMode.FP32``. The implicit ``FP32`` to ``TF32`` data type conversion
+            will be enabled if dtype is set to ``FP32MathMode.TF32``. The implicit ``FP32``
+            to ``BF16`` data type conversion will be enabled if dtype is set to ``FP32MathMode.BF32``.
+        device (string): ``cpu``, ``xpu``
 
     Examples:
 
         >>> import intel_extension_for_pytorch as ipex
         >>> # to enable the implicit data type conversion
-        >>> ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.BF32)
+        >>> ipex.set_fp32_math_mode(device="xpu", mode=ipex.FP32MathMode.BF32)
         >>> # to disable the implicit data type conversion
-        >>> ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.FP32)
+        >>> ipex.set_fp32_math_mode(device="xpu", mode=ipex.FP32MathMode.FP32)
+
+    ``torch.xpu.set_fp32_math_mode()`` is an alternative function in Intel® Extension for PyTorch*,
+    to provide identical usage for XPU device only. The motivation of adding this alias is
+    to unify the coding style in user scripts base on ``torch.xpu`` modular.
+
+    Examples:
+
+        >>> import intel_extension_for_pytorch as ipex
+        >>> # to enable the implicit data type conversion
+        >>> torch.xpu.set_fp32_math_mode(device="xpu", mode=ipex.FP32MathMode.BF32)
+        >>> # to disable the implicit data type conversion
+        >>> torch.xpu.set_fp32_math_mode(device="xpu", mode=ipex.FP32MathMode.FP32)
     """
 
     if device == "cpu":
@@ -664,19 +676,31 @@ def get_fp32_math_mode(device="cpu"):
     Get the current fpmath_mode setting.
 
     Args:
-        device (string): Only "cpu" is supported right now
+        device (string): ``cpu``, ``xpu``
 
     Returns:
         Fpmath mode
-        The value will be ``FP32MathMode.FP32`` or ``FP32MathMode.BF32``.
-        ``FP32MathMode.FP32`` means implicit down-conversion is disabled,
-        while ``FP32MathMode.BF32`` means implicit down-conversions from f32 to bf16/f16 or compatible FP type is allowed.
+        The value will be ``FP32MathMode.FP32``, ``FP32MathMode.BF32`` or ``FP32MathMode.TF32`` (GPU ONLY).
+        oneDNN fpmath mode will be disabled by default if dtype is set to ``FP32MathMode.FP32``.
+        The implicit ``FP32`` to ``TF32`` data type conversion will be enabled if dtype is set
+        to ``FP32MathMode.TF32``. The implicit ``FP32`` to ``BF16`` data type conversion will be
+        enabled if dtype is set to ``FP32MathMode.BF32``.
 
     Examples:
 
         >>> import intel_extension_for_pytorch as ipex
         >>> # to get the current fpmath mode
-        >>> ipex.get_fp32_math_mode(device="cpu")
+        >>> ipex.get_fp32_math_mode(device="xpu")
+
+    ``torch.xpu.get_fp32_math_mode()`` is an alternative function in Intel® Extension for PyTorch*,
+    to provide identical usage for XPU device only. The motivation of adding this alias is
+    to unify the coding style in user scripts base on ``torch.xpu`` modular.
+
+    Examples:
+
+        >>> import intel_extension_for_pytorch as ipex
+        >>> # to get the current fpmath mode
+        >>> torch.xpu.get_fp32_math_mode(device="xpu")
     """
 
     if device == "cpu":

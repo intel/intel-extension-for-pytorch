@@ -13,7 +13,7 @@ To use the legacy profiler tool, you need to build Intel® Extension for PyTorch
 
 The build option `BUILD_PROFILER` is switched on as default but you can switch it off via setting `BUILD_PROFILER=OFF` while building Intel® Extension for PyTorch\* from source. With `BUILD_PROFILER=OFF`, no profiler code will be compiled and all python scripts using profiler with XPU support will raise a runtime error to user.
 
-```unix
+```bash
 [BUILD_PROFILER=ON] python setup.py install     # build from source with profiler tool
 BUILD_PROFILER=OFF python setup.py install      # build from source without profiler tool
 ```

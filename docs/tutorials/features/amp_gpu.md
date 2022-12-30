@@ -1,4 +1,4 @@
-# Auto Mixed Precision (AMP)
+# Auto Mixed Precision (AMP) on GPU
 
 ## Introduction
 

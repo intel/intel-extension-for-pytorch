@@ -12,35 +12,41 @@ namespace xpu {
 namespace dpcpp {
 
 /*
+ * [Keep the format for automatic doc generation.]
  * All available launch options for IPEX
- *
- * IPEX_VERBOSE:
- *    Default = 0, Set verbose level with synchronization execution mode
- * IPEX_FP32_MATH_MODE:
- *    Default = 0, Set values for FP32 math mode (0: FP32, 1: TF32, 2: BF32)
- *
+ * ==========ALL==========
+ *   IPEX_VERBOSE:
+ *      Default = 0 | Set verbose level with synchronization execution mode
+ *   IPEX_FP32_MATH_MODE:
+ *      Default = 0 | Set values for FP32 math mode (0: FP32, 1: TF32, 2: BF32)
+ * ==========ALL==========
  *
  * XPU ONLY optionos:
- *
- *   IPEX_XPU_BACKEND:
- *      Default = 0 (GPU), Set XPU_BACKEND as global IPEX backend
+ * ==========GPU==========
  *   IPEX_XPU_SYNC_MODE:
- *      Default = 0, Set 1 to enforce synchronization execution mode
+ *      Default = 0 | Set 1 to enforce synchronization execution mode
  *   IPEX_TILE_AS_DEVICE:
- *      Default = 1, Set 0 to disable tile partition and map per root device
- *
+ *      Default = 1 | Set 0 to disable tile partition and map per root device
+ * ==========GPU==========
  *
  * EXPERIMENTAL options:
- *
- *   IPEX_SHOW_OPTION:
- *      Default = 0, Set 1 to show all launch option values
- *   IPEX_XPU_ONEDNN_LAYOUT:
- *      Default = 0, Set 1 to enable onednn specific layouts
- *   IPEX_FORCE_ONEDNN_PRIMITIVE:
- *      Default = 0, Set 1 to force oneDNN primitive solution for below
- *      operators: GRU
+ * ==========EXP==========
  *   IPEX_SIMPLE_TRACE:
- *      Default = 0, Set 1 to enable simple trace for all operators*
+ *      Default = 0 | Set 1 to enable simple trace for all operators*
+ * ==========EXP==========
+
+ * Internal options:
+ * ==========INT==========
+ *   IPEX_XPU_BACKEND:
+ *      Default = 0 (GPU) | Set XPU_BACKEND as global IPEX backend
+ *   IPEX_SHOW_OPTION:
+ *      Default = 0 | Set 1 to show all launch option values
+ *   IPEX_XPU_ONEDNN_LAYOUT:
+ *      Default = 0 | Set 1 to enable onednn specific layouts
+ *   IPEX_FORCE_ONEDNN_PRIMITIVE:
+ *      Default = 0 | Set 1 to force oneDNN primitive solution for below
+ *      operators: GRU
+ * ==========INT==========
  */
 
 static std::mutex s_mutex;

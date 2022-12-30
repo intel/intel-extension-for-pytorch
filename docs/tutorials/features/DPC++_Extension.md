@@ -10,7 +10,9 @@ This tutorial walks through a practical example of writing and using a DPC++ ext
 
 ## Writing a DPC++ Extension
 
-You can build a DPC++ extension with `setuptools` or `CMake`. We’ll begin with the first approach and discuss the CMake extension later.
+DPC++ extensions come in two flavors: They can be built “ahead of time” (AOT) with `setuptools`, or “just in time” (JIT) via `intel_extension_for_pytorch.xpu.cpp_extension.load()`. We’ll begin with the first approach and discuss the latter one afterwards.
+
+Besides, DPC++ extension also supports compilation with `CMake`. We’ll discuss the CMake methodology at last.
 
 ### Building with setuptools
 
@@ -46,9 +48,31 @@ After building the Python module with DPC++ extension, the `lltm_xpu` is availab
 ```
 import lltm_xpu
 ```
->**Note:**
->
-> We still need to setup complier manually, example: ```CC=icx CXX=dpcpp python setup.py install```
+
+
+### JIT Compiling Extensions
+
+Previously, we mentioned that there were two ways of building DPC++ extensions: use setuptools as AOT or compile with JIT. Having the former one introduced, let’s elaborate on the latter one. The JIT compilation mechanism provides a methodology to compile and load your extensions on the fly by invoking a simple `intel_extension_for_pytorch` API function `intel_extension_for_pytorch.xpu.cpp_extension.load()`. For the LLTM, this would look as simple as this:
+
+```
+from intel_extension_for_pytorch.xpu.cpp_extension import load
+
+lltm_xpu = load(name="lltm_xpu", sources=['lltm_xpu.cpp', 'lltm_xpu_kernel.cpp',])
+```
+Here, we provide a function with the same information as those for `setuptools`. In the background, the function will do the followings:
+1. Create a temporary directory `/tmp/torch_extensions/py[ver]_xpu/lltm_xpu`,
+2. Emit a `Ninja` build file into that temporary directory,
+3. Compile your source files into a shared library,
+4. Import this shared library as a Python module.
+
+In fact, if you pass `verbose=True` to `cpp_extension.load()`, you will be informed about the process:
+```
+Emitting ninja build file /home/xu/.cache/torch_extensions/py[ver]_xpu/lltm_xpu/build.ninja...
+Building extension module lltm_xpu...
+Loading extension module lltm_xpu...
+```
+The resulting Python module are exactly the same as the ones produced by `setuptools`. This avoids maintaining a separate `setup.py` build file. Generally this JIT technique will do the compilation just fine, however, if your setup is more complicated and you do need the full power of `setuptools`, you can still write your own `setup.py`. It will take some time at the first time when you run through this line, as the extension is compiling in the background. Since we use Ninja build system to build source codes, re-compilation is incremental and thus the compilation reloads the extension when you run your Python module from the second time. It is fast and has low overhead if there are no code changes in the extension’s source files.
+
 
 ### Building with CMake
 

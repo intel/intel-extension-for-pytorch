@@ -13,7 +13,7 @@ To use the simple trace tool, you need to build Intel® Extension for PyTorch\* 
 
 Add the Simple Trace tool by turning on the build option `BUILD_SIMPLE_TRACE=ON` and then build Intel® Extension for PyTorch\* from source.
 
-```unix
+```bash
 BUILD_SIMPLE_TRACE=ON python setup.py install
 ```
 

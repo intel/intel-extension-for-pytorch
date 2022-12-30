@@ -3,20 +3,28 @@
 Horovod is a distributed deep learning training framework for TensorFlow, Keras, PyTorch, and Apache MXNet. The goal of Horovod is to make distributed deep learning fast and easy to use. Horovod core principles are based on MPI concepts such as size, rank, local rank, allreduce, allgather, broadcast, and alltoall. To use Horovod with PyTorch, you need to install Horovod with Pytorch first, and make specific change for Horovod in your training script.
 
 ## Install Horovod with PyTorch
-### Dependency
-- [Intel® Optimization for Horovod*](https://pypi.org/project/intel-optimization-for-horovod/)
 
-You can use normal pip command to install the package:
-```python -m pip install intel-optimization-for-horovod```
+You can use normal pip command to install [Intel® Optimization for Horovod\*](https://pypi.org/project/intel-optimization-for-horovod/):
+
+```bash
+python -m pip install intel-optimization-for-horovod
+```
+
+**Note:** Make sure you already install oneAPI basekit. You need to activate the environment when use Horovod.
+
+```bash
+source ${HOME}/intel/oneapi/ccl/latest/env/vars.sh
+```
 
 ## Horovod with PyTorch Usage
+
 To use Horovod with PyTorch for XPU backend, make the following modifications to your training script:
 
 1. Initialize Horovod.
 
 
         import torch
-        import intel_extension_for_pytorch 
+        import intel_extension_for_pytorch
         import horovod.torch as hvd
         hvd.init()
 
@@ -41,8 +49,8 @@ To use Horovod with PyTorch for XPU backend, make the following modifications to
 5. Broadcast the initial variable states from rank 0 to all other processes:
 
 
-       hvd.broadcast_parameters(model.state_dict(), root_rank=0)
-       hvd.broadcast_optimizer_state(optimizer, root_rank=0)
+        hvd.broadcast_parameters(model.state_dict(), root_rank=0)
+        hvd.broadcast_optimizer_state(optimizer, root_rank=0)
 
    This is necessary to ensure consistent initialization of all workers when training is started with random weights or restored from a checkpoint.
 

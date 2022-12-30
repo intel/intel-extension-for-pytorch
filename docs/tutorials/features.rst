@@ -46,6 +46,23 @@ Detailed information of AMP for GPU and CPU are available at `Auto Mixed Precisi
    features/amp_gpu
 
 
+INT8 Quantization
+-----------------
+
+Intel® Extension for PyTorch* provides built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models on CPU side. On top of that, if users would like to tune for a higher accuracy than what the default recipe provides, a recipe tuning API powered by Intel® Neural Compressor is provided for users to try.
+
+Check more detailed information for `INT8 Quantization [CPU] <features/int8_overview.md>`_ and `INT8 recipe tuning API guide (Experimental, *NEW feature in 1.13.0* on CPU) <features/int8_recipe_tuning_api.md>`_ on CPU side.
+
+On Intel® GPUs, quantization usages follows PyTorch default quantization APIs.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/int8_overview
+   features/int8_recipe_tuning_api
+
+
 Distributed Training
 --------------------
 
@@ -106,7 +123,7 @@ For more detailed information, check `Advanced Configuration <features/advanced_
 
 
 Legacy Profiler Tool
------------------
+--------------------
 
 The legacy profiler tool is an extension of PyTorch* legacy profiler for profiling operators' overhead on XPU devices. With this tool, users can get the information in many fields of the run models or code scripts. User should build Intel® Extension for PyTorch* with profiler support as default and enable this tool by a `with` statement before the code segment.
 
@@ -167,21 +184,6 @@ For more detailed information, check `Runtime Extension <features/runtime_extens
    :maxdepth: 1
 
    features/runtime_extension
-
-
-INT8 Quantization
------------------
-
-Intel® Extension for PyTorch* provides built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models. On top of that, if users would like to tune for a higher accuracy than what the default recipe provides, a recipe tuning API powered by Intel® Neural Compressor is provided for users to try.
-
-Check more detailed information for `INT8 Quantization <features/int8_overview.md>`_ and `INT8 recipe tuning API guide (Experimental, *NEW feature in 1.13.0*) <features/int8_recipe_tuning_api.md>`_.
-
-.. toctree::
-   :hidden:
-   :maxdepth: 1
-
-   features/int8_overview
-   features/int8_recipe_tuning_api
 
 
 Codeless Optimization (Experimental, *NEW feature in 1.13.\**)

@@ -1,13 +1,15 @@
 # DistributedDataParallel (DDP)
 
 ## Introduction
-`DistributedDataParallel (DDP)` is a PyTorch\* module that implements multi-process data parallelism across multiple GPUs and machines. With DDP, the model is replicated on every process, and each model replica is fed a different set of input data samples. DDP enables overlapping between gradient communication and gradient computations to speed up training. Please refer to https://pytorch.org/tutorials/intermediate/ddp_tutorial.html for an introduction to DDP.
 
-The PyTorch `Collective Communication (c10d)` library supports communication across processes. To run DDP on XPU, we use Intel® oneCCL Bindings for Pytorch\* (formerly known as torch-ccl) to implement the PyTorch c10d ProcessGroup API (https://github.com/intel/torch-ccl). It holds PyTorch bindings maintained by Intel for the Intel® oneAPI Collective Communications Library\* (oneCCL), a library for efficient distributed deep learning training implementing such collectives as `allreduce`, `allgather`, and `alltoall`. Refer to https://github.com/oneapi-src/oneCCL for more information about oneCCL.
+`DistributedDataParallel (DDP)` is a PyTorch\* module that implements multi-process data parallelism across multiple GPUs and machines. With DDP, the model is replicated on every process, and each model replica is fed a different set of input data samples. DDP enables overlapping between gradient communication and gradient computations to speed up training. Please refer to [DDP Tutorial](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html) for an introduction to DDP.
+
+The PyTorch `Collective Communication (c10d)` library supports communication across processes. To run DDP on XPU, we use Intel® oneCCL Bindings for Pytorch\* (formerly known as torch-ccl) to implement the PyTorch c10d ProcessGroup API (https://github.com/intel/torch-ccl). It holds PyTorch bindings maintained by Intel for the Intel® oneAPI Collective Communications Library\* (oneCCL), a library for efficient distributed deep learning training implementing such collectives as `allreduce`, `allgather`, and `alltoall`. Refer to [oneCCL Github page](https://github.com/oneapi-src/oneCCL) for more information about oneCCL.
 
 ## Installation of Intel® oneCCL Bindings for Pytorch\*
 
 To use PyTorch DDP on XPU, install Intel® oneCCL Bindings for Pytorch\* as described below.
+
 ### Install PyTorch and Intel® Extension for PyTorch\*
 
 Make sure you have installed PyTorch and Intel® Extension for PyTorch\* successfully.
@@ -15,7 +17,8 @@ For more detailed information, check [installation guide](../installation.md).
 
 ### Install Intel® oneCCL Bindings for Pytorch\*
 
-Install from source:
+#### Install from source:
+
 ```bash
 git clone https://github.com/intel/torch-ccl.git -b v1.13.100+gpu
 cd torch-ccl
@@ -24,54 +27,56 @@ git submodule update --init --recursive
 BUILD_NO_ONECCL_PACKAGE=ON COMPUTE_BACKEND=dpcpp python setup.py install
 ```
 
-Install from prebuilt wheel:
+#### Install from prebuilt wheel:
 
-Download the prebuilt wheel from https://developer.intel.com/ipex-whl-stable-xpu and use the `pip install` to install it.
+Installation for CPU:
 
-### Use oneCCL in the basekit
+```bash
+python -m pip install oneccl_bind_pt -f https://developer.intel.com/ipex-whl-stable-cpu
+```
 
-Make sure you have installed basekit from https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit
+Installation for GPU:
+
+```bash
+python -m pip install oneccl_bind_pt -f https://developer.intel.com/ipex-whl-stable-xpu
+```
+
+**Note:** Make sure you have installed basekit from https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit
 
 ```bash
 source $basekit_root/ccl/latest/env/vars.sh
 ```
 
-## DDP usage for XPU in model training 
+## DDP Usage
 
-DDP follows its usage in PyTorch. To use DDP on XPU, make the following modifications to your model script:
+DDP follows its usage in PyTorch. To use DDP with Intel® Extension for PyTorch\*, make the following modifications to your model script:
 
 1. Import the necessary packages.
-
 ```python
 import torch
 import intel_extension_for_pytorch 
 import oneccl_bindings_for_pytorch
 ```      
-
 2. Initialize the process group with ccl backend.
-
 ```python
 dist.init_process_group(backend='ccl')
 ```        
-
-3. For DDP with each process exclusively works on a single GPU, set the device ID as `local rank`.
-
+3. For DDP with each process exclusively works on a single GPU, set the device ID as `local rank`. This step is not required for usage on CPU.
 ```python 
 device = "xpu:{}".format(args.local_rank)
 torch.xpu.set_device(device)
 ```
-
 4. Wrap model by DDP.
-
 ```python
 model = model.to(device)
 model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[device])
 ```
 
-Note: For single-device modules, `device_ids` can contain exactly one device id, which represents the only xpu device where the input module corresponding to this process resides. Alternatively, device_ids can be `None`.
+Note: For single-device modules, `device_ids` can contain exactly one device id, which represents the only GPU device where the input module corresponding to this process resides. Alternatively, device_ids can be `None`.
 
 ## Example Usage (MPI launch for single node):
-Intel® oneCCL Bindings for Pytorch\* recommends MPI as the launcher to start multiple processes.  Here's an example to illustrate such usage.
+
+Intel® oneCCL Bindings for Pytorch\* recommends MPI as the launcher to start multiple processes. Here's an example to illustrate such usage.
 
 Use MPI from basekit:
 
@@ -122,6 +127,7 @@ if __name__ == "__main__":
 
     # For single-node distributed training, local_rank is the same as global rank
     local_rank = dist.get_rank()
+    # Only set device for distributed training on GPU
     device = "xpu:{}".format(local_rank)
     model = Model().to(device)
     if dist.get_world_size() > 1:
@@ -148,14 +154,17 @@ if __name__ == "__main__":
 ```
 
 Running command:
+
 ```bash
 mpirun -n 2 -l python Example_DDP.py
 ```
 
-## DDP scaling API
-For using one GPU card has multiple tiles, each tile could be regarded as a device for explicit scaling. We provide a DDP scaling API to enable DDP on one GPU card in the GitHub repo at `intel_extension_for_pytorch/xpu/single_card.py`.
+## DDP scaling API (GPU Only)
+
+For using one GPU card with multiple tiles, each tile could be regarded as a device for explicit scaling. We provide a DDP scaling API to enable DDP on one GPU card in [GitHub repo](https://github.com/intel/intel-extension-for-pytorch/blob/xpu-master/intel_extension_for_pytorch/xpu/single_card.py).
 
 ### Usage of DDP scaling API 
+
 Note: This API supports XPU devices on one card.
 
 ```python
