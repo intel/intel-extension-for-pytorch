@@ -156,7 +156,7 @@ If you have a model running on a single tile, you only need to make minor change
 
 ```python
 try:
-    from intel_extension_for_pytorch.xpu.single_card import single_card_dist
+    from torch.xpu.single_card import single_card_dist
 except ImportError:
     raise ImportError("single_card_dist not available!")
 ```
