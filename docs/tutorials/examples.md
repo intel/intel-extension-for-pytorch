@@ -1,6 +1,8 @@
 Examples
 ========
 
+**Note:** For examples on CPU, please check [here](../../../cpu/latest/tutorials/examples.html).
+
 ## Training
 
 ### Single-instance Training
@@ -24,7 +26,7 @@ criterion = ...
 optimizer = ...
 model.train()
 # For Float32
-model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.float32)
+model, optimizer = ipex.optimize(model, optimizer=optimizer)
 # For BFloat16
 model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
 ...
@@ -70,11 +72,11 @@ model = torchvision.models.resnet50()
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
 model.train()
-#################################### code changes ################################
+######################## code changes #######################
 model = model.to("xpu")
 criterion = criterion.to("xpu")
-model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.float32)
-#################################### code changes ################################
+model, optimizer = ipex.optimize(model, optimizer=optimizer)
+######################## code changes #######################
 
 for batch_idx, (data, target) in enumerate(train_loader):
     ########## code changes ##########
@@ -189,11 +191,11 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-#################### code changes ################
+######## code changes #######
 model = model.to("xpu")
 data = data.to("xpu")
-model = ipex.optimize(model, dtype=torch.float32)
-#################### code changes ################
+model = ipex.optimize(model)
+######## code changes #######
 
 with torch.no_grad():
     model(data)
@@ -216,11 +218,11 @@ batch_size = 1
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
-#################### code changes ################
+######## code changes #######
 model = model.to("xpu")
 data = data.to("xpu")
-model = ipex.optimize(model, dtype=torch.float32)
-#################### code changes ################
+model = ipex.optimize(model)
+######## code changes #######
 
 with torch.no_grad():
     model(data)
@@ -243,11 +245,11 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-#################### code changes ################
+######## code changes #######
 model = model.to("xpu")
 data = data.to("xpu")
-model = ipex.optimize(model, dtype=torch.float32)
-#################### code changes ################
+model = ipex.optimize(model)
+######## code changes #######
 
 with torch.no_grad():
     d = torch.rand(1, 3, 224, 224)
@@ -277,11 +279,11 @@ batch_size = 1
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
-#################### code changes ################
+######## code changes #######
 model = model.to("xpu")
 data = data.to("xpu")
-model = ipex.optimize(model, dtype=torch.float32)
-#################### code changes ################
+model = ipex.optimize(model)
+######## code changes #######
 
 with torch.no_grad():
     d = torch.randint(vocab_size, size=[batch_size, seq_length])
@@ -352,9 +354,9 @@ model = ipex.optimize(model, dtype=torch.bfloat16)
 #################### code changes #################
 
 with torch.no_grad():
-    ################################# code changes ######################################
+    ########################### code changes ########################
     with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):    
-    ################################# code changes ######################################
+    ########################### code changes ########################
         model(data)
 ```
 
@@ -616,10 +618,10 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-#################### code changes ####################
+##### code changes #####
 model = model.to("xpu")
 data = data.to("xpu")
-#################### code changes ####################
+##### code changes #####
 
 with torch.no_grad():
   d = torch.rand(1, 3, 224, 224)
@@ -670,11 +672,11 @@ data = torch.rand(1, 3, 224, 224)
 model = model.to(memory_format=torch.channels_last)
 data = data.to(memory_format=torch.channels_last)
 
-#################### code changes ################
+########## code changes #########
 model = model.to("xpu")
 data = data.to("xpu")
-model = torch.xpu.optimize(model, dtype=torch.float32)
-#################### code changes ################
+model = torch.xpu.optimize(model)
+########## code changes #########
 
 with torch.no_grad():
   model(data)
