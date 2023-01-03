@@ -55,8 +55,10 @@ def patch_zero_grad_for_master_weight_training(optimizer):
                         _param.grad.requires_grad_(False)
                     _param.grad.zero_()
         self._original_zero_grad(set_to_none)
-    setattr(optimizer, '_original_zero_grad', optimizer.zero_grad) # noqa B010
-    setattr(optimizer, 'zero_grad', types.MethodType(zero_grad, optimizer)) # noqa B010
+
+    if not hasattr(optimizer, '_original_zero_grad'):
+        setattr(optimizer, '_original_zero_grad', optimizer.zero_grad) # noqa B010
+        setattr(optimizer, 'zero_grad', types.MethodType(zero_grad, optimizer)) # noqa B010
 
 
 def patch_step_for_master_weight_training(optimizer):
@@ -114,10 +116,12 @@ def patch_step_for_master_weight_training(optimizer):
             if 'fp16_param' in value.keys():
                 torch.ops.torch_ipex.sync_master_weight_to_fp16(k, value['fp16_param'])
         return loss
-    setattr(optimizer, '_original_step', optimizer.step) # noqa B010
-    setattr(optimizer, 'step', types.MethodType(master_param_non_fused_step, optimizer)) # noqa B010
-    setattr(optimizer, 'sync_grad', types.MethodType(sync_grad, optimizer)) # noqa B010
-    setattr(optimizer, 'step_sync_weight', types.MethodType(step_sync_weight, optimizer)) # noqa B010
+
+    if not hasattr(optimizer, '_original_step'):
+        setattr(optimizer, '_original_step', optimizer.step) # noqa B010
+        setattr(optimizer, 'step', types.MethodType(master_param_non_fused_step, optimizer)) # noqa B010
+        setattr(optimizer, 'sync_grad', types.MethodType(sync_grad, optimizer)) # noqa B010
+        setattr(optimizer, 'step_sync_weight', types.MethodType(step_sync_weight, optimizer)) # noqa B010
 
 
 def patch_load_state_dict(optimizer):
@@ -127,8 +131,10 @@ def patch_load_state_dict(optimizer):
 
     def load_state_dict(self, state_dict):
         assert False, "_ipex_optimizer does not support load_state_dict" # noqa B011
-    setattr(optimizer, '_original_load_state_dict', optimizer.load_state_dict) # noqa B010
-    setattr(optimizer, 'load_state_dict', types.MethodType(load_state_dict, optimizer)) # noqa B010
+
+    if not hasattr(optimizer, '_original_load_state_dict'):
+        setattr(optimizer, '_original_load_state_dict', optimizer.load_state_dict) # noqa B010
+        setattr(optimizer, 'load_state_dict', types.MethodType(load_state_dict, optimizer)) # noqa B010
 
 
 def refresh_optimizer_params_after_cast(m, attr, float_param, master_weight_split, optimizer):
@@ -222,8 +228,10 @@ def patch_state_dict(optimizer):
                                 assert False, "unsupported op to unpack" # noqa B011
                         v2[state_key] = state_value
         return opt_temp.state_dict()
-    setattr(optimizer, '_original_state_dict', optimizer.state_dict) # noqa B010
-    setattr(optimizer, 'state_dict', types.MethodType(get_optimizer_unpacked_state_dict, optimizer)) # noqa B010
+
+    if not hasattr(optimizer, '_original_state_dict'):
+        setattr(optimizer, '_original_state_dict', optimizer.state_dict) # noqa B010
+        setattr(optimizer, 'state_dict', types.MethodType(get_optimizer_unpacked_state_dict, optimizer)) # noqa B010
 
 
 def optimizer_fusion(optimizer, master_weight_split, device_type):
