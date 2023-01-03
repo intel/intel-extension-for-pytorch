@@ -560,3 +560,54 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(y_cpu, y_dpcpp.to(torch.float).cpu(), rtol=10e-4, atol=10e-2)
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.to(torch.float).cpu(), rtol=10e-4, atol=10e-2)
+
+    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(),
+                        reason="doesn't enable channels last 1d or channels last does not support onednn block format")
+    def test_channels_last_1d_bwd_no_grad(self, dtype=torch.float):
+        shapes = [(1, 7, 15000), (2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
+                  (4, 1, 1), (1, 4, 4), (1, 4, 1)]
+        for shape in shapes:
+            N, C, H, W = shape[0], shape[1], 1, shape[2]
+            x_cpu = torch.randn([N, C, H, W], dtype=dtype, device=cpu_device, requires_grad=False)
+
+            for test_weight_pollution in [False]:
+                x_cpu = x_cpu.to(memory_format=torch.channels_last)
+                conv_ic, conv_oc, conv_ks = C, 5, 1
+                grad_cpu = torch.full([N, conv_oc, H, W], 1e-3, dtype=dtype, device=cpu_device, requires_grad=False)
+                w = torch.ones(conv_oc, conv_ic, conv_ks, conv_ks, dtype=torch.float)
+                # cpu doesn't support channels last 1d, so we use conv2d to simulate conv1d here
+                conv_cpu = nn.Conv2d(conv_ic, conv_oc, kernel_size=conv_ks, stride=1, bias=True)
+                conv_cpu.weight.data = w
+                conv_cpu.bias.data.fill_(0.01)
+                y_cpu = conv_cpu(x_cpu)
+                y_cpu.backward(grad_cpu)
+                y_cpu_gw = conv_cpu.weight.grad.detach().clone()
+                # convert 4D tensor to 3D tensor here to make comparison below happy
+                y_cpu = y_cpu.view(y_cpu.shape[0], y_cpu.shape[1], y_cpu.shape[3])
+                y_cpu_gw = y_cpu_gw.view(y_cpu_gw.shape[0], y_cpu_gw.shape[1], y_cpu_gw.shape[3])
+                conv_cpu.zero_grad()
+
+                x_dpcpp = x_cpu.view(x_cpu.shape[0], x_cpu.shape[1], x_cpu.shape[3])
+                x_dpcpp = x_dpcpp.to(dpcpp_device)
+                x_dpcpp = torch.xpu.to_channels_last_1d(x_dpcpp)
+
+                grad_dpcpp = grad_cpu.view(grad_cpu.shape[0], grad_cpu.shape[1], grad_cpu.shape[3])
+                if not test_weight_pollution:
+                    grad_dpcpp = torch.xpu.to_channels_last_1d(grad_dpcpp.to(dpcpp_device))
+                else:
+                    grad_dpcpp = grad_dpcpp.to(dpcpp_device).to(memory_format=torch.contiguous_format)
+
+                w = torch.ones(conv_oc, conv_ic, conv_ks, dtype=torch.float)
+                conv_dpcpp = nn.Conv1d(conv_ic, conv_oc, kernel_size=conv_ks, stride=1, bias=True)
+                conv_dpcpp.weight.data = w
+                conv_dpcpp.bias.data.fill_(0.01)
+                conv_dpcpp = torch.xpu.to_channels_last_1d(conv_dpcpp.to(dpcpp_device))
+                y_dpcpp = conv_dpcpp(x_dpcpp)
+
+                y_dpcpp.backward(grad_dpcpp)
+                y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
+
+                conv_dpcpp.zero_grad()
+
+                self.assertEqual(y_cpu, y_dpcpp.cpu(), atol=5 * 1e-5, rtol=0)
+                self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
