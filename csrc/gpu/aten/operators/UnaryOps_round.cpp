@@ -1,7 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
-
+#include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
+
 #include "comm/AccumulateType.h"
 #include "comm/LoopsMeta.h"
 #include "comm/Numerics.h"
@@ -11,6 +12,7 @@
 #include "comm/zmath.h"
 
 #include "Loops.h"
+#include "LoopsTemplates.h"
 
 using namespace xpu::dpcpp;
 
@@ -20,12 +22,28 @@ namespace AtenIpexTypeXPU {
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(floor_out, Numerics<scalar_t>::floor, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(ceil_out, Numerics<scalar_t>::ceil, Real);
 
-IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL(
-    round_out,
-    [](scalar_t a) -> scalar_t {
-      return std::nearbyintf(static_cast<float>(a));
-    },
-    unary_op);
+Tensor& round_out(const Tensor& self, Tensor& out) {
+  return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_round>(
+      TensorIterator::unary_op,
+      out,
+      self,
+      [=](TensorIteratorBase& iter) {
+        IPEX_DISPATCH_FLOATING_TYPES_AND2(
+            at::ScalarType::Half,
+            at::ScalarType::BFloat16,
+            iter.dtype(),
+            "round",
+            [&]() {
+              dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+                return std::nearbyintf(static_cast<float>(a));
+              });
+            });
+      },
+      0.0f,
+      0.0f,
+      /*Onednn round only support float type*/ self.scalar_type() ==
+          at::ScalarType::Float);
+}
 
 void round_decimals_out(const Tensor& self, int64_t decimals, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);

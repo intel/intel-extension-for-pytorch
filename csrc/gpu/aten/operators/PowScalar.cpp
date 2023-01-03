@@ -1,4 +1,6 @@
+#include <oneDNN/oneDNN.h>
 #include "Loops.h"
+#include "LoopsTemplates.h"
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
@@ -86,19 +88,27 @@ Tensor& pow_out(const Tensor& base, const Scalar& exp, Tensor& result) {
       "can't be cast to the desired output type ",
       result.scalar_type());
 
-  if (exp.isComplex() && (exp.toComplexDouble() == 0.0)) {
-    result.resize_as_(base).fill_(1);
-  } else if (exp.isComplex() && (exp.toComplexDouble() == 1.0)) {
-    result.resize_as_(base).fill_(base);
-  } else if (!exp.isComplex() && (exp.toDouble() == 0.0)) {
-    result.resize_as_(base).fill_(1);
-  } else if (!exp.isComplex() && (exp.toDouble() == 1.0)) {
-    result.resize_as_(base).copy_(base);
-  } else {
-    auto iter = TensorIterator::unary_op(result, base.to(common_dtype));
-    pow_tensor_scalar_kernel(iter, exp);
-  }
-  return result;
+  return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_pow>(
+      TensorIterator::unary_op,
+      result,
+      base.to(common_dtype),
+      [=](TensorIteratorBase& iter) {
+        auto& base_ = iter.tensor(1);
+        if (exp.isComplex() && (exp.toComplexDouble() == 0.0)) {
+          result.resize_as_(base_).fill_(1);
+        } else if (exp.isComplex() && (exp.toComplexDouble() == 1.0)) {
+          result.resize_as_(base_).fill_(base_);
+        } else if (!exp.isComplex() && (exp.toDouble() == 0.0)) {
+          result.resize_as_(base_).fill_(1);
+        } else if (!exp.isComplex() && (exp.toDouble() == 1.0)) {
+          result.resize_as_(base_).copy_(base_);
+        } else {
+          pow_tensor_scalar_kernel(dynamic_cast<TensorIterator&>(iter), exp);
+        }
+      },
+      /* alpha = */ 1.0f,
+      /* beta = */ exp.toFloat(),
+      !exp.isComplex());
 }
 
 Tensor pow(const Tensor& base, Scalar exp) {

@@ -1,7 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
-
+#include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
+
 #include "comm/AccumulateType.h"
 #include "comm/LoopsMeta.h"
 #include "comm/Numerics.h"
@@ -10,6 +11,7 @@
 #include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
+#include "LoopsTemplates.h"
 #include "Resize.h"
 
 using namespace xpu::dpcpp;
@@ -36,7 +38,8 @@ static inline Tensor& unary_op_impl_with_complex_to_float_out(
 
     // Runs the function complex->complex, as TensorIterator expects
     Tensor complex_result = at::empty({0}, self.options());
-    auto iter = TensorIterator::unary_op(complex_result, self);
+    auto self_ = at::AtenIpexTypeXPU::to_plain_if_needed(self);
+    auto iter = TensorIterator::unary_op(complex_result, self_);
     fn(iter);
 
     // Copies the complex result to the actual result and returns it
@@ -46,15 +49,19 @@ static inline Tensor& unary_op_impl_with_complex_to_float_out(
   }
 
   if (promotes_integer_to_float) {
-    auto iter = TensorIterator::unary_float_op(result, self);
+    result = at::AtenIpexTypeXPU::to_plain_if_needed_(result);
+    auto self_ = at::AtenIpexTypeXPU::to_plain_if_needed(self);
+    auto iter = TensorIterator::unary_float_op(result, self_);
     fn(iter);
     iter.cast_outputs();
     return result;
   }
 
-  auto iter = TensorIterator::unary_op(result, self);
-  fn(iter);
-  return result;
+  // abs kernel
+  return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_abs>(
+      TensorIterator::unary_op, result, self, [=](TensorIteratorBase& iter) {
+        fn(iter);
+      });
 }
 
 template <typename T>
@@ -62,7 +69,7 @@ static T abs_impl(T v) {
   return Numerics<T>::abs(v);
 }
 
-void abs_kernel(TensorIterator& iter) {
+void abs_kernel(TensorIteratorBase& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       ScalarType::Half,
       ScalarType::BFloat16,
@@ -75,7 +82,7 @@ void abs_kernel(TensorIterator& iter) {
       });
 }
 
-void angle_kernel(TensorIterator& iter) {
+void angle_kernel(TensorIteratorBase& iter) {
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
       kBFloat16, kHalf, iter.common_dtype(), "angle", [&]() {
         dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {

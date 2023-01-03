@@ -18,6 +18,7 @@
 #include <oneDNN/oneDNN.h>
 #include "DistributionTemplates.h"
 #include "Loops.h"
+#include "LoopsTemplates.h"
 #include "RandomEngine.h"
 
 using namespace xpu::dpcpp::detail;
@@ -345,36 +346,29 @@ inline Tensor threshold_out(
     const Scalar& value,
     const Tensor& other) {
   Tensor result = opt_result.value_or(Tensor());
-  if (IPEX_ANY(xpu::oneDNN::is_onednn_layout, self, other) &&
-      0.0 == threshold.to<float>() && 0.0 == value.to<float>() &&
-      IPEX_ALL(xpu::oneDNN::eltwise_backward_valid, self, other)) {
-    // need or not
-    // 1. input is oneDNN layout
-    // 2. it is a relu bwd (threshold and value)
-    // can or not
-    // 1. input is a valid memory supported by oneDNN
-    xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_relu>(
-        result, self, other, 0.0f, 0.0f);
-    return result;
-  } else {
-    auto _self = to_plain_if_needed(self);
-    auto _other = to_plain_if_needed(other);
-    auto iter = TensorIterator::binary_op(result, _self, _other);
-    IPEX_DISPATCH_ALL_TYPES_AND2(
-        at::ScalarType::BFloat16,
-        at::ScalarType::Half,
-        iter.dtype(),
-        "threshold",
-        [&] {
-          scalar_t _threshold = threshold.to<scalar_t>();
-          scalar_t _value = value.to<scalar_t>();
-          dpcpp_kernel_for_tensor_iter(
-              iter, [=](scalar_t x, scalar_t other) -> scalar_t {
-                return x <= _threshold ? _value : other;
-              });
-        });
-    return iter.output();
-  }
+  return unary_out_with_onednn_and_loops_bw<dnnl::algorithm::eltwise_relu>(
+      TensorIterator::binary_op,
+      result,
+      self,
+      other,
+      [=](TensorIteratorBase& iter) {
+        IPEX_DISPATCH_ALL_TYPES_AND2(
+            at::ScalarType::BFloat16,
+            at::ScalarType::Half,
+            iter.dtype(),
+            "threshold",
+            [&] {
+              scalar_t _threshold = threshold.to<scalar_t>();
+              scalar_t _value = value.to<scalar_t>();
+              dpcpp_kernel_for_tensor_iter(
+                  iter, [=](scalar_t x, scalar_t other) -> scalar_t {
+                    return x <= _threshold ? _value : other;
+                  });
+            });
+      },
+      0.0f,
+      0.0f,
+      0.0 == threshold.to<float>() && 0.0 == value.to<float>());
 }
 
 template <typename scalar_t>
@@ -475,60 +469,41 @@ void silu_backward_kernel(
   });
 }
 
-template <typename scalar_t>
-inline scalar_t mish_forward(scalar_t self) {
-  using T_ACC = acc_type<scalar_t>;
-  const T_ACC x_acc = static_cast<T_ACC>(self);
-  return (
-      scalar_t)(x_acc * Numerics<T_ACC>::tanh(Numerics<T_ACC>::log1p(Numerics<T_ACC>::exp(x_acc))));
-}
 } // namespace impl
 
 Tensor relu(const Tensor& self) {
-  if (xpu::oneDNN::is_onednn_layout(self) &&
-      xpu::oneDNN::eltwise_forward_valid(self)) {
-    Tensor result;
-    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(
-        result, self, 0.0f, 0.0f);
-    return result;
-  } else {
-    auto _self = to_plain_if_needed(self);
-    auto result = at::empty_like(_self);
-    auto iter = TensorIterator::unary_op(result, _self);
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::BFloat16,
-        at::ScalarType::Half,
-        iter.dtype(),
-        "relu",
-        [&]() {
-          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t self) -> scalar_t {
-            return impl::relu_forward<scalar_t>(self);
-          });
-        });
-    return result;
-  }
+  Tensor result;
+  return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_relu>(
+      TensorIterator::unary_op, result, self, [=](TensorIteratorBase& iter) {
+        IPEX_DISPATCH_FLOATING_TYPES_AND2(
+            at::ScalarType::BFloat16,
+            at::ScalarType::Half,
+            iter.dtype(),
+            "relu",
+            [&]() {
+              dpcpp_kernel_for_tensor_iter(
+                  iter, [=](scalar_t self) -> scalar_t {
+                    return impl::relu_forward<scalar_t>(self);
+                  });
+            });
+      });
 }
 
 Tensor& relu_(Tensor& self) {
-  if (xpu::oneDNN::is_onednn_layout(self) &&
-      xpu::oneDNN::eltwise_forward_valid(self)) {
-    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(self, self, 0.0f, 0.0f);
-    return self;
-  } else {
-    self = to_plain_if_needed_(self);
-    auto iter = TensorIterator::unary_op(self, self);
-    IPEX_DISPATCH_ALL_TYPES_AND2(
-        at::ScalarType::BFloat16,
-        at::ScalarType::Half,
-        iter.dtype(),
-        "relu_",
-        [&]() {
-          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t self) -> scalar_t {
-            return impl::relu_forward<scalar_t>(self);
-          });
-        });
-    return self;
-  }
+  return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_relu>(
+      TensorIterator::unary_op, self, self, [=](TensorIteratorBase& iter) {
+        IPEX_DISPATCH_ALL_TYPES_AND2(
+            at::ScalarType::BFloat16,
+            at::ScalarType::Half,
+            iter.dtype(),
+            "relu_",
+            [&]() {
+              dpcpp_kernel_for_tensor_iter(
+                  iter, [=](scalar_t self) -> scalar_t {
+                    return impl::relu_forward<scalar_t>(self);
+                  });
+            });
+      });
 }
 
 Tensor& threshold_(Tensor& self, const Scalar& threshold, const Scalar& value) {
@@ -765,28 +740,36 @@ Tensor hardshrink_backward(
 }
 
 Tensor& hardswish_out(const Tensor& self, Tensor& result) {
-  auto iter = TensorIterator::unary_op(result, self);
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::BFloat16,
-      at::ScalarType::Half,
-      iter.dtype(),
-      "hardswish",
-      [&]() {
-        using accscalar_t = acc_type<scalar_t>;
-        const accscalar_t zero(0.0f);
-        const accscalar_t one_sixth(1.0f / 6.0f);
-        const accscalar_t three(3.0f);
-        const accscalar_t six(6.0f);
-        dpcpp_kernel_for_tensor_iter(
-            iter, [zero, one_sixth, three, six](scalar_t self_val) -> scalar_t {
-              accscalar_t x = static_cast<accscalar_t>(self_val);
-              return x *
-                  Numerics<accscalar_t>::min(
-                         Numerics<accscalar_t>::max(x + three, zero), six) *
-                  one_sixth;
+  return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_hardswish>(
+      TensorIterator::unary_op,
+      result,
+      self,
+      [=](TensorIteratorBase& iter) {
+        IPEX_DISPATCH_FLOATING_TYPES_AND2(
+            at::ScalarType::BFloat16,
+            at::ScalarType::Half,
+            iter.dtype(),
+            "hardswish",
+            [&]() {
+              using accscalar_t = acc_type<scalar_t>;
+              const accscalar_t zero(0.0f);
+              const accscalar_t one_sixth(1.0f / 6.0f);
+              const accscalar_t three(3.0f);
+              const accscalar_t six(6.0f);
+              dpcpp_kernel_for_tensor_iter(
+                  iter,
+                  [zero, one_sixth, three, six](scalar_t self_val) -> scalar_t {
+                    accscalar_t x = static_cast<accscalar_t>(self_val);
+                    return x *
+                        Numerics<accscalar_t>::min(
+                               Numerics<accscalar_t>::max(x + three, zero),
+                               six) *
+                        one_sixth;
+                  });
             });
-      });
-  return result;
+      },
+      /* alpha = */ 1.0f / 6.0f,
+      /* beta = */ 1.0f / 2.0f);
 }
 
 Tensor hardswish(const Tensor& self) {
@@ -835,47 +818,36 @@ Tensor& gelu_out(
     c10::string_view approximate,
     Tensor& result) {
   auto _approximate = at::native::get_gelutype_enum(approximate);
-  if (xpu::oneDNN::is_onednn_layout(self) &&
-      xpu::oneDNN::eltwise_forward_valid(self)) {
-    if (_approximate == at::native::GeluType::Tanh) {
-      xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_tanh>(
-          result, self, 0.0f, 0.0f);
-    } else {
-      xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
-          result, self, 0.0f, 0.0f);
-    }
-    return result;
+  if (_approximate == at::native::GeluType::Tanh) {
+    return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_gelu_tanh>(
+        TensorIterator::unary_op, result, self, [=](TensorIteratorBase& iter) {
+          IPEX_DISPATCH_FLOATING_TYPES_AND2(
+              at::ScalarType::BFloat16,
+              at::ScalarType::Half,
+              iter.dtype(),
+              "gelu",
+              [&]() {
+                dpcpp_kernel_for_tensor_iter(
+                    iter, [=](scalar_t self) -> scalar_t {
+                      return impl::gelu_tanh_forward<scalar_t>(self);
+                    });
+              });
+        });
   } else {
-    auto _self = to_plain_if_needed(self);
-    if (!result.defined()) {
-      result = at::empty_like(_self);
-    }
-    auto iter = TensorIterator::unary_op(result, _self);
-
-    if (_approximate == at::native::GeluType::Tanh) {
-      IPEX_DISPATCH_FLOATING_TYPES_AND2(
-          at::ScalarType::BFloat16,
-          at::ScalarType::Half,
-          iter.dtype(),
-          "gelu",
-          [&]() {
-            dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t self) -> scalar_t {
-              return impl::gelu_tanh_forward<scalar_t>(self);
-            });
-          });
-    } else {
-      IPEX_DISPATCH_FLOATING_TYPES_AND2(
-          at::ScalarType::BFloat16,
-          at::ScalarType::Half,
-          iter.dtype(),
-          "gelu",
-          [&]() {
-            dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t self) -> scalar_t {
-              return impl::gelu_erf_forward<scalar_t>(self);
-            });
-          });
-    }
-    return result;
+    return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_gelu_erf>(
+        TensorIterator::unary_op, result, self, [=](TensorIteratorBase& iter) {
+          IPEX_DISPATCH_FLOATING_TYPES_AND2(
+              at::ScalarType::BFloat16,
+              at::ScalarType::Half,
+              iter.dtype(),
+              "gelu",
+              [&]() {
+                dpcpp_kernel_for_tensor_iter(
+                    iter, [=](scalar_t self) -> scalar_t {
+                      return impl::gelu_erf_forward<scalar_t>(self);
+                    });
+              });
+        });
   }
 }
 
@@ -890,49 +862,46 @@ Tensor& gelu_backward_out(
     c10::string_view approximate,
     Tensor& grad_input) {
   auto _approximate = at::native::get_gelutype_enum(approximate);
-  if (IPEX_ANY(xpu::oneDNN::is_onednn_layout, grad, self) &&
-      IPEX_ALL(xpu::oneDNN::eltwise_backward_valid, grad, self)) {
-    if (_approximate == at::native::GeluType::Tanh) {
-      xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_gelu_tanh>(
-          grad_input, self, grad, 0.0f, 0.0f);
-    } else {
-      xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_gelu_erf>(
-          grad_input, self, grad, 0.0f, 0.0f);
-    }
-    return grad_input;
+  if (_approximate == at::native::GeluType::Tanh) {
+    return unary_out_with_onednn_and_loops_bw<
+        dnnl::algorithm::eltwise_gelu_tanh>(
+        TensorIterator::binary_op,
+        grad_input,
+        self,
+        grad,
+        [=](TensorIteratorBase& iter) {
+          IPEX_DISPATCH_FLOATING_TYPES_AND2(
+              at::ScalarType::BFloat16,
+              at::ScalarType::Half,
+              iter.dtype(),
+              "gelu_backward",
+              [&]() {
+                dpcpp_kernel_with_scalars(
+                    iter, [=](scalar_t self, scalar_t grad) -> scalar_t {
+                      return impl::gelu_tanh_backward<scalar_t>(grad, self);
+                    });
+              });
+        });
   } else {
-    auto _self = to_plain_if_needed(self);
-    auto _grad = to_plain_if_needed(grad);
-    if (!grad_input.defined()) {
-      grad_input = at::empty_like(_self);
-    }
-    auto iter = TensorIterator::binary_op(grad_input, _grad, _self);
-    if (_approximate == at::native::GeluType::Tanh) {
-      IPEX_DISPATCH_FLOATING_TYPES_AND2(
-          at::ScalarType::BFloat16,
-          at::ScalarType::Half,
-          iter.dtype(),
-          "gelu_backward",
-          [&]() {
-            dpcpp_kernel_with_scalars(
-                iter, [=](scalar_t grad, scalar_t self) -> scalar_t {
-                  return impl::gelu_tanh_backward<scalar_t>(grad, self);
-                });
-          });
-    } else {
-      IPEX_DISPATCH_FLOATING_TYPES_AND2(
-          at::ScalarType::BFloat16,
-          at::ScalarType::Half,
-          iter.dtype(),
-          "gelu_backward",
-          [&]() {
-            dpcpp_kernel_with_scalars(
-                iter, [=](scalar_t grad, scalar_t self) -> scalar_t {
-                  return impl::gelu_erf_backward<scalar_t>(grad, self);
-                });
-          });
-    }
-    return grad_input;
+    return unary_out_with_onednn_and_loops_bw<
+        dnnl::algorithm::eltwise_gelu_erf>(
+        TensorIterator::binary_op,
+        grad_input,
+        self,
+        grad,
+        [=](TensorIteratorBase& iter) {
+          IPEX_DISPATCH_FLOATING_TYPES_AND2(
+              at::ScalarType::BFloat16,
+              at::ScalarType::Half,
+              iter.dtype(),
+              "gelu_backward",
+              [&]() {
+                dpcpp_kernel_with_scalars(
+                    iter, [=](scalar_t self, scalar_t grad) -> scalar_t {
+                      return impl::gelu_erf_backward<scalar_t>(grad, self);
+                    });
+              });
+        });
   }
 }
 
@@ -963,28 +932,25 @@ Tensor& silu_backward_out(
 }
 
 at::Tensor& mish_out(const at::Tensor& self, at::Tensor& out) {
-  if (xpu::oneDNN::is_onednn_layout(self) &&
-      xpu::oneDNN::eltwise_forward_valid(self)) {
-    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_mish>(out, self, 0.0f, 0.0f);
-    return out;
-  } else {
-    auto _self = to_plain_if_needed(self);
-    if (!out.defined()) {
-      out = at::empty_like(_self);
-    }
-    auto iter = TensorIterator::unary_op(out, _self);
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::BFloat16,
-        at::ScalarType::Half,
-        iter.dtype(),
-        "mish",
-        [&]() {
-          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t self) -> scalar_t {
-            return impl::mish_forward<scalar_t>(self);
-          });
-        });
-    return out;
-  }
+  return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_mish>(
+      TensorIterator::unary_op, out, self, [=](TensorIteratorBase& iter) {
+        IPEX_DISPATCH_FLOATING_TYPES_AND2(
+            at::ScalarType::BFloat16,
+            at::ScalarType::Half,
+            iter.dtype(),
+            "mish",
+            [&]() {
+              dpcpp_kernel_for_tensor_iter(
+                  iter, [=](scalar_t self) -> scalar_t {
+                    using accscalar_t = acc_type<scalar_t>;
+                    const accscalar_t x_acc = static_cast<accscalar_t>(self);
+                    return x_acc *
+                        Numerics<accscalar_t>::tanh(
+                               Numerics<accscalar_t>::log1p(
+                                   Numerics<accscalar_t>::exp(x_acc)));
+                  });
+            });
+      });
 }
 
 } // namespace AtenIpexTypeXPU

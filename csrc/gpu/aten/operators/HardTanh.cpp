@@ -1,9 +1,10 @@
 #include <ATen/Context.h>
 #include <ATen/Functions.h>
 #include <ATen/native/TensorIterator.h>
-
+#include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
 #include "Loops.h"
+#include "LoopsTemplates.h"
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
 
@@ -16,32 +17,31 @@ Tensor& hardtanh_out(
     const Scalar& max_val,
     Tensor& out) {
   checkBackend("hardtanh", out, self.options().backend());
-  // Compare the norm and maxnorm value.
-  auto iter = TensorIteratorConfig()
-                  .set_check_mem_overlap(true)
-                  .add_output(out)
-                  .add_input(self)
-                  .build();
-
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::BFloat16,
-      at::ScalarType::Half,
-      iter.dtype(),
-      "hardtanh",
-      [&]() {
-        scalar_t min_ = min_val.to<scalar_t>();
-        scalar_t max_ = max_val.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t x) -> scalar_t {
-          if (x < min_)
-            return min_;
-          else if (x > max_)
-            return max_;
-          else
-            return x;
-        });
-      });
-
-  return out;
+  return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_clip>(
+      TensorIterator::unary_op,
+      out,
+      self,
+      [=](TensorIteratorBase& iter) {
+        IPEX_DISPATCH_ALL_TYPES_AND2(
+            at::ScalarType::BFloat16,
+            at::ScalarType::Half,
+            iter.dtype(),
+            "hardtanh",
+            [&]() {
+              scalar_t min_ = min_val.to<scalar_t>();
+              scalar_t max_ = max_val.to<scalar_t>();
+              dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t x) -> scalar_t {
+                if (x < min_)
+                  return min_;
+                else if (x > max_)
+                  return max_;
+                else
+                  return x;
+              });
+            });
+      },
+      /* alpha = */ min_val.toFloat(),
+      /* beta = */ max_val.toFloat());
 }
 
 Tensor hardtanh(
@@ -49,7 +49,7 @@ Tensor hardtanh(
     const Scalar& min_val,
     const Scalar& max_val) {
   TORCH_CHECK(!self.is_sparse(), "hardtanh(dpcpp_sparse) is not supported.");
-  Tensor result = at::empty(self.sizes(), self.options());
+  Tensor result = at::empty_like(self);
   at::AtenIpexTypeXPU::hardtanh_out(self, min_val, max_val, result);
   return result;
 }

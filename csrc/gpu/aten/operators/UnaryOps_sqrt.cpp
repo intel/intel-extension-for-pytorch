@@ -10,6 +10,7 @@
 
 #include <oneDNN/oneDNN.h>
 #include "Loops.h"
+#include "LoopsTemplates.h"
 
 using namespace xpu::dpcpp;
 
@@ -30,9 +31,22 @@ void sqrt_kernel_xpu(TensorIterator& iter) {
 }
 
 Tensor& sqrt_out(const Tensor& self, Tensor& result) {
-  auto iter = TensorIterator::unary_float_op(result, self);
-  sqrt_kernel_xpu(iter);
-  return result;
+  return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_sqrt>(
+      TensorIterator::unary_float_op,
+      result,
+      self,
+      [=](TensorIteratorBase& iter) {
+        IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+            at::ScalarType::Half,
+            at::ScalarType::BFloat16,
+            iter.common_dtype(),
+            "sqrt",
+            [&]() {
+              dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+                return Numerics<scalar_t>::sqrt(a);
+              });
+            });
+      });
 }
 
 void rsqrt_kernel_xpu(TensorIterator& iter) {

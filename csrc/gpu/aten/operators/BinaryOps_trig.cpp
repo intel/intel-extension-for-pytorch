@@ -1,6 +1,7 @@
 #include <ATen/Context.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
+#include <oneDNN/oneDNN.h>
 
 #include <utils/DPCPP.h>
 #include "comm/Numerics.h"
@@ -8,6 +9,7 @@
 #include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
+#include "LoopsTemplates.h"
 
 using namespace xpu::dpcpp;
 
@@ -18,27 +20,27 @@ Tensor& tanh_backward_out(
     const Tensor& grad_output,
     const Tensor& output,
     Tensor& grad_input) {
-  auto iter = TensorIteratorConfig()
-                  .set_check_mem_overlap(true)
-                  .add_output(grad_input)
-                  .add_input(grad_output)
-                  .add_input(output)
-                  .build();
-
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::BFloat16, iter.dtype(), "tanh_backward_out", [&]() {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t output, scalar_t z) -> scalar_t {
-              return output * (1. - z * z);
+  return unary_out_with_onednn_and_loops_bw<
+      dnnl::algorithm::eltwise_tanh_use_dst_for_bwd>(
+      TensorIterator::binary_op,
+      grad_input,
+      grad_output,
+      output,
+      [=](TensorIteratorBase& iter) {
+        IPEX_DISPATCH_ALL_TYPES_AND(
+            at::ScalarType::BFloat16, iter.dtype(), "tanh_backward_out", [&]() {
+              dpcpp_kernel_for_tensor_iter(
+                  iter, [](scalar_t output, scalar_t z) -> scalar_t {
+                    return output * (1. - z * z);
+                  });
             });
       });
-
-  return grad_input;
 }
 
 Tensor tanh_backward(const Tensor& grad_output, const Tensor& output) {
-  auto grad_input = at::empty({0}, grad_output.options());
-  return at::tanh_backward_out(grad_input, grad_output, output);
+  auto grad_input = at::empty_like(grad_output);
+  return at::AtenIpexTypeXPU::tanh_backward_out(
+      grad_output, output, grad_input);
 }
 
 void atan2_kernel(TensorIterator& iter) {

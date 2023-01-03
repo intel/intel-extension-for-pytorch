@@ -78,10 +78,22 @@ static inline void eltwise(
         eltwise_forward_pd.dst_desc(), engine, dst.data_ptr());
   } else {
     if (dst.defined()) {
+      Tensor dst_ = dst;
       auto dst_ctx =
           at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(dst);
-      auto dst_md = dst_ctx.is_plain() ? src_md : dst_ctx.meta();
-      dst_memory = dpcpp_onednn_memory(dst_md, engine, dst.data_ptr());
+      auto dst_md = dst_ctx.meta();
+      auto expected_dst_md = eltwise_forward_pd.dst_desc();
+
+      if (dst_md != expected_dst_md) {
+        dst_ = at::AtenIpexTypeXPU::empty_opaque_tensor(
+            expected_dst_md, src.options(), c10::nullopt);
+      }
+      if (!dst.is_same(dst_)) {
+        dst_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
+        DPCPPTensorContext::set_tensor_ctx(dst, std::move(dst_ctx));
+      }
+
+      dst_memory = dpcpp_onednn_memory(expected_dst_md, engine, dst.data_ptr());
     } else {
       auto plain_dst_md = memory::desc({src_tz}, data_t, format_data);
       auto expected_dst_md = eltwise_forward_pd.dst_desc();
