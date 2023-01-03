@@ -1,4 +1,6 @@
-from intel_extension_for_pytorch.xpu.cpp_extension import load
+import torch
+import intel_extension_for_pytorch
+from torch.xpu.cpp_extension import load
 import os
 
 dnnl_path = os.getenv('DNNLROOT')

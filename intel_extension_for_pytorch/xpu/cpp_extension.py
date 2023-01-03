@@ -84,7 +84,7 @@ def _get_exec_path(module_name, path):
 
 def get_dpcpp_complier():
     # build cxx via dpcpp
-    dpcpp_cmp = shutil.which('dpcpp')
+    dpcpp_cmp = shutil.which('icpx')
     if dpcpp_cmp is None:
         raise RuntimeError("Failed to find compiler path from OS PATH")
     _cxxbin = os.getenv("CXX")
@@ -458,7 +458,7 @@ def _is_binary_build() -> bool:
 
 def _accepted_compilers_for_platform() -> List[str]:
     # gnu-c++ and gnu-cc are the conda gcc compilers
-    return ['clang++', 'clang'] if IS_MACOS else ['dpcpp', 'icx']
+    return ['clang++', 'clang'] if IS_MACOS else ['icpx', 'icx']
 
 def check_compiler_ok_for_platform(compiler: str) -> bool:
     r'''
@@ -652,6 +652,9 @@ def _write_ninja_file_and_build_library(
         extra_ldflags or [],
         verbose,
         is_standalone)
+
+    extra_cflags = _prepare_compile_flags(extra_cflags)
+
     build_file_path = os.path.join(build_directory, 'build.ninja')
     if verbose:
         print(f'Emitting ninja build file {build_file_path}...')
@@ -699,6 +702,16 @@ def library_paths() -> List[str]:
     paths += get_one_api_help().get_library_dirs()
 
     return paths
+
+def _prepare_compile_flags(extra_compile_args):
+    if(isinstance(extra_compile_args, List)):
+        extra_compile_args.append('-fsycl')
+    elif(isinstance(extra_compile_args, dict)):
+        cl_flags = extra_compile_args.get('cxx', [])
+        cl_flags.append('-fsycl')
+        extra_compile_args['cxx'] = cl_flags
+
+    return extra_compile_args
 
 def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
     if IS_WINDOWS:
@@ -1012,7 +1025,7 @@ def load(name,
          is_standalone=False,
          keep_intermediates=True):
     r'''
-    Loads a PyTorch C++ extension just-in-time (JIT).
+    Loads a intel_extension_for_pytorch DPC++ extension just-in-time (JIT).
 
     To load an extension, a Ninja build file is emitted, which is used to
     compile the given sources into a dynamic library. This library is
@@ -1349,6 +1362,7 @@ def DPCPPExtension(name, sources, *args, **kwargs):
     extra_link_args = kwargs.get('extra_link_args', [])
     # add oneapi link parameters
     extra_link_args = _prepare_ldflags(extra_link_args, False, False)
+    extra_compile_args = _prepare_compile_flags(extra_compile_args)
 
     # todo: add dpcpp parameter support.
     kwargs['extra_link_args'] = extra_link_args

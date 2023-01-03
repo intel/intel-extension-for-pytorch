@@ -1,5 +1,7 @@
 from setuptools import setup
-from intel_extension_for_pytorch.xpu.cpp_extension import DpcppBuildExtension, DPCPPExtension
+import torch
+import intel_extension_for_pytorch
+from torch.xpu.cpp_extension import DpcppBuildExtension, DPCPPExtension
 
 setup(
     name='operation_syclkernel',
