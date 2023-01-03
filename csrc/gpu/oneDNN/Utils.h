@@ -346,7 +346,8 @@ static inline bool binary_valid(
      selected:
      * 1. self and other should be xpu tensor and be defined.
      * 2. self or other should not be scalar (wrapped tensor).
-     * 3. dim of self and other should be equal and must be larger than 0.
+     * 3. dim of self and other should be equal and must be larger than 0 and
+     samller than 7.
      * 4. the datatype should be supported by oneDNN primitive.
      * 5. self and other should be in the same datatype.
      * 6. self and other should be contiguous or channel-last contiguous.*/
@@ -362,8 +363,10 @@ static inline bool binary_valid(
   if (is_wrapped_number(self) || is_wrapped_number(other))
     return false;
 
-  // 3. dim of self and other should be equal and must be larger than 0.
-  if ((self.dim() <= 0) || (other.dim() <= 0) || (self.dim() != other.dim()))
+  // 3. dim of self and other should be equal and must be larger than 0 and
+  // smaller than 7.
+  if ((self.dim() <= 0) || (other.dim() <= 0) || (self.dim() != other.dim()) ||
+      (self.dim() > 6) || (other.dim() > 6))
     return false;
 
   // 4. the datatype should be supported by oneDNN primitive.
@@ -652,6 +655,32 @@ void convert_convtranspose_weight_layout(
 at::Tensor convert_linear_weight_layout(
     at::Tensor& weight,
     const IntArrayRef input_size);
+
+static inline bool binary_forward_valid(
+    const Tensor& out,
+    const Tensor& self,
+    const Tensor& other) {
+  bool onednn_path_valid = true;
+  if (!(IPEX_ANY(xpu::oneDNN::is_onednn_layout, self, other) &&
+        binary_valid(self, other))) {
+    onednn_path_valid = false;
+  }
+  if (!out.defined()) {
+    return onednn_path_valid;
+  } else {
+    if (!out.is_view() && out.is_contiguous() &&
+        self.scalar_type() == out.scalar_type()) {
+      // The output tensor is not a slice of another tensor
+      return onednn_path_valid;
+    } else {
+      // The output tensor is a slice of another tensor
+      TORCH_CHECK(
+          !xpu::oneDNN::is_onednn_layout(out),
+          "cannot convert tensor slice to plain format");
+      return false;
+    }
+  }
+}
 
 } // namespace oneDNN
 } // namespace xpu

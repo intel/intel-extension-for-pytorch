@@ -2,12 +2,14 @@
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
 
+#include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
 #include "comm/ScalarOps.h"
 
 #include "Loops.h"
+#include "LoopsTemplates.h"
 
 using namespace xpu::dpcpp;
 
@@ -15,7 +17,7 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-void minimum_kernel(TensorIterator& iter) {
+void minimum_kernel(TensorIteratorBase& iter) {
   if (iter.dtype() == ScalarType::Bool) {
     dpcpp_kernel_with_scalars(
         iter, [](bool a, bool b) -> bool { return a && b; });
@@ -41,20 +43,25 @@ Tensor& minimum_out(const Tensor& self, const Tensor& other, Tensor& result) {
       !self.is_complex() && !other.is_complex(),
       "minimum does not support complex inputs.");
 
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::minimum_kernel(iter);
-  return result;
+  return binary_out_template<dnnl::algorithm::binary_min>(
+      TensorIterator::binary_op,
+      result,
+      self,
+      other,
+      [=](TensorIteratorBase& iter) { impl::minimum_kernel(iter); });
 }
 
 Tensor minimum(const Tensor& self, const Tensor& other) {
   TORCH_CHECK(
       !self.is_complex() && !other.is_complex(),
       "minimum does not support complex inputs.");
-
   Tensor result;
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::minimum_kernel(iter);
-  return iter.output();
+  return binary_out_template<dnnl::algorithm::binary_min>(
+      TensorIterator::binary_op,
+      result,
+      self,
+      other,
+      [=](TensorIteratorBase& iter) { impl::minimum_kernel(iter); });
 }
 
 Tensor& fmin_out(const Tensor& self, const Tensor& other, Tensor& result) {

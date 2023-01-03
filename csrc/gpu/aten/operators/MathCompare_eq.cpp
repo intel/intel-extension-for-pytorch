@@ -49,6 +49,7 @@ Tensor eq(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
   return at::AtenIpexTypeXPU::eq_out(self, other, result);
 }
+
 Tensor& eq_out(const Tensor& self, const Scalar& other_, Tensor& out) {
   return at::AtenIpexTypeXPU::eq_out(self, wrapped_scalar_tensor(other_), out);
 }

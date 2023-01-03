@@ -327,6 +327,10 @@ def using_onednn_layout():
     return _C._is_onednn_layout_enabled()
 
 
+def is_onednn_layout(tensor):
+    return torch.ops.torch_ipex.check_onednn_layout(tensor)
+
+
 def enable_onednn_layout():
     _C._enable_onednn_layout()
 

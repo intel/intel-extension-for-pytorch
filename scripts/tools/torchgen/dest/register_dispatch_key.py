@@ -341,6 +341,20 @@ class RegisterDispatchKey:
         'q_per_channel_axis',
         'set_quantizer_',
         'quantized_max_pool2d',
+        'sub',
+        'sub_out',
+        'sub_',
+        'mul',
+        'mul_out',
+        'mul_',
+        'div_out',
+        'div',
+        'div_',
+        'rsub',
+        'maximum_out',
+        'maximum',
+        'minimum_out',
+        'minimum',
     ])
 
     LAZY_REORDER_TENSORLIST = CodeTemplate("""\

@@ -2,12 +2,14 @@
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
 
+#include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
 #include "comm/ScalarOps.h"
 
 #include "Loops.h"
+#include "LoopsTemplates.h"
 
 using namespace xpu::dpcpp;
 
@@ -15,7 +17,7 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-void maximum_kernel(TensorIterator& iter) {
+void maximum_kernel(TensorIteratorBase& iter) {
   if (iter.dtype() == ScalarType::Bool) {
     dpcpp_kernel_with_scalars(
         iter, [](bool a, bool b) -> bool { return a || b; });
@@ -41,9 +43,12 @@ Tensor& maximum_out(const Tensor& self, const Tensor& other, Tensor& result) {
       !self.is_complex() && !other.is_complex(),
       "maximum does not support complex inputs.");
 
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::maximum_kernel(iter);
-  return result;
+  return binary_out_template<dnnl::algorithm::binary_max>(
+      TensorIterator::binary_op,
+      result,
+      self,
+      other,
+      [=](TensorIteratorBase& iter) { impl::maximum_kernel(iter); });
 }
 
 Tensor maximum(const Tensor& self, const Tensor& other) {
@@ -52,9 +57,12 @@ Tensor maximum(const Tensor& self, const Tensor& other) {
       "maximum does not support complex inputs.");
 
   Tensor result;
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::maximum_kernel(iter);
-  return iter.output();
+  return binary_out_template<dnnl::algorithm::binary_max>(
+      TensorIterator::binary_op,
+      result,
+      self,
+      other,
+      [=](TensorIteratorBase& iter) { impl::maximum_kernel(iter); });
 }
 
 Tensor& fmax_out(const Tensor& self, const Tensor& other, Tensor& result) {

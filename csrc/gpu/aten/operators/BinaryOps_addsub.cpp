@@ -12,13 +12,14 @@
 
 #include "EltwiseNaiveKer.h"
 #include "Loops.h"
+#include "LoopsTemplates.h"
 
 using namespace xpu::dpcpp;
 
 namespace at {
 namespace impl {
 
-void add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
+void add_kernel_dpcpp(TensorIteratorBase& iter, Scalar alpha_scalar) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -33,7 +34,7 @@ void add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
       });
 }
 
-void sub_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
+void sub_kernel_dpcpp(TensorIteratorBase& iter, Scalar alpha_scalar) {
   return add_kernel_dpcpp(iter, -alpha_scalar);
 }
 
@@ -71,54 +72,30 @@ Tensor& add_out(
     const Tensor& _other,
     const Scalar& alpha,
     Tensor& result) {
-  if ((!alpha.isComplex()) && 1.0 == alpha.to<float>() &&
-      xpu::oneDNN::binary_valid(_self, _other) &&
-      IPEX_ANY(xpu::oneDNN::is_onednn_layout, _self, _other)) {
-    xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
-    return result;
-  } else {
-    result = to_plain_if_needed_(result);
-    auto self = to_plain_if_needed(_self);
-    auto other = to_plain_if_needed(_other);
-
-    auto iter = TensorIterator::binary_op(result, self, other);
-    impl::alpha_check(iter, alpha);
-    impl::add_kernel_dpcpp(iter, alpha);
-    TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
-
-    auto smf = _self.suggest_memory_format();
-    if (is_channels_last(smf)) {
-      if (!result.is_contiguous(smf)) {
-        result.contiguous(smf);
-      }
-    }
-    return result;
-  }
+  return binary_out_template<dnnl::algorithm::binary_add>(
+      TensorIterator::binary_op,
+      result,
+      _self,
+      _other,
+      [=](TensorIteratorBase& iter) {
+        impl::alpha_check(iter, alpha);
+        impl::add_kernel_dpcpp(iter, alpha);
+      },
+      ((!alpha.isComplex()) && (1.0 == alpha.to<float>())));
 }
 
 Tensor add(const Tensor& _self, const Tensor& _other, const Scalar& alpha) {
   Tensor result;
-  if ((!alpha.isComplex()) && 1.0 == alpha.to<float>() &&
-      xpu::oneDNN::binary_valid(_self, _other) &&
-      IPEX_ANY(xpu::oneDNN::is_onednn_layout, _self, _other)) {
-    xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
-    return result;
-  } else {
-    auto self = to_plain_if_needed(_self);
-    auto other = to_plain_if_needed(_other);
-
-    auto iter = TensorIterator::binary_op(result, self, other);
-    impl::alpha_check(iter, alpha);
-    impl::add_kernel_dpcpp(iter, alpha);
-
-    auto smf = _self.suggest_memory_format();
-    if (is_channels_last(smf)) {
-      if (!(iter.output().is_contiguous(smf))) {
-        iter.output().contiguous(smf);
-      }
-    }
-    return iter.output();
-  }
+  return binary_out_template<dnnl::algorithm::binary_add>(
+      TensorIterator::binary_op,
+      result,
+      _self,
+      _other,
+      [=](TensorIteratorBase& iter) {
+        impl::alpha_check(iter, alpha);
+        impl::add_kernel_dpcpp(iter, alpha);
+      },
+      ((!alpha.isComplex()) && (1.0 == alpha.to<float>())));
 }
 
 Tensor& add_(Tensor& self, const Tensor& other, const Scalar& alpha) {
@@ -139,11 +116,16 @@ Tensor& sub_out(
     const Scalar& alpha,
     Tensor& result) {
   impl::sub_check(self, other);
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::alpha_check(iter, alpha);
-  impl::sub_kernel_dpcpp(iter, alpha);
-  TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
-  return result;
+  return binary_out_template<dnnl::algorithm::binary_sub>(
+      TensorIterator::binary_op,
+      result,
+      self,
+      other,
+      [=](TensorIteratorBase& iter) {
+        impl::alpha_check(iter, alpha);
+        impl::sub_kernel_dpcpp(iter, alpha);
+      },
+      ((!alpha.isComplex()) && (1.0 == alpha.to<float>())));
 }
 
 Tensor rsub(const Tensor& self, const Tensor& other, const Scalar& alpha) {
@@ -195,9 +177,9 @@ Tensor add(const Tensor& _self, const Tensor& _other, const Scalar& alpha) {
         iter.output().contiguous(smf);
       }
     }
-
     return iter.output();
   }
 }
+
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

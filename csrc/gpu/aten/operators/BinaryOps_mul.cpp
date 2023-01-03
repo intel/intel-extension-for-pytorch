@@ -8,6 +8,7 @@
 #include "comm/ScalarOps.h"
 
 #include "Loops.h"
+#include "LoopsTemplates.h"
 #include "comm/zmath.h"
 
 using namespace xpu::dpcpp;
@@ -16,7 +17,7 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-static void mul_kernel_dpcpp(TensorIterator& iter) {
+static void mul_kernel_dpcpp(TensorIteratorBase& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -31,16 +32,22 @@ static void mul_kernel_dpcpp(TensorIterator& iter) {
 } // namespace impl
 
 Tensor& mul_out(const Tensor& self, const Tensor& other, Tensor& result) {
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::mul_kernel_dpcpp(iter);
-  return result;
+  return binary_out_template<dnnl::algorithm::binary_mul>(
+      TensorIterator::binary_op,
+      result,
+      self,
+      other,
+      [=](TensorIteratorBase& iter) { impl::mul_kernel_dpcpp(iter); });
 }
 
 Tensor mul(const Tensor& self, const Tensor& other) {
   Tensor result;
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::mul_kernel_dpcpp(iter);
-  return iter.output();
+  return binary_out_template<dnnl::algorithm::binary_mul>(
+      TensorIterator::binary_op,
+      result,
+      self,
+      other,
+      [=](TensorIteratorBase& iter) { impl::mul_kernel_dpcpp(iter); });
 }
 
 Tensor& mul_(Tensor& self, const Tensor& other) {
