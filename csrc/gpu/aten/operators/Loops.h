@@ -576,7 +576,10 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
     }                                                                          \
   }
 
-    if constexpr (fast_mode) {
+#ifndef USE_SPLIT_FP64_LOOPS
+    if constexpr (fast_mode)
+#endif
+    {
       if (!has_double_arg<func_t>(iter)) {
         HANDLE_DYNAMIC_CAST(true)
         return;

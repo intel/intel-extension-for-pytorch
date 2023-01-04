@@ -27,8 +27,8 @@ if(NOT ${Torch_COMP_VERION} VERSION_EQUAL "${Torch_VERSION_MAJOR}.${Torch_VERSIO
   message(FATAL_ERROR "Not compatible Torch version ${Torch_VERSION} at ${TORCH_INSTALL_PREFIX}!\nTorch ${Torch_COMP_VERION} is needed!")
 endif()
 
-include(${IPEX_ROOT_DIR}/cmake/BuildFlags.cmake)
 include(${IPEX_ROOT_DIR}/cmake/Options.cmake)
+include(${IPEX_ROOT_DIR}/cmake/BuildFlags.cmake)
 
 add_subdirectory(${IPEX_ROOT_DIR}/csrc)
 add_subdirectory(${IPEX_ROOT_DIR}/intel_extension_for_pytorch/csrc)
