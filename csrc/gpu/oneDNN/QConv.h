@@ -40,15 +40,15 @@ qconv_get_plain_md(
     int64_t groups,
     bool is_channels_last_suggested) {
   auto ndim = src.ndimension();
-  auto src_data_t = is_opaque_u8(src) ? memory::data_type::s8
-                                      : get_onednn_dtype_include_double(src);
+  auto src_data_t =
+      is_opaque_u8(src) ? memory::data_type::s8 : get_onednn_dtype(src);
   // 3D: n/c/w (n/w/c)
   // 4D: n/c/h/w (n/h/w/c)
   // 5D: n/c/d/h/w (n/d/h/w/c)
   auto fmt_src = conv_src_fmt(ndim, is_channels_last_suggested);
   auto src_usr_md = memory::desc(src.sizes().vec(), src_data_t, fmt_src);
 
-  auto dst_data_t = get_onednn_dtype_include_double(dst);
+  auto dst_data_t = get_onednn_dtype(dst);
   auto dst_usr_md = memory::desc(dst.sizes().vec(), dst_data_t, fmt_src);
 
   memory::desc wgh_usr_md, wgh_md;
@@ -93,8 +93,8 @@ qconv_get_blocked_md(
   auto fmt_src = conv_src_fmt(ndim);
   if (src_ctx.is_plain()) {
     auto src_tz = src.sizes().vec();
-    auto src_data_t = is_opaque_u8(src) ? memory::data_type::s8
-                                        : get_onednn_dtype_include_double(src);
+    auto src_data_t =
+        is_opaque_u8(src) ? memory::data_type::s8 : get_onednn_dtype(src);
     src_usr_md = memory::desc(src_tz, src_data_t, fmt_src);
   } else {
     src_usr_md = src_ctx.meta();
@@ -103,7 +103,7 @@ qconv_get_blocked_md(
   auto dst_ctx = DPCPPTensorContext::get_tensor_ctx(dst);
   if (dst_ctx.is_plain()) {
     auto dst_tz = dst.sizes().vec();
-    auto dst_data_t = get_onednn_dtype_include_double(dst);
+    auto dst_data_t = get_onednn_dtype(dst);
     dst_usr_md = memory::desc(dst_tz, dst_data_t, fmt_src);
   } else {
     dst_usr_md = dst_ctx.meta();
@@ -217,13 +217,13 @@ static memory qconv_get_expected_wgh_memory(
 
     auto reshaped_wgh = wgh;
     // reshape for group convolution weight
-    if (wgh_blocked.ndimension() == 5 && wgh.ndimension() == 4) {
+    if (wgh_blocked.ndimension() > wgh.ndimension()) {
       reshaped_wgh = share_storage_and_set_strided_as(
           wgh,
           wgh_blocked.sizes(),
           /*compatible with different strides of weight (including contiguous,
              channels_last and non-contiguous) */
-          compatible_groups_conv_strides(wgh, wgh_blocked),
+          compatible_groups_conv_strides(wgh, wgh_blocked.sizes().vec()),
           c10::nullopt);
     }
     xpu::oneDNN::reorder(reshaped_wgh, wgh_blocked);
@@ -250,7 +250,7 @@ static memory qconv_get_blocked_dst_memory(
   memory dst_m;
   if (dst_usr_md != expected_dst_md) {
     auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
-        (get_onednn_dtype_include_double(dst) == memory::data_type::u8 &&
+        (get_onednn_dtype(dst) == memory::data_type::u8 &&
          dst.q_zero_point() == 128)
             ? dst.q_scale() / 2
             : dst.q_scale(),

@@ -129,57 +129,208 @@ static inline memory::dims compatible_wgh_dims(
   return {};
 }
 
-static convolution_forward::primitive_desc get_convolution_pd(
+static std::tuple<
+    memory::desc,
+    memory::desc,
+    memory::desc,
+    memory::desc,
+    memory::desc,
+    memory::desc>
+conv_get_plain_md(
     const at::Tensor& src,
     const at::Tensor& wgh,
-    const at::Tensor& bia,
-    const IntArrayRef padding,
-    const IntArrayRef stride,
-    IntArrayRef dilation,
-    const int64_t groups) {
-  auto src_data_t = get_onednn_dtype(src);
-  auto wei_data_t = get_onednn_dtype(wgh);
-  auto bia_data_t =
-      bia.defined() ? get_onednn_dtype(bia) : memory::data_type::undef;
-  auto dst_data_t = src_data_t;
-
+    const at::Tensor& dst,
+    int64_t groups,
+    bool is_channels_last_suggested) {
   auto ndim = src.ndimension();
-  memory::dims dst_tz = conv_dst_tz(
-      ndim, src.sizes(), wgh.sizes(), padding, padding, stride, dilation);
+  auto src_data_t = get_onednn_dtype_include_double(src);
+  // 3D: n/c/w (n/w/c)
+  // 4D: n/c/h/w (n/h/w/c)
+  // 5D: n/c/d/h/w (n/d/h/w/c)
+  auto fmt_src = conv_src_fmt(ndim, is_channels_last_suggested);
+  auto src_usr_md = memory::desc(src.sizes().vec(), src_data_t, fmt_src);
+
+  auto dst_data_t = get_onednn_dtype_include_double(dst);
+  auto dst_usr_md = memory::desc(dst.sizes().vec(), dst_data_t, fmt_src);
+
   auto ic = src.size(1);
-  auto oc = dst_tz[1];
-  memory::dims src_tz = src.sizes().vec();
+  auto oc = dst.size(1);
   memory::dims wgh_tz = compatible_wgh_dims(ndim, groups, oc, ic, wgh.sizes());
-  memory::dims bia_tz = {oc};
+  auto wei_data_t = get_onednn_dtype_include_double(wgh);
+  // 3D: (g)o/i/w ((g)o/w/i)
+  // 4D: (g)o/i/h/w ((g)o/h/w/i)
+  // 5D: (g)o/i/d/h/w ((g)o/d/h/w/i)
+  auto fmt_wgh = conv_wgh_fmt(ndim, groups != 1, is_channels_last_suggested);
+  auto wgh_usr_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
 
+  // FIXME:
+  // WA for ChannelsLast with FP32
+  // https://jira.devtools.intel.com/browse/MFDNN-9218
+  memory::desc wgh_md = wgh_usr_md;
+  if ((src_data_t == memory::data_type::f32 ||
+       src_data_t == memory::data_type::f64) &&
+      is_channels_last_suggested) {
+    wgh_md = memory::desc(wgh_tz, wei_data_t, memory::format_tag::any);
+  }
+
+  return {src_usr_md, wgh_usr_md, dst_usr_md, src_usr_md, wgh_md, dst_usr_md};
+}
+
+static std::tuple<
+    memory::desc,
+    memory::desc,
+    memory::desc,
+    memory::desc,
+    memory::desc,
+    memory::desc>
+conv_get_blocked_md(
+    const at::Tensor& src,
+    const at::Tensor& wgh,
+    const at::Tensor& dst,
+    int64_t groups) {
+  // create memory desc from the src/wgh/dst tensors
+  memory::desc src_usr_md, wgh_usr_md, dst_usr_md;
+  auto ndim = src.ndimension();
+  auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
+  auto fmt_src = conv_src_fmt(ndim);
+  if (src_ctx.is_plain()) {
+    auto src_tz = src.sizes().vec();
+    auto src_data_t = get_onednn_dtype_include_double(src);
+    src_usr_md = memory::desc(src.sizes().vec(), src_data_t, fmt_src);
+  } else {
+    src_usr_md = src_ctx.meta();
+  }
+
+  auto dst_ctx = DPCPPTensorContext::get_tensor_ctx(dst);
+  if (dst_ctx.is_plain()) {
+    auto dst_tz = dst.sizes().vec();
+    auto dst_data_t = get_onednn_dtype_include_double(dst);
+    dst_usr_md = memory::desc(dst_tz, dst_data_t, fmt_src);
+  } else {
+    dst_usr_md = dst_ctx.meta();
+  }
+
+  auto wgh_ctx = DPCPPTensorContext::get_tensor_ctx(wgh);
+  if (wgh_ctx.is_plain()) {
+    auto ic = src.size(1);
+    auto oc = dst.size(1);
+    auto wei_data_t = get_onednn_dtype_include_double(wgh);
+    memory::dims wgh_tz =
+        compatible_wgh_dims(ndim, groups, oc, ic, wgh.sizes());
+    auto fmt_wgh = conv_wgh_fmt(ndim, groups != 1);
+    wgh_usr_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
+  } else {
+    wgh_usr_md = wgh_ctx.meta();
+  }
+
+  // create memory desc for conv primitive and query the blocked format
   auto fmt_any = memory::format_tag::any;
-  auto src_md = memory::desc(src_tz, src_data_t, fmt_any);
-  auto wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
-  auto bia_md = bia.defined() ? memory::desc(bia_tz, bia_data_t, fmt_any)
-                              : memory::desc();
-  auto dst_md = memory::desc(dst_tz, dst_data_t, fmt_any);
+  auto src_md = src.size(1) == 3
+      ? src_usr_md
+      : memory::desc(src_usr_md.dims(), src_usr_md.data_type(), fmt_any);
+  auto wgh_md =
+      memory::desc(wgh_usr_md.dims(), wgh_usr_md.data_type(), fmt_any);
+  auto dst_md =
+      memory::desc(dst_usr_md.dims(), dst_usr_md.data_type(), fmt_any);
 
-  auto conv_forward_desc = convolution_forward::desc(
-      prop_kind::forward,
-      algorithm::convolution_direct,
-      src_md,
-      wgh_md,
-      bia_md,
-      dst_md,
-      stride.vec(),
-      compatible_dilation(dilation),
-      padding.vec(),
-      padding.vec());
+  return {src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md};
+}
 
-  primitive_attr pattr;
-#ifdef USE_SCRATCHPAD_MODE
-  pattr.set_scratchpad_mode(scratchpad_mode::user);
-#endif
+static memory conv_get_expected_src_memory(
+    const at::Tensor& src,
+    at::Tensor& src_blocked,
+    memory::desc& src_usr_md,
+    memory::desc& expected_src_md,
+    dnnl::engine& engine,
+    bool need_reorder = true) {
+  memory src_m;
+  if (src_usr_md != expected_src_md) {
+    // avoid reorder in case of, [n][C][1][1][16c] <==> [n][c][1][1]
+    if (src.sizes().size() == 4 && src.size(2) == 1 && src.size(3) == 1) {
+      src_m = dpcpp_onednn_memory(expected_src_md, engine, src.data_ptr());
+    } else {
+      src_blocked =
+          empty_opaque_tensor(expected_src_md, src.options(), c10::nullopt);
+      src_m =
+          dpcpp_onednn_memory(expected_src_md, engine, src_blocked.data_ptr());
+      if (need_reorder)
+        xpu::oneDNN::reorder(src, src_blocked);
+    }
+  } else {
+    src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
+  }
+  return src_m;
+}
 
-  return convolution_forward::primitive_desc(
-      conv_forward_desc,
-      pattr,
-      GpuEngineManager::Instance().get_engine({kXPU, current_device()}));
+static memory conv_get_expected_wgh_memory(
+    const at::Tensor& wgh,
+    at::Tensor& wgh_blocked,
+    memory::desc& wgh_usr_md,
+    memory::desc& expected_wgh_md,
+    dnnl::engine& engine,
+    bool weight_cache_optimization,
+    bool need_reorder = true) {
+  memory wgh_m;
+  if (wgh_usr_md != expected_wgh_md) {
+    wgh_blocked =
+        empty_opaque_tensor(expected_wgh_md, wgh.options(), c10::nullopt);
+    wgh_m =
+        dpcpp_onednn_memory(expected_wgh_md, engine, wgh_blocked.data_ptr());
+
+    if (need_reorder) {
+      auto reshaped_wgh = wgh;
+      // reshape for group convolution weight
+      if (wgh_blocked.ndimension() > wgh.ndimension()) {
+        // for groups conv case:
+        // expected_wgh will be 5-D Tensor based on expected_wgh_md:
+        // g/o/i/h/w or g/o/h/w/i
+        // wgh will be 4-D Tensor based on PyTorch
+        // (g)o/i/h/w or (g)o/h/w/i
+        // we need to manually reshape 4-D wgh to 5-D,
+        // consistent with expected_wgh
+        reshaped_wgh = share_storage_and_set_strided_as(
+            wgh,
+            wgh_blocked.sizes(),
+            /*compatible with different strides of weight (including contiguous,
+               channels_last and non-contiguous) */
+            compatible_groups_conv_strides(wgh, wgh_blocked.sizes().vec()),
+            c10::nullopt);
+      }
+      xpu::oneDNN::reorder(reshaped_wgh, wgh_blocked);
+
+      if (weight_cache_optimization) {
+        auto wgh_opt_ctx = DPCPPTensorContext::release_tensor_ctx(wgh_blocked);
+        wgh_opt_ctx.set_aten_meta(
+            {reshaped_wgh.sizes().vec(), reshaped_wgh.strides().vec()});
+        DPCPPTensorContext::set_tensor_ctx(wgh, std::move(wgh_opt_ctx));
+      }
+    }
+  } else {
+    wgh_m = dpcpp_onednn_memory(wgh_usr_md, engine, wgh.data_ptr());
+  }
+  return wgh_m;
+}
+
+static memory conv_get_expected_dst_memory(
+    const at::Tensor& dst,
+    at::Tensor& dst_blocked,
+    memory::desc& dst_usr_md,
+    memory::desc& expected_dst_md,
+    dnnl::engine& engine,
+    bool need_reorder = true) {
+  memory dst_m;
+  if (dst_usr_md != expected_dst_md) {
+    dst_blocked =
+        empty_opaque_tensor(expected_dst_md, dst.options(), c10::nullopt);
+    dst_m =
+        dpcpp_onednn_memory(expected_dst_md, engine, dst_blocked.data_ptr());
+
+    if (need_reorder)
+      xpu::oneDNN::reorder(dst, dst_blocked);
+  } else {
+    dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
+  }
+  return dst_m;
 }
 
 static at::Tensor convolution(
@@ -196,99 +347,33 @@ static at::Tensor convolution(
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
-  auto ndim = src.ndimension();
-  if (src.is_quantized()) {
-    TORCH_CHECK(
-        !bia.defined(), "QConv only supports binary_add post-op for bias");
+
+  auto memory_layout_for_conv = get_memory_layout_for_conv(src, wgh);
+  bool is_onednn_layout_suggested =
+      memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked;
+
+  // create usr_md for tensors, and md for conv primitive
+  memory::desc src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md;
+  if (is_onednn_layout_suggested) {
+    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
+        conv_get_blocked_md(src, wgh, dst, groups);
+  } else {
+    bool is_channels_last_suggested =
+        memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
+    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
+        conv_get_plain_md(src, wgh, dst, groups, is_channels_last_suggested);
   }
-  auto dst_tz = conv_dst_tz(
-      ndim,
-      src.sizes(),
-      wgh.sizes(),
-      padding_front_top_left,
-      padding_back_bottom_right,
-      stride,
-      dilation);
-  if (!dst.defined()) {
-    auto dst_opt = src.options();
-    if (src.is_quantized()) {
-      dst_opt = attr.get_dst_dtype();
-    }
-    // ensure channels_last can be propagated from src to dst
-    if (is_smf_channels_last(src) || is_smf_channels_last(wgh)) {
-      TORCH_CHECK(
-          3 == ndim || 4 == ndim || 5 == ndim,
-          "convolution only supports 3D, 4D, 5D tensor");
-      dst_opt = dst_opt.memory_format(get_cl_tag_by_ndim(ndim));
-    }
-    dst = at::empty(dst_tz, dst_opt);
-  }
-  auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  auto src_data_t = src_ctx.is_plain() ? get_onednn_dtype_include_double(src)
-                                       : src_ctx.meta().data_type();
-  auto wei_usr_data_t = get_onednn_dtype_include_double(wgh);
-  auto wei_data_t = src.is_quantized() ? memory::data_type::s8
-                                       : get_onednn_dtype_include_double(wgh);
-  auto dst_data_t =
-      dst.defined() ? get_onednn_dtype_include_double(dst) : src_data_t;
+  auto bia_fmt = memory::format_tag::x;
+  auto bia_md = bia.defined()
+      ? memory::desc(
+            {dst.size(1)}, get_onednn_dtype_include_double(bia), bia_fmt)
+      : memory::desc({}, memory::data_type::undef, bia_fmt);
 
-  auto bia_data_t = bia.defined() ? get_onednn_dtype_include_double(bia)
-                                  : memory::data_type::undef;
-
-  if (memory::data_type::bf16 == src_data_t && bia.defined()) {
-    // if src data type is bf16 and bia is defined, bia data type must be bf16
-    // or f32
-    TORCH_CHECK(
-        memory::data_type::f32 == bia_data_t ||
-        memory::data_type::bf16 == bia_data_t);
-  }
-
-  auto ic = src.size(1);
-  auto oc = dst_tz[1];
-
-  bool is_channels_last_suggested = using_channels_last_for_conv(src, wgh);
-  auto fmt_any = memory::format_tag::any;
-  // 3D: n/c/w (n/w/c)
-  // 4D: n/c/h/w (n/h/w/c)
-  // 5D: n/c/d/h/w (n/d/h/w/c)
-  auto fmt_src = conv_src_fmt(ndim, is_channels_last_suggested);
-  // 3D: (g)o/i/w ((g)o/w/i)
-  // 4D: (g)o/i/h/w ((g)o/h/w/i)
-  // 5D: (g)o/i/d/h/w ((g)o/d/h/w/i)
-  auto fmt_wgh = conv_wgh_fmt(ndim, groups != 1, is_channels_last_suggested);
-  auto fmt_bia = memory::format_tag::x;
-
-  memory::dims src_tz = src.sizes().vec();
-  memory::dims wgh_tz = compatible_wgh_dims(ndim, groups, oc, ic, wgh.sizes());
-  memory::dims bia_tz = {oc};
+  // create conv primitive descriptor
   memory::dims _stride = stride.vec();
   memory::dims _padding_front_top_left = padding_front_top_left.vec();
   memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
   memory::dims _dilation = compatible_dilation(dilation);
-
-  // plain combination
-  auto src_md = memory::desc(src_tz, src_data_t, fmt_src);
-  auto wgh_md = is_channels_last_suggested
-      ? memory::desc(wgh_tz, wei_data_t, fmt_any)
-      : memory::desc(wgh_tz, wei_data_t, fmt_wgh);
-  auto dst_md = memory::desc(dst_tz, dst_data_t, fmt_src);
-  auto bia_md = bia.defined() ? memory::desc(bia_tz, bia_data_t, fmt_bia)
-                              : memory::desc();
-
-  bool is_onednn_layout_suggested = using_onednn_layout_for_conv(src, wgh);
-  // block combination
-  if (is_onednn_layout_suggested) {
-    // In blocked format scenario, oneDNN accept the src in plain format
-    // when src ic = 3
-    if (ic == 3) {
-      src_md = memory::desc(src_tz, src_data_t, fmt_src);
-    } else {
-      src_md = memory::desc(src_tz, src_data_t, fmt_any);
-    }
-    dst_md = memory::desc(dst_tz, dst_data_t, fmt_any);
-    wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
-  }
-
   auto conv_fwd_desc = convolution_forward::desc(
       prop_kind::forward,
       algorithm::convolution_direct,
@@ -301,46 +386,8 @@ static at::Tensor convolution(
       _padding_front_top_left,
       _padding_back_bottom_right);
 
+  // extract post ops
   primitive_attr pattr;
-  float src_scale;
-  std::vector<float> wgh_scales, conv_scale = {1};
-  int conv_zero_point = 0;
-  if (src.is_quantized()) {
-    if (wgh.qscheme() == kPerTensorAffine) {
-      wgh_scales.push_back(static_cast<float>(wgh.q_scale()));
-    } else {
-      for (int i = 0; i < oc; i++) {
-        wgh_scales.push_back(wgh.q_per_channel_scales()[i].item<float>());
-      }
-    }
-
-    src_scale =
-        (src_data_t == memory::data_type::u8 && src.q_zero_point() == 128)
-        ? src.q_scale() / 2
-        : src.q_scale();
-    conv_scale.clear();
-    /* Note: [Convolution requantization]
-       Suppose y = w * x. The * refer to convolution operation, and y, w, x are
-       dtype of FP32.
-       Then we have
-         y_int / y_sc =  (w_int / w_sc) * (x_int / x_sc) =>
-         y_int = [y_sc / (w_sc x x_sc)] (w_int * x_int).
-       The y_sc / (w_sc x x_sc) is requantization scale, which is also the
-       conv_scale in following line.
-       Inversion is required due to scale_onednn = 1  / scale_torch */
-    /*The requantization will be performed in Attr.h with appending post op
-     * linear to adjust the scale/zeropoint*/
-    for (int i = 0; i < wgh_scales.size(); i++) {
-      conv_scale.push_back(1.f / (1.f / (src_scale * wgh_scales[i])));
-    }
-    conv_zero_point = static_cast<int>(0);
-    int mask_ac = 0;
-    int mask_conv = wgh_scales.size() > 1 ? 1 << 1 : 0;
-    pattr.set_output_scales(mask_conv, conv_scale);
-    pattr.set_zero_points(DNNL_ARG_DST, mask_ac, {conv_zero_point});
-  }
-
-  std::unordered_map<int, memory> args;
   post_ops po;
   attr.extract_post_ops(po, dst);
   pattr.set_post_ops(po);
@@ -349,7 +396,7 @@ static at::Tensor convolution(
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
 
-  if (src_data_t == memory::data_type::f32) {
+  if (src_usr_md.data_type() == memory::data_type::f32) {
     pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
   }
 
@@ -365,169 +412,77 @@ static at::Tensor convolution(
       _dilation,
       _padding_front_top_left,
       _padding_back_bottom_right,
-      attr,
-      conv_scale,
-      conv_zero_point);
+      attr);
 #endif
 
   auto conv_fwd_pd =
       convolution_forward::primitive_desc(conv_fwd_desc, pattr, engine);
 
-  memory::desc src_usr_md, wgh_usr_md, dst_usr_md;
-
-  // block weight when NHWC
-  auto wgh_ctx = DPCPPTensorContext::get_tensor_ctx(wgh);
-  wgh_usr_md = wgh_ctx.is_plain()
-      ? memory::desc(wgh_tz, wei_usr_data_t, fmt_wgh)
-      : wgh_ctx.meta();
-
-  if (!is_onednn_layout_suggested) {
-    src_usr_md = memory::desc(src_tz, src_data_t, fmt_src);
-    dst_usr_md = memory::desc(dst_tz, dst_data_t, fmt_src);
-  } else {
-    auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-    src_usr_md = src_ctx.is_plain() ? memory::desc(src_tz, src_data_t, fmt_src)
-                                    : src_ctx.meta();
-
-    if (dst.defined()) {
-      auto dst_ctx = DPCPPTensorContext::get_tensor_ctx(dst);
-      dst_usr_md = dst_ctx.is_plain()
-          ? memory::desc(dst_tz, dst_data_t, fmt_src)
-          : dst_ctx.meta();
-    } else {
-      auto expected_dst_md = conv_fwd_pd.dst_desc();
-      auto plain_dst_md = memory::desc({dst_tz}, dst_data_t, fmt_src);
-      auto mem_fmt = get_cl_tag_by_ndim(ndim);
-      auto dst_opt = is_smf_channels_last(src) || is_smf_channels_last(wgh)
-          // src.options() is just used to fill dst_opt. can also be
-          // any other tensor to do this
-          ? src.options().memory_format(mem_fmt)
-          : src.options();
-      if (expected_dst_md != plain_dst_md) {
-        dst = empty_opaque_tensor(expected_dst_md, dst_opt, c10::nullopt);
-      } else {
-        // ChannelsLast in block mode
-        dst = at::empty(dst_tz, dst_opt);
-      }
-    }
-  }
-
-  Tensor src_, wgh_, dst_ = dst, bia_;
-  auto expected_src_md = conv_fwd_pd.src_desc();
-  memory src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
-  if (src_usr_md != expected_src_md) {
-    // avoid reorder in case of, [n][C][1][1][16c] <==> [n][c][1][1]
-    if (src.sizes().size() == 4 && src.size(2) == 1 && src.size(3) == 1) {
-      src_m = dpcpp_onednn_memory(expected_src_md, engine, src.data_ptr());
-    } else {
-      src_ = empty_opaque_tensor(expected_src_md, src.options(), c10::nullopt);
-      src_m = dpcpp_onednn_memory(expected_src_md, engine, src_.data_ptr());
-      xpu::oneDNN::reorder(src, src_);
-    }
-  }
-
   auto weight_cache_optimization = [&]() {
-    bool onoff = false;
-    onoff |= is_onednn_layout_suggested;
-    onoff |= using_channels_last_for_conv(src, wgh);
-    onoff &= !at::GradMode::is_enabled();
-    return onoff;
+    // FIXME:
+    // WA for ChannelsLast with FP32
+    // https://jira.devtools.intel.com/browse/MFDNN-9218
+    // After this issue fixed, ChannelsLast do not need weight cache
+    bool flag =
+        (memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast) &&
+        (src_usr_md.data_type() == memory::data_type::f32 ||
+         src_usr_md.data_type() == memory::data_type::f64);
+    return ((memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked) ||
+            flag) &&
+        !at::GradMode::is_enabled();
   }();
 
-  auto expected_wgh_md = conv_fwd_pd.weights_desc();
-  auto wgh_m = dpcpp_onednn_memory(wgh_usr_md, engine, wgh.data_ptr());
-  if (wgh_usr_md != expected_wgh_md) {
-    if (weight_cache_optimization && src.is_quantized()) {
-      QuantizerPtr quantizer;
-
-      if (wgh.is_quantized() && wgh.qscheme() == kPerChannelAffine) {
-        quantizer = dpcpp_make_per_channel_affine_quantizer(
-            wgh.q_per_channel_scales(),
-            wgh.q_per_channel_zero_points(),
-            0,
-            kQInt8);
-      } else {
-        quantizer =
-            dpcpp_make_per_tensor_affine_quantizer(wgh_scales[0], 0, kQInt8);
-      }
-      wgh_ = empty_opaque_qtensor(expected_wgh_md, c10::nullopt, quantizer);
-    } else {
-      wgh_ = empty_opaque_tensor(expected_wgh_md, wgh.options(), c10::nullopt);
-    }
-
-    wgh_m = dpcpp_onednn_memory(expected_wgh_md, engine, wgh_.data_ptr());
-    auto reshaped_wgh = wgh;
-    // reshape for group convolution weight
-    if (wgh_.ndimension() == 5 && wgh.ndimension() == 4) {
-      // for groups conv case:
-      // wgh_ will be 5-D Tensor based on expected_wgh_md:
-      // g/o/i/h/w or g/o/h/w/i
-      // wgh will be 4-D Tensor based on PyTorch
-      // (g)o/i/h/w or (g)o/h/w/i
-      // we need to manually reshape 4-D wgh to 5-D,
-      // consistent with expected_wgh
-      reshaped_wgh = share_storage_and_set_strided_as(
+  memory src_m, wgh_m, dst_m, bia_m;
+  Tensor src_blocked, wgh_blocked, dst_blocked = dst;
+  if (is_onednn_layout_suggested) {
+    auto expected_src_md = conv_fwd_pd.src_desc();
+    auto expected_wgh_md = conv_fwd_pd.weights_desc();
+    auto expected_dst_md = conv_fwd_pd.dst_desc();
+    src_m = conv_get_expected_src_memory(
+        src, src_blocked, src_usr_md, expected_src_md, engine);
+    wgh_m = conv_get_expected_wgh_memory(
+        wgh,
+        wgh_blocked,
+        wgh_usr_md,
+        expected_wgh_md,
+        engine,
+        weight_cache_optimization);
+    dst_m = conv_get_expected_dst_memory(
+        dst, dst_blocked, dst_usr_md, expected_dst_md, engine, attr.with_sum());
+  } else {
+    src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
+    wgh_m = dpcpp_onednn_memory(wgh_usr_md, engine, wgh.data_ptr());
+    dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
+    // FIXME:
+    // WA for ChannelsLast with FP32
+    // https://jira.devtools.intel.com/browse/MFDNN-9218
+    bool is_channels_last_suggested =
+        memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
+    if (is_channels_last_suggested &&
+        (src_usr_md.data_type() == memory::data_type::f32 ||
+         src_usr_md.data_type() == memory::data_type::f64)) {
+      auto expected_wgh_md = conv_fwd_pd.weights_desc();
+      wgh_m = conv_get_expected_wgh_memory(
           wgh,
-          wgh_.sizes(),
-          /*compatible with different strides of weight (including contiguous,
-             channels_last and non-contiguous) */
-          compatible_groups_conv_strides(wgh, wgh_),
-          c10::nullopt);
+          wgh_blocked,
+          wgh_usr_md,
+          expected_wgh_md,
+          engine,
+          weight_cache_optimization);
     }
-    xpu::oneDNN::reorder(reshaped_wgh, wgh_);
+  }
 
-    if (weight_cache_optimization) {
-      auto wgh_opt_ctx = DPCPPTensorContext::release_tensor_ctx(wgh_);
-      wgh_opt_ctx.set_aten_meta(
-          {reshaped_wgh.sizes().vec(), reshaped_wgh.strides().vec()});
-      DPCPPTensorContext::set_tensor_ctx(wgh, std::move(wgh_opt_ctx));
-    }
+  std::unordered_map<int, memory> args;
+  if (bia.defined()) {
+    bia_m = dpcpp_onednn_memory(bia_md, engine, bia.data_ptr());
+    args.insert({DNNL_ARG_BIAS, bia_m});
   }
   auto expected_dst_md = conv_fwd_pd.dst_desc();
-  auto dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
-  if (dst_usr_md != expected_dst_md) {
-    if (is_onednn_layout_suggested && dst.is_quantized()) {
-      auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
-          (get_onednn_dtype_include_double(dst) == memory::data_type::u8 &&
-           dst.q_zero_point() == 128)
-              ? dst.q_scale() / 2
-              : dst.q_scale(),
-          0,
-          typeMetaToScalarType(dst.options().dtype()));
-      dst_ = empty_opaque_qtensor(expected_dst_md, c10::nullopt, quantizer);
-    } else {
-      dst_ = empty_opaque_tensor(expected_dst_md, dst.options(), c10::nullopt);
-    }
-
-    dst_m = dpcpp_onednn_memory(expected_dst_md, engine, dst_.data_ptr());
-
-    if (attr.with_sum())
-      xpu::oneDNN::reorder(dst, dst_);
-  }
-
   if (attr.with_binary())
     attr.construct_post_binary(conv_fwd_pd, po, args);
 
-  memory bia_m = memory({{}, bia_data_t, fmt_bia}, engine);
-  if (bia.defined()) {
-    auto bia_ctx = DPCPPTensorContext::get_tensor_ctx(bia);
-
-    bia_m = bia_ctx.is_plain()
-        ? dpcpp_onednn_memory(
-              {bia_tz, bia_data_t, fmt_bia}, engine, bia.data_ptr())
-        : dpcpp_onednn_memory({bia_ctx.meta()}, engine, bia.data_ptr());
-  }
-
-#ifdef USE_PRIMITIVE_CACHE
-  auto conv_forward =
-      fetch_or_create_m<convolution_forward>(key_pd, conv_fwd_pd);
-#else
-  auto conv_forward = convolution_forward(conv_fwd_pd);
-#endif
-
   args.insert({DNNL_ARG_SRC, src_m});
   args.insert({DNNL_ARG_WEIGHTS, wgh_m});
-  args.insert({DNNL_ARG_BIAS, bia_m});
   args.insert({DNNL_ARG_DST, dst_m});
 
 #ifdef USE_SCRATCHPAD_MODE
@@ -539,16 +494,25 @@ static at::Tensor convolution(
   args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_m});
 #endif
 
+#ifdef USE_PRIMITIVE_CACHE
+  auto conv_forward =
+      fetch_or_create_m<convolution_forward>(key_pd, conv_fwd_pd);
+#else
+  auto conv_forward = convolution_forward(conv_fwd_pd);
+#endif
   DPCPP_ONEDNN_EXEC(conv_forward, strm, args);
-  if (is_onednn_layout_suggested && dst_.data_ptr() != dst.data_ptr()) {
-    auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
+
+  if (is_onednn_layout_suggested && dst_blocked.data_ptr() != dst.data_ptr()) {
+    auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_blocked);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));
   }
 
   return dst;
 }
 
-static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
+static void convolution_backward_weights(
+    at::Tensor& diff_wgh,
+    at::Tensor& diff_bia,
     const at::Tensor& diff_dst,
     const at::Tensor& src,
     IntArrayRef diff_wgh_aten_tz,
@@ -556,262 +520,307 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     IntArrayRef padding_back_bottom_right,
     IntArrayRef stride,
     IntArrayRef dilation,
-    int64_t groups,
-    bool with_bias) {
+    int64_t groups) {
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  auto ndim = diff_dst.ndimension();
-  TORCH_CHECK(
-      3 == ndim || 4 == ndim || 5 == ndim,
-      "convolution bwd wgh only supports 3D, 4D, 5D tensor");
-  bool is_channels_last_suggested = using_channels_last_for_conv(src, diff_dst);
-  auto smf = is_channels_last_suggested ? get_cl_tag_by_ndim(ndim)
-                                        : at::MemoryFormat::Contiguous;
+  auto memory_layout_for_conv = get_memory_layout_for_conv(src, diff_dst);
+  bool is_onednn_layout_suggested =
+      memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked;
 
-  Tensor diff_bia;
-  if (with_bias) {
-    diff_bia = at::empty({diff_dst.size(1)}, diff_dst.options());
+  // create memory desc
+  memory::desc src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md;
+  if (is_onednn_layout_suggested) {
+    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
+        conv_get_blocked_md(src, diff_wgh, diff_dst, groups);
+  } else {
+    bool is_channels_last_suggested =
+        memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
+    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
+        conv_get_plain_md(
+            src, diff_wgh, diff_dst, groups, is_channels_last_suggested);
   }
-
-  auto diff_wgh = at::empty(diff_wgh_aten_tz, diff_dst.options(), smf);
-  if (src.numel() == 0) {
-    return std::tuple<at::Tensor, at::Tensor>{diff_wgh, diff_bia};
-  }
-
-  auto ic = src.size(1);
-  auto oc = diff_dst.size(1);
-
-  memory::data_type diff_dst_dt = get_onednn_dtype_include_double(diff_dst);
-  memory::data_type src_dt = get_onednn_dtype_include_double(src);
-  TORCH_CHECK(
-      diff_dst_dt == src_dt,
-      "convolution bwd_wb need same dtype for src and diff_dst");
-  memory::data_type wgh_dt = src_dt;
-  memory::data_type dst_dt = src_dt;
-  memory::data_type bia_dt = src_dt;
-
-  memory::format_tag any_fmt = memory::format_tag::any;
-  memory::format_tag src_fmt = conv_src_fmt(ndim, is_channels_last_suggested);
-  memory::format_tag wgh_fmt =
-      conv_wgh_fmt(ndim, groups != 1, is_channels_last_suggested);
-  memory::format_tag dst_fmt = src_fmt;
   memory::format_tag bia_fmt = memory::format_tag::x;
+  auto bia_md = diff_bia.defined()
+      ? memory::desc({diff_dst.size(1)}, src_md.data_type(), bia_fmt)
+      : memory::desc({}, memory::data_type::undef, bia_fmt);
 
-  memory::dims src_tz = src.sizes().vec();
-  memory::dims wgh_tz =
-      compatible_wgh_dims(ndim, groups, oc, ic, diff_wgh.sizes());
-  memory::dims bia_tz = {oc};
-  memory::dims dst_tz = diff_dst.sizes().vec();
-  dst_tz[0] = src.size(0); // set n
-
+  // create fwd primitive hint
   memory::dims _stride = stride.vec();
   memory::dims _padding_front_top_left = padding_front_top_left.vec();
   memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
   memory::dims _dilation = compatible_dilation(dilation);
-
-  auto src_md = memory::desc(src_tz, src_dt, src_fmt);
-  auto wgh_md = is_channels_last_suggested
-      ? memory::desc(wgh_tz, wgh_dt, any_fmt)
-      : memory::desc(wgh_tz, wgh_dt, wgh_fmt);
-  auto dst_md = memory::desc(dst_tz, dst_dt, dst_fmt);
-  auto bia_md =
-      with_bias ? memory::desc(bia_tz, bia_dt, bia_fmt) : memory::desc();
-
-  auto conv_fwd_desc = with_bias ? convolution_forward::desc(
-                                       prop_kind::forward,
-                                       algorithm::convolution_direct,
-                                       src_md,
-                                       wgh_md,
-                                       bia_md,
-                                       dst_md,
-                                       _stride,
-                                       _dilation,
-                                       _padding_front_top_left,
-                                       _padding_back_bottom_right)
-                                 : convolution_forward::desc(
-                                       prop_kind::forward,
-                                       algorithm::convolution_direct,
-                                       src_md,
-                                       wgh_md,
-                                       dst_md,
-                                       _stride,
-                                       _dilation,
-                                       _padding_front_top_left,
-                                       _padding_back_bottom_right);
-
+  auto conv_fwd_desc = convolution_forward::desc(
+      prop_kind::forward,
+      algorithm::convolution_direct,
+      src_md,
+      wgh_md,
+      bia_md,
+      dst_md,
+      _stride,
+      _dilation,
+      _padding_front_top_left,
+      _padding_back_bottom_right);
   primitive_attr pattr;
-  if (src_dt == memory::data_type::f32) {
+  if (src_usr_md.data_type() == memory::data_type::f32) {
     pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
   }
-
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
-
   auto conv_fwd_pd =
       convolution_forward::primitive_desc(conv_fwd_desc, pattr, engine);
 
-  if (Settings::I().is_onednn_layout_enabled()) {
-    src_md = memory::desc(src_tz, src_dt, any_fmt);
-    wgh_md = memory::desc(wgh_tz, wgh_dt, any_fmt);
-    dst_md = memory::desc(dst_tz, dst_dt, any_fmt);
-    bia_md = with_bias ? memory::desc(bia_tz, bia_dt, bia_fmt) : memory::desc();
-  }
-
-  auto conv_bwd_w_desc = with_bias ? convolution_backward_weights::desc(
-                                         algorithm::convolution_direct,
-                                         src_md,
-                                         wgh_md,
-                                         bia_md,
-                                         dst_md,
-                                         _stride,
-                                         _dilation,
-                                         _padding_front_top_left,
-                                         _padding_back_bottom_right)
-                                   : convolution_backward_weights::desc(
-                                         algorithm::convolution_direct,
-                                         src_md,
-                                         wgh_md,
-                                         dst_md,
-                                         _stride,
-                                         _dilation,
-                                         _padding_front_top_left,
-                                         _padding_back_bottom_right);
-
+  // create bwd weight primitive
+  auto conv_bwd_w_desc = convolution_backward_weights::desc(
+      algorithm::convolution_direct,
+      src_md,
+      wgh_md,
+      bia_md,
+      dst_md,
+      _stride,
+      _dilation,
+      _padding_front_top_left,
+      _padding_back_bottom_right);
   auto conv_bwd_w_pd = convolution_backward_weights::primitive_desc(
       conv_bwd_w_desc, pattr, engine, conv_fwd_pd);
 
-  memory src_usr_m, diff_dst_usr_m, diff_wgh_usr_m;
-  if (!Settings::I().is_onednn_layout_enabled()) {
-    src_usr_m =
-        dpcpp_onednn_memory({src_tz, src_dt, src_fmt}, engine, src.data_ptr());
+  // create bwd memory
+  Tensor expected_src, expected_diff_dst, expected_diff_wgh;
+  memory src_m, diff_dst_m, diff_wgh_m;
+  if (is_onednn_layout_suggested) {
+    auto expected_src_md = conv_bwd_w_pd.src_desc();
+    auto expected_dst_md = conv_bwd_w_pd.diff_dst_desc();
+    auto expected_wgh_md = conv_bwd_w_pd.diff_weights_desc();
+    src_m = conv_get_expected_src_memory(
+        src, expected_src, src_usr_md, expected_src_md, engine);
+    diff_wgh_m = conv_get_expected_wgh_memory(
+        diff_wgh,
+        expected_diff_wgh,
+        wgh_usr_md,
+        expected_wgh_md,
+        engine,
+        false, // weight_cache
+        false); // need_reorder
+    diff_dst_m = conv_get_expected_dst_memory(
+        diff_dst, expected_diff_dst, dst_usr_md, expected_dst_md, engine);
 
-    diff_dst_usr_m = dpcpp_onednn_memory(
-        {dst_tz, diff_dst_dt, dst_fmt}, engine, diff_dst.data_ptr());
-
-    diff_wgh_usr_m = dpcpp_onednn_memory(
-        {wgh_tz, wgh_dt, wgh_fmt}, engine, diff_wgh.data_ptr());
   } else {
-    auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
-    src_usr_m = src_ctx.is_plain()
-        ? dpcpp_onednn_memory({src_tz, src_dt, src_fmt}, engine, src.data_ptr())
-        : dpcpp_onednn_memory({src_ctx.meta()}, engine, src.data_ptr());
+    src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
+    diff_dst_m = dpcpp_onednn_memory(dst_usr_md, engine, diff_dst.data_ptr());
+    diff_wgh_m = dpcpp_onednn_memory(wgh_usr_md, engine, diff_wgh.data_ptr());
 
-    auto diff_dst_ctx =
-        at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(diff_dst);
-    diff_dst_usr_m = diff_dst_ctx.is_plain()
-        ? dpcpp_onednn_memory(
-              {dst_tz, diff_dst_dt, dst_fmt}, engine, diff_dst.data_ptr())
-        : dpcpp_onednn_memory(
-              {diff_dst_ctx.meta()}, engine, diff_dst.data_ptr());
-
-    auto diff_wgh_ctx =
-        at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(diff_wgh);
-    diff_wgh_usr_m = diff_wgh_ctx.is_plain()
-        ? dpcpp_onednn_memory(
-              {wgh_tz, wgh_dt, wgh_fmt}, engine, diff_wgh.data_ptr())
-        : dpcpp_onednn_memory(
-              {diff_wgh_ctx.meta()}, engine, diff_wgh.data_ptr());
+    // FIXME:
+    // WA for ChannelsLast with FP32
+    // https://jira.devtools.intel.com/browse/MFDNN-9218
+    auto expected_wgh_md = conv_bwd_w_pd.diff_weights_desc();
+    bool is_channels_last_suggested =
+        memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
+    if (is_channels_last_suggested &&
+        (src_usr_md.data_type() == memory::data_type::f32 ||
+         src_usr_md.data_type() == memory::data_type::f64)) {
+      if (wgh_usr_md != expected_wgh_md) {
+        expected_diff_wgh = empty_opaque_tensor(
+            expected_wgh_md, diff_wgh.options(), c10::nullopt);
+        diff_wgh_m = dpcpp_onednn_memory(
+            expected_wgh_md, engine, expected_diff_wgh.data_ptr());
+      }
+    }
   }
 
-  Tensor src_;
-  auto expected_src_md = conv_bwd_w_pd.src_desc();
-  auto src_m = src_usr_m;
-  if (src_usr_m.get_desc() != expected_src_md) {
-    src_ = empty_opaque_tensor(expected_src_md, src.options(), c10::nullopt);
-    src_m = dpcpp_onednn_memory(expected_src_md, engine, src_.data_ptr());
-    xpu::oneDNN::reorder(src, src_);
+  // insert args
+  std::unordered_map<int, memory> args;
+  args.insert({DNNL_ARG_DIFF_DST, diff_dst_m});
+  args.insert({DNNL_ARG_SRC, src_m});
+  args.insert({DNNL_ARG_DIFF_WEIGHTS, diff_wgh_m});
+  if (diff_bia.defined()) {
+    memory diff_bia_m =
+        dpcpp_onednn_memory(bia_md, engine, diff_bia.data_ptr());
+    args.insert({DNNL_ARG_DIFF_BIAS, diff_bia_m});
   }
-
-  Tensor diff_dst_;
-  auto expected_diff_dst_md = conv_bwd_w_pd.diff_dst_desc();
-  auto diff_dst_m = diff_dst_usr_m;
-  if (diff_dst_usr_m.get_desc() != expected_diff_dst_md) {
-    diff_dst_ = empty_opaque_tensor(
-        expected_diff_dst_md, diff_dst.options(), c10::nullopt);
-    diff_dst_m =
-        dpcpp_onednn_memory(expected_diff_dst_md, engine, diff_dst_.data_ptr());
-    xpu::oneDNN::reorder(diff_dst, diff_dst_);
-  }
-
-  Tensor diff_wgh_;
-  auto expected_diff_wgh_md = conv_bwd_w_pd.diff_weights_desc();
-  auto diff_wgh_m = diff_wgh_usr_m;
-  if (diff_wgh_usr_m.get_desc() != expected_diff_wgh_md) {
-    diff_wgh_ = empty_opaque_tensor(
-        expected_diff_wgh_md, diff_wgh.options(), c10::nullopt);
-    diff_wgh_m =
-        dpcpp_onednn_memory(expected_diff_wgh_md, engine, diff_wgh_.data_ptr());
-  }
-
 #ifdef USE_SCRATCHPAD_MODE
   int scratchpad_size = conv_bwd_w_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
       {scratchpad_size}, src.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_m = dnnl::memory(
       conv_bwd_w_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_m});
 #endif
 
+  // execute primitive
   auto conv_bwd_w = dnnl::convolution_backward_weights(conv_bwd_w_pd);
-  if (with_bias) {
-    memory diff_bia_m = dpcpp_onednn_memory(
-        {bia_tz, bia_dt, bia_fmt}, engine, diff_bia.data_ptr());
+  DPCPP_ONEDNN_EXEC(conv_bwd_w, strm, args);
 
-    DPCPP_ONEDNN_EXEC(
-        conv_bwd_w,
-        strm,
-        {
-            {DNNL_ARG_DIFF_DST, diff_dst_m},
-            {DNNL_ARG_SRC, src_m},
-            {DNNL_ARG_DIFF_WEIGHTS, diff_wgh_m},
-            {DNNL_ARG_DIFF_BIAS, diff_bia_m},
-#ifdef USE_SCRATCHPAD_MODE
-            {DNNL_ARG_SCRATCHPAD, scratchpad_m},
-#endif
-        });
-  } else {
-    DPCPP_ONEDNN_EXEC(
-        conv_bwd_w,
-        strm,
-        {
-            {DNNL_ARG_DIFF_DST, diff_dst_m},
-            {DNNL_ARG_SRC, src_m},
-            {DNNL_ARG_DIFF_WEIGHTS, diff_wgh_m},
-#ifdef USE_SCRATCHPAD_MODE
-            {DNNL_ARG_SCRATCHPAD, scratchpad_m},
-#endif
-        });
-  }
-
-  if (diff_wgh_m.get_desc() != diff_wgh_usr_m.get_desc()) {
-    // diff_wgh_ contains the result of gw
-    // backward, while it is blk format. In
-    // training mode, plain gw output is
-    // expected for sgd update regardless of
-    // onednn_layout_enabled or not. Thus, we
-    // need one additional reorder here to make
-    // diff_wgh plain.
+  // FIXME:
+  // This should only need is_onednn_layout_suggested
+  // after oneDNN fix the issue
+  if (diff_wgh_m.get_desc() != wgh_usr_md) {
+    // expected_diff_wgh contains the result of gw backward in blk format.
+    // In training mode, plain gw output is expected for sgd update
+    // Thus, we need one additional reorder here to make diff_wgh plain.
     auto reshaped_diff_wgh = diff_wgh;
-    if (diff_wgh_.ndimension() == 5 && diff_wgh.ndimension() == 4) {
+    if (expected_diff_wgh.ndimension() > diff_wgh.ndimension()) {
       // for groups conv case:
-      // diff_wgh_ will be 5-D Tensor based on expected_diff_wgh_md:
+      // expected_diff_wgh will be 5-D Tensor based on expected_diff_wgh_md:
       // g/o/i/h/w or g/o/h/w/i
       // diff_wgh will be 4-D Tensor based on PyTorch
       // (g)o/i/h/w or (g)o/h/w/i
-      // we need to manually reshape 4-D wgh to 5-D,
-      // consistent with expected_diff_wgh
+      // we need to manually reshape 5-D expected_diff_wgh to 4-D,
+      // consistent with PyTorch diff_wgh
       reshaped_diff_wgh = share_storage_and_set_strided_as(
           diff_wgh,
-          diff_wgh_.sizes(),
-          compatible_groups_conv_strides(diff_wgh, diff_wgh_),
+          expected_diff_wgh.sizes(),
+          compatible_groups_conv_strides(
+              diff_wgh, expected_diff_wgh.sizes().vec()),
           c10::nullopt);
     }
-    xpu::oneDNN::reorder(diff_wgh_, reshaped_diff_wgh);
+    xpu::oneDNN::reorder(expected_diff_wgh, reshaped_diff_wgh);
+  }
+}
+
+static void convolution_backward_data(
+    at::Tensor& diff_src,
+    const at::Tensor& diff_dst,
+    const at::Tensor& weight,
+    IntArrayRef padding_front_top_left,
+    IntArrayRef padding_back_bottom_right,
+    IntArrayRef stride,
+    IntArrayRef dilation,
+    int64_t groups,
+    bool bias_defined) {
+  auto engine =
+      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
+  auto strm = GpuStreamManager::Instance().get_stream();
+
+  auto memory_layout_for_conv = get_memory_layout_for_conv(diff_dst, weight);
+  bool is_onednn_layout_suggested =
+      memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked;
+
+  // create memory desc
+  memory::desc src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md;
+  if (is_onednn_layout_suggested) {
+    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
+        conv_get_blocked_md(diff_src, weight, diff_dst, groups);
+  } else {
+    bool is_channels_last_suggested =
+        memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
+    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
+        conv_get_plain_md(
+            diff_src, weight, diff_dst, groups, is_channels_last_suggested);
+  }
+  memory::format_tag bia_fmt = memory::format_tag::x;
+  auto bia_md = bias_defined
+      ? memory::desc({diff_dst.size(1)}, wgh_md.data_type(), bia_fmt)
+      : memory::desc({}, memory::data_type::undef, bia_fmt);
+
+  // create fwd primitive desc hint
+  primitive_attr pattr;
+  if (dst_usr_md.data_type() == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+  memory::dims _stride = stride.vec();
+  memory::dims _padding_front_top_left = padding_front_top_left.vec();
+  memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
+  memory::dims _dilation = compatible_dilation(dilation);
+  auto conv_forward_desc = convolution_forward::desc(
+      prop_kind::forward,
+      algorithm::convolution_direct,
+      src_md,
+      wgh_md,
+      bia_md,
+      dst_md,
+      _stride,
+      _dilation,
+      _padding_front_top_left,
+      _padding_back_bottom_right);
+  auto conv_forward_pd =
+      convolution_forward::primitive_desc(conv_forward_desc, pattr, engine);
+
+  // create bwd primitive desc
+  auto conv_backward_data_desc = convolution_backward_data::desc(
+      algorithm::convolution_direct,
+      src_md,
+      wgh_md,
+      dst_md,
+      _stride,
+      _dilation,
+      _padding_front_top_left,
+      _padding_back_bottom_right);
+  auto conv_backward_data_pd = convolution_backward_data::primitive_desc(
+      conv_backward_data_desc, pattr, engine, conv_forward_pd);
+
+  // create memory
+  Tensor expected_src, expected_wei, expected_dst;
+  memory diff_dst_m, wei_m, diff_src_m;
+  if (is_onednn_layout_suggested) {
+    auto expected_src_md = conv_backward_data_pd.diff_src_desc();
+    auto expected_wgh_md = conv_backward_data_pd.weights_desc();
+    auto expected_dst_md = conv_backward_data_pd.diff_dst_desc();
+    diff_src_m = conv_get_expected_src_memory(
+        diff_src, expected_src, src_usr_md, expected_src_md, engine, false);
+    wei_m = conv_get_expected_wgh_memory(
+        weight,
+        expected_wei,
+        wgh_usr_md,
+        expected_wgh_md,
+        engine,
+        false); // weight_cache
+    diff_dst_m = conv_get_expected_dst_memory(
+        diff_dst, expected_dst, dst_usr_md, expected_dst_md, engine);
+  } else {
+    diff_src_m = dpcpp_onednn_memory(src_usr_md, engine, diff_src.data_ptr());
+    wei_m = dpcpp_onednn_memory(wgh_usr_md, engine, weight.data_ptr());
+    diff_dst_m = dpcpp_onednn_memory(dst_usr_md, engine, diff_dst.data_ptr());
+    // FIXME:
+    // WA for ChannelsLast with FP32
+    // https://jira.devtools.intel.com/browse/MFDNN-9218
+    auto expected_wgh_md = conv_backward_data_pd.weights_desc();
+    bool is_channels_last_suggested =
+        memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
+    if (is_channels_last_suggested &&
+        (src_usr_md.data_type() == memory::data_type::f32 ||
+         src_usr_md.data_type() == memory::data_type::f64)) {
+      if (wgh_usr_md != expected_wgh_md) {
+        expected_wei = empty_opaque_tensor(
+            expected_wgh_md, weight.options(), c10::nullopt);
+        wei_m = dpcpp_onednn_memory(
+            expected_wgh_md, engine, expected_wei.data_ptr());
+        xpu::oneDNN::reorder(weight, expected_wei);
+      }
+    }
   }
 
-  return std::tuple<at::Tensor, at::Tensor>{diff_wgh, diff_bia};
+  // insert args
+  std::unordered_map<int, memory> args;
+#ifdef USE_SCRATCHPAD_MODE
+  int scratchpad_size = conv_backward_data_pd.scratchpad_desc().get_size();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
+      {scratchpad_size}, diff_dst.options().dtype(at::kByte), c10::nullopt);
+  auto scratchpad_memory = dpcpp_onednn_memory(
+      conv_backward_data_pd.scratchpad_desc(),
+      engine,
+      scratchpad_tensor.data_ptr());
+  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_memory});
+#endif
+  args.insert({DNNL_ARG_DIFF_DST, diff_dst_m});
+  args.insert({DNNL_ARG_WEIGHTS, wei_m});
+  args.insert({DNNL_ARG_DIFF_SRC, diff_src_m});
+
+  // execute primitive
+  auto conv_backward_data =
+      dnnl::convolution_backward_data(conv_backward_data_pd);
+  DPCPP_ONEDNN_EXEC(conv_backward_data, strm, args);
+
+  // propagate blk format
+  if (is_onednn_layout_suggested &&
+      diff_src.data_ptr() != expected_src.data_ptr()) {
+    auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(expected_src);
+    DPCPPTensorContext::set_tensor_ctx(diff_src, std::move(blk_ctx));
+  }
 }
 
 } // namespace oneDNN

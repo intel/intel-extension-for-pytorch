@@ -669,7 +669,7 @@ c10::optional<at::Tensor> sgd_fused_step(
       momentum_buffer = at::empty_like(fp32_weight);
       momentum_buf_initialized = false;
     } else {
-      momentum_buffer = momentum_buffer_.value().contiguous();
+      momentum_buffer = momentum_buffer_.value();
       momentum_buf_initialized = true;
     }
   }

@@ -267,13 +267,9 @@ static inline bool is_onednn_matmul_strides(
 
 static inline std::vector<int64_t> compatible_groups_conv_strides(
     const at::Tensor& wgh,
-    const at::Tensor& wgh_) {
-  std::vector<int64_t> strides(wgh_.sizes().size());
-  strides[4] = wgh.strides()[3];
-  strides[3] = wgh.strides()[2];
-  strides[2] = wgh.strides()[1];
-  strides[1] = wgh.strides()[0];
-  strides[0] = wgh_.sizes()[1] * wgh.strides()[0];
+    memory::dims group_size) {
+  std::vector<int64_t> strides = wgh.strides().vec();
+  strides.insert(strides.begin(), group_size[1] * wgh.stride(0));
   return strides;
 }
 
@@ -466,73 +462,6 @@ static inline bool cat_valid(const TensorList& tensors) {
   return true;
 }
 
-// judge to use block or plain for Conv
-static inline bool using_onednn_layout_for_conv(
-    const at::Tensor& src,
-    const at::Tensor& weight) {
-  if (!src.defined() || src.is_sparse()) {
-    // suggest plain
-    return false;
-  }
-
-  if (Settings::I().is_onednn_layout_enabled()) {
-    // suggest block
-    return true;
-  }
-
-  // inference workloads on ATSM platform, the conv will use blocked format
-  // used double support to distinguish is atsm or not
-  auto is_auto_transpose = !dpcppSupportFP64();
-  auto suggest_weight_block = is_auto_transpose &&
-      (c10::InferenceMode::is_enabled() || !at::GradMode::is_enabled()) &&
-      !is_smf_channels_last(src) && !is_smf_channels_last(weight);
-  if (suggest_weight_block) {
-    // suggest block
-    return true;
-  }
-
-  // suggest plain
-  return false;
-}
-
-// judge to use block or plain for Matmul
-static inline bool using_onednn_layout_for_matmul(const at::Tensor& src) {
-  if (!src.defined() || src.is_sparse()) {
-    // suggest plain
-    return false;
-  }
-
-  if (Settings::I().is_onednn_layout_enabled()) {
-    // suggest block
-    return true;
-  }
-
-  auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
-  if (!src_ctx.is_plain()) {
-    // suggest block
-    return true;
-  }
-
-  // suggest plain
-  return false;
-}
-
-static inline bool using_channels_last_for_conv(
-    const at::Tensor& src,
-    const at::Tensor& weight) {
-  if (using_onednn_layout_for_conv(src, weight)) {
-    // suggest block
-    return false;
-  }
-
-  // Convolution modules, unlike binary p-wise operator, have
-  // channels last as the dominating memory format. If both
-  // src and weight are in contiguous memory format, the
-  // operator produces output in contiguous memory format.
-  // Otherwise, output will be in channels last memory format.
-  return (is_smf_channels_last(src) || is_smf_channels_last(weight));
-}
-
 enum MEMORY_LAYOUT_FOR_CONV {
   ChannelsFirst = 0, // using channels_first for conv computation.
   ChannelsLast = 1, /// using channels_last for conv computation.
@@ -586,6 +515,28 @@ static inline at::MemoryFormat get_tensor_format_for_conv(
   return mfmt;
 }
 
+// judge to use block or plain for Matmul
+static inline bool using_onednn_layout_for_matmul(const at::Tensor& src) {
+  if (!src.defined() || src.is_sparse()) {
+    // suggest plain
+    return false;
+  }
+
+  if (Settings::I().is_onednn_layout_enabled()) {
+    // suggest block
+    return true;
+  }
+
+  auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
+  if (!src_ctx.is_plain()) {
+    // suggest block
+    return true;
+  }
+
+  // suggest plain
+  return false;
+}
+
 static inline bool using_channels_last_for_onednn_op(const at::Tensor& input) {
   const auto ndim = input.ndimension();
   if (ndim == 2) {
@@ -603,62 +554,13 @@ static inline bool using_channels_last_for_onednn_op(const at::Tensor& input) {
   return is_smf_channels_last(input);
 }
 
-static inline std::vector<int64_t> gen_dummy_input_size_for(
-    const at::IntArrayRef weight_sizes,
-    const int64_t groups) {
-  // weights_dims is 3 for conv1d, 4 for (de)conv2d and 5 for (de)conv3d
-  auto input_dim = weight_sizes.size();
-
-  std::vector<int64_t> kernel_size;
-  if (5 == input_dim) {
-    kernel_size.push_back(weight_sizes[input_dim - 3]);
-    kernel_size.push_back(weight_sizes[input_dim - 2]);
-  }
-  if (4 == input_dim) {
-    kernel_size.push_back(weight_sizes[input_dim - 2]);
-  }
-  kernel_size.push_back(weight_sizes[input_dim - 1]);
-
-  std::vector<int64_t> input_sizes;
-  auto ic = weight_sizes[1];
-
-  // batch size is 32
-  input_sizes.push_back(32);
-  // input channel
-  input_sizes.push_back(ic);
-  // [important] the factor is 14
-  input_sizes.push_back(14 * kernel_size[0]);
-
-  if (4 == input_dim) {
-    input_sizes.push_back(14 * kernel_size[1]);
-  } else if (5 == input_dim) {
-    input_sizes.push_back(14 * kernel_size[1]);
-    input_sizes.push_back(14 * kernel_size[2]);
-  }
-
-  return input_sizes;
+static inline Tensor contiguous_if_needed(
+    const Tensor& t,
+    at::MemoryFormat mfmt) {
+  auto ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(t);
+  Tensor t_ = ctx.is_plain() ? t.contiguous(mfmt) : t;
+  return t_;
 }
-
-void convert_conv_weight_layout(
-    const at::Tensor& weight,
-    const IntArrayRef padding,
-    const IntArrayRef stride,
-    IntArrayRef dilation,
-    const int64_t groups,
-    const IntArrayRef input_size);
-
-void convert_convtranspose_weight_layout(
-    const at::Tensor& weight,
-    const IntArrayRef padding,
-    const IntArrayRef stride,
-    IntArrayRef dilation,
-    const IntArrayRef dst_padding,
-    const int64_t groups,
-    const IntArrayRef input_size);
-
-at::Tensor convert_linear_weight_layout(
-    at::Tensor& weight,
-    const IntArrayRef input_size);
 
 static inline bool eltwise_forward_valid(
     const Tensor& out,
