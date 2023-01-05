@@ -515,6 +515,7 @@ class IPEXCPPLibBuild(build_clib, object):
 
         ipex_cppsdk_build_dir = get_ipex_cppsdk_build_dir()
         cpack_out_file = os.path.abspath(os.path.join(build_type_dir, 'IPEXCPackConfig.cmake'))
+        self_extract_script = "gen_self_extract.sh"
 
         if _get_build_target() == 'cppsdk':
             cmake_prefix_path = torch_install_prefix
@@ -641,7 +642,8 @@ class IPEXCPPLibBuild(build_clib, object):
                 **build_option_common,
                 'BUILD_MODULE_TYPE' : 'CPPSDK',
                 'CPACK_CONFIG_FILE' : cpack_out_file,
-                'CPACK_OUTPUT_DIR'  : build_type_dir
+                'CPACK_OUTPUT_DIR'  : build_type_dir,
+                'LIBIPEX_GEN_SCRIPT': self_extract_script
             }
 
             cmake_args_cppsdk = []
@@ -668,6 +670,10 @@ class IPEXCPPLibBuild(build_clib, object):
             _build_project(build_args, ipex_cppsdk_build_dir, my_env, use_ninja)
             cpack_exec = get_cpack_command()
             check_call([cpack_exec, '--config', cpack_out_file])
+            gen_script_path = os.path.abspath(os.path.join(build_type_dir, self_extract_script))
+            if not os.path.isfile(gen_script_path):
+                raise "Cannot find script to generate self-extract package in {}".format(gen_script_path)
+            check_call(gen_script_path, shell=True)
 
 
 def get_src_py_and_dst():

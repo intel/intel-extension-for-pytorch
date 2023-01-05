@@ -10,6 +10,7 @@ if(BUILD_MODULE_TYPE STREQUAL "CPU")
   print_cpu_config_summary()
 endif()
 
+set(LIBIPEX_COMP_LIST)
 include(CMakePackageConfigHelpers)
 # CMake config file for the external project.
 configure_package_config_file(
@@ -26,31 +27,29 @@ install(FILES
   ${PROJECT_BINARY_DIR}/IPEXConfig.cmake
   ${PROJECT_BINARY_DIR}/IPEXVersionConfig.cmake
   DESTINATION share/cmake/IPEX)
+list(APPEND LIBIPEX_COMP_LIST "share/cmake/IPEX/IPEXConfig.cmake")
+list(APPEND LIBIPEX_COMP_LIST "share/cmake/IPEX/IPEXVersionConfig.cmake")
 
+set(CPACK_RESOURCE_FILE_LICENSE "${IPEX_ROOT_DIR}/LICENSE")
+install(FILES ${CPACK_RESOURCE_FILE_LICENSE} DESTINATION .)
+
+# XXX: All variables with prefix LIBIPEX_ will be used to set in LIBIPEX installation scripts
 if(BUILD_MODULE_TYPE STREQUAL "CPPSDK")
-  install(PROGRAMS "${IPEX_ROOT_DIR}/scripts/cppsdk/install_c++_sdk.sh.in"
-    RENAME "install_c++_sdk.sh"
-    DESTINATION scripts)
+  set(CPU_LIB "${CMAKE_INSTALL_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}intel-ext-pt-cpu${CMAKE_SHARED_LIBRARY_SUFFIX}")
+  install(FILES "${CMAKE_INSTALL_PREFIX}/${CPU_LIB}" DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  list(APPEND LIBIPEX_COMP_LIST "${CPU_LIB}")
 
-  set(RUN_SCRIPT "libintel-ext-pt-${CMAKE_PROJECT_VERSION}.run")
-  if(GLIBCXX_USE_CXX11_ABI)
-    set(RUN_SCRIPT "libintel-ext-pt-cxx11-abi-${CMAKE_PROJECT_VERSION}.run")
-  endif()
-  install(PROGRAMS "${IPEX_ROOT_DIR}/scripts/cppsdk/intel-ext-pt-cpu.run.in"
-    RENAME ${RUN_SCRIPT}
-    DESTINATION scripts)
-
-  set(CPU_LIB "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}intel-ext-pt-cpu${CMAKE_SHARED_LIBRARY_SUFFIX}")
-  install(FILES ${CPU_LIB} DESTINATION ${CMAKE_INSTALL_LIBDIR})
   if(BUILD_WITH_XPU)
-    set(GPU_LIB "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}intel-ext-pt-gpu${CMAKE_SHARED_LIBRARY_SUFFIX}")
-    install(FILES ${GPU_LIB} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    set(GPU_LIB "${CMAKE_INSTALL_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}intel-ext-pt-gpu${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    install(FILES "${CMAKE_INSTALL_PREFIX}/${GPU_LIB}" DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    list(APPEND LIBIPEX_COMP_LIST "${GPU_LIB}")
   endif()
 
   set(CPACK_PACKAGE_NAME "${IPEX_PROJ_NAME}")
   if(GLIBCXX_USE_CXX11_ABI)
     set(CPACK_PACKAGE_NAME "${IPEX_PROJ_NAME}-cxx11-abi")
   endif()
+  set(LIBIPEX_PACK_PREFIX "${CPACK_OUTPUT_DIR}/${CPACK_PACKAGE_NAME}")
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(CPACK_GENERATOR "TXZ")
@@ -60,14 +59,37 @@ if(BUILD_MODULE_TYPE STREQUAL "CPPSDK")
     set(CPACK_SOURCE_GENERATOR "ZIP")
   endif()
 
-  if(CPACK_CONFIG_FILE)
-    set(CPACK_OUTPUT_CONFIG_FILE "${CPACK_CONFIG_FILE}")
+  if(NOT CPACK_CONFIG_FILE)
+    message(FATAL_ERROR "Please set correct CPACK_CONFIG_FILE!")
   endif()
-  set(CPACK_RESOURCE_FILE_LICENSE "${IPEX_ROOT_DIR}/LICENSE")
+  set(CPACK_OUTPUT_CONFIG_FILE "${CPACK_CONFIG_FILE}")
 
-  if(CPACK_OUTPUT_DIR)
-    set(CPACK_PACKAGE_DIRECTORY "${CPACK_OUTPUT_DIR}")
+  if(NOT CPACK_OUTPUT_DIR)
+    message(FATAL_ERROR "Please set correct CPACK_OUTPUT_DIR!")
   endif()
+  set(CPACK_PACKAGE_DIRECTORY "${CPACK_OUTPUT_DIR}")
 
   include(CPack)
+
+  set(INSTALL_SCRIPT "libintel-ext-pt-${CMAKE_PROJECT_VERSION}.installer.sh")
+  if(GLIBCXX_USE_CXX11_ABI)
+    set(INSTALL_SCRIPT "libintel-ext-pt-cxx11-abi-${CMAKE_PROJECT_VERSION}.installer.sh")
+  endif()
+  configure_package_config_file(
+    ${IPEX_ROOT_DIR}/cmake/cppsdk/libintel-ext-pt.installer.sh.in
+    ${PROJECT_BINARY_DIR}/${INSTALL_SCRIPT}
+    INSTALL_DESTINATION ${CPACK_OUTPUT_DIR})
+  install(PROGRAMS ${PROJECT_BINARY_DIR}/${INSTALL_SCRIPT}
+    DESTINATION ${CPACK_OUTPUT_DIR})
+  set(LIBIPEX_INSTALL_SCRIPT "${CPACK_OUTPUT_DIR}/${INSTALL_SCRIPT}")
+
+  if(NOT LIBIPEX_GEN_SCRIPT)
+    message(FATAL_ERROR "Please set script name for LIBIPEX_GEN_SCRIPT!")
+  endif()
+  configure_package_config_file(
+    ${IPEX_ROOT_DIR}/cmake/cppsdk/gen_self_extract.sh.in
+    ${PROJECT_BINARY_DIR}/${LIBIPEX_GEN_SCRIPT}
+    INSTALL_DESTINATION ${CPACK_OUTPUT_DIR})
+  install(PROGRAMS ${PROJECT_BINARY_DIR}/${LIBIPEX_GEN_SCRIPT}
+    DESTINATION ${CPACK_OUTPUT_DIR})
 endif()
