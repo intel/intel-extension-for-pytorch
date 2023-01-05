@@ -7,14 +7,17 @@ Ahead of Time (AOT) Compilation
 
 ## Use case
 
-Intel® Extension for PyTorch\* provides build option `USE_AOT_DEVLIST` for users who install Intel® Extension for PyTorch\* via source compilation to configure device list for AOT compilation. The target device in device list is specified by DEVICE type of the target. Multi-target AOT compilation is supported by using a comma (,) as a delimiter in device list. See below table for the AOT setting targeting [Intel® Data Center GPU Flex Series](https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html) & Intel® Arc™ series GPUs.
+Intel® Extension for PyTorch\* provides build option `USE_AOT_DEVLIST` for users who install Intel® Extension for PyTorch\* via source compilation to configure device list for AOT compilation. The target device in device list is specified by DEVICE type of the target. Multi-target AOT compilation is supported by using a comma (,) as a delimiter in device list. See below table for the AOT setting targeting [Intel® Data Center GPU Flex Series](https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html) & Intel® Arc™ A-Series GPUs.
 
 | Supported HW | AOT Setting |
-| ------------ |---------------------|
-| Intel® Data Center GPU Flex Series 170 and <BR> Intel® Data Center GPU Max Series | USE_AOT_DEVLIST='ats-m150,pvc' |
-| Intel® Arc™ Series | USE_AOT_DEVLIST='dg2-g10'.<br />Depending on the driver-version, the AOT devlist string might even be `dg2-g10-c0` or `dg2`.<br />Please try `dg2-g10` first. If you would encounter a build error corresponding to AOT, please try one of the other two strings |
+| ------------ | ----------- |
+| Intel® Data Center GPU Flex Series 170 | USE_AOT_DEVLIST='ats-m150' |
+| Intel® Data Center GPU Max Series | USE_AOT_DEVLIST='pvc' |
+| Intel® Arc™ A-Series | USE_AOT_DEVLIST='ats-m150' |
 
-Intel® Extension for PyTorch\* enables AOT compilation for Intel GPU target devices in prebuilt wheel files. Intel® Data Center GPU Flex Series 170 and Intel® Data Center GPU Max Series are the enabled target devices in current release, with Intel® Arc™ series GPUs having experimental support. If Intel® Extension for PyTorch\* is executed on a device which is not pre-configured in `USE_AOT_DEVLIST`, this application can still run because JIT compilation will be triggered automatically to allow execution on the current device. It causes additional compilation time during execution.
+**Note:** Multiple AOT settings can be used together by seperating setting texts with a comma (,) to make the compiled wheel file have multiple AOT supports. E.g. a wheel file built with `USE_AOT_DEVLIST='ats-m150,pvc'` has both `ats-m150` and `pvc` AOT enabled.
+
+Intel® Extension for PyTorch\* enables AOT compilation for Intel GPU target devices in prebuilt wheel files. Intel® Data Center GPU Flex Series 170 and Intel® Data Center GPU Max Series are the enabled target devices in current release, with Intel® Arc™ A-Series GPUs having experimental support. If Intel® Extension for PyTorch\* is executed on a device which is not pre-configured in `USE_AOT_DEVLIST`, this application can still run because JIT compilation will be triggered automatically to allow execution on the current device. It causes additional compilation time during execution.
 
 For more GPU platforms, please refer to [Use AOT for Integrated Graphics (Intel GPU)](https://www.intel.com/content/www/us/en/develop/documentation/oneapi-dpcpp-cpp-compiler-dev-guide-and-reference/top/compilation/ahead-of-time-compilation.html).
 

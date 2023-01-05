@@ -1,6 +1,33 @@
 Releases
 =============
 
+## 1.13.10+xpu
+
+Intel® Extension for PyTorch\* v1.13.10+xpu extends PyTorch\* 1.13 with up-to-date features and optimizations on `xpu` for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel Xe Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch* `xpu` device, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs with PyTorch*.
+
+### Highlights
+
+This release introduces specific XPU solution optimizations on Intel discrete GPUs which include Intel® Data Center GPU Flex Series 170 and Intel® Data Center GPU Max Series. Optimized operators and kernels are implemented and registered through PyTorch\* dispatching mechanism for the `xpu` device. These operators and kernels are accelerated on Intel GPU hardware from the corresponding native vectorization and matrix calculation features. In graph mode, additional operator fusions are supported to reduce operator/kernel invocation overheads, and thus increase performance.
+
+This release provides the following features:
+- Usability and Performance Features listed in [Intel® Extension for PyTorch\* v1.13.0+cpu release](https://intel.github.io/intel-extension-for-pytorch/cpu/1.13.0+cpu/tutorials/releases.html#id1)
+- Distributed Training
+  - support of distributed training with DistributedDataParallel (DDP) on Intel GPU hardware
+  - support of distributed training with Horovod (experimental) on Intel GPU hardware
+- DLPack Solution
+  - mechanism to share tensor data without copy when interoparate with other libraries on Intel GPU hardware
+- Legacy Profiler Tool
+  - an extension of PyTorch* legacy profiler for profiling operators' overhead on Intel GPU hardware
+- Simple Trace Tool
+  - built-in debugging tool to print out the call stack for a piece of code
+
+This release adds the following fusion patterns in PyTorch\* JIT mode for Intel GPU:
+- `Conv2D` + UnaryOp(`abs`, `sqrt`, `square`, `exp`, `log`, `round`, `GeLU`, `Log_Sigmoid`, `Hardswish`, `Mish`, `HardSigmoid`, `Tanh`, `Pow`, `ELU`, `hardtanh`)
+- `Linear` + UnaryOp(`abs`, `sqrt`, `square`, `exp`, `log`, `round`, `Log_Sigmoid`, `Hardswish`, `HardSigmoid`, `Pow`, `ELU`, `SiLU`, `hardtanh`, `Leaky_relu`)
+### Known Issues
+
+Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
+
 ## 1.10.200+gpu
 
 Intel® Extension for PyTorch\* v1.10.200+gpu extends PyTorch\* 1.10 with up-to-date features and optimizations on XPU for an extra performance boost on Intel Graphics cards. XPU is a user visible device that is a counterpart of the well-known CPU and CUDA in the PyTorch\* community. XPU represents an Intel-specific kernel and graph optimizations for various “concrete” devices. The XPU runtime will choose the actual device when executing AI workloads on the XPU device. The default selected device is Intel GPU. XPU kernels from Intel® Extension for PyTorch\* are written in [DPC++](https://github.com/intel/llvm#oneapi-dpc-compiler) that supports [SYCL language](https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html) and also a number of [DPC++ extensions](https://github.com/intel/llvm/tree/sycl/sycl/doc/extensions).

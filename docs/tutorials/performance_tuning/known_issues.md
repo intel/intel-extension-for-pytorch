@@ -1,6 +1,90 @@
 Known Issues
 ============
 
+## Known Issues in GPU-Specific
+
+- [CRITICAL ERROR] Kernel 'XXX' removed due to usage of FP64 instructions unsupported by the targeted hardware
+
+    FP64 is not natively supported by the [Intel® Data Center GPU Flex Series](https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html) platform. If you run any AI workload on that platform and receive this error message, it means a kernel requiring FP64 instructions is removed and not executed, hence the accuracy of the whole workload is wrong.
+
+- symbol undefined caused by `_GLIBCXX_USE_CXX11_ABI`
+
+    ```bash
+    ImportError: undefined symbol: _ZNK5torch8autograd4Node4nameB5cxx11Ev
+    ```
+    
+    DPC++ does not support `_GLIBCXX_USE_CXX11_ABI=0`, Intel® Extension for PyTorch\* is always compiled with `_GLIBCXX_USE_CXX11_ABI=1`. This symbol undefined issue appears when PyTorch\* is compiled with `_GLIBCXX_USE_CXX11_ABI=0`. Update PyTorch\* CMAKE file to set `_GLIBCXX_USE_CXX11_ABI=1` and compile PyTorch\* with particular compiler which supports `_GLIBCXX_USE_CXX11_ABI=1`. We recommend using prebuilt wheels in [download server](https://developer.intel.com/ipex-whl-stable-xpu) to avoid this issue.
+
+- Can't find oneMKL library when build Intel® Extension for PyTorch\* without oneMKL
+
+    ```bash
+    /usr/bin/ld: cannot find -lmkl_sycl
+    /usr/bin/ld: cannot find -lmkl_intel_ilp64
+    /usr/bin/ld: cannot find -lmkl_core
+    /usr/bin/ld: cannot find -lmkl_tbb_thread
+    dpcpp: error: linker command failed with exit code 1 (use -v to see invocation)
+    ```
+    
+    When PyTorch\* is built with oneMKL library and Intel® Extension for PyTorch\* is built without oneMKL library, this linker issue may occur. Resolve it by setting:
+    
+    ```bash
+    export USE_ONEMKL=OFF
+    export MKL_DPCPP_ROOT=${PATH_To_Your_oneMKL}/__release_lnx/mkl
+    ```
+    
+    Then clean build Intel® Extension for PyTorch\*.
+
+- undefined symbol: `mkl_lapack_dspevd`. Intel MKL FATAL ERROR: cannot load `libmkl_vml_avx512.so.2` or `libmkl_vml_def.so.2`
+
+    This issue may occur when Intel® Extension for PyTorch\* is built with oneMKL library and PyTorch\* is not build with any MKL library. The oneMKL kernel may run into CPU backend incorrectly and trigger this issue. Resolve it by installing MKL library from conda:
+    
+    ```bash
+    conda install mkl
+    conda install mkl-include
+    ```
+    
+    then clean build PyTorch\*.
+
+- OSError: `libmkl_intel_lp64.so.1`: cannot open shared object file: No such file or directory
+
+    Wrong MKL library is used when multiple MKL libraries exist in system. Preload oneMKL by:
+    
+    ```bash
+    export LD_PRELOAD=${MKL_DPCPP_ROOT}/lib/intel64/libmkl_intel_lp64.so.2:${MKL_DPCPP_ROOT}/lib/intel64/libmkl_intel_ilp64.so.2:${MKL_DPCPP_ROOT}/lib/intel64/libmkl_gnu_thread.so.2:${MKL_DPCPP_ROOT}/lib/intel64/libmkl_core.so.2:${MKL_DPCPP_ROOT}/lib/intel64/libmkl_sycl.so.2
+    ```
+    
+    If you continue seeing similar issues for other shared object files, add the corresponding files under `${MKL_DPCPP_ROOT}/lib/intel64/` by `LD_PRELOAD`. Note that the suffix of the libraries may change (e.g. from .1 to .2), if more than one oneMKL library is installed on the system.
+
+- RuntimeError: Number of dpcpp devices should be greater than zero! 
+
+    Running some AI models (e.g. 3D-Unet inference) on Ubuntu22.04 may trigger this runtime error, as oneAPI Base Toolkit 2023.0 fails to return available GPU device on ubuntu22.04 in such scenario. The workaround solution is to update the model script to make sure `import torch` and `import intel_extension_for_pytorch` happen before importing other libraries.
+    
+- OpenMP library could not be found
+
+    Build Intel® Extension for PyTorch\* on SLES15 SP3 using default GCC 7.5 and CentOS8 using default GCC 8.5 may trigger this build error.
+    
+    ```bash
+    Make Error at third_party/ideep/mkl-dnn/third_party/oneDNN/cmake/OpenMP.cmake:118 (message):
+      OpenMP library could not be found.  Proceeding might lead to highly
+      sub-optimal performance.
+    Call Stack (most recent call first):
+      third_party/ideep/mkl-dnn/third_party/oneDNN/CMakeLists.txt:117 (include)
+    ```
+    
+    The root cause is GCC 7.5 or 8.5 does not support `-Wno-error=redundant-move` option. Uplift to GCC version >=9 can solve this issue.
+
+- Unit test failures on Intel® Data Center GPU Flex Series 170
+        
+    The following unit tests fail on Intel® Data Center GPU Flex Series 170.
+
+      test_groupnorm.py::TestTorchMethod::test_group_norm_backward 
+      test_groupnorm_channels_last.py::TestTorchMethod::test_group_norm_backward
+      test_fusion.py::TestNNMethod::test_conv_binary_mul
+
+    The same test cases pass on Intel® Data Center GPU Max Series. The root cause of the failures is under investigation.
+
+## Known Issues in CPU-Specific
+
 - If you found the workload runs with Intel® Extension for PyTorch\* occupies a remarkably large amount of memory, you can try to reduce the occupied memory size by setting the `--weights_prepack` parameter of the `ipex.optimize()` function to `False`.
 
 - Supporting of EmbeddingBag with INT8 when bag size > 1 is working in progress.

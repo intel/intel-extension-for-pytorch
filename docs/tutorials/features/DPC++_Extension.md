@@ -204,9 +204,7 @@ Let’s go through the DPC++ code step by step:
 
 ```
 #include <torch/extension.h>
-
 #include <ipex.h>
-
 #include <vector>
 
 template <typename scalar_t>
