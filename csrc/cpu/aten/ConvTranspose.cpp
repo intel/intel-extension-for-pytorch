@@ -197,7 +197,13 @@ at::Tensor conv_transpose_forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context) {
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> weight_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> output_padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<int64_t> groups) {
   return reinterpret_cast<IpexConvTransposeOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run(input, ideep::attr_t());
@@ -207,7 +213,13 @@ at::Tensor IPEXConvTransposeOp::_forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context) {
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> weight_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> output_padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<int64_t> groups) {
   at::AutoDispatchBelowADInplaceOrView g;
   RECORD_FUNCTION(
       "IPEXConvTransposeOp::_forward", c10::ArrayRef<c10::IValue>({}));
@@ -215,7 +227,17 @@ at::Tensor IPEXConvTransposeOp::_forward(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::conv_transpose", "")
                        .typed<decltype(conv_transpose)>();
-  return op.call(input, weight, bias_opt, op_context);
+  return op.call(
+      input,
+      weight,
+      bias_opt,
+      op_context,
+      weight_size,
+      padding,
+      output_padding,
+      stride,
+      dilation,
+      groups);
 }
 
 at::Tensor IPEXConvTransposeOp::forward(
@@ -223,7 +245,13 @@ at::Tensor IPEXConvTransposeOp::forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context) {
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> weight_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> output_padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<int64_t> groups) {
   RECORD_FUNCTION(
       "IPEXConvTransposeOp::forward", c10::ArrayRef<c10::IValue>({}));
 
@@ -234,7 +262,17 @@ at::Tensor IPEXConvTransposeOp::forward(
       bias_opt.has_value() && bias_opt.value().requires_grad() ? true : false;
   ctx->save_for_backward({input});
 
-  return _forward(input, weight, bias_opt, op_context);
+  return _forward(
+      input,
+      weight,
+      bias_opt,
+      op_context,
+      weight_size,
+      padding,
+      output_padding,
+      stride,
+      dilation,
+      groups);
 }
 
 at::Tensor conv_transpose_backward_input(
@@ -418,18 +456,83 @@ torch::autograd::variable_list IPEXConvTransposeOp::backward(
   at::Tensor grad_input, grad_weight, grad_bias;
   std::tie(grad_input, grad_weight, grad_bias) =
       conv_transpose_backward(input, grad_outputs[0], output_mask, op_context);
-  return {grad_input, grad_weight, grad_bias, at::Tensor()};
+  return {
+      grad_input,
+      grad_weight,
+      grad_bias,
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor()};
 }
 
 at::Tensor conv_transpose(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context) {
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> weight_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> output_padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<int64_t> groups) {
   if (at::GradMode::is_enabled()) {
-    return IPEXConvTransposeOp::apply(input, weight, bias_opt, op_context);
+    return IPEXConvTransposeOp::apply(
+        input,
+        weight,
+        bias_opt,
+        op_context,
+        weight_size,
+        padding,
+        output_padding,
+        stride,
+        dilation,
+        groups);
   }
-  return IPEXConvTransposeOp::_forward(input, weight, bias_opt, op_context);
+  return IPEXConvTransposeOp::_forward(
+      input,
+      weight,
+      bias_opt,
+      op_context,
+      weight_size,
+      padding,
+      output_padding,
+      stride,
+      dilation,
+      groups);
+}
+
+at::Tensor conv_transpose_forward_meta(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias_opt,
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> weight_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> output_padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<int64_t> groups) {
+  TORCH_CHECK(
+      weight_size.has_value() && padding.has_value() &&
+          output_padding.has_value() && stride.has_value() &&
+          dilation.has_value() && groups.has_value(),
+      "weight_size, padding, output_padding, stride, dilation and groups must have value for conv_transpose_forward_meta");
+  auto input_size = input.sizes();
+  std::vector<int64_t> output_sizes = conv_input_size(
+      input.sizes(),
+      weight_size.value(),
+      padding.value(),
+      output_padding.value(),
+      stride.value(),
+      dilation.value(),
+      groups.value());
+  auto output = at::empty(output_sizes, input.options());
+  return output;
 }
 
 } // namespace cpu
@@ -442,7 +545,13 @@ at::Tensor conv_transpose(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context) {
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> weight_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> output_padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<int64_t> groups) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::conv_transpose", "")
@@ -451,7 +560,16 @@ at::Tensor conv_transpose(
 
   // TODO: make check weight dtype should be float for training case.
   return op.call(
-      cpu_cached_cast(target_type, input), weight, bias_opt, op_context);
+      cpu_cached_cast(target_type, input),
+      weight,
+      bias_opt,
+      op_context,
+      weight_size,
+      padding,
+      output_padding,
+      stride,
+      dilation,
+      groups);
 }
 
 } // namespace autocast
@@ -462,7 +580,7 @@ namespace {
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "conv_transpose(Tensor input, Tensor weight, Tensor? bias_opt, "
-      "Tensor W_prepack) -> Tensor");
+      "Tensor W_prepack, int[]? weight_size, int[]? padding, int[]? output_padding, int[]? stride, int[]? dilation, int? groups) -> Tensor");
   m.impl(
       "conv_transpose",
       c10::DispatchKey::Autograd,
@@ -471,6 +589,10 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "conv_transpose",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::conv_transpose_forward);
+  m.impl(
+      "conv_transpose",
+      c10::DispatchKey::Meta,
+      torch_ipex::cpu::conv_transpose_forward_meta);
   m.impl(
       "conv_transpose",
       c10::DispatchKey::AutocastCPU,

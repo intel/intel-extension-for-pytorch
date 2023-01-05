@@ -38,7 +38,25 @@ at::Tensor conv_transpose(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context);
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> weight_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> output_padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<int64_t> groups);
+
+at::Tensor conv_transpose_forward_meta(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias_opt,
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> weight_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> output_padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<int64_t> groups);
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor>
 conv_transpose_backward_kernel_impl(
@@ -63,14 +81,26 @@ class IPEXConvTransposeOp
       const at::Tensor& input,
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias_opt,
-      const at::Tensor& op_context);
+      const at::Tensor& op_context,
+      c10::optional<at::IntArrayRef> weight_size,
+      c10::optional<at::IntArrayRef> padding,
+      c10::optional<at::IntArrayRef> output_padding,
+      c10::optional<at::IntArrayRef> stride,
+      c10::optional<at::IntArrayRef> dilation,
+      c10::optional<int64_t> groups);
 
   static at::Tensor forward(
       torch::autograd::AutogradContext* ctx,
       const at::Tensor& input,
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias_opt,
-      const at::Tensor& op_context);
+      const at::Tensor& op_context,
+      c10::optional<at::IntArrayRef> weight_size,
+      c10::optional<at::IntArrayRef> padding,
+      c10::optional<at::IntArrayRef> output_padding,
+      c10::optional<at::IntArrayRef> stride,
+      c10::optional<at::IntArrayRef> dilation,
+      c10::optional<int64_t> groups);
 
   static torch::autograd::variable_list backward(
       torch::autograd::AutogradContext* ctx,
