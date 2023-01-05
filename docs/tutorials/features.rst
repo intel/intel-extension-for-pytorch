@@ -53,7 +53,7 @@ Intel® Extension for PyTorch* provides built-in quantization recipes to deliver
 
 Check more detailed information for `INT8 Quantization [CPU] <features/int8_overview.md>`_ and `INT8 recipe tuning API guide (Experimental, *NEW feature in 1.13.0* on CPU) <features/int8_recipe_tuning_api.md>`_ on CPU side.
 
-On Intel® GPUs, quantization usages follows PyTorch default quantization APIs.
+On Intel® GPUs, quantization usages follow PyTorch default quantization APIs. Check sample codes at `Examples <./examples.html#int8>`_ page.
 
 .. toctree::
    :hidden:

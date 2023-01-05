@@ -652,7 +652,7 @@ modelJit = convert_jit(modelJit, True)
 modelJit(data)
 ```
 
-### `torch.xpu.optimize`
+### torch.xpu.optimize
 
 `torch.xpu.optimize` is an alternative of `ipex.optimize` in Intel® Extension for PyTorch*, to provide identical usage for XPU device only. The motivation of adding this alias is to unify the coding style in user scripts base on torch.xpu modular. Refer to below example for usage.
 

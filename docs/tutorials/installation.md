@@ -8,36 +8,31 @@ Installation Guide
 Verified Hardware Platforms:
  - Intel® Data Center GPU Flex Series 170
  - Intel® Data Center GPU Max Series
- - Intel® Arc™ series GPUs (Experimental support)
+ - Intel® Arc™ A-Series GPUs (Experimental support)
 
 ### Software Requirements
 
-- Ubuntu 22.04 (64-bit)
-- Intel GPU Drivers 
-  - Intel® Data Center GPU Flex Series [Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)
-  - Intel® Data Center GPU Max Series [Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)
-  - Intel® Arc™ A-Series Graphics [Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)
+- OS & Intel GPU Drivers
+
+|Hardware|OS|Driver|
+|-|-|-|
+|Intel® Data Center GPU Flex Series|Ubuntu 22.04, Red Hat 8.6|[Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)|
+|Intel® Data Center GPU Max Series|Red Hat 8.6, Sles 15sp3/sp4|[Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)|
+|Intel® Arc™ A-Series Graphics|Ubuntu 22.04|[Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)|
+|Intel® Arc™ A-Series Graphics|Windows 11 or Windows 10 21H2 (via WSL2)|[for Windows 11 or Windows 10 21H2](https://www.intel.com/content/www/us/en/download/726609/intel-arc-graphics-windows-dch-driver.html)|
+
 - Intel® oneAPI Base Toolkit 2023.0
 - Python 3.7-3.10
 - Verified with GNU GCC 11
-
-## PyTorch-Intel® Extension for PyTorch\* Version Mapping
-
-Intel® Extension for PyTorch\* has to work with a corresponding version of PyTorch. Here are the PyTorch versions that we support and the mapping relationship:
-
-|PyTorch Version|Extension Version|
-|--|--|
-|[v1.13.\*](https://github.com/pytorch/pytorch/tree/v1.13.0) (patches needed)|[v1.13.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.13.10+xpu)|
-|[v1.10.\*](https://github.com/pytorch/pytorch/tree/v1.10.0) (patches needed)|[v1.10.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.10.200+gpu)|
 
 ## Preparations
 
 ### Install Intel GPU Driver
 
 |OS|Instructions for installing Intel GPU Driver|
-|-|-|-|
-|Ubuntu 22.04|Refer to the [Installation Guides](https://dgpu-docs.intel.com/installation-guides/ubuntu/ubuntu-jammy-arc.html) for the latest driver installation. When installing the verified [Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html) driver, use a specific version for component package names, such as `sudo apt-get install intel-opencl-icd=22.43.24595.35`|
-|WSL2 Ubuntu 20.04 on Windows 11 or Windows 10 21H2|Please download drivers for Intel® Arc™ series [for Windows 11 or Windows 10 21H2](https://www.intel.com/content/www/us/en/download/726609/intel-arc-graphics-windows-dch-driver.html). Please note that you would have to follow the rest of the steps in WSL2, but the drivers should be installed on Windows|
+|-|-|
+|Linux\*|Refer to the [Installation Guides](https://dgpu-docs.intel.com/installation-guides/index.html) for the latest driver installation for individual Linux\* distributions. When installing the verified [Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html) driver, use a specific version for component package names, such as `sudo apt-get install intel-opencl-icd=22.43.24595.35`|
+|Windows 11 or Windows 10 21H2 (via WSL2)|Please download drivers for Intel® Arc™ A-Series [for Windows 11 or Windows 10 21H2](https://www.intel.com/content/www/us/en/download/726609/intel-arc-graphics-windows-dch-driver.html). Please note that you would have to follow the rest of the steps in WSL2, but the drivers should be installed on Windows|
 
 ### Install oneAPI Base Toolkit
 
@@ -55,6 +50,15 @@ Default installation location *{ONEAPI_ROOT}* is `/opt/intel/oneapi` for root ac
 source {ONEAPI_ROOT}/setvars.sh
 ```
 
+## PyTorch-Intel® Extension for PyTorch\* Version Mapping
+
+Intel® Extension for PyTorch\* has to work with a corresponding version of PyTorch. Here are the PyTorch versions that we support and the mapping relationship:
+
+|PyTorch Version|Extension Version|
+|--|--|
+|[v1.13.\*](https://github.com/pytorch/pytorch/tree/v1.13.0) (patches needed)|[v1.13.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.13.10+xpu)|
+|[v1.10.\*](https://github.com/pytorch/pytorch/tree/v1.10.0) (patches needed)|[v1.10.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.10.200+gpu)|
+
 ## Install via wheel files
 
 Prebuilt wheel files availability matrix for Python versions:
@@ -64,18 +68,24 @@ Prebuilt wheel files availability matrix for Python versions:
 | 1.13.10+xpu |  | ✔️ | ✔️ | ✔️ | ✔️ |
 | 1.10.200+gpu | ✔️ | ✔️ | ✔️ | ✔️ |  |
 
-### Install PyTorch and TorchVision for stock Python
+**Note:** Wheel files for Intel® Distribution for Python\* only supports Python 3.9.
 
-```bash
-python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 -f https://developer.intel.com/ipex-whl-stable-xpu
+**Note:** Wheel files supporting Intel® Distribution for Python\* starts from 1.13.
+
+### Repositories for prebuilt wheel files
+
+```
+# Stock PyTorch
+REPO_URL: https://developer.intel.com/ipex-whl-stable-xpu
+
+# Intel® Distribution for Python*
+REPO_URL: https://developer.intel.com/ipex-whl-stable-xpu-idp
 ```
 
-**Note:** Installation of TorchVision is optional.
-
-### Install PyTorch and TorchVision for Intel® Distribution for Python\*
+### Install PyTorch and TorchVision
 
 ```bash
-python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 -f https://developer.intel.com/ipex-whl-stable-xpu-idp
+python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 -f <REPO_URL>
 ```
 
 **Note:** Installation of TorchVision is optional.
@@ -89,7 +99,7 @@ Intel® Extension for PyTorch\* doesn't depend on torchaudio. If you need TorchA
 ### Install Intel® Extension for PyTorch\*
 
 ```bash
-python -m pip install intel_extension_for_pytorch==1.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
+python -m pip install intel_extension_for_pytorch==1.13.10+xpu -f <REPO_URL>
 ```
 
 ## Install via compiling from source
@@ -140,5 +150,5 @@ $ pip install dist/*.whl
 
 |Issue|Explanation|
 |-|-|
-|Building from source for Intel® Arc™ series GPUs failed on WSL2 without any error thrown|Your system probably does not have enough RAM, so Linux kernel's Out-of-memory killer got invoked. You can verify it by running `dmesg` on bash (WSL2 terminal). If the OOM killer had indeed killed the build process, then you can try increasing the swap-size of WSL2, and/or decreasing the number of parallel build jobs with the environment variable `MAX_JOBS` (by default, it's equal to the number of logical CPU cores. So, setting `MAX_JOBS` to 1 is a very conservative approach, which would slow things down a lot).|
+|Building from source for Intel® Arc™ A-Series GPUs failed on WSL2 without any error thrown|Your system probably does not have enough RAM, so Linux kernel's Out-of-memory killer got invoked. You can verify it by running `dmesg` on bash (WSL2 terminal). If the OOM killer had indeed killed the build process, then you can try increasing the swap-size of WSL2, and/or decreasing the number of parallel build jobs with the environment variable `MAX_JOBS` (by default, it's equal to the number of logical CPU cores. So, setting `MAX_JOBS` to 1 is a very conservative approach, which would slow things down a lot).|
 |On WSL2, some workloads terminate with an error `CL_DEVICE_NOT_FOUND` after some time | This is due to the [TDR feature](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/tdr-registry-keys#tdrdelay) in Windows. You can try increasing TDRDelay in your Windows Registry to a large value, such as 20 (it is 2 seconds, by default), and reboot.|
