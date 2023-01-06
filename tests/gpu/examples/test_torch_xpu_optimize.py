@@ -4,6 +4,7 @@ from torch import nn as nn
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 import pytest  # noqa
+import os
 
 device = 'xpu'
 
@@ -313,3 +314,57 @@ class TestTorchMethod(TestCase):
         optimizer_xpu = torch.optim.SGD(module.parameters(), lr=0.1)
         optimized_module, optimizer_xpu = torch.xpu.optimize(model=module, optimizer=optimizer_xpu, dtype=torch.float32)
         check_layout_for_module(optimized_module)
+
+    def test_load_state_dict(self):
+        def training(model, optimizer):
+            input_xpu = torch.randn(batch_size, input_channel, 7, 7).to(device=device)
+            target_xpu = torch.empty(batch_size, dtype=torch.long).random_(class_num).to(device=device)
+
+            criterion = nn.CrossEntropyLoss()
+
+            # forward
+            with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+                output_xpu = model(input_xpu)
+                loss_xpu = criterion(output_xpu, target_xpu)
+
+            # optimizer
+            optimizer.zero_grad(set_to_none=True)
+            loss_xpu.backward()
+            optimizer.step()
+            torch.xpu.synchronize()
+
+        model_xpu = TrainingModel()
+        model_xpu = model_xpu.to(device=device).train()
+        optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=0.1)
+        model_xpu, optimizer_xpu = torch.xpu.optimize(model=model_xpu, dtype=torch.bfloat16, optimizer=optimizer_xpu)
+
+        # training for some iterations
+        for _ in range(10):
+            training(model_xpu, optimizer_xpu)
+
+        state = {
+                'model_state_dict': model_xpu.state_dict(),
+                'optimizer_state_dict' : optimizer_xpu.state_dict(),
+            }
+        filename = './_checkpoint_check_load_state_dict.pth.tar'
+        if os.path.exists(filename):
+            os.remove(filename)
+        torch.save(state, filename)
+
+        # load checkpoint
+        new_model = TrainingModel()
+        new_model = new_model.to(device=device).train()
+        new_optimizer = torch.optim.SGD(new_model.parameters(), lr=0.1)
+        new_model, new_optimizer = torch.xpu.optimize(model=new_model, dtype=torch.bfloat16, optimizer=new_optimizer)
+
+        checkpoint = torch.load(filename)
+        new_model.load_state_dict(checkpoint['model_state_dict'])
+        new_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        load_state = {
+                'model_state_dict': new_model.state_dict(),
+                'optimizer_state_dict' : new_optimizer.state_dict(),
+            }
+
+        self.assertEqual(state['model_state_dict'], load_state['model_state_dict'])
+        self.assertEqual(state['optimizer_state_dict'], load_state['optimizer_state_dict'])
+        os.remove(filename)

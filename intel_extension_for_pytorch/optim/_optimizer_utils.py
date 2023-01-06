@@ -2,6 +2,9 @@ import torch
 import copy
 import types
 import warnings
+from copy import deepcopy
+from itertools import chain
+from collections import defaultdict
 from ._functional import sgd_step, adagrad_step, lamb_step, adam_step, adamw_step
 from ._lamb import Lamb
 from ..nn import utils
@@ -124,13 +127,129 @@ def patch_step_for_master_weight_training(optimizer):
         setattr(optimizer, 'step_sync_weight', types.MethodType(step_sync_weight, optimizer)) # noqa B010
 
 
+def pack_state(state, state_key, state_value, attr):
+    if attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE_CPU:
+        if attr['op'] is torch.nn.Conv1d or attr['op'] is torch.nn.Conv2d or attr['op'] is torch.nn.Conv3d:
+            if attr['op'] is torch.nn.Conv2d:
+                memory_format = torch.channels_last
+            elif attr['op'] is torch.nn.Conv3d:
+                memory_format = torch.channels_last_3d
+            else:
+                memory_format = torch.contiguous_format
+            value_temp = state_value.to(memory_format=memory_format) \
+                if attr['weight_channels_last'] else state_value
+            state[state_key] = attr['ctx'].pack(value_temp)
+        else:
+            state[state_key] = attr['ctx'].pack(state_value)
+
+
 def patch_load_state_dict(optimizer):
     r"""
-    Forbid optimizer load state dict after weight-prepack or weight-cast
+    Re-pack parameter state after load state_dict
     """
+    def repack(self):
+        for group in self.param_groups:
+            for i, p in enumerate(group['params']):
+                if p in self.params_attr and p.device.type == 'cpu':
+                    attr = self.params_attr[p]
+                    if 'op' in attr:
+                        # weight attr need "op" info to pack state while bias attr not
+                        state = self.state[p]
+                        public_p = attr['ctx'].to_public(p)
+                        for state_key, state_value in state.items():
+                            if isinstance(state_value, torch.Tensor) and state_value.size() == public_p.size():
+                                # We have an assumption here that any tensor's in parameter state, if they
+                                # have same shapes with the parameter, they should share same layout with 
+                                # the parameter. Thus we need pack the state as we did to parameters.
+                                pack_state(state, state_key, state_value, attr)
+
+    def original_load_state_dict_without_state_cast(self, state_dict):
+        r"""Loads the optimizer state.
+        Args:
+            state_dict (dict): optimizer state. Should be an object returned
+                from a call to :meth:`state_dict`.
+        Copied from torch/optim/optimizer.py.
+        We need copy it here and change the behavior of state cast.
+        For example, in out bf16 training. The mumentum buffer should always
+        be float, but the original load_state_dict for optimizer will cast it to
+        bfloat16 which will loss accuracy
+
+        The original code:
+    
+            def cast(param, value, key=None):
+                if isinstance(value, torch.Tensor):
+                    # Floating-point types are a bit special here. They are the only ones
+                    # that are assumed to always match the type of params.
+                    # Make sure state['step'] is not casted https://github.com/pytorch/pytorch/issues/74424
+                    if (key != "step"):
+                        if param.is_floating_point():
+                            value = value.to(param.dtype)
+                        value = value.to(param.device)
+                    return value
+                elif isinstance(value, dict):
+                    return {k: cast(param, v, key=k) for k, v in value.items()}
+                elif isinstance(value, container_abcs.Iterable):
+                    return type(value)(cast(param, v) for v in value)
+                else:
+                    return value
+            state = defaultdict(dict)
+            for k, v in state_dict['state'].items():
+                if k in id_map:
+                    param = id_map[k]
+                    state[param] = cast(param, v)
+                else:
+                    state[k] = v
+        We change it to:
+            state = defaultdict(dict)
+            for k, v in state_dict['state'].items():
+                if k in id_map:
+                    param = id_map[k]
+                    state[param] = v
+                else:
+                    state[k] = v
+        """
+        # deepcopy, to be consistent with module API
+        state_dict = deepcopy(state_dict)
+        # Validate the state_dict
+        groups = self.param_groups
+        saved_groups = state_dict['param_groups']
+
+        if len(groups) != len(saved_groups):
+            raise ValueError("loaded state dict has a different number of "
+                             "parameter groups")
+        param_lens = (len(g['params']) for g in groups)
+        saved_lens = (len(g['params']) for g in saved_groups)
+        if any(p_len != s_len for p_len, s_len in zip(param_lens, saved_lens)):
+            raise ValueError("loaded state dict contains a parameter group "
+                             "that doesn't match the size of optimizer's group")
+
+        # Update the state
+        id_map = {old_id: p for old_id, p in
+                  zip(chain.from_iterable((g['params'] for g in saved_groups)),
+                      chain.from_iterable((g['params'] for g in groups)))}
+
+        # Copy state assigned to params (and cast tensors to appropriate types).
+        # State that is not assigned to params is copied as is (needed for
+        # backward compatibility).
+        state = defaultdict(dict)
+        for k, v in state_dict['state'].items():
+            if k in id_map:
+                param = id_map[k]
+                state[param] = v
+            else:
+                state[k] = v
+
+        # Update parameter groups, setting their 'params' value
+        def update_group(group, new_group):
+            new_group['params'] = group['params']
+            return new_group
+        param_groups = [
+            update_group(g, ng) for g, ng in zip(groups, saved_groups)]
+        self.__setstate__({'state': state, 'param_groups': param_groups})
 
     def load_state_dict(self, state_dict):
-        assert False, "_ipex_optimizer does not support load_state_dict" # noqa B011
+        original_load_state_dict_without_state_cast(self, state_dict)
+        repack(self)
 
     if not hasattr(optimizer, '_original_load_state_dict'):
         setattr(optimizer, '_original_load_state_dict', optimizer.load_state_dict) # noqa B010
@@ -184,23 +303,10 @@ def pack_optimizer_params_and_states(optimizer, param_pair, attrs, pack_dtype):
                             state = optimizer.state[new_param]
                             for state_key, state_value in state.items():
                                 if isinstance(state_value, torch.Tensor) and state_value.size() == p.size():
-                                    # We have an assumtion here that any tensor's in parameter state, if they
+                                    # We have an assumption here that any tensor's in parameter state, if they
                                     # have same shapes with the parameter, they should share same layout with
                                     # the parameter. Thus we need pack the state as we did to parameters.
-                                    if attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE_CPU:
-                                        if attr['op'] is torch.nn.Conv1d or attr['op'] is torch.nn.Conv2d or \
-                                                attr['op'] is torch.nn.Conv3d:
-                                            if attr['op'] is torch.nn.Conv2d:
-                                                memory_format = torch.channels_last
-                                            elif attr['op'] is torch.nn.Conv3d:
-                                                memory_format = torch.channels_last_3d
-                                            else:
-                                                memory_format = torch.contiguous_format
-                                            value_temp = state_value.to(memory_format=memory_format) \
-                                                if attr['weight_channels_last'] else state_value
-                                            state[state_key] = attr['ctx'].pack(value_temp)
-                                        else:
-                                            state[state_key] = attr['ctx'].pack(state_value)
+                                    pack_state(state, state_key, state_value, attr)
 
 
 def patch_state_dict(optimizer):
@@ -217,7 +323,7 @@ def patch_state_dict(optimizer):
                 params_attr = opt.params_attr[k1]
                 for state_key, state_value in v2.items():
                     if isinstance(state_value, torch.Tensor) and state_value.shape == k1.shape:
-                        # We have an assumtion here that any tensor's in parameter state, if they
+                        # We have an assumption here that any tensor's in parameter state, if they
                         # have same shapes with the parameter, they should share same layout with
                         # the parameter. Thus we need unpack the state as we did to parameters.
                         if 'op' in params_attr:
