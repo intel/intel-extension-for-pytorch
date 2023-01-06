@@ -652,10 +652,22 @@ Tensor _convolution_out(
 
   Tensor output;
   if (transposed_) {
-    // TODO::
-    // currently only support deconvolution padding with the same value on two
-    // side need to check deconvolution support different padding values or not
-    output = xpu::oneDNN::deconvolution(
+    // create output and propagate memory format
+    if (output_r.defined()) {
+      output = contiguous_if_needed(output_r, mfmt);
+    } else {
+      auto dst_tz = deconv_dst_tz(
+          input.sizes(),
+          weight.sizes(),
+          params.padding,
+          params.stride,
+          params.dilation,
+          params.output_padding,
+          params.groups);
+      output = at::empty(dst_tz, input.options(), mfmt);
+    }
+    xpu::oneDNN::deconvolution(
+        output,
         input,
         weight,
         bias,
@@ -663,7 +675,8 @@ Tensor _convolution_out(
         params.padding,
         params.output_padding,
         params.dilation,
-        params.groups);
+        params.groups,
+        attr);
   } else {
     // oneDNN supports padding the two sides of src with different values
     // the padding order should be front_top_left and back_bottom_right
@@ -828,13 +841,10 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
     IntArrayRef output_padding,
     int64_t groups,
     std::array<bool, 3> output_mask) {
-  // oneDNN can revice non-contiguous input if we define the stride in input_md,
-  // for now, we contiguous the input before oneDNN.
   auto ndim = input.ndimension();
   TORCH_CHECK(
       3 == ndim || 4 == ndim || 5 == ndim,
       "convolution bwd only supports 3D, 4D, 5D tensor");
-
   TORCH_CHECK(
       grad_output.scalar_type() == ScalarType::Float ||
           grad_output.scalar_type() == ScalarType::BFloat16 ||
@@ -897,19 +907,18 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
     grad_bias = at::empty({grad_output_.size(1)}, opt);
 
   if (output_mask[0]) {
-    if (transposed_) {
-      grad_input = xpu::oneDNN::deconvolution_backward_data(
-          input_,
-          weight_,
-          grad_output_,
-          stride_,
-          padding_,
-          dilation_,
-          groups_,
-          output_mask[2]);
-    } else {
-      // ensure the mfmt can be propagated
-      if (input.numel() > 0) {
+    if (input.numel() > 0) {
+      if (transposed_) {
+        xpu::oneDNN::deconvolution_backward_data(
+            grad_input,
+            grad_output_,
+            weight_,
+            stride_,
+            padding_,
+            dilation_,
+            groups_,
+            output_mask[2]);
+      } else {
         xpu::oneDNN::convolution_backward_data(
             grad_input,
             grad_output_,
@@ -924,19 +933,18 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
     }
   }
   if (output_mask[1] || output_mask[2]) {
-    if (transposed_) {
-      std::tie(grad_weight, grad_bias) =
-          xpu::oneDNN::deconvolution_backward_weights(
-              input_,
-              weight_,
-              grad_output_,
-              stride_,
-              padding_,
-              dilation_,
-              groups_,
-              output_mask[2]);
-    } else {
-      if (input.numel() > 0) {
+    if (input.numel() > 0) {
+      if (transposed_) {
+        xpu::oneDNN::deconvolution_backward_weights(
+            grad_weight,
+            grad_bias,
+            grad_output_,
+            input_,
+            stride_,
+            padding_,
+            dilation_,
+            groups_);
+      } else {
         xpu::oneDNN::convolution_backward_weights(
             grad_weight,
             grad_bias,

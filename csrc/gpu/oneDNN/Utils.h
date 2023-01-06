@@ -272,6 +272,15 @@ static inline std::vector<int64_t> compatible_groups_conv_strides(
   strides.insert(strides.begin(), group_size[1] * wgh.stride(0));
   return strides;
 }
+static inline std::vector<int64_t> compatible_groups_deconv_strides(
+    const at::Tensor& wgh,
+    memory::dims group_size) {
+  std::vector<int64_t> strides = wgh.strides().vec();
+  strides[0] = wgh.strides()[1];
+  strides[1] = wgh.strides()[0];
+  strides.insert(strides.begin(), group_size[2] * wgh.strides()[0]);
+  return strides;
+}
 
 static inline bool is_onednn_layout(const at::Tensor& tensor) {
   return !at::AtenIpexTypeXPU::DPCPPTensorContext::is_plain(tensor);
