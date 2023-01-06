@@ -1,17 +1,12 @@
-# for install
+# Python dependencies required for development
+expecttest
 future
+hypothesis
+numpy
+psutil
+pytest
 pyyaml
+scipy
 setuptools
-six
 types-dataclasses
 typing_extensions
-# for test
-expecttest
-hypothesis
-matplotlib
-numpy
-pytest
-scipy
-# for cpu merge
-packaging
-psutil
