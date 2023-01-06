@@ -14,6 +14,7 @@ class IPEXLinearEltwise(torch.nn.Module):
         super(IPEXLinearEltwise, self).__init__()
         assert isinstance(ipex_linear_module, _IPEXLinear)
         self.m = ipex_linear_module
+        self.out_features = ipex_linear_module.out_features
         if eltwise == 'relu':
             self.eltwise = EltwiseType.ReLU
         else:
@@ -22,4 +23,4 @@ class IPEXLinearEltwise(torch.nn.Module):
 
     def forward(self, x):
         return torch.ops.torch_ipex.ipex_linear_eltwise(
-            x, self.m.weight, self.m.bias, self.eltwise, self.m.ctx.get_data_handle())
+            x, self.m.weight, self.m.bias, self.eltwise, self.m.ctx.get_data_handle(), self.out_features)

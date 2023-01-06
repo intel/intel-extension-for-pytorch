@@ -59,19 +59,47 @@ class IPEXConvolutionOp : public torch::autograd::Function<IPEXConvolutionOp> {
       const at::Tensor& input,
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias_opt,
-      const at::Tensor& op_context);
+      const at::Tensor& op_context,
+      c10::optional<at::IntArrayRef> kernel_size,
+      c10::optional<at::IntArrayRef> padding,
+      c10::optional<at::IntArrayRef> stride,
+      c10::optional<at::IntArrayRef> dilation);
 
   static at::Tensor forward(
       torch::autograd::AutogradContext* ctx,
       const at::Tensor& input,
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias_opt,
-      const at::Tensor& op_context);
+      const at::Tensor& op_context,
+      c10::optional<at::IntArrayRef> kernel_size,
+      c10::optional<at::IntArrayRef> padding,
+      c10::optional<at::IntArrayRef> stride,
+      c10::optional<at::IntArrayRef> dilation);
 
   static torch::autograd::variable_list backward(
       torch::autograd::AutogradContext* ctx,
       torch::autograd::variable_list grad_outputs);
 };
+
+at::Tensor convolution_forward(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias_opt,
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> kernel_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation);
+
+at::Tensor convolution_forward_meta(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias_opt,
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> kernel_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation);
 
 } // namespace cpu
 } // namespace torch_ipex

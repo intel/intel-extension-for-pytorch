@@ -1,3 +1,4 @@
+#include <ATen/Parallel.h>
 #include <torch/csrc/autograd/function.h>
 #include "aten/LinearMKL.h"
 #include "aten/utils/utils.h"
@@ -60,17 +61,11 @@ void mkl_sgemm_base_kernel_impl(
   if (bias.defined()) {
     auto bias_ = self.is_contiguous() ? bias : bias.contiguous();
     auto bias_ptr = bias_.data_ptr<float>();
-#ifdef _OPENMP
-#if (_OPENMP >= 201307)
-#pragma omp parallel for simd schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
-#else
-#pragma omp parallel for schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
-#endif
-#endif
-    for (int64_t i = 0; i < M; ++i)
-      memcpy(out_ptr + i * N, bias_ptr, sizeof(float) * N);
+    at::parallel_for(0, M, 1, [&](int64_t begin, int64_t end) {
+      for (const auto d : c10::irange(begin, end)) {
+        memcpy(out_ptr + d * N, bias_ptr, sizeof(float) * N);
+      }
+    });
   }
   if (pack) {
     cblas_sgemm_compute(

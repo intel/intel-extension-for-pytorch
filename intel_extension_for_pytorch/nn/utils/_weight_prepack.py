@@ -75,6 +75,7 @@ class _IPEXConvNd(nn.Module):
         self.prepack_input_shape = dense_module.input_shape if hasattr(dense_module, "input_shape") else []
         self.weight_channels_last = dense_module.weight.is_contiguous(memory_format=torch.channels_last) \
             or dense_module.weight.is_contiguous(memory_format=torch.channels_last_3d)
+        self.weight_size = dense_module.weight.size()
 
         # TODO: ".clone()" will make weight shared by multiple module not shared anymore
         # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
@@ -123,7 +124,7 @@ class _IPEXConvNd(nn.Module):
             _load_from_state_dict_post_hook(self, loaded_ctx, fp32_loaded_weight, weight_trail)
 
     def forward(self, x):
-        return torch.ops.torch_ipex.convolution_forward(x, self.weight, self.bias, self.ctx.get_data_handle())
+        return torch.ops.torch_ipex.convolution_forward(x, self.weight, self.bias, self.ctx.get_data_handle(), self.weight_size, self.padding, self.stride, self.dilation)
 
 class _IPEXConv1d(_IPEXConvNd):
     def __init__(self, dense_module):
@@ -162,6 +163,8 @@ class _IPEXLinear(torch.nn.Module):
         else:
             self.register_parameter('bias', None)
 
+        self.out_features = dense_module.out_features
+
         # create linear op context
         if self.use_dnnl:
             self.ctx = torch.ops.ipex_prepack.linear_prepack(dense_module.weight,
@@ -185,10 +188,10 @@ class _IPEXLinear(torch.nn.Module):
     def forward(self, x):
         if self.use_dnnl:
             return torch.ops.torch_ipex.ipex_linear(
-                x, self.weight, self.bias, self.ctx.get_data_handle())
+                x, self.weight, self.bias, self.ctx.get_data_handle(), self.out_features)
         else:
             return torch.ops.torch_ipex.ipex_MKLSGEMM(
-                x, self.weight, self.bias, self.ctx.get_data_handle())
+                x, self.weight, self.bias, self.ctx.get_data_handle(), self.out_features)
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
         assert not keep_vars, "can not using keep_vars true when to save _IPEXLinear's parameters"
@@ -219,6 +222,7 @@ class _IPEXConvTransposeNd(nn.Module):
         self.prepack_input_shape = dense_module.input_shape if hasattr(dense_module, "input_shape") else []
         self.weight_channels_last = dense_module.weight.is_contiguous(memory_format=torch.channels_last) \
             or dense_module.weight.is_contiguous(memory_format=torch.channels_last_3d)
+        self.weight_size = dense_module.weight.size()
 
         if dense_module.bias is not None:
             self.bias = nn.Parameter(
@@ -269,7 +273,13 @@ class _IPEXConvTransposeNd(nn.Module):
             x,
             self.weight,
             self.bias,
-            self.ctx.get_data_handle())
+            self.ctx.get_data_handle(),
+            self.weight_size,
+            self.padding,
+            self.output_padding,
+            self.stride,
+            self.dilation,
+            self.groups)
 
 class _IPEXConvTranspose2d(_IPEXConvTransposeNd):
     def __init__(self, dense_module):

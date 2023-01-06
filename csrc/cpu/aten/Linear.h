@@ -43,7 +43,8 @@ class IPEXLinearOp : public torch::autograd::Function<IPEXLinearOp> {
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias,
       const int64_t eltwise,
-      const at::Tensor& op_context);
+      const at::Tensor& op_context,
+      const c10::optional<int64_t> out_features);
 
   static at::Tensor forward(
       torch::autograd::AutogradContext* ctx,
@@ -51,7 +52,8 @@ class IPEXLinearOp : public torch::autograd::Function<IPEXLinearOp> {
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias,
       const int64_t eltwise,
-      const at::Tensor& op_context);
+      const at::Tensor& op_context,
+      const c10::optional<int64_t> out_features);
 
   static torch::autograd::tensor_list backward(
       torch::autograd::AutogradContext* ctx,
@@ -62,14 +64,16 @@ at::Tensor ipex_linear(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
-    const at::Tensor& op_context);
+    const at::Tensor& op_context,
+    const c10::optional<int64_t> out_features);
 
 at::Tensor ipex_linear_eltwise(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
     const int64_t eltwise,
-    const at::Tensor& op_context);
+    const at::Tensor& op_context,
+    const c10::optional<int64_t> out_features);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -140,7 +140,13 @@ at::Tensor convolution_kernel(
 
 at::Tensor convolution_forward_impl(
     const at::Tensor& input,
-    const at::Tensor& op_context) {
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias_opt,
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> kernel_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation) {
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::convolution_forward_impl\n");
 #endif
@@ -343,15 +349,41 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward_kernel(
   return std::make_tuple(grad_input, grad_weight, grad_bias);
 }
 
+std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward(
+    const at::Tensor& input,
+    const at::Tensor& grad_output,
+    std::array<bool, 3> output_mask,
+    const at::Tensor& op_context) {
+  return reinterpret_cast<IpexConvolutionOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run_backward(input, grad_output, output_mask);
+}
+
 at::Tensor IPEXConvolutionOp::_forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context) {
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> kernel_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation) {
+  at::AutoDispatchBelowADInplaceOrView g;
   RECORD_FUNCTION(
       "IPEXConvolutionOp::_forward", c10::ArrayRef<c10::IValue>({}));
 
-  return convolution_forward_impl(input, op_context);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::convolution_forward", "")
+                       .typed<decltype(convolution_forward)>();
+  return op.call(
+      input,
+      weight,
+      bias_opt,
+      op_context,
+      kernel_size,
+      padding,
+      stride,
+      dilation);
 }
 
 at::Tensor IPEXConvolutionOp::forward(
@@ -359,9 +391,14 @@ at::Tensor IPEXConvolutionOp::forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context) {
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> kernel_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation) {
   RECORD_FUNCTION("IPEXConvolutionOp::forward", c10::ArrayRef<c10::IValue>({}));
 
+  at::AutoDispatchBelowADInplaceOrView g;
   ctx->saved_data["op_context"] = op_context;
   ctx->saved_data["input_requires_grad"] = input.requires_grad();
   ctx->saved_data["weight_requires_grad"] = weight.requires_grad();
@@ -369,7 +406,15 @@ at::Tensor IPEXConvolutionOp::forward(
       bias_opt.has_value() && bias_opt.value().requires_grad() ? true : false;
   ctx->save_for_backward({input});
 
-  return convolution_forward_impl(input, op_context);
+  return _forward(
+      input,
+      weight,
+      bias_opt,
+      op_context,
+      kernel_size,
+      padding,
+      stride,
+      dilation);
 }
 
 torch::autograd::variable_list IPEXConvolutionOp::backward(
@@ -386,37 +431,80 @@ torch::autograd::variable_list IPEXConvolutionOp::backward(
   auto saved = ctx->get_saved_variables();
   at::Tensor input = saved[0];
   at::Tensor grad_input, grad_weight, grad_bias;
+  static auto op =
+      torch::Dispatcher::singleton()
+          .findSchemaOrThrow("torch_ipex::convolution_backward", "")
+          .typed<decltype(convolution_backward)>();
   std::tie(grad_input, grad_weight, grad_bias) =
-      reinterpret_cast<IpexConvolutionOpContext*>(
-          op_context.data_ptr<int64_t>()[0])
-          ->run_backward(input, grad_outputs[0], output_mask);
-  return {grad_input, grad_weight, grad_bias, at::Tensor()};
+      op.call(input, grad_outputs[0], output_mask, op_context);
+  return {
+      grad_input,
+      grad_weight,
+      grad_bias,
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor()};
 }
 
 at::Tensor convolution_forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context) {
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> kernel_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation) {
   if (at::GradMode::is_enabled()) {
-    return IPEXConvolutionOp::apply(input, weight, bias_opt, op_context);
+    return IPEXConvolutionOp::apply(
+        input,
+        weight,
+        bias_opt,
+        op_context,
+        kernel_size,
+        padding,
+        stride,
+        dilation);
   }
-  return IPEXConvolutionOp::_forward(input, weight, bias_opt, op_context);
+  return IPEXConvolutionOp::_forward(
+      input,
+      weight,
+      bias_opt,
+      op_context,
+      kernel_size,
+      padding,
+      stride,
+      dilation);
+}
+
+at::Tensor convolution_forward_meta(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias_opt,
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> kernel_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation) {
+  TORCH_CHECK(
+      kernel_size.has_value() && padding.has_value() && stride.has_value() &&
+          dilation.has_value(),
+      "kernel_size, padding, stride and dilation must have value for convolution_forward_meta");
+  auto input_size = input.sizes();
+  std::vector<int64_t> output_sizes = calc_conv_output_size(
+      input_size,
+      kernel_size.value(),
+      padding.value(),
+      stride.value(),
+      dilation.value());
+  auto output = at::empty(output_sizes, input.options());
+  return output;
 }
 
 } // namespace cpu
 } // namespace torch_ipex
-
-namespace {
-
-TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      "convolution_forward(Tensor input, Tensor weight, Tensor? bias, "
-      "Tensor W_prepack) -> Tensor",
-      torch_ipex::cpu::convolution_forward);
-}
-
-} // namespace
 
 namespace torch_ipex {
 namespace autocast {
@@ -425,7 +513,11 @@ at::Tensor convolution_forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context) {
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> kernel_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::convolution_forward", "")
@@ -434,12 +526,48 @@ at::Tensor convolution_forward(
 
   // TODO: make check weight dtype should be float for training case.
   return op.call(
-      cpu_cached_cast(target_type, input), weight, bias_opt, op_context);
-}
-
-TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
-  m.impl("convolution_forward", torch_ipex::autocast::convolution_forward);
+      cpu_cached_cast(target_type, input),
+      weight,
+      bias_opt,
+      op_context,
+      kernel_size,
+      padding,
+      stride,
+      dilation);
 }
 
 } // namespace autocast
 } // namespace torch_ipex
+
+namespace {
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "convolution_forward(Tensor input, Tensor weight, Tensor? bias, "
+      "Tensor W_prepack, int[]? kernel_size, int[]? padding, int[]? stride, int[]? dilation) -> Tensor");
+  m.impl(
+      "convolution_forward",
+      c10::DispatchKey::Autograd,
+      torch_ipex::cpu::convolution_forward);
+  m.impl(
+      "convolution_forward",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::convolution_forward);
+  m.impl(
+      "convolution_forward",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::convolution_forward_impl);
+  m.impl(
+      "convolution_forward",
+      c10::DispatchKey::Meta,
+      torch_ipex::cpu::convolution_forward_meta);
+  // bw
+  m.def(
+      "convolution_backward(Tensor input, Tensor grad_output, bool[3] out_mask, "
+      "Tensor W_prepack) -> (Tensor, Tensor, Tensor)");
+  m.impl(
+      "convolution_backward",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::convolution_backward);
+}
+} // namespace
