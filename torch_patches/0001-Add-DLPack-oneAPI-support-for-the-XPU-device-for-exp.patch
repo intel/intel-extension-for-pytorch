@@ -1,7 +1,7 @@
-From efca3558f7af0f470540c6c980db19fd4339e496 Mon Sep 17 00:00:00 2001
+From bedd439a1447610754c5bd4089d5498b4b419df7 Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Mon, 28 Mar 2022 20:49:03 +0800
-Subject: [PATCH 01/10] Add DLPack oneAPI support for the XPU device for
+Subject: [PATCH 1/9] Add DLPack oneAPI support for the XPU device for
  experimental.
 
 ---
@@ -468,10 +468,10 @@ index 0ad1e119bc..3d33935d31 100644
    DLDataType dtype;
    /*! \brief The shape of the tensor */
 diff --git a/torch/_tensor.py b/torch/_tensor.py
-index 8330fde582..56d387d4c0 100644
+index fd3f338d51..7ec31661b1 100644
 --- a/torch/_tensor.py
 +++ b/torch/_tensor.py
-@@ -1346,6 +1346,8 @@ class Tensor(torch._C._TensorBase):
+@@ -1347,6 +1347,8 @@ class Tensor(torch._C._TensorBase):
              device_type = DLDeviceType.kDLGPU
          elif self.device.type == "cpu":
              device_type = DLDeviceType.kDLCPU

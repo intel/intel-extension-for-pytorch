@@ -1,14 +1,14 @@
-From 1f70653db353bb70c5d7cd46cbd723fa9aea290d Mon Sep 17 00:00:00 2001
+From a52821b6d8a6c9d15f35f1adebba4b2d08ec3e0c Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Wed, 20 Apr 2022 00:28:18 +0800
-Subject: [PATCH 07/10] Add xpu legacy profiler (#30)
+Subject: [PATCH 6/9] Add xpu legacy profiler (#30)
 
 Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
 ---
  torch/_C/_autograd.pyi                        |   1 +
  torch/autograd/profiler.py                    |  18 +-
- torch/autograd/profiler_legacy.py             | 114 ++++++++---
- torch/autograd/profiler_util.py               | 187 +++++++++++++++---
+ torch/autograd/profiler_legacy.py             | 116 ++++++++---
+ torch/autograd/profiler_util.py               | 188 +++++++++++++++---
  torch/csrc/autograd/init.cpp                  |  10 +
  torch/csrc/autograd/profiler_legacy.cpp       | 111 ++++++++---
  torch/csrc/autograd/profiler_legacy.h         |  59 ++++--
@@ -19,7 +19,7 @@ Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
  torch/csrc/profiler/orchestration/observer.h  |   1 +
  torch/csrc/profiler/python/init.cpp           |   1 +
  .../_internal/distributed/rpc/rpc_test.py     |   4 +-
- 14 files changed, 469 insertions(+), 181 deletions(-)
+ 14 files changed, 472 insertions(+), 181 deletions(-)
 
 diff --git a/torch/_C/_autograd.pyi b/torch/_C/_autograd.pyi
 index bddda0a8c9..9206273838 100644
@@ -119,7 +119,7 @@ index dd5700f949..24ba73512d 100644
  
      functions.sort(key=lambda evt: evt.time_range.start)
 diff --git a/torch/autograd/profiler_legacy.py b/torch/autograd/profiler_legacy.py
-index b3e875f252..190199f51a 100644
+index b3e875f252..14bc2a2f70 100644
 --- a/torch/autograd/profiler_legacy.py
 +++ b/torch/autograd/profiler_legacy.py
 @@ -1,7 +1,7 @@
@@ -190,7 +190,23 @@ index b3e875f252..190199f51a 100644
          self.function_events._build_tree()
          return False
  
-@@ -184,8 +198,12 @@ def _parse_legacy_records(thread_records):
+@@ -109,6 +123,7 @@ class profile(object):
+             max_src_column_width=75,
+             max_name_column_width=55,
+             max_shapes_column_width=80,
++            max_depth=10,
+             header=None,
+             top_level_events_only=False
+     ):
+@@ -120,6 +135,7 @@ class profile(object):
+             max_src_column_width=max_src_column_width,
+             max_name_column_width=max_name_column_width,
+             max_shapes_column_width=max_shapes_column_width,
++            max_depth=max_depth,
+             header=header,
+             top_level_events_only=top_level_events_only
+         )
+@@ -184,8 +200,12 @@ def _parse_legacy_records(thread_records):
          # accumulated memory allocations per handle
          cpu_memory_allocs = {}
          cuda_memory_allocs = {}
@@ -203,7 +219,7 @@ index b3e875f252..190199f51a 100644
  
          filtered_handles = set()
          prev_record = None
-@@ -209,9 +227,27 @@ def _parse_legacy_records(thread_records):
+@@ -209,9 +229,27 @@ def _parse_legacy_records(thread_records):
                          filtered_handles.add(record_key)
                          continue
  
@@ -232,7 +248,7 @@ index b3e875f252..190199f51a 100644
              elif record.kind() == 'pop':
                  assert (
                      record_key in range_starts
-@@ -220,37 +256,33 @@ def _parse_legacy_records(thread_records):
+@@ -220,37 +258,33 @@ def _parse_legacy_records(thread_records):
                      record_key
                  )
  
@@ -288,7 +304,7 @@ index b3e875f252..190199f51a 100644
                  # note: async events have only cpu total time
                  if not is_async and start.has_cuda():
                      duration = start.cuda_elapsed_us(record)
-@@ -260,9 +292,11 @@ def _parse_legacy_records(thread_records):
+@@ -260,9 +294,11 @@ def _parse_legacy_records(thread_records):
                              start.device(),
                              duration)
                  functions.append(fe)
@@ -300,7 +316,7 @@ index b3e875f252..190199f51a 100644
              elif record.kind() == 'memory_alloc':
                  num_open_handles_cpu = len(cpu_memory_allocs)
                  num_open_handles_cuda = len(cuda_memory_allocs)
-@@ -271,6 +305,8 @@ def _parse_legacy_records(thread_records):
+@@ -271,6 +307,8 @@ def _parse_legacy_records(thread_records):
                      cpu_memory_allocs[handle] += record.cpu_memory_usage()
                  for handle in cuda_memory_allocs.keys():
                      cuda_memory_allocs[handle] += record.cuda_memory_usage()
@@ -309,7 +325,7 @@ index b3e875f252..190199f51a 100644
                  if num_open_handles_cpu == 0:
                      # output event as a top-level memory event
                      fe = FunctionEvent(
-@@ -283,9 +319,37 @@ def _parse_legacy_records(thread_records):
+@@ -283,9 +321,37 @@ def _parse_legacy_records(thread_records):
                          stack=[],
                          cpu_memory_usage=record.cpu_memory_usage(),
                          cuda_memory_usage=record.cuda_memory_usage(),
@@ -348,7 +364,7 @@ index b3e875f252..190199f51a 100644
  
      # Sort functions by start time then by end time ascending.
 diff --git a/torch/autograd/profiler_util.py b/torch/autograd/profiler_util.py
-index 7d0532d611..42f17defe5 100644
+index 7d0532d611..ea3e6726e8 100644
 --- a/torch/autograd/profiler_util.py
 +++ b/torch/autograd/profiler_util.py
 @@ -15,13 +15,17 @@ class EventList(list):
@@ -369,7 +385,19 @@ index 7d0532d611..42f17defe5 100644
  
      def _build_tree(self):
          self._populate_cpu_children()
-@@ -183,6 +187,7 @@ class EventList(list):
+@@ -153,6 +157,7 @@ class EventList(list):
+             max_src_column_width=75,
+             max_name_column_width=55,
+             max_shapes_column_width=80,
++            max_depth=10,
+             header=None,
+             top_level_events_only=False
+     ):
+@@ -180,9 +185,11 @@ class EventList(list):
+             max_src_column_width=max_src_column_width,
+             max_name_column_width=max_name_column_width,
+             max_shapes_column_width=max_shapes_column_width,
++            max_depth=10,
              header=header,
              profile_memory=self._profile_memory,
              with_flops=self._with_flops,
@@ -377,7 +405,7 @@ index 7d0532d611..42f17defe5 100644
              top_level_events_only=top_level_events_only)
  
      def export_chrome_trace(self, path):
-@@ -220,20 +225,36 @@ class EventList(list):
+@@ -220,20 +227,36 @@ class EventList(list):
                          else f'" node_id:{evt.node_id}, thread_id:{evt.thread} "',
                      )
                  )
@@ -428,7 +456,7 @@ index 7d0532d611..42f17defe5 100644
              if len(self) > 0:
                  # remove trailing whitespace and comma
                  f.seek(f.tell() - 2, os.SEEK_SET)
-@@ -290,8 +311,10 @@ class EventList(list):
+@@ -290,8 +313,10 @@ class EventList(list):
          avg_list = EventList(
              stats.values(),
              use_cuda=self._use_cuda,
@@ -440,7 +468,7 @@ index 7d0532d611..42f17defe5 100644
          for evt in avg_list:
              evt.stack = evt.stack[:group_by_stack_n]
              if not group_by_input_shapes:
-@@ -354,10 +377,13 @@ class FormattedTimesMixin(object):
+@@ -354,10 +379,13 @@ class FormattedTimesMixin(object):
      """
      cpu_time_str = _attr_formatter('cpu_time')
      cuda_time_str = _attr_formatter('cuda_time')
@@ -454,7 +482,7 @@ index 7d0532d611..42f17defe5 100644
  
      @property
      def cpu_time(self):
-@@ -367,6 +393,10 @@ class FormattedTimesMixin(object):
+@@ -367,6 +395,10 @@ class FormattedTimesMixin(object):
      def cuda_time(self):
          return 0.0 if self.count == 0 else 1.0 * self.cuda_time_total / self.count  # type: ignore[attr-defined]
  
@@ -465,7 +493,7 @@ index 7d0532d611..42f17defe5 100644
  
  class Interval(object):
      def __init__(self, start, end):
-@@ -384,7 +414,7 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -384,7 +416,7 @@ class FunctionEvent(FormattedTimesMixin):
      """Profiling information about a single function."""
      def __init__(
              self, id, name, thread, start_us, end_us, fwd_thread=None, input_shapes=None,
@@ -474,7 +502,7 @@ index 7d0532d611..42f17defe5 100644
              is_remote=False, sequence_nr=-1, node_id=-1, device_type=DeviceType.CPU, device_index=0,
              is_legacy=False, flops=None, trace_name=None):
          self.id: int = id
-@@ -400,9 +430,11 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -400,9 +432,11 @@ class FunctionEvent(FormattedTimesMixin):
          self.cpu_parent: Optional[FunctionEvent] = None
          self.input_shapes: Tuple[int, ...] = input_shapes
          self.stack: List = stack
@@ -486,7 +514,7 @@ index 7d0532d611..42f17defe5 100644
          self.is_async: bool = is_async
          self.is_remote: bool = is_remote
          self.sequence_nr: int = sequence_nr
-@@ -411,7 +443,7 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -411,7 +445,7 @@ class FunctionEvent(FormattedTimesMixin):
          self.is_legacy: bool = is_legacy
          self.flops: Optional[int] = flops
  
@@ -495,7 +523,7 @@ index 7d0532d611..42f17defe5 100644
          assert self.device_type == DeviceType.CPU
          self.kernels.append(Kernel(name, device, duration))
  
-@@ -456,6 +488,12 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -456,6 +490,12 @@ class FunctionEvent(FormattedTimesMixin):
              [child.cuda_memory_usage for child in self.cpu_children]
          )
  
@@ -508,7 +536,7 @@ index 7d0532d611..42f17defe5 100644
      @property
      def self_cpu_time_total(self):
          if self.is_async or self.device_type != DeviceType.CPU:
-@@ -471,14 +509,15 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -471,14 +511,15 @@ class FunctionEvent(FormattedTimesMixin):
          if self.device_type == DeviceType.CPU:
              if not self.is_legacy:
                  # account for the kernels in the children ops
@@ -528,7 +556,7 @@ index 7d0532d611..42f17defe5 100644
  
      @property
      def self_cuda_time_total(self):
-@@ -487,9 +526,10 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -487,9 +528,10 @@ class FunctionEvent(FormattedTimesMixin):
          if self.device_type == DeviceType.CPU:
              return self.cuda_time_total - \
                  sum([child.cuda_time_total for child in self.cpu_children])
@@ -541,7 +569,7 @@ index 7d0532d611..42f17defe5 100644
  
      @property
      def cpu_time_total(self):
-@@ -498,6 +538,27 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -498,6 +540,27 @@ class FunctionEvent(FormattedTimesMixin):
          else:
              return 0
  
@@ -569,7 +597,7 @@ index 7d0532d611..42f17defe5 100644
      @property
      def key(self):
          return self.name
-@@ -505,8 +566,8 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -505,8 +568,8 @@ class FunctionEvent(FormattedTimesMixin):
      def __repr__(self):
          return (
              '<FunctionEvent id={} name={} device_type={} node_id={} cpu_time={} start_us={} end_us={} '
@@ -580,7 +608,7 @@ index 7d0532d611..42f17defe5 100644
                  self.id,
                  self.name,
                  self.device_type,
-@@ -516,11 +577,14 @@ class FunctionEvent(FormattedTimesMixin):
+@@ -516,11 +579,14 @@ class FunctionEvent(FormattedTimesMixin):
                  self.time_range.end,
                  str([child.id for child in self.cpu_children]),
                  self.cuda_time_str,
@@ -595,7 +623,7 @@ index 7d0532d611..42f17defe5 100644
                  self.is_async,
                  self.is_remote,
                  self.sequence_nr,
-@@ -539,15 +603,20 @@ class FunctionEventAvg(FormattedTimesMixin):
+@@ -539,15 +605,20 @@ class FunctionEventAvg(FormattedTimesMixin):
          self.is_remote: bool = False
          self.cpu_time_total: int = 0
          self.cuda_time_total: int = 0
@@ -616,7 +644,7 @@ index 7d0532d611..42f17defe5 100644
          self.cpu_children: Optional[List[FunctionEvent]] = None
          self.cpu_parent: Optional[FunctionEvent] = None
          self.device_type: DeviceType = DeviceType.CPU
-@@ -567,6 +636,7 @@ class FunctionEventAvg(FormattedTimesMixin):
+@@ -567,6 +638,7 @@ class FunctionEventAvg(FormattedTimesMixin):
  
              self.input_shapes = other.input_shapes
              self.stack = other.stack
@@ -624,7 +652,7 @@ index 7d0532d611..42f17defe5 100644
              self.scope = other.scope
              self.device_type = other.device_type
              self.is_legacy = other.is_legacy
-@@ -575,12 +645,16 @@ class FunctionEventAvg(FormattedTimesMixin):
+@@ -575,12 +647,16 @@ class FunctionEventAvg(FormattedTimesMixin):
          assert other.key == self.key
          self.cpu_time_total += other.cpu_time_total
          self.cuda_time_total += other.cuda_time_total
@@ -641,7 +669,7 @@ index 7d0532d611..42f17defe5 100644
          self.count += other.count
          if self.flops is None:
              self.flops = other.flops
-@@ -594,16 +668,20 @@ class FunctionEventAvg(FormattedTimesMixin):
+@@ -594,16 +670,20 @@ class FunctionEventAvg(FormattedTimesMixin):
      def __repr__(self):
          return (
              '<FunctionEventAvg key={} self_cpu_time={} cpu_time={} '
@@ -664,15 +692,17 @@ index 7d0532d611..42f17defe5 100644
              )
          )
  
-@@ -684,6 +762,7 @@ def _build_table(
+@@ -683,7 +763,9 @@ def _build_table(
+         max_src_column_width=75,
          max_name_column_width=55,
          max_shapes_column_width=80,
++        max_depth=10,
          with_flops=False,
 +        with_calling_stack=False,
          profile_memory=False,
          top_level_events_only=False):
      """Prints a summary of events (which can be a list of FunctionEvent or FunctionEventAvg)."""
-@@ -692,13 +771,15 @@ def _build_table(
+@@ -692,13 +774,15 @@ def _build_table(
  
      has_cuda_time = any([event.self_cuda_time_total > 0 for event in events])
      has_cuda_mem = any([event.self_cuda_memory_usage > 0 for event in events])
@@ -689,17 +719,17 @@ index 7d0532d611..42f17defe5 100644
  
      name_column_width = max([len(evt.key) for evt in events]) + 4
      if max_name_column_width is not None:
-@@ -711,6 +792,9 @@ def _build_table(
+@@ -711,6 +795,9 @@ def _build_table(
      DEFAULT_COLUMN_WIDTH = 12
      flops_column_width = DEFAULT_COLUMN_WIDTH
  
-+    # cstack_column_width = max([len(str(evt.cstack[:max_depth])[1:-1]) for evt in events]) + 8
-+    # cstack_column_width = max(cstack_column_width, 20)
++    cstack_column_width = max([len(str(evt.cstack[:max_depth])[1:-1]) for evt in events]) + 8
++    cstack_column_width = max(cstack_column_width, 20)
 +
      src_column_width = None
      stacks = []
      for evt in events:
-@@ -737,6 +821,13 @@ def _build_table(
+@@ -737,6 +824,13 @@ def _build_table(
              'CUDA total',
              'CUDA time avg',
          ])
@@ -713,7 +743,7 @@ index 7d0532d611..42f17defe5 100644
      if profile_memory:
          headers.extend([
              'CPU Mem',
-@@ -747,6 +838,11 @@ def _build_table(
+@@ -747,6 +841,11 @@ def _build_table(
                  'CUDA Mem',
                  'Self CUDA Mem',
              ])
@@ -725,19 +755,18 @@ index 7d0532d611..42f17defe5 100644
      headers.append(
          '# of Calls'
      )
-@@ -806,6 +902,11 @@ def _build_table(
+@@ -806,6 +905,10 @@ def _build_table(
          else:
              with_flops = False  # can't find any valid flops
  
 +    if with_calling_stack:
-+        # headers.append('Calling Stack Tree'.ljust(cstack_column_width))
-+        # add_column(cstack_column_width)
-+        pass
++        headers.append('Calling Stack Tree'.ljust(cstack_column_width))
++        add_column(cstack_column_width)
 +
      row_format = row_format_lst[0]
      header_sep = header_sep_lst[0]
      line_length = line_length_lst[0]
-@@ -820,14 +921,19 @@ def _build_table(
+@@ -820,14 +923,19 @@ def _build_table(
  
      sum_self_cpu_time_total = sum([event.self_cpu_time_total for event in events])
      sum_self_cuda_time_total = 0
@@ -757,7 +786,7 @@ index 7d0532d611..42f17defe5 100644
  
      # Actual printing
      if header is not None:
-@@ -878,6 +984,14 @@ def _build_table(
+@@ -878,6 +986,14 @@ def _build_table(
                  evt.cuda_time_total_str,
                  evt.cuda_time_str,  # Cuda time avg
              ])
@@ -772,7 +801,7 @@ index 7d0532d611..42f17defe5 100644
          if profile_memory:
              row_values.extend([
                  # CPU Mem Total
-@@ -892,6 +1006,13 @@ def _build_table(
+@@ -892,6 +1008,13 @@ def _build_table(
                      # Self CUDA Mem Total
                      _format_memory(evt.self_cuda_memory_usage),
                  ])
@@ -786,21 +815,20 @@ index 7d0532d611..42f17defe5 100644
          row_values.append(
              evt.count,  # Number of calls
          )
-@@ -910,6 +1031,13 @@ def _build_table(
+@@ -910,6 +1033,12 @@ def _build_table(
              if len(evt.stack) > 0:
                  src_field = trim_path(evt.stack[0], src_column_width)
              row_values.append(src_field)
 +        if with_calling_stack:
-+            # if len(evt.cstack) > max_depth:
-+            #     cstack_str = str(evt.cstack[:max_depth])[1:-1] + ",..."
-+            # else:
-+            #     cstack_str = str(evt.cstack)[1:-1]
-+            # row_values.append(cstack_str.ljust(cstack_column_width))
-+            pass
++            if len(evt.cstack) > max_depth:
++                cstack_str = str(evt.cstack[:max_depth])[1:-1] + ",..."
++            else:
++                cstack_str = str(evt.cstack)[1:-1]
++            row_values.append(cstack_str.ljust(cstack_column_width))
          append(row_format.format(*row_values))
  
          if has_stack:
-@@ -919,8 +1047,11 @@ def _build_table(
+@@ -919,8 +1048,11 @@ def _build_table(
              empty_headers.append("")
              append(row_format.format(*empty_headers))
  
