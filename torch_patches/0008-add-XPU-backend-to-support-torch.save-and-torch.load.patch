@@ -1,7 +1,7 @@
 From 3f89d395c3a05359d3947972ced5318b4aa9268e Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Wed, 30 Nov 2022 20:38:02 +0000
-Subject: [PATCH 8/9] add XPU backend to support torch.save and torch.load
+Subject: [PATCH 08/10] add XPU backend to support torch.save and torch.load
  (#89679)
 
 We need to add XPU backend to support torch.save and torch.load when parameter _use_new_zipfile_serialization=False.

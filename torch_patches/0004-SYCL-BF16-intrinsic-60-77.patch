@@ -1,7 +1,7 @@
 From 1942c5fa9a93e3aab4b7ad1720ab2327f7395a60 Mon Sep 17 00:00:00 2001
 From: "Gu, Jinghui" <jinghui.gu@intel.com>
 Date: Wed, 16 Nov 2022 13:11:37 +0000
-Subject: [PATCH 4/9] SYCL BF16 intrinsic (#60) (#77)
+Subject: [PATCH 04/10] SYCL BF16 intrinsic (#60) (#77)
 
 * Add SYCL bfloat16 type support to c10::BFloat16
 ---

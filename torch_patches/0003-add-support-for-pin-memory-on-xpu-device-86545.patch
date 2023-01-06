@@ -1,7 +1,7 @@
 From 763de4eb63f883178735652545786cd0592d1a4a Mon Sep 17 00:00:00 2001
 From: leizhenyuan <zhenyuan.lei@intel.com>
 Date: Wed, 19 Oct 2022 13:24:48 +0000
-Subject: [PATCH 3/9] add support for pin memory on xpu device (#86545)
+Subject: [PATCH 03/10] add support for pin memory on xpu device (#86545)
 
 add support for pin memory on xpu device
 
