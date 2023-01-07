@@ -1,4 +1,5 @@
-# DPC++ Extension
+DPC++ Extension
+===============
 
 ## Introduction
 

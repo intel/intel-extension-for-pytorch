@@ -126,6 +126,7 @@ build_ios
 .build_release/*
 distribute/*
 dist/
+docs/_build/
 *.testbin
 *.bin
 cmake_build

@@ -1,4 +1,5 @@
-# Auto Mixed Precision (AMP) on CPU
+Auto Mixed Precision (AMP) on CPU
+=================================
 
 ## Introduction
 

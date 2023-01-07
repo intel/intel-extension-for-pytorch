@@ -45,7 +45,7 @@ Known Issues
     
     then clean build PyTorch\*.
 
-- OSError: `libmkl_intel_lp64.so.1`: cannot open shared object file: No such file or directory
+- OSError: `libmkl_intel_lp64.so.2`: cannot open shared object file: No such file or directory
 
     Wrong MKL library is used when multiple MKL libraries exist in system. Preload oneMKL by:
     

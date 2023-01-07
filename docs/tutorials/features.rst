@@ -66,9 +66,9 @@ On Intel® GPUs, quantization usages follow PyTorch default quantization APIs. C
 Distributed Training
 --------------------
 
-To meet demands of large scale model training over multiple devices, distributed training on Intel® GPUs and CPUs are supported. Two alternative methodologies are available. Users can choose either to use PyTorch native distributed training module, `Distributed Data Parallel (DDP) <https://pytorch.org/docs/stable/notes/ddp.html>`_, with `Intel® oneAPI Collective Communications Library (oneCCL) <https://www.intel.com/content/www/us/en/developer/tools/oneapi/oneccl.html>`_ support via `Intel® oneCCL Bindings for PyTorch (formerly known as torch_ccl) <https://github.com/intel/torch-ccl>`_ or use Horovod with `Intel® oneAPI Collective Communications Library (oneCCL) <https://www.intel.com/content/www/us/en/developer/tools/oneapi/oneccl.html>`_ support.
+To meet demands of large scale model training over multiple devices, distributed training on Intel® GPUs and CPUs are supported. Two alternative methodologies are available. Users can choose either to use PyTorch native distributed training module, `Distributed Data Parallel (DDP) <https://pytorch.org/docs/stable/notes/ddp.html>`_, with `Intel® oneAPI Collective Communications Library (oneCCL) <https://www.intel.com/content/www/us/en/developer/tools/oneapi/oneccl.html>`_ support via `Intel® oneCCL Bindings for PyTorch (formerly known as torch_ccl) <https://github.com/intel/torch-ccl>`_ or use Horovod with `Intel® oneAPI Collective Communications Library (oneCCL) <https://www.intel.com/content/www/us/en/developer/tools/oneapi/oneccl.html>`_ support (Experimental).
 
-For more detailed information, check `DDP <features/DDP.md>`_ and `Horovod <features/horovod.md>`_.
+For more detailed information, check `DDP <features/DDP.md>`_ and `Horovod (Experimental) <features/horovod.md>`_.
 
 .. toctree::
    :hidden:
@@ -122,8 +122,8 @@ For more detailed information, check `Advanced Configuration <features/advanced_
    features/advanced_configuration
 
 
-Legacy Profiler Tool
---------------------
+Legacy Profiler Tool (Experimental)
+-----------------------------------
 
 The legacy profiler tool is an extension of PyTorch* legacy profiler for profiling operators' overhead on XPU devices. With this tool, users can get the information in many fields of the run models or code scripts. User should build Intel® Extension for PyTorch* with profiler support as default and enable this tool by a `with` statement before the code segment.
 
@@ -135,8 +135,8 @@ For more detailed information, check `Legacy Profiler Tool <features/profiler_le
 
    features/profiler_legacy
 
-Simple Trace Tool
------------------
+Simple Trace Tool (Experimental)
+--------------------------------
 
 Simple Trace is a built-in debugging tool that lets you control printing out the call stack for a piece of code. Once enabled, it can automatically print out verbose messages of called operators in a stack format with indenting to distinguish the context. 
 

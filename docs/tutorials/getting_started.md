@@ -38,10 +38,10 @@ model = Model()
 data = ...
 dtype=torch.float32 # torch.bfloat16, torch.float16 (float16 only works on GPU)
 
-##### Run on GPU #####
+##### Run on GPU ######
 model = model.to('xpu')
 data = data.to('xpu')
-######################
+#######################
 
 model = ipex.optimize(model, dtype=dtype)
 

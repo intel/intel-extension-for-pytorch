@@ -1,4 +1,5 @@
-# Advanced Configuration
+Advanced Configuration
+======================
 
 The default settings for Intel® Extension for PyTorch\* are sufficient for most use cases. However, if users want to customize Intel® Extension for PyTorch\*, advanced configuration is available at build time and runtime. 
 

@@ -1,5 +1,5 @@
-
-# DLPack Solution
+DLPack Solution
+===============
 
 ## Introduction
 

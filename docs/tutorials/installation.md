@@ -16,10 +16,11 @@ Verified Hardware Platforms:
 
 |Hardware|OS|Driver|
 |-|-|-|
-|Intel® Data Center GPU Flex Series|Ubuntu 22.04, Red Hat 8.6|[Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)|
-|Intel® Data Center GPU Max Series|Red Hat 8.6, Sles 15sp3/sp4|[Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)|
+|Intel® Data Center GPU Flex Series|Ubuntu 22.04 (Validated), Red Hat 8.6|[Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)|
+|Intel® Data Center GPU Max Series|Red Hat 8.6, Sles 15sp3/sp4 (Validated)|[Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)|
 |Intel® Arc™ A-Series Graphics|Ubuntu 22.04|[Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)|
 |Intel® Arc™ A-Series Graphics|Windows 11 or Windows 10 21H2 (via WSL2)|[for Windows 11 or Windows 10 21H2](https://www.intel.com/content/www/us/en/download/726609/intel-arc-graphics-windows-dch-driver.html)|
+|CPU (3<sup>rd</sup> and 4<sup>th</sup> Gen of Intel® Xeon® Scalable Processors)|Linux\* distributions with glibc>=2.17. Validated on Ubuntu 18.04.|N/A|
 
 - Intel® oneAPI Base Toolkit 2023.0
 - Python 3.7-3.10
@@ -74,8 +75,10 @@ Prebuilt wheel files availability matrix for Python versions:
 
 ### Repositories for prebuilt wheel files
 
+Prebuilt wheel files for generic Python\* and Intel® Distribution for Python\* are released in separate repositories. Replace the place holder `<REPO_URL>` in installation commands with a real URL below.
+
 ```
-# Stock PyTorch
+# Generic Python
 REPO_URL: https://developer.intel.com/ipex-whl-stable-xpu
 
 # Intel® Distribution for Python*

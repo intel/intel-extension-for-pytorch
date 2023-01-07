@@ -1,5 +1,5 @@
-
-# Simple Trace Tool [EXPERIMENTAL]
+Simple Trace Tool (Experimental)
+================================
 
 ## Introduction
 
