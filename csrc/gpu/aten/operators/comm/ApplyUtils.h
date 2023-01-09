@@ -124,7 +124,7 @@ struct ApplyOp1 {
       Offsets... aOffsets) {
     // Convert 'linearIndex' into an offset of 'a'
     const IndexType aOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? IndexToOffset<scalar, IndexType, ADims>::get(linearIndex, a)
+        ? IndexToOffset<scalar, IndexType>::get(linearIndex, a)
         : 0;
     // Convert 'linearIndex' into an offset of input 'b'
     ApplyOp1<
@@ -269,11 +269,11 @@ struct ApplyOp2 {
       Offsets... bOffsets) {
     // Convert 'linearIndex' into an offset of 'a'
     const IndexType aOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? IndexToOffset<scalar1, IndexType, ADims>::get(linearIndex, a)
+        ? IndexToOffset<scalar1, IndexType>::get(linearIndex, a)
         : 0;
     // Convert 'linearIndex' into an offset of input 'b'
     const IndexType bOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? IndexToOffset<scalar2, IndexType, BDims>::get(linearIndex, b)
+        ? IndexToOffset<scalar2, IndexType>::get(linearIndex, b)
         : 0;
     ApplyOp2<
         Op,
@@ -496,15 +496,15 @@ struct ApplyOp3 {
       Offsets... cOffsets) {
     // Convert 'linearIndex' into an offset of 'a'
     const IndexType aOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? IndexToOffset<scalar1, IndexType, ADims>::get(linearIndex, a)
+        ? IndexToOffset<scalar1, IndexType>::get(linearIndex, a)
         : 0;
     // Convert 'linearIndex' into an offset of input 'b'
     const IndexType bOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? IndexToOffset<scalar2, IndexType, BDims>::get(linearIndex, b)
+        ? IndexToOffset<scalar2, IndexType>::get(linearIndex, b)
         : 0;
     // Convert 'linearIndex' into an offset of input 'c'
     const IndexType cOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? IndexToOffset<scalar3, IndexType, CDims>::get(linearIndex, c)
+        ? IndexToOffset<scalar3, IndexType>::get(linearIndex, c)
         : 0;
 
     ApplyOp3<
@@ -722,19 +722,19 @@ struct ApplyOp4 {
       Offsets... dOffsets) {
     // Convert 'linearIndex' into an offset of 'a'
     const IndexType aOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? IndexToOffset<scalar1, IndexType, ADims>::get(linearIndex, a)
+        ? IndexToOffset<scalar1, IndexType>::get(linearIndex, a)
         : 0;
     // Convert 'linearIndex' into an offset of input 'b'
     const IndexType bOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? IndexToOffset<scalar2, IndexType, BDims>::get(linearIndex, b)
+        ? IndexToOffset<scalar2, IndexType>::get(linearIndex, b)
         : 0;
     // Convert 'linearIndex' into an offset of input 'c'
     const IndexType cOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? IndexToOffset<scalar3, IndexType, CDims>::get(linearIndex, c)
+        ? IndexToOffset<scalar3, IndexType>::get(linearIndex, c)
         : 0;
     // Convert 'linearIndex' into an offset of input 'c'
     const IndexType dOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? IndexToOffset<scalar4, IndexType, DDims>::get(linearIndex, d)
+        ? IndexToOffset<scalar4, IndexType>::get(linearIndex, d)
         : 0;
 
     ApplyOp4<

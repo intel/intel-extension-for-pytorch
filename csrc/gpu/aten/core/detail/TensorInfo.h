@@ -129,7 +129,7 @@ int TensorInfo<T, IndexType>::outerSize(const int exclusive) {
 }
 
 // Translate a linear index for the apply to a T* offset;
-template <typename T, typename IndexType, /* deprecated */ int DIM = -1>
+template <typename T, typename IndexType, bool Trivial = false>
 struct IndexToOffset {
   static constexpr bool STRICT_CONTIGUOUS = true;
   static constexpr bool NON_STRICT_CONTIGUOUS = false;
@@ -156,9 +156,21 @@ struct IndexToOffset {
   }
 };
 
+template <typename T, typename IndexType>
+struct IndexToOffset<T, IndexType, true> {
+  static constexpr bool STRICT_CONTIGUOUS = true;
+  static constexpr bool NON_STRICT_CONTIGUOUS = false;
+  static inline IndexType get(
+      IndexType linearId,
+      const TensorInfo<T, IndexType>& info,
+      bool strict_contiguous = true) {
+    return linearId;
+  }
+};
+
 // OffsetInfo is a faster implementation of IndexToOffset that uses faster
-// integer division: we transform each division into integer multiplication by a
-// pre-computed constant.  (See IntDivider for details.)
+// integer division: we transform each division into integer multiplication by
+// a pre-computed constant.  (See IntDivider for details.)
 template <typename T, typename IndexType, int Dims>
 struct OffsetInfo {
   explicit OffsetInfo(const TensorInfo<T, IndexType>& tinfo) {
@@ -211,7 +223,7 @@ struct OffsetInfo<T, IndexType, -1> {
   explicit OffsetInfo(const TensorInfo<T, IndexType>& tinfo) : tinfo(tinfo) {}
 
   T* get(IndexType linearIndex) const {
-    IndexType offset = IndexToOffset<T, IndexType, -1>::get(linearIndex, tinfo);
+    IndexType offset = IndexToOffset<T, IndexType>::get(linearIndex, tinfo);
     return &tinfo.data[offset];
   }
 

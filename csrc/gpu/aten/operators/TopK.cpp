@@ -461,11 +461,11 @@ void gatherTopK(
       // Find the start offset for our slice
       IndexType slice = item_id.get_group_linear_id();
       IndexType sliceStartIndex =
-          IndexToOffset<T, IndexType, Dim>::get(slice, input);
+          IndexToOffset<T, IndexType>::get(slice, input);
       IndexType topKSliceStartIndex =
-          IndexToOffset<T, IndexType, Dim>::get(slice, topK);
+          IndexToOffset<T, IndexType>::get(slice, topK);
       IndexType indicesSliceStartIndex =
-          IndexToOffset<int64_t, IndexType, Dim>::get(slice, indices);
+          IndexToOffset<int64_t, IndexType>::get(slice, indices);
       T* inputSliceStart = in_data + sliceStartIndex;
       T* topKSliceStart = topk_data + topKSliceStartIndex;
       int64_t* indicesSliceStart = indices_data + indicesSliceStartIndex;

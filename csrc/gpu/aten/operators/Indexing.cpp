@@ -105,10 +105,14 @@ void indexSelect(
     TensorInfo<scalar_t, int64_t> dst_info =
         tensorInfoIfScalar(getTensorInfo<scalar_t, int64_t>(dst));
     TensorInfo<scalar_t, int64_t> src_info =
-        tensorInfoIfScalar(getTensorInfo<scalar_t, int64_t>(src));
+        tensorInfoIfScalar(getTensorInfo<scalar_t, int64_t>(src.contiguous()));
     int new_indexing_dim = src_info.collapseDims(dim);
 
-    _index_select_kernel(src_info, dst_info, indices_info, new_indexing_dim);
+    _index_select_kernel<
+        decltype(src_info),
+        decltype(dst_info),
+        decltype(indices_info),
+        true>(src_info, dst_info, indices_info, new_indexing_dim);
   });
   return;
 }

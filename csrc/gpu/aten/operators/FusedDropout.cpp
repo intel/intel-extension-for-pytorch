@@ -158,7 +158,7 @@ inline void fused_dropout_kernel(
       if (li < totalElements) {
         // Convert `linearIndex` into an offset of `a`
         const IndexType aOffset =
-            IndexToOffset<scalar_t, IndexType, ADims>::get(li, a);
+            IndexToOffset<scalar_t, IndexType>::get(li, a);
         src[ii] = a.data[aOffset];
       }
     }
@@ -168,7 +168,7 @@ inline void fused_dropout_kernel(
       if (li < totalElements) {
         // Convert `linearIndex` into an offset of `b`
         const IndexType bOffset =
-            IndexToOffset<scalar_t, IndexType, BDims>::get(li, b);
+            IndexToOffset<scalar_t, IndexType>::get(li, b);
         b.data[bOffset] = src[ii] * (&rand.x)[ii] * scale;
         c.data[bOffset] = (mask_t)(&rand.x)[ii];
       }

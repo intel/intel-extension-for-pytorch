@@ -155,7 +155,7 @@ class IndexKernelConfig : public BatchKernelConfig {
   FuncType func_;
 };
 
-template <class IdxConfig>
+template <class IdxConfig, bool TrivialOffCal>
 class IndexKernel {
  public:
   using ValType = typename IdxConfig::ValType;
@@ -252,28 +252,40 @@ class IndexKernel {
           fixing_logical_off(id, glb_batch_group, idx_logical_off);
     }
 
-    if (cfg_.indexing_dst_) {
-      // index_copy, index_add, index_fill
-      dst_off = IndexToOffset<ValType, int64_t>::get(
-          glb_indexing_logical_off,
-          cfg_.dinfo_,
-          IndexToOffset<ValType, int64_t>::NON_STRICT_CONTIGUOUS);
-      if (cfg_.sinfo_.data != nullptr) {
-        src_off = IndexToOffset<ValType, int64_t>::get(
-            glb_fixing_logical_off,
-            cfg_.sinfo_,
-            IndexToOffset<ValType, int64_t>::NON_STRICT_CONTIGUOUS);
+    if constexpr (TrivialOffCal) {
+      if (cfg_.indexing_dst_) {
+        dst_off = glb_indexing_logical_off;
+        if (cfg_.sinfo_.data != nullptr) {
+          src_off = glb_fixing_logical_off;
+        }
+      } else {
+        src_off = glb_indexing_logical_off;
+        dst_off = glb_fixing_logical_off;
       }
     } else {
-      // index_select
-      src_off = IndexToOffset<ValType, int64_t>::get(
-          glb_indexing_logical_off,
-          cfg_.sinfo_,
-          IndexToOffset<ValType, int64_t>::NON_STRICT_CONTIGUOUS);
-      dst_off = IndexToOffset<ValType, int64_t>::get(
-          glb_fixing_logical_off,
-          cfg_.dinfo_,
-          IndexToOffset<ValType, int64_t>::NON_STRICT_CONTIGUOUS);
+      if (cfg_.indexing_dst_) {
+        // index_copy, index_add, index_fill
+        dst_off = IndexToOffset<ValType, int64_t>::get(
+            glb_indexing_logical_off,
+            cfg_.dinfo_,
+            IndexToOffset<ValType, int64_t>::NON_STRICT_CONTIGUOUS);
+        if (cfg_.sinfo_.data != nullptr) {
+          src_off = IndexToOffset<ValType, int64_t>::get(
+              glb_fixing_logical_off,
+              cfg_.sinfo_,
+              IndexToOffset<ValType, int64_t>::NON_STRICT_CONTIGUOUS);
+        }
+      } else {
+        // index_select
+        src_off = IndexToOffset<ValType, int64_t>::get(
+            glb_indexing_logical_off,
+            cfg_.sinfo_,
+            IndexToOffset<ValType, int64_t>::NON_STRICT_CONTIGUOUS);
+        dst_off = IndexToOffset<ValType, int64_t>::get(
+            glb_fixing_logical_off,
+            cfg_.dinfo_,
+            IndexToOffset<ValType, int64_t>::NON_STRICT_CONTIGUOUS);
+      }
     }
 
     cfg_.func_(
@@ -289,11 +301,11 @@ class IndexKernel {
   IdxConfig cfg_;
 };
 
-template <class IdxConfig>
+template <class IdxConfig, bool TrivialOffCal = false>
 static inline void launch_index_kernel(IdxConfig& cfg) {
   auto& queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    IndexKernel<IdxConfig> idx_ker(cfg);
+    IndexKernel<IdxConfig, TrivialOffCal> idx_ker(cfg);
     __cgh.parallel_for(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), idx_ker);
   };
@@ -427,7 +439,11 @@ class IndexSelectOperator {
   }
 };
 
-template <class SrcInfo, class DstInfo, class IdxInfo>
+template <
+    class SrcInfo,
+    class DstInfo,
+    class IdxInfo,
+    bool TrivialOffCal = false>
 static inline void _index_select_kernel(
     SrcInfo& src_info,
     DstInfo& dst_info,
@@ -447,7 +463,7 @@ static inline void _index_select_kernel(
           dim,
           false,
           IndexSelectOperator<scalar_t>());
-  launch_index_kernel(cfg);
+  launch_index_kernel<decltype(cfg), TrivialOffCal>(cfg);
 }
 
 // DPCPP suggest: it’s possible (and even desirable) to oversubscribe tasks to

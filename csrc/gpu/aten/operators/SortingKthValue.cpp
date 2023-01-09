@@ -55,11 +55,11 @@ void gatherKthValue(
 
       // Find the start offset for our slice
       auto sliceStartIndex =
-          IndexToOffset<scalar_t, index_t, Dim>::get(slice, input);
+          IndexToOffset<scalar_t, index_t>::get(slice, input);
       auto kthValueSliceStartIndex =
-          IndexToOffset<scalar_t, index_t, Dim>::get(slice, kthValue);
+          IndexToOffset<scalar_t, index_t>::get(slice, kthValue);
       auto indicesSliceStartIndex =
-          IndexToOffset<int64_t, index_t, Dim>::get(slice, indices);
+          IndexToOffset<int64_t, index_t>::get(slice, indices);
 
       scalar_t* inputSliceStart = in_data + sliceStartIndex;
       scalar_t* kthValueSliceStart = kth_data + kthValueSliceStartIndex;
@@ -143,11 +143,11 @@ void gatherMedian(
 
       // Finds the start offset for our slice
       index_t valuesSliceStartIndex =
-          IndexToOffset<scalar_t, index_t, Dim>::get(slice, values);
+          IndexToOffset<scalar_t, index_t>::get(slice, values);
       index_t indicesSliceStartIndex =
-          IndexToOffset<int64_t, index_t, Dim>::get(slice, indices);
+          IndexToOffset<int64_t, index_t>::get(slice, indices);
       index_t inputSliceStartIndex =
-          IndexToOffset<scalar_t, index_t, Dim>::get(slice, input);
+          IndexToOffset<scalar_t, index_t>::get(slice, input);
 
       scalar_t* valuesSliceStart = values_data + valuesSliceStartIndex;
       int64_t* indicesSliceStart = indices_data + indicesSliceStartIndex;

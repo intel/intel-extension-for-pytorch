@@ -49,7 +49,7 @@ void fillSliceWithIndex(
       IndexType local_id = item_id.get_local_id(0);
       IndexType slice = item_id.get_group_linear_id();
       const uint64_t offset =
-          IndexToOffset<int64_t, IndexType, Dim>::get(slice, out);
+          IndexToOffset<int64_t, IndexType>::get(slice, out);
       int64_t* base = out_data + offset;
 
       for (IndexType i = local_id; i < sliceSize;

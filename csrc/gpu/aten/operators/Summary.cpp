@@ -77,7 +77,7 @@ void kernelHistogram1D(
         const IndexType bin =
             getBin<input_t, IndexType>(bVal, minvalue, maxvalue, nbins);
         const IndexType aOffset =
-            IndexToOffset<output_t, IndexType, ADims>::get(bin, a);
+            IndexToOffset<output_t, IndexType>::get(bin, a);
         atomicAdd(
             (dpcpp_global_ptr_pt<output_t>)&out_ptr[aOffset],
             getOp(weight_ptr, linearIndex));
@@ -122,7 +122,7 @@ bool dpcpp_tensor_histogram(
     auto cInfo = getTensorInfo<output_t, IndexType>(c);
     const auto getWeightsOp = [cInfo](output_t* cPtr, IndexType cIndex) {
       const IndexType cOffset =
-          IndexToOffset<output_t, IndexType, 1>::get(cIndex, cInfo);
+          IndexToOffset<output_t, IndexType>::get(cIndex, cInfo);
       return cPtr[cOffset];
     };
     HANDLE_CASE(getWeightsOp, true);
