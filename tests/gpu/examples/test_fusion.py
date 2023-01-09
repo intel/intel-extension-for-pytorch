@@ -663,6 +663,14 @@ class Conv2dBinaryMul(torch.nn.Module):
     def forward(self, x, a):
         return torch.mul(self.conv(x), x)
 
+class Conv2dBinaryMulScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryMulScalar, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.mul(self.conv(x), 3.)
+
 class Conv2dBinaryMulAdd(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryMulAdd, self).__init__()
@@ -680,6 +688,14 @@ class Conv2dBinaryDiv(torch.nn.Module):
     def forward(self, x, a):
         return torch.div(self.conv(x), x)
 
+class Conv2dBinaryDivScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryDivScalar, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.div(self.conv(x), 3.)
+
 class Conv2dBinarySub(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinarySub, self).__init__()
@@ -687,6 +703,14 @@ class Conv2dBinarySub(torch.nn.Module):
 
     def forward(self, x, a):
         return self.conv(x) - a
+
+class Conv2dBinarySubScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinarySubScalar, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return self.conv(x) - 3.
 
 class Conv2dBinaryEqual(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -696,6 +720,14 @@ class Conv2dBinaryEqual(torch.nn.Module):
     def forward(self, x, a):
         return torch.eq(self.conv(x), a)
 
+class Conv2dBinaryEqualScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryEqualScalar, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.eq(self.conv(x), 3.)
+
 class Conv2dBinaryNotEqual(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryNotEqual, self).__init__()
@@ -703,6 +735,14 @@ class Conv2dBinaryNotEqual(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.ne(self.conv(x), a)
+
+class Conv2dBinaryNotEqualScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryNotEqualScalar, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.ne(self.conv(x), 3.)
 
 class Conv2dBinaryMin(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -712,6 +752,14 @@ class Conv2dBinaryMin(torch.nn.Module):
     def forward(self, x, a):
         return torch.min(self.conv(x), a)
 
+class Conv2dBinaryMinScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryMinScalar, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.min(self.conv(x), torch.tensor(3.))
+
 class Conv2dBinaryMax(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryMax, self).__init__()
@@ -719,6 +767,14 @@ class Conv2dBinaryMax(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.max(self.conv(x), a)
+
+class Conv2dBinaryMaxScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryMaxScalar, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.max(self.conv(x), torch.tensor(3.))
 
 class Conv2dBinaryGE(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -728,6 +784,14 @@ class Conv2dBinaryGE(torch.nn.Module):
     def forward(self, x, a):
         return torch.ge(self.conv(x), a)
 
+class Conv2dBinaryGEScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryGEScalar, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.ge(self.conv(x), 3.)
+
 class Conv2dBinaryGT(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryGT, self).__init__()
@@ -735,6 +799,14 @@ class Conv2dBinaryGT(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.gt(self.conv(x), a)
+
+class Conv2dBinaryGTScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryGTScalar, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.gt(self.conv(x), 3.)
 
 class Conv2dBinaryLE(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -744,6 +816,14 @@ class Conv2dBinaryLE(torch.nn.Module):
     def forward(self, x, a):
         return torch.le(self.conv(x), a)
 
+class Conv2dBinaryLEScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryLEScalar, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.le(self.conv(x), 3.)
+
 class Conv2dBinaryLT(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryLT, self).__init__()
@@ -751,6 +831,14 @@ class Conv2dBinaryLT(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.lt(self.conv(x), a)
+
+class Conv2dBinaryLTScalar(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBinaryLTScalar, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x, a):
+        return torch.lt(self.conv(x), 3.)
 
 
 class PadConv2d(torch.nn.Module):
@@ -1882,9 +1970,15 @@ class TestNNMethod(TestCase):
 
         model = Conv2dBinaryMul(2, 2, kernel_size=1, stride=1, bias=True)
         model1 = copy.deepcopy(model)
+        model_scalar = Conv2dBinaryMulScalar(2, 2, kernel_size=1, stride=1, bias=True)
+        model_scalar1 = copy.deepcopy(model)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script)
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+        y, y_script = conv2d_fusion(x, a1, model_scalar, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model_scalar1, print_graph)
         self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
 
     def test_conv_binary_mul_add_fusion(self, dtype=torch.float):
@@ -1914,9 +2008,15 @@ class TestNNMethod(TestCase):
 
         model = Conv2dBinarySub(2, 2, kernel_size=3, stride=1, bias=True)
         model1 = copy.deepcopy(model)
+        model_scalar = Conv2dBinarySubScalar(2, 2, kernel_size=3, stride=1, bias=True)
+        model_scalar1 = copy.deepcopy(model_scalar)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script)
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+        y, y_script = conv2d_fusion(x, a1, model_scalar, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model_scalar1, print_graph)
         self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
 
     def test_conv_binary_div_fusion(self, dtype=torch.float):
@@ -1930,9 +2030,15 @@ class TestNNMethod(TestCase):
 
         model = Conv2dBinaryDiv(2, 2, kernel_size=1, stride=1, bias=True)
         model1 = copy.deepcopy(model)
+        model_scalar = Conv2dBinaryDivScalar(2, 2, kernel_size=1, stride=1, bias=True)
+        model_scalar1 = copy.deepcopy(model_scalar)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script)
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+        y, y_script = conv2d_fusion(x, a1, model_scalar, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model_scalar1, print_graph)
         self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
 
     def test_conv_binary_eq_fusion(self, dtype=torch.float):
@@ -1946,9 +2052,15 @@ class TestNNMethod(TestCase):
 
         model = Conv2dBinaryEqual(2, 2, kernel_size=3, stride=1, bias=True)
         model1 = copy.deepcopy(model)
+        model_scalar = Conv2dBinaryEqualScalar(2, 2, kernel_size=3, stride=1, bias=True)
+        model_scalar1 = copy.deepcopy(model_scalar)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script.bool())
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
+        y, y_script = conv2d_fusion(x, a1, model_scalar, print_graph)
+        self.assertEqual(y, y_script.bool())
+        y, y_script = _conv_fusion(x, a1, model_scalar1, print_graph)
         self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
 
     def test_conv_binary_ne_fusion(self, dtype=torch.float):
@@ -1962,9 +2074,15 @@ class TestNNMethod(TestCase):
 
         model = Conv2dBinaryNotEqual(2, 2, kernel_size=3, stride=1, bias=True)
         model1 = copy.deepcopy(model)
+        model_scalar = Conv2dBinaryNotEqualScalar(2, 2, kernel_size=3, stride=1, bias=True)
+        model_scalar1 = copy.deepcopy(model_scalar)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script.bool())
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
+        y, y_script = conv2d_fusion(x, a1, model_scalar, print_graph)
+        self.assertEqual(y, y_script.bool())
+        y, y_script = _conv_fusion(x, a1, model_scalar1, print_graph)
         self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
 
     def test_conv_binary_max_fusion(self, dtype=torch.float):
@@ -1978,9 +2096,15 @@ class TestNNMethod(TestCase):
 
         model = Conv2dBinaryMax(2, 2, kernel_size=3, stride=1, bias=True)
         model1 = copy.deepcopy(model)
+        model_scalar = Conv2dBinaryMaxScalar(2, 2, kernel_size=3, stride=1, bias=True)
+        model_scalar1 = copy.deepcopy(model_scalar)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script)
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+        y, y_script = conv2d_fusion(x, a1, model_scalar, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model_scalar1, print_graph)
         self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
 
     def test_conv_binary_min_fusion(self, dtype=torch.float):
@@ -1994,9 +2118,15 @@ class TestNNMethod(TestCase):
 
         model = Conv2dBinaryMin(2, 2, kernel_size=3, stride=1, bias=True)
         model1 = copy.deepcopy(model)
+        model_scalar = Conv2dBinaryMinScalar(2, 2, kernel_size=3, stride=1, bias=True)
+        model_scalar1 = copy.deepcopy(model_scalar)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script)
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+        y, y_script = conv2d_fusion(x, a1, model_scalar, print_graph)
+        self.assertEqual(y, y_script)
+        y, y_script = _conv_fusion(x, a1, model_scalar1, print_graph)
         self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
 
     def test_conv_binary_gt_fusion(self, dtype=torch.float):
@@ -2010,9 +2140,15 @@ class TestNNMethod(TestCase):
 
         model = Conv2dBinaryGT(2, 2, kernel_size=3, stride=1, bias=True)
         model1 = copy.deepcopy(model)
+        model_scalar = Conv2dBinaryGTScalar(2, 2, kernel_size=3, stride=1, bias=True)
+        model_scalar1 = copy.deepcopy(model_scalar)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script.bool())
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
+        y, y_script = conv2d_fusion(x, a1, model_scalar, print_graph)
+        self.assertEqual(y, y_script.bool())
+        y, y_script = _conv_fusion(x, a1, model_scalar1, print_graph)
         self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
 
     def test_conv_binary_ge_fusion(self, dtype=torch.float):
@@ -2026,9 +2162,15 @@ class TestNNMethod(TestCase):
 
         model = Conv2dBinaryGE(2, 2, kernel_size=3, stride=1, bias=True)
         model1 = copy.deepcopy(model)
+        model_scalar = Conv2dBinaryGEScalar(2, 2, kernel_size=3, stride=1, bias=True)
+        model_scalar1 = copy.deepcopy(model_scalar)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script.bool())
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
+        y, y_script = conv2d_fusion(x, a1, model_scalar, print_graph)
+        self.assertEqual(y, y_script.bool())
+        y, y_script = _conv_fusion(x, a1, model_scalar1, print_graph)
         self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
 
     def test_conv_binary_lt_fusion(self, dtype=torch.float):
@@ -2042,9 +2184,15 @@ class TestNNMethod(TestCase):
 
         model = Conv2dBinaryLT(2, 2, kernel_size=3, stride=1, bias=True)
         model1 = copy.deepcopy(model)
+        model_scalar = Conv2dBinaryLTScalar(2, 2, kernel_size=3, stride=1, bias=True)
+        model_scalar1 = copy.deepcopy(model_scalar)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script.bool())
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
+        y, y_script = conv2d_fusion(x, a1, model_scalar, print_graph)
+        self.assertEqual(y, y_script.bool())
+        y, y_script = _conv_fusion(x, a1, model_scalar1, print_graph)
         self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
 
     def test_conv_binary_le_fusion(self, dtype=torch.float):
@@ -2058,9 +2206,15 @@ class TestNNMethod(TestCase):
 
         model = Conv2dBinaryLE(2, 2, kernel_size=3, stride=1, bias=True)
         model1 = copy.deepcopy(model)
+        model_scalar = Conv2dBinaryLEScalar(2, 2, kernel_size=3, stride=1, bias=True)
+        model_scalar1 = copy.deepcopy(model_scalar)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script.bool())
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
+        self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
+        y, y_script = conv2d_fusion(x, a1, model_scalar, print_graph)
+        self.assertEqual(y, y_script.bool())
+        y, y_script = _conv_fusion(x, a1, model_scalar1, print_graph)
         self.assertEqual(y, y_script.bool(), atol=1e3, rtol=1e3)
 
     def test_pad_conv_fusion(self, dtype=torch.float):

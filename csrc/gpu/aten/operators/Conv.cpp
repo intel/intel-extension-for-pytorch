@@ -3,10 +3,15 @@
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
 #include <tensor/Tensor.h>
+#include <vector>
 
 #include <oneDNN/oneDNN.h>
+#include "ATen/core/ATen_fwd.h"
 #include "ATen/core/interned_strings.h"
+#include "ATen/ops/full.h"
 #include "ATen/ops/neg.h"
+#include "c10/core/Scalar.h"
+#include "c10/util/Exception.h"
 #include "c10/util/Optional.h"
 #include "comm/ParamUtils.h"
 #include "comm/RegistrationDeclarations.h"
@@ -38,7 +43,11 @@ namespace {
 #define DEFINE_BINARY_FUNC(func)                          \
   static Tensor func(Tensor& src, const Tensor& binary) { \
     return AtenIpexTypeXPU::func(src, binary);            \
+  }                                                       \
+  static Tensor func(Tensor& src, const Scalar& binary) { \
+    return AtenIpexTypeXPU::func(src, binary);            \
   }
+
 DEFINE_BINARY_FUNC(mul)
 DEFINE_BINARY_FUNC(div)
 DEFINE_BINARY_FUNC(eq)
@@ -54,6 +63,14 @@ static Tensor min(Tensor& src, const Tensor& binary) {
 }
 static Tensor max(Tensor& src, const Tensor& binary) {
   return at::fmax(src, binary);
+}
+static Tensor min(Tensor& src, const Scalar& binary) {
+  Tensor binary_tensor = at::full_like(src, binary);
+  return at::fmin(src, binary_tensor);
+}
+static Tensor max(Tensor& src, const Scalar& binary) {
+  Tensor binary_tensor = at::full_like(src, binary);
+  return at::fmax(src, binary_tensor);
 }
 
 /* IPEX_CONV_DEFINATION
@@ -119,98 +136,180 @@ signiture.
         att);                                                      \
   }
 
-#define IPEX_CONV_BINARY_DEFINATION(op)                            \
-  Tensor _convolution_binary_##op(                                 \
-      const Tensor& input_r,                                       \
-      const Tensor& weight_r,                                      \
-      const c10::optional<Tensor>& bias,                           \
-      std::vector<int64_t> stride_,                                \
-      std::vector<int64_t> padding_,                               \
-      std::vector<int64_t> dilation_,                              \
-      bool transposed,                                             \
-      std::vector<int64_t> output_padding_,                        \
-      int64_t groups_,                                             \
-      bool benchmark,                                              \
-      bool deterministic,                                          \
-      bool cudnn_enabled,                                          \
-      bool allow_tf32,                                             \
-      const Tensor& binary) {                                      \
-    Attr attr;                                                     \
-    auto ndim = input_r.ndimension();                              \
-    auto output_size = conv_dst_tz(                                \
-        ndim,                                                      \
-        input_r.sizes(),                                           \
-        weight_r.sizes(),                                          \
-        padding_,                                                  \
-        padding_,                                                  \
-        stride_,                                                   \
-        dilation_);                                                \
-    Tensor out = at::empty(output_size, input_r.options());        \
-    bool binary_enabled = xpu::oneDNN::binary_valid(out, binary);  \
-    if (binary_enabled) {                                          \
-      attr.append_post_binary(attr.kind_with_binary_##op, binary); \
-    }                                                              \
-    Tensor output_r;                                               \
-    Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor(); \
-    Tensor ret = _convolution_out(                                 \
-        output_r,                                                  \
-        input_r,                                                   \
-        weight_r,                                                  \
-        bias_,                                                     \
-        stride_,                                                   \
-        padding_,                                                  \
-        dilation_,                                                 \
-        false,                                                     \
-        {{0, 0}},                                                  \
-        groups_,                                                   \
-        attr);                                                     \
-    if (!binary_enabled) {                                         \
-      return op(ret, binary);                                      \
-    }                                                              \
-    return ret;                                                    \
-  }                                                                \
-  Tensor convolution_binary_##op(                                  \
-      const Tensor& input_r,                                       \
-      const Tensor& weight_r,                                      \
-      const c10::optional<Tensor>& bias,                           \
-      std::vector<int64_t> stride_,                                \
-      std::vector<int64_t> padding_,                               \
-      std::vector<int64_t> dilation_,                              \
-      int64_t groups_,                                             \
-      const Tensor& binary) {                                      \
-    Attr attr;                                                     \
-    auto ndim = input_r.ndimension();                              \
-    auto output_size = conv_dst_tz(                                \
-        ndim,                                                      \
-        input_r.sizes(),                                           \
-        weight_r.sizes(),                                          \
-        padding_,                                                  \
-        padding_,                                                  \
-        stride_,                                                   \
-        dilation_);                                                \
-    Tensor out = at::empty(output_size, input_r.options());        \
-    bool binary_enabled = xpu::oneDNN::binary_valid(out, binary);  \
-    if (binary_enabled) {                                          \
-      attr.append_post_binary(attr.kind_with_binary_##op, binary); \
-    }                                                              \
-    Tensor output_r;                                               \
-    Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor(); \
-    Tensor ret = _convolution_out(                                 \
-        output_r,                                                  \
-        input_r,                                                   \
-        weight_r,                                                  \
-        bias_,                                                     \
-        stride_,                                                   \
-        padding_,                                                  \
-        dilation_,                                                 \
-        false,                                                     \
-        {{0, 0}},                                                  \
-        groups_,                                                   \
-        attr);                                                     \
-    if (!binary_enabled) {                                         \
-      return op(ret, binary);                                      \
-    }                                                              \
-    return ret;                                                    \
+#define IPEX_CONV_BINARY_DEFINATION(op)                                 \
+  Tensor _convolution_binary_##op(                                      \
+      const Tensor& input_r,                                            \
+      const Tensor& weight_r,                                           \
+      const c10::optional<Tensor>& bias,                                \
+      std::vector<int64_t> stride_,                                     \
+      std::vector<int64_t> padding_,                                    \
+      std::vector<int64_t> dilation_,                                   \
+      bool transposed,                                                  \
+      std::vector<int64_t> output_padding_,                             \
+      int64_t groups_,                                                  \
+      bool benchmark,                                                   \
+      bool deterministic,                                               \
+      bool cudnn_enabled,                                               \
+      bool allow_tf32,                                                  \
+      const Tensor& binary) {                                           \
+    Attr attr;                                                          \
+    auto ndim = input_r.ndimension();                                   \
+    auto output_size = conv_dst_tz(                                     \
+        ndim,                                                           \
+        input_r.sizes(),                                                \
+        weight_r.sizes(),                                               \
+        padding_,                                                       \
+        padding_,                                                       \
+        stride_,                                                        \
+        dilation_);                                                     \
+    Tensor out = at::empty(output_size, input_r.options());             \
+    bool binary_enabled = xpu::oneDNN::binary_valid(out, binary);       \
+    if (binary_enabled) {                                               \
+      attr.append_post_binary(attr.kind_with_binary_##op, binary);      \
+    }                                                                   \
+    Tensor output_r;                                                    \
+    Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();      \
+    Tensor ret = _convolution_out(                                      \
+        output_r,                                                       \
+        input_r,                                                        \
+        weight_r,                                                       \
+        bias_,                                                          \
+        stride_,                                                        \
+        padding_,                                                       \
+        dilation_,                                                      \
+        false,                                                          \
+        {{0, 0}},                                                       \
+        groups_,                                                        \
+        attr);                                                          \
+    if (!binary_enabled) {                                              \
+      return op(ret, binary);                                           \
+    }                                                                   \
+    return ret;                                                         \
+  }                                                                     \
+  Tensor convolution_binary_##op(                                       \
+      const Tensor& input_r,                                            \
+      const Tensor& weight_r,                                           \
+      const c10::optional<Tensor>& bias,                                \
+      std::vector<int64_t> stride_,                                     \
+      std::vector<int64_t> padding_,                                    \
+      std::vector<int64_t> dilation_,                                   \
+      int64_t groups_,                                                  \
+      const Tensor& binary) {                                           \
+    Attr attr;                                                          \
+    auto ndim = input_r.ndimension();                                   \
+    auto output_size = conv_dst_tz(                                     \
+        ndim,                                                           \
+        input_r.sizes(),                                                \
+        weight_r.sizes(),                                               \
+        padding_,                                                       \
+        padding_,                                                       \
+        stride_,                                                        \
+        dilation_);                                                     \
+    Tensor out = at::empty(output_size, input_r.options());             \
+    bool binary_enabled = xpu::oneDNN::binary_valid(out, binary);       \
+    if (binary_enabled) {                                               \
+      attr.append_post_binary(attr.kind_with_binary_##op, binary);      \
+    }                                                                   \
+    Tensor output_r;                                                    \
+    Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();      \
+    Tensor ret = _convolution_out(                                      \
+        output_r,                                                       \
+        input_r,                                                        \
+        weight_r,                                                       \
+        bias_,                                                          \
+        stride_,                                                        \
+        padding_,                                                       \
+        dilation_,                                                      \
+        false,                                                          \
+        {{0, 0}},                                                       \
+        groups_,                                                        \
+        attr);                                                          \
+    if (!binary_enabled) {                                              \
+      return op(ret, binary);                                           \
+    }                                                                   \
+    return ret;                                                         \
+  }                                                                     \
+  Tensor _convolution_binary_##op##_scalar(                             \
+      const Tensor& input_r,                                            \
+      const Tensor& weight_r,                                           \
+      const c10::optional<Tensor>& bias,                                \
+      std::vector<int64_t> stride_,                                     \
+      std::vector<int64_t> padding_,                                    \
+      std::vector<int64_t> dilation_,                                   \
+      bool transposed,                                                  \
+      std::vector<int64_t> output_padding_,                             \
+      int64_t groups_,                                                  \
+      bool benchmark,                                                   \
+      bool deterministic,                                               \
+      bool cudnn_enabled,                                               \
+      bool allow_tf32,                                                  \
+      const Scalar& binary) {                                           \
+    Attr attr;                                                          \
+    auto ndim = input_r.ndimension();                                   \
+    auto output_size = conv_dst_tz(                                     \
+        ndim,                                                           \
+        input_r.sizes(),                                                \
+        weight_r.sizes(),                                               \
+        padding_,                                                       \
+        padding_,                                                       \
+        stride_,                                                        \
+        dilation_);                                                     \
+    Tensor out = at::empty(output_size, input_r.options());             \
+    Tensor binary_tensor = at::full_like(out, binary);                  \
+    attr.append_post_binary(attr.kind_with_binary_##op, binary_tensor); \
+    Tensor output_r;                                                    \
+    Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();      \
+    Tensor ret = _convolution_out(                                      \
+        output_r,                                                       \
+        input_r,                                                        \
+        weight_r,                                                       \
+        bias_,                                                          \
+        stride_,                                                        \
+        padding_,                                                       \
+        dilation_,                                                      \
+        false,                                                          \
+        {{0, 0}},                                                       \
+        groups_,                                                        \
+        attr);                                                          \
+    return ret;                                                         \
+  }                                                                     \
+  Tensor convolution_binary_##op##_scalar(                              \
+      const Tensor& input_r,                                            \
+      const Tensor& weight_r,                                           \
+      const c10::optional<Tensor>& bias,                                \
+      std::vector<int64_t> stride_,                                     \
+      std::vector<int64_t> padding_,                                    \
+      std::vector<int64_t> dilation_,                                   \
+      int64_t groups_,                                                  \
+      const Scalar& binary) {                                           \
+    Attr attr;                                                          \
+    auto ndim = input_r.ndimension();                                   \
+    auto output_size = conv_dst_tz(                                     \
+        ndim,                                                           \
+        input_r.sizes(),                                                \
+        weight_r.sizes(),                                               \
+        padding_,                                                       \
+        padding_,                                                       \
+        stride_,                                                        \
+        dilation_);                                                     \
+    Tensor out = at::empty(output_size, input_r.options());             \
+    Tensor binary_tensor = at::full_like(out, binary);                  \
+    attr.append_post_binary(attr.kind_with_binary_##op, binary_tensor); \
+    Tensor output_r;                                                    \
+    Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();      \
+    Tensor ret = _convolution_out(                                      \
+        output_r,                                                       \
+        input_r,                                                        \
+        weight_r,                                                       \
+        bias_,                                                          \
+        stride_,                                                        \
+        padding_,                                                       \
+        dilation_,                                                      \
+        false,                                                          \
+        {{0, 0}},                                                       \
+        groups_,                                                        \
+        attr);                                                          \
+    return ret;                                                         \
   }
 
 } // namespace
@@ -1617,6 +1716,114 @@ Tensor convolution_sum(
   return res;
 }
 
+Tensor convolution_sum_scalar(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const c10::optional<Tensor>& bias,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    int64_t groups_,
+    const Scalar& binary,
+    Scalar scale) {
+  bool is_fused;
+  Tensor output;
+  Tensor bias_r = bias.has_value() ? bias.value() : at::Tensor();
+  auto ndim = input_r.ndimension();
+  auto output_size = conv_dst_tz(
+      ndim,
+      input_r.sizes(),
+      weight_r.sizes(),
+      padding_,
+      padding_,
+      stride_,
+      dilation_);
+  Tensor out = at::empty(output_size, input_r.options());
+  Tensor binary_tensor = at::full_like(out, binary);
+  Attr attr = get_onednn_conv_sum_attr(
+      input_r,
+      weight_r,
+      stride_,
+      padding_,
+      dilation_,
+      binary_tensor,
+      scale.to<float>(),
+      output,
+      is_fused);
+  Tensor res = _convolution_out(
+      output,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
+      groups_,
+      attr);
+  if (!is_fused)
+    res = at::AtenIpexTypeXPU::add_out(res, binary_tensor, 1.f, binary_tensor);
+  return res;
+}
+
+Tensor _convolution_sum_scalar(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const c10::optional<Tensor>& bias,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    const Scalar& binary,
+    Scalar scale) {
+  bool is_fused;
+  Tensor output;
+  Tensor bias_r = bias.has_value() ? bias.value() : at::Tensor();
+  auto ndim = input_r.ndimension();
+  auto output_size = conv_dst_tz(
+      ndim,
+      input_r.sizes(),
+      weight_r.sizes(),
+      padding_,
+      padding_,
+      stride_,
+      dilation_);
+  Tensor out = at::empty(output_size, input_r.options());
+  Tensor binary_tensor = at::full_like(out, binary);
+  Attr attr = get_onednn_conv_sum_attr(
+      input_r,
+      weight_r,
+      stride_,
+      padding_,
+      dilation_,
+      binary_tensor,
+      scale.to<float>(),
+      output,
+      is_fused);
+  Tensor res = _convolution_out(
+      output,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      attr);
+  if (!is_fused)
+    res = at::AtenIpexTypeXPU::add_out(res, binary_tensor, 1.f, binary_tensor);
+  return res;
+}
+
 Tensor _convolution_sum(
     const Tensor& input_r,
     const Tensor& weight_r,
@@ -1696,6 +1903,41 @@ Tensor _convolution_binary_sub(
       binary,
       -scale);
 }
+
+Tensor _convolution_binary_sub_scalar(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    const Scalar& binary,
+    Scalar scale) {
+  return _convolution_sum_scalar(
+      input_r,
+      weight_r,
+      bias,
+      stride_,
+      padding_,
+      dilation_,
+      transposed,
+      output_padding_,
+      groups_,
+      benchmark,
+      deterministic,
+      cudnn_enabled,
+      allow_tf32,
+      binary,
+      -scale);
+}
+
 Tensor convolution_binary_sub(
     const Tensor& input_r,
     const Tensor& weight_r,
@@ -1707,6 +1949,28 @@ Tensor convolution_binary_sub(
     Tensor& binary,
     Scalar scale) {
   return convolution_sum(
+      input_r,
+      weight_r,
+      bias,
+      stride_,
+      padding_,
+      dilation_,
+      groups_,
+      binary,
+      -scale);
+}
+
+Tensor convolution_binary_sub_scalar(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    int64_t groups_,
+    const Scalar& binary,
+    Scalar scale) {
+  return convolution_sum_scalar(
       input_r,
       weight_r,
       bias,
@@ -2328,9 +2592,13 @@ Tensor _convolution_sigmoid_binary_mul_add_relu(
   return AtenIpexTypeXPU::relu(ret);
 }
 
-#define IPEX_OP_REGISTER_CONVOLUTION(op)             \
-  IPEX_OP_REGISTER("conv2d_" #op, convolution_##op); \
-  IPEX_OP_REGISTER("_convolution_" #op, _convolution_##op);
+#define IPEX_OP_REGISTER_CONVOLUTION(op, ...)                    \
+  IPEX_OP_REGISTER("conv2d_" #op __VA_ARGS__, convolution_##op); \
+  IPEX_OP_REGISTER("_convolution_" #op __VA_ARGS__, _convolution_##op);
+
+#define IPEX_OP_REGISTER_CONVOLUTION_SCALAR(op)                         \
+  IPEX_OP_REGISTER("conv2d_" #op ".Scalar", convolution_##op##_scalar); \
+  IPEX_OP_REGISTER("_convolution_" #op ".Scalar", _convolution_##op##_scalar);
 
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_CONVOLUTION(sigmoid);
@@ -2368,6 +2636,18 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_CONVOLUTION(binary_gt);
   IPEX_OP_REGISTER_CONVOLUTION(binary_le);
   IPEX_OP_REGISTER_CONVOLUTION(binary_lt);
+  IPEX_OP_REGISTER_CONVOLUTION_SCALAR(sum);
+  IPEX_OP_REGISTER_CONVOLUTION_SCALAR(binary_sub);
+  IPEX_OP_REGISTER_CONVOLUTION_SCALAR(binary_mul);
+  IPEX_OP_REGISTER_CONVOLUTION_SCALAR(binary_div);
+  IPEX_OP_REGISTER_CONVOLUTION_SCALAR(binary_max);
+  IPEX_OP_REGISTER_CONVOLUTION_SCALAR(binary_min);
+  IPEX_OP_REGISTER_CONVOLUTION_SCALAR(binary_eq);
+  IPEX_OP_REGISTER_CONVOLUTION_SCALAR(binary_ne);
+  IPEX_OP_REGISTER_CONVOLUTION_SCALAR(binary_ge);
+  IPEX_OP_REGISTER_CONVOLUTION_SCALAR(binary_gt);
+  IPEX_OP_REGISTER_CONVOLUTION_SCALAR(binary_le);
+  IPEX_OP_REGISTER_CONVOLUTION_SCALAR(binary_lt);
   IPEX_OP_REGISTER_CONVOLUTION(binary_mul_add);
   IPEX_OP_REGISTER_CONVOLUTION(sigmoid_binary_mul);
   IPEX_OP_REGISTER_CONVOLUTION(sigmoid_binary_mul_add);
