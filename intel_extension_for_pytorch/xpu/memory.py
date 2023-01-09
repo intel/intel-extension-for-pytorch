@@ -14,8 +14,7 @@ def empty_cache() -> None:
     .. note::
         :func:`~torch.xpu.empty_cache` doesn't increase the amount of GPU
         memory available for PyTorch. However, it may help reduce fragmentation
-        of GPU memory in certain cases. See :ref:`xpu-memory-management` for
-        more details about GPU memory management.
+        of GPU memory in certain cases.
     """
     intel_extension_for_pytorch._C._emptyCache()
 
@@ -74,10 +73,6 @@ def memory_stats(device: Union[Device, int] = None) -> Dict[str, Any]:
         device (torch.device or int, optional): selected device. Returns
             statistics for the current device, given by :func:`~torch.xpu.current_device`,
             if :attr:`device` is ``None`` (default).
-
-    .. note::
-        See :ref:`xpu-memory-management` for more details about GPU memory
-        management.
     """
     result = []
 
@@ -114,10 +109,6 @@ def reset_accumulated_memory_stats(device: Union[Device, int] = None) -> None:
         device (torch.device or int, optional): selected device. Returns
             statistic for the current device, given by :func:`~torch.xpu.current_device`,
             if :attr:`device` is ``None`` (default).
-
-    .. note::
-        See :ref:`xpu-memory-management` for more details about GPU memory
-        management.
     """
     device = _get_device_index(device, optional=True)
     return intel_extension_for_pytorch._C._resetAccumulatedMemoryStats(device)
@@ -133,10 +124,6 @@ def reset_peak_memory_stats(device: Union[Device, int] = None) -> None:
         device (torch.device or int, optional): selected device. Returns
             statistic for the current device, given by :func:`~torch.xpu.current_device`,
             if :attr:`device` is ``None`` (default).
-
-    .. note::
-        See :ref:`xpu-memory-management` for more details about GPU memory
-        management.
     """
     device = _get_device_index(device, optional=True)
     return intel_extension_for_pytorch._C._resetPeakMemoryStats(device)
@@ -154,8 +141,7 @@ def memory_allocated(device: Union[Device, int] = None) -> int:
     .. note::
         This is likely less than the amount shown in sysman toolkit since some
         unused memory can be held by the caching allocator and some context
-        needs to be created on GPU. See :ref:`xpu-memory-management` for more
-        details about GPU memory management.
+        needs to be created on GPU.
     """
     return memory_stats(device=device)["allocated_bytes.all.current"]
 
@@ -174,10 +160,6 @@ def max_memory_allocated(device: Union[Device, int] = None) -> int:
         device (torch.device or int, optional): selected device. Returns
             statistic for the current device, given by :func:`~torch.xpu.current_device`,
             if :attr:`device` is ``None`` (default).
-
-    .. note::
-        See :ref:`xpu-memory-management` for more details about GPU memory
-        management.
     """
     return memory_stats(device=device)["allocated_bytes.all.peak"]
 
@@ -190,10 +172,6 @@ def memory_reserved(device: Union[Device, int] = None) -> int:
         device (torch.device or int, optional): selected device. Returns
             statistic for the current device, given by :func:`~torch.xpu.current_device`,
             if :attr:`device` is ``None`` (default).
-
-    .. note::
-        See :ref:`xpu-memory-management` for more details about GPU memory
-        management.
     """
     return memory_stats(device=device)["reserved_bytes.all.current"]
 
@@ -212,10 +190,6 @@ def max_memory_reserved(device: Union[Device, int] = None) -> int:
         device (torch.device or int, optional): selected device. Returns
             statistic for the current device, given by :func:`~torch.xpu.current_device`,
             if :attr:`device` is ``None`` (default).
-
-    .. note::
-        See :ref:`xpu-memory-management` for more details about GPU memory
-        management.
     """
     return memory_stats(device=device)["reserved_bytes.all.peak"]
 
@@ -225,10 +199,6 @@ def memory_snapshot():
 
     Interpreting the output of this function requires familiarity with the
     memory allocator internals.
-
-    .. note::
-        See :ref:`xpu-memory-management` for more details about GPU memory
-        management.
     """
     return intel_extension_for_pytorch._C._memorySnapshot()
 
@@ -246,10 +216,6 @@ def memory_summary(device: Union[Device, int] = None, abbreviated: bool = False)
             if :attr:`device` is ``None`` (default).
         abbreviated (bool, optional): whether to return an abbreviated summary
             (default: False).
-
-    .. note::
-        See :ref:`xpu-memory-management` for more details about GPU memory
-        management.
     """
     device = _get_device_index(device, optional=True)
     stats = memory_stats(device=device)

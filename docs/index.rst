@@ -11,43 +11,33 @@ Intel® Extension for PyTorch* provides optimizations for both eager mode and gr
 
 The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts users can enable it dynamically by importing `intel_extension_for_pytorch`.
 
--------------------------------------
+Intel® Extension for PyTorch* is structured as shown in the following figure:
 
-Intel® Extension for PyTorch* for CPU is structured as shown in the following figure:
-
-.. figure:: ./images/intel_extension_for_pytorch_structure_cpu.png
+.. figure:: ./images/intel_extension_for_pytorch_structure.png
   :width: 800
   :align: center
-  :alt: Structure of Intel® Extension for PyTorch* for CPU
+  :alt: Architecture of Intel® Extension for PyTorch*
 
+|
 
-PyTorch components are depicted with white boxes while Intel Extensions are with blue boxes. Extra performance of the extension is delivered via both custom addons and overriding existing PyTorch components. In eager mode, the PyTorch frontend is extended with custom Python modules (such as fusion modules), optimal optimizers and INT8 quantization API. Further performance boosting is available by converting the eager-mode model into graph mode via the extended graph fusion passes. Intel® Extension for PyTorch* dispatches the operators into their underlying kernels automatically based on ISA that it detects and leverages vectorization and matrix acceleration units available in Intel hardware, as much as possible. oneDNN library is used for computation intensive operations. Intel Extension for PyTorch runtime extension brings better efficiency with finer-grained thread runtime control and weight sharing.
+Optimizations for both eager mode and graph mode contribute to extra performance accelerations with the extension. In eager mode, the PyTorch frontend is extended with custom Python modules (such as fusion modules), optimal optimizers, and INT8 quantization APIs. Further performance boost is available by converting the eager-mode model into graph mode via extended graph fusion passes. In the graph mode, the fusions reduce operator/kernel invocation overheads, and thus increase performance. On CPU, Intel® Extension for PyTorch* dispatches the operators into their underlying kernels automatically based on ISA that it detects and leverages vectorization and matrix acceleration units available on Intel hardware. Intel® Extension for PyTorch* runtime extension brings better efficiency with finer-grained thread runtime control and weight sharing. On GPU, optimized operators and kernels are implemented and registered through PyTorch dispatching mechanism. These operators and kernels are accelerated from native vectorization feature and matrix calculation feature of Intel GPU hardware. Intel® Extension for PyTorch* for GPU utilizes the `DPC++ <https://github.com/intel/llvm#oneapi-dpc-compiler>`_ compiler that supports the latest `SYCL* <https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html>`_ standard and also a number of extensions to the SYCL* standard, which can be found in the `sycl/doc/extensions <https://github.com/intel/llvm/tree/sycl/sycl/doc/extensions>`_ directory.
 
-Intel® Extension for PyTorch* for CPU has been released as an open–source project at `Github master branch <https://github.com/intel/intel-extension-for-pytorch/tree/master>`_. Check `CPU tutorial <https://intel.github.io/intel-extension-for-pytorch/cpu/latest/>`_ for detailed information of Intel® Extension for PyTorch* for Intel® CPUs.
+.. note:: GPU features are not included in CPU only packages.
 
--------------------------------------
-
-Intel® Extension for PyTorch* for GPU is structured as shown in the following figure:
-
-.. figure:: ./images/intel_extension_for_pytorch_structure_gpu.svg
-  :width: 800
-  :align: center
-  :alt: Architecture of Intel® Extension for PyTorch* for GPU
-
-PyTorch components are depicted with white boxes and Intel extensions are with blue boxes. Extra performance of the extension comes from optimizations for both eager mode and graph mode. In eager mode, the PyTorch frontend is extended with custom Python modules (such as fusion modules), optimal optimizers, and INT8 quantization API. Further performance boosting is available by converting the eager-mode model into graph mode via extended graph fusion passes. On GPU, optimized operators and kernels are implemented and registered through PyTorch dispatching mechanism. These operators and kernels are accelerated from native vectorization feature and matrix calculation feature of Intel GPU hardware. In graph mode, further operator fusions are supported to reduce operator/kernel invocation overheads, and thus increase performance.
-
-Intel® Extension for PyTorch* for GPU utilizes the `DPC++ <https://github.com/intel/llvm#oneapi-dpc-compiler>`_ compiler that supports the latest `SYCL* <https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html>`_ standard and also a number of extensions to the SYCL* standard, which can be found in the `sycl/doc/extensions <https://github.com/intel/llvm/tree/sycl/sycl/doc/extensions>`_ directory. Intel® Extension for PyTorch* also integrates `oneDNN <https://github.com/oneapi-src/oneDNN>`_ and `oneMKL <https://github.com/oneapi-src/oneMKL>`_ libraries and provides kernels based on that. The oneDNN library is used for computation intensive operations. The oneMKL library is used for fundamental mathematical operations.
-
-Intel® Extension for PyTorch* for GPU has been released as an open–source project on `GitHub xpu-master branch <https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master>`_. Check `GPU tutorial <https://intel.github.io/intel-extension-for-pytorch/xpu/latest/>`_ for detailed information of Intel® Extension for PyTorch* for Intel® GPUs.
+Intel® Extension for PyTorch* has been released as an open–source project at `Github <https://github.com/intel/intel-extension-for-pytorch>`_. Source code is available at `xpu-master branch <https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master>`_. Check `the tutorial <https://intel.github.io/intel-extension-for-pytorch/xpu/latest/>`_ for detailed information. Due to different development schedule, optimizations for CPU only might have a newer code base. Source code is available at `master branch <https://github.com/intel/intel-extension-for-pytorch/tree/master>`_. Check `the CPU tutorial <https://intel.github.io/intel-extension-for-pytorch/cpu/latest/>`_ for detailed information on the CPU side.
 
 .. toctree::
    :hidden:
    :maxdepth: 1
 
+   tutorials/getting_started
    tutorials/features
    tutorials/releases
    tutorials/installation
    tutorials/examples
    tutorials/api_doc
+   tutorials/performance_tuning
+   tutorials/technical_details
+   tutorials/blogs_publications
    tutorials/contribution
    tutorials/license

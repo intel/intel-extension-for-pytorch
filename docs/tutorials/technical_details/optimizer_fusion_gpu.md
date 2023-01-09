@@ -1,5 +1,5 @@
-Optimizer Fusion
-================
+Optimizer Fusion on GPU
+=======================
 
 ## Introduction
 As with TorchScript, operation fusion reduces the number of operators that will be executed, and reduces overhead time. This methodology is also applied in Intel® Extension for PyTorch\* optimizer optimization. We support SGD/AdamW fusion for both FP32/BF16 at current stage.

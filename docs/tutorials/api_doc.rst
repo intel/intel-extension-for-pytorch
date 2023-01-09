@@ -1,11 +1,21 @@
 API Documentation
 #################
 
-General
-*******
+Device-Agnostic
+***************
 
 .. currentmodule:: intel_extension_for_pytorch
 .. autofunction:: optimize
+.. autofunction:: get_fp32_math_mode
+.. autofunction:: set_fp32_math_mode
+.. autoclass:: verbose
+
+GPU-Specific
+************
+
+Miscellaneous
+=============
+
 .. currentmodule:: intel_extension_for_pytorch.xpu
 .. StreamContext
 .. can_device_access_peer
@@ -31,10 +41,8 @@ General
 .. autofunction:: stream
 .. autofunction:: synchronize
 
-
-
 Random Number Generator
-***********************
+=======================
 
 .. currentmodule:: intel_extension_for_pytorch.xpu
 .. autofunction:: get_rng_state
@@ -47,10 +55,8 @@ Random Number Generator
 .. autofunction:: seed_all
 .. autofunction:: initial_seed
 
-
-
 Streams and events
-******************
+==================
 
 .. currentmodule:: intel_extension_for_pytorch.xpu
 .. autoclass:: Stream
@@ -60,7 +66,7 @@ Streams and events
     :members: 
 
 Memory management
-*****************
+=================
 
 .. currentmodule:: intel_extension_for_pytorch.xpu
 .. autofunction:: empty_cache
@@ -82,27 +88,50 @@ Memory management
 .. caching_allocator_alloc
 .. caching_allocator_delete
 
-
-
 .. autofunction:: memory_stats_as_nested_dict
 .. autofunction:: reset_accumulated_memory_stats
 
-Other
-*****
-
-.. currentmodule:: intel_extension_for_pytorch.xpu
-.. autofunction:: get_fp32_math_mode
-.. autofunction:: set_fp32_math_mode
-
-    
-.. .. automodule:: intel_extension_for_pytorch.quantization
-..    :members:
-
 C++ API
-*******
+=======
 
 .. doxygenenum:: xpu::FP32_MATH_MODE
 
 .. doxygenfunction:: xpu::set_fp32_math_mode
 
 .. doxygenfunction:: xpu::get_queue_from_stream
+
+
+CPU-Specific
+************
+
+Miscellaneous
+=============
+
+.. currentmodule:: intel_extension_for_pytorch
+.. autofunction:: enable_onednn_fusion
+
+Quantization
+============
+
+.. automodule:: intel_extension_for_pytorch.quantization
+.. autofunction:: prepare
+.. autofunction:: convert
+
+Experimental API, introduction is avaiable at `feature page <./features/int8_recipe_tuning_api.md>`_.
+
+.. autofunction:: autotune
+
+CPU Runtime
+===========
+
+.. automodule:: intel_extension_for_pytorch.cpu.runtime
+.. autofunction:: is_runtime_ext_enabled
+.. autoclass:: CPUPool
+.. autoclass:: pin
+.. autoclass:: MultiStreamModuleHint
+.. autoclass:: MultiStreamModule
+.. autoclass:: Task
+.. autofunction:: get_core_list_of_node_id
+
+.. .. automodule:: intel_extension_for_pytorch.quantization
+..    :members:

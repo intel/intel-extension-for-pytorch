@@ -1,5 +1,5 @@
-
-# DLPack Solution
+DLPack Solution
+===============
 
 ## Introduction
 
@@ -14,13 +14,13 @@ import intel_extension_for_pytorch
 import torch.utils.dlpack
 
 # create DLPack capsule from external
-capsule = …
+capsule = ...
 
 # Usage 1: convert DLPack capsule to PyTorch tensor on XPU
 t = torch.from_dlpack(capsule)
 
 # create PyTorch tensor on XPU
-t2 = torch.empty([10], device=’xpu’)
+t2 = torch.empty([10], device='xpu')
 
 # Usage 2: convert PyTorch tensor on XPU to DLPack capsule
 capsule2 = torch.to_dlpack(t2)
