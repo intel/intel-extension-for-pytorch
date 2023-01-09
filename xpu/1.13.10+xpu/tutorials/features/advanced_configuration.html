@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Advanced Configuration &mdash; intel_extension_for_pytorch 1.13.10+xpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/sphinx_highlight.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Legacy Profiler Tool (Experimental)" href="profiler_legacy.html" />
+    <link rel="prev" title="DPC++ Extension" href="DPC%2B%2B_Extension.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../../">1.13.10+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#device-agnostics">Device-Agnostics</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#gpu-specific">GPU-Specific</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Advanced Configuration</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#build-time-configuration">Build Time Configuration</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#runtime-configuration">Runtime Configuration</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#legacy-profiler-tool-experimental">Legacy Profiler Tool (Experimental)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#simple-trace-tool-experimental">Simple Trace Tool (Experimental)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#cpu-specific">CPU-Specific</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a></li>
+          <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
+      <li class="breadcrumb-item active">Advanced Configuration</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/advanced_configuration.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="advanced-configuration">
+<h1>Advanced Configuration<a class="headerlink" href="#advanced-configuration" title="Permalink to this heading"></a></h1>
+<p>The default settings for Intel® Extension for PyTorch* are sufficient for most use cases. However, if users want to customize Intel® Extension for PyTorch*, advanced configuration is available at build time and runtime.</p>
+<section id="build-time-configuration">
+<h2>Build Time Configuration<a class="headerlink" href="#build-time-configuration" title="Permalink to this heading"></a></h2>
+<p>The following build options are supported by Intel® Extension for PyTorch*. Users who install Intel® Extension for PyTorch* via source compilation could override the default configuration by explicitly setting a build option ON or OFF, and then build.</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th><strong>Build Option</strong></th>
+<th><strong>Default<br>Value</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>USE_ONEMKL</td>
+<td>ON</td>
+<td>Use oneMKL BLAS</td>
+</tr>
+<tr>
+<td>USE_CHANNELS_LAST_1D</td>
+<td>ON</td>
+<td>Use channels last 1d</td>
+</tr>
+<tr>
+<td>USE_PERSIST_STREAM</td>
+<td>ON</td>
+<td>Use persistent oneDNN stream</td>
+</tr>
+<tr>
+<td>USE_SCRATCHPAD_MODE</td>
+<td>ON</td>
+<td>Use oneDNN scratchpad mode</td>
+</tr>
+<tr>
+<td>USE_PRIMITIVE_CACHE</td>
+<td>OFF</td>
+<td>Cache oneDNN primitives by FRAMEWORK, instead of oneDNN itself</td>
+</tr>
+<tr>
+<td>USE_QUEUE_BARRIER</td>
+<td>ON</td>
+<td>Use queue submit_barrier, otherwise use dummy kernel</td>
+</tr>
+<tr>
+<td>USE_MULTI_CONTEXT</td>
+<td>ON</td>
+<td>Create DPC++ runtime context per device</td>
+</tr>
+<tr>
+<td>USE_PROFILER</td>
+<td>ON</td>
+<td>USE XPU Profiler in build.</td>
+</tr>
+<tr>
+<td>USE_SYCL_ASSERT</td>
+<td>OFF</td>
+<td>Enables assert in sycl kernel</td>
+</tr>
+<tr>
+<td>USE_ITT_ANNOTATION</td>
+<td>OFF</td>
+<td>Enables ITT annotation in sycl kernel</td>
+</tr>
+<tr>
+<td>BUILD_BY_PER_KERNEL</td>
+<td>OFF</td>
+<td>Build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)</td>
+</tr>
+<tr>
+<td>BUILD_INTERNAL_DEBUG</td>
+<td>OFF</td>
+<td>Use internal debug code path</td>
+</tr>
+<tr>
+<td>BUILD_SEPARATE_OPS</td>
+<td>OFF</td>
+<td>Build each operator in separate library</td>
+</tr>
+<tr>
+<td>BUILD_SIMPLE_TRACE</td>
+<td>ON</td>
+<td>Build simple trace for each registered operator</td>
+</tr>
+<tr>
+<td>BUILD_JIT_QUANTIZATION_SAVE</td>
+<td>OFF</td>
+<td>Support jit quantization model save and load</td>
+</tr>
+<tr>
+<td>USE_AOT_DEVLIST</td>
+<td>""</td>
+<td>Set device list for AOT build</td>
+</tr>
+<tr>
+<td>BUILD_OPT_LEVEL</td>
+<td>""</td>
+<td>Add build option -Ox, accept values: 0/1</td>
+</tr>
+</tbody>
+</table><p>For above build options which can be configured to ON or OFF, users can configure them to 1 or 0 also, while ON equals to 1 and OFF equals to 0.</p>
+</section>
+<section id="runtime-configuration">
+<h2>Runtime Configuration<a class="headerlink" href="#runtime-configuration" title="Permalink to this heading"></a></h2>
+<p>The following launch options are supported in Intel® Extension for PyTorch*. Users who execute AI models on XPU could override the default configuration by explicitly setting the option value at runtime using environment variables, and then launch the execution.</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th><strong>Launch Option<br>CPU, GPU</strong></th>
+<th><strong>Default<br>Value</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IPEX_VERBOSE</td>
+<td>0</td>
+<td>Set verbose level with synchronization execution mode</td>
+</tr>
+<tr>
+<td>IPEX_FP32_MATH_MODE</td>
+<td>0</td>
+<td>Set values for FP32 math mode (0: FP32, 1: TF32, 2: BF32)</td>
+</tr>
+</tbody>
+</table><table border="1" class="docutils">
+<thead>
+<tr>
+<th><strong>Launch Option<br>GPU ONLY</strong></th>
+<th><strong>Default<br>Value</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IPEX_XPU_SYNC_MODE</td>
+<td>0</td>
+<td>Set 1 to enforce synchronization execution mode</td>
+</tr>
+<tr>
+<td>IPEX_TILE_AS_DEVICE</td>
+<td>1</td>
+<td>Set 0 to disable tile partition and map per root device</td>
+</tr>
+</tbody>
+</table><table border="1" class="docutils">
+<thead>
+<tr>
+<th><strong>Launch Option<br>Experimental</strong></th>
+<th><strong>Default<br>Value</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IPEX_SIMPLE_TRACE</td>
+<td>0</td>
+<td>Set 1 to enable simple trace for all operators*</td>
+</tr>
+</tbody>
+</table><p>For above launch options which can be configured to 1 or 0, users can configure them to ON or OFF also, while ON equals to 1 and OFF equals to 0.</p>
+<p>Examples to configure the launch options:</br></p>
+<ul class="simple">
+<li><p>Set one or more options before running the model</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span> <span class="nv">IPEX_VERBOSE</span><span class="o">=</span><span class="m">1</span>
+<span class="nb">export</span> <span class="nv">IPEX_FP32_MATH_MODE</span><span class="o">=</span>TF32
+...
+python ResNet50.py
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Set one option when running the model</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">IPEX_VERBOSE</span><span class="o">=</span><span class="m">1</span> python ResNet50.py
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Set more than one options when running the model</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">IPEX_VERBOSE</span><span class="o">=</span><span class="m">1</span> <span class="nv">IPEX_FP32_MATH_MODE</span><span class="o">=</span>TF32 python ResNet50.py
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="DPC%2B%2B_Extension.html" class="btn btn-neutral float-left" title="DPC++ Extension" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="profiler_legacy.html" class="btn btn-neutral float-right" title="Legacy Profiler Tool (Experimental)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
