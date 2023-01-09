@@ -22,4 +22,5 @@ endif()
 # Since 2016 Debian start using RUNPATH instead of normally RPATH, which gave the annoy effect that
 # allow LD_LIBRARY_PATH to override dynamic linking path. Depends on intention of linking priority,
 # change below for best outcome: disable, using RPATH, enable, using RUNPATH
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--disable-new-dtags")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--disable-new-dtags")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--disable-new-dtags")
