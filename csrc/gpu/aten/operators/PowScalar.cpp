@@ -1,4 +1,5 @@
 #include <oneDNN/oneDNN.h>
+#include "ATen/OpMathType.h"
 #include "Loops.h"
 #include "LoopsTemplates.h"
 #include "comm/ATDispatch.h"
@@ -32,8 +33,10 @@ void pow_tensor_scalar_kernel_impl(TensorIterator& iter, const Scalar& exp) {
     dpcpp_kernel_for_tensor_iter(
         iter, [](scalar_t base) -> scalar_t { return 1.0 / (base * base); });
   } else {
+    using opmath_t = at::opmath_type<scalar_t>;
+    const auto exp_ = static_cast<opmath_t>(double_exp);
     dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t base) -> scalar_t {
-      return Numerics<scalar_t>::pow(base, double_exp);
+      return Numerics<scalar_t>::pow(base, exp_);
     });
   }
 }
