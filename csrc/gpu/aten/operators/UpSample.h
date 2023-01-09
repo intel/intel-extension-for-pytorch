@@ -123,8 +123,8 @@ static inline scalar_t area_pixel_compute_source_index(
   if (align_corners) {
     return scale * dst_index;
   } else {
-    scalar_t src_idx = scale * (dst_index + 0.5) - 0.5;
-    return (!cubic && src_idx < 0) ? scalar_t(0) : src_idx;
+    scalar_t src_idx = scale * (dst_index + 0.5f) - 0.5f;
+    return (!cubic && src_idx < 0.f) ? scalar_t(0.f) : src_idx;
   }
 }
 
