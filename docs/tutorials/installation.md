@@ -40,15 +40,22 @@ Verified Hardware Platforms:
 Please refer to [Install oneAPI Base Toolkit Packages](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit).
 
 Need to install components of Intel® oneAPI Base Toolkit:
- - Intel® oneAPI DPC++ Compiler
- - Intel® oneAPI Math Kernel Library (oneMKL)
+ - Intel® oneAPI DPC++ Compiler (`DPCPP_ROOT` as its installation path)
+ - Intel® oneAPI Math Kernel Library (oneMKL) (`MKL_ROOT` as its installation path)
 
-Default installation location *{ONEAPI_ROOT}* is `/opt/intel/oneapi` for root account, `${HOME}/intel/oneapi` for other accounts.
+Default installation location *{ONEAPI_ROOT}* is `/opt/intel/oneapi` for root account, `${HOME}/intel/oneapi` for other accounts. Generally, `DPCPP_ROOT` is `{ONEAPI_ROOT}/compiler/latest`, `MKL_ROOT` is `{ONEAPI_ROOT}/mkl/latest`.
 
 **_NOTE:_** You need to activate oneAPI environment when using Intel® Extension for PyTorch\* on Intel GPU.
 
 ```bash
 source {ONEAPI_ROOT}/setvars.sh
+```
+
+**_NOTE:_** You need to activate ONLY DPC++ compiler and oneMKL environment when compiling Intel® Extension for PyTorch\* from source on Intel GPU.
+
+```bash
+source {DPCPP_ROOT}/env/vars.sh
+source {MKL_ROOT}/env/vars.sh
 ```
 
 ## PyTorch-Intel® Extension for PyTorch\* Version Mapping
@@ -69,41 +76,27 @@ Prebuilt wheel files availability matrix for Python versions:
 | 1.13.10+xpu |  | ✔️ | ✔️ | ✔️ | ✔️ |
 | 1.10.200+gpu | ✔️ | ✔️ | ✔️ | ✔️ |  |
 
-**Note:** Wheel files for Intel® Distribution for Python\* only supports Python 3.9.
+---
 
-**Note:** Wheel files supporting Intel® Distribution for Python\* starts from 1.13.
-
-### Repositories for prebuilt wheel files
-
-Prebuilt wheel files for generic Python\* and Intel® Distribution for Python\* are released in separate repositories. Replace the place holder `<REPO_URL>` in installation commands with a real URL below.
-
-```
-# Generic Python
-REPO_URL: https://developer.intel.com/ipex-whl-stable-xpu
-
-# Intel® Distribution for Python*
-REPO_URL: https://developer.intel.com/ipex-whl-stable-xpu-idp
-```
-
-### Install PyTorch and TorchVision
+Prebuilt wheel files for generic Python\* and Intel® Distribution for Python\* are released in separate repositories.
 
 ```bash
-python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 -f <REPO_URL>
+# General Python*
+python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 intel_extension_for_pytorch==1.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
+
+# Intel® Distribution for Python*
+python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 intel_extension_for_pytorch==1.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu-idp
 ```
 
-**Note:** Installation of TorchVision is optional.
+**Note:** Wheel files for Intel® Distribution for Python\* only supports Python 3.9. The support starts from 1.13.10+xpu.
 
 **Note:** Please install Numpy 1.22.3 under Intel® Distribution for Python\*.
 
-### Install torchaudio (Optional)
+**Note:** Installation of TorchVision is optional.
 
-Intel® Extension for PyTorch\* doesn't depend on torchaudio. If you need TorchAudio, please follow the [instructions](https://github.com/pytorch/audio/tree/v0.13.0#from-source) to compile it from source. According to torchaudio-pytorch dependency table, torchaudio 0.13.0 is recommended.
+**Note:** Since DPC++ compiler doesn't support old [C++ ABI](https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html) (`_GLIBCXX_USE_CXX11_ABI=0`), ecosystem packages, including PyTorch and TorchVision, need to be compiled with the new C++ ABI (`_GLIBCXX_USE_CXX11_ABI=1`).
 
-### Install Intel® Extension for PyTorch\*
-
-```bash
-python -m pip install intel_extension_for_pytorch==1.13.10+xpu -f <REPO_URL>
-```
+**Note:** If you need TorchAudio, please follow the [instructions](https://github.com/pytorch/audio/tree/v0.13.0#from-source) to compile it from source. According to torchaudio-pytorch dependency table, torchaudio 0.13.0 is recommended.
 
 ## Install via compiling from source
 
@@ -126,15 +119,16 @@ $ cd pytorch
 $ git apply ${intel_extension_for_pytorch_directory}/torch_patches/*.patch 
 $ git submodule sync
 $ git submodule update --init --recursive
+$ conda install numpy ninja cmake
 $ pip install -r requirements.txt
-$ source {ONEAPI_ROOT}/setvars.sh
+$ export GLIBCXX_USE_CXX11_ABI=1
 $ python setup.py bdist_wheel
 $ pip install dist/*.whl
 ```
 
 ### Configure the AOT (Optional)
 
-Please refer to [AOT documentation](./AOT.md) for how to configure `USE_AOT_DEVLIST`. Without configuring AOT, the start-up time for processes using Intel® Extension for PyTorch\* will be high, so this step is important.
+Please refer to [AOT documentation](./AOT.md) for how to configure `USE_AOT_DEVLIST`. Without configuring AOT, the start-up time for processes using Intel® Extension for PyTorch\* will be long, so this step is important.
 
 ### Install Intel® Extension for PyTorch\*:
 
@@ -143,7 +137,9 @@ $ cd intel-extension-for-pytorch
 $ git submodule sync
 $ git submodule update --init --recursive
 $ pip install -r requirements.txt
-$ source {ONEAPI_ROOT}/setvars.sh # If you have sourced the oneAPI environment when compiling PyTorch, please skip this step.
+$ source {DPCPP_ROOT}/env/vars.sh
+$ source {MKL_ROOT}/env/vars.sh
+$ export USE_AOT_DEVLIST="..." # Set values accordingly
 $ python setup.py bdist_wheel
 $ pip install dist/*.whl
 ```

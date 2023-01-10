@@ -5,7 +5,7 @@
 Prebuilt wheel files are released for multiple Python versions. You can install them simply with the following pip command.
 
 ```bash
-python -m pip install torch==1.13.0a0 torchvision==0.14.0 intel_extension_for_pytorch==1.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
+python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 intel_extension_for_pytorch==1.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
 ```
 
 You can run a simple sanity test to double confirm if the correct version is installed, and if the software stack can get correct hardware information onboard your system.

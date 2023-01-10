@@ -13,7 +13,7 @@ Known Issues
     ImportError: undefined symbol: _ZNK5torch8autograd4Node4nameB5cxx11Ev
     ```
     
-    DPC++ does not support `_GLIBCXX_USE_CXX11_ABI=0`, Intel® Extension for PyTorch\* is always compiled with `_GLIBCXX_USE_CXX11_ABI=1`. This symbol undefined issue appears when PyTorch\* is compiled with `_GLIBCXX_USE_CXX11_ABI=0`. Update PyTorch\* CMAKE file to set `_GLIBCXX_USE_CXX11_ABI=1` and compile PyTorch\* with particular compiler which supports `_GLIBCXX_USE_CXX11_ABI=1`. We recommend using prebuilt wheels in [download server](https://developer.intel.com/ipex-whl-stable-xpu) to avoid this issue.
+    DPC++ does not support `_GLIBCXX_USE_CXX11_ABI=0`, Intel® Extension for PyTorch\* is always compiled with `_GLIBCXX_USE_CXX11_ABI=1`. This symbol undefined issue appears when PyTorch\* is compiled with `_GLIBCXX_USE_CXX11_ABI=0`. Pass `export GLIBCXX_USE_CXX11_ABI=1` and compile PyTorch\* with particular compiler which supports `_GLIBCXX_USE_CXX11_ABI=1`. We recommend using prebuilt wheels in [download server](https://developer.intel.com/ipex-whl-stable-xpu) to avoid this issue.
 
 - Can't find oneMKL library when build Intel® Extension for PyTorch\* without oneMKL
 
