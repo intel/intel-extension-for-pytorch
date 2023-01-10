@@ -60,18 +60,12 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#pytorch-intel-extension-for-pytorch-version-mapping">PyTorch-Intel® Extension for PyTorch* Version Mapping</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#install-via-wheel-files">Install via wheel files</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#repositories-for-prebuilt-wheel-files">Repositories for prebuilt wheel files</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#install-pytorch-and-torchvision">Install PyTorch and TorchVision</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#install-torchaudio-optional">Install torchaudio (Optional)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#install-intel-extension-for-pytorch">Install Intel® Extension for PyTorch*</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="#install-via-wheel-files">Install via wheel files</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#install-via-compiling-from-source">Install via compiling from source</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#download-source-code-of-pytorch-and-intel-extension-for-pytorch">Download source code of PyTorch and Intel® Extension for PyTorch*:</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#install-pytorch">Install PyTorch:</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configure-the-aot-optional">Configure the AOT (Optional)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id1">Install Intel® Extension for PyTorch*:</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#install-intel-extension-for-pytorch">Install Intel® Extension for PyTorch*:</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#solutions-to-potential-issues-on-wsl2">Solutions to potential issues on WSL2</a></li>
@@ -197,12 +191,17 @@
 <p>Please refer to <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit">Install oneAPI Base Toolkit Packages</a>.</p>
 <p>Need to install components of Intel® oneAPI Base Toolkit:</p>
 <ul class="simple">
-<li><p>Intel® oneAPI DPC++ Compiler</p></li>
-<li><p>Intel® oneAPI Math Kernel Library (oneMKL)</p></li>
+<li><p>Intel® oneAPI DPC++ Compiler (<code class="docutils literal notranslate"><span class="pre">DPCPP_ROOT</span></code> as its installation path)</p></li>
+<li><p>Intel® oneAPI Math Kernel Library (oneMKL) (<code class="docutils literal notranslate"><span class="pre">MKL_ROOT</span></code> as its installation path)</p></li>
 </ul>
-<p>Default installation location <em>{ONEAPI_ROOT}</em> is <code class="docutils literal notranslate"><span class="pre">/opt/intel/oneapi</span></code> for root account, <code class="docutils literal notranslate"><span class="pre">${HOME}/intel/oneapi</span></code> for other accounts.</p>
+<p>Default installation location <em>{ONEAPI_ROOT}</em> is <code class="docutils literal notranslate"><span class="pre">/opt/intel/oneapi</span></code> for root account, <code class="docutils literal notranslate"><span class="pre">${HOME}/intel/oneapi</span></code> for other accounts. Generally, <code class="docutils literal notranslate"><span class="pre">DPCPP_ROOT</span></code> is <code class="docutils literal notranslate"><span class="pre">{ONEAPI_ROOT}/compiler/latest</span></code>, <code class="docutils literal notranslate"><span class="pre">MKL_ROOT</span></code> is <code class="docutils literal notranslate"><span class="pre">{ONEAPI_ROOT}/mkl/latest</span></code>.</p>
 <p><strong><em>NOTE:</em></strong> You need to activate oneAPI environment when using Intel® Extension for PyTorch* on Intel GPU.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span> <span class="o">{</span>ONEAPI_ROOT<span class="o">}</span>/setvars.sh
+</pre></div>
+</div>
+<p><strong><em>NOTE:</em></strong> You need to activate ONLY DPC++ compiler and oneMKL environment when compiling Intel® Extension for PyTorch* from source on Intel GPU.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span> <span class="o">{</span>DPCPP_ROOT<span class="o">}</span>/env/vars.sh
+<span class="nb">source</span> <span class="o">{</span>MKL_ROOT<span class="o">}</span>/env/vars.sh
 </pre></div>
 </div>
 </section>
@@ -260,37 +259,20 @@
 <td style="text-align: center;"></td>
 </tr>
 </tbody>
-</table><p><strong>Note:</strong> Wheel files for Intel® Distribution for Python* only supports Python 3.9.</p>
-<p><strong>Note:</strong> Wheel files supporting Intel® Distribution for Python* starts from 1.13.</p>
-<section id="repositories-for-prebuilt-wheel-files">
-<h3>Repositories for prebuilt wheel files<a class="headerlink" href="#repositories-for-prebuilt-wheel-files" title="Permalink to this heading"></a></h3>
-<p>Prebuilt wheel files for generic Python* and Intel® Distribution for Python* are released in separate repositories. Replace the place holder <code class="docutils literal notranslate"><span class="pre">&lt;REPO_URL&gt;</span></code> in installation commands with a real URL below.</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Generic Python</span>
-<span class="n">REPO_URL</span><span class="p">:</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">developer</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">ipex</span><span class="o">-</span><span class="n">whl</span><span class="o">-</span><span class="n">stable</span><span class="o">-</span><span class="n">xpu</span>
+</table><hr class="docutils" />
+<p>Prebuilt wheel files for generic Python* and Intel® Distribution for Python* are released in separate repositories.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># General Python*</span>
+python -m pip install <span class="nv">torch</span><span class="o">==</span><span class="m">1</span>.13.0a0 <span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.14.1a0 <span class="nv">intel_extension_for_pytorch</span><span class="o">==</span><span class="m">1</span>.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
 
 <span class="c1"># Intel® Distribution for Python*</span>
-<span class="n">REPO_URL</span><span class="p">:</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">developer</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">ipex</span><span class="o">-</span><span class="n">whl</span><span class="o">-</span><span class="n">stable</span><span class="o">-</span><span class="n">xpu</span><span class="o">-</span><span class="n">idp</span>
+python -m pip install <span class="nv">torch</span><span class="o">==</span><span class="m">1</span>.13.0a0 <span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.14.1a0 <span class="nv">intel_extension_for_pytorch</span><span class="o">==</span><span class="m">1</span>.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu-idp
 </pre></div>
 </div>
-</section>
-<section id="install-pytorch-and-torchvision">
-<h3>Install PyTorch and TorchVision<a class="headerlink" href="#install-pytorch-and-torchvision" title="Permalink to this heading"></a></h3>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python -m pip install <span class="nv">torch</span><span class="o">==</span><span class="m">1</span>.13.0a0 <span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.14.1a0 -f &lt;REPO_URL&gt;
-</pre></div>
-</div>
-<p><strong>Note:</strong> Installation of TorchVision is optional.</p>
+<p><strong>Note:</strong> Wheel files for Intel® Distribution for Python* only supports Python 3.9. The support starts from 1.13.10+xpu.</p>
 <p><strong>Note:</strong> Please install Numpy 1.22.3 under Intel® Distribution for Python*.</p>
-</section>
-<section id="install-torchaudio-optional">
-<h3>Install torchaudio (Optional)<a class="headerlink" href="#install-torchaudio-optional" title="Permalink to this heading"></a></h3>
-<p>Intel® Extension for PyTorch* doesn’t depend on torchaudio. If you need TorchAudio, please follow the <a class="reference external" href="https://github.com/pytorch/audio/tree/v0.13.0#from-source">instructions</a> to compile it from source. According to torchaudio-pytorch dependency table, torchaudio 0.13.0 is recommended.</p>
-</section>
-<section id="install-intel-extension-for-pytorch">
-<h3>Install Intel® Extension for PyTorch*<a class="headerlink" href="#install-intel-extension-for-pytorch" title="Permalink to this heading"></a></h3>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python -m pip install <span class="nv">intel_extension_for_pytorch</span><span class="o">==</span><span class="m">1</span>.13.10+xpu -f &lt;REPO_URL&gt;
-</pre></div>
-</div>
-</section>
+<p><strong>Note:</strong> Installation of TorchVision is optional.</p>
+<p><strong>Note:</strong> Since DPC++ compiler doesn’t support old <a class="reference external" href="https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html">C++ ABI</a> (<code class="docutils literal notranslate"><span class="pre">_GLIBCXX_USE_CXX11_ABI=0</span></code>), ecosystem packages, including PyTorch and TorchVision, need to be compiled with the new C++ ABI (<code class="docutils literal notranslate"><span class="pre">_GLIBCXX_USE_CXX11_ABI=1</span></code>).</p>
+<p><strong>Note:</strong> If you need TorchAudio, please follow the <a class="reference external" href="https://github.com/pytorch/audio/tree/v0.13.0#from-source">instructions</a> to compile it from source. According to torchaudio-pytorch dependency table, torchaudio 0.13.0 is recommended.</p>
 </section>
 <section id="install-via-compiling-from-source">
 <h2>Install via compiling from source<a class="headerlink" href="#install-via-compiling-from-source" title="Permalink to this heading"></a></h2>
@@ -312,8 +294,9 @@ $ git checkout v1.13.10+xpu
 $ git apply <span class="si">${</span><span class="nv">intel_extension_for_pytorch_directory</span><span class="si">}</span>/torch_patches/*.patch 
 $ git submodule sync
 $ git submodule update --init --recursive
+$ conda install numpy ninja cmake
 $ pip install -r requirements.txt
-$ <span class="nb">source</span> <span class="o">{</span>ONEAPI_ROOT<span class="o">}</span>/setvars.sh
+$ <span class="nb">export</span> <span class="nv">GLIBCXX_USE_CXX11_ABI</span><span class="o">=</span><span class="m">1</span>
 $ python setup.py bdist_wheel
 $ pip install dist/*.whl
 </pre></div>
@@ -321,15 +304,17 @@ $ pip install dist/*.whl
 </section>
 <section id="configure-the-aot-optional">
 <h3>Configure the AOT (Optional)<a class="headerlink" href="#configure-the-aot-optional" title="Permalink to this heading"></a></h3>
-<p>Please refer to <a class="reference internal" href="AOT.html"><span class="doc">AOT documentation</span></a> for how to configure <code class="docutils literal notranslate"><span class="pre">USE_AOT_DEVLIST</span></code>. Without configuring AOT, the start-up time for processes using Intel® Extension for PyTorch* will be high, so this step is important.</p>
+<p>Please refer to <a class="reference internal" href="AOT.html"><span class="doc">AOT documentation</span></a> for how to configure <code class="docutils literal notranslate"><span class="pre">USE_AOT_DEVLIST</span></code>. Without configuring AOT, the start-up time for processes using Intel® Extension for PyTorch* will be long, so this step is important.</p>
 </section>
-<section id="id1">
-<h3>Install Intel® Extension for PyTorch*:<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h3>
+<section id="install-intel-extension-for-pytorch">
+<h3>Install Intel® Extension for PyTorch*:<a class="headerlink" href="#install-intel-extension-for-pytorch" title="Permalink to this heading"></a></h3>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ <span class="nb">cd</span> intel-extension-for-pytorch
 $ git submodule sync
 $ git submodule update --init --recursive
 $ pip install -r requirements.txt
-$ <span class="nb">source</span> <span class="o">{</span>ONEAPI_ROOT<span class="o">}</span>/setvars.sh <span class="c1"># If you have sourced the oneAPI environment when compiling PyTorch, please skip this step.</span>
+$ <span class="nb">source</span> <span class="o">{</span>DPCPP_ROOT<span class="o">}</span>/env/vars.sh
+$ <span class="nb">source</span> <span class="o">{</span>MKL_ROOT<span class="o">}</span>/env/vars.sh
+$ <span class="nb">export</span> <span class="nv">USE_AOT_DEVLIST</span><span class="o">=</span><span class="s2">&quot;...&quot;</span> <span class="c1"># Set values accordingly</span>
 $ python setup.py bdist_wheel
 $ pip install dist/*.whl
 </pre></div>
