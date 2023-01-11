@@ -202,6 +202,20 @@ def _check_has_quantizable_node_before_node(node):
                 # for none ipex customer op, if have a qconfig, we can say it is a quantizable op.
                 return True
 
+def _check_has_quantizable_node_after_node(node):
+    r"""
+    This function is about check whether all quantizable nodes after the given node,
+    which is used to check whether insert fake quant before one quantizable node or not.
+    """
+    if len(node.post_nodes) > 0:
+        output = True
+        for i in range(len(node.post_nodes)):
+            if node.post_nodes[i].qconfig is None:
+                output = False
+        return output
+    else:
+        return False
+
 def _add_recipe(node):
     '''
     Case1: add has pre gemm node.
@@ -261,14 +275,14 @@ def _add_recipe(node):
             node.input_tensor_infos[0].inf_dtype = node.input_tensor_infos[0].orig_dtype
             node.input_tensor_force_inf_dtype[0] = node.input_tensor_infos[0].inf_dtype
             # TODO: set another input's dtype for conv nodes when oneDNN is ready.
-            if conv_node is None:
+            if conv_node is None or not _check_has_quantizable_node_after_node(node):
                 # set another input's dtype, if another's input is from non-quantizable op, we can remove the fake quant.
                 reset_input_inf_dtype_to_orig_dtype(node, 1)
         elif node.input_tensor_infos[1] is not None and node.input_tensor_infos[1] in conv_gemm_node.output_tensor_infos:
             node.input_tensor_infos[1].inf_dtype = node.input_tensor_infos[1].orig_dtype
             node.input_tensor_force_inf_dtype[1] = node.input_tensor_infos[1].inf_dtype
             # TODO: set another input's dtype for conv nodes when oneDNN is ready.
-            if conv_node is None:
+            if conv_node is None or not _check_has_quantizable_node_after_node(node):
                 # set another input's dtype, if another's input is from non-quantizable op, we can remove the fake quant.
                 reset_input_inf_dtype_to_orig_dtype(node, 0)
 
