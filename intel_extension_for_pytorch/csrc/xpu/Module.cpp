@@ -364,7 +364,9 @@ static PyObject* set_autocast_xpu_dtype(PyObject* _unused, PyObject* arg) {
 static PyObject* get_autocast_xpu_dtype(PyObject* _unused, PyObject* arg) {
   HANDLE_TH_ERRORS
   at::ScalarType current_dtype = at::autocast::get_autocast_xpu_dtype();
-  return THPDtype_New(current_dtype, scalarTypeName(current_dtype));
+  auto dtype = (PyObject*)torch::getTHPDtype(current_dtype);
+  Py_INCREF(dtype);
+  return dtype;
   END_HANDLE_TH_ERRORS
 }
 

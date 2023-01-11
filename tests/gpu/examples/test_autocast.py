@@ -81,3 +81,9 @@ class TestTorchMethod(TestCase):
         self.assertEqual(gw_conv2, gw_conv2_xpu.to('cpu'))
         self.assertEqual(gw_conv1, gw_conv1_xpu.to('cpu'), atol=checking_atol, rtol=checking_rtol)
         self.assertEqual(x.grad, x_xpu.grad.to('cpu'), atol=checking_atol, rtol=checking_rtol)
+
+    def test_set_autocast_dtype(self):
+        with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+            self.assertEqual(torch.xpu.get_autocast_xpu_dtype(), torch.bfloat16)
+        with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16):
+            self.assertEqual(torch.xpu.get_autocast_xpu_dtype(), torch.float16)
