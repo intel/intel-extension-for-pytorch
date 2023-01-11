@@ -1,6 +1,7 @@
 Blogs & Publications
 ====================
 
+* [Intel® Deep Learning Boost - Improve Inference Performance of BERT Base Model from Hugging Face for Network Security Technology Guide, Jan 2023](https://networkbuilders.intel.com/solutionslibrary/intel-deep-learning-boost-improve-inference-performance-of-bert-base-model-from-hugging-face-for-network-security-technology-guide)
 * [What is New in Intel Extension for PyTorch, PyTorch Conference, Dec 2022](https://www.youtube.com/watch?v=SE56wFXdvP4&t=1s)
 * [Accelerating PyG on Intel CPUs, Dec 2022](https://www.pyg.org/ns-newsarticle-accelerating-pyg-on-intel-cpus)
 * [PyTorch Stable Diffusion Using Hugging Face and Intel Arc, Nov 2022](https://towardsdatascience.com/pytorch-stable-diffusion-using-hugging-face-and-intel-arc-77010e9eead6)
