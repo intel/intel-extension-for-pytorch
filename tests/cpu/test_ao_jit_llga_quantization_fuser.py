@@ -374,6 +374,25 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::linear', 'aten::dequantize'])
                 self.checkPatterns(graph, patterns)
 
+    def test_3d_bmm_int8_in_f32_out(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                return torch.bmm(x, y)
+
+        x = torch.randn(128, 3, 4) * 0.1
+        y = torch.randn(128, 4, 5) * 0.1
+        patterns = [
+            ["aten::dequantize", "aten::bmm"],
+        ]
+        m = M()
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertFused(graph, ['aten::dequantize', 'aten::bmm'])
+        self.checkPatterns(graph, patterns)    
+
     def test_bmm_int8_in_f32_out(self):
         class M(nn.Module):
             def __init__(self):

@@ -15,7 +15,8 @@ elt_wise_noq_ops = [str(torch.relu_), str(torch.sigmoid_), str(nn.ReLU), str(tor
         str(nn.SiLU), str(F.silu), str(torch.Tensor.sigmoid), str(torch.sigmoid), str(F.sigmoid), str(nn.Sigmoid), str(F.gelu), str(nn.GELU)]
 conv_gemm_ops = [str(F.conv2d), str(nn.Conv2d), str(F.conv3d), str(nn.Conv3d), str(torch.conv2d), str(torch.conv3d), \
     str(F.conv_transpose2d), str(torch.nn.ConvTranspose2d), str(F.conv_transpose3d), str(torch.nn.ConvTranspose3d),
-    str(torch.conv_transpose2d), str(torch.conv_transpose2d), str(F.linear), str(nn.Linear), str(torch.matmul), str(torch.Tensor.matmul)]
+    str(torch.conv_transpose2d), str(torch.conv_transpose2d), str(F.linear), str(nn.Linear), str(torch.matmul), str(torch.Tensor.matmul),
+    str(torch.bmm), str(torch.Tensor.bmm)]
 conv_ops = [str(F.conv2d), str(nn.Conv2d), str(F.conv3d), str(nn.Conv3d), str(torch.conv2d), str(torch.conv3d), \
     str(F.conv_transpose2d), str(torch.nn.ConvTranspose2d), str(F.conv_transpose3d), str(torch.nn.ConvTranspose3d),
     str(torch.conv_transpose2d), str(torch.conv_transpose2d)]
