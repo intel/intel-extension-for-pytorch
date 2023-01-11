@@ -1803,6 +1803,34 @@ class TestShapeFallback(JitLlgaTestCase):
                 # TODO: enable this check when size peephole optimization is enabled
                 # self.assertGraphContainsExactly(graph, "aten::size", 0)
 
+    def test_add_recipe(self):
+        class ConvAddRelu(nn.Module):
+            def __init__(self, in_channels, out_channels, kernel_size, image_size):
+                super(ConvAddRelu, self).__init__()
+                self.conv = torch.nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+
+            def forward(self, x1, x2):
+                return torch.relu(torch.add(self.conv(x1), x2))
+
+        class ConvAdd(nn.Module):
+            def __init__(self, in_channels, out_channels, kernel_size, image_size):
+                super(ConvAdd, self).__init__()
+                self.conv = torch.nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+
+            def forward(self, x1, x2):
+                return torch.add(self.conv(x1), x2)
+
+        for memory_format in [torch.contiguous_format, torch.channels_last]:
+            conv_add_relu = ConvAddRelu(3, 16, 3, 2)
+            conv_add = ConvAdd(3, 16, 3, 2)
+            x1 = torch.rand(1, 3, 224, 224, requires_grad=False).to(memory_format=memory_format)
+            x2 = torch.rand(1, 16, 111, 111, requires_grad=False).to(memory_format=memory_format)
+            input = [x1, x2]
+            graph1 = self.checkQuantizeTrace(conv_add_relu, input, atol=1e-2)
+            self.assertGraphContainsExactly(graph1, 'aten::quantize_per_tensor', 2)
+            graph2 = self.checkQuantizeTrace(conv_add, input, atol=1e-2)
+            self.assertGraphContainsExactly(graph2, 'aten::quantize_per_tensor', 1)
+
 class TestModel(JitLlgaTestCase):
     @skipIfNoTorchVision
     def _test_vision(self, model_name):
