@@ -151,24 +151,6 @@ torch.save({
      'optimizer_state_dict': optimizer.state_dict(),
      }, 'checkpoint.pth')
 ```
-#### Complete - Model checkpoint load Example
-
-```
-model = torchvision.models.resnet50()
-optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
-model.train()
-##### code changes #####
-model = model.to("xpu")
-##### code changes #####
-
-checkpoint = torch.load('checkpoint.pth', map_location="xpu")
-model.load_state_dict(checkpoint['model_state_dict'])
-optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-
-##################################### code changes ####################################
-model, optimizer = torch.xpu.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
-##################################### code changes ####################################
-```
 
 ## Inference
 

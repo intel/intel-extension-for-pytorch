@@ -325,11 +325,6 @@ def optimize(
 
     .. warning::
 
-        Please invoke ``optimize`` function AFTER loading weights to model via
-        ``model.load_state_dict(torch.load(PATH))``.
-
-    .. warning::
-
         Please invoke ``optimize`` function BEFORE invoking DDP in distributed
         training scenario.
 
