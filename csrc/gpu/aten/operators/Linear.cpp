@@ -82,27 +82,37 @@ struct LinearConverter {
     return output;                                                         \
   }
 
-#define IPEX_LINEAR_BINARY_DEFINATION(func)                          \
-  Tensor linear_binary_##func(                                       \
-      const Tensor& input,                                           \
-      const Tensor& weight,                                          \
-      const Tensor& bias,                                            \
-      const Tensor& binary) {                                        \
-    RECORD_FUNCTION(                                                 \
-        "linear_binary_" #func,                                      \
-        std::vector<c10::IValue>({input, weight, bias}));            \
-    auto linear_wrapper = LinearConverter();                         \
-    auto post_op = [=]() {                                           \
-      Attr attr;                                                     \
-      attr.append_post_binary(attr.kind_with_binary_##func, binary); \
-      return attr;                                                   \
-    };                                                               \
-    Tensor output;                                                   \
-    linear_wrapper.call(input, weight, bias, output, post_op);       \
-    if (!linear_wrapper.is_fused()) {                                \
-      output = at::func(output, binary);                             \
-    }                                                                \
-    return output;                                                   \
+#define IPEX_LINEAR_BINARY_DEFINATION(func)                                   \
+  Tensor linear_binary_##func(                                                \
+      const Tensor& input,                                                    \
+      const Tensor& weight,                                                   \
+      const Tensor& bias,                                                     \
+      const Tensor& binary) {                                                 \
+    RECORD_FUNCTION(                                                          \
+        "linear_binary_" #func,                                               \
+        std::vector<c10::IValue>({input, weight, bias}));                     \
+    auto linear_wrapper = LinearConverter();                                  \
+    int dim = input.dim();                                                    \
+    std::vector<int64_t> result_shape;                                        \
+    if (dim == 2) {                                                           \
+      result_shape = std::vector<int64_t>{input.size(0), weight.size(1)};     \
+    } else {                                                                  \
+      result_shape =                                                          \
+          std::vector<int64_t>{input.size(0), input.size(1), weight.size(1)}; \
+    }                                                                         \
+    Tensor output = at::empty(result_shape, input.options());                 \
+    bool valid = xpu::oneDNN::binary_valid(output, binary);                   \
+    auto post_op = [=]() {                                                    \
+      Attr attr;                                                              \
+      if (valid)                                                              \
+        attr.append_post_binary(attr.kind_with_binary_##func, binary);        \
+      return attr;                                                            \
+    };                                                                        \
+    linear_wrapper.call(input, weight, bias, output, post_op);                \
+    if (!valid) {                                                             \
+      output = at::func(output, binary);                                      \
+    }                                                                         \
+    return output;                                                            \
   }
 
 IPEX_LINEAR_DEFINATION(sqrt)
