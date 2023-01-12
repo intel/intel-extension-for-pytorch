@@ -1,4 +1,10 @@
 # coding: utf-8
+import torch
+try:
+    import torchvision
+except ImportError:
+    pass  # skip if torchvision is not available
+
 from .utils._trap_module import *
 from . import cpu
 from . import xpu
@@ -13,11 +19,6 @@ from .frontend import set_fp32_math_mode, get_fp32_math_mode, FP32MathMode
 from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl
 from .cpu.utils.verbose import verbose
 import os
-import torch
-try:
-    import torchvision
-except ImportError:
-    pass  # skip if torchvision is not available
 from . import _C
 from ._version import (__version__, __ipex_gitrev__, __torch_gitrev__, 
             __gpu_onednn_gitrev__, __cpu_ideep_gitrev__, __build_type__)
