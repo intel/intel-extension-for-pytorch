@@ -2,6 +2,7 @@
 
 #include <ATen/Context.h>
 #include <ATen/InferSize.h>
+#include <ATen/Parallel.h>
 #include <c10/util/Exception.h>
 #include <c10/util/Logging.h>
 #include <torch/csrc/autograd/function.h>
@@ -61,27 +62,22 @@ void mkl_fp32_bmm_impl(
   const MKL_INT size_per_grp[GRP_COUNT] = {array_size};
   float *a_array[array_size], *b_array[array_size], *c_array[array_size];
 
-#ifdef _OPENMP
-#if (_OPENMP >= 201307)
-#pragma omp parallel for simd schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
-#else
-#pragma omp parallel for schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
-#endif
-#endif
-  for (int64_t i = 0; i < array_size; ++i) {
-    a_array[i] = batch1.data_ptr<float>();
-    b_array[i] = batch2.data_ptr<float>();
-    c_array[i] = out.data_ptr<float>();
-    int64_t count = 1;
-    for (int64_t j = batch_dim - 3; j >= 0; --j) {
-      a_array[i] += ((int64_t)(i / count) % batch1.size(j)) * batch1.stride(j);
-      b_array[i] += ((int64_t)(i / count) % batch2.size(j)) * batch2.stride(j);
-      c_array[i] += ((int64_t)(i / count) % out.size(j)) * out.stride(j);
-      count *= batch1.size(j);
+  at::parallel_for(0, array_size, 1, [&](int64_t begin, int64_t end) {
+    for (const auto i : c10::irange(begin, end)) {
+      a_array[i] = batch1.data_ptr<float>();
+      b_array[i] = batch2.data_ptr<float>();
+      c_array[i] = out.data_ptr<float>();
+      int64_t count = 1;
+      for (int64_t j = batch_dim - 3; j >= 0; --j) {
+        a_array[i] +=
+            ((int64_t)(i / count) % batch1.size(j)) * batch1.stride(j);
+        b_array[i] +=
+            ((int64_t)(i / count) % batch2.size(j)) * batch2.stride(j);
+        c_array[i] += ((int64_t)(i / count) % out.size(j)) * out.stride(j);
+        count *= batch1.size(j);
+      }
     }
-  }
+  });
 
   cblas_sgemm_batch(
       CblasRowMajor,
