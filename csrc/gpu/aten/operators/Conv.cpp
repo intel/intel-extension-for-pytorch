@@ -1060,7 +1060,8 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
   }
 
   if (3 == ndim && !is_onednn_layout_suggested) {
-    grad_input = view3d(grad_input);
+    if (output_mask[0])
+      grad_input = view3d(grad_input);
     grad_weight = view3d(grad_weight);
   }
   return std::tuple<Tensor, Tensor, Tensor>{grad_input, grad_weight, grad_bias};
