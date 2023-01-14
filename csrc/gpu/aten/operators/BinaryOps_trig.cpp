@@ -31,7 +31,7 @@ Tensor& tanh_backward_out(
             at::ScalarType::BFloat16, iter.dtype(), "tanh_backward_out", [&]() {
               dpcpp_kernel_for_tensor_iter(
                   iter, [](scalar_t output, scalar_t z) -> scalar_t {
-                    return output * (1. - z * z);
+                    return output * (scalar_t{1} - z * z);
                   });
             });
       });
