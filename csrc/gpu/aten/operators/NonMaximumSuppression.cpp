@@ -201,4 +201,10 @@ namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("nms.xpu", at::AtenIpexTypeXPU::nms_kernel);
 }
+
+IPEX_TORCH_LIBRARY_IMPL(torchvision, XPU, m) {
+  m.impl(
+      TORCH_SELECTIVE_NAME("torchvision::nms"),
+      TORCH_FN((&at::AtenIpexTypeXPU::nms_kernel)));
+}
 } // namespace
