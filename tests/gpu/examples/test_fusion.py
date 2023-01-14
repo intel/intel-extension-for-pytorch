@@ -856,7 +856,7 @@ class PermuteContiguous(torch.nn.Module):
     def __init__(self) -> None:
         super(PermuteContiguous, self).__init__()
         self.block = nn.Sequential(
-            nn.Conv2d(32, 126, (1, 1))
+            nn.Conv2d(2, 2, (1, 1))
         )
 
     def forward(self, x):
@@ -2235,10 +2235,9 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
 
-    @pytest.mark.skip("quantize convolution have some misalignment with pytorch")
     def test_permute_contiguous_fusion(self, dtype=torch.float):
         model = PermuteContiguous()
-        input_cpu = torch.rand([1, 32, 128, 128])
+        input_cpu = torch.rand([1, 2, 9, 9])
         input_xpu = input_cpu.clone().to("xpu")
 
         torch._C._jit_set_profiling_mode(True)
@@ -2826,48 +2825,48 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_scalar, y_dpcpp_scalar.to(cpu_device))
         del modelJit
 
-    @pytest.mark.skip("oneDNN not implement yet") 
-    def test_linear_binary_eq_fusion(self, dtype=torch.float):
-        x = torch.randn([2, 4], device=cpu_device)
-        a = torch.randn([2, 4], device=cpu_device)
-        model = LinearBinaryEqual(4, 4)
-        y = model(x, a)
-        print("raw: ", y)
+    # @pytest.mark.skip("oneDNN not implement yet") 
+    # def test_linear_binary_eq_fusion(self, dtype=torch.float):
+    #     x = torch.randn([2, 4], device=cpu_device)
+    #     a = torch.randn([2, 4], device=cpu_device)
+    #     model = LinearBinaryEqual(4, 4)
+    #     y = model(x, a)
+    #     print("raw: ", y)
 
-        x = x.to("xpu")
-        a = a.to("xpu")
-        model.to("xpu")
-        modelJit = torch.jit.trace(model, (x, a))
+    #     x = x.to("xpu")
+    #     a = a.to("xpu")
+    #     model.to("xpu")
+    #     modelJit = torch.jit.trace(model, (x, a))
 
-        with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x, a))
-            y_dpcpp = modelJit(x, a)
-            print("fusion:", y_dpcpp.cpu())
-        self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
-        del modelJit
+    #     with torch.no_grad():
+    #         if print_graph:
+    #             print(modelJit.graph_for(x, a))
+    #         y_dpcpp = modelJit(x, a)
+    #         print("fusion:", y_dpcpp.cpu())
+    #     self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
+    #     del modelJit
 
 
-    @pytest.mark.skip("oneDNN not implement yet") 
-    def test_linear_binary_ne_fusion(self, dtype=torch.float):
-        x = torch.randn([2, 4], device=cpu_device)
-        a = torch.randn([2, 4], device=cpu_device)
-        model = LinearBinaryNotEqual(4, 4)
-        y = model(x, a)
-        print("raw: ", y)
+    # @pytest.mark.skip("oneDNN not implement yet") 
+    # def test_linear_binary_ne_fusion(self, dtype=torch.float):
+    #     x = torch.randn([2, 4], device=cpu_device)
+    #     a = torch.randn([2, 4], device=cpu_device)
+    #     model = LinearBinaryNotEqual(4, 4)
+    #     y = model(x, a)
+    #     print("raw: ", y)
 
-        x = x.to("xpu")
-        a = a.to("xpu")
-        model.to("xpu")
-        modelJit = torch.jit.trace(model, (x, a))
+    #     x = x.to("xpu")
+    #     a = a.to("xpu")
+    #     model.to("xpu")
+    #     modelJit = torch.jit.trace(model, (x, a))
 
-        with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x, a))
-            y_dpcpp = modelJit(x, a)
-            print("fusion:", y_dpcpp.cpu())
-        self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
-        del modelJit
+    #     with torch.no_grad():
+    #         if print_graph:
+    #             print(modelJit.graph_for(x, a))
+    #         y_dpcpp = modelJit(x, a)
+    #         print("fusion:", y_dpcpp.cpu())
+    #     self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
+    #     del modelJit
 
 
     def test_linear_binary_max_fusion(self, dtype=torch.float):
@@ -2911,86 +2910,86 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
 
-    @pytest.mark.skip("oneDNN not implement yet") 
-    def test_linear_binary_ge_fusion(self, dtype=torch.float):
-        x = torch.randn([2, 4], device=cpu_device)
-        a = torch.randn([2, 4], device=cpu_device)
-        model = LinearBinaryGE(4, 4)
-        y = model(x, a)
-        print("raw: ", y)
+    # @pytest.mark.skip("oneDNN not implement yet") 
+    # def test_linear_binary_ge_fusion(self, dtype=torch.float):
+    #     x = torch.randn([2, 4], device=cpu_device)
+    #     a = torch.randn([2, 4], device=cpu_device)
+    #     model = LinearBinaryGE(4, 4)
+    #     y = model(x, a)
+    #     print("raw: ", y)
 
-        x = x.to("xpu")
-        a = a.to("xpu")
-        model.to("xpu")
-        modelJit = torch.jit.script(model)
+    #     x = x.to("xpu")
+    #     a = a.to("xpu")
+    #     model.to("xpu")
+    #     modelJit = torch.jit.script(model)
 
-        with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x, a))
-            y_dpcpp = modelJit(x, a)
-            print("fusion:", y_dpcpp.cpu())
-        self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
-        del modelJit
+    #     with torch.no_grad():
+    #         if print_graph:
+    #             print(modelJit.graph_for(x, a))
+    #         y_dpcpp = modelJit(x, a)
+    #         print("fusion:", y_dpcpp.cpu())
+    #     self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
+    #     del modelJit
 
-    @pytest.mark.skip("oneDNN not implement yet") 
-    def test_linear_binary_gt_fusion(self, dtype=torch.float):
-        x = torch.randn([2, 4], device=cpu_device)
-        a = torch.randn([2, 4], device=cpu_device)
-        model = LinearBinaryGT(4, 4)
-        y = model(x, a)
-        print("raw: ", y)
+    # @pytest.mark.skip("oneDNN not implement yet") 
+    # def test_linear_binary_gt_fusion(self, dtype=torch.float):
+    #     x = torch.randn([2, 4], device=cpu_device)
+    #     a = torch.randn([2, 4], device=cpu_device)
+    #     model = LinearBinaryGT(4, 4)
+    #     y = model(x, a)
+    #     print("raw: ", y)
 
-        x = x.to("xpu")
-        a = a.to("xpu")
-        model.to("xpu")
-        modelJit = torch.jit.trace(model, (x, a))
+    #     x = x.to("xpu")
+    #     a = a.to("xpu")
+    #     model.to("xpu")
+    #     modelJit = torch.jit.trace(model, (x, a))
 
-        with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x, a))
-            y_dpcpp = modelJit(x, a)
-            print("fusion:", y_dpcpp.cpu())
-        self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
-        del modelJit
+    #     with torch.no_grad():
+    #         if print_graph:
+    #             print(modelJit.graph_for(x, a))
+    #         y_dpcpp = modelJit(x, a)
+    #         print("fusion:", y_dpcpp.cpu())
+    #     self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
+    #     del modelJit
 
-    @pytest.mark.skip("oneDNN not implement yet") 
-    def test_linear_binary_le_fusion(self, dtype=torch.float):
-        x = torch.randn([2, 4], device=cpu_device)
-        a = torch.randn([2, 4], device=cpu_device)
-        model = LinearBinaryLE(4, 4)
-        y = model(x, a)
-        print("raw: ", y)
+    # @pytest.mark.skip("oneDNN not implement yet") 
+    # def test_linear_binary_le_fusion(self, dtype=torch.float):
+    #     x = torch.randn([2, 4], device=cpu_device)
+    #     a = torch.randn([2, 4], device=cpu_device)
+    #     model = LinearBinaryLE(4, 4)
+    #     y = model(x, a)
+    #     print("raw: ", y)
 
-        x = x.to("xpu")
-        a = a.to("xpu")
-        model.to("xpu")
-        modelJit = torch.jit.trace(model, (x, a))
+    #     x = x.to("xpu")
+    #     a = a.to("xpu")
+    #     model.to("xpu")
+    #     modelJit = torch.jit.trace(model, (x, a))
 
-        with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x, a))
-            y_dpcpp = modelJit(x, a)
-            print("fusion:", y_dpcpp.cpu())
-        self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
-        del modelJit
+    #     with torch.no_grad():
+    #         if print_graph:
+    #             print(modelJit.graph_for(x, a))
+    #         y_dpcpp = modelJit(x, a)
+    #         print("fusion:", y_dpcpp.cpu())
+    #     self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
+    #     del modelJit
 
-    @pytest.mark.skip("oneDNN not implement yet") 
-    def test_linear_binary_lt_fusion(self, dtype=torch.float):
-        x = torch.randn([2, 4], device=cpu_device)
-        a = torch.randn([2, 4], device=cpu_device)
-        model = LinearBinaryLT(4, 4)
-        y = model(x, a)
-        print("raw: ", y)
+    # @pytest.mark.skip("oneDNN not implement yet") 
+    # def test_linear_binary_lt_fusion(self, dtype=torch.float):
+    #     x = torch.randn([2, 4], device=cpu_device)
+    #     a = torch.randn([2, 4], device=cpu_device)
+    #     model = LinearBinaryLT(4, 4)
+    #     y = model(x, a)
+    #     print("raw: ", y)
 
-        x = x.to("xpu")
-        a = a.to("xpu")
-        model.to("xpu")
-        modelJit = torch.jit.trace(model, (x, a))
+    #     x = x.to("xpu")
+    #     a = a.to("xpu")
+    #     model.to("xpu")
+    #     modelJit = torch.jit.trace(model, (x, a))
 
-        with torch.no_grad():
-            if print_graph:
-                print(modelJit.graph_for(x, a))
-            y_dpcpp = modelJit(x, a)
-            print("fusion:", y_dpcpp.cpu())
-        self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
-        del modelJit
+    #     with torch.no_grad():
+    #         if print_graph:
+    #             print(modelJit.graph_for(x, a))
+    #         y_dpcpp = modelJit(x, a)
+    #         print("fusion:", y_dpcpp.cpu())
+    #     self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
+    #     del modelJit
