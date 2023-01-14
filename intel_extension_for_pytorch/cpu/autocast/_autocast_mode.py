@@ -107,5 +107,5 @@ class _autocast(autocast_cpu):
         torch.set_autocast_cache_enabled(self.prev_cache_enabled)
         return False
 
-
-torch.cpu.amp.autocast = _autocast
+if (core._has_cpu()):
+    torch.cpu.amp.autocast = _autocast
