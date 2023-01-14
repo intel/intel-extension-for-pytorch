@@ -226,8 +226,12 @@ static void upsample_bilinear2d_out_dpcpp_template(
   }
   const int num_kernels = output_height * output_width;
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "upsample_bilinear2d_out_frame", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      input.scalar_type(),
+      "upsample_bilinear2d_out_frame",
+      [&] {
         using accscalar_t = acc_type<scalar_t>;
 
         auto* idata = input.data_ptr<scalar_t>();
@@ -295,8 +299,12 @@ static void upsample_bilinear2d_backward_out_dpcpp_template(
     return;
   }
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      grad_output.scalar_type(), "upsample_bilinear2d_backward_out_frame", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      grad_output.scalar_type(),
+      "upsample_bilinear2d_backward_out_frame",
+      [&] {
         using accscalar_t = acc_type<scalar_t>;
 
         scalar_t* idata = grad_input.data_ptr<scalar_t>();
