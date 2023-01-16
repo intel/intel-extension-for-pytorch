@@ -6,6 +6,7 @@
 
 #include <ATen/Context.h>
 #include <ATen/InferSize.h>
+#include <ATen/Parallel.h>
 #include <c10/util/Exception.h>
 #include <c10/util/Logging.h>
 #include <torch/csrc/autograd/function.h>
@@ -223,25 +224,19 @@ std::vector<at::Tensor> dil_mat_split(
   }
 
   T* src = mat.data_ptr<T>();
-#ifdef _OPENMP
-#if (_OPENMP >= 201307)
-#pragma omp parallel for simd schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
-#else
-#pragma omp parallel for schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
-#endif
-#endif
-  for (int i = 0; i < batchSize * sequenceSize; ++i) {
-    int64_t accum = 0;
-    for (int j = 0; j < split_size; ++j) {
-      memcpy(
-          split_mat[j].data_ptr<T>() + i * split_list[j],
-          src + i * total_size + accum,
-          sizeof(T) * split_list[j]);
-      accum += split_list[j];
-    }
-  }
+  at::parallel_for(
+      0, batchSize * sequenceSize, 1, [&](int64_t begin, int64_t end) {
+        for (const auto i : c10::irange(begin, end)) {
+          int64_t accum = 0;
+          for (int j = 0; j < split_size; ++j) {
+            memcpy(
+                split_mat[j].data_ptr<T>() + i * split_list[j],
+                src + i * total_size + accum,
+                sizeof(T) * split_list[j]);
+            accum += split_list[j];
+          }
+        }
+      });
 
   return split_mat;
 }

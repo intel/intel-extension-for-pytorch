@@ -36,7 +36,9 @@ functions_supported_by_quantization =set([
     F.linear,
     torch._C._nn.linear,
     torch.matmul,
+    torch.bmm,
     torch.Tensor.matmul,
+    torch.Tensor.bmm,
     F.embedding_bag,
     torch.embedding_bag,
     ])
@@ -349,7 +351,7 @@ def iterate_and_apply_convert(
                     args = args.dequantize()
             else:
                 # white list, conv, linear, matmul, we always convert it's input to bflat16 firstly, and then inser q+dq
-                if str(op) in conv_linear_ops + [str(torch.matmul), str(torch.Tensor.matmul)] + embedding_op or str(type(op)) in conv_linear_modules:
+                if str(op) in conv_linear_ops + [str(torch.matmul), str(torch.Tensor.matmul), str(torch.bmm), str(torch.Tensor.bmm)] + embedding_op or str(type(op)) in conv_linear_modules:
                     if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
                         if args.dtype == torch.float32:
                             args = args.to(torch.bfloat16)

@@ -73,7 +73,7 @@ For memory management, it configures NUMA binding and preload optimized memory a
    eg: run 0th instance among SKX with 2 instance, 2 cores per instance, first four cores (i.e., numactl -C 0-1)
 ::
 
-   >>> ipexrun  --core_list "0, 1, 2, 3" --ninstances 2 --ncore_per_instance 2 --instance_idx 0 python_script args
+   >>> ipexrun  --core_list "0-3" --ninstances 2 --ncore_per_instance 2 --instance_idx 0 python_script args
 
 *** Distributed Training ***
 
@@ -230,7 +230,7 @@ class Launcher():
 
     def add_lib_preload(self, lib_type=None):
         '''
-        Enale TCMalloc/JeMalloc/intel OpenMP
+        Enable TCMalloc/JeMalloc/intel OpenMP
         '''
         library_paths = []
         if "CONDA_PREFIX" in os.environ:
@@ -239,7 +239,8 @@ class Launcher():
             library_paths.append(os.environ["VIRTUAL_ENV"] + "/lib/")
 
         library_paths += ["{}/.local/lib/".format(expanduser("~")), "/usr/local/lib/",
-                          "/usr/local/lib64/", "/usr/lib/", "/usr/lib64/"]
+                          "/usr/local/lib64/", "/usr/lib/", "/usr/lib64/", 
+                          "/usr/lib/x86_64-linux-gnu/"]
 
         lib_find = False
         lib_set = False

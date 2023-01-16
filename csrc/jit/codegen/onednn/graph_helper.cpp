@@ -374,6 +374,8 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     return Operator(node, opkind::MatMul).setInput(0, 1).setOutput(0);
   } else if (nodeKind == Symbol::aten("mm")) {
     return Operator(node, opkind::MatMul).setInput(0, 1).setOutput(0);
+  } else if (nodeKind == Symbol::aten("bmm")) {
+    return Operator(node, opkind::MatMul).setInput(0, 1).setOutput(0);
   } else if (nodeKind == Symbol::aten("linear")) {
     auto dim0 = getDimensions(node->input(0)).value_or(-1);
     auto dim1 = getDimensions(node->input(1)).value_or(-1);
