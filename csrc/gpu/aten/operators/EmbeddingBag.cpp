@@ -7,6 +7,7 @@
 #include <utils/DPCPP.h>
 
 #include "BitonicMergeSort.h"
+#include "MemoryAccess.h"
 #include "PSTLFunctions.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
@@ -15,16 +16,14 @@
 
 #include <aten/operators/MemoryAccess.h>
 #include "EmbeddingBackwardKernel.h"
+#include "EmbeddingBagKernel.h"
 
 using namespace xpu::dpcpp;
+using namespace xpu::dpcpp::detail;
 
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
-
-constexpr int MODE_SUM = 0;
-constexpr int MODE_MEAN = 1;
-constexpr int MODE_MAX = 2;
 
 std::pair<Tensor, Tensor> promoteIndicesAndOffsets(
     const Tensor& indices,
@@ -347,7 +346,8 @@ void EmbeddingBag_updateOutputKernel(
     scalar_t* per_sample_weights_data,
     int64_t per_sample_weights_stride,
     const bool include_last_offset,
-    const index_t padding_idx) {
+    const index_t padding_idx,
+    const bool ignore_offsets) {
   using accscalar_t = acc_type<scalar_t>;
 
   // vector size, query it according to machine, scalar_t and weight_data
@@ -683,8 +683,9 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
   isOnSameDevice("embedding_bag_dpcpp", weight_arg, indices_arg);
   isOnSameDevice("embedding_bag_dpcpp", weight_arg, offsets_arg);
 
-  int64_t numIndices = indices.size(0);
-  int64_t numBags = offsets.size(0);
+  bool ignore_offsets = indices.sizes().size() == 2;
+  int64_t numIndices = indices.numel();
+  int64_t numBags = ignore_offsets ? indices.size(0) : offsets.size(0);
 
   // include last offset = True, means the last element of offsets will be set
   // equal to the length of input. Default it is False.
@@ -701,10 +702,37 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
 
   Tensor max_indices = at::empty({numBags, weight.size(1)}, indices.options());
 
-  if (mode == MODE_MAX) {
-    max_indices.zero_();
-  }
+#ifndef VEC_EMBBAG_KERNEL_OPT
+#define EXTEND_EMBBAG_TEMPLATE(mode) \
+  embedding_bag_##mode##_template(   \
+      indices,                       \
+      offsets,                       \
+      weight,                        \
+      per_sample_weights,            \
+      output,                        \
+      offset2bag,                    \
+      bag_size,                      \
+      max_indices,                   \
+      numIndices,                    \
+      numBags,                       \
+      weight.stride(0),              \
+      padding_idx,                   \
+      ignore_offsets)
 
+  switch (mode) {
+    case MODE_SUM:
+      EXTEND_EMBBAG_TEMPLATE(sum);
+      break;
+    case MODE_MEAN:
+      EXTEND_EMBBAG_TEMPLATE(mean);
+      break;
+    case MODE_MAX:
+      EXTEND_EMBBAG_TEMPLATE(max);
+      break;
+    default:
+      TORCH_CHECK(0, "Invalid EmbeddingBag mode (max, sum, mean) ...");
+  };
+#else
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -733,9 +761,11 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
                   per_sample_weights.defined() ? per_sample_weights.stride(0)
                                                : 0,
                   include_last_offset,
-                  padding_idx);
+                  padding_idx,
+                  ignore_offsets);
             });
       });
+#endif
 
   return std::tuple<Tensor, Tensor, Tensor, Tensor>(
       output, offset2bag, bag_size, max_indices);
