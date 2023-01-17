@@ -15,8 +15,12 @@ typedef enum {
 } ScanType;
 
 // group x scan by using up down sweep algorithm(call uds for short)
-template <class LSConfig, class T, class BinaryFunction>
-DPCPP_DEVICE T group_x_scan_by_uds_for_loop_scan(
+template <
+    class LSConfig,
+    class T,
+    class BinaryFunction,
+    bool TrivialOffCal = false>
+DPCPP_DEVICE T inline group_x_scan_by_uds_for_loop_scan(
     sycl::nd_item<2> item,
     const T pre_max_carr,
     int64_t base_off_batch,
@@ -44,35 +48,40 @@ DPCPP_DEVICE T group_x_scan_by_uds_for_loop_scan(
   uint32_t ix1 = base_off_problem + rx + lix;
   uint32_t glb0 = base_off_batch * cfg.problem_ + ix0;
   uint32_t glb1 = base_off_batch * cfg.problem_ + ix1;
+  if constexpr (TrivialOffCal) {
+    glb_ldr_off_0 = glb0;
+    glb_ldr_off_1 = glb1;
+    glb_str_off_0 = glb0;
+    glb_str_off_1 = glb1;
+  } else {
+    glb_ldr_logical_off_0 = glb0;
+    glb_ldr_off_0 = IndexToOffset<typename InputInfo::scalar_t, int64_t>::get(
+        glb_ldr_logical_off_0,
+        cfg.input_,
+        IndexToOffset<typename InputInfo::scalar_t, int64_t>::
+            NON_STRICT_CONTIGUOUS);
 
-  glb_ldr_logical_off_0 = glb0;
-  glb_ldr_off_0 = IndexToOffset<typename InputInfo::scalar_t, int64_t>::get(
-      glb_ldr_logical_off_0,
-      cfg.input_,
-      IndexToOffset<typename InputInfo::scalar_t, int64_t>::
-          NON_STRICT_CONTIGUOUS);
+    glb_ldr_logical_off_1 = glb1;
+    glb_ldr_off_1 = IndexToOffset<typename InputInfo::scalar_t, int64_t>::get(
+        glb_ldr_logical_off_1,
+        cfg.input_,
+        IndexToOffset<typename InputInfo::scalar_t, int64_t>::
+            NON_STRICT_CONTIGUOUS);
 
-  glb_ldr_logical_off_1 = glb1;
-  glb_ldr_off_1 = IndexToOffset<typename InputInfo::scalar_t, int64_t>::get(
-      glb_ldr_logical_off_1,
-      cfg.input_,
-      IndexToOffset<typename InputInfo::scalar_t, int64_t>::
-          NON_STRICT_CONTIGUOUS);
+    glb_str_logical_off_0 = glb0;
+    glb_str_off_0 = IndexToOffset<typename OutputInfo::scalar_t, int64_t>::get(
+        glb_str_logical_off_0,
+        cfg.output_,
+        IndexToOffset<typename OutputInfo::scalar_t, int64_t>::
+            NON_STRICT_CONTIGUOUS);
 
-  glb_str_logical_off_0 = glb0;
-  glb_str_off_0 = IndexToOffset<typename OutputInfo::scalar_t, int64_t>::get(
-      glb_str_logical_off_0,
-      cfg.output_,
-      IndexToOffset<typename OutputInfo::scalar_t, int64_t>::
-          NON_STRICT_CONTIGUOUS);
-
-  glb_str_logical_off_1 = glb1;
-  glb_str_off_1 = IndexToOffset<typename OutputInfo::scalar_t, int64_t>::get(
-      glb_str_logical_off_1,
-      cfg.output_,
-      IndexToOffset<typename OutputInfo::scalar_t, int64_t>::
-          NON_STRICT_CONTIGUOUS);
-
+    glb_str_logical_off_1 = glb1;
+    glb_str_off_1 = IndexToOffset<typename OutputInfo::scalar_t, int64_t>::get(
+        glb_str_logical_off_1,
+        cfg.output_,
+        IndexToOffset<typename OutputInfo::scalar_t, int64_t>::
+            NON_STRICT_CONTIGUOUS);
+  }
   // TODO: opti for bank conflict elemination
   // Read data from global memory to shared local memory
   // Each work item load 2 elements from global device memory to shared local
@@ -280,8 +289,8 @@ class LoopScanConfig {
         glb_range_y_(0),
         wg_range_x_(0),
         wg_range_y_(0) {
-    int64_t wg_size = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
     auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+    int64_t wg_size = dpcppMaxWorkItemsPerEU(dev_id);
     wg_range_x_ = 32;
     while (problem_ <= wg_range_x_ >> 1) {
       wg_range_x_ = wg_range_x_ >> 1;
@@ -356,7 +365,11 @@ class LoopScanConfig {
   int wg_range_y_;
 };
 
-template <class LSConfig, class T, class BinaryFunction>
+template <
+    class LSConfig,
+    class T,
+    class BinaryFunction,
+    bool TrivialOffCal = false>
 class loop_scan_kernel {
  public:
   loop_scan_kernel(const LSConfig& cfg) : cfg(cfg) {}
@@ -370,20 +383,21 @@ class loop_scan_kernel {
     const auto group_size_x = cfg.wg_range_x_;
     const auto liy = item.get_local_id(0);
 
-    for (int k = 0; k < loops_batch; ++k) {
+    for (int k = 0,
+             base_off_batch_group = item.get_group(0) * item.get_local_range(0);
+         k < loops_batch && base_off_batch_group < cfg.batch_;
+         k++, base_off_batch_group += cfg.glb_range_y_) {
       max_carr[liy] = cfg.init_;
       int64_t base_off_batch = k * cfg.glb_range_y_ + item.get_global_id(0);
       for (int i = 0; i < loops_problem; ++i) {
         // calculate base addr offset for each loop
         int64_t base_off_problem = i * group_size_x * 2;
-        max_carr[liy] =
-            group_x_scan_by_uds_for_loop_scan<LSConfig, T, BinaryFunction>(
-                item,
-                max_carr[liy],
-                base_off_batch,
-                base_off_problem,
-                slm,
-                cfg);
+        max_carr[liy] = group_x_scan_by_uds_for_loop_scan<
+            LSConfig,
+            T,
+            BinaryFunction,
+            TrivialOffCal>(
+            item, max_carr[liy], base_off_batch, base_off_problem, slm, cfg);
       }
     }
   }
@@ -411,10 +425,9 @@ class loop_scan {
   dpcpp_local_acc_t<T> max_carr_;
 };
 
-template <typename LSConfig>
+template <typename LSConfig, bool TrivialOffCal = false>
 static inline void launch_loop_scan(const LSConfig& cfg) {
   auto& queue = dpcppGetCurrentQueue();
-
   auto cgf = DPCPP_Q_CGF(__cgh) {
     // up_down_sweep demands 2 times work group size
     int slm_size = cfg.wg_range_x_ * cfg.wg_range_y_ * 2;
@@ -424,9 +437,9 @@ static inline void launch_loop_scan(const LSConfig& cfg) {
     loop_scan_kernel<
         LSConfig,
         typename LSConfig::arg_t,
-        typename LSConfig::func_t>
+        typename LSConfig::func_t,
+        TrivialOffCal>
         ker(cfg);
-
     loop_scan sscan(ker, shared, max_carr);
     __cgh.parallel_for(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), sscan);
@@ -510,7 +523,11 @@ class SegmentScanConfig : public BatchKernelConfig {
   /* contiguous temp buffer */ T* carrier_;
 };
 
-template <class SSConfig, class T, class BinaryFunction>
+template <
+    class SSConfig,
+    class T,
+    class BinaryFunction,
+    bool TrivialOffCal = false>
 class segment_scan_kernel {
  public:
   using InputInfo = typename SSConfig::InputInfoType;
@@ -536,22 +553,28 @@ class segment_scan_kernel {
         si + (pi + e) * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
     crr_off = si + id.chunk * cfg.stride_ + bi * id.chunk_num * cfg.stride_;
 
-    glb_ldr_off = IndexToOffset<typename InputInfo::scalar_t, int64_t>::get(
-        glb_ldr_logical_off,
-        cfg.iinfo_,
-        IndexToOffset<typename InputInfo::scalar_t, int64_t>::
-            NON_STRICT_CONTIGUOUS);
-    glb_str_off = IndexToOffset<typename OutputInfo::scalar_t, int64_t>::get(
-        glb_str_logical_off,
-        cfg.oinfo_,
-        IndexToOffset<typename InputInfo::scalar_t, int64_t>::
-            NON_STRICT_CONTIGUOUS);
-    glb_str_off_0 = IndexToOffset<typename OutputInfo::scalar_t, int64_t>::get(
-        glb_ldr_logical_off,
-        cfg.oinfo_,
-        IndexToOffset<typename InputInfo::scalar_t, int64_t>::
-            NON_STRICT_CONTIGUOUS);
-
+    if constexpr (TrivialOffCal) {
+      glb_ldr_off = glb_ldr_logical_off;
+      glb_str_off = glb_str_logical_off;
+      glb_str_off_0 = glb_ldr_logical_off;
+    } else {
+      glb_ldr_off = IndexToOffset<typename InputInfo::scalar_t, int64_t>::get(
+          glb_ldr_logical_off,
+          cfg.iinfo_,
+          IndexToOffset<typename InputInfo::scalar_t, int64_t>::
+              NON_STRICT_CONTIGUOUS);
+      glb_str_off = IndexToOffset<typename OutputInfo::scalar_t, int64_t>::get(
+          glb_str_logical_off,
+          cfg.oinfo_,
+          IndexToOffset<typename InputInfo::scalar_t, int64_t>::
+              NON_STRICT_CONTIGUOUS);
+      glb_str_off_0 =
+          IndexToOffset<typename OutputInfo::scalar_t, int64_t>::get(
+              glb_ldr_logical_off,
+              cfg.oinfo_,
+              IndexToOffset<typename InputInfo::scalar_t, int64_t>::
+                  NON_STRICT_CONTIGUOUS);
+    }
     T value = cfg.init_;
     if (id.glb_problem < cfg.problem_ && id.glb_batch < cfg.problem_batch_) {
       value = cfg.iinfo_.data[glb_ldr_off];
@@ -607,7 +630,7 @@ class segment_scan {
   dpcpp_local_acc_t<T> shared_;
 };
 
-template <typename SSConfig>
+template <typename SSConfig, bool TrivialOffCal = false>
 static inline void launch_segment_scan(const SSConfig& cfg) {
   auto& queue = dpcppGetCurrentQueue();
 
@@ -627,7 +650,8 @@ static inline void launch_segment_scan(const SSConfig& cfg) {
     segment_scan_kernel<
         SSConfig,
         typename SSConfig::arg_t,
-        typename SSConfig::func_t>
+        typename SSConfig::func_t,
+        TrivialOffCal>
         ker(cfg);
     segment_scan gscan(ker, shared);
     __cgh.parallel_for(
@@ -762,6 +786,7 @@ static inline bool dispatch_to_loop_scan_kernel(
 
 template <
     ScanType Type,
+    bool TrivialOffCal,
     typename T,
     class InputInfo,
     class OutputInfo,
@@ -776,13 +801,14 @@ static inline void _loop_scan_kernel(
       LoopScanConfig<InputInfo, OutputInfo, T, BinaryFunction>::make_config(
           input_info, output_info, dim_after_collapse, init, Type, func);
   TORCH_CHECK(1 == cfg.stride_);
-  launch_loop_scan(cfg);
+  launch_loop_scan<decltype(cfg), TrivialOffCal>(cfg);
 
   return;
 }
 
 template <
     ScanType Type,
+    bool TrivialOffCal,
     typename T,
     class InputInfo,
     class OutputInfo,
@@ -800,7 +826,7 @@ static inline void _segment_scan_kernel(
   // 0. recursive convergence
   if (cfg.problem_ <= cfg.problem_wg_range_) {
     cfg.set_carrier(nullptr);
-    launch_segment_scan(cfg);
+    launch_segment_scan<decltype(cfg), TrivialOffCal>(cfg);
     return;
   }
 
@@ -811,10 +837,10 @@ static inline void _segment_scan_kernel(
   TensorInfo<T, int64_t> carrier_info =
       getTensorInfo<T, int64_t>(carrier_holder);
   cfg.set_carrier(carrier_info.data);
-  launch_segment_scan(cfg);
+  launch_segment_scan<decltype(cfg), TrivialOffCal>(cfg);
 
   // 2. recursion for carrier
-  _segment_scan_kernel<EXCLUSIVE_TYPE>(
+  _segment_scan_kernel<EXCLUSIVE_TYPE, TrivialOffCal>(
       carrier_info, carrier_info, 1, init, func);
 
   // 3. accumulate among all chunk
@@ -842,16 +868,16 @@ void scan(
     self.zero_();
     return;
   }
-
-  dimension = maybe_wrap_dim(dimension, input.dim());
+  auto input_ = input.contiguous();
+  dimension = maybe_wrap_dim(dimension, input_.dim());
   TORCH_CHECK(
-      dimension >= 0 && dimension < input.dim(),
+      dimension >= 0 && dimension < input_.dim(),
       "dimension ",
       dimension,
       " out of range");
 
   TensorInfo<scalar_t, int64_t> input_info =
-      getTensorInfo<scalar_t, int64_t>(input);
+      getTensorInfo<scalar_t, int64_t>(input_);
   int dim_after_collapse = input_info.collapseDims(dimension);
 
   TensorInfo<oscalar_t, int64_t> output_info =
@@ -863,10 +889,10 @@ void scan(
   int64_t problem = input_info.sizes[dim_after_collapse];
 
   if (dispatch_to_loop_scan_kernel(problem, stride, batch)) {
-    _loop_scan_kernel<Type>(
+    _loop_scan_kernel<Type, true>(
         input_info, output_info, dim_after_collapse, init, func);
   } else {
-    _segment_scan_kernel<Type>(
+    _segment_scan_kernel<Type, true>(
         input_info, output_info, dim_after_collapse, init, func);
   }
 }
