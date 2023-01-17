@@ -2,7 +2,7 @@ include(CheckCXXCompilerFlag)
 
 FIND_PACKAGE(AVX)
 
-file(GLOB_RECURSE cpu_kernel_cpp_in "${IPEX_CPU_CPP_ROOT}/aten/kernels/*.cpp")
+file(GLOB_RECURSE cpu_kernel_cpp_in "${IPEX_CPU_ROOT_DIR}/aten/kernels/*.cpp")
 list(APPEND IPEX_CPU_CPP_ISA_SRCS_ORIGIN ${cpu_kernel_cpp_in})
 
 # foreach(file_path ${cpu_kernel_cpp_in})
@@ -118,10 +118,10 @@ math(EXPR NUM_CPU_CAPABILITY_NAMES "${NUM_CPU_CAPABILITY_NAMES}-1")
 # See NOTE [ Linking AVX and non-AVX files ]
 foreach(i RANGE ${NUM_CPU_CAPABILITY_NAMES})
   foreach(IMPL ${cpu_kernel_cpp_in})
-    file(RELATIVE_PATH NAME "${IPEX_PROJECT_TOP_DIR}/csrc/" "${IMPL}")
+    file(RELATIVE_PATH NAME "${IPEX_ROOT_DIR}/csrc/" "${IMPL}")
     list(GET CPU_CAPABILITY_NAMES ${i} CPU_CAPABILITY)
     set(NEW_IMPL ${CMAKE_BINARY_DIR}/isa_codegen/${NAME}.${CPU_CAPABILITY}.cpp)
-    configure_file("${IPEX_PROJECT_TOP_DIR}/cmake/cpu/IncludeSource.cpp.in" ${NEW_IMPL})
+    configure_file("${IPEX_ROOT_DIR}/cmake/cpu/IncludeSource.cpp.in" ${NEW_IMPL})
     set(cpu_kernel_cpp ${NEW_IMPL} ${cpu_kernel_cpp}) # Create list of copies
     list(GET CPU_CAPABILITY_FLAGS ${i} FLAGS)
     if(MSVC)

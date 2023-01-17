@@ -1,9 +1,9 @@
 #pragma once
 
 #include <ATen/Tensor.h>
+#include <dyndisp/DispatchStub.h>
 #include <torch/all.h>
 #include <string>
-#include "csrc/cpu/dyndisp/DispatchStub.h"
 
 namespace torch_ipex {
 namespace cpu {

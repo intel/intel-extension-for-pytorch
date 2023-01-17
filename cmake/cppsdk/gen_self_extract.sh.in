@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Generate self-extract package
+
+SCRIPT=$(realpath "$0")
+SCRIPTPATH=$(dirname "$SCRIPT")
+
+LIBIPEX_PACK_PREFIX="@LIBIPEX_PACK_PREFIX@"
+LIBIPEX_INSTALL_SCRIPT="@LIBIPEX_INSTALL_SCRIPT@"
+
+if [ ! -f ${LIBIPEX_INSTALL_SCRIPT} ]; then
+    echo "ERROR! Cannot find install script in ${LIBIPEX_INSTALL_SCRIPT}!"
+    exit 20
+fi
+
+TOTAL_NR=$(awk 'END { print NR; exit 0; }' ${LIBIPEX_INSTALL_SCRIPT})
+ARCHIVE_NR=$(awk '/^__ARCHIVE_BELOW_ONLY__/ {print NR; exit 0; }' ${LIBIPEX_INSTALL_SCRIPT})
+if [ ! ${TOTAL_NR} -eq ${ARCHIVE_NR} ]; then
+    echo "ERROR! ${LIBIPEX_INSTALL_SCRIPT} was already packed!"
+    exit 21
+fi
+
+PACK_FILE=$(find ${LIBIPEX_PACK_PREFIX}* -type f)
+if [ ! -f ${PACK_FILE} ]; then
+    echo "ERROR! Cannot file package file by prefix ${LIBIPEX_PACK_PREFIX}*!"
+    exit 22
+fi
+
+cat ${PACK_FILE} >> ${LIBIPEX_INSTALL_SCRIPT}
+if [ $? -gt 0 ]; then
+    echo "ERROR! Failed to embed package (${PACK_FILE}) into script (${LIBIPEX_INSTALL_SCRIPT})!"
+    exit 23
+fi
+
+echo "Successfully generate self-extacting package at ${LIBIPEX_INSTALL_SCRIPT}"
+exit

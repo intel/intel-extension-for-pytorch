@@ -1,5 +1,5 @@
 #include <ATen/Tensor.h>
-#include <csrc/cpu/dyndisp/DispatchStub.h>
+#include <dyndisp/DispatchStub.h>
 #include <torch/all.h>
 
 namespace torch_ipex {

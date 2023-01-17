@@ -4,7 +4,7 @@ try:
 except ImportError:
     pass  # skip if torchvision is not available
 
-from .version import __version__
+from ._version import __version__
 from .utils import _cpu_isa, _custom_fx_tracer
 _cpu_isa.check_minimal_isa_support()
 
