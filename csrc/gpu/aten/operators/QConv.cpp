@@ -49,6 +49,9 @@ struct QuantizeConvConverter {
     stride_ = pack_ptr->stride();
     groups_ = pack_ptr->groups();
     dilation_ = pack_ptr->dilation();
+    transpose_ = pack_ptr->transpose();
+    output_padding_ = pack_ptr->output_padding();
+    transpose_ = pack_ptr->transpose();
     q_scale_ = q_scale;
     q_zero_point_ = q_zero_point;
     dtype_ = type;
@@ -65,16 +68,29 @@ struct QuantizeConvConverter {
     at::Tensor output_ = quantizedEmptyTensorFromInput(input_);
 
     Attr att = func();
-    output_ = quantized_convolution(
-        output_,
-        input_,
-        weight_,
-        padding_.vec(),
-        padding_.vec(),
-        stride_.vec(),
-        dilation_.vec(),
-        groups_,
-        att);
+    if (!transpose_) {
+      output_ = quantized_convolution(
+          output_,
+          input_,
+          weight_,
+          padding_.vec(),
+          padding_.vec(),
+          stride_.vec(),
+          dilation_.vec(),
+          groups_,
+          att);
+    } else {
+      output_ = quantized_deconvolution(
+          output_,
+          input_,
+          weight_,
+          Tensor(),
+          stride_.vec(),
+          padding_.vec(),
+          output_padding_.vec(),
+          dilation_.vec(),
+          groups_);
+    }
     return output_;
   }
 
@@ -91,36 +107,63 @@ struct QuantizeConvConverter {
         : quantizedEmptyTensorFromInput(input_);
 
     Attr att = func();
-    output = quantized_convolution(
-        output_,
-        input_,
-        weight_,
-        padding_.vec(),
-        padding_.vec(),
-        stride_.vec(),
-        dilation_.vec(),
-        groups_,
-        att);
-    if (!output.is_same(output_)) {
-      output.copy_(output_);
+    if (!transpose_) {
+      output = quantized_convolution(
+          output_,
+          input_,
+          weight_,
+          padding_.vec(),
+          padding_.vec(),
+          stride_.vec(),
+          dilation_.vec(),
+          groups_,
+          att);
+      if (!output.is_same(output_)) {
+        output.copy_(output_);
+      }
+      set_quantizer_(
+          output,
+          dpcpp_make_per_tensor_affine_quantizer(
+              q_scale_, q_zero_point_, dtype_));
+    } else {
+      output_ = quantized_deconvolution(
+          output_,
+          input_,
+          weight_,
+          Tensor(),
+          stride_.vec(),
+          padding_.vec(),
+          output_padding_.vec(),
+          dilation_.vec(),
+          groups_);
+
+      set_quantizer_(
+          output_,
+          dpcpp_make_per_tensor_affine_quantizer(
+              q_scale_, q_zero_point_, dtype_));
     }
-    set_quantizer_(
-        output,
-        dpcpp_make_per_tensor_affine_quantizer(
-            q_scale_, q_zero_point_, dtype_));
-    return output;
+    return output_;
   }
 
   at::Tensor quantizedEmptyTensorFromInput(const at::Tensor& input) {
+    auto dst_tz = transpose_ ? deconv_dst_tz(
+                                   input.sizes(),
+                                   weight_.sizes(),
+                                   padding_.vec(),
+                                   stride_.vec(),
+                                   dilation_.vec(),
+                                   output_padding_.vec(),
+                                   groups_)
+                             : conv_dst_tz(
+                                   input.ndimension(),
+                                   input.sizes(),
+                                   weight_.sizes(),
+                                   padding_.vec(),
+                                   padding_.vec(),
+                                   stride_.vec(),
+                                   dilation_.vec());
     return at::_empty_affine_quantized(
-        conv_dst_tz(
-            input.ndimension(),
-            input.sizes(),
-            weight_.sizes(),
-            padding_.vec(),
-            padding_.vec(),
-            stride_.vec(),
-            dilation_.vec()),
+        dst_tz,
         device(at::kXPU).dtype(dtype_),
         q_scale_,
         q_zero_point_,
@@ -130,7 +173,9 @@ struct QuantizeConvConverter {
   at::Tensor output_;
   torch::List<int64_t> padding_;
   torch::List<int64_t> stride_;
+  torch::List<int64_t> output_padding_;
   int64_t groups_;
+  bool transpose_;
   torch::List<int64_t> dilation_;
   at::MemoryFormat channel_last_format_;
   at::MemoryFormat mfmt_;
@@ -259,11 +304,34 @@ Tensor q_conv3d_relu(
   return qconv_wrapper.call(input, post_op);
 }
 
+Tensor q_deconv3d(
+    Tensor input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<3>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto qconv_wrapper =
+      QuantizeConvConverter<3>(packed_weight, output_scale, 0, kQInt8);
+
+  // TODO: no post op for q_deconv3d
+  auto post_op = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<3>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      attr.append_bias<3>(bias);
+    }
+    return attr;
+  };
+  return qconv_wrapper.call(input, post_op);
+}
+
 TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
   m.impl("quantized::conv2d.new", q_conv2d);
   m.impl("quantized::conv2d_relu.new", q_conv2d_relu);
   m.impl("quantized::conv3d.new", q_conv3d);
   m.impl("quantized::conv3d_relu.new", q_conv3d_relu);
+  m.impl("quantized::conv_transpose3d", q_deconv3d);
 }
 
 } // namespace AtenIpexTypeQuantizedXPU

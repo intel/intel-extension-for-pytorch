@@ -90,13 +90,35 @@ c10::intrusive_ptr<ConvPackedParamsBase<3>> dpcppConvPrepack3d(
   return ret_ptr;
 }
 
+c10::intrusive_ptr<ConvPackedParamsBase<3>> dpcppDeconvPrepack3d(
+    Tensor weight,
+    c10::optional<Tensor> bias,
+    torch::List<int64_t> stride,
+    torch::List<int64_t> padding,
+    torch::List<int64_t> output_padding,
+    torch::List<int64_t> dilation,
+    int64_t groups) {
+  auto ret_ptr = PackedConvWeightQDPCPP<3>::prepack(
+      weight,
+      bias,
+      stride,
+      padding,
+      output_padding,
+      dilation,
+      groups,
+      /*transpose=*/true);
+  return ret_ptr;
+}
+
 TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
   m.impl("conv2d_prepack", TORCH_FN(dpcppConvPrepack2d));
   m.impl("conv3d_prepack", TORCH_FN(dpcppConvPrepack3d));
+  m.impl("conv_transpose3d_prepack", TORCH_FN(dpcppDeconvPrepack3d));
 }
 
 TORCH_LIBRARY_IMPL(quantized, XPU, m) {
   m.impl("conv2d_prepack", TORCH_FN(dpcppConvPrepack2d));
+  m.impl("conv_transpose3d_prepack", TORCH_FN(dpcppDeconvPrepack3d));
 }
 
 } // namespace AtenIpexTypeQuantizedXPU
