@@ -20,6 +20,9 @@ def read_file(file_name):
     return data 
 
 def write_file(file_name, data):
+    dirname = os.path.dirname(os.path.realpath(file_name))
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
     f = open(file_name, "w")
     f.write(data)
     f.close()
