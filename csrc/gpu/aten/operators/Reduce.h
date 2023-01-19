@@ -208,21 +208,20 @@ struct ReduceConfig {
 
   template <typename T>
   void set_group_dimension(int64_t dim0, int64_t dim1) {
-    auto max_wg_sz = dpcppGetCurrentQueue()
-                         .get_device()
-                         .template get_info<dpcpp_dev_max_work_group_size>();
+    auto max_wg_sz = dpcppMaxWorkGroupSize();
+    auto max_sg_sz = dpcppMaxSubGroupSize();
     const int max_num_items = max_wg_sz / output_vec_size;
     int dim0_pow2 = dim0 < max_num_items ? static_cast<int>(last_pow2(dim0))
                                          : max_num_items;
     int dim1_pow2 = dim1 < max_num_items ? static_cast<int>(last_pow2(dim1))
                                          : max_num_items;
-    group_width = std::min(dim0_pow2, int(32)); /* suggested sub-group */
+    group_width = std::min(dim0_pow2, int(max_sg_sz));
     group_height = std::min(dim1_pow2, int(max_num_items / group_width));
     group_width = std::min(dim0_pow2, int(max_num_items / group_height));
     num_items = group_width * group_height;
 
-    if (num_items < 32)
-      group_width = 32;
+    if (num_items < max_sg_sz)
+      group_width = max_sg_sz;
   }
 
   int split_input(int parallelism) {
@@ -1160,7 +1159,6 @@ struct ReduceOp {
       reduce_buffer[offset] = value;
     }
 
-    pos.barrier(dpcpp_local_fence);
     mark_group_finished(pos, is_last_group_done);
 
     if (is_last_group_done[0]) {
@@ -1529,20 +1527,21 @@ inline void dpcpp_reduce_kernel(
   // And now we use catch-all configuration
   constexpr int min_values_per_item = 16;
   constexpr int max_values_per_item = 256;
-  // Query max compute units for EU num temporarily
-  auto eu_num = dpcppGetCurrentDeviceProperties()->max_compute_units;
-  const auto target_global_size = eu_num * 32 /* SIMD32 */ * 8 /* HD threads */;
-  int g_x = config.n_groups()[1];
+
+  const auto target_group_range =
+      dpcppMaxWorkItemsPerTile() / (group_height * group_width);
+  // outputs after spliting to work group
+  int reset_output = config.n_groups()[1];
   if (config.input_mult[1] != 0 &&
       config.values_per_item() >= max_values_per_item &&
-      g_x <= target_global_size) {
+      reset_output <= target_group_range) {
     // Divide the input across work-groups if the amount of work per-item
     // is large enough and the size of the output is small enough. This will
     // require a reduction using global memory.
     // If we decide to split input across groups, as long as we can get enough
-    // number of groups ('target_group_size') to balance SS, we should still
+    // number of groups ('target_group_range') to balance SS, we should still
     // make the number of values per item large for best performance.
-    auto groups_per_output1 = div_up(target_global_size, g_x);
+    auto groups_per_output1 = div_up(target_group_range, reset_output);
     auto groups_per_output2 =
         div_up(config.values_per_item(), min_values_per_item);
     auto groups_per_output3 =
