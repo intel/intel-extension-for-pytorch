@@ -191,6 +191,43 @@ class TestAutoChannelsLast(TestCase):
         model_ipex_channels_last_modules = self.get_channels_last_modules(model_ipex)
         
         self.assertEqual(model_channels_last, model_ipex_channels_last_modules)
+    
+    def test_auto_channels_last_for_int8(self):
+        conv_module = {1: torch.nn.Conv1d, 2 : torch.nn.Conv2d, 3 : torch.nn.Conv3d}
+        class ConvNd(torch.nn.Module):
+            def __init__(self, dim, in_channels, out_channels, kernel_size, stride):
+                super(ConvNd, self).__init__()
+                self.conv = conv_module[dim](in_channels, out_channels, kernel_size=kernel_size, stride=stride)
+
+            def forward(self, x):
+                return self.conv(x)
+
+        def _test_conv(dim):
+            input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
+            x_shape = (2, 3) + input_shapes[dim]
+            x = torch.randn(x_shape, dtype=torch.float32)
+            model = ConvNd(dim, 3, 4, 3, 2).eval()
+            qconfig = ipex.quantization.default_static_qconfig
+            prepared_model = ipex.quantization.prepare(model, qconfig, x)
+            # do calibration
+            y = prepared_model(x)
+            convert_model = ipex.quantization.convert(prepared_model)
+            with torch.no_grad():
+                traced_model = torch.jit.trace(convert_model, x)
+                traced_model = torch.jit.freeze(traced_model)
+                for _ in range(3):
+                    y = traced_model(x)
+            return y
+
+        # disable auto channels_last
+        ipex.disable_auto_channels_last()
+        self.assertTrue(_test_conv(2).is_contiguous(memory_format = torch.contiguous_format))
+        self.assertTrue(_test_conv(3).is_contiguous(memory_format = torch.contiguous_format))
+
+        # enable auto channels_last
+        ipex.enable_auto_channels_last()
+        self.assertTrue(_test_conv(2).is_contiguous(memory_format = torch.channels_last))
+        self.assertTrue(_test_conv(3).is_contiguous(memory_format = torch.channels_last_3d))
 
 if __name__ == '__main__':
     test = unittest.main()
