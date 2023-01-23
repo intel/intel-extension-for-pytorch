@@ -108,4 +108,5 @@ class _autocast(autocast_cpu):
         return False
 
 
-torch.cpu.amp.autocast = _autocast
+if (core._has_cpu()):
+    torch.cpu.amp.autocast = _autocast

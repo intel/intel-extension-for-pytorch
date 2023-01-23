@@ -1,8 +1,8 @@
-#include "init_python_bindings.h"
+#include "Module.h"
 
-#include "csrc/cpu/aten/utils/isa_help.h"
-#include "csrc/jit/codegen/onednn/interface.h"
-#include "csrc/utils/version.h"
+#include "interface.h"
+#include "isa_help.h"
+#include "version.h"
 
 #include <c10/core/Device.h>
 #include <c10/core/Layout.h>
@@ -14,30 +14,30 @@
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/csrc/jit/runtime/custom_operator.h>
 #include <torch/csrc/jit/runtime/operator_options.h>
-#include "csrc/jit/fusion_pass.h"
+#include "jit/fusion_pass.h"
 
 #include <cstring>
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include "csrc/cpu/utils/fpmath_mode.h"
-#include "csrc/cpu/utils/onednn_utils.h"
-#include "csrc/jit/auto_opt_config.h"
-#include "csrc/jit/cpu/tensorexpr/nnc_fuser_register.h"
+#include "jit/auto_opt_config.h"
+#include "jit/cpu/tensorexpr/nnc_fuser_register.h"
+#include "utils/fpmath_mode.h"
+#include "utils/onednn_utils.h"
 
 #include <c10/core/DeviceType.h>
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/api/include/torch/python.h>
 #include <torch/csrc/jit/passes/pass_manager.h>
-#include "csrc/cpu/autocast/autocast_kernels.h"
-#include "csrc/cpu/autocast/autocast_mode.h"
+#include "autocast/autocast_kernels.h"
+#include "autocast/autocast_mode.h"
 
 #include "TaskModule.h"
-#include "csrc/cpu/aten/EmbeddingBag.h"
-#include "csrc/cpu/runtime/CPUPool.h"
-#include "csrc/cpu/runtime/TaskExecutor.h"
-#include "csrc/cpu/toolkit/sklearn.h"
+#include "aten/EmbeddingBag.h"
+#include "runtime/CPUPool.h"
+#include "runtime/TaskExecutor.h"
+#include "toolkit/sklearn.h"
 
 namespace torch_ipex {
 namespace {
@@ -46,7 +46,7 @@ py::object GetBinaryInfo() {
   py_dict["__version__"] = __version__();
   py_dict["__gitrev__"] = __gitrev__();
   py_dict["__torch_gitrev__"] = __torch_gitrev__();
-  py_dict["__mode__"] = __mode__();
+  py_dict["__build_type__"] = __build_type__();
   return std::move(py_dict);
 }
 
@@ -224,6 +224,7 @@ void InitIpexModuleBindings(py::module m) {
         torch_ipex::runtime::set_mask_affinity_from_cpu_pool((*cpu_pool));
         return;
       });
+
   m.def("roc_auc_score", &toolkit::roc_auc_score);
   m.def("roc_auc_score_all", &toolkit::roc_auc_score_all);
 }
@@ -231,7 +232,7 @@ void InitIpexModuleBindings(py::module m) {
 
 using namespace torch::jit;
 
-void InitIpexCpuBindings(py::module m) {
+void init_cpu_module(py::module m) {
   torch_ipex::InitIpexModuleBindings(m);
 }
 } // namespace torch_ipex

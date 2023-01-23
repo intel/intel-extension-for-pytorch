@@ -4,7 +4,7 @@
 #include <torch/csrc/Stream.h>
 #include <torch/csrc/python_headers.h>
 
-namespace {
+namespace xpu {
 
 struct THDPStream {
   struct THPStream base;
@@ -17,4 +17,5 @@ void THDPStream_init(PyObject* module);
 inline bool THDPStream_Check(PyObject* obj) {
   return THDPStreamClass && PyObject_IsInstance(obj, THDPStreamClass);
 }
-} // namespace
+
+} // namespace xpu

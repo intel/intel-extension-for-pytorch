@@ -1,94 +1,91 @@
-# CMAKE FILE for intel-ext-pt-python.so
-cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
-project(IPEX CXX C)
-
-set(LINUX TRUE)
-set(CMAKE_INSTALL_MESSAGE NEVER)
-set(CMAKE_VERBOSE_MAKEFILE ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-set(PLUGIN_NAME_PYTHON intel-ext-pt-python)
-
-# Setup project top directory.
-set(IPEX_PROJECT_TOP_DIR "${PROJECT_SOURCE_DIR}/../../")
-
-set(RPATH_VALUE $ORIGIN)
-set(CMAKE_SKIP_BUILD_RPATH  FALSE)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-set(CMAKE_INSTALL_RPATH "${RPATH_VALUE}/lib/:${RPATH_VALUE}/")
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${IPEX_INSTALL_LIBDIR})
-
-list(APPEND CMAKE_MODULE_PATH ${IPEX_PROJECT_TOP_DIR}/cmake/Modules)
-
-set(IPEX_CPU_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/cpu")
-set(IPEX_CPU_CPP_THIRD_PARTY_ROOT "${IPEX_PROJECT_TOP_DIR}/third_party")
-set(IPEX_JIT_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/jit")
-set(IPEX_UTLIS_CPP_ROOT "${IPEX_PROJECT_TOP_DIR}/csrc/utils")
-
-set(DNNL_BUILD_TESTS FALSE CACHE BOOL "" FORCE)
-set(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "" FORCE)
-set(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
-set(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
-
-# ---[ Build flags
-include(${IPEX_PROJECT_TOP_DIR}/cmake/cpu/BuildFlags.cmake)
-
-# includes
-include_directories(${IPEX_PROJECT_TOP_DIR})
-include_directories(${IPEX_CPU_CPP_ROOT})
-include_directories(${IPEX_CPU_CPP_ROOT}/aten)
-include_directories(${IPEX_CPU_CPP_ROOT}/utils)
-
-include_directories(${IPEX_JIT_CPP_ROOT})
-include_directories(${IPEX_UTLIS_CPP_ROOT})
-
-# Set installed PyTorch dir
-if(DEFINED PYTORCH_INSTALL_DIR)
-  include_directories(${PYTORCH_INSTALL_DIR}/include)
-  include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include/)
-else()
-  message(FATAL_ERROR, "Cannot find installed PyTorch directory")
+if(NOT BUILD_MODULE_TYPE STREQUAL "PYTHON")
+  return()
 endif()
 
-if(DEFINED PYBIND11_CL_FLAGS)
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PYBIND11_CL_FLAGS}")
+include(${IPEX_ROOT_DIR}/cmake/BuildFlags.cmake)
+
+find_package(pybind11)
+if(NOT pybind11_FOUND)
+    find_package(pybind11 CONFIG)
+    if(NOT pybind11_FOUND)
+        message(FATAL_ERROR "System pybind11 not found")
+    else()
+        message(STATUS "SYSTEM pybind11 found")
+    endif()
 else()
-  message(FATAL_ERROR, "Cannot get pybind11 abi compiler flags")
+    message(STATUS "pybind11 found")
 endif()
 
-# Set Python include dir
-if(DEFINED PYTHON_INCLUDE_DIR)
-  include_directories(${PYTHON_INCLUDE_DIR})
-else()
-  message(FATAL_ERROR, "Cannot find installed Python head file directory")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PYBIND11_CL_FLAGS}")
+
+if(BUILD_WITH_CPU)
+  add_subdirectory(cpu)
+  list(APPEND PY_CPP_OBJS $<TARGET_OBJECTS:PY_CPU_OBJ>)
 endif()
 
-set(IPEX_PYTHON_CPP_SRCS)
-set(IPEX_PYTHON_CPP_CPU_SRCS)
-set(IPEX_PYTHON_CPP_XPU_SRCS)
-add_subdirectory(cpu)
-
-if(DEFINED IPEX_BUILD_WITH_XPU)
-  # pass down definition from CMAKE to CPP files.
-  add_compile_definitions(IPEX_BUILD_WITH_XPU)
+if(BUILD_WITH_XPU)
   add_subdirectory(xpu)
+  list(APPEND PY_CPP_OBJS $<TARGET_OBJECTS:PY_XPU_OBJ>)
 endif()
 
-set(IPEX_PYTHON_CPP_SRCS ${IPEX_PYTHON_CPP_CPU_SRCS} ${IPEX_PYTHON_CPP_XPU_SRCS})
+add_library(intel-ext-pt-python SHARED ${PY_CPP_OBJS} init_python_bindings.cpp)
 
-add_library(${PLUGIN_NAME_PYTHON} SHARED ${IPEX_PYTHON_CPP_SRCS})
-
-include(${IPEX_PROJECT_TOP_DIR}/cmake/ClangFormat.cmake)
+include(${IPEX_ROOT_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)
-  file(GLOB_RECURSE ALL_NATIVE_CSRC_FILES ${PROJECT_SOURCE_DIR}/**.[ch] ${PROJECT_SOURCE_DIR}/**.[ch]pp)
-  add_custom_target(CL_FORMAT_PYTHON_NATIVE_CSRC COMMAND clang-format -i -style=file ${ALL_NATIVE_CSRC_FILES})
-  add_dependencies(${PLUGIN_NAME_PYTHON} CL_FORMAT_PYTHON_NATIVE_CSRC)
+  file(GLOB_RECURSE ALL_NATIVE_CSRC_FILES ${IPEX_FRONT_END_ROOT_DIR}/**.[ch] ${IPEX_FRONT_END_ROOT_DIR}/**.[ch]pp)
+  add_custom_target(CL_FORMAT_FRONT_END_NATIVE_CSRC COMMAND ${CLANG_FORMAT_EXEC} -i -style=file ${ALL_NATIVE_CSRC_FILES})
+  add_dependencies(intel-ext-pt-python CL_FORMAT_FRONT_END_NATIVE_CSRC)
 endif()
 
-target_link_directories(${PLUGIN_NAME_PYTHON} PUBLIC ${IPEX_INSTALL_LIBDIR})
-target_link_libraries(${PLUGIN_NAME_PYTHON} PUBLIC intel-ext-pt-cpu)
+target_include_directories(intel-ext-pt-python PUBLIC ${TORCH_INCLUDE_DIRS})
+target_include_directories(intel-ext-pt-python PUBLIC ${PYTHON_INCLUDE_DIR})
+target_include_directories(intel-ext-pt-python PUBLIC ${pybind11_INCLUDE_DIRS})
 
-if(DEFINED IPEX_BUILD_WITH_XPU)
-target_link_libraries(${PLUGIN_NAME_PYTHON} PUBLIC intel-ext-pt-gpu)
+target_link_directories(intel-ext-pt-python PRIVATE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+
+if(BUILD_STRIPPED_BIN)
+  set_target_properties(intel-ext-pt-python PROPERTIES LINK_FLAGS_RELEASE -s)
 endif()
+
+if(BUILD_WITH_CPU)
+  target_compile_definitions(intel-ext-pt-python PUBLIC "BUILD_WITH_CPU")
+  target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-cpu)
+endif()
+
+if(BUILD_WITH_XPU)
+  target_compile_definitions(intel-ext-pt-python PUBLIC "BUILD_WITH_XPU")
+  target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-gpu)
+endif()
+
+function (print_python_config_summary)
+  get_target_property(PYTHON_LINK_LIBRARIES intel-ext-pt-python LINK_LIBRARIES)
+
+  print_config_summary()
+  message(STATUS "******** Summary on Python ********")
+  message(STATUS "General:")
+
+  message(STATUS "  C compiler            : ${CMAKE_C_COMPILER}")
+
+  message(STATUS "  C++ compiler          : ${CMAKE_CXX_COMPILER}")
+  message(STATUS "  C++ compiler ID       : ${CMAKE_CXX_COMPILER_ID}")
+  message(STATUS "  C++ compiler version  : ${CMAKE_CXX_COMPILER_VERSION}")
+
+  message(STATUS "  CXX flags             : ${CMAKE_CXX_FLAGS}")
+  message(STATUS "  CXX Linker options    : ${CMAKE_SHARED_LINKER_FLAGS}")
+  message(STATUS "  Link libraries        : ${PYTHON_LINK_LIBRARIES}")
+
+  message(STATUS "  Torch version         : ${Torch_VERSION}")
+  message(STATUS "  Torch include         : ${TORCH_INCLUDE_DIRS}")
+
+  message(STATUS "  Python include        : ${PYTHON_INCLUDE_DIR}")
+  message(STATUS "  pybind11 include      : ${pybind11_INCLUDE_DIRS}")
+
+  message(STATUS "")
+  message(STATUS "***********************************")
+endfunction()
+
+install(TARGETS intel-ext-pt-python
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+print_python_config_summary()

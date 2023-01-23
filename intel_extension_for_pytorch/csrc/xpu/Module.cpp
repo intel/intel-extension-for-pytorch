@@ -1,22 +1,21 @@
+#include <torch/csrc/Dtype.h>
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/THP.h>
-#include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/csrc/tensor/python_tensor.h>
 
 #include <ATen/autocast_mode.h>
 
 #include <core/Allocator.h>
+#include <core/Convertor.h>
 #include <core/Device.h>
 #include <core/Generator.h>
 #include <include/xpu/Settings.h>
-#include <intrinsic/intrinsic.h>
-#include <oneDNN/Utils.h>
 #include <pybind11/stl.h>
 #include <utils/Settings.h>
 #include "Event.h"
+#include "Generator.h"
 #include "LazyInit.h"
 #include "Module.h"
-#include "Storage.h"
 #include "Stream.h"
 
 #include <thread>
@@ -26,6 +25,7 @@
   return
 
 namespace xpu {
+
 PyObject* module;
 
 static bool in_bad_fork = false; // True for children forked after xpu init
@@ -139,8 +139,6 @@ static PyObject* THPModule_initExtension(PyObject* self, PyObject* noargs) {
       THPObjectPtr(PyImport_ImportModule("intel_extension_for_pytorch.xpu"));
   if (!module)
     throw python_error();
-
-  THDPStorage_postInitExtension(module);
 
   auto set_module_attr = [&](const char* name, PyObject* v) {
     // PyObject_SetAttrString doesn't steal reference. So no need to incref.
@@ -369,6 +367,45 @@ static PyObject* get_autocast_xpu_dtype(PyObject* _unused, PyObject* arg) {
   return THPDtype_New(current_dtype, scalarTypeName(current_dtype));
   END_HANDLE_TH_ERRORS
 }
+
+PyObject* THPModule_fromUSM(PyObject* _unused, PyObject* args) {
+  using namespace torch::autograd;
+  HANDLE_TH_ERRORS
+  Py_ssize_t num_args = args ? (Py_ssize_t)PyTuple_Size(args) : 0;
+  THPUtils_assert(num_args == 5, "expected exactly 5 arguments");
+
+  PyObject* arg0 = PyTuple_GET_ITEM(args, 0);
+  PyObject* arg1 = PyTuple_GET_ITEM(args, 1);
+  THPUtils_assert(THPDtype_Check(arg1), "expected a torch.dtype as argument 1");
+  PyObject* arg2 = PyTuple_GET_ITEM(args, 2);
+  PyObject* arg3 = PyTuple_GET_ITEM(args, 3);
+  PyObject* arg4 = PyTuple_GET_ITEM(args, 4);
+  THPUtils_assert(THPUtils_checkLong(arg4), "expected a int as argument 4");
+
+  void* src = PyCapsule_GetPointer(arg0, "USMtensor");
+  auto stype = reinterpret_cast<THPDtype*>(arg1)->scalar_type;
+  auto shape = THPUtils_unpackLongs(arg2);
+  auto strides = (arg3 != Py_None)
+      ? c10::optional<IntArrayRef>(THPUtils_unpackLongs(arg3))
+      : c10::nullopt;
+  auto device_id = (int)THPUtils_unpackLong(arg4);
+
+  // Here, it is not necessary to add lazy_init repeatedly. It will be called
+  // automatically.
+  auto tensor =
+      xpu::dpcpp::fromUSM((void*)src, stype, shape, strides, device_id);
+  return THPVariable_Wrap(tensor);
+  END_HANDLE_TH_ERRORS
+}
+
+PyObject* THPModule_toUSM(PyObject* _unused, PyObject* data) {
+  HANDLE_TH_ERRORS
+  THPUtils_assert(THPVariable_Check(data), "data must be a Tensor");
+  auto usm = xpu::dpcpp::toUSM(THPVariable_Unpack(data));
+  return PyCapsule_New(usm, "USMtensor", NULL);
+  END_HANDLE_TH_ERRORS
+}
+
 static struct PyMethodDef _THPModule_methods[] = {
     {"_initExtension",
      (PyCFunction)THPModule_initExtension,
@@ -426,70 +463,71 @@ static struct PyMethodDef _THPModule_methods[] = {
     {"is_autocast_xpu_enabled", is_autocast_xpu_enabled, METH_NOARGS, nullptr},
     {"set_autocast_xpu_dtype", set_autocast_xpu_dtype, METH_O, nullptr},
     {"get_autocast_xpu_dtype", get_autocast_xpu_dtype, METH_NOARGS, nullptr},
+    {"generator_new",
+     castPyCFunctionWithKeywords(THPGenerator_New),
+     METH_VARARGS | METH_KEYWORDS,
+     nullptr},
+    {"_from_usm", THPModule_fromUSM, METH_VARARGS, nullptr},
+    {"_to_usm", THPModule_toUSM, METH_O, nullptr},
     {nullptr}};
 
-std::string get_dev_type(const DeviceProp& prop) {
+std::string get_dev_type(const DeviceInfo& info) {
   std::ostringstream stream;
-  switch (prop.dev_type) {
-    case sycl::info::device_type::cpu:
+  switch (info.dev_type) {
+    case xpu::dpcpp::device_type::cpu:
       stream << "cpu";
       break;
-    case sycl::info::device_type::gpu:
+    case xpu::dpcpp::device_type::gpu:
       stream << "gpu";
       break;
-    case sycl::info::device_type::accelerator:
+    case xpu::dpcpp::device_type::accelerator:
       stream << "accelerator";
+      break;
+    case xpu::dpcpp::device_type::host:
+      stream << "host";
       break;
     default:
       stream
           << "unknown device type:"
           << static_cast<
-                 typename std::underlying_type<sycl::info::device_type>::type>(
-                 prop.dev_type);
+                 typename std::underlying_type<xpu::dpcpp::device_type>::type>(
+                 info.dev_type);
       break;
   }
   return stream.str();
 }
 
-static void register_xpu_device_properties(PyObject* module) {
-  // Add _DeviceProperties class to intel_extension_for_pytorch._C
+static void register_xpu_device_info(PyObject* module) {
+  // Add _DeviceInfo class to intel_extension_for_pytorch._C
   auto m = py::handle(module).cast<py::module>();
-  py::class_<DeviceProp>(m, "_DeviceProperties")
-      .def_readonly("name", &DeviceProp::dev_name)
-      .def_readonly("platform_name", &DeviceProp::platform_name)
-      .def_readonly("total_memory", &DeviceProp::global_mem_size)
-      .def_readonly("max_compute_units", &DeviceProp::max_compute_units)
-      .def_readonly("max_sub_devices", &DeviceProp::max_sub_devices)
-      .def_readonly("support_fp64", &DeviceProp::support_fp64)
+  py::class_<DeviceInfo>(m, "_DeviceProperties")
+      .def_readonly("name", &DeviceInfo::dev_name)
+      .def_readonly("platform_name", &DeviceInfo::platform_name)
+      .def_readonly("total_memory", &DeviceInfo::global_mem_size)
+      .def_readonly("max_compute_units", &DeviceInfo::max_compute_units)
+      .def_readonly("support_fp64", &DeviceInfo::support_fp64)
       .def_property_readonly(
-          "dev_type", [](const DeviceProp& prop) { return get_dev_type(prop); })
-      .def("__repr__", [](const DeviceProp& prop) {
+          "dev_type", [](const DeviceInfo& info) { return get_dev_type(info); })
+      .def("__repr__", [](const DeviceInfo& info) {
         std::ostringstream stream;
-        stream << "_DeviceProperties(name='" << prop.dev_name
-               << "', platform_name='" << prop.platform_name << "', dev_type='"
-               << get_dev_type(prop)
-               << "', max_sub_devices=" << prop.max_sub_devices
-               << ", prop.support_fp64=" << prop.support_fp64
-               << ", total_memory=" << prop.global_mem_size / (1024 * 1024)
-               << "MB, max_compute_units=" << prop.max_compute_units << ")";
+        stream << "_DeviceProperties(name='" << info.dev_name
+               << "', platform_name='" << info.platform_name << "', dev_type='"
+               << get_dev_type(info) << ", support_fp64=" << info.support_fp64
+               << ", total_memory=" << info.global_mem_size / (1024 * 1024)
+               << "MB, max_compute_units=" << info.max_compute_units << ")";
         return stream.str();
       });
 }
 
-static void bindGetDeviceProperties(PyObject* module) {
+static void bindGetDeviceInfo(PyObject* module) {
   // Add method to intel_extension_for_pytorch._C
   auto m = py::handle(module).cast<py::module>();
   m.def(
       "_get_device_properties",
-      [](int device) -> DeviceProp* {
-        return xpu::dpcpp::getDeviceProperties(device);
+      [](int device) -> DeviceInfo* {
+        return xpu::dpcpp::getDeviceInfo(device);
       },
       py::return_value_policy::reference);
-
-  m.def("_synchronize", [](const int& device_index) {
-    auto& dpcpp_queue = getCurrentDPCPPStream(device_index).dpcpp_queue();
-    dpcpp_queue.wait_and_throw();
-  });
 }
 
 at::Scalar scalar_slow(PyObject* object) {
@@ -516,8 +554,7 @@ at::Scalar scalar_slow(PyObject* object) {
 void init_xpu_module(pybind11::module& m) {
   // For Runtime API, still use pybind
   m.def("_synchronize", [](const int& device_index) {
-    auto& dpcpp_queue = getCurrentDPCPPStream(device_index).dpcpp_queue();
-    dpcpp_queue.wait();
+    getCurrentDPCPPStream(device_index).synchronize();
   });
 
   m.def("dump_memory_stat", [](const int& device_index) {
@@ -527,12 +564,24 @@ void init_xpu_module(pybind11::module& m) {
   m.def(
       "_is_onemkl_enabled", []() { return Settings::I().is_onemkl_enabled(); });
 
+  m.def("_is_multi_context_enabled", []() {
+    return Settings::I().is_multi_context_enabled();
+  });
+
   m.def("_is_jit_quantization_save_enabled", []() {
     return Settings::I().is_jit_quantization_save_enabled();
   });
 
   m.def("_is_channels_last_1d_enabled", []() {
     return Settings::I().is_channels_last_1d_enabled();
+  });
+
+  m.def("_has_fp64_dtype", [](int device) {
+    return Settings::I().has_fp64_dtype(device);
+  });
+
+  m.def("_has_2d_block_array", [](int device) {
+    return Settings::I().has_2d_block_array(device);
   });
 
   m.def(
@@ -604,12 +653,17 @@ void init_xpu_module(pybind11::module& m) {
     return Settings::I().set_onemkl_verbose(level);
   });
 
+  py::enum_<FP32_MATH_MODE>(m, "XPUFP32MathMode")
+      .value("FP32", FP32_MATH_MODE::FP32)
+      .value("TF32", FP32_MATH_MODE::TF32)
+      .value("BF32", FP32_MATH_MODE::BF32)
+      .export_values();
+
   m.def("_get_fp32_math_mode", []() {
-    return static_cast<int>(Settings::I().get_fp32_math_mode());
+    return Settings::I().get_fp32_math_mode();
   });
-  m.def("_set_fp32_math_mode", [](const int mode) {
-    return Settings::I().set_fp32_math_mode(
-        static_cast<xpu::FP32_MATH_MODE>(mode));
+  m.def("_set_fp32_math_mode", [](const FP32_MATH_MODE mode) {
+    return Settings::I().set_fp32_math_mode(mode);
   });
 
   m.def("_enable_simple_trace", []() { Settings::I().enable_simple_trace(); });
@@ -624,9 +678,9 @@ void init_xpu_module(pybind11::module& m) {
   auto module = m.ptr();
   THDPStream_init(module);
   THDPEvent_init(module);
-  THDPStorage_init(module);
   PyModule_AddFunctions(module, _THPModule_methods);
-  register_xpu_device_properties(module);
-  bindGetDeviceProperties(module);
+  register_xpu_device_info(module);
+  bindGetDeviceInfo(module);
 }
+
 } // namespace xpu
