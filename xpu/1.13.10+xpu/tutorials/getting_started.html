@@ -116,6 +116,7 @@
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 <span class="n">data</span> <span class="o">=</span> <span class="o">...</span>
 <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span> <span class="c1"># torch.bfloat16, torch.float16 (float16 only works on GPU)</span>
 
