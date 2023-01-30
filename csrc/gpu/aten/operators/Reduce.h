@@ -22,54 +22,82 @@
 #include <utility>
 #include "comm/Numerics.h"
 
-template <class arg_t, class item_t, class ReduceOp, int out_vec_sz = 1>
+namespace xpu {
+namespace dpcpp {
+namespace detail {
+template <class arg_t, class item_t, class CombineFunc, int out_vec_sz = 1>
 DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_reduce(
     item_t item,
     int wg_size,
     dpcpp_local_ptr<void> shared,
     at::detail::Array<arg_t, out_vec_sz> value,
-    ReduceOp reduce) {
+    CombineFunc combine) {
   using vec_t = at::detail::Array<arg_t, out_vec_sz>;
   dpcpp_local_ptr<vec_t> shared_(shared);
   int l_x = item.get_local_linear_id();
   int dim_x = wg_size;
   auto sg = item.get_sub_group();
   int sg_size = sg.get_local_range()[0];
+  int sg_lid = sg.get_local_linear_id();
+  int sg_gid = sg.get_group_linear_id();
+  int sg_range = sg.get_group_range()[0];
 
-  if (dim_x > sg_size) {
-    int base = l_x;
-    shared_[base] = value;
-    for (int offset = dim_x / 2; offset >= sg_size; offset >>= 1) {
-      item.barrier(dpcpp_local_fence);
-      if (l_x < offset && l_x + offset < wg_size) {
-        vec_t other = shared_[base + offset];
-#pragma unroll(out_vec_sz)
-        for (int i = 0; i < out_vec_sz; ++i) {
-          value[i] = reduce(value[i], other[i]);
-        }
-        shared_[base] = value;
-      }
-    }
-    dim_x = sg_size;
-  }
-
-  // sub-group reduction
-  for (int offset = 1; offset < dim_x; offset <<= 1) {
+  for (int offset = 1; offset < sg_size; offset <<= 1) {
 #pragma unroll(out_vec_sz)
     for (int i = 0; i < out_vec_sz; ++i) {
       arg_t other = sg.shuffle_down(value[i], offset);
-      value[i] = reduce(value[i], other);
+      value[i] = combine(value[i], other);
+    }
+  }
+
+  if (sg_lid == 0) {
+    shared_[sg_gid] = value;
+  }
+  item.barrier(dpcpp_local_fence);
+
+  if (sg_range <= sg_size) {
+    // sub-group reduce
+    if (l_x < sg_size) {
+      value = shared_[l_x];
+    }
+
+    if (sg_gid == 0 && sg_lid < sg_range) {
+      value = shared_[sg_lid];
+      for (int offset = 1; offset < sg_range; offset <<= 1) {
+#pragma unroll(out_vec_sz)
+        for (int i = 0; i < out_vec_sz; ++i) {
+          arg_t other = sg.shuffle_down(value[i], offset);
+          value[i] = combine(value[i], other);
+        }
+      }
+    }
+  } else {
+    // work item tree reduce
+    if (l_x < sg_range) {
+      value = shared_[l_x];
+    }
+
+    for (int offset = sg_range / 2; offset > 0; offset >>= 1) {
+      if (l_x < offset) {
+        vec_t other = shared_[l_x + offset];
+#pragma unroll(out_vec_sz)
+        for (int i = 0; i < out_vec_sz; ++i) {
+          value[i] = combine(value[i], other[i]);
+        }
+        shared_[l_x] = value;
+      }
+      item.barrier(dpcpp_local_fence);
     }
   }
   return value;
 }
 
-template <class arg_t, class item_t, class ReduceOp, int out_vec_sz = 1>
+template <class arg_t, class item_t, class CombineFunc, int out_vec_sz = 1>
 DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_x_reduce(
     item_t item,
     dpcpp_local_ptr<void> shared,
     at::detail::Array<arg_t, out_vec_sz> value,
-    ReduceOp reduce) {
+    CombineFunc combine) {
   using vec_t = at::detail::Array<arg_t, out_vec_sz>;
   dpcpp_local_ptr<vec_t> shared_(shared);
   int l_x = item.get_local_id(1), l_y = item.get_local_id(0);
@@ -87,7 +115,7 @@ DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_x_reduce(
         vec_t other = shared_[base + offset];
 #pragma unroll(out_vec_sz)
         for (int i = 0; i < out_vec_sz; ++i) {
-          value[i] = reduce(value[i], other[i]);
+          value[i] = combine(value[i], other[i]);
         }
         shared_[base] = value;
       }
@@ -100,18 +128,18 @@ DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_x_reduce(
 #pragma unroll(out_vec_sz)
     for (int i = 0; i < out_vec_sz; ++i) {
       arg_t other = sg.shuffle_down(value[i], offset);
-      value[i] = reduce(value[i], other);
+      value[i] = combine(value[i], other);
     }
   }
   return value;
 }
 
-template <class arg_t, class item_t, class ReduceOp, int out_vec_sz = 1>
+template <class arg_t, class item_t, class CombineFunc, int out_vec_sz = 1>
 DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_y_reduce(
     item_t item,
     dpcpp_local_ptr<void> shared,
     at::detail::Array<arg_t, out_vec_sz> value,
-    ReduceOp reduce) {
+    CombineFunc combine) {
   using vec_t = at::detail::Array<arg_t, out_vec_sz>;
   dpcpp_local_ptr<vec_t> shared_(shared);
   int l_x = item.get_local_id(1), l_y = item.get_local_id(0);
@@ -129,7 +157,7 @@ DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_y_reduce(
       vec_t other = shared_[slm_off(offset)];
 #pragma unroll(out_vec_sz)
       for (int i = 0; i < out_vec_sz; ++i) {
-        value[i] = reduce(value[i], other[i]);
+        value[i] = combine(value[i], other[i]);
       }
       shared_[slm_off(0)] = value;
     }
@@ -137,10 +165,15 @@ DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_y_reduce(
   return value;
 }
 
+} // namespace detail
+} // namespace dpcpp
+} // namespace xpu
+
 namespace at {
 namespace AtenIpexTypeXPU {
 
 using namespace xpu::dpcpp;
+using namespace xpu::dpcpp::detail;
 using namespace at::native::Memory::detail;
 using at::detail::Array;
 
@@ -423,6 +456,11 @@ struct ReduceOp {
   using InputCalculator = OffsetCalculator<1, index_t>;
   using OutputCalculator = OffsetCalculator<2, index_t>;
 
+  using arg1_t =
+      typename binary_function_traits<decltype(&ops_t::combine)>::arg1_t;
+  using arg2_t =
+      typename binary_function_traits<decltype(&ops_t::combine)>::arg2_t;
+
   static constexpr bool can_accumulate_in_output =
       std::is_convertible<arg_t, out_scalar_t>::value &&
       std::is_convertible<out_scalar_t, arg_t>::value;
@@ -507,23 +545,39 @@ struct ReduceOp {
     constexpr bool is_pair =
         std::is_same<std::pair<scalar_t, int64_t>, arg_t>::value;
 
+    auto combine = [=](arg1_t value, arg2_t other) -> arg1_t {
+      return ops.combine(value, other);
+    };
+
     if (config.should_group_x_reduce() && config.should_group_y_reduce()) {
       if constexpr (is_pair) {
         value = group_reduce_for_compound_dtype<output_vec_size>(
             pos, value, shared);
       } else {
-        value = group_reduce<output_vec_size>(pos, value, shared);
+        value = group_reduce<
+            arg_t,
+            decltype(pos),
+            decltype(combine),
+            output_vec_size>(pos, config.num_items, shared, value, combine);
       }
     } else {
       if (config.should_group_y_reduce()) {
-        value = group_y_reduce<output_vec_size>(pos, value, shared);
+        value = group_y_reduce<
+            arg_t,
+            decltype(pos),
+            decltype(combine),
+            output_vec_size>(pos, shared, value, combine);
       }
       if (config.should_group_x_reduce()) {
         if constexpr (is_pair) {
           value = group_x_reduce_for_compound_dtype<output_vec_size>(
               pos, value, shared);
         } else {
-          value = group_x_reduce<output_vec_size>(pos, value, shared);
+          value = group_x_reduce<
+              arg_t,
+              decltype(pos),
+              decltype(combine),
+              output_vec_size>(pos, shared, value, combine);
         }
       }
     }
@@ -852,115 +906,6 @@ struct ReduceOp {
     return value;
   }
 
-  template <int output_vec_size>
-  at::detail::Array<arg_t, output_vec_size> group_reduce(
-      sycl::nd_item<2> pos,
-      at::detail::Array<arg_t, output_vec_size> value,
-      dpcpp_local_ptr<void> shared_memory) const {
-    auto sg = pos.get_sub_group();
-    uint32_t sbgrpSize = sg.get_local_range()[0];
-    int l_x = pos.get_local_linear_id();
-    int sg_lid = sg.get_local_linear_id();
-    int sg_gid = sg.get_group_linear_id();
-    int sg_range = sg.get_group_range()[0];
-
-    for (int offset = 1; offset < sbgrpSize; offset <<= 1) {
-#pragma unroll(output_vec_size)
-      for (int i = 0; i < output_vec_size; ++i) {
-        arg_t other = sg.shuffle_down(value[i], offset);
-        value[i] = ops.combine(value[i], other);
-      }
-    }
-
-    using args_vec_t = at::detail::Array<arg_t, output_vec_size>;
-    dpcpp_local_ptr<args_vec_t> shared{shared_memory};
-
-    if (sg_lid == 0) {
-      shared[sg_gid] = value;
-    }
-    pos.barrier(dpcpp_local_fence);
-
-    if (sg_range <= sbgrpSize) {
-      // sub-group reduce
-#pragma unroll(output_vec_size)
-      for (int i = 0; i < output_vec_size; i++) {
-        value[i] = ident;
-      }
-      if (sg_gid == 0 && sg_lid < sg_range) {
-        value = shared[sg_lid];
-        for (int offset = 1; offset < sg_range; offset <<= 1) {
-#pragma unroll(output_vec_size)
-          for (int i = 0; i < output_vec_size; ++i) {
-            arg_t other = sg.shuffle_down(value[i], offset);
-            value[i] = ops.combine(value[i], other);
-          }
-        }
-      }
-    } else {
-      // work item tree reduce
-      if (l_x < sg_range) {
-        value = shared[l_x];
-      }
-
-      for (int offset = sg_range / 2; offset > 0; offset >>= 1) {
-        if (l_x < offset) {
-          args_vec_t other = shared[l_x + offset];
-#pragma unroll(output_vec_size)
-          for (int i = 0; i < output_vec_size; ++i) {
-            value[i] = ops.combine(value[i], other[i]);
-          }
-          shared[l_x] = value;
-        }
-        pos.barrier(dpcpp_local_fence);
-      }
-    }
-
-    return value;
-  }
-
-  template <int output_vec_size>
-  at::detail::Array<arg_t, output_vec_size> group_x_reduce(
-      sycl::nd_item<2> pos,
-      at::detail::Array<arg_t, output_vec_size> value,
-      dpcpp_local_ptr<void> shared_memory) const {
-    using args_vec_t = at::detail::Array<arg_t, output_vec_size>;
-    auto l_x = pos.get_local_id(1), l_y = pos.get_local_id(0);
-    auto gp_x = pos.get_local_range(1);
-
-    int dim_x = gp_x;
-    dpcpp_local_ptr<args_vec_t> shared(shared_memory);
-    auto sg = pos.get_sub_group();
-    uint32_t sbgrpSize = sg.get_local_range()[0];
-    if (dim_x > sbgrpSize) {
-      int address_base = l_x + l_y * gp_x;
-      shared[address_base] = value;
-      for (int offset = dim_x / 2; offset >= sbgrpSize; offset >>= 1) {
-        pos.barrier(dpcpp_local_fence);
-        if (l_x < offset && l_x + offset < gp_x /* redundant??? */) {
-          args_vec_t other = shared[address_base + offset];
-#pragma unroll(output_vec_size)
-          for (int i = 0; i < output_vec_size; ++i) {
-            value[i] = ops.combine(value[i], other[i]);
-          }
-          shared[address_base] = value;
-        }
-      }
-      dim_x = sbgrpSize;
-    }
-
-    pos.barrier(dpcpp_local_fence);
-
-    // sub-group reduction
-    for (int offset = 1; offset < dim_x; offset <<= 1) {
-#pragma unroll(output_vec_size)
-      for (int i = 0; i < output_vec_size; ++i) {
-        arg_t other = sg.shuffle_down(value[i], offset);
-        value[i] = ops.combine(value[i], other);
-      }
-    }
-    return value;
-  }
-
   // TODO: Currently, there are bugs with shuffle_down when the arg_t is a
   // pair for half dtype, We temporarily workaround to do
   // "reduce_for_compound_dtype" function.
@@ -1006,31 +951,6 @@ struct ReduceOp {
                     sg.shuffle_down(value[i].first, offset),
                     sg.shuffle_down(value[i].second, offset));
         value[i] = ops.combine(value[i], other);
-      }
-    }
-    return value;
-  }
-
-  template <int output_vec_size>
-  at::detail::Array<arg_t, output_vec_size> group_y_reduce(
-      sycl::nd_item<2> pos,
-      at::detail::Array<arg_t, output_vec_size> value,
-      dpcpp_local_ptr<void> shared_memory) const {
-    using args_vec_t = at::detail::Array<arg_t, output_vec_size>;
-    dpcpp_local_ptr<args_vec_t> shared{shared_memory};
-    shared[config.slm_offset(pos, 0)] = value;
-
-    auto l_y = pos.get_local_id(0);
-    auto dim_y = pos.get_local_range(0);
-    for (int offset = dim_y / 2; offset > 0; offset >>= 1) {
-      pos.barrier(dpcpp_local_fence);
-      if (l_y < offset && l_y + offset < dim_y /* redundant ??? */) {
-        args_vec_t other = shared[config.slm_offset(pos, offset)];
-#pragma unroll(output_vec_size)
-        for (int i = 0; i < output_vec_size; ++i) {
-          value[i] = ops.combine(value[i], other[i]);
-        }
-        shared[config.slm_offset(pos, 0)] = value;
       }
     }
     return value;
@@ -1187,7 +1107,16 @@ struct ReduceOp {
           }
         }
       }
-      value = group_y_reduce(pos, value, shared_memory);
+
+      auto combine = [=](arg1_t value, arg2_t other) -> arg1_t {
+        return ops.combine(value, other);
+      };
+
+      value = group_y_reduce<
+          arg_t,
+          decltype(pos),
+          decltype(combine),
+          output_vec_size>(pos, shared_memory, value, combine);
       if (config.should_group_x_reduce()) {
         // TODO: workaround because sg.shuffle_down will fail on `half` dtype.
         constexpr bool is_pair =
@@ -1196,7 +1125,11 @@ struct ReduceOp {
           value = group_x_reduce_for_compound_dtype<output_vec_size>(
               pos, value, shared_memory);
         } else {
-          value = group_x_reduce<output_vec_size>(pos, value, shared_memory);
+          value = group_x_reduce<
+              arg_t,
+              decltype(pos),
+              decltype(combine),
+              output_vec_size>(pos, shared_memory, value, combine);
         }
       }
       if (should_store) {
