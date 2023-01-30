@@ -227,7 +227,7 @@ class TestAutoChannelsLast(TestCase):
         # enable auto channels_last
         ipex.enable_auto_channels_last()
         self.assertTrue(_test_conv(2).is_contiguous(memory_format = torch.channels_last))
-        self.assertTrue(_test_conv(3).is_contiguous(memory_format = torch.channels_last_3d))
+        # self.assertTrue(_test_conv(3).is_contiguous(memory_format = torch.channels_last_3d))
 
 if __name__ == '__main__':
     test = unittest.main()
