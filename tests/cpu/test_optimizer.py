@@ -452,7 +452,7 @@ class TestFusedSteps(TestCase):
         packed_add = torch.ops.torch_ipex.packed_add
         learning_rate = 0.1
         param.add_(grad, alpha=-learning_rate)
-        packed_add(param2, trail, grad2, alpha=-learning_rate)
+        packed_add(param2, trail, grad2, -learning_rate)
         # compare fp32 vs bf16 fused
         self.assertEqual(param, param2.float(), rtol=1e-4, atol=1e-1)
 
