@@ -11,7 +11,7 @@ namespace {
 
 using namespace torch_ipex::cpu::kernel;
 
-void packed_add_kernel_impl(
+at::Tensor packed_add_kernel_impl(
     at::Tensor& top_half_,
     at::Tensor& bot_half_,
     const at::Tensor& grad_,
@@ -161,6 +161,7 @@ void packed_add_kernel_impl(
   if (!bot_half_.is_contiguous()) {
     bot_half_.copy_(bot_half);
   }
+  return top_half_;
 }
 
 } // anonymous namespace
