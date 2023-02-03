@@ -31,7 +31,7 @@ namespace impl {
 constexpr int CAT_ARRAY_BATCH_SIZE = 1024;
 
 // Maximum parallel dimension to supporte
-constexpr int CAT_ARRAY_MAX_INPUT_DIMS = 4;
+constexpr int CAT_ARRAY_MAX_INPUT_DIMS = 5;
 
 // Similar to any other IndexToOffset calculation for copying along a given
 // dimension.
@@ -298,6 +298,9 @@ void parallel_cat(
       case 4:
         HANDLE_CASE(4);
         break;
+      case 5:
+        HANDLE_CASE(5);
+        break;
       default:
         break;
     }
@@ -442,6 +445,9 @@ static void cat(
         });
   } else {
     offset = 0;
+    TORCH_CHECK(
+        !inputs[0].get().is_quantized(),
+        "Quantized cat should not be simply copied without requantization");
     for (j = 0; j < numInputs; j++) {
       if (should_skip(inputs[j]))
         continue;
