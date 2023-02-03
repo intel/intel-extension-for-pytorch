@@ -94,6 +94,8 @@ python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 intel_extension_for_
 
 **Note:** Installation of TorchVision is optional.
 
+**Note:** You may need to have gomp package in your system (`apt install libgomp1` or `yum/dnf install libgomp`).
+
 **Note:** Since DPC++ compiler doesn't support old [C++ ABI](https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html) (`_GLIBCXX_USE_CXX11_ABI=0`), ecosystem packages, including PyTorch and TorchVision, need to be compiled with the new C++ ABI (`_GLIBCXX_USE_CXX11_ABI=1`).
 
 **Note:** If you need TorchAudio, please follow the [instructions](https://github.com/pytorch/audio/tree/v0.13.0#from-source) to compile it from source. According to torchaudio-pytorch dependency table, torchaudio 0.13.0 is recommended.

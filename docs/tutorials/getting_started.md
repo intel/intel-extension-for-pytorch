@@ -35,6 +35,7 @@ import torch
 import intel_extension_for_pytorch as ipex
 
 model = Model()
+model.eval() # Set the model to evaluation mode for inference, as required by ipex.optimize() function.
 data = ...
 dtype=torch.float32 # torch.bfloat16, torch.float16 (float16 only works on GPU)
 
