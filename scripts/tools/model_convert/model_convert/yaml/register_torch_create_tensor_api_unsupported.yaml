@@ -1,0 +1,5 @@
+- torch.sparse_bsc_tensor
+- torch.sparse_compressed_tensor
+- torch.sparse_csr_tensor
+- torch.sparse_bsr_tensor
+- torch.sparse_csc_tensor

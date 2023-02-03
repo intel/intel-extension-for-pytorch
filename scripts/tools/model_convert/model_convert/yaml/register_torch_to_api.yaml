@@ -1,0 +1,2 @@
+- torch.Tensor.to
+- torch.Tensor.cuda

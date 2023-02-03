@@ -1,0 +1,2 @@
+- torch.has_cuda
+- torch.version.cuda
