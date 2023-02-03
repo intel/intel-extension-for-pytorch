@@ -190,7 +190,8 @@ PyObject* THPModule_setCurrentStream_wrap(PyObject* self, PyObject* obj) {
   auto stream = xpu::dpcpp::DPCPPStream::unpack(bits);
   auto device = static_cast<int>(xpu::dpcpp::current_device());
   if (device != stream.device_index()) {
-    xpu::dpcpp::set_device(static_cast<c10::DeviceIndex>(device));
+    xpu::dpcpp::set_device(
+        static_cast<c10::DeviceIndex>(stream.device_index()));
   }
   xpu::dpcpp::setCurrentDPCPPStream(stream);
   Py_RETURN_NONE;
