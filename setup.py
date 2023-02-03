@@ -79,7 +79,7 @@ except Exception:
 #TORCH_VERSION = '1.13.0'
 #TORCH_VERSION = os.getenv('TORCH_VERSION', TORCH_VERSION)
 
-TORCH_IPEX_VERSION = '1.13.0+cpu'
+TORCH_IPEX_VERSION = '1.13.100+cpu'
 PYTHON_VERSION = sys.version_info
 
 package_name = "intel_extension_for_pytorch"
@@ -431,7 +431,7 @@ IS_DARWIN = (platform.system() == 'Darwin')
 IS_LINUX = (platform.system() == 'Linux')
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
-python_include_dir = get_paths()['include'] 
+python_include_dir = get_paths()['include']
 
 # Generate version info (ipex.__version__)
 ipex_git_sha, torch_git_sha = get_git_head_sha(base_dir)
