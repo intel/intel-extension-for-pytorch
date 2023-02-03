@@ -28,8 +28,7 @@ template <
     typename scalar_t,
     typename accscalar_t,
     typename IndexType,
-    int ADims,
-    int VEC,
+    int vec_size,
     typename mask_t,
     typename item_t>
 inline void fused_dropout_kernel_vec(
@@ -42,10 +41,10 @@ inline void fused_dropout_kernel_vec(
     PhiloxState philox_args) {
   // make sure we don't break assumption that we can't have > 4 elements /
   // thread
-  static_assert(VEC <= 4, "Value of VEC must be in [2, 4]");
+  static_assert(vec_size <= 4, "Value of vec_size must be in [2, 4]");
 
-  using LoadT = native::Memory::aligned_vector_loop<scalar_t, VEC>;
-  using MaskLoadT = native::Memory::aligned_vector_loop<mask_t, VEC>;
+  using LoadT = native::Memory::aligned_vector_loop<scalar_t, vec_size>;
+  using MaskLoadT = native::Memory::aligned_vector_loop<mask_t, vec_size>;
 
   auto thread_idx = item.get_local_id(0);
   auto thread_range = item.get_local_range(0);
@@ -64,18 +63,19 @@ inline void fused_dropout_kernel_vec(
 
   float4 rand;
 
-  // Note: Vectorized loads means we'll stride each thread by an additional VEC
-  // factor, as we'll load VEC elements at a time
-  for (IndexType linearIndex = idx * VEC; linearIndex < totalElements;
-       linearIndex += group_range * thread_range * VEC) {
+  // Note: Vectorized loads means we'll stride each thread by an additional
+  // vec_size factor, as we'll load vec_size elements at a time
+  for (IndexType linearIndex = idx * vec_size; linearIndex < totalElements;
+       linearIndex += group_range * thread_range * vec_size) {
     // local storage
-    scalar_t src[VEC];
+    scalar_t src[vec_size];
     // We'll use this to actually cause vectorized loads later
     LoadT* value = reinterpret_cast<LoadT*>(&src);
 
-    // Note: need a new set of random values per 4 elements -- we'll handle VEC
-    // elements in this thread, so need ceil(VEC / 4) sets of rand.
-    if ((VEC == 4) || (gxvec_loop_state == 0)) {
+    // Note: need a new set of random values per 4 elements -- we'll handle
+    // vec_size elements in this thread, so need ceil(vec_size / 4) sets of
+    // rand.
+    if ((vec_size == 4) || (gxvec_loop_state == 0)) {
       rand = rand_uniform4(&state);
     } else {
       // sets up the last two values we generated last iteration to be used this
@@ -87,7 +87,7 @@ inline void fused_dropout_kernel_vec(
 
     rand.x = rand.x < p;
     rand.y = rand.y < p;
-    if (VEC == 4) {
+    if (vec_size == 4) {
       rand.z = rand.z < p;
       rand.w = rand.w < p;
     }
@@ -97,12 +97,12 @@ inline void fused_dropout_kernel_vec(
     // allow vectorization of NHWC (or other) ordering. Single vectorized load
     *value = *reinterpret_cast<LoadT*>(&a.data[linearIndex]);
 
-    scalar_t r[VEC];
-    mask_t mask[VEC];
+    scalar_t r[vec_size];
+    mask_t mask[vec_size];
 
 // Perform the actual computation
 #pragma unroll
-    for (int ii = 0; ii < VEC; ii++) {
+    for (int ii = 0; ii < vec_size; ii++) {
       r[ii] = src[ii] * (&rand.x)[ii] * scale;
       mask[ii] = (mask_t)(&rand.x)[ii];
     }
@@ -118,11 +118,36 @@ template <
     typename scalar_t,
     typename accscalar_t,
     typename IndexType,
-    int ADims,
-    int BDims = ADims,
     typename mask_t,
     typename item_t>
 inline void fused_dropout_kernel(
+    item_t& item,
+    TensorInfo<scalar_t, IndexType> a,
+    TensorInfo<scalar_t, IndexType> b,
+    TensorInfo<mask_t, IndexType> c,
+    IndexType totalElements,
+    accscalar_t p,
+    PhiloxState philox_args) {
+  auto seeds = philox_unpack(philox_args);
+  IndexType idx = item.get_linear_id();
+  randStatePhilox4_32_10_t state;
+  rand_init(std::get<0>(seeds), idx, std::get<1>(seeds), &state);
+  accscalar_t scale = 1.0 / p;
+
+  float rand = _rand_uniform(state.output.x);
+  rand = rand < p;
+  scalar_t src = a.data[idx];
+  b.data[idx] = src * rand * scale;
+  c.data[idx] = (mask_t)rand;
+}
+
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename IndexType,
+    typename mask_t,
+    typename item_t>
+inline void fused_dropout_kernel_unroll(
     item_t& item,
     TensorInfo<scalar_t, IndexType> a,
     TensorInfo<scalar_t, IndexType> b,
@@ -201,17 +226,21 @@ int get_vector_size(at::Tensor self, at::Tensor ret, at::Tensor mask) {
   return can_vectorize ? vec_size : 1;
 }
 
-template <typename index_type, typename mask_t>
-inline void launcher(
+template <typename mask_t>
+std::tuple<Tensor, Tensor> dropout_template(
+    DPCPPGeneratorImpl* gen,
     const Tensor& self,
-    Tensor& ret,
-    Tensor& mask,
-    double p,
-    const int64_t nelem,
-    const PhiloxState rng_engine_inputs,
-    int num_groups,
-    int group_size) {
-  auto& sycl_queue = dpcppGetCurrentQueue();
+    double p) {
+  Tensor mask = at::empty_like(
+      self, self.options().dtype(c10::CppTypeToScalarType<mask_t>::value));
+
+  // empty tensors should not get here, but just in case, avoid FPE
+  // non-training shot-cut
+  int64_t nelem = self.numel();
+  if (nelem == 0)
+    return std::tuple<Tensor, Tensor>(self.clone(), mask);
+  Tensor ret = at::empty_like(self);
+
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -219,30 +248,65 @@ inline void launcher(
       "fused_dropout",
       [&] {
         using accscalar_t = acc_type<scalar_t>;
+        using index_t = int64_t;
+
         accscalar_t pa = (accscalar_t)(p);
-        auto self_info = getTensorInfo<scalar_t, index_type>(self);
-        auto ret_info = getTensorInfo<scalar_t, index_type>(ret);
-        auto mask_info = getTensorInfo<mask_t, index_type>(mask);
+
+        bool need_not_rand4 = nelem < dpcppMaxWorkItemsPerTile();
+        int vec_size =
+            need_not_rand4 ? 1 : get_vector_size<scalar_t>(self, ret, mask);
+        uint64_t counter_offset;
+        uint32_t group_range, group_size;
+        std::tie(counter_offset, group_range, group_size) =
+            calc_execution_policy(nelem / vec_size);
+        auto glb_range = group_range * group_size;
+        auto loc_range = group_size;
+
+        // trivial offset calculate for small workload
+        // 1. due to bounding in latency, avoid offset calculation
+        // 2. additional copy for contiguous is cheap
+        auto self_ = need_not_rand4 ? self.contiguous() : self;
+        auto self_info = getTensorInfo<scalar_t, index_t>(self_);
+        auto ret_info = getTensorInfo<scalar_t, index_t>(ret);
+        auto mask_info = getTensorInfo<mask_t, index_t>(mask);
         self_info.collapseDims();
         ret_info.collapseDims();
-        mask_info.collapseDims(); // ret and mask are collapsed to 1d
-                                  // contiguous tensor
+        mask_info.collapseDims();
 
-        int vec_size = get_vector_size<scalar_t>(self, ret, mask);
+        std::pair<uint64_t, uint64_t> seeds;
+        {
+          // See Note [Acquire lock when using random generators]
+          std::lock_guard<std::mutex> lock(gen->mutex_);
+          seeds = gen->philox_engine_inputs(counter_offset);
+        }
+        PhiloxState rng_engine_inputs(std::get<0>(seeds), std::get<1>(seeds));
 
-        if (vec_size > 1) {
+        auto& q = dpcppGetCurrentQueue();
+        if (need_not_rand4) {
+          auto cgf = DPCPP_Q_CGF(cgh) {
+            auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
+              fused_dropout_kernel<scalar_t, accscalar_t, index_t>(
+                  item,
+                  self_info,
+                  ret_info,
+                  mask_info,
+                  nelem,
+                  pa,
+                  rng_engine_inputs);
+            };
+            cgh.parallel_for(sycl::range<1>(nelem), kfn);
+          };
+          DPCPP_Q_SUBMIT(q, cgf);
+        } else {
+          // 1. batch random number creation
+          // 2. batch/vectorized memory access
           switch (vec_size) {
             case 16:
             case 8:
             case 4: {
               auto cgf = DPCPP_Q_CGF(cgh) {
                 auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-                  fused_dropout_kernel_vec<
-                      scalar_t,
-                      accscalar_t,
-                      index_type,
-                      1,
-                      4>(
+                  fused_dropout_kernel_vec<scalar_t, accscalar_t, index_t, 4>(
                       item,
                       self_info,
                       ret_info,
@@ -251,21 +315,14 @@ inline void launcher(
                       pa,
                       rng_engine_inputs);
                 };
-                cgh.parallel_for(
-                    sycl::nd_range<1>(num_groups * group_size, group_size),
-                    kfn);
+                cgh.parallel_for(sycl::nd_range<1>(glb_range, loc_range), kfn);
               };
-              DPCPP_Q_SUBMIT(sycl_queue, cgf);
+              DPCPP_Q_SUBMIT(q, cgf);
             } break;
             case 2: {
               auto cgf = DPCPP_Q_CGF(cgh) {
                 auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-                  fused_dropout_kernel_vec<
-                      scalar_t,
-                      accscalar_t,
-                      index_type,
-                      1,
-                      2>(
+                  fused_dropout_kernel_vec<scalar_t, accscalar_t, index_t, 2>(
                       item,
                       self_info,
                       ret_info,
@@ -274,19 +331,14 @@ inline void launcher(
                       pa,
                       rng_engine_inputs);
                 };
-                cgh.parallel_for(
-                    sycl::nd_range<1>(num_groups * group_size, group_size),
-                    kfn);
+                cgh.parallel_for(sycl::nd_range<1>(glb_range, loc_range), kfn);
               };
-              DPCPP_Q_SUBMIT(sycl_queue, cgf);
+              DPCPP_Q_SUBMIT(q, cgf);
             } break;
-          }
-        } else {
-          switch (self_info.dims) {
             case 1: {
               auto cgf = DPCPP_Q_CGF(cgh) {
                 auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-                  fused_dropout_kernel<scalar_t, accscalar_t, index_type, 1>(
+                  fused_dropout_kernel_unroll<scalar_t, accscalar_t, index_t>(
                       item,
                       self_info,
                       ret_info,
@@ -295,91 +347,14 @@ inline void launcher(
                       pa,
                       rng_engine_inputs);
                 };
-                cgh.parallel_for(
-                    sycl::nd_range<1>(num_groups * group_size, group_size),
-                    kfn);
+                cgh.parallel_for(sycl::nd_range<1>(glb_range, loc_range), kfn);
               };
-              DPCPP_Q_SUBMIT(sycl_queue, cgf);
+              DPCPP_Q_SUBMIT(q, cgf);
             } break;
-            default:
-              if (!self.is_contiguous() && ret.is_contiguous() &&
-                  mask.is_contiguous()) {
-                auto cgf = DPCPP_Q_CGF(cgh) {
-                  auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-                    fused_dropout_kernel<
-                        scalar_t,
-                        accscalar_t,
-                        index_type,
-                        -1,
-                        1>(
-                        item,
-                        self_info,
-                        ret_info,
-                        mask_info,
-                        nelem,
-                        pa,
-                        rng_engine_inputs);
-                  };
-                  cgh.parallel_for(
-                      sycl::nd_range<1>(num_groups * group_size, group_size),
-                      kfn);
-                };
-                DPCPP_Q_SUBMIT(sycl_queue, cgf);
-              } else {
-                auto cgf = DPCPP_Q_CGF(cgh) {
-                  auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-                    fused_dropout_kernel<scalar_t, accscalar_t, index_type, -1>(
-                        item,
-                        self_info,
-                        ret_info,
-                        mask_info,
-                        nelem,
-                        pa,
-                        rng_engine_inputs);
-                  };
-                  cgh.parallel_for(
-                      sycl::nd_range<1>(num_groups * group_size, group_size),
-                      kfn);
-                };
-                DPCPP_Q_SUBMIT(sycl_queue, cgf);
-              }
-          }
+          };
         }
       });
-}
 
-template <typename mask_t>
-std::tuple<Tensor, Tensor> dropout_dpcpp(
-    DPCPPGeneratorImpl* gen,
-    const Tensor& self,
-    double p) {
-  Tensor mask = at::empty_like(
-      self, self.options().dtype(c10::CppTypeToScalarType<mask_t>::value));
-  const int64_t nelem = self.numel();
-  // empty tensors should not get here, but just in case, avoid FPE
-  // non-training shot-cut
-  if (nelem == 0)
-    return std::tuple<Tensor, Tensor>(self.clone(), mask);
-  Tensor ret = at::empty_like(self);
-  auto execution_policy = calc_execution_policy(nelem);
-  auto counter_offset = std::get<0>(execution_policy);
-  auto num_groups = std::get<1>(execution_policy);
-  auto group_size = std::get<2>(execution_policy);
-
-  std::pair<uint64_t, uint64_t> seeds;
-  {
-    // See Note [Acquire lock when using random generators]
-    std::lock_guard<std::mutex> lock(gen->mutex_);
-    seeds = gen->philox_engine_inputs(counter_offset);
-  }
-  PhiloxState rng_engine_inputs(std::get<0>(seeds), std::get<1>(seeds));
-  if (xpu::dpcpp::detail::canUse32BitIndexMath(self)) {
-    launcher<unsigned int, mask_t>(
-        self, ret, mask, p, nelem, rng_engine_inputs, num_groups, group_size);
-  } else {
-    launcher<uint64_t, mask_t>(
-        self, ret, mask, p, nelem, rng_engine_inputs, num_groups, group_size);
-  }
   return std::tuple<Tensor, Tensor>(ret, mask);
 }
 
@@ -447,7 +422,7 @@ std::tuple<Tensor, Tensor> native_dropout(
   auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
       c10::nullopt, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   double p1m = 1. - p;
-  return impl::dropout_dpcpp<bool>(gen, self, p1m);
+  return impl::dropout_template<bool>(gen, self, p1m);
 }
 
 // NOTE: _fused_dropout will be removed, see PR #63937
@@ -457,7 +432,7 @@ std::tuple<Tensor, Tensor> _fused_dropout(
     c10::optional<Generator> gen_) {
   auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
       gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
-  return impl::dropout_dpcpp<uint8_t>(gen, self, p);
+  return impl::dropout_template<uint8_t>(gen, self, p);
 }
 
 Tensor native_dropout_backward(
