@@ -56,8 +56,10 @@ def patch_zero_grad_for_master_weight_training(optimizer):
                         _param.grad.requires_grad_(False)
                     _param.grad.zero_()
         self._original_zero_grad(set_to_none)
-    setattr(optimizer, '_original_zero_grad', optimizer.zero_grad)
-    setattr(optimizer, 'zero_grad', types.MethodType(zero_grad, optimizer))
+
+    if not hasattr(optimizer, '_original_zero_grad'):
+        setattr(optimizer, '_original_zero_grad', optimizer.zero_grad)
+        setattr(optimizer, 'zero_grad', types.MethodType(zero_grad, optimizer))
 
 def patch_step_for_master_weight_training(optimizer):
     r"""
@@ -110,10 +112,12 @@ def patch_step_for_master_weight_training(optimizer):
             if 'fp16_param' in value.keys():
                 torch.ops.torch_ipex.sync_master_weight_to_fp16(k, value['fp16_param'])
         return loss
-    setattr(optimizer, '_original_step', optimizer.step)
-    setattr(optimizer, 'step', types.MethodType(master_param_non_fused_step, optimizer))
-    setattr(optimizer, 'sync_grad', types.MethodType(sync_grad, optimizer))
-    setattr(optimizer, 'step_sync_weight', types.MethodType(step_sync_weight, optimizer))
+
+    if not hasattr(optimizer, '_original_step'):
+        setattr(optimizer, '_original_step', optimizer.step)
+        setattr(optimizer, 'step', types.MethodType(master_param_non_fused_step, optimizer))
+        setattr(optimizer, 'sync_grad', types.MethodType(sync_grad, optimizer))
+        setattr(optimizer, 'step_sync_weight', types.MethodType(step_sync_weight, optimizer))
 
 def pack_state(state, state_key, state_value, attr):
     if attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE_CPU:
@@ -241,8 +245,9 @@ def patch_load_state_dict(optimizer):
         original_load_state_dict_without_state_cast(self, state_dict)
         repack(self)
 
-    setattr(optimizer, '_original_load_state_dict', optimizer.load_state_dict)
-    setattr(optimizer, 'load_state_dict', types.MethodType(load_state_dict, optimizer))
+    if not hasattr(optimizer, '_original_load_state_dict'):
+        setattr(optimizer, '_original_load_state_dict', optimizer.load_state_dict)
+        setattr(optimizer, 'load_state_dict', types.MethodType(load_state_dict, optimizer))
 
 def refresh_optimizer_params_after_cast(m, attr, float_param, master_weight_split, optimizer):
     r"""
@@ -319,8 +324,10 @@ def patch_state_dict(optimizer):
                                 assert False, "unsupported op to unpack"
                         v2[state_key] = state_value
         return opt_temp.state_dict()
-    setattr(optimizer, '_original_state_dict', optimizer.state_dict)
-    setattr(optimizer, 'state_dict', types.MethodType(get_optimizer_unpacked_state_dict, optimizer))
+
+    if not hasattr(optimizer, '_original_state_dict'):
+        setattr(optimizer, '_original_state_dict', optimizer.state_dict)
+        setattr(optimizer, 'state_dict', types.MethodType(get_optimizer_unpacked_state_dict, optimizer))
 
 def optimizer_fusion(optimizer, master_weight_split, is_xpu=False):
     r"""
