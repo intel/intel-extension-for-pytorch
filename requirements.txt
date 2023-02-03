@@ -6,4 +6,3 @@ setuptools>=50.0
 packaging
 psutil
 torchdynamo==1.13
-clang-format==12.0.1

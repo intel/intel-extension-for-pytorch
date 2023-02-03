@@ -141,7 +141,7 @@ include(${IPEX_PROJECT_TOP_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)
   file(GLOB_RECURSE ALL_NATIVE_CSRC_FILES ${IPEX_CPU_CPP_ROOT}/**.[ch] ${IPEX_CPU_CPP_ROOT}/**.[ch]pp 
       ${IPEX_JIT_CPP_ROOT}/**.[ch] ${IPEX_JIT_CPP_ROOT}/**.[ch]pp ${IPEX_UTLIS_CPP_ROOT}/**.[ch] ${IPEX_UTLIS_CPP_ROOT}/**.[ch]pp)
-  add_custom_target(CL_FORMAT_CPU_NATIVE_CSRC COMMAND clang-format -i -style=file ${ALL_NATIVE_CSRC_FILES})
+  add_custom_target(CL_FORMAT_CPU_NATIVE_CSRC COMMAND ${CLANG_FORMAT_EXEC} -i -style=file ${ALL_NATIVE_CSRC_FILES})
   add_dependencies(${PLUGIN_NAME_CPU} CL_FORMAT_CPU_NATIVE_CSRC)
 endif()
 

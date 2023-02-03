@@ -82,7 +82,7 @@ add_library(${PLUGIN_NAME_PYTHON} SHARED ${IPEX_PYTHON_CPP_SRCS})
 include(${IPEX_PROJECT_TOP_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)
   file(GLOB_RECURSE ALL_NATIVE_CSRC_FILES ${PROJECT_SOURCE_DIR}/**.[ch] ${PROJECT_SOURCE_DIR}/**.[ch]pp)
-  add_custom_target(CL_FORMAT_PYTHON_NATIVE_CSRC COMMAND clang-format -i -style=file ${ALL_NATIVE_CSRC_FILES})
+  add_custom_target(CL_FORMAT_PYTHON_NATIVE_CSRC COMMAND ${CLANG_FORMAT_EXEC} -i -style=file ${ALL_NATIVE_CSRC_FILES})
   add_dependencies(${PLUGIN_NAME_PYTHON} CL_FORMAT_PYTHON_NATIVE_CSRC)
 endif()
 
