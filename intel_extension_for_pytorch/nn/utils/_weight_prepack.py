@@ -396,6 +396,11 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, device_type='cpu'):
                     new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU[type(m)](m, use_dnnl = True)
             else:
                 new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU[type(m)](m)
+
+            # move original layer info to new prepacked layer
+            if hasattr(m, 'master_weight_split'):
+                setattr(new_m, 'master_weight_split', m.master_weight_split)
+
             params_attr[weight].update({
                 'op': type(m),
                 'ctx': new_m.ctx})
