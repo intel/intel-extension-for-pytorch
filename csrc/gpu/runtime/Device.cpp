@@ -156,7 +156,7 @@ int dpcppSetDevice(DeviceId device_id) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
   if (device_id >= (DeviceId)gDevPool.devices.size()) {
-    TORCH_WARN("dpcppSetDevice: device_id is out of range");
+    TORCH_CHECK(0, "dpcppSetDevice: device_id is out of range");
   } else {
     cur_dev_index = device_id;
   }
@@ -167,7 +167,7 @@ sycl::device dpcppGetRawDevice(DeviceId device_id) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
   if (device_id >= (DeviceId)gDevPool.devices.size()) {
-    TORCH_CHECK(0, "dpcppSetDevice: device_id is out of range");
+    TORCH_CHECK(0, "dpcppGetRawDevice: device_id is out of range");
   }
   return *gDevPool.devices[device_id];
 }
