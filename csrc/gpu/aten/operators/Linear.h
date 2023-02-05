@@ -3,11 +3,10 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-Tensor& dpcpp_linear_out(
+Tensor dpcpp_linear(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
-    Tensor& output);
+    const Tensor& bias);
 
 // IPEX customer linear for weight prepack
 Tensor linear(

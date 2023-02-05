@@ -32,11 +32,20 @@ Tensor& addmm_out(
       mat2.sizes()[1],
       ")");
 
-  if (alpha.to<float>() == 0.f || mat1.numel() == 0 || mat2.numel() == 0) {
-    result.resize_({mat1.size(0), mat2.size(1)});
-    if (result.numel() == 0)
-      return result;
+  std::vector<int64_t> result_shape = {mat1.size(0), mat2.size(1)};
+  result.resize_(result_shape);
+  if (result.numel() == 0)
+    return result;
 
+  TORCH_CHECK(
+      are_expandable(self.sizes(), result_shape),
+      "addmm_out input must be expanable to:",
+      result_shape,
+      " but got:",
+      self.sizes());
+
+  // special case
+  if (alpha.to<float>() == 0.f) {
     if (self.defined() && beta.to<float>() != 0.f) {
       result = at::mul_out(
           result, self, at::native::wrapped_scalar_tensor(at::Scalar(beta)));
@@ -46,6 +55,7 @@ Tensor& addmm_out(
     return result;
   }
 
+  // complex/double case
   if (mat1.is_complex() || mat1.scalar_type() == ScalarType::Double) {
 #ifdef USE_ONEMKL
     impl::mkl_matmul(result, self, mat1, mat2, beta, alpha);
@@ -56,17 +66,29 @@ Tensor& addmm_out(
 #endif
   }
 
-  Tensor bias, accumul, accumul2 = at::Tensor();
-  Attr attr = get_onednn_matmul_attr(
-      result,
-      self,
-      accumul2,
-      alpha.to<float>(),
-      beta.to<float>(),
-      0.f,
-      bias,
-      accumul);
-  onednn_matmul(result, mat1, mat2, bias, accumul, true, attr);
+  // general case
+  Attr attr;
+  float beta_ = beta.to<float>();
+  if (beta_ == 0.f) {
+    if (alpha.to<float>() != 1.f) {
+      attr.append_post_eltwise(
+          1.f, alpha.to<float>(), 0.f, attr.kind_with_linear);
+    }
+  } else {
+    Tensor binary = self.dim() == 1 ? self.unsqueeze(0) : self;
+    // Tensor binary = self.expand_as(result);
+    // For post-binary-add, onednn needs binary scale=1.f
+    // Thus we need the following transformation
+    // alpha * matmul(mat1, mat2) + beta * binary
+    // beta * (alpha/beta * matmul(src, wei) + binary)
+    float alpha_ = alpha.to<float>() / beta_;
+    if (alpha_ != 1.f)
+      attr.append_post_eltwise(1.f, alpha_, 0.f, attr.kind_with_linear);
+    attr.append_post_binary(attr.kind_with_binary_add, binary);
+    if (beta_ != 1.f)
+      attr.append_post_eltwise(1.f, beta_, 0.f, attr.kind_with_linear);
+  }
+  xpu::oneDNN::matmul(result, mat1, mat2, at::Tensor(), true, attr);
   return result;
 }
 
@@ -86,8 +108,8 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
       mat2.sizes()[1],
       ")");
 
+  result.resize_({self.size(0), mat2.size(1)});
   if (self.numel() == 0 || mat2.numel() == 0) {
-    result.resize_({self.size(0), mat2.size(1)});
     if (result.numel() > 0)
       result.zero_();
     return result;
@@ -103,7 +125,7 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
 #endif
   }
 
-  onednn_matmul(result, self, mat2, at::Tensor(), at::Tensor(), true, Attr());
+  xpu::oneDNN::matmul(result, self, mat2, at::Tensor(), true, Attr());
   return result;
 }
 
@@ -130,11 +152,21 @@ Tensor& baddbmm_out(
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
 
-  if (alpha.to<float>() == 0.f || batch1.numel() == 0 || batch2.numel() == 0) {
-    result.resize_({batch1.size(0), batch1.size(1), batch2.size(2)});
-    if (result.numel() == 0)
-      return result;
+  std::vector<int64_t> result_shape = {
+      batch1.size(0), batch1.size(1), batch2.size(2)};
+  result.resize_(result_shape);
+  if (result.numel() == 0)
+    return result;
 
+  TORCH_CHECK(
+      are_expandable(input.sizes(), result_shape),
+      "baddbmm_out input must be expanable to:",
+      result_shape,
+      " but got:",
+      input.sizes());
+
+  // special case
+  if (alpha.to<float>() == 0.f || batch1.numel() == 0 || batch2.numel() == 0) {
     if (input.defined() && beta.to<float>() != 0.f) {
       result = at::AtenIpexTypeXPU::mul_out(
           input, at::native::wrapped_scalar_tensor(at::Scalar(beta)), result);
@@ -144,6 +176,7 @@ Tensor& baddbmm_out(
     return result;
   }
 
+  // complex and double case
   if (batch1.is_complex() || batch2.scalar_type() == ScalarType::Double) {
 #ifdef USE_ONEMKL
     impl::mkl_baddbmm(result, input, batch1, batch2, beta, alpha);
@@ -154,17 +187,25 @@ Tensor& baddbmm_out(
 #endif
   }
 
-  Tensor bias, accumul, accumul2 = at::Tensor();
-  Attr attr = get_onednn_matmul_attr(
-      result,
-      input,
-      accumul2,
-      alpha.to<float>(),
-      beta.to<float>(),
-      0.f,
-      bias,
-      accumul);
-  onednn_matmul(result, batch1, batch2, bias, accumul, true, attr);
+  // general case
+  Attr attr;
+  float beta_ = beta.to<float>();
+  if (beta_ == 0.f) {
+    if (alpha.to<float>() != 1.f) {
+      attr.append_post_eltwise(
+          1.f, alpha.to<float>(), 0.f, attr.kind_with_linear);
+    }
+  } else {
+    Tensor binary = binary.dim() < 3 ? input.unsqueeze(0) : input;
+    binary = binary.dim() < 3 ? binary.unsqueeze_(0) : binary;
+    float alpha_ = alpha.to<float>() / beta_;
+    if (alpha_ != 1.f)
+      attr.append_post_eltwise(1.f, alpha_, 0.f, attr.kind_with_linear);
+    attr.append_post_binary(attr.kind_with_binary_add, binary);
+    if (beta_ != 1.f)
+      attr.append_post_eltwise(1.f, beta_, 0.f, attr.kind_with_linear);
+  }
+  xpu::oneDNN::matmul(result, batch1, batch2, at::Tensor(), true, attr);
   return result;
 }
 
@@ -257,8 +298,8 @@ Tensor& bmm_out(const Tensor& self, const Tensor& batch2, Tensor& result) {
   TORCH_CHECK(self.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
 
+  result.resize_({self.size(0), self.size(1), batch2.size(2)});
   if (self.numel() == 0 || batch2.numel() == 0) {
-    result.resize_({self.size(0), self.size(1), batch2.size(2)});
     if (result.numel() > 0)
       result.zero_();
     return result;
@@ -273,7 +314,7 @@ Tensor& bmm_out(const Tensor& self, const Tensor& batch2, Tensor& result) {
         "Double and complex datatype matmul is not supported. Include oneMKL library in compilation");
 #endif
   }
-  onednn_matmul(result, self, batch2, at::Tensor(), at::Tensor(), true, Attr());
+  xpu::oneDNN::matmul(result, self, batch2, at::Tensor(), true, Attr());
   return result;
 }
 
@@ -480,48 +521,32 @@ Tensor& tensordot_out(
 }
 
 /************************** matmul fusion path **************************/
-#define IPEX_MATMUL_DEFINATION(func)                                      \
-  at::Tensor matmul_##func(                                               \
-      const at::Tensor& tensor1, const at::Tensor& tensor2) {             \
-    RECORD_FUNCTION(                                                      \
-        "matmul_" #func, std::vector<c10::IValue>({tensor1, tensor2}));   \
-    Attr attr;                                                            \
-    attr.append_post_eltwise(                                             \
-        /* scale */ 1.f,                                                  \
-        /* alpha */ 0.f,                                                  \
-        /* beta */ 0.f,                                                   \
-        attr.kind_with_##func);                                           \
-    Tensor bias, accumul;                                                 \
-    bool fallback = false;                                                \
-    Tensor result = at::empty({0}, tensor1.options());                    \
-    result = matmul_fusion_variants(                                      \
-        result, tensor1, tensor2, bias, accumul, true, fallback, attr);   \
-    if (fallback) {                                                       \
-      result = at::native::matmul(tensor1, tensor2);                      \
-      result = at::func(result);                                          \
-    }                                                                     \
-    return result;                                                        \
-  }                                                                       \
-  at::Tensor t_matmul_##func(                                             \
-      const at::Tensor& tensor2, const at::Tensor& tensor1) {             \
-    RECORD_FUNCTION(                                                      \
-        "t_matmul_" #func, std::vector<c10::IValue>({tensor1, tensor2})); \
-    Attr attr;                                                            \
-    attr.append_post_eltwise(                                             \
-        /* scale */ 1.f,                                                  \
-        /* alpha */ 0.f,                                                  \
-        /* beta */ 0.f,                                                   \
-        attr.kind_with_##func);                                           \
-    Tensor bias, accumul;                                                 \
-    bool fallback = false;                                                \
-    Tensor result = at::empty({0}, tensor1.options());                    \
-    result = matmul_fusion_variants(                                      \
-        result, tensor1, tensor2, bias, accumul, false, fallback, attr);  \
-    if (fallback) {                                                       \
-      result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));    \
-      result = at::func(result);                                          \
-    }                                                                     \
-    return result;                                                        \
+#define IPEX_MATMUL_DEFINATION(func)                                        \
+  at::Tensor matmul_##func(                                                 \
+      const at::Tensor& tensor1, const at::Tensor& tensor2) {               \
+    RECORD_FUNCTION(                                                        \
+        "matmul_" #func, std::vector<c10::IValue>({tensor1, tensor2}));     \
+    Attr attr;                                                              \
+    attr.append_post_eltwise(                                               \
+        /* scale */ 1.f,                                                    \
+        /* alpha */ 0.f,                                                    \
+        /* beta */ 0.f,                                                     \
+        attr.kind_with_##func);                                             \
+    bool is_fused;                                                          \
+    return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);  \
+  }                                                                         \
+  at::Tensor t_matmul_##func(                                               \
+      const at::Tensor& tensor2, const at::Tensor& tensor1) {               \
+    RECORD_FUNCTION(                                                        \
+        "t_matmul_" #func, std::vector<c10::IValue>({tensor1, tensor2}));   \
+    Attr attr;                                                              \
+    attr.append_post_eltwise(                                               \
+        /* scale */ 1.f,                                                    \
+        /* alpha */ 0.f,                                                    \
+        /* beta */ 0.f,                                                     \
+        attr.kind_with_##func);                                             \
+    bool is_fused;                                                          \
+    return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused); \
   }
 
 IPEX_MATMUL_DEFINATION(sqrt)
@@ -545,16 +570,8 @@ at::Tensor matmul_silu(const at::Tensor& tensor1, const at::Tensor& tensor2) {
       /* alpha */ 1.f,
       /* beta */ 0.f,
       attr.kind_with_swish);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2);
-    result = at::silu(result);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
 }
 
 at::Tensor matmul_gelu(
@@ -576,16 +593,8 @@ at::Tensor matmul_gelu(
       /* alpha */ 0.f,
       /* beta */ 0.f,
       algo);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2);
-    result = at::gelu(result, approximate);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
 }
 
 at::Tensor matmul_hardsigmoid(
@@ -599,16 +608,8 @@ at::Tensor matmul_hardsigmoid(
       /* alpha */ 1.f / 6.,
       /* beta */ 1.f / 2.,
       attr.kind_with_hardsigmoid);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2);
-    result = at::hardsigmoid(result);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
 }
 
 at::Tensor matmul_pow(
@@ -622,16 +623,8 @@ at::Tensor matmul_pow(
       /* alpha */ 1.f,
       /* beta */ exponent.toFloat(),
       attr.kind_with_pow);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2);
-    result = at::pow(result, exponent);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
 }
 
 at::Tensor matmul_leaky_relu(
@@ -646,16 +639,8 @@ at::Tensor matmul_leaky_relu(
       /* alpha */ negative_slope.toFloat(),
       /* beta */ 0.f,
       attr.kind_with_relu);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2);
-    result = at::leaky_relu(result, negative_slope);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
 }
 
 at::Tensor matmul_hardtanh(
@@ -671,16 +656,8 @@ at::Tensor matmul_hardtanh(
       /* alpha */ minval.toFloat(),
       /* beta */ maxval.toFloat(),
       attr.kind_with_clip);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2);
-    result = at::hardtanh(result, minval, maxval);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
 }
 
 at::Tensor matmul_elu(
@@ -696,16 +673,8 @@ at::Tensor matmul_elu(
       /* alpha */ alpha.toFloat(),
       /* beta */ 1.f,
       attr.kind_with_elu);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, true, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2);
-    result = at::elu(result, alpha, scale, input_scale);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
 }
 
 // res = m1 * m2 + beta * accumu
@@ -716,26 +685,16 @@ at::Tensor matmul_add(
     Scalar beta1) {
   RECORD_FUNCTION(
       "matmul_add", std::vector<c10::IValue>({tensor1, tensor2, accumul1}));
-  auto result = at::empty({0}, tensor1.options());
-  Tensor bias, accumul, accumul2 = at::Tensor();
-  Attr attr = get_onednn_matmul_attr(
-      result,
-      accumul1,
-      accumul2,
-      1.f, // alpha
-      beta1.to<float>(),
-      0.f, // beta2
-      bias,
-      accumul);
-
-  bool trans = true, fallback = false;
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, trans, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2);
-    result = result + at::mul(accumul1, beta1);
+  Attr attr;
+  attr.append_scale_binary(
+      attr.kind_with_binary_add, accumul1, beta1.to<float>());
+  bool is_fused;
+  Tensor output =
+      matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
+  if (!is_fused) {
+    output += at::mul(accumul1, beta1);
   }
-  return result;
+  return output;
 }
 
 // res = m1 * m2.transpose()
@@ -745,21 +704,17 @@ at::Tensor trans_matmul(
     int64_t dim2,
     const at::Tensor& tensor1) {
   RECORD_FUNCTION("trans_matmul", std::vector<c10::IValue>({tensor1, tensor2}));
-  bool trans = false, fallback = false;
-  Tensor bias, accumul;
-  auto result = at::empty({0}, tensor1.options());
-  return matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, trans, fallback, Attr());
+  Attr attr;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
 }
 
 // res = m1 * m2.t()
 at::Tensor t_matmul(const at::Tensor& tensor2, const at::Tensor& tensor1) {
   RECORD_FUNCTION("t_matmul", std::vector<c10::IValue>({tensor1, tensor2}));
-  bool trans = false, fallback = false;
-  Tensor bias, accumul;
-  auto result = at::empty({0}, tensor1.options());
-  return matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, trans, fallback, Attr());
+  Attr attr;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
 }
 
 // res = m1 * m2.t() + beta * accumu
@@ -770,26 +725,17 @@ at::Tensor t_matmul_add(
     Scalar beta1) {
   RECORD_FUNCTION(
       "t_matmul_add", std::vector<c10::IValue>({tensor1, tensor2, accumul1}));
-  auto result = at::empty({0}, tensor1.options());
-  Tensor bias, accumul, accumul2 = at::Tensor();
-  Attr attr = get_onednn_matmul_attr(
-      result,
-      accumul1,
-      accumul2,
-      1.f, // alpha
-      beta1.to<float>(),
-      0.f, // beta2
-      bias,
-      accumul);
 
-  bool trans = false, fallback = false;
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, trans, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
-    result = result + at::mul(accumul1, beta1);
+  Attr attr;
+  attr.append_scale_binary(
+      attr.kind_with_binary_add, accumul1, beta1.to<float>());
+  bool is_fused;
+  Tensor output =
+      matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  if (!is_fused) {
+    output += at::mul(accumul1, beta1);
   }
-  return result;
+  return output;
 }
 
 // res = GELU(m1 * m2.t() + beta * accumu)
@@ -802,17 +748,9 @@ at::Tensor t_matmul_add_gelu(
   RECORD_FUNCTION(
       "t_matmul_add_gelu",
       std::vector<c10::IValue>({tensor1, tensor2, accumul1}));
-  auto result = at::empty({0}, tensor1.options());
-  Tensor bias, accumul, accumul2 = at::Tensor();
-  Attr attr = get_onednn_matmul_attr(
-      result,
-      accumul1,
-      accumul2,
-      1.f, // alpha
-      beta1.to<float>(),
-      0.f, // beta2
-      bias,
-      accumul);
+  Attr attr;
+  attr.append_scale_binary(
+      attr.kind_with_binary_add, accumul1, beta1.to<float>());
   algorithm algo;
   if (approximate == "none") {
     algo = attr.kind_with_gelu_erf;
@@ -826,15 +764,13 @@ at::Tensor t_matmul_add_gelu(
       /* alpha */ 0.f,
       /* beta */ 0.f,
       algo);
-
-  bool trans = false, fallback = false;
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, trans, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
-    result = at::gelu((result + at::mul(accumul1, beta1)), approximate);
+  bool is_fused;
+  Tensor output =
+      matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  if (!is_fused) {
+    output = at::gelu((output + at::mul(accumul1, beta1)), approximate);
   }
-  return result;
+  return output;
 }
 
 // res = alpha * (m1 * m2.t()) + beta1 * accumu1 + beta2 * accumu2
@@ -848,26 +784,18 @@ at::Tensor t_matmul_add_add(
   RECORD_FUNCTION(
       "t_matmul_add_add",
       std::vector<c10::IValue>({tensor1, tensor2, accumul1, accumul2}));
-  auto result = at::empty({0}, tensor1.options());
-  Tensor bias, accumul;
-  Attr attr = get_onednn_matmul_attr(
-      result,
-      accumul1,
-      accumul2,
-      1.f, // alpha
-      beta1.to<float>(),
-      beta2.to<float>(),
-      bias,
-      accumul);
-
-  bool trans = false, fallback = false;
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, trans, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
-    result = result + at::mul(accumul1, beta1) + at::mul(accumul2, beta2);
+  bool is_fused;
+  Attr attr;
+  attr.append_scale_binary(
+      attr.kind_with_binary_add, accumul1, beta1.to<float>());
+  attr.append_scale_binary(
+      attr.kind_with_binary_add, accumul2, beta2.to<float>());
+  Tensor output =
+      matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  if (!is_fused) {
+    output += at::mul(accumul1, beta1) + at::mul(accumul2, beta2);
   }
-  return result;
+  return output;
 }
 
 // res = (m1 * m2.transpose()) / oscale
@@ -886,12 +814,8 @@ at::Tensor trans_matmul_div(
       /* alpha */ 1.f / oscale.to<float>(),
       /* beta */ 0.f,
       attr.kind_with_linear);
-
-  Tensor bias, accumul;
-  bool trans = false, fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  return matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, trans, fallback, attr);
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_silu(const at::Tensor& tensor2, const at::Tensor& tensor1) {
@@ -903,16 +827,8 @@ at::Tensor t_matmul_silu(const at::Tensor& tensor2, const at::Tensor& tensor1) {
       /* alpha */ 1.f,
       /* beta */ 0.f,
       attr.kind_with_swish);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
-    result = at::silu(result);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_hardsigmoid(
@@ -926,16 +842,8 @@ at::Tensor t_matmul_hardsigmoid(
       /* alpha */ 1.f / 6.,
       /* beta */ 1.f / 2.,
       attr.kind_with_hardsigmoid);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
-    result = at::hardsigmoid(result);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_pow(
@@ -949,16 +857,8 @@ at::Tensor t_matmul_pow(
       /* alpha */ 1.f,
       /* beta */ exponent.toFloat(),
       attr.kind_with_pow);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
-    result = at::pow(result, exponent);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_leaky_relu(
@@ -973,16 +873,8 @@ at::Tensor t_matmul_leaky_relu(
       /* alpha */ negative_slope.toFloat(),
       /* beta */ 0.f,
       attr.kind_with_relu);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
-    result = at::leaky_relu(result, negative_slope);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_hardtanh(
@@ -998,16 +890,8 @@ at::Tensor t_matmul_hardtanh(
       /* alpha */ minval.toFloat(),
       /* beta */ maxval.toFloat(),
       attr.kind_with_clip);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
-    result = at::hardtanh(result, minval, maxval);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_elu(
@@ -1023,16 +907,8 @@ at::Tensor t_matmul_elu(
       /* alpha */ alpha.toFloat(),
       /* beta */ 1.f,
       attr.kind_with_elu);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
-    result = at::elu(result, alpha, scale, input_scale);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_gelu(
@@ -1055,16 +931,8 @@ at::Tensor t_matmul_gelu(
       /* alpha */ 0.f,
       /* beta */ 0.f,
       algo);
-  Tensor bias, accumul;
-  bool fallback = false;
-  Tensor result = at::empty({0}, tensor1.options());
-  result = matmul_fusion_variants(
-      result, tensor1, tensor2, bias, accumul, false, fallback, attr);
-  if (fallback) {
-    result = at::native::matmul(tensor1, tensor2.transpose(-1, -2));
-    result = at::gelu(result, approximate);
-  }
-  return result;
+  bool is_fused;
+  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
 }
 
 } // namespace AtenIpexTypeXPU
@@ -1079,22 +947,30 @@ Tensor addmm(
     const Scalar& alpha) {
   checkBackend("addmm", m1, Backend::QuantizedXPU);
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
+  std::vector<int64_t> result_shape = {m1.size(0), m2.size(1)};
   Tensor result;
   if (input.is_quantized()) {
     result = at::_empty_affine_quantized(
-        {0},
+        result_shape,
         device(kXPU).dtype(input.scalar_type()),
         1.f,
         static_cast<int>(0),
         MemoryFormat::Contiguous);
   } else {
-    result = at::empty({0}, input.options());
+    result = at::empty(result_shape, input.options());
   }
 
   Attr attr;
-  attr.append_post_sum(/* sum_scale */ beta.to<float>());
-  Tensor bias;
-  onednn_matmul(result, m1, m2, bias, input, true, attr);
+  if (!input.is_quantized() && beta.to<float>() == 1.f) {
+    Tensor binary = input.dim() == 1 ? input.unsqueeze(0) : input;
+    attr.append_post_binary(attr.kind_with_binary_add, binary);
+  } else {
+    c10::MaybeOwned<Tensor> accumu =
+        expand_size(input, result_shape, "gemm_broadcast");
+    result.copy_(*accumu);
+    attr.append_post_sum(/* sum_scale */ beta.to<float>());
+  }
+  xpu::oneDNN::matmul(result, m1, m2, at::Tensor(), true, attr);
   return result;
 }
 

@@ -489,391 +489,435 @@ static void mkl_matmul(
 #endif
 }
 
-// Eltwise((m1 x m2 + b) * alpha + beta * accumu)
-// Eltwise((m1 x m2 + b) * alpha) + beta * accumu
-static void onednn_matmul(
+/***** The helper function to get post binary(or sum) for onednn_matmul *****
+In onednn, it supports: result = BinaryOP(alpha * (m1 @ m2 + bias), beta *
+binary). Since the inputs/outputs shapes of Matmul are complicated,
+this helper function is used to adjust binary tensor size according different
+matmul cases.*/
+static bool get_onednn_matmul_binary_attr(
     Tensor& result,
-    const Tensor& m1,
-    const Tensor& m2,
-    const Tensor& bias,
-    const Tensor& accumu, // tensor for post_sum
-    bool m2_trans,
-    Attr attr) {
-  if (m1.is_quantized()) {
-    if (m2.sizes()[1] == m1.sizes()[1])
-      m2.transpose_(0, 1);
-  }
-  std::vector<int64_t> result_shape;
-  auto dim = m1.dim();
-  if (dim == 2) {
-    result_shape = m2_trans ? std::vector<int64_t>{m1.size(0), m2.size(1)}
-                            : std::vector<int64_t>{m1.size(0), m2.size(0)};
-  } else {
-    result_shape = m2_trans
-        ? std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(2)}
-        : std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(1)};
-  }
-  if (!result.defined())
-    result = at::empty(result_shape, m1.options());
+    Attr& attr,
+    int dim_tensor1,
+    int dim_tensor2,
+    DimVector output_shape,
+    bool t2_is_matrix = true,
+    bool should_fold_tensor1 = false,
+    bool should_fold_tensor2 = false) {
+  Attr attr_update;
+  for (int i = 0; i < attr.ops_params_.size(); ++i) {
+    kind_t kind = attr.ops_params_[i].kind_;
+    if (kind != kind_t::binary || !attr.ops_params_[i].binary_.defined()) {
+      attr_update.ops_params_.push_back(attr.ops_params_[i]);
+      continue;
+    }
 
-  if (attr.with_sum()) {
-    TORCH_CHECK(
-        check_broadcast(accumu, result_shape),
-        "tensor for accumulate ",
-        accumu.sizes(),
-        " cannot broadcast to ",
-        result_shape);
-    c10::MaybeOwned<Tensor> bc_accumu =
-        expand_size(accumu, result_shape, "gemm_broadcast");
-    if (!result.is_same(*bc_accumu))
-      result.resize_(result_shape).copy_(*bc_accumu);
-  } else {
-    result.resize_(result_shape);
-  }
+    float beta = attr.ops_params_[i].scale_;
+    bool need_binary = attr.ops_params_[i].binary_.defined() && (beta != 0.f);
+    if (!need_binary) {
+      continue;
+    }
 
-  // mat1, mat2, res should satisfy oneDNN supported strides
-  Tensor mat1 =
-      xpu::oneDNN::is_onednn_matmul_strides(m1) ? m1 : m1.contiguous();
-  Tensor mat2 =
-      xpu::oneDNN::is_onednn_matmul_strides(m2) ? m2 : m2.contiguous();
-  Tensor res = xpu::oneDNN::is_onednn_matmul_strides(result, true)
-      ? result
-      : result.contiguous();
-  // bias should always contiguous in oneDNN
-  Tensor _bias = bias.defined() ? bias.contiguous() : bias;
+    Tensor binary_final;
+    std::vector<int64_t> compute_shape = result.sizes().vec();
+    if (dim_tensor1 == 2 && dim_tensor2 == 1) {
+      // case 2
+      const auto binary =
+          MaybeOwned<Tensor>::borrowed(attr.ops_params_[i].binary_);
+      binary_final = binary->unsqueeze(1);
+    } else if (dim_tensor1 == 1 && dim_tensor2 == 2) {
+      // case 3
+      const auto binary =
+          MaybeOwned<Tensor>::borrowed(attr.ops_params_[i].binary_);
+      binary_final = binary->unsqueeze(0);
+    } else if (dim_tensor1 == 2 && dim_tensor2 == 2) {
+      // case 4
+      const auto binary =
+          MaybeOwned<Tensor>::borrowed(attr.ops_params_[i].binary_);
+      if (binary->dim() < output_shape.size())
+        binary_final = binary->unsqueeze(0);
+      else
+        binary_final = *binary;
+    } else if (should_fold_tensor1) {
+      // case 5
+      auto binary = t2_is_matrix
+          ? MaybeOwned<Tensor>::borrowed(attr.ops_params_[i].binary_)
+          : MaybeOwned<Tensor>::owned(
+                attr.ops_params_[i].binary_.unsqueeze(-1));
+      while (binary->dim() < output_shape.size())
+        binary = MaybeOwned<Tensor>::owned(binary->unsqueeze(0));
 
-  xpu::oneDNN::matmul(res, mat1, mat2, _bias, m2_trans, attr);
-  if (!res.is_same(result)) {
-    result.copy_(res);
-  }
-}
+      if (binary->dim() >= compute_shape.size()) {
+        std::vector<int64_t> shape = binary->sizes().vec();
+        auto shape_fold = DimVector(shape.begin(), shape.end() - 1);
+        const auto first_dim = c10::multiply_integers(shape_fold);
+        shape_fold = {first_dim, *(shape.end() - 1)};
+        if (first_dim == compute_shape[0] || first_dim == 1) {
+          binary_final = binary->contiguous().view(shape_fold);
+        } else {
+          auto expand_shape = output_shape;
+          expand_shape[expand_shape.size() - 1] =
+              shape_fold[shape_fold.size() - 1];
+          std::vector<int64_t> acc_shape = {compute_shape[0], shape_fold[1]};
+          binary_final =
+              binary->expand(expand_shape).contiguous().view(acc_shape);
+        }
+      } else {
+        binary_final = *binary;
+      }
 
-static Attr get_onednn_linear_sum_attr(
-    const Tensor& input,
-    const Tensor& weight,
-    Tensor& accumu,
-    Tensor& output,
-    float scale,
-    bool& is_fused) {
-  is_fused = true;
-  Attr attr;
-  if (scale == 0.f)
-    return attr;
+    } else if (should_fold_tensor2) {
+      // case 6
+      auto binary = t2_is_matrix
+          ? MaybeOwned<Tensor>::borrowed(attr.ops_params_[i].binary_)
+          : MaybeOwned<Tensor>::owned(
+                attr.ops_params_[i].binary_.unsqueeze(-1));
 
-  const auto input_sizes = input.sizes();
-  const auto weight_sizes = weight.sizes();
-  std::vector<int64_t> output_sizes;
-  if (input.dim() == 2) {
-    output_sizes = {input_sizes[0], weight_sizes[1]};
-  } else if (input.dim() == 3) {
-    output_sizes = {input_sizes[0], input_sizes[1], weight_sizes[1]};
-  }
+      while (binary->dim() < output_shape.size())
+        binary = MaybeOwned<Tensor>::owned(binary->unsqueeze(0));
 
-  Tensor out = at::empty(output_sizes, input.options());
-  if (!xpu::oneDNN::binary_valid(out, accumu)) {
-    is_fused = false;
-    return attr;
-  }
+      if (binary->dim() >= compute_shape.size()) {
+        if (t2_is_matrix)
+          binary = MaybeOwned<Tensor>::owned(binary->mT());
 
-  // For post-sum and post-binary-add, onednn needs sum/binary scale=1.f
-  // Thus we need the following transformation
-  // conv(src, wei) + scale * accumu
-  // scale * (1/scale * linear(src, wei) + sum/binary)
-  if (scale != 1.f)
-    attr.append_post_eltwise(
-        /* scale */ 1.f,
-        /* alpha */ 1.f / scale,
-        /* beta */ 0.f,
-        attr.kind_with_linear);
-
-  auto accumu_ctx = DPCPPTensorContext::get_tensor_ctx(accumu);
-  if (accumu_ctx.is_plain())
-    accumu = accumu.contiguous();
-
-  if (accumu.sizes() == output_sizes) {
-    // If sizes are the same, post sum is used.
-    output = accumu;
-    attr.append_post_sum(/* sum_scale */ 1.f);
-  } else {
-    // If sizes are different, post binary is used.
-    if (input.dim() == 3)
-      accumu = accumu.view({-1, accumu.sizes()[2]});
-    attr.append_post_binary(attr.kind_with_binary_add, accumu);
-  }
-
-  if (scale != 1.f)
-    attr.append_post_eltwise(
-        /* scale */ 1.f,
-        /* alpha */ scale,
-        /* beta */ 0.f,
-        attr.kind_with_linear);
-
-  return attr;
-}
-
-/***** The helper function to get bias or post sum for onednn_matmul *****
-Decide the accumul tensor should be bias or post sum.
-In onednn, it support accumul = alpha * (m1 x m2 + bias) + accumul.
-We prefer to use bias when the scale of accumul tensor is equal to alpha.
-Otherwise, post sum will be selected. Sometimes, post sum will introduce extra
-D2D copy to between accumul and result buffers, because oneDNN only supports the
-post sum buffer and the result buffer are the same one.
-*/
-static Attr get_onednn_matmul_attr(
-    at::Tensor& result,
-    const at::Tensor& accumul1,
-    const at::Tensor& accumul2,
-    float alpha,
-    float beta1,
-    float beta2,
-    at::Tensor& bias,
-    at::Tensor& accumul) {
-  TORCH_CHECK(alpha != 0.f, "Alpha should not be equal to 0.f");
-  Attr attr;
-  bool need_add_accumul1 = accumul1.defined() && (beta1 != 0.f);
-  bool need_add_accumul2 = accumul2.defined() && (beta2 != 0.f);
-
-  if (!need_add_accumul1 && !need_add_accumul2) {
-    // no bias and no accumul
-    Attr attr;
-    return attr;
-  }
-
-  if (need_add_accumul1 && !need_add_accumul2) {
-    if (alpha == beta1 && !result.is_same(accumul1)) {
-      // only bias
-      // result = alpha * (m1 x m2 + accumul1)
-      bias = accumul1;
-      if (alpha != 1.f)
-        attr.append_post_eltwise(
-            /* scale */ 1.f,
-            alpha,
-            /* beta */ 0.f,
-            attr.kind_with_linear);
+        std::vector<int64_t> shape = binary->sizes().vec();
+        auto shape_fold = DimVector(shape.begin(), shape.end() - 1);
+        const auto first_dim = c10::multiply_integers(shape_fold);
+        shape_fold = {first_dim, *(shape.end() - 1)};
+        if (first_dim == compute_shape[0] || first_dim == 1) {
+          binary_final = binary->contiguous().view(shape_fold);
+        } else {
+          auto expand_shape = output_shape;
+          expand_shape[expand_shape.size() - 1] =
+              shape_fold[shape_fold.size() - 1];
+          std::vector<int64_t> acc_shape = {compute_shape[0], shape_fold[1]};
+          binary_final =
+              binary->expand(expand_shape).contiguous().view(acc_shape);
+        }
+      } else {
+        binary_final = *binary;
+      }
     } else {
-      // only accumul
-      // result = alpha * (m1 x m2) + beta1 * accumul1
-      // result = beta1 * (alpha / beta1 * (mat1 * mat2) + accumul1)
+      // case 7
+      auto binary = MaybeOwned<Tensor>::borrowed(attr.ops_params_[i].binary_);
+      while (binary->dim() < output_shape.size())
+        binary = MaybeOwned<Tensor>::owned(binary->unsqueeze(0));
+
+      if (binary->dim() > 3) {
+        std::vector<int64_t> shape = binary->sizes().vec();
+        auto shape_fold = DimVector(shape.begin(), shape.end() - 2);
+        const auto first_dim = c10::multiply_integers(shape_fold);
+        shape_fold = {first_dim, *(shape.end() - 2), *(shape.end() - 1)};
+        if (first_dim == compute_shape[0] || first_dim == 1) {
+          binary_final = binary->reshape(shape_fold);
+        } else {
+          auto expand_shape = output_shape;
+          expand_shape[expand_shape.size() - 1] =
+              shape_fold[shape_fold.size() - 1];
+          expand_shape[expand_shape.size() - 2] =
+              shape_fold[shape_fold.size() - 2];
+          std::vector<int64_t> acc_shape = {
+              compute_shape[0], shape_fold[1], shape_fold[2]};
+          binary_final =
+              binary->expand(expand_shape).contiguous().view(acc_shape);
+        }
+      } else {
+        binary_final = *binary;
+      }
+    }
+
+    if (!binary_valid(result, binary_final)) {
+      return false;
+    }
+
+    auto algo = attr.ops_params_[i].algo_;
+    if (algo == attr.kind_with_binary_add) {
+      // result = (m1 x m2) + beta * binary
+      // result = beta * (1.f / beta * (mat1 * mat2) + binary)
       // Since oneDNN only supports sum_scale=1.0 for non-int8 case,
       // we do this formula transformation.
-      accumul = accumul1;
-      alpha /= beta1;
-      if (alpha != 1.f)
-        attr.append_post_eltwise(1.f, alpha, 0.f, attr.kind_with_linear);
-      attr.append_post_sum(/* sum_scale */ 1.f);
-      if (beta1 != 1.f)
-        attr.append_post_eltwise(1.f, beta1, 0.f, attr.kind_with_linear);
-    }
-  }
-
-  if (!need_add_accumul1 && need_add_accumul2) {
-    if (alpha == beta2 && !result.is_same(accumul2)) {
-      // only bias
-      // result = alpha * (m1 * m2 + accumul2)
-      bias = accumul2;
-      if (alpha != 1.f)
-        attr.append_post_eltwise(
-            /* scale */ 1.f,
-            alpha,
-            /* beta */ 0.f,
-            attr.kind_with_linear);
+      if (beta != 1.f) {
+        attr_update.append_post_eltwise(
+            1.f, 1.f / beta, 0.f, attr.kind_with_linear);
+      }
+      attr_update.append_post_binary(algo, binary_final);
+      if (beta != 1.f) {
+        attr_update.append_post_eltwise(1.f, beta, 0.f, attr.kind_with_linear);
+      }
     } else {
-      // only accumul
-      // result = alpha * (m1 x m2) + beta2 * accumul2
-      // result = beta2 * (alpha / beta2 * (mat1 * mat2) + accumul2)
-      accumul = accumul2;
-      alpha /= beta2;
-      if (alpha != 1.f)
-        attr.append_post_eltwise(1.f, alpha, 0.f, attr.kind_with_linear);
-      attr.append_post_sum(/* sum_scale */ 1.f);
-      if (beta2 != 1.f)
-        attr.append_post_eltwise(1.f, beta2, 0.f, attr.kind_with_linear);
+      // binary_mul: result = (m1 x m2) * binary * beta;
+      // binary_div: result = (m1 x m2) / binary * beta;
+      // binary_min: result = min((m1 x m2), binary) * beta;
+      // binary_max: result = max((m1 x m2), binary) * beta;
+      // binary_eq: result = eq((m1 x m2), binary) * beta;
+      // binary_ne: result = ne((m1 x m2), binary) * beta;
+      // binary_ge: result = ge((m1 x m2), binary) * beta;
+      // binary_gt: result = gt((m1 x m2), binary) * beta;
+      // binary_le: result = le((m1 x m2), binary) * beta;
+      // binary_lt: result = lt((m1 x m2), binary) * beta;
+      attr_update.append_post_binary(algo, binary_final);
+      if (beta != 1.f)
+        attr_update.append_post_eltwise(1.f, beta, 0.f, attr.kind_with_linear);
     }
   }
-
-  if (need_add_accumul1 && need_add_accumul2) {
-    // both need_add_accumul1 and need_add_accumul2
-    if (alpha == beta1 && !result.is_same(accumul1)) {
-      // result = alpha * (m1 x m2 + accumul1) + beta2 * accumul2
-      // result = beta2 * (alpha / beta2 * (mat1 * mat2 + accumul1) + accumul2)
-      bias = accumul1;
-      accumul = accumul2;
-      alpha /= beta2;
-      if (alpha != 1.f)
-        attr.append_post_eltwise(1.f, alpha, 0.f, attr.kind_with_linear);
-      attr.append_post_sum(/* sum_scale */ 1.f);
-      if (beta2 != 1.f)
-        attr.append_post_eltwise(1.f, beta2, 0.f, attr.kind_with_linear);
-    } else if (alpha == beta2 && !result.is_same(accumul2)) {
-      // result = alpha * (m1 x m2 + accumul2) + beta1 * accumul1
-      // result = beta1 * (alpha / beta1 * (mat1 * mat2 + accumul2) + accumul1)
-      bias = accumul2;
-      accumul = accumul1;
-      alpha /= beta1;
-      if (alpha != 1.f)
-        attr.append_post_eltwise(1.f, alpha, 0.f, attr.kind_with_linear);
-      attr.append_post_sum(/* sum_scale */ 1.f);
-      if (beta1 != 1.f)
-        attr.append_post_eltwise(1.f, beta1, 0.f, attr.kind_with_linear);
-    } else {
-      // result = beta1 * accumul1 + beta2 * accumul2;
-      // result = alpha * (m1 x m2) + result
-      result = accumul1 * beta1;
-      result = at::AtenIpexTypeXPU::add_out(result, accumul2, beta2, result);
-      accumul = result;
-      if (alpha != 1.f)
-        attr.append_post_eltwise(1.f, alpha, 0.f, attr.kind_with_linear);
-      attr.append_post_sum(/* sum_scale */ 1.f);
-    }
-  }
-
-  return attr;
+  attr = attr_update;
+  return true;
 }
 
-// result = alpha x (tensor1 x tensor2 + bias) + accmul_scale x accumul
+static bool should_fold(const Tensor& tensor1, const int64_t dim_tensor2) {
+  const auto dim_tensor1 = tensor1.dim();
+  if (dim_tensor1 >= 3 && (dim_tensor2 == 1 || dim_tensor2 == 2)) {
+    const auto t1_sizes_ptr = tensor1.sizes().cbegin();
+    const auto t1_strides = tensor1.strides();
+    if (dim_tensor1 == 3 && dim_tensor2 == 2 && t1_strides.back() != 1 &&
+        t1_strides.front() == t1_sizes_ptr[1] * t1_sizes_ptr[2]) {
+      // First dim is slowest moving, and then the following two dims are //
+      // transposed. This can happen for example by permute(0, 2, 1).      //
+      // First 2 dims could be folded to use mm but would require permutation //
+      // with actual data movement, which can be instead handled by BMM with
+      // each      // GEMM transposed. This can be generalized to a tensor with
+      // dim X + Y + Z where X, Y, and Z      // dims are contiguous, Y dims and
+      // Z dims are transposed, and X, Y, Z > 0.      // For example, this can
+      // happen by permute(0, 1, 5, 2, 3, 4), where X = 2, Y = 3, and Z = 1.
+      return false;
+    } else {
+      return true;
+    }
+  } else {
+    return false;
+  }
+}
+
+// Port from PyTorch _matmul_impl function
+/*
+Matrix product of two Tensors.
+The behavior depends on the dimensionality of the Tensors as follows:
+- If both Tensors are 1-dimensional, (1d) the dot product (scalar) is
+returned.
+- If the arguments are 2D - 1D or 1D - 2D, the matrix-vector product is
+returned.
+- If both arguments are 2D, the matrix-matrix product is returned.
+- If one of the arguments is ND with N >= 3 and the other is 1D or 2D, and
+some conditions on the strides apply (see should_fold) we fold the first N-1
+dimensions of the ND argument to form a matrix, call mm or mv, reshape it
+back to ND and return it
+- Otherwise, we return bmm, after broadcasting and folding the batched
+dimensions if there's more than one
+*/
 static at::Tensor matmul_fusion_variants(
-    at::Tensor& result,
-    const at::Tensor& tensor1,
-    const at::Tensor& tensor2,
-    at::Tensor& bias,
-    at::Tensor& accumul,
+    const Tensor& tensor1,
+    const Tensor& tensor2,
     bool trans,
-    bool& fallback,
-    Attr attr) {
-  const OptionalDeviceGuard device_guard(device_of(accumul));
-  auto dim_tensor1 = tensor1.dim();
-  auto dim_tensor2 = tensor2.dim();
+    Attr& attr,
+    bool& is_fused,
+    Tensor bias = at::Tensor()) {
+  const auto dim_tensor1 = tensor1.dim();
+  const auto dim_tensor2 = tensor2.dim();
+  // This is checked up here to simplify the logic below
+  // Note that the strings are just evaluated on failure, so almost always we
+  // just evaluate the condition and move on
+  TORCH_CHECK(
+      dim_tensor1 != 0 && dim_tensor2 != 0,
+      "both arguments to matmul need to be at least 1D, but they are ",
+      dim_tensor1,
+      "D and ",
+      dim_tensor2,
+      "D");
 
-  // TODO: matmul case is complicated
-  // supported fusion cases,
-  // 1. 2D x 2D
-  // 2. 3D x 3D
-  fallback = false;
-  if (dim_tensor1 == 2 && dim_tensor2 == 2) {
-    onednn_matmul(result, tensor1, tensor2, bias, accumul, trans, attr);
-    return result;
-  } else if (dim_tensor1 >= 3 && (dim_tensor2 == 1 || dim_tensor2 == 2)) {
-    Tensor t1 = tensor1;
-    std::vector<int64_t> t1_shape, r_shape;
+  bool should_fold_tensor1 = should_fold(tensor1, dim_tensor2);
+  bool should_fold_tensor2 = should_fold(tensor2, dim_tensor1);
 
-    for (int i = 0; i < t1.sizes().size() - 1; i++) {
-      t1_shape.push_back(t1.sizes()[i]);
-      r_shape.push_back(t1.sizes()[i]);
-    }
-    t1_shape.push_back(t1.sizes()[t1.sizes().size() - 1]);
-    r_shape.push_back(trans ? tensor2.sizes()[1] : tensor2.sizes()[0]);
+  Tensor output;
+  if (dim_tensor1 == 1 && dim_tensor2 == 1) {
+    // case1:
+    // original size: [6] x [6] -> []
+    is_fused = true;
+    output = at::empty({1, 1}, tensor1.options());
+    xpu::oneDNN::matmul(
+        output,
+        tensor1.view({1, tensor1.size(0)}),
+        tensor2.view({tensor2.size(0), 1}),
+        bias,
+        trans,
+        attr);
+    output.resize_({});
+  } else if (dim_tensor1 == 2 && dim_tensor2 == 1) {
+    // case2:
+    // original sizes: [4, 2] x [2] -> [4]
+    // onednn sizes: [4, 2] x [2, 1] -> [4, 1]
+    DimVector output_shape({tensor1.size(0)});
+    Tensor result = at::empty({tensor1.size(0), 1}, tensor1.options());
+    Tensor t2 = tensor2.view({tensor2.size(0), 1});
 
-    std::vector<int64_t> sizes = t1.sizes().vec();
-    std::vector<int64_t> strides = t1.strides().vec();
-    at::collapse_dims(sizes.data(), strides.data(), t1.dim(), t1.dim() - 1);
-    t1.resize_({sizes.data()[0], sizes.data()[1]});
-
-    bool can_be_fused = accumul.defined() && (accumul.sizes() == r_shape);
-    if (!accumul.defined() || can_be_fused) {
-      if (can_be_fused) {
-        accumul.resize_({t1.size(0), r_shape[2]});
-      }
-
-      onednn_matmul(result, t1, tensor2, bias, accumul, trans, attr);
-
-      if (r_shape.size()) {
-        result.resize_(r_shape);
-      }
-      return result;
-    }
-
-  } else if (
-      (dim_tensor1 >= 1 && dim_tensor2 >= 1) &&
-      (dim_tensor1 >= 3 || dim_tensor2 >= 3)) {
-    // We are multiplying b1 x n x m1 by x2 x m2 x p (where b1 can be a list);
-    // we track m1 vs m2 separately even though they must match for nicer error
-    // messages
-    TORCH_CHECK(
-        !(bias.defined() && accumul.defined()),
-        "for 3D matmul, we only support one accumulate tensor");
-
-    int64_t n = dim_tensor1 > 1 ? tensor1.size(-2) : 1;
-    int64_t m1 = tensor1.size(-1);
-    at::IntArrayRef batch_tensor1(
-        tensor1.sizes().data(), std::max<int64_t>(dim_tensor1 - 2, 0));
-
-    // inverse dims in non-transpose case
-    int64_t m2 = dim_tensor2 > 1 ? tensor2.size(-1) : 1;
-    int64_t p = tensor2.size(-2);
-
-    at::IntArrayRef batch_tensor2(
-        tensor2.sizes().data(), std::max<int64_t>(dim_tensor2 - 2, 0));
-
-    // expand the batch portion (i.e. cut off matrix dimensions and expand rest)
-    std::vector<int64_t> expand_batch_portion =
-        at::infer_size(batch_tensor1, batch_tensor2);
-
-    std::vector<int64_t> tensor1_expand_size(expand_batch_portion);
-    tensor1_expand_size.insert(tensor1_expand_size.end(), {n, m1});
-
-    std::vector<int64_t> tensor2_expand_size(expand_batch_portion);
+    is_fused = get_onednn_matmul_binary_attr(
+        result, attr, dim_tensor1, dim_tensor2, output_shape);
+    xpu::oneDNN::matmul(result, tensor1, t2, bias, trans, attr);
+    output = result.view(output_shape);
+  } else if (dim_tensor1 == 1 && dim_tensor2 == 2) {
+    // case3:
+    // original sizes: [2] x [2, 6] -> [6]
+    // onednn sizes: [1, 2] x [2, 6] -> [1, 6]
+    DimVector output_shape({tensor2.size(1)});
     if (!trans)
-      tensor2_expand_size.insert(tensor2_expand_size.end(), {p, m2});
-    else
-      tensor2_expand_size.insert(tensor2_expand_size.end(), {m2, p});
-    int expand_batch_product = std::accumulate(
-        expand_batch_portion.begin(),
-        expand_batch_portion.end(),
-        1,
-        std::multiplies<int64_t>());
+      output_shape[0] = tensor2.size(0);
+    Tensor t1 = tensor1.unsqueeze(0);
+    Tensor result = at::empty({1, output_shape[0]}, tensor1.options());
 
-    std::vector<int64_t> tensor1_bmm_view({expand_batch_product});
-    tensor1_bmm_view.insert(tensor1_bmm_view.end(), {n, m1});
-
-    std::vector<int64_t> tensor2_bmm_view({expand_batch_product});
+    is_fused = get_onednn_matmul_binary_attr(
+        result, attr, dim_tensor1, dim_tensor2, output_shape);
+    xpu::oneDNN::matmul(result, t1, tensor2, bias, trans, attr);
+    output = result.view(output_shape);
+  } else if (dim_tensor1 == 2 && dim_tensor2 == 2) {
+    // case4:
+    // original sizes: [4, 2] x [2, 6] -> [4, 6]
+    // onednn sizes: [4, 2] x [2, 6] -> [4, 6]
+    DimVector output_shape({tensor1.size(0), tensor2.size(1)});
     if (!trans)
-      tensor2_bmm_view.insert(tensor2_bmm_view.end(), {p, m2});
+      output_shape[1] = tensor2.size(0);
+
+    Tensor result = at::empty(output_shape, tensor1.options());
+
+    is_fused = get_onednn_matmul_binary_attr(
+        result, attr, dim_tensor1, dim_tensor2, output_shape);
+    xpu::oneDNN::matmul(result, tensor1, tensor2, bias, trans, attr);
+    output = result;
+  } else if (should_fold_tensor1) {
+    // dim_tensor1 >=3 && (dim_tensor2 == 1 || dim_tensor2 == 2)
+    // case5-1:
+    // original sizes: [3, 4, 2] x [2, 6] -> [3, 4, 6]
+    // onednn sizes: [12, 2] x [2, 6] -> [12, 6]
+    // case5-2:
+    // original sizes: [3, 4, 2] x [2] -> [3, 4]
+    // onednn sizes: [12, 2] x [2, 1] -> [12, 1]
+    const auto t1_own = MaybeOwned<Tensor>::borrowed(tensor1);
+    const auto t2_own = MaybeOwned<Tensor>::borrowed(tensor2);
+
+    const auto sizes_1 = t1_own->sizes();
+    auto output_shape = DimVector(sizes_1.begin(), sizes_1.end() - 1);
+    const auto folded_dim1 = c10::multiply_integers(output_shape);
+    const auto t1 = t1_own->reshape({folded_dim1, sizes_1.back()});
+    const auto t2_is_matrix = t2_own->dim() == 2;
+    Tensor t2 = t2_is_matrix ? *t2_own : t2_own->view({t2_own->size(0), 1});
+    if (trans)
+      output_shape.push_back(t2.size(1));
     else
-      tensor2_bmm_view.insert(tensor2_bmm_view.end(), {m2, p});
+      output_shape.push_back(t2.size(0));
+    Tensor result = at::empty(
+        {t1.size(0), output_shape[output_shape.size() - 1]}, tensor1.options());
+
+    is_fused = get_onednn_matmul_binary_attr(
+        result,
+        attr,
+        dim_tensor1,
+        dim_tensor2,
+        output_shape,
+        t2_is_matrix,
+        should_fold_tensor1,
+        should_fold_tensor2);
+    xpu::oneDNN::matmul(result, t1, t2, bias, trans, attr);
+    output = at::_unsafe_view(result, output_shape);
+    output = t2_is_matrix ? output : output.squeeze(-1);
+  } else if (should_fold_tensor2) {
+    // dim_tensor2 >=3 && (dim_tensor1 == 1 || dim_tensor1 == 2)
+    // case6-1:
+    // original sizes: [2] x [3, 2, 4] = [3, 4]
+    // onednn sizes: [12, 2] x [2, 1] = [12, 1]
+    // or
+    // original sizes: [2] x [2, 3, 2, 4] = [2, 3, 4]
+    // onednn sizes: [24, 2] x [2, 1] = [24, 1]
+
+    // case6-2:
+    // original sizes: [6, 2] x [3, 2, 4] = [3, 6, 4]
+    // onednn sizes: [12, 2] x [2, 6] = [12, 6]
+    // or
+    // original sizes: [6, 2] x [2, 3, 2, 4] = [2, 3, 6, 4]
+    // onednn sizes: [24, 2] x [2, 6] = [24, 6]
+
+    const auto t1_own = trans
+        ? MaybeOwned<Tensor>::owned(tensor2.mT())
+        : MaybeOwned<Tensor>::owned(tensor2.transpose(-1, -2).mT());
+    trans = true;
+    const auto t2_own = dim_tensor1 == 2
+        ? MaybeOwned<Tensor>::owned(tensor1.t())
+        : MaybeOwned<Tensor>::borrowed(tensor1);
+
+    const auto sizes_1 = t1_own->sizes();
+    auto output_shape = DimVector(sizes_1.begin(), sizes_1.end() - 1);
+    const auto folded_dim1 = c10::multiply_integers(output_shape);
+    const auto t1 = t1_own->reshape({folded_dim1, sizes_1.back()});
+    const auto t2_is_matrix = t2_own->dim() == 2;
+    Tensor t2 = t2_is_matrix ? *t2_own : t2_own->view({t2_own->size(0), 1});
+    output_shape.push_back(t2.size(1));
+    Tensor result = at::empty({t1.size(0), t2.size(1)}, tensor1.options());
+
+    is_fused = get_onednn_matmul_binary_attr(
+        result,
+        attr,
+        dim_tensor1,
+        dim_tensor2,
+        output_shape,
+        t2_is_matrix,
+        should_fold_tensor1,
+        should_fold_tensor2);
+    xpu::oneDNN::matmul(result, t1, t2, bias, trans, attr);
+    output = at::_unsafe_view(result, output_shape);
+    output = t2_is_matrix ? output.mT().contiguous() : output.squeeze(-1);
+  } else {
+    // dim_tensor1 >= 3 || dim_tensor2 >= 3
+    // case7-1:
+    // original sizes: [3, 4, 2] x [3, 2, 6] = [3, 4, 6]
+    // onednn sizes: [3, 4, 2] x [3, 2, 6] = [3, 4, 6]
+    // case7-2:
+    // original sizes: [5, 1, 4, 2] x [3, 2, 6] = [5, 3, 4, 6]
+    // onednn sizes: [15, 4, 2] x [15, 2, 6] = [15, 4, 6]
+    const auto t2_own = trans
+        ? MaybeOwned<Tensor>::borrowed(tensor2)
+        : MaybeOwned<Tensor>::owned(tensor2.transpose(-1, -2));
+    trans = true;
+
+    const int64_t n = dim_tensor1 > 1 ? tensor1.sizes().cend()[-2] : 1LL;
+    const int64_t m1 = tensor1.sizes().back();
+    const IntArrayRef batch_tensor1(
+        tensor1.sizes().data(), std::max<int64_t>(dim_tensor1 - 2, 0LL));
+    const int64_t m2 =
+        dim_tensor2 > 1 ? t2_own->sizes().cend()[-2] : t2_own->sizes().back();
+    const int64_t p = dim_tensor2 > 1 ? t2_own->sizes().back() : 1LL;
+    const IntArrayRef batch_tensor2(
+        t2_own->sizes().data(), std::max<int64_t>(dim_tensor2 - 2, 0LL));
+    auto output_shape = infer_size_dimvector(batch_tensor1, batch_tensor2);
+
+    const auto tensor1_expand_size = [&output_shape, n, m1] {
+      DimVector ret(output_shape);
+      ret.append({n, m1});
+      return ret;
+    }();
+    const auto tensor2_expand_size = [&output_shape, m2, p] {
+      DimVector ret(output_shape);
+      ret.append({m2, p});
+      return ret;
+    }();
+    const int64_t expand_batch_product = c10::multiply_integers(output_shape);
+
     // flatten expanded batches
-    at::Tensor tensor1_expanded =
-        tensor1.expand(tensor1_expand_size).contiguous().view(tensor1_bmm_view);
-    at::Tensor tensor2_expanded =
-        tensor2.expand(tensor2_expand_size).contiguous().view(tensor2_bmm_view);
-
-    TORCH_CHECK(tensor1_expanded.dim() == 3, "expected 3D tensor");
-    TORCH_CHECK(tensor2_expanded.dim() == 3, "expected 3D tensor");
-
-    // reshape batches back into result
-    std::vector<int64_t> output_shape(expand_batch_portion);
+    const auto tensor1_expanded = tensor1.expand(tensor1_expand_size)
+                                      .reshape({expand_batch_product, n, m1});
+    const auto tensor2_expanded = t2_own->expand(tensor2_expand_size)
+                                      .reshape({expand_batch_product, m2, p});
     if (dim_tensor1 > 1) {
       output_shape.push_back(n);
     }
     if (dim_tensor2 > 1) {
       output_shape.push_back(p);
     }
+    auto result = at::empty({expand_batch_product, n, p}, tensor1.options());
 
-    // 3D matmul does not support bias
-    if (bias.defined()) {
-      attr.append_post_sum(/* sum_scale */ 1.f);
-      accumul = bias;
-      bias = at::Tensor();
-    }
-
-    bool can_be_fused =
-        accumul.defined() && (accumul.sizes().vec() == output_shape);
-    if (!accumul.defined() || can_be_fused) {
-      onednn_matmul(
-          result,
-          tensor1_expanded,
-          tensor2_expanded,
-          bias,
-          accumul,
-          trans,
-          attr);
-      Tensor output = at::_unsafe_view(result, output_shape);
-      return output;
-    }
+    is_fused = get_onednn_matmul_binary_attr(
+        result, attr, dim_tensor1, dim_tensor2, output_shape);
+    xpu::oneDNN::matmul(
+        result, tensor1_expanded, tensor2_expanded, bias, trans, attr);
+    output = at::_unsafe_view(result, output_shape);
   }
 
-  // fallback
-  fallback = true;
-  return result;
+  return output;
 }
 
 } // namespace impl

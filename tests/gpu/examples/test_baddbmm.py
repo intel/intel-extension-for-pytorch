@@ -9,12 +9,12 @@ checking_rtol = 3e-2
 
 
 class TestTorchMethod(TestCase):
-    def test_addmm_scale(self, dtype=torch.float):
-        m1_cpu = torch.randn([3, 4], dtype=dtype)
-        m2_cpu = torch.randn([4, 2], dtype=dtype)
+    def test_baddbmm_scale(self, dtype=torch.float):
+        m1_cpu = torch.randn([6, 3, 4], dtype=dtype)
+        m2_cpu = torch.randn([6, 4, 2], dtype=dtype)
         m1_xpu = m1_cpu.to(xpu_device)
         m2_xpu = m2_cpu.to(xpu_device)
-        x_cpu = torch.ones([3, 2], dtype=dtype)
+        x_cpu = torch.ones([6, 3, 2], dtype=dtype)
         x_xpu = x_cpu.to(xpu_device)
 
         alphas = [0.0, 1.0, 2.0, 3.0]
@@ -23,27 +23,26 @@ class TestTorchMethod(TestCase):
             for beta in betas:
                 print("alpha", alpha)
                 print("beta", beta)
-                res_cpu = torch.addmm(x_cpu, m1_cpu, m2_cpu, beta=beta, alpha=alpha)
-                res_xpu = torch.addmm(x_xpu, m1_xpu, m2_xpu, beta=beta, alpha=alpha)
+                res_cpu = torch.baddbmm(x_cpu, m1_cpu, m2_cpu, beta=beta, alpha=alpha)
+                res_xpu = torch.baddbmm(x_xpu, m1_xpu, m2_xpu, beta=beta, alpha=alpha)
                 print("cpu addmm_ result", res_cpu)
                 print("xpu addmm_ result", res_xpu.cpu())
                 self.assertEqual(res_cpu, res_xpu.cpu())
 
-    def test_addmm(self, dtype=torch.float):
-        m1_cpu = torch.randn([3, 4], dtype=dtype)
-        m2_cpu = torch.randn([4, 2], dtype=dtype)
+    def test_baddbmm(self, dtype=torch.float):
+        m1_cpu = torch.randn([6, 3, 4], dtype=dtype)
+        m2_cpu = torch.randn([6, 4, 2], dtype=dtype)
         m1_xpu = m1_cpu.to(xpu_device)
         m2_xpu = m2_cpu.to(xpu_device)
-
-        shapes = [[3, 2], [1, 2], [2]]
+        shapes = [[6, 3, 2], [1, 3, 2], [6, 1, 2], [6, 1, 1], [1,3,1], [1,1,2], [1, 1, 1], [3, 2], [3, 1], [1, 2], [1, 1], [2], [1]]
         for shape in shapes:
-            print("shape", shape)
+            print("shape={}", shape)
             x_cpu = torch.ones(shape, dtype=dtype)
             x_xpu = x_cpu.to(xpu_device)
-            res_cpu = torch.addmm(x_cpu, m1_cpu, m2_cpu)
-            res_xpu = torch.addmm(x_xpu, m1_xpu, m2_xpu)
-            print("cpu addmm_ result", res_cpu)
-            print("xpu addmm_ result", res_xpu.cpu())
+            res_cpu = torch.baddbmm(x_cpu, m1_cpu, m2_cpu)
+            res_xpu = torch.baddbmm(x_xpu, m1_xpu, m2_xpu)
+            print("cpu baddbmm result", res_cpu)
+            print("xpu baddbmm result", res_xpu.cpu())
             self.assertEqual(res_cpu, res_xpu.cpu())
 
     # This case is used to check opaque tensor's allocation size in reorder, so it is running in block format

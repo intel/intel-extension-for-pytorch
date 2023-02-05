@@ -101,6 +101,10 @@ struct PostOpParam {
   // prelu post op constructor
   PostOpParam(int mask, kind_t kind) : mask_(mask), kind_(kind) {}
 
+  // post sum or binary with scale post op constructor
+  PostOpParam(Tensor& binary, float scale, algorithm algo, kind_t kind)
+      : scale_(scale), binary_(binary), algo_(algo), kind_(kind) {}
+
   // for int8 sum/eltwise
   float scale_;
   // for eltwise
@@ -189,10 +193,7 @@ class Attr {
     memory::desc md;
     if (ctx.is_plain()) {
       binary_ = binary_.contiguous();
-      md = memory::desc(
-          get_onednn_dims(binary_),
-          get_onednn_dtype(binary_),
-          get_onednn_strides(binary_));
+      md = get_onednn_md(binary_);
     } else {
       md = ctx.meta();
     }
@@ -200,6 +201,17 @@ class Attr {
         memory::desc(md.dims(), md.data_type(), memory::format_tag::any);
     ops_params_.push_back(
         PostOpParam(binary_, md, expected_md, algo, kind_t::binary));
+    return *this;
+  }
+
+  Attr& append_scale_binary(
+      algorithm algo,
+      Tensor binary,
+      float scale,
+      float sum_q_scale = 1.f,
+      int64_t zp = 0) {
+    ops_params_.push_back(PostOpParam(
+        binary, /*scale_sum*/ scale * sum_q_scale, algo, kind_t::binary));
     return *this;
   }
 

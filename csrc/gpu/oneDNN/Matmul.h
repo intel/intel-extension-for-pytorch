@@ -19,20 +19,29 @@ using namespace at::AtenIpexTypeXPU;
 namespace xpu {
 namespace oneDNN {
 static inline void matmul(
-    Tensor& dst,
-    const Tensor& m1,
-    const Tensor& m2,
+    Tensor& result,
+    const Tensor& mat1,
+    const Tensor& mat2,
     const Tensor& b_raw,
     bool m2_trans,
     Attr attr) {
-  size_t dims = dst.dim();
+  size_t dims = result.dim();
   TORCH_CHECK(
       dims == 2 || dims == 3,
       "oneDNN matmul only works with 2D or 3D, got ",
       dims);
   TORCH_CHECK(
-      dims == m1.dim() && dims == m2.dim(),
+      dims == mat1.dim() && dims == mat2.dim(),
       "oneDNN input matrixes must have the same ranks");
+  TORCH_CHECK(result.defined(), "oneDNN matmul result should be defined");
+
+  Tensor m1 =
+      xpu::oneDNN::is_onednn_matmul_strides(mat1) ? mat1 : mat1.contiguous();
+  Tensor m2 =
+      xpu::oneDNN::is_onednn_matmul_strides(mat2) ? mat2 : mat2.contiguous();
+  Tensor dst = xpu::oneDNN::is_onednn_matmul_strides(result, true)
+      ? result
+      : result.contiguous();
 
   int64_t m = dst.size(-2);
   int64_t n = dst.size(-1);
@@ -52,8 +61,8 @@ static inline void matmul(
   }
 
   // validate bias and make it compatible with oneDNN implementation
-  Tensor b = b_raw;
   bool with_bias = false;
+  Tensor b = b_raw;
   if (b.defined()) {
     with_bias = true;
     if (b.dim() == 1) {
@@ -354,6 +363,9 @@ static inline void matmul(
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));
   }
+
+  if (!dst.is_same(result))
+    result.copy_(dst);
 }
 
 } // namespace oneDNN

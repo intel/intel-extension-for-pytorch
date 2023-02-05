@@ -234,6 +234,9 @@ static inline bool is_onednn_matmul_strides(
   if (tensor_dim != 2 && tensor_dim != 3)
     return false;
 
+  if (tensor.is_contiguous())
+    return true;
+
   // the overlaped cases are not supported
   memory::dims strides = get_onednn_strides(tensor);
   int64_t storage_size = 1;
