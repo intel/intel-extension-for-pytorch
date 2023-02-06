@@ -6,6 +6,7 @@ import tempfile
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.utils.rnn import pack_padded_sequence,pad_packed_sequence
 from torch.testing import FileCheck
 import copy
 import json
@@ -261,6 +262,32 @@ class TestIpexOps(JitLlgaTestCase):
             m = M(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
             graph = self.checkQuantizeTrace(m, [x], atol=3e-2, rtol=1e-1)
             self.assertGraphContainsExactly(graph, 'ipex::quantized_lstm', 1)
+
+    def test_lstm_PackedSequence(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.lstm = nn.LSTM(input_size=288, hidden_size=1024, num_layers=6, batch_first=True, bidirectional=True, bias=True, dropout=0.2)
+
+            def forward(self, input, hid, mask=None):
+                if mask is not None:
+                    lengths = mask.sum(-1)
+                    seq = pack_padded_sequence(input, lengths.cpu(), batch_first=True)
+                    seq, hid = self.lstm(seq, hid)
+                    seq = pad_packed_sequence(seq, batch_first=True)[0]
+                    return seq, hid
+                else:
+                    return self.lstm(input, hid)
+
+        model = M().eval()
+        seq = torch.randn(size=(1, 211, 288), dtype=torch.float32)
+        # initialize hidden states
+        h0 = torch.zeros((12, 1, 1024), dtype=seq.dtype)
+        hid = (h0, h0)
+        mask = torch.ones(size=(1, 211), dtype=torch.uint8)
+
+        graph = self.checkQuantizeTrace(model, [seq, hid, mask])
+        self.assertGraphContainsExactly(graph, 'aten::lstm', 1)
 
 class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
     def test_inplace_preapre(self):

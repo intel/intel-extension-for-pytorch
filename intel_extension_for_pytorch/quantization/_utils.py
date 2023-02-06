@@ -403,7 +403,7 @@ def set_node_output_quantized(nodes):
     # output's infe dtype is not int8, set it and also set insert_fake_quant_after_output to True.
     """
     def _reset_post_node_input_infos(node):
-        # make sure the post node will node insert fake quant if we add fake quant by cur node' output
+        # make sure the post node will insert fake quant if we add fake quant by cur node' output
         if len(node.post_nodes) > 0:
             for post_node in node.post_nodes:
                 if post_node.qconfig is not None:
@@ -434,10 +434,12 @@ def set_node_output_quantized(nodes):
                     node.insert_fake_quant_after_outputs[0] = True
                     _reset_post_node_input_infos(node)
             else:
-                if node.input_tensor_force_inf_dtype[0] in [torch.qint8, torch.quint8] and not post_node_are_quantized:
-                   node.output_tensor_infos[0].inf_dtype = node.input_tensor_force_inf_dtype[0]
-                   node.insert_fake_quant_after_outputs[0] = True
-                   _reset_post_node_input_infos(node)
+                # TODO: enable PackedSequence input for LSTM.
+                if not (node.type in [nn.LSTM] and len(node.input_tensor_infos) > 2):
+                    if node.input_tensor_force_inf_dtype[0] in [torch.qint8, torch.quint8] and not post_node_are_quantized:
+                        node.output_tensor_infos[0].inf_dtype = node.input_tensor_force_inf_dtype[0]
+                        node.insert_fake_quant_after_outputs[0] = True
+                        _reset_post_node_input_infos(node)
 
 qscheme_dict = {
     str(torch.per_tensor_affine): torch.per_tensor_affine,
