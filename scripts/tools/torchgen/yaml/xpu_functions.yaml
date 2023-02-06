@@ -94,6 +94,7 @@ supported:
   - addbmm.out
   - addcdiv.out
   - addcmul.out
+  - _addmm_activation.out
   - addmm.out  # newly added
   - addmv.out  # newly added
   - addr

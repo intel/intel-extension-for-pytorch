@@ -46,6 +46,34 @@ class TestTorchMethod(TestCase):
             print("xpu addmm_ result", res_xpu.cpu())
             self.assertEqual(res_cpu, res_xpu.cpu())
 
+    def test_addmm_activation(self, dtype=torch.float):
+
+        m1_cpu = torch.randn([30, 40], dtype=dtype)
+        m2_cpu = torch.randn([40, 12], dtype=dtype)
+        x_cpu = torch.ones([30, 12], dtype=dtype)
+
+        m1_xpu = m1_cpu.to(xpu_device)
+        m2_xpu = m2_cpu.to(xpu_device)
+        x_xpu = x_cpu.to(xpu_device)
+
+        print("cpu addmm_ self", x_cpu)
+        x_cpu._addmm_activation(m1_cpu, m2_cpu, use_gelu=True)
+        print("cpu addmm_ result", x_cpu)
+
+        print("xpu addmm_ self", x_xpu.cpu())
+        x_xpu._addmm_activation(m1_xpu, m2_xpu, use_gelu=True)
+        print("xpu addmm_ result", x_xpu.cpu())
+        self.assertEqual(x_cpu, x_xpu.cpu())
+
+        print("cpu addmm_ self", x_cpu)
+        x_cpu._addmm_activation(m1_cpu, m2_cpu, use_gelu=False)
+        print("cpu addmm_ result", x_cpu)
+
+        print("xpu addmm_ self", x_xpu.cpu())
+        x_xpu._addmm_activation(m1_xpu, m2_xpu, use_gelu=False)
+        print("xpu addmm_ result", x_xpu.cpu())
+        self.assertEqual(x_cpu, x_xpu.cpu())
+
     # This case is used to check opaque tensor's allocation size in reorder, so it is running in block format
     def test_addmm_block(self, dtype=torch.float):
         bs = 64

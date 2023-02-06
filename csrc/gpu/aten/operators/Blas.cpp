@@ -92,6 +92,23 @@ Tensor& addmm_out(
   return result;
 }
 
+Tensor& _addmm_activation_out(
+    const Tensor& self,
+    const Tensor& mat1,
+    const Tensor& mat2,
+    const Scalar& beta,
+    const Scalar& alpha,
+    bool use_gelu,
+    at::Tensor& result) {
+  addmm_out(self, mat1, mat2, beta, alpha, result);
+  if (use_gelu) {
+    at::gelu_(result);
+  } else {
+    at::relu_(result);
+  }
+  return result;
+}
+
 Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
   checkBackend("mm_out", {result, self, mat2}, Backend::XPU);
   TORCH_CHECK(self.dim() == 2, "self must be a matrix");
