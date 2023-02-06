@@ -64,6 +64,17 @@ def _default_recipe_init(nodes):
                             tensor_info.inf_dtype = tensor_info.orig_dtype
                             node.input_tensor_force_inf_dtype[idx] = tensor_info.inf_dtype
 
+            # For LSTM, if it's input is a PackedSequence, we don't support ot now.
+            # TODO: support PackedSequence input for quantization LSTM.
+            if node.type in rnn_ops and len(node.input_tensor_infos) > 2:
+                for idx, tensor_info in enumerate(node.input_tensor_infos):
+                    if tensor_info is not None:
+                        tensor_info.inf_dtype = tensor_info.orig_dtype
+                        node.input_tensor_force_inf_dtype[idx] = tensor_info.inf_dtype
+                for idx, tensor_info in enumerate(node.weight_tensor_infos):
+                    if tensor_info is not None:
+                        tensor_info.inf_dtype = tensor_info.orig_dtype
+
 #TODO: making fusion pattern check more general.
 def _find_fused_node_with_cur_elt_wise(node, ops):
     r"""
