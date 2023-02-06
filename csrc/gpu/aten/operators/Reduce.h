@@ -1246,9 +1246,10 @@ class AccumulationBuffer {
   at::DataPtr buffer_;
 };
 
-template <typename scalar_t>
+#define DEFAULT_OUTPUT_VEC_SIZE 4
+template <typename scalar_t, int vt1>
 int get_output_vec_size(at::TensorIterator& iter) {
-  int vec_size = 4;
+  int vec_size = DEFAULT_OUTPUT_VEC_SIZE;
   auto update_vec_size = [&vec_size](uint64_t n) {
     while (n % vec_size != 0) {
       vec_size /= 2;
@@ -1270,13 +1271,16 @@ int get_output_vec_size(at::TensorIterator& iter) {
     }
     j++;
   }
-  return vec_size;
+  return std::min(vec_size, vt1);
 }
 
 template <
     typename scalar_t,
     typename out_scalar_t,
+    // register pressure controlled by input vec size
     int vt0 = 4,
+    // register pressure controlled by output vec size
+    int vt1 = DEFAULT_OUTPUT_VEC_SIZE,
     typename ops_t,
     typename ident_t = double>
 inline void dpcpp_reduce_kernel(
@@ -1421,7 +1425,7 @@ inline void dpcpp_reduce_kernel(
       config.input_vec_size = vec_size;
     } else if (!reduction_on_fastest_striding_dimension) {
       // Case 2: "vectorize along output"
-      config.output_vec_size = get_output_vec_size<scalar_t>(iter);
+      config.output_vec_size = get_output_vec_size<scalar_t, vt1>(iter);
       dim0 /= config.output_vec_size;
     }
   }
@@ -1527,5 +1531,6 @@ inline void dpcpp_reduce_kernel(
   launch_reduce_kernel(config, reduce);
 }
 
+#undef DEFAULT_OUTPUT_VEC_SIZE
 } // namespace AtenIpexTypeXPU
 } // namespace at

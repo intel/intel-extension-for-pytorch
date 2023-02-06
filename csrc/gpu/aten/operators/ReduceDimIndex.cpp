@@ -105,7 +105,9 @@ std::tuple<Tensor&, Tensor&> _min_out(
         "min", min, min_indices, self, dim, keepdim, self.scalar_type(), kLong);
     IPEX_DISPATCH_ALL_TYPES_AND3(
         kBFloat16, kHalf, kBool, iter.dtype(2), "min_xpu", [&]() {
-          dpcpp_reduce_kernel<scalar_t, scalar_t>(
+          // register pressure is heavy when output vec size is large.
+          // using 2 to mitigate register pressure to avoid register spill
+          dpcpp_reduce_kernel<scalar_t, scalar_t, 4 /* vt0 */, 2 /* vt1 */>(
               iter,
               MinOps<scalar_t>{},
               std::pair<scalar_t, int64_t>(
@@ -159,7 +161,9 @@ std::tuple<Tensor&, Tensor&> _max_out(
         "max", max, max_indices, self, dim, keepdim, self.scalar_type(), kLong);
     IPEX_DISPATCH_ALL_TYPES_AND3(
         kBFloat16, kHalf, kBool, iter.dtype(2), "max_xpu", [&]() {
-          dpcpp_reduce_kernel<scalar_t, scalar_t>(
+          // register pressure is heavy when output vec size is large.
+          // using 2 to mitigate register pressure to avoid register spill
+          dpcpp_reduce_kernel<scalar_t, scalar_t, 4 /* vt0 */, 2 /* vt1 */>(
               iter,
               MaxOps<scalar_t>{},
               std::pair<scalar_t, int64_t>(
