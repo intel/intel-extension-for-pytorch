@@ -345,9 +345,13 @@ batch_normalization_backward(
     auto bia_m = dpcpp_onednn_memory(
         bn_bwd_pd.weights_desc(), engine, bia_f32.data_ptr());
 
+    if (!diff_wgh.has_storage())
+      diff_wgh = at::empty_like(wgh_f32);
     auto diff_wgh_m = dpcpp_onednn_memory(
         bn_bwd_pd.diff_weights_desc(), engine, diff_wgh.data_ptr());
 
+    if (!diff_bia.has_storage())
+      diff_bia = at::empty_like(wgh_f32);
     auto diff_bia_m = dpcpp_onednn_memory(
         bn_bwd_pd.diff_weights_desc(), engine, diff_bia.data_ptr());
 
