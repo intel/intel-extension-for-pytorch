@@ -31,11 +31,52 @@ def _copy_model_and_optimizer(model, optimizer):
         dic_param = {}
         for k, value in zip(model.parameters(), new_model.parameters()):
             dic_param[k] = value
+
+        # deep copy param_groups
         for group1, group2 in zip(optimizer.param_groups, new_optimizer.param_groups):
             for i, p in enumerate(group1['params']):
-                new_model_param = dic_param[p]
-                group2['params'][i] = new_model_param
-                new_optimizer.state[new_model_param] = copy.deepcopy(optimizer.state[p])
+                # for the p not in the dic_param case, the new optimizer state will be updated
+                # in _deep_copy_params_attr because the param here in optimizer state is the master
+                # parameter of the model, which has ever optimized by ipex.optimize
+                if p in dic_param:
+                    new_model_param = dic_param[p]
+                    group2['params'][i] = new_model_param
+                    new_optimizer.state[new_model_param] = copy.deepcopy(optimizer.state[p])
+
+        # deep copy params_attr for reentrancy of ipex.optimize
+        def _deep_copy_params_attr(old_module, new_module):
+            if hasattr(old_module, 'master_weight_split'):
+                setattr(new_module, 'master_weight_split', old_module.master_weight_split)
+                master_weight_split = getattr(new_module, 'master_weight_split')
+
+                for name, param in old_module.named_parameters():
+                    if master_weight_split:
+                        attr_name = name + '_trail'
+                        if param in optimizer.params_attr:
+                            new_optimizer.params_attr[getattr(new_module, name)] = optimizer.params_attr[param]
+                            new_optimizer.params_attr[getattr(new_module, name)]['trail'] = getattr(new_module, attr_name)
+                    else:
+                        attr_name = 'master_' + name
+                        old_master_param = getattr(old_module, attr_name)
+                        new_master_param = getattr(new_module, attr_name)
+                        if old_master_param in optimizer.params_attr:
+                            new_optimizer.params_attr[new_master_param] = optimizer.params_attr[old_master_param]
+                            if 'bf16_param' in new_optimizer.params_attr[new_master_param]:
+                                new_optimizer.params_attr[new_master_param]['bf16_param'] = getattr(new_module, name)
+                            if 'fp16_param' in new_optimizer.params_attr[new_master_param]:
+                                new_optimizer.params_attr[new_master_param]['fp16_param'] = getattr(new_module, name)
+
+                        # deep copy new optimizer state for master parameter
+                        new_optimizer.state[new_master_param] = copy.deepcopy(optimizer.state[old_master_param])
+
+            for (_, old_child), (_, new_child) in zip(old_module.named_children(), new_module.named_children()):
+                _deep_copy_params_attr(old_child, new_child)
+
+        if hasattr(optimizer, 'params_attr'):
+            params_attr = {}
+            setattr(new_optimizer, 'params_attr', params_attr)
+            _deep_copy_params_attr(model, new_model)
+
         return new_model, new_optimizer
 
 
@@ -517,6 +558,8 @@ def optimize(
 
     # convert optimizer for training case.
     params_attr = {}
+    if hasattr(optimized_optimizer, 'params_attr'):
+        params_attr = optimized_optimizer.params_attr
     if dtype == torch.bfloat16 and model.training:
         optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
             optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16,

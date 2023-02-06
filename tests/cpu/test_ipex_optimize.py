@@ -363,6 +363,67 @@ class TestOptimizeCases(TestCase):
             ipex_model_state = ipex_model.state_dict()
             for var_name in origin_model_state:
                 self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
-    
+
+    def test_reentrancy_of_ipex_optimize(self):
+        CALL_NUM = 3
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super(Model, self).__init__()
+                self.input = (torch.randn(1, 3, 224, 224), torch.randn(100, 100), torch.randn(5, 5, 3, 3))
+                self.conv = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3))
+                self.linear = torch.nn.Linear(100, 100)
+                self.conv_transpose2d = torch.nn.ConvTranspose2d(5, 5, (3 ,3))
+
+            def forward(self, x1, x2, x3):
+                return self.conv(x1).sum() + self.linear(x2).sum() + self.conv_transpose2d(x3)
+
+        def run_and_recursively_call_ipex_optimize(model_class,
+                                                dtype,
+                                                level,
+                                                inplace,
+                                                weights_prepack,
+                                                split_master_weight_for_bf16,
+                                                fuse_update_step,
+                                                graph_mode):
+            model = model_class().train()
+            input = model.input
+            optimizer = torch.optim.SGD(model.parameters(), lr=10.01)
+            for _ in range(CALL_NUM):
+                # recursively calling ipex.optimize CALL_NUM times
+                model, optimizer = ipex.optimize(model,
+                                                dtype=dtype,
+                                                optimizer=optimizer,
+                                                level=level,
+                                                inplace=inplace,
+                                                weights_prepack=weights_prepack,
+                                                split_master_weight_for_bf16=split_master_weight_for_bf16,
+                                                fuse_update_step=fuse_update_step,
+                                                graph_mode=graph_mode)
+                with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
+                    y = model(*input).sum()
+                optimizer.zero_grad()
+                y.backward()
+                optimizer.step()
+
+        params_dict = {
+            "dtype": [torch.float32, torch.bfloat16],
+            "level": ['O1'],
+            "inplace": [True, False],
+            "weights_prepack": [True, False],
+            "split_master_weight_for_bf16": [True, False],
+            "fuse_update_step": [True, False],
+            "graph_mode": [True, False]
+        }
+
+        for dtype, level, inplace, weights_prepack, split_master_weight_for_bf16, fuse_update_step, graph_mode in list(itertools.product(*params_dict.values())):
+            run_and_recursively_call_ipex_optimize(Model,
+                                                   dtype,
+                                                   level,
+                                                   inplace,
+                                                   weights_prepack,
+                                                   split_master_weight_for_bf16,
+                                                   fuse_update_step,
+                                                   graph_mode)
+
 if __name__ == '__main__':
     test = unittest.main()

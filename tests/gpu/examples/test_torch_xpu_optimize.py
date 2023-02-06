@@ -5,6 +5,7 @@ from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 import pytest  # noqa
 import os
+import itertools
 
 device = 'xpu'
 
@@ -368,3 +369,53 @@ class TestTorchMethod(TestCase):
         self.assertEqual(state['model_state_dict'], load_state['model_state_dict'])
         self.assertEqual(state['optimizer_state_dict'], load_state['optimizer_state_dict'])
         os.remove(filename)
+
+    def test_reentrancy_of_ipex_optimize(self):
+        CALL_NUM = 3
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super(Model, self).__init__()
+                self.input = (torch.randn(1, 3, 224, 224), torch.randn(100, 100), torch.randn(5, 5, 3, 3))
+                self.conv = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3))
+                self.linear = torch.nn.Linear(100, 100)
+                self.conv_transpose2d = torch.nn.ConvTranspose2d(5, 5, (3 ,3))
+
+            def forward(self, x1, x2, x3):
+                return self.conv(x1).sum() + self.linear(x2).sum() + self.conv_transpose2d(x3)
+
+        def run_and_recursively_call_ipex_optimize(model_class,
+                                                   dtype,
+                                                   level,
+                                                   split_master_weight_for_bf16,
+                                                   fuse_update_step):
+            model = model_class().train()
+            input = model.input
+            optimizer = torch.optim.SGD(model.parameters(), lr=10.01)
+            for _ in range(CALL_NUM):
+                # recursively calling ipex.optimize CALL_NUM times
+                model, optimizer = torch.xpu.optimize(model,
+                                                      dtype=dtype,
+                                                      optimizer=optimizer,
+                                                      level=level,
+                                                      split_master_weight_for_bf16=split_master_weight_for_bf16,
+                                                      fuse_update_step=fuse_update_step)
+                with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
+                    y = model(*input).sum()
+                optimizer.zero_grad()
+                y.backward()
+                optimizer.step()
+
+        # TODO: when support split master weight, will set split_master_weight_for_bf16: [True, False]
+        params_dict = {
+            "dtype": [torch.float32, torch.bfloat16],
+            "level": ['O1'],
+            "split_master_weight_for_bf16": [False],
+            "fuse_update_step": [True, False],
+        }
+
+        for dtype, level, split_master_weight_for_bf16, fuse_update_step in list(itertools.product(*params_dict.values())):
+            run_and_recursively_call_ipex_optimize(Model,
+                                                   dtype,
+                                                   level,
+                                                   split_master_weight_for_bf16,
+                                                   fuse_update_step)
