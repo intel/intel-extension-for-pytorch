@@ -71,12 +71,14 @@ Tensor mul_add_scalar(
       "The dimensions of two inputs tensor is not equal ");
   Tensor _self, result, _accumu;
   if (check_has_opaque_and_no_padding({self, accumu})) {
-    if (self.numel() != accumu.numel()) {
-      _accumu = accumu.expand_as(self).contiguous();
+    if (self.numel() > accumu.numel()) {
+      _accumu = accumu.expand_as(self);
+    } else if (self.numel() < accumu.numel()) {
+      _self = self.expand_as(accumu);
     } else {
       _accumu = accumu;
     }
-    Tensor tar = DPCPPTensorConvertor::is_opaque_tensor(self) ? self : accumu;
+    Tensor tar = DPCPPTensorConvertor::is_opaque_tensor(_self) ? _self : accumu;
     auto ctx = AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(tar);
     auto converter = [&](const Tensor& tensor) {
       auto tensor_ctx =
@@ -89,7 +91,7 @@ Tensor mul_add_scalar(
       }
       return tensor;
     };
-    _self = converter(self);
+    _self = converter(_self);
     _accumu = converter(_accumu);
     result = empty_opaque_tensor(ctx.meta(), _self.options(), c10::nullopt);
   } else {
@@ -128,18 +130,26 @@ Tensor mul_add(
   Tensor _self, _other, _accumu, result;
   if (check_has_opaque_and_no_padding({self, other, accumu})) {
     std::vector<Tensor> inputs;
-    inputs.push_back(self);
 
-    // align shape
-    if (self.numel() != other.numel())
-      inputs.push_back(other.expand_as(self).contiguous());
-    else
-      inputs.push_back(other);
-
-    if (self.numel() != accumu.numel())
-      inputs.push_back(accumu.expand_as(self).contiguous());
-    else
-      inputs.push_back(accumu);
+    Tensor target_tensor = self;
+    int target_numel = self.numel();
+    if (target_numel < other.numel()) {
+      target_tensor = other;
+      target_numel = other.numel();
+    }
+    if (target_numel < accumu.numel()) {
+      target_tensor = accumu;
+      target_numel = accumu.numel();
+    }
+    self.numel() == target_numel
+        ? inputs.push_back(self)
+        : inputs.push_back(self.expand_as(target_tensor));
+    other.numel() == target_numel
+        ? inputs.push_back(other)
+        : inputs.push_back(other.expand_as(target_tensor));
+    accumu.numel() == target_numel
+        ? inputs.push_back(accumu)
+        : inputs.push_back(accumu.expand_as(target_tensor));
 
     // align format
     std::vector<Tensor> _inputs;

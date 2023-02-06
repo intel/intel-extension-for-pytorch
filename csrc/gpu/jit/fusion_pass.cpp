@@ -548,6 +548,9 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{aten::conv2d, aten::add_}, xpu::conv2d_sum_sym},
     // RCAN: mul + add
     {{aten::mul, aten::add_}, xpu::mul_add_sym},
+    {{aten::mul, aten::add}, xpu::mul_add_sym},
+    {{aten::mul_, aten::add_}, xpu::mul_add_sym},
+    {{aten::mul_, aten::add}, xpu::mul_add_sym},
     // RN50/RCAN INT8: conv + add + relu
     {{Symbol::fromQualString("quantized::conv2d"),
       Symbol::fromQualString("quantized::add_relu")},
