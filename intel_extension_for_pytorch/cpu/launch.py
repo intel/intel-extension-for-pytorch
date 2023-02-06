@@ -98,7 +98,7 @@ for well-improved multi-node distributed training performance as well.
 2. Multi-Node multi-process distributed training: (e.g. two nodes)
 
 
-rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*
+rank 0: *(IP: 192.168.10.10, and has a free port: 29500)*
 
 ::
 
@@ -156,6 +156,7 @@ class CPUinfo():
         self.node_logical_cores = []   # node_id is index
         self.physical_core_node_map = {}  # phyical core to numa node id
         self.logical_core_node_map = {}   # logical core to numa node id
+        self.physical_to_logical = {}
 
         for node_id in range(self.nodes):
             cur_node_physical_core = []
@@ -166,6 +167,8 @@ class CPUinfo():
                     if int(line[1]) not in cur_node_physical_core:
                         cur_node_physical_core.append(int(line[1]))
                         self.physical_core_node_map[int(line[1])] = int(node_id)
+                    else:
+                        self.physical_to_logical[int(line[1])] = int(line[0])
                     cur_node_logical_core.append(int(line[0]))
                     self.logical_core_node_map[int(line[0])] = int(node_id)
             self.node_physical_cores.append(cur_node_physical_core)
@@ -364,7 +367,22 @@ class MultiInstanceLauncher(Launcher):
         set_kmp_affinity = True
         enable_taskset = False
         if args.core_list:  # user specify what cores will be used by params
-            cores = [int(x) for x in args.core_list.split(",")]
+            for core_list_elem in args.core_list.split(","):
+                spec_core = core_list_elem.strip()
+                if spec_core.isdigit():
+                    cores.append(int(spec_core))
+                else:
+                    core_range = [int(x.strip()) for x in spec_core.split("-")]
+                    assert len(core_range) == 2, "Invalid core_list argument format"
+                    beg, end = core_range
+                    if beg > end:
+                        beg, end = end, beg
+                    cores.extend(list(range(beg, end + 1)))
+            cores = list(set(cores))
+            valid_cores = self.cpuinfo.get_all_physical_cores() + self.cpuinfo.get_all_logical_cores()
+            for c in cores:
+                assert c in valid_cores, "Invalid core ID {} in core_list argument".format(c)
+
             if args.ncore_per_instance == -1:
                 logger.error("please specify the '--ncore_per_instance' if you have pass the --core_list params")
                 exit(-1)
@@ -374,6 +392,14 @@ class MultiInstanceLauncher(Launcher):
                 args.ninstances = len(cores) // args.ncore_per_instance
 
         else:
+            if os.environ.get('OMP_NUM_THREADS') is not None:
+                if args.node_id != -1:
+                    physical_cores_number = len(self.cpuinfo.get_node_physical_cores(args.node_id))
+                else:
+                    physical_cores_number = len(self.cpuinfo.get_all_physical_cores())
+                
+                if int(os.environ.get('OMP_NUM_THREADS')) > physical_cores_number:
+                    logger.warning("there are {} physical cores but you specify OMP_NUM_THREADS equals to {} ; please set OMP_NUM_THREADS <= physical cores or add argument --use_logical_core to use logical core to meet your setting threads".format(physical_cores_number, int(os.environ.get('OMP_NUM_THREADS')) ))
             if args.use_logical_core:
                 if args.node_id != -1:
                     cores = self.cpuinfo.get_node_logical_cores(args.node_id)
@@ -550,22 +576,33 @@ class DistributedTrainingLauncher(Launcher):
     r"""
      Launcher for distributed traning with MPI launcher
      """
-    def get_mpi_pin_domain(self, nproc_per_node, ccl_worker_count, total_cores):
+    def get_mpi_pin_domain(self, nproc_per_node, ccl_worker_count, total_cores, logical_core_for_ccl=False):
         '''
         I_MPI_PIN_DOMAIN specify the cores used for every MPI process.
+        1)use physical core for oneccl 
         The first ccl_worker_count cores of every rank for ccl communication
         and the other cores will be used to do computation.
         For example: on CascadeLake 8280 CPU, 2 ranks on one node. ccl_worker_count=4
         CCL_WORKER_COUNT=4
         CCL_WORKER_AFFINITY="0,1,2,3,28,29,30,31"
-        I_MPI_PIN_DOMAIN=[0xffffff0,0xffffff0000000]
+        I_MPI_PIN_DOMAIN=[0xffffff0,0xffffff00000000]
+        2)use logical core oneccl 
+        The first ccl_worker_count logical cores which is correponding to the 
+        first ccl_worker_count physical cores are used as the ccl cores. 
+        For example: on CascadeLake 8280 CPU, 2 ranks on one node. ccl_worker_count=4
+        CCL_WORKER_COUNT=4
+        CCL_WORKER_AFFINITY="56,57,58,59,84,85,86,87"
+        I_MPI_PIN_DOMAIN=[0xfffffff,0xfffffff0000000]
         '''
         ppn = nproc_per_node
         cores_per_rank = total_cores // ppn
         pin_domain = "["
         for proc in range(ppn):
             domain_binary = 0
-            begin = proc * cores_per_rank + ccl_worker_count
+            if logical_core_for_ccl:
+                begin = proc * cores_per_rank
+            else:
+                begin = proc * cores_per_rank + ccl_worker_count
             end = proc * cores_per_rank + cores_per_rank - 1
             for i in range(begin, end + 1):
                 domain_binary |= (1 << i)
@@ -573,18 +610,22 @@ class DistributedTrainingLauncher(Launcher):
         pin_domain += "]"
         return pin_domain
 
-    def get_ccl_worker_affinity(self, nproc_per_node, ccl_worker_count, total_cores):
+    def get_ccl_worker_affinity(self, nproc_per_node, 
+            ccl_worker_count, total_cores, logical_core_for_ccl=False, physical_to_logical=None):
         '''
         Computation and communication use different cores when using oneCCL
-        backend for distributed training. we use first ccl_worker_count cores of
-        every rank for ccl communication
+        backend for distributed training.         
         '''
         ppn = nproc_per_node
         cores_per_rank = total_cores // ppn
         affinity = ''
         for proc in range(ppn):
             for ccl_worker in range(ccl_worker_count):
-                affinity += str(proc * cores_per_rank + ccl_worker) + ","
+                if logical_core_for_ccl:
+                    logical_core = physical_to_logical[proc * cores_per_rank + ccl_worker]
+                    affinity += str(logical_core) + ","
+                else:
+                    affinity += str(proc * cores_per_rank + ccl_worker) + ","
         affinity = affinity[:-1]
         return affinity
 
@@ -592,6 +633,7 @@ class DistributedTrainingLauncher(Launcher):
         '''
         Set ENVs and launch MPI process for distributed training.
         '''
+        assert not(args.logical_core_for_ccl and args.use_logical_core), "Can't use logical_core_for_ccl and use_logical_core at the same time"
         if args.nnodes > 1 and not os.path.exists(args.hostfile):
             raise ValueError("hostfile is necessary when you use multi-node distributed training,"
                              "Please create hostfile which include the ip list you used for distributed running")
@@ -639,13 +681,19 @@ class DistributedTrainingLauncher(Launcher):
         # set distributed related environmental variables
         self.set_env("MASTER_ADDR", args.master_addr)
         self.set_env("MASTER_PORT", str(args.master_port))
-        mpi_pin_domain = self.get_mpi_pin_domain(args.nproc_per_node, args.ccl_worker_count, total_cores_per_node)
+        mpi_pin_domain = self.get_mpi_pin_domain(args.nproc_per_node, 
+                                                 args.ccl_worker_count, 
+                                                 total_cores_per_node, 
+                                                 args.logical_core_for_ccl)
         self.set_env("I_MPI_PIN_DOMAIN", mpi_pin_domain)
 
         ppn = args.nproc_per_node
         cores_per_rank = total_cores_per_node // ppn
+        if args.logical_core_for_ccl:
+            omp_num_threads = cores_per_rank
+        else:
+            omp_num_threads = cores_per_rank - args.ccl_worker_count
 
-        omp_num_threads = cores_per_rank - args.ccl_worker_count
         self.set_multi_thread_and_allocator(omp_num_threads,
                                             args.disable_iomp,
                                             True,
@@ -654,7 +702,11 @@ class DistributedTrainingLauncher(Launcher):
                                             args.use_default_allocator)
 
         self.set_env("CCL_WORKER_COUNT", str(args.ccl_worker_count))
-        ccl_affinity = self.get_ccl_worker_affinity(args.nproc_per_node, args.ccl_worker_count, total_cores_per_node)
+        ccl_affinity = self.get_ccl_worker_affinity(args.nproc_per_node, 
+                                                    args.ccl_worker_count, 
+                                                    total_cores_per_node,
+                                                    args.logical_core_for_ccl,
+                                                    self.cpuinfo.physical_to_logical)
         self.set_env("CCL_WORKER_AFFINITY", ccl_affinity)
 
         os.environ["LAUNCH_CMD"] = "#"
@@ -697,6 +749,9 @@ def add_distributed_training_params(parser):
     # ccl control
     group.add_argument("--ccl_worker_count", metavar='\b', default=4, type=int,
                        help="Core numbers per rank used for ccl communication")
+    
+    group.add_argument("--logical_core_for_ccl", action='store_true', default=False,
+                       help="Use logical core for ccl worker can get better perfomrance in some case.")
     # mpi control
     group.add_argument("--master_addr", metavar='\b', default="127.0.0.1", type=str,
                        help="Master node (rank 0)'s address, should be either "
@@ -752,7 +807,7 @@ def add_multi_instance_params(parser):
     group.add_argument("--disable_taskset", action='store_true', default=False,
                        help="Disable taskset")
     group.add_argument("--core_list", metavar='\b', default=None, type=str,
-                       help="Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used.")
+                       help="Specify the core list as 'core_id, core_id, ...' or 'core_id-core_id, ...', otherwise, all the cores will be used.")
     group.add_argument("--benchmark", action='store_true', default=False,
                    help="Enable benchmark config. JeMalloc's MALLOC_CONF has been tuned for low latency. Recommend to use this for benchmarking purpose; for other use cases, this MALLOC_CONF may cause Out-of-Memory crash.")
     group.add_argument("--log_path", metavar='\b', default="", type=str,

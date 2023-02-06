@@ -23,6 +23,22 @@ class EmbeddingSpec(NamedTuple):
     pooling_modes: str
     dtype: torch.dtype
     weight: Optional[torch.Tensor]
+    sparse: bool 
+
+
+def merged_embeddingbag(
+    indices,
+    offsets,
+    indices_with_row_offsets,
+    row_offsets,
+    pooling_modes,
+    *weights
+):
+    if torch.is_grad_enabled():
+        return MergedEmbeddingBagFunc.apply(
+            indices, offsets, indices_with_row_offsets, row_offsets, pooling_modes, *weights
+        )
+    return torch.ops.torch_ipex.merged_embeddingbag_forward(indices, offsets, weights, pooling_modes)
 
 
 def merged_embeddingbag_sgd(
@@ -39,6 +55,40 @@ def merged_embeddingbag_sgd(
             indices, offsets, indices_with_row_offsets, row_offsets, pooling_modes, sgd_args, *weights
         )
     return torch.ops.torch_ipex.merged_embeddingbag_forward(indices, offsets, weights, pooling_modes)
+
+
+class MergedEmbeddingBagFunc(Function):
+    @staticmethod
+    def unpack(*args):
+        return args
+
+    @staticmethod
+    def forward(ctx, indices, offsets, indices_with_row_offsets, row_offsets, pooling_modes, *weights):
+        output = torch.ops.torch_ipex.merged_embeddingbag_forward(
+            indices, offsets, weights, pooling_modes
+        )
+        ctx.offsets = offsets
+        ctx.weights = weights
+        ctx.indices_with_row_offsets = indices_with_row_offsets
+        ctx.row_offsets = row_offsets
+        ctx.pooling_modes = pooling_modes
+        return MergedEmbeddingBagFunc.unpack(*output)
+
+    @staticmethod
+    def backward(ctx, *grad_out):
+        offsets = ctx.offsets
+        weights = ctx.weights
+        indices_with_row_offsets = ctx.indices_with_row_offsets
+        row_offsets = ctx.row_offsets
+        pooling_modes = ctx.pooling_modes
+        grad_list = torch.ops.torch_ipex.merged_embeddingbag_backward_cpu(
+            grad_out, offsets, weights, indices_with_row_offsets,
+            row_offsets, pooling_modes)
+        n_tables = len(weights)
+        output = [None for i in range(5)]
+        for grad in grad_list:
+             output.append(grad)
+        return MergedEmbeddingBagFunc.unpack(*output)
 
 
 class MergedEmbeddingBagSGDFunc(Function):
@@ -84,7 +134,10 @@ class MergedEmbeddingBagSGDFunc(Function):
 class MergedEmbeddingBag(nn.Module):
     r"""
     Merge multiple Pytorch EmbeddingBag (https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/sparse.py#L221) 
-    as one torch.nn.Module. 
+    as one torch.nn.Module.
+    At the current stage:
+    MergedEmbeddingBag assumes constructed by nn.EmbeddingBag with sparse=False, and will return dense grad.
+    MergedEmbeddingBagWithSGD does not return any grad, backward and update are fused.
     Native usage for multiple EmbeddingBag is:
         >>> EmbLists = torch.nn.Modulist(emb1, emb2, emb3, ..., emb_m)
         >>> inputs = [in1, in2, in3, ..., in_m]
@@ -120,9 +173,10 @@ class MergedEmbeddingBag(nn.Module):
         self.pooling_modes = []
         self.dtypes = []
         dtype = None
+        self.alldense = True
         self.weights = torch.nn.ParameterList([nn.Parameter(torch.Tensor()) for i in range(len(embedding_specs))])
         for i, emb in enumerate(embedding_specs):
-            num_of_features, feature_size, mode, dtype, weight = emb
+            num_of_features, feature_size, mode, dtype, weight, sparse = emb
             row_offsets.append(num_of_features)
             if mode == 'sum':
                 self.pooling_modes.append(PoolingMode.SUM)
@@ -133,10 +187,33 @@ class MergedEmbeddingBag(nn.Module):
             if weight is None:
                 weight = torch.empty((num_of_features, feature_size), dtype=dtype)
             self.weights[i] = nn.Parameter(weight)
+            if sparse:
+                self.alldense = False
+
         self.register_buffer(
             "row_offsets",
             torch.tensor([0] + list(accumulate(row_offsets)), dtype=torch.int64),
         )
+    
+    @classmethod
+    def from_embeddingbag_list(
+        cls,
+        tables: List[torch.nn.EmbeddingBag],
+    ):
+        embedding_specs = []
+        for emb in tables:
+            emb_shape = emb.weight.shape
+            assert not emb.sparse, "MergedEmbeddingBag can only be used for dense gradient EmebddingBag. Please use MergedEmbeddingBagWith[Optimizer] for sparse gradient." 
+            embedding_specs.append(
+                EmbeddingSpec(
+                    num_of_features=emb_shape[0],
+                    feature_size=emb_shape[1],
+                    pooling_modes=emb.mode,
+                    dtype=emb.weight.dtype,
+                    weight=emb.weight.detach(),
+                    sparse=emb.sparse
+               ))
+        return cls(embedding_specs)
 
     def extra_repr(self) -> str:
         s = 'number of tables={}\n'.format(self.n_tables)
@@ -208,7 +285,23 @@ class MergedEmbeddingBag(nn.Module):
         return (merged_indices, merged_offsets, merged_indices_with_row_offsets)
 
     def forward(self, input, need_linearize_indices_and_offsets=torch.BoolTensor([True])):
-        assert False, "Please use MergedEmbeddingBagWith[Optimizer]. We only support SGD now, so please create module MergedEmbeddingBagWithSGD instead"
+        r"""
+        Args:
+            input (Tuple[Tensor]): a tuple of (indices, offsets, include_last_offsets(if not merged)/indices_with_row_offsets(if merged))
+            need_linearize_indices_and_offsets: indicate whether input need to be linearized
+        Returns:
+            List[Tensor] output shape of `(batch_size, feature_size)` which length = num of tables.
+        """
+        assert self.alldense, "MergedEmbeddingBag only support EmbeddingBag List with all dense gradient, please use MergedEmbeddingBagWith[Optimizer] for sparse gridient EmbeddingBag" 
+        if need_linearize_indices_and_offsets.item():
+            indices, offsets, include_last_offsets = input
+            indices, offsets, indices_with_row_offsets = self.linearize_indices_and_offsets(indices, offsets, include_last_offsets)
+        else:
+            indices, offsets, indices_with_row_offsets = input
+        return merged_embeddingbag(
+            indices, offsets, indices_with_row_offsets, self.row_offsets,
+            self.pooling_modes, *self.weights
+        )
 
 
 class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
@@ -264,7 +357,7 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
             else:
                 self.sgd_args.bf16_trail.append(torch.empty(0, dtype=torch.bfloat16))
 
-    def init_sgd_args(self, lr, weight_decay, bf16_trail=[]): # noqa B006
+    def init_sgd_args(self, lr, weight_decay, bf16_trail=[]):
         if lr < 0.0:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if weight_decay < 0.0:
@@ -289,7 +382,7 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
             elif self.weights[i].dtype == torch.double:
                 bf16_w, trail = torch.ops.torch_ipex.split_float_bfloat16(self.weights[i].float())
             else:
-                assert False, r"MergedEmbeddingBag only support dtypes with bfloat, float and double" # noqa B011
+                assert False, r"MergedEmbeddingBag only support dtypes with bfloat, float and double"
             trails.append(trail)
             self.weights[i] = torch.nn.Parameter(bf16_w)
         self.sgd_args = self.sgd_args._replace(bf16_trail=trails)
@@ -297,8 +390,7 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
     def forward(self, input, need_linearize_indices_and_offsets=torch.BoolTensor([True])):
         r"""
         Args:
-            input (Tuple[Tensor]): a tuple of (indices, offsets, 
-            include_last_offsets(if not merged)/indices_with_row_offsets(if merged))
+            input (Tuple[Tensor]): a tuple of (indices, offsets, include_last_offsets(if not merged)/indices_with_row_offsets(if merged))
             need_linearize_indices_and_offsets: indicate whether input need to be linearized
         Returns:
             List[Tensor] output shape of `(batch_size, feature_size)` which length = num of tables.
@@ -329,6 +421,7 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
                     feature_size=emb_shape[1],
                     pooling_modes=emb.mode,
                     dtype=emb.weight.dtype,
-                    weight=emb.weight.detach()
+                    weight=emb.weight.detach(),
+                    sparse=emb.sparse
                 ))
         return cls(embedding_specs, lr, weight_decay)
