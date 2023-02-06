@@ -122,7 +122,10 @@ $ git submodule update --init --recursive
 $ conda install numpy ninja cmake
 $ pip install -r requirements.txt
 $ export GLIBCXX_USE_CXX11_ABI=1
+$ export USE_CUDA=0
 $ python setup.py bdist_wheel
+$ unset USE_CUDA
+$ unset GLIBCXX_USE_CXX11_ABI
 $ pip install dist/*.whl
 ```
 
