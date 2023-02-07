@@ -35,7 +35,7 @@ at::Tensor dequant_pixelshuffle_quant(
 at::Tensor batch_norm(
     const at::Tensor& input,
     const at::Tensor& weight,
-    const at::Tensor& bias,
+    const c10::optional<at::Tensor>& bias,
     const at::Tensor& running_mean,
     const at::Tensor& running_var,
     bool train,
@@ -57,14 +57,15 @@ at::Tensor fold_weight(
 
 at::Tensor fold_bias(
     const at::Tensor& weight,
-    const at::Tensor& bias,
+    const c10::optional<at::Tensor>& bias,
     const at::Tensor& bn_weight,
     const at::Tensor& bn_bias,
     const at::Tensor& running_mean,
     const at::Tensor& running_var,
     double eps) {
   const OptionalDeviceGuard device_guard(device_of(weight));
-  return at::empty_like(bias);
+  Tensor _bias = bias.has_value() ? bias.value() : at::Tensor();
+  return at::empty_like(_bias);
 }
 
 at::Tensor reorder(

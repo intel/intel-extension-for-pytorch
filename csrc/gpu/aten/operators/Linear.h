@@ -6,7 +6,7 @@ namespace AtenIpexTypeXPU {
 Tensor dpcpp_linear(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias);
+    const c10::optional<Tensor>& bias);
 
 // IPEX customer linear for weight prepack
 Tensor linear(
@@ -23,26 +23,26 @@ Tensor& linear_out(
 Tensor linear_pow(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     Scalar exponent);
 
 Tensor linear_leaky_relu(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     Scalar negative_slope);
 
 Tensor linear_hardtanh(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     Scalar minval,
     Scalar maxval);
 
 Tensor linear_elu(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     Scalar alpha,
     Scalar scale,
     Scalar input_scale);

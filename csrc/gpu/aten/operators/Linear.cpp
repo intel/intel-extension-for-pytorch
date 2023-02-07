@@ -16,10 +16,10 @@ struct LinearConverter {
   Tensor call(
       const Tensor& input,
       const Tensor& weight,
-      const Tensor& bias,
+      const c10::optional<Tensor>& bias,
       Func func) {
     Attr attr = func();
-    Tensor _bias = bias.defined() ? bias : at::Tensor();
+    Tensor _bias = bias.has_value() ? bias.value() : at::Tensor();
     Tensor _input = input.dim() <= 2 ? input : input.contiguous();
     return matmul_fusion_variants(
         _input, weight, false, attr, is_fused_, _bias);
@@ -34,7 +34,9 @@ struct LinearConverter {
 
 #define IPEX_LINEAR_DEFINATION(func)                                       \
   Tensor linear_##func(                                                    \
-      const Tensor& input, const Tensor& weight, const Tensor& bias) {     \
+      const Tensor& input,                                                 \
+      const Tensor& weight,                                                \
+      const c10::optional<Tensor>& bias) {                                 \
     RECORD_FUNCTION(                                                       \
         "linear_" #func, std::vector<c10::IValue>({input, weight, bias})); \
     auto linear_wrapper = LinearConverter();                               \
@@ -54,7 +56,7 @@ struct LinearConverter {
   Tensor linear_binary_##func(                                             \
       const Tensor& input,                                                 \
       const Tensor& weight,                                                \
-      const Tensor& bias,                                                  \
+      const c10::optional<Tensor>& bias,                                   \
       const Tensor& binary) {                                              \
     RECORD_FUNCTION(                                                       \
         "linear_binary_" #func,                                            \
@@ -99,7 +101,7 @@ IPEX_LINEAR_BINARY_DEFINATION(lt)
 Tensor linear_silu(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias) {
+    const c10::optional<Tensor>& bias) {
   RECORD_FUNCTION(
       "linear_silu", std::vector<c10::IValue>({input, weight, bias}));
   auto linear_wrapper = LinearConverter();
@@ -118,7 +120,7 @@ Tensor linear_silu(
 Tensor linear_scalar_mul(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     Scalar scalar) {
   RECORD_FUNCTION(
       "linear_scalar_mul", std::vector<c10::IValue>({input, weight, bias}));
@@ -138,7 +140,7 @@ Tensor linear_scalar_mul(
 Tensor linear_scalar_div(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     Scalar scalar) {
   TORCH_INTERNAL_ASSERT(scalar.toFloat() != 0, "div zero in linear_scalar_div");
   RECORD_FUNCTION(
@@ -159,7 +161,7 @@ Tensor linear_scalar_div(
 Tensor linear_scalar_add(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     Scalar scalar,
     Scalar scale) {
   RECORD_FUNCTION(
@@ -180,7 +182,7 @@ Tensor linear_scalar_add(
 Tensor linear_scalar_sub(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     Scalar scalar,
     Scalar scale) {
   RECORD_FUNCTION(
@@ -191,7 +193,7 @@ Tensor linear_scalar_sub(
 Tensor linear_gelu(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     c10::string_view approximate) {
   RECORD_FUNCTION(
       "linear_gelu", std::vector<c10::IValue>({input, weight, bias}));
@@ -215,7 +217,7 @@ Tensor linear_gelu(
 Tensor linear_hardsigmoid(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias) {
+    const c10::optional<Tensor>& bias) {
   RECORD_FUNCTION(
       "linear_hardsigmoid", std::vector<c10::IValue>({input, weight, bias}));
   auto linear_wrapper = LinearConverter();
@@ -234,7 +236,7 @@ Tensor linear_hardsigmoid(
 Tensor linear_pow(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     Scalar exponent) {
   RECORD_FUNCTION(
       "linear_pow", std::vector<c10::IValue>({input, weight, bias}));
@@ -254,7 +256,7 @@ Tensor linear_pow(
 Tensor linear_leaky_relu(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     Scalar negative_slope) {
   RECORD_FUNCTION(
       "linear_leaky_relu", std::vector<c10::IValue>({input, weight, bias}));
@@ -274,7 +276,7 @@ Tensor linear_leaky_relu(
 Tensor linear_hardtanh(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     Scalar minval,
     Scalar maxval) {
   RECORD_FUNCTION(
@@ -295,7 +297,7 @@ Tensor linear_hardtanh(
 Tensor linear_elu(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     Scalar alpha,
     Scalar scale,
     Scalar input_scale) {
@@ -318,7 +320,7 @@ Tensor linear_elu(
 Tensor linear_sum(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     Tensor& accumul,
     Scalar alpha) {
   RECORD_FUNCTION(
@@ -346,7 +348,7 @@ Tensor linear_sum(
 Tensor linear_binary_sub(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias,
+    const c10::optional<Tensor>& bias,
     at::Tensor& binary,
     at::Scalar alpha) {
   RECORD_FUNCTION(
@@ -358,7 +360,7 @@ Tensor linear_binary_sub(
 Tensor dpcpp_linear(
     const Tensor& input,
     const Tensor& weight,
-    const Tensor& bias) {
+    const c10::optional<Tensor>& bias) {
   auto post_op = [=]() {
     Attr attr;
     return attr;

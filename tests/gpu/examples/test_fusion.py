@@ -878,7 +878,7 @@ class PermuteContiguous(torch.nn.Module):
 class LinearGELU(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearGELU, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
         self.gelu = nn.GELU()
 
     def forward(self, x):
@@ -889,7 +889,7 @@ class LinearGELU(torch.nn.Module):
 class LinearAdd(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearAdd, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x1 = torch.ones(x.shape).to(x.device)
@@ -901,7 +901,7 @@ class LinearAdd(torch.nn.Module):
 class LinearReLU(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearReLU, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
         self.relu = nn.ReLU()
 
     def forward(self, x):
@@ -912,7 +912,7 @@ class LinearReLU(torch.nn.Module):
 class LinearSigmoid(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearSigmoid, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
@@ -922,7 +922,7 @@ class LinearSigmoid(torch.nn.Module):
 class LinearSqrt(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearSqrt, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = torch.sqrt(self.linear(x))
@@ -931,7 +931,7 @@ class LinearSqrt(torch.nn.Module):
 class LinearSquare(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearSquare, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = torch.square(self.linear(x))
@@ -940,7 +940,7 @@ class LinearSquare(torch.nn.Module):
 class LinearAbs(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearAbs, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = torch.abs(self.linear(x))
@@ -949,7 +949,7 @@ class LinearAbs(torch.nn.Module):
 class LinearExp(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearExp, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = torch.exp(self.linear(x))
@@ -958,7 +958,7 @@ class LinearExp(torch.nn.Module):
 class LinearLog(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearLog, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = torch.log(self.linear(x))
@@ -967,7 +967,7 @@ class LinearLog(torch.nn.Module):
 class LinearRound(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearRound, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = torch.round(self.linear(x))
@@ -976,7 +976,7 @@ class LinearRound(torch.nn.Module):
 class LinearSilu(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearSilu, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = F.silu(self.linear(x))
@@ -985,7 +985,7 @@ class LinearSilu(torch.nn.Module):
 class LinearLogSigmoid(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearLogSigmoid, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = F.logsigmoid(self.linear(x))
@@ -994,7 +994,7 @@ class LinearLogSigmoid(torch.nn.Module):
 class LinearHardswish(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearHardswish, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = F.hardswish(self.linear(x))
@@ -1003,7 +1003,7 @@ class LinearHardswish(torch.nn.Module):
 class LinearMish(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearMish, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
         self.activation = torch.nn.Mish()
 
     def forward(self, x):
@@ -1013,7 +1013,7 @@ class LinearMish(torch.nn.Module):
 class LinearHardSigmoid(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearHardSigmoid, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = F.hardsigmoid(self.linear(x))
@@ -1022,7 +1022,7 @@ class LinearHardSigmoid(torch.nn.Module):
 class LinearTanh(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearTanh, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = torch.tanh(self.linear(x))
@@ -1031,7 +1031,7 @@ class LinearTanh(torch.nn.Module):
 class LinearLeakyRelu(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearLeakyRelu, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = F.leaky_relu(self.linear(x), 0.01)
@@ -1040,7 +1040,7 @@ class LinearLeakyRelu(torch.nn.Module):
 class LinearPow(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearPow, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = torch.pow(self.linear(x), 2)
@@ -1049,7 +1049,7 @@ class LinearPow(torch.nn.Module):
 class LinearHardtanh(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearHardtanh, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
         self.activation = nn.ReLU6()
 
     def forward(self, x):
@@ -1059,7 +1059,7 @@ class LinearHardtanh(torch.nn.Module):
 class LinearElu(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearElu, self).__init__()
-        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         x = F.elu(self.linear(x), 1.2)
