@@ -165,6 +165,7 @@ void interaction_kernel(
           } // col-loop
 
           // Write the tail 351 results to output
+          item.barrier(dpcpp_local_fence);
           if (local_row < working_set) {
 #pragma unroll
             for (int i = 0; i < TILE_OUTPUT_COL; ++i) {
@@ -177,7 +178,7 @@ void interaction_kernel(
                 if (global_col < global_row) {
                   size_t offset =
                       Col + (global_row - 1) * global_row / 2 + global_col;
-                  output_bn[offset] = half(res[i][j]);
+                  output_bn[offset] = static_cast<half>(res[i][j]);
                 }
               }
             }
