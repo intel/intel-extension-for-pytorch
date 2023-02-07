@@ -3,6 +3,7 @@
 #include <torch/csrc/jit/runtime/custom_operator.h>
 #include <torch/csrc/jit/runtime/operator.h>
 
+#include "aten/RMSNorm.h"
 #include "aten/AddLayerNorm.h"
 #include "aten/ConcatBnRelu.h"
 #include "cpu/kernels/ConvPacked.h"
@@ -1333,6 +1334,21 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 2, 4))).toInt(),
                 (std::move(peek(stack, 3, 4))).toInt());
             drop(stack, 4);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex::RMSNorm(Tensor a, Tensor b, float eps) -> "
+        "Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = dil_RMSNorm(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toTensor(),
+                (std::move(peek(stack, 2, 3))).toDouble());
+            drop(stack, 3);
             torch::jit::pack(stack, std::move(result));
             return 0;
           };

@@ -194,6 +194,25 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
 
 } // namespace graph_rewrite
 
+void FuseRMSNorm(std::shared_ptr<Graph>& graph) {
+  std::string aten_RMSNorm = R"(
+      graph(%hidden_states, %weight, %exponent:int, %dim:int[], %keepdim:bool, %dtype:NoneType, %eps:float, %alpha:int):
+        %s = aten::pow(%hidden_states, %exponent)
+        %v = aten::mean(%s, %dim, %keepdim, %dtype)
+        %m = aten::add(%v, %eps, %alpha)
+        %n = aten::rsqrt(%m)
+        %l = aten::mul(%hidden_states, %n)
+        %r = aten::mul(%weight, %l)
+        return (%r) )";
+  std::string fused_RMSNorm = R"(
+      graph(%hidden_states, %weight, %exponent:int, %dim:int[], %keepdim:bool, %dtype:NoneType, %eps:float, %alpha:int):
+        %r = ipex::RMSNorm(%hidden_states, %weight, %eps)
+        return (%r) )";
+  SubgraphRewriter rewriter_aten;
+  rewriter_aten.RegisterRewritePattern(aten_RMSNorm, fused_RMSNorm);
+  rewriter_aten.runOnGraph(graph);
+}
+
 void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
   std::string aten_add_layernorm = R"(
       graph(%add_a, %add_b, %alpha, %shape:int[], %w, %b, %eps:float, %cudnn_enable:bool):

@@ -143,6 +143,8 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   GRAPH_DUMP("After fuseLinearAddRelu.", graph);
   graph_rewrite::FuseLinearSwishCustomized(graph);
 
+  // fuse rmsnorm
+  graph_rewrite::FuseRMSNorm(graph);
   // fuse add+layernorm
   graph_rewrite::FuseAddLayerNorm(graph);
 
