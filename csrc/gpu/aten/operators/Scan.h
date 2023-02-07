@@ -177,40 +177,18 @@ DPCPP_DEVICE T group_x_scan(
   const auto liy = item.get_local_id(0);
   const auto rx = item.get_local_range(1);
   const auto ry = item.get_local_range(0);
+
   slm[liy * rx + lix] = value;
-
-  // Parallel reduction (Up-sweep)
-  int offset = 1;
-  for (int d = rx >> 1; d > 0; d >>= 1) {
+  for (int offset = 1; offset < rx; offset <<= 1) {
     item.barrier(dpcpp_local_fence);
-    if (lix < d) {
-      int ai = liy * rx + offset * (2 * lix + 1) - 1;
-      int bi = liy * rx + offset * (2 * lix + 2) - 1;
-      slm[bi] = func(slm[ai], slm[bi]);
-    }
-    offset <<= 1;
-  }
-
-  if (lix == 0) {
-    slm[liy * rx + rx - 1] = init;
-  }
-
-  // Down-sweep
-  for (int d = 1; d < rx; d <<= 1) {
-    offset >>= 1;
+    if (lix >= offset)
+      value = func(slm[liy * rx + (lix - offset)], slm[liy * rx + lix]);
     item.barrier(dpcpp_local_fence);
-    if (lix < d) {
-      int ai = liy * rx + offset * (2 * lix + 1) - 1;
-      int bi = liy * rx + offset * (2 * lix + 2) - 1;
-      T temp = slm[ai];
-      slm[ai] = slm[bi];
-      slm[bi] = func(temp, slm[bi]);
-    }
+
+    if (lix >= offset)
+      slm[liy * rx + lix] = value;
   }
 
-  item.barrier(dpcpp_local_fence);
-  // inclusive
-  value = func(slm[liy * rx + lix], value);
 #else
   const auto wg_size = item.get_local_range(1);
   const auto sg = item.get_sub_group();
@@ -527,7 +505,8 @@ template <
     class SSConfig,
     class T,
     class BinaryFunction,
-    bool TrivialOffCal = false>
+    bool TrivialOffCal = false,
+    bool TrivialIdxCal = false>
 class segment_scan_kernel {
  public:
   using InputInfo = typename SSConfig::InputInfoType;
@@ -542,16 +521,21 @@ class segment_scan_kernel {
     int64_t si, pi, bi, glb_ldr_off, glb_str_off, glb_str_off_0,
         glb_ldr_logical_off, glb_str_logical_off, crr_off;
 
-    si = id.glb_batch % cfg.stride_;
-    bi = id.glb_batch / cfg.stride_;
-    pi = id.chunk * id.chunk_size + id.chunk_off;
-
     int64_t e = cfg.type_ == INCLUSIVE_TYPE ? 0 : 1;
-    glb_ldr_logical_off =
-        si + pi * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
-    glb_str_logical_off =
-        si + (pi + e) * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
-    crr_off = si + id.chunk * cfg.stride_ + bi * id.chunk_num * cfg.stride_;
+    if constexpr (TrivialIdxCal) {
+      glb_ldr_logical_off = item.get_global_linear_id();
+      glb_str_logical_off = glb_ldr_logical_off + e;
+      crr_off = id.chunk;
+    } else {
+      si = id.glb_batch % cfg.stride_;
+      bi = id.glb_batch / cfg.stride_;
+      pi = id.chunk * id.chunk_size + id.chunk_off;
+      glb_ldr_logical_off =
+          si + pi * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
+      glb_str_logical_off =
+          si + (pi + e) * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
+      crr_off = si + id.chunk * cfg.stride_ + bi * id.chunk_num * cfg.stride_;
+    }
 
     if constexpr (TrivialOffCal) {
       glb_ldr_off = glb_ldr_logical_off;
@@ -630,7 +614,10 @@ class segment_scan {
   dpcpp_local_acc_t<T> shared_;
 };
 
-template <typename SSConfig, bool TrivialOffCal = false>
+template <
+    typename SSConfig,
+    bool TrivialOffCal = false,
+    bool TrivialIdxCal = false>
 static inline void launch_segment_scan(const SSConfig& cfg) {
   auto& queue = dpcppGetCurrentQueue();
 
@@ -651,7 +638,8 @@ static inline void launch_segment_scan(const SSConfig& cfg) {
         SSConfig,
         typename SSConfig::arg_t,
         typename SSConfig::func_t,
-        TrivialOffCal>
+        TrivialOffCal,
+        TrivialIdxCal>
         ker(cfg);
     segment_scan gscan(ker, shared);
     __cgh.parallel_for(
@@ -660,7 +648,7 @@ static inline void launch_segment_scan(const SSConfig& cfg) {
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
-template <class SSConfig>
+template <class SSConfig, bool TrivialIdxCal = false>
 static inline void accumulate_carrier(const SSConfig& cfg) {
   TORCH_CHECK(
       cfg.carrier_ != nullptr, "scan: nullptr carrier in accumulation ...");
@@ -670,13 +658,16 @@ static inline void accumulate_carrier(const SSConfig& cfg) {
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
       auto id = cfg.get_item_desc(item);
       int64_t si, pi, bi, glb_off, crr_off;
-
-      si = id.glb_batch % cfg.stride_;
-      bi = id.glb_batch / cfg.stride_;
-      pi = id.chunk * id.chunk_size + id.chunk_off;
-      glb_off = si + pi * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
-      crr_off = si + id.chunk * cfg.stride_ + bi * id.chunk_num * cfg.stride_;
-
+      if constexpr (TrivialIdxCal) {
+        glb_off = item.get_global_linear_id();
+        crr_off = id.chunk;
+      } else {
+        si = id.glb_batch % cfg.stride_;
+        bi = id.glb_batch / cfg.stride_;
+        pi = id.chunk * id.chunk_size + id.chunk_off;
+        glb_off = si + pi * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
+        crr_off = si + id.chunk * cfg.stride_ + bi * id.chunk_num * cfg.stride_;
+      }
       if (id.glb_problem < cfg.problem_ && id.glb_batch < cfg.problem_batch_) {
         cfg.oinfo_.data[glb_off] =
             cfg.func_(cfg.oinfo_.data[glb_off], cfg.carrier_[crr_off]);
@@ -809,6 +800,7 @@ static inline void _loop_scan_kernel(
 template <
     ScanType Type,
     bool TrivialOffCal,
+    bool TrivialIdxCal,
     typename T,
     class InputInfo,
     class OutputInfo,
@@ -822,11 +814,10 @@ static inline void _segment_scan_kernel(
   auto cfg =
       SegmentScanConfig<InputInfo, OutputInfo, T, BinaryFunction>::make_config(
           input_info, output_info, dim_after_collapse, init, Type, func);
-
   // 0. recursive convergence
   if (cfg.problem_ <= cfg.problem_wg_range_) {
     cfg.set_carrier(nullptr);
-    launch_segment_scan<decltype(cfg), TrivialOffCal>(cfg);
+    launch_segment_scan<decltype(cfg), TrivialOffCal, TrivialIdxCal>(cfg);
     return;
   }
 
@@ -837,14 +828,14 @@ static inline void _segment_scan_kernel(
   TensorInfo<T, int64_t> carrier_info =
       getTensorInfo<T, int64_t>(carrier_holder);
   cfg.set_carrier(carrier_info.data);
-  launch_segment_scan<decltype(cfg), TrivialOffCal>(cfg);
+  launch_segment_scan<decltype(cfg), TrivialOffCal, TrivialIdxCal>(cfg);
 
   // 2. recursion for carrier
-  _segment_scan_kernel<EXCLUSIVE_TYPE, TrivialOffCal>(
+  _segment_scan_kernel<EXCLUSIVE_TYPE, TrivialOffCal, TrivialIdxCal>(
       carrier_info, carrier_info, 1, init, func);
 
   // 3. accumulate among all chunk
-  accumulate_carrier(cfg);
+  accumulate_carrier<decltype(cfg), TrivialIdxCal>(cfg);
 
   return;
 }
@@ -892,8 +883,13 @@ void scan(
     _loop_scan_kernel<Type, true>(
         input_info, output_info, dim_after_collapse, init, func);
   } else {
-    _segment_scan_kernel<Type, true>(
-        input_info, output_info, dim_after_collapse, init, func);
+    if (batch == 1 && stride == 1) {
+      _segment_scan_kernel<Type, true, true>(
+          input_info, output_info, dim_after_collapse, init, func);
+    } else {
+      _segment_scan_kernel<Type, true, false>(
+          input_info, output_info, dim_after_collapse, init, func);
+    }
   }
 }
 
