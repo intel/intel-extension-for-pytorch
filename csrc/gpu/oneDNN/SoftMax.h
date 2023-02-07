@@ -78,11 +78,6 @@ static Tensor softmax(
   auto softmax_forward_desc =
       dnnl::softmax_forward::desc(prop_kind::forward, input_md, axis);
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, input_md, axis);
-#endif
-
   // Create primitive descriptor.
   auto softmax_forward_pd =
       dnnl::softmax_forward::primitive_desc(softmax_forward_desc, engine);
@@ -101,12 +96,7 @@ static Tensor softmax(
       softmax_forward_pd.dst_desc(), engine, output.data_ptr());
 
   // Create the primitive.
-#ifdef USE_PRIMITIVE_CACHE
-  auto softmax_onednn_forward =
-      fetch_or_create_m<dnnl::softmax_forward>(key, softmax_forward_pd);
-#else
   auto softmax_onednn_forward = dnnl::softmax_forward(softmax_forward_pd);
-#endif
 
   // Primitive execution.
   DPCPP_ONEDNN_EXEC(
@@ -178,10 +168,6 @@ static Tensor softmax_backward(
       dnnl::softmax_backward::desc(grad_md, output_md, axis);
   auto softmax_backward_pd = dnnl::softmax_backward::primitive_desc(
       softmax_backward_desc, engine, softmax_forward_pd);
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, grad_md, output_md, axis);
-#endif
 
   auto plain_gi_md = memory::desc({grad_tz, grad_t, grad_dnnl_format});
   auto expected_gi_md = softmax_backward_pd.diff_src_desc();
@@ -191,12 +177,7 @@ static Tensor softmax_backward(
   auto gi_memory = dpcpp_onednn_memory(expected_gi_md, engine, gI.data_ptr());
 
   // Create the primitive.
-#ifdef USE_PRIMITIVE_CACHE
-  auto softmax_onednn_backward =
-      fetch_or_create_m<dnnl::softmax_backward>(key, softmax_backward_pd);
-#else
   auto softmax_onednn_backward = dnnl::softmax_backward(softmax_backward_pd);
-#endif
 
   // Primitive execution.
   DPCPP_ONEDNN_EXEC(

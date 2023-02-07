@@ -42,10 +42,6 @@ void inner_product(
   auto bias_md =
       use_bias ? memory::desc(bias_tz, data_t, format_any) : memory::desc();
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, input_md, weight_md, use_bias);
-#endif
   auto ipFwd_desc = inner_product_forward::desc(
       prop_kind::forward_inference, input_md, weight_md, bias_md, output_md);
   auto ip_forward_pd =
@@ -64,12 +60,7 @@ void inner_product(
         {bias_tz, data_t, format_x}, engine, bias.data_ptr());
   }
 
-#ifdef USE_PRIMITIVE_CACHE
-  auto ip_forward =
-      fetch_or_create_m<inner_product_forward>(key, ip_forward_pd);
-#else
   auto ip_forward = inner_product_forward(ip_forward_pd);
-#endif
   DPCPP_ONEDNN_EXEC(
       ip_forward,
       strm,

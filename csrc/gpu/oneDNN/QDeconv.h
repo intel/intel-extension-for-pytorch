@@ -303,20 +303,6 @@ static Tensor quantized_deconvolution(
   auto bia_md =
       with_bias ? memory::desc(bia_tz, bia_dt, bia_fmt) : memory::desc();
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key_pd;
-  create_key(
-      key_pd,
-      src_md,
-      wgh_md,
-      with_bias,
-      dst_dt,
-      _stride,
-      _dilation,
-      _padding,
-      _padding);
-#endif
-
   auto deconv_fwd_desc = deconvolution_forward::desc(
       prop_kind::forward,
       algorithm::deconvolution_direct,
@@ -395,12 +381,7 @@ static Tensor quantized_deconvolution(
     args.insert({DNNL_ARG_BIAS, bia_m});
   }
 
-#ifdef USE_PRIMITIVE_CACHE
-  auto deconv_fwd =
-      fetch_or_create_m<deconvolution_forward>(key_pd, deconv_fwd_pd);
-#else
   auto deconv_fwd = deconvolution_forward(deconv_fwd_pd);
-#endif
 
   DPCPP_ONEDNN_EXEC(deconv_fwd, strm, args);
   if (is_onednn_layout_suggested && dst_blocked.data_ptr() != dst.data_ptr()) {

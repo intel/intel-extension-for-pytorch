@@ -95,11 +95,6 @@ static std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> batch_normalization(
   auto sft_md = memory::desc(
       {feature_num}, memory::data_type::f32, memory::format_tag::a);
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, src_md, epsilon, flag);
-#endif
-
   auto bn_fwd_desc =
       batch_normalization_forward::desc(prop, src_md, epsilon, flag);
 
@@ -132,11 +127,7 @@ static std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> batch_normalization(
   auto src_m = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
   auto dst_m = dpcpp_onednn_memory(dst_md, engine, dst.data_ptr());
 
-#ifdef USE_PRIMITIVE_CACHE
-  auto bn_fwd = fetch_or_create_m<batch_normalization_forward>(key, bn_fwd_pd);
-#else
   auto bn_fwd = batch_normalization_forward(bn_fwd_pd);
-#endif
 
   std::unordered_map<int, memory> args = {
       {DNNL_ARG_SRC, src_m},
@@ -270,11 +261,6 @@ batch_normalization_backward(
     xpu::oneDNN::reorder(diff_dst, diff_dst_);
   }
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, diff_dst_md, src_md, epsilon, flags);
-#endif
-
   prop_kind p_kind;
   if ((bool)(flags & normalization_flags::use_scale)) {
     p_kind = prop_kind::backward;
@@ -309,12 +295,7 @@ batch_normalization_backward(
   auto diff_src_m =
       dpcpp_onednn_memory(expected_diff_src_md, engine, diff_src.data_ptr());
 
-#ifdef USE_PRIMITIVE_CACHE
-  auto bn_bwd =
-      fetch_or_create_m<dnnl::batch_normalization_backward>(key, bn_bwd_pd);
-#else
   auto bn_bwd = dnnl::batch_normalization_backward(bn_bwd_pd);
-#endif
 
   std::unordered_map<int, memory> args = {
       {DNNL_ARG_SRC, src_m},

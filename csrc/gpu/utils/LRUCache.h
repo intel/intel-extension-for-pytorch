@@ -244,6 +244,10 @@ struct lru_cache_standalone : public computation_cache<value_t, 128, key_t> {
  public:
   using cache = computation_cache<value_t, 128, key_t>;
 
+  inline bool find_key(key_t key) {
+    return cache::find(key) != cache::end();
+  }
+
   template <typename... Ts>
   inline value_t fetch_or_create_m(key_t key, Ts&&... args) {
     auto it = cache::find(key);
@@ -252,12 +256,37 @@ struct lru_cache_standalone : public computation_cache<value_t, 128, key_t> {
         : cache::fetch(it);
     return op;
   }
+
+  template <typename... Ts>
+  inline value_t create_and_fetch_m(key_t key, Ts&&... args) {
+    return cache::fetch(cache::create(key, std::forward<Ts>(args)...));
+  }
+
+  inline value_t fetch_m(key_t key) {
+    return cache::fetch(cache::find(key));
+  }
 };
+
+template <class value_t, class key_t>
+inline bool find_key(key_t key) {
+  return lru_cache_standalone<value_t, key_t>().find_key(key);
+}
 
 template <class value_t, class key_t, typename... Ts>
 inline value_t fetch_or_create_m(key_t key, Ts&&... args) {
   return lru_cache_standalone<value_t, key_t>().fetch_or_create_m(
       key, std::forward<Ts>(args)...);
+}
+
+template <class value_t, class key_t, typename... Ts>
+inline value_t create_and_fetch_m(key_t key, Ts&&... args) {
+  return lru_cache_standalone<value_t, key_t>().create_and_fetch_m(
+      key, std::forward<Ts>(args)...);
+}
+
+template <class value_t, class key_t>
+inline value_t fetch_m(key_t key) {
+  return lru_cache_standalone<value_t, key_t>().fetch_m(key);
 }
 
 template <typename T>

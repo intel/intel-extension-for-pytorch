@@ -400,21 +400,6 @@ static at::Tensor convolution(
     pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
   }
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key_pd;
-  create_key(
-      key_pd,
-      src_md,
-      wgh_md,
-      bia.defined(),
-      dst_data_t,
-      _stride,
-      _dilation,
-      _padding_front_top_left,
-      _padding_back_bottom_right,
-      attr);
-#endif
-
   auto conv_fwd_pd =
       convolution_forward::primitive_desc(conv_fwd_desc, pattr, engine);
 
@@ -494,12 +479,7 @@ static at::Tensor convolution(
   args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_m});
 #endif
 
-#ifdef USE_PRIMITIVE_CACHE
-  auto conv_forward =
-      fetch_or_create_m<convolution_forward>(key_pd, conv_fwd_pd);
-#else
   auto conv_forward = convolution_forward(conv_fwd_pd);
-#endif
   DPCPP_ONEDNN_EXEC(conv_forward, strm, args);
 
   if (is_onednn_layout_suggested && dst_blocked.data_ptr() != dst.data_ptr()) {

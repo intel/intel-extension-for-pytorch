@@ -52,11 +52,6 @@ static inline void eltwise(
     src_memory = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
   }
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, alg_kind, src_md, alpha, beta);
-#endif
-
   eltwise_forward::desc eltwise_eltwiseFwd_desc(
       prop_kind::forward, alg_kind, src_md, alpha, beta);
 
@@ -115,12 +110,7 @@ static inline void eltwise(
 
   auto strm = GpuStreamManager::Instance().get_stream();
 
-#ifdef USE_PRIMITIVE_CACHE
-  auto eltwise_fwd =
-      fetch_or_create_m<dnnl::eltwise_forward>(key, eltwise_forward_pd);
-#else
   auto eltwise_fwd = dnnl::eltwise_forward(eltwise_forward_pd);
-#endif
 
 #ifdef USE_SCRATCHPAD_MODE
   int scratchpad_size = eltwise_forward_pd.scratchpad_desc().get_size();
@@ -204,11 +194,6 @@ static inline void eltwise_backward(
   auto src_dst_memory = src_dst_usr_memory;
   auto diff_dst_memory = diff_dst_usr_memory;
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, alg_kind, src_dst_md, alpha, beta);
-#endif
-
   primitive_attr attr;
 #ifdef USE_SCRATCHPAD_MODE
   attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
@@ -268,12 +253,7 @@ static inline void eltwise_backward(
     }
   }
 
-#ifdef USE_PRIMITIVE_CACHE
-  auto eltwise_bwd =
-      fetch_or_create_m<dnnl::eltwise_backward>(key, eltwise_backward_pd);
-#else
   auto eltwise_bwd = dnnl::eltwise_backward(eltwise_backward_pd);
-#endif
 
 #ifdef USE_SCRATCHPAD_MODE
   int scratchpad_size = eltwise_backward_pd.scratchpad_desc().get_size();

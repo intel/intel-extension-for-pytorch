@@ -222,10 +222,6 @@ static inline void matmul(
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-#endif
-
   auto matmul_desc = matmul::desc(m1_md, m2_md, dst_md);
 
   auto is_onednn_layout_suggested = using_onednn_layout_for_matmul(m1);
@@ -237,29 +233,17 @@ static inline void matmul(
 
     if (dims == 2 && is_onednn_layout_suggested) {
       // attr + blk
-#ifdef USE_PRIMITIVE_CACHE
-      create_key(key, m1_any_md, m2_any_md, b_md, dst_any_md, attr);
-#endif
       matmul_desc = matmul::desc(m1_any_md, m2_any_md, b_md, dst_any_md);
     } else {
       // attr + plain
-#ifdef USE_PRIMITIVE_CACHE
-      create_key(key, m1_md, m2_md, b_md, dst_md, attr);
-#endif
       matmul_desc = matmul::desc(m1_md, m2_md, b_md, dst_md);
     }
   } else {
     if (dims == 2 && is_onednn_layout_suggested) {
       // no attr + blk
-#ifdef USE_PRIMITIVE_CACHE
-      create_key(key, m1_any_md, m2_any_md, dst_any_md, attr);
-#endif
       matmul_desc = matmul::desc(m1_any_md, m2_any_md, dst_any_md);
     } else {
       // no attr + plain
-#ifdef USE_PRIMITIVE_CACHE
-      create_key(key, m1_md, m2_md, dst_md, attr);
-#endif
       matmul_desc = matmul::desc(m1_md, m2_md, dst_md);
     }
   }
@@ -274,11 +258,7 @@ static inline void matmul(
       matmul_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
 #endif
 
-#ifdef USE_PRIMITIVE_CACHE
-  auto matmul_p = fetch_or_create_m<dnnl::matmul>(key, matmul_pd);
-#else
   auto matmul_p = dnnl::matmul(matmul_pd);
-#endif
 
   // STEP4: create memory
   auto m1_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m1);

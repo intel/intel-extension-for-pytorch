@@ -43,22 +43,13 @@ static void reduce(
   auto desc_src = memory::desc(src_dims, src_dt, src_format);
   auto desc_dst = memory::desc(dst_dims, dst_dt, dst_format);
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, aalgorithm, desc_src, desc_dst, p, eps);
-#endif
-
   auto op_desc = reduction::desc();
   op_desc = reduction::desc(aalgorithm, desc_src, desc_dst, p, eps);
 
   auto pd = reduction::primitive_desc();
   pd = reduction::primitive_desc(op_desc, engine);
 
-#ifdef USE_PRIMITIVE_CACHE
-  auto prim = fetch_or_create_m<reduction>(key, pd);
-#else
   auto prim = reduction(pd);
-#endif
 
   const auto src_desc = pd.src_desc();
   const auto dst_desc = pd.dst_desc();

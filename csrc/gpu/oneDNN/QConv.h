@@ -26,14 +26,8 @@ using namespace at::AtenIpexTypeQuantizedXPU;
 namespace xpu {
 namespace oneDNN {
 
-static std::tuple<
-    memory::desc,
-    memory::desc,
-    memory::desc,
-    memory::desc,
-    memory::desc,
-    memory::desc>
-qconv_get_plain_md(
+static std::tuple<memory::desc, memory::desc, memory::desc>
+qconv_get_plain_usr_md(
     const at::Tensor& src,
     const at::Tensor& wgh,
     const at::Tensor& dst,
@@ -63,25 +57,16 @@ qconv_get_plain_md(
   if (is_channels_last_suggested) {
     // TODO: remove this path when oneDNN fix the accuracy issue.
     // in ChannelsLast senario, fmt_wgh should be nhwc instead of any
-    auto fmt_any = memory::format_tag::any;
     wgh_usr_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
-    wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
   } else {
     wgh_usr_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
-    wgh_md = wgh_usr_md;
   }
 
-  return {src_usr_md, wgh_usr_md, dst_usr_md, src_usr_md, wgh_md, dst_usr_md};
+  return {src_usr_md, wgh_usr_md, dst_usr_md};
 }
 
-static std::tuple<
-    memory::desc,
-    memory::desc,
-    memory::desc,
-    memory::desc,
-    memory::desc,
-    memory::desc>
-qconv_get_blocked_md(
+static std::tuple<memory::desc, memory::desc, memory::desc>
+qconv_get_blocked_usr_md(
     const at::Tensor& src,
     const at::Tensor& wgh,
     const at::Tensor& dst,
@@ -91,6 +76,7 @@ qconv_get_blocked_md(
   auto ndim = src.ndimension();
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
   auto fmt_src = conv_src_fmt(ndim);
+
   if (src_ctx.is_plain()) {
     auto src_tz = src.sizes().vec();
     auto src_data_t =
@@ -122,6 +108,14 @@ qconv_get_blocked_md(
     wgh_usr_md = wgh_ctx.meta();
   }
 
+  return {src_usr_md, wgh_usr_md, dst_usr_md};
+}
+
+static std::tuple<memory::desc, memory::desc, memory::desc> qconv_get_blocked_md(
+    const at::Tensor& src,
+    memory::desc src_usr_md,
+    memory::desc wgh_usr_md,
+    memory::desc dst_usr_md) {
   // create memory desc for conv primitive and query the blocked format
   memory::desc src_md, wgh_md, dst_md;
   auto fmt_any = memory::format_tag::any;
@@ -131,13 +125,35 @@ qconv_get_blocked_md(
   wgh_md = memory::desc(wgh_usr_md.dims(), memory::data_type::s8, fmt_any);
   dst_md = memory::desc(dst_usr_md.dims(), dst_usr_md.data_type(), fmt_any);
 
-  return {src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md};
+  return {src_md, wgh_md, dst_md};
+}
+
+static std::tuple<memory::desc, memory::desc, memory::desc> qconv_get_plain_md(
+    memory::desc src_usr_md,
+    memory::desc wgh_usr_md,
+    memory::desc dst_usr_md,
+    memory::dims wgh_tz,
+    bool is_channels_last_suggested) {
+  // create memory desc for conv primitive and query the blocked format
+  memory::desc src_md, wgh_md, dst_md;
+  src_md = src_usr_md;
+  dst_md = dst_usr_md;
+  if (is_channels_last_suggested) {
+    // TODO: remove this path when oneDNN fix the accuracy issue.
+    // in ChannelsLast senario, fmt_wgh should be nhwc instead of any
+    auto fmt_any = memory::format_tag::any;
+    auto wei_data_t = memory::data_type::s8;
+    wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
+  } else {
+    wgh_md = wgh_usr_md;
+  }
+  return {src_md, wgh_md, dst_md};
 }
 
 static inline void get_conv_scale(
     const Tensor& src,
     const Tensor& wgh,
-    const memory::desc& src_usr_md,
+    const memory::data_type& src_data_t,
     int oc,
     std::vector<float>& wgh_scales,
     std::vector<float>& conv_scale,
@@ -152,7 +168,6 @@ static inline void get_conv_scale(
   }
 
   // TODO: scale setting in separate functions
-  auto src_data_t = src_usr_md.data_type();
   src_scale = (src_data_t == memory::data_type::u8 && src.q_zero_point() == 128)
       ? src.q_scale() / 2
       : src.q_scale();
@@ -180,7 +195,8 @@ static memory qconv_get_expected_src_memory(
     at::Tensor& src_blocked,
     memory::desc& src_usr_md,
     memory::desc& expected_src_md,
-    dnnl::engine& engine) {
+    dnnl::engine& engine,
+    bool load_from_cache) {
   memory src_m;
   if (src_usr_md != expected_src_md) {
     // avoid reorder in case of, [n][C][1][1][16c] <==> [n][c][1][1]
@@ -297,70 +313,119 @@ static at::Tensor quantized_convolution(
   auto memory_layout_for_conv = get_memory_layout_for_conv(src, wgh);
   bool is_onednn_layout_suggested =
       memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked;
-  if (is_onednn_layout_suggested) {
-    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
-        qconv_get_blocked_md(src, wgh, dst, groups);
-  } else {
-    bool is_channels_last_suggested =
-        memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
-    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
-        qconv_get_plain_md(src, wgh, dst, groups, is_channels_last_suggested);
-  }
-
-  // create conv primitive descriptor
+  bool is_channels_last_suggested =
+      memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
+  // input tensors config
+  memory::dims src_dims = src.sizes().vec();
+  memory::dims wgh_dims = wgh.sizes().vec();
+  auto src_data_t = is_opaque_u8(src) ? memory::data_type::s8
+                                      : get_onednn_dtype_include_double(src);
+  auto dst_data_t = get_onednn_dtype_include_double(dst);
+  // conv config
   memory::dims _stride = stride.vec();
   memory::dims _padding_front_top_left = padding_front_top_left.vec();
   memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
   memory::dims _dilation = compatible_dilation(dilation);
-  auto conv_fwd_desc = convolution_forward::desc(
-      prop_kind::forward,
-      algorithm::convolution_direct,
-      src_md,
-      wgh_md,
-      memory::desc(),
-      dst_md,
-      _stride,
-      _dilation,
-      _padding_front_top_left,
-      _padding_back_bottom_right);
-
-  // set conv primitive scale and zero_point
+  // conv post ops config
+  post_ops po;
+  attr.extract_post_ops(po, dst);
+  // conv scale and zero_point
   std::vector<float> wgh_scales, conv_scale = {1};
   int conv_zero_point = 0, mask_ac = 0, mask_conv;
   get_conv_scale(
-      src, wgh, src_usr_md, dst.size(1), wgh_scales, conv_scale, mask_conv);
-  primitive_attr pattr;
-  pattr.set_output_scales(mask_conv, conv_scale);
-  pattr.set_zero_points(DNNL_ARG_DST, mask_ac, {conv_zero_point});
+      src, wgh, src_data_t, dst.size(1), wgh_scales, conv_scale, mask_conv);
 
-  // extract post ops
-  post_ops po;
-  attr.extract_post_ops(po, dst);
-  pattr.set_post_ops(po);
-
-#ifdef USE_SCRATCHPAD_MODE
-  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-#endif
-
+  lru_key_t key_primitive;
 #ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key_pd;
   create_key(
-      key_pd,
-      src_md,
-      wgh_md,
+      key_primitive,
+      src_dims,
+      wgh_dims,
+      src_data_t,
       dst_data_t,
+      groups,
       _stride,
       _dilation,
       _padding_front_top_left,
       _padding_back_bottom_right,
+      is_onednn_layout_suggested,
+      is_channels_last_suggested,
       attr,
       conv_scale,
       conv_zero_point);
 #endif
 
-  // create primitive
-  auto conv_fwd_pd =
-      convolution_forward::primitive_desc(conv_fwd_desc, pattr, engine);
+  convolution_forward conv_forward;
+  convolution_forward::primitive_desc conv_fwd_pd;
+
+#ifdef USE_PRIMITIVE_CACHE
+  bool load_from_cache = find_key<convolution_forward>(key_primitive);
+#else
+  bool load_from_cache = false;
+#endif
+
+  if (is_onednn_layout_suggested) {
+    std::tie(src_usr_md, wgh_usr_md, dst_usr_md) =
+        qconv_get_blocked_usr_md(src, wgh, dst, groups);
+  } else {
+    std::tie(src_usr_md, wgh_usr_md, dst_usr_md) = qconv_get_plain_usr_md(
+        src, wgh, dst, groups, is_channels_last_suggested);
+  }
+
+  if (load_from_cache) {
+    conv_forward = fetch_m<convolution_forward>(key_primitive);
+    auto conv_fwd_pd_t = conv_forward.get_primitive_desc();
+    conv_fwd_pd = convolution_forward::primitive_desc(
+        const_cast<dnnl_primitive_desc_t>(conv_fwd_pd_t));
+  } else {
+    if (is_onednn_layout_suggested) {
+      std::tie(src_md, wgh_md, dst_md) =
+          qconv_get_blocked_md(src, src_usr_md, wgh_usr_md, dst_usr_md);
+    } else {
+      auto ic = src.size(1);
+      auto oc = dst.size(1);
+      memory::dims wgh_tz =
+          compatible_wgh_dims(ndim, groups, oc, ic, wgh.sizes());
+      std::tie(src_md, wgh_md, dst_md) = qconv_get_plain_md(
+          src_usr_md,
+          wgh_usr_md,
+          dst_usr_md,
+          wgh_tz,
+          is_channels_last_suggested);
+    }
+
+    auto conv_fwd_desc = convolution_forward::desc(
+        prop_kind::forward,
+        algorithm::convolution_direct,
+        src_md,
+        wgh_md,
+        memory::desc(),
+        dst_md,
+        _stride,
+        _dilation,
+        _padding_front_top_left,
+        _padding_back_bottom_right);
+
+    primitive_attr pattr;
+    pattr.set_output_scales(mask_conv, conv_scale);
+    pattr.set_zero_points(DNNL_ARG_DST, mask_ac, {conv_zero_point});
+    pattr.set_post_ops(po);
+
+#ifdef USE_SCRATCHPAD_MODE
+    pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
+    // create primitive
+    conv_fwd_pd =
+        convolution_forward::primitive_desc(conv_fwd_desc, pattr, engine);
+
+#ifdef USE_PRIMITIVE_CACHE
+    conv_forward =
+        create_and_fetch_m<convolution_forward>(key_primitive, conv_fwd_pd);
+#else
+    conv_forward = convolution_forward(conv_fwd_pd);
+#endif
+  }
 
   auto weight_cache_optimization = [&]() {
     // TODO:: remove ChannelsLast option after oneDNN fix accuracy issue
@@ -376,7 +441,7 @@ static at::Tensor quantized_convolution(
     auto expected_wgh_md = conv_fwd_pd.weights_desc();
     auto expected_dst_md = conv_fwd_pd.dst_desc();
     src_m = qconv_get_expected_src_memory(
-        src, src_blocked, src_usr_md, expected_src_md, engine);
+        src, src_blocked, src_usr_md, expected_src_md, engine, load_from_cache);
     wgh_m = qconv_get_expected_wgh_memory(
         wgh,
         wgh_blocked,
@@ -406,17 +471,8 @@ static at::Tensor quantized_convolution(
   }
 
   std::unordered_map<int, memory> args;
-  auto expected_dst_md = conv_fwd_pd.dst_desc();
   if (attr.with_binary())
     attr.construct_post_binary(conv_fwd_pd, po, args);
-
-#ifdef USE_PRIMITIVE_CACHE
-  auto conv_forward =
-      fetch_or_create_m<convolution_forward>(key_pd, conv_fwd_pd);
-#else
-  auto conv_forward = convolution_forward(conv_fwd_pd);
-#endif
-
   args.insert({DNNL_ARG_SRC, src_m});
   args.insert({DNNL_ARG_WEIGHTS, wgh_m});
   args.insert({DNNL_ARG_DST, dst_m});

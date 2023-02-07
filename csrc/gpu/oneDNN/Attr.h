@@ -106,20 +106,21 @@ struct PostOpParam {
       : scale_(scale), binary_(binary), algo_(algo), kind_(kind) {}
 
   // for int8 sum/eltwise
-  float scale_;
+  float scale_ = 1.0;
   // for eltwise
-  float alpha_;
-  float beta_;
+  float alpha_ = 0.0;
+  float beta_ = 0.0;
   // for binary
-  Tensor binary_;
-  meta_t meta_;
-  Tensor expected_binary_;
-  meta_t expected_meta_;
+  Tensor binary_ = Tensor();
+  Tensor expected_binary_ = Tensor();
+  data_t binary_ptr_ = nullptr;
+  meta_t meta_ = memory::desc();
+  meta_t expected_meta_ = memory::desc();
   // for prelu
-  int mask_;
+  int mask_ = 0;
   // common
-  algorithm algo_;
-  kind_t kind_;
+  algorithm algo_ = algorithm::eltwise_relu;
+  kind_t kind_ = kind_t::eltwise;
 };
 
 class Attr {
@@ -388,19 +389,22 @@ class Attr {
 #ifdef USE_PRIMITIVE_CACHE
   void to_bytes(bytestring& bytes) {
     xpu::dpcpp::to_bytes(bytes, q_scale_);
+    xpu::dpcpp::to_bytes(bytes, q_zero_point_);
     for (int i = 0; i < ops_params_.size(); ++i) {
       xpu::dpcpp::to_bytes(bytes, ops_params_[i].scale_);
       xpu::dpcpp::to_bytes(bytes, ops_params_[i].alpha_);
       xpu::dpcpp::to_bytes(bytes, ops_params_[i].beta_);
       xpu::dpcpp::to_bytes(bytes, ops_params_[i].algo_);
       xpu::dpcpp::to_bytes(bytes, ops_params_[i].kind_);
+      xpu::dpcpp::to_bytes(bytes, ops_params_[i].mask_);
+      xpu::dpcpp::to_bytes(bytes, ops_params_[i].meta_);
     }
   }
 #endif
 
-  float q_scale_; // the scale used to quantize the fused result from fp32 to
-                  // int8, only works for int8 case
-  int64_t q_zero_point_;
+  float q_scale_ = 1.0; // the scale used to quantize the fused result from fp32
+                        // to int8, only works for int8 case
+  int64_t q_zero_point_ = 0;
   std::vector<PostOpParam> ops_params_; // series of post ops
 }; // namespace oneDNN
 

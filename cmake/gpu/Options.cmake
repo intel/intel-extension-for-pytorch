@@ -11,7 +11,7 @@ cmake_dependent_option(BUILD_STATIC_ONEMKL "Static link with oneMKL" OFF "USE_ON
 option(USE_CHANNELS_LAST_1D "Use channels last 1d" ON)
 option(USE_PERSIST_STREAM "Use persistent oneDNN stream" ON)
 option(USE_SCRATCHPAD_MODE "Use oneDNN scratchpad mode" ON)
-option(USE_PRIMITIVE_CACHE "Cache oneDNN primitives by FRAMEWORK, instead of oneDNN itself" OFF)
+option(USE_PRIMITIVE_CACHE "Cache oneDNN primitives by FRAMEWORK for specific operators" ON)
 option(USE_QUEUE_BARRIER "Use queue submit_barrier, otherwise use dummy kernel" ON)
 option(USE_MULTI_CONTEXT "Create DPC++ runtime context per device" ON)
 set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build")

@@ -136,25 +136,11 @@ static void resample(
       ? memory::desc(src_dims, data_type, data_format)
       : src_ctx.meta();
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  if (!is_customer_scales) {
-    create_key(key, resampling_algorithm, factors, src_md, *dst_md);
-  } else {
-    create_key(key, resampling_algorithm, factors, src_md);
-  }
-#endif
-
   auto resampling_desc = resampling_forward::desc(
       prop_kind::forward, resampling_algorithm, factors, src_md, *dst_md);
   auto resampling_pd = resampling_forward::primitive_desc(resampling_desc, eng);
 
-#ifdef USE_PRIMITIVE_CACHE
-  auto resample_forward =
-      fetch_or_create_m<resampling_forward>(key, resampling_pd);
-#else
   auto resample_forward = resampling_forward(resampling_pd);
-#endif
 
   if (!src_ctx.is_plain()) {
     if (src.is_quantized()) {
@@ -246,33 +232,12 @@ static void resample_backward(
   auto diff_dst_md =
       diff_dst_ctx.is_plain() ? resampling_pd.dst_desc() : diff_dst_ctx.meta();
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  if (!is_customer_scales) {
-    create_key(
-        key,
-        resampling_algorithm,
-        factors,
-        src_md,
-        *dst_md,
-        diff_src_md,
-        diff_dst_md);
-  } else {
-    create_key(
-        key, resampling_algorithm, factors, src_md, diff_src_md, diff_dst_md);
-  }
-#endif
-
   auto resampling_bwd_desc = resampling_backward::desc(
       resampling_algorithm, factors, diff_src_md, diff_dst_md);
   auto resampling_bwd_pd = resampling_backward::primitive_desc(
       resampling_bwd_desc, eng, resampling_pd);
-#ifdef USE_PRIMITIVE_CACHE
-  auto resampling_bwd =
-      fetch_or_create_m<resampling_backward>(key, resampling_bwd_pd);
-#else
+
   auto resampling_bwd = resampling_backward(resampling_bwd_pd);
-#endif
 
   if (!diff_dst_ctx.is_plain()) {
     diff_src = empty_opaque_tensor(

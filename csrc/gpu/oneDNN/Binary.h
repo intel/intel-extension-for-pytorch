@@ -124,25 +124,14 @@ static inline Tensor bin(
   }
   auto mo = dpcpp_onednn_memory(tar_md, engine, dst.data_ptr());
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  if (t3.defined()) {
-    create_key(key, algo, md1, md2, tar_md, attr.get_post_ops().len());
-  } else {
-    create_key(key, algo, md1, md2, tar_md);
-  }
-#endif
   binary::primitive_desc pd;
   if (t3.defined()) {
     pd = binary::primitive_desc({algo, md1, md2, tar_md}, attr, engine);
   } else {
     pd = binary::primitive_desc({algo, md1, md2, tar_md}, engine);
   }
-#ifdef USE_PRIMITIVE_CACHE
-  auto prim = fetch_or_create_m<binary>(key, pd);
-#else
+
   auto prim = binary(pd);
-#endif
 
   if (t3.defined()) {
     prim.execute(

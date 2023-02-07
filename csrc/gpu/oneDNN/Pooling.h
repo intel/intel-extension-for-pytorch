@@ -137,11 +137,6 @@ static at::Tensor pooling(
   auto dst_md = memory::desc({dst_tz}, data_t, format);
   auto dst_md_any = memory::desc({dst_tz}, data_t, format_any);
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(
-      key, src_md, dst_md_any, stride, kernel, padding_l, padding_r, alg_kind);
-#endif
   auto pooling_fwd_desc = pooling_forward::desc(
       prop_kind,
       alg_kind,
@@ -180,11 +175,7 @@ static at::Tensor pooling(
     }
   }
 
-#ifdef USE_PRIMITIVE_CACHE
-  auto pooling_fwd = fetch_or_create_m<pooling_forward>(key, pooling_fwd_pd);
-#else
   auto pooling_fwd = pooling_forward(pooling_fwd_pd);
-#endif
 
   DPCPP_ONEDNN_EXEC(
       pooling_fwd, strm, {{DNNL_ARG_SRC, src_m}, {DNNL_ARG_DST, dst_m}});
@@ -294,11 +285,6 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
 
   auto dst_md_any = memory::desc(dst_tz, data_t, format_any);
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(
-      key, src_md, dst_md_any, stride, kernel, padding_l, padding_r, alg_kind);
-#endif
   auto pooling_fwd_desc = pooling_forward::desc(
       prop_kind,
       alg_kind,
@@ -356,11 +342,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
       idx_m = dpcpp_onednn_memory(expected_idx_md, engine, idx_.data_ptr());
     }
 
-#ifdef USE_PRIMITIVE_CACHE
-    auto pooling_fwd = fetch_or_create_m<pooling_forward>(key, pooling_fwd_pd);
-#else
     auto pooling_fwd = pooling_forward(pooling_fwd_pd);
-#endif
 
     DPCPP_ONEDNN_EXEC(
         pooling_fwd,
@@ -378,11 +360,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
     }
   } else {
     idx = at::empty({dst_tz}, at::TensorOptions(at::kXPU).dtype(at::kInt));
-#ifdef USE_PRIMITIVE_CACHE
-    auto pooling_fwd = fetch_or_create_m<pooling_forward>(key, pooling_fwd_pd);
-#else
     auto pooling_fwd = pooling_forward(pooling_fwd_pd);
-#endif
     DPCPP_ONEDNN_EXEC(
         pooling_fwd, strm, {{DNNL_ARG_SRC, src_m}, {DNNL_ARG_DST, dst_m}});
   }
@@ -507,11 +485,6 @@ static at::Tensor pooling_backward(
     diff_dst_md = diff_dst_ctx.is_plain() ? diff_dst_md : diff_dst_ctx.meta();
   }
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(
-      key, src_md, diff_dst_md, stride, kernel, padding, padding, alg_kind);
-#endif
   auto pooling_fwd_desc = pooling_forward::desc(
       prop_kind,
       alg_kind,
@@ -530,12 +503,7 @@ static at::Tensor pooling_backward(
   auto pooling_bwd_pd = dnnl::pooling_backward::primitive_desc(
       pooling_bwd_desc, engine, pooling_fwd_pd);
 
-#ifdef USE_PRIMITIVE_CACHE
-  auto pooling_bwd =
-      fetch_or_create_m<dnnl::pooling_backward>(key, pooling_bwd_pd);
-#else
   auto pooling_bwd = dnnl::pooling_backward(pooling_bwd_pd);
-#endif
 
   memory diff_src_m, diff_dst_m;
   if (!Settings::I().is_onednn_layout_enabled() ||
@@ -683,11 +651,6 @@ static at::Tensor pooling_backward(
     diff_dst_md = diff_dst_ctx.is_plain() ? diff_dst_md : diff_dst_ctx.meta();
   }
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(
-      key, src_md, diff_dst_md, stride, kernel, padding, padding, alg_kind);
-#endif
   auto pooling_fwd_desc = pooling_forward::desc(
       prop_kind,
       alg_kind,

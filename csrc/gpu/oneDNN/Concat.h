@@ -143,11 +143,6 @@ static void concat(
   auto concat_pd = concat::primitive_desc(
       dst_md, static_cast<int>(dimension), srcs_md, engine);
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, static_cast<int>(dimension), dst_md, srcs_md);
-#endif
-
   memory dst_m;
   auto expected_dst_md = concat_pd.dst_desc();
   if (dst_md != expected_dst_md) {
@@ -179,11 +174,7 @@ static void concat(
 
   auto strm = GpuStreamManager::Instance().get_stream();
 
-#ifdef USE_PRIMITIVE_CACHE
-  auto concat_p = fetch_or_create_m<dnnl::concat>(key, concat_pd);
-#else
   auto concat_p = dnnl::concat(concat_pd);
-#endif
 
   DPCPP_ONEDNN_EXEC(concat_p, strm, args);
 }

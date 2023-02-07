@@ -131,16 +131,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
     args.insert({DNNL_ARG_SHIFT, sft_m});
   }
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  if (training)
-    create_key(key, md, stats_exp_md, epsilon, flags);
-  else
-    create_key(key, md, epsilon, flags);
-  auto ln_fwd = fetch_or_create_m<layer_normalization_forward>(key, ln_fwd_pd);
-#else
   auto ln_fwd = layer_normalization_forward(ln_fwd_pd);
-#endif
 
   DPCPP_ONEDNN_EXEC(ln_fwd, strm, args);
   return std::make_tuple(dst, mean, rstd);
@@ -294,14 +285,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
     args.insert({DNNL_ARG_DIFF_SHIFT, diff_bia_m});
   }
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, src_md, diff_dst_md, epsilon, flags);
-  auto ln_backward =
-      fetch_or_create_m<layer_normalization_backward>(key, ln_bwd_pd);
-#else
   auto ln_backward = layer_normalization_backward(ln_bwd_pd);
-#endif
 
 #ifdef USE_SCRATCHPAD_MODE
   int scratchpad_size = ln_bwd_pd.scratchpad_desc().get_size();

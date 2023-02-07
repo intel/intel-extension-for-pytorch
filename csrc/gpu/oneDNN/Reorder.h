@@ -114,22 +114,9 @@ static inline void reorder(
   primitive prim;
   if (rattr.is_quant()) {
     auto pattr = rattr.pattr();
-#ifdef USE_PRIMITIVE_CACHE
-    lru_key_t key;
-    auto oscale = rattr.sc();
-    create_key(key, src_md, dst_md, oscale);
-    prim = fetch_or_create_m<dnnl::reorder>(key, src_mem, dst_mem, pattr);
-#else
     prim = dnnl::reorder(src_mem, dst_mem, pattr);
-#endif
   } else {
-#ifdef USE_PRIMITIVE_CACHE
-    lru_key_t key;
-    create_key(key, src_md, dst_md);
-    prim = fetch_or_create_m<dnnl::reorder>(key, src_mem, dst_mem);
-#else
     prim = dnnl::reorder(src_mem, dst_mem);
-#endif
   }
 
   DPCPP_ONEDNN_EXEC(
