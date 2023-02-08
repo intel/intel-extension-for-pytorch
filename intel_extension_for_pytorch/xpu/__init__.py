@@ -160,7 +160,7 @@ def set_device(device: _device_t) -> None:
 
 
 def get_device_name(device: Optional[_device_t] = None) -> str:
-    r"""Gets the name of a device.
+    r"""Gets the model name of the device if available, otherwise returns the ID.
 
     Arguments:
         device (torch.device or int, optional): device for which to return the
@@ -168,7 +168,20 @@ def get_device_name(device: Optional[_device_t] = None) -> str:
             integer. It uses the current device, given by :func:`~torch.xpu.current_device`,
             if :attr:`device` is ``None`` (default).
     """
-    return get_device_properties(device).name
+    arc_ids = {
+        "0x5690": "Intel Arc A770M Graphics",
+        "0x5691": "Intel Arc A730M Graphics",
+        "0x5692": "Intel Arc A550M Graphics",
+        "0x5693": "Intel Arc A370M Graphics",
+        "0x5694": "Intel Arc A350M Graphics",
+        "0x56a0": "Intel Arc A770 Graphics",
+        "0x56a1": "Intel Arc A750 Graphics",
+        "0x56a5": "Intel Arc A380 Graphics",
+        "0x56a6": "Intel Arc A310 Graphics",
+        "0x56b0": "Intel Arc Pro A30M Graphics",
+        "0x56b1": "Intel Arc Pro A40/A50 Graphics",
+    }
+    return arc_ids.get(get_device_properties(device).name) if arc_ids.get(get_device_properties(device).name) is not None else get_device_properties(device).name
 
 
 def get_device_properties(device: _device_t):
