@@ -156,7 +156,14 @@ class GraphCapture(object):
     def __call__(self, func):
 
         def compiler(gm: torch.fx.GraphModule, example_inputs: List[torch.Tensor]):
-            traced_gm = torch.jit.trace(gm.eval(), example_inputs).eval()
+            from torch.utils._mode_utils import no_dispatch
+            with no_dispatch():
+                static_inputs = []
+                for x in example_inputs:
+                    size = [s.node.shape_env.size_hint(s.node.expr) for s in x.size()]
+                    stride = [s.node.shape_env.size_hint(s.node.expr) for s in x.stride()]
+                    static_inputs.append(torch.as_strided(torch.zeros(size, dtype=x.dtype, device=x.device), size, stride))
+            traced_gm = torch.jit.trace(gm.eval(), static_inputs).eval()
             traced_gm = torch.jit.freeze(traced_gm)
             return traced_gm
 
@@ -204,8 +211,7 @@ class GraphCapture(object):
                                 try:
                                     # JIT trace failed, try torchdynamo with JIT trace backend.
                                     torch._dynamo.reset()
-                                    torch._dynamo.config.dynamic_shapes = True
-                                    dynamo_model = torch._dynamo.optimize(compiler)(self.model)
+                                    dynamo_model = torch._dynamo.optimize(compiler, dynamic=True)(self.model)
                                     output = dynamo_model(*input, **kwargs)
                                     self.model = dynamo_model
                                     self.method = RunMethods.TorchDynamo
@@ -214,16 +220,6 @@ class GraphCapture(object):
                                 except:
                                     warnings.warn("Both JIT and TorchDynamo failed, fallback to original model.")
                                     self.method = RunMethods.EagerInfer
-                                    if self.weights_prepack:
-                                        if self.dtype == torch.bfloat16:
-                                            assert core.onednn_has_bf16_support(), \
-                                                    "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, " + \
-                                                    "please set dtype to torch.float or set weights_prepack to False."
-                                        if self.dtype == torch.half:
-                                            assert core.onednn_has_fp16_support(), \
-                                                    "FP16 weight prepack needs the cpu support avx512_core_fp16, " + \
-                                                    "please set dtype to torch.float or set weights_prepack to False."
-                                        self.model, _, _ = utils._weight_prepack.weight_prepack_with_ipex(self.model, None, {})
                                     return self.model(*input, **kwargs)
 
         return forward
@@ -516,17 +512,20 @@ def optimize(
     # the weights prepacking here is temporarily cancelled, and it will be completed on the graph.
     if opt_properties.weights_prepack:
         if device_type == 'cpu':
-            if opt_properties.graph_mode is not True or optimizer is not None:
-                if dtype == torch.bfloat16:
-                    assert core.onednn_has_bf16_support(), \
-                            "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, " + \
-                            "please set dtype to torch.float or set weights_prepack to False."
-                if dtype == torch.half:
-                    assert core.onednn_has_fp16_support(), \
-                            "FP16 weight prepack needs the cpu support avx512_core_fp16, " + \
-                            "please set dtype to torch.float or set weights_prepack to False."
-                optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
-                    optimized_model, optimized_optimizer, params_attr, 'cpu')
+            if dtype == torch.bfloat16:
+                assert core.onednn_has_bf16_support(), \
+                        "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, " + \
+                        "please set dtype to torch.float or set weights_prepack to False."
+            if dtype == torch.half:
+                assert core.onednn_has_fp16_support(), \
+                        "FP16 weight prepack needs the cpu support avx512_core_fp16, " + \
+                        "please set dtype to torch.float or set weights_prepack to False."
+            optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
+                optimized_model, optimized_optimizer, params_attr, 'cpu')
+            torch._dynamo.allow_in_graph(utils._weight_prepack._IPEXConv2d)
+            torch._dynamo.allow_in_graph(utils._weight_prepack._IPEXConvTranspose2d)
+            torch._dynamo.allow_in_graph(utils._weight_prepack._IPEXLinear)
+            torch._dynamo.allow_in_graph(utils._model_convert._LSTM)
         else:
             assert device_type == 'xpu', "Unknown device type, only support device CPU and XPU"
             optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(

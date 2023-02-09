@@ -94,10 +94,10 @@ at::Tensor mkl_sgemm_forward_meta(
   TORCH_CHECK(
       out_features.has_value(),
       "out_features must have value for mkl_sgemm_forward_meta");
-  auto input_size = input.sizes();
-  std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
+  auto input_size = input.sym_sizes();
+  c10::SymDimVector output_size(input_size.begin(), input_size.end() - 1);
   output_size.push_back(out_features.value());
-  auto output = at::empty(output_size, input.options());
+  auto output = at::empty_symint(output_size, input.options());
   return output;
 }
 
