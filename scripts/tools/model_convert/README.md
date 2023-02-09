@@ -1,8 +1,13 @@
-# Model Convert Tool
 
-change cuda script to xpu, implicitly(during runtime) and explicitly(before runtime).
+del Convert Tool
+
+This tool can be used to help leverage effort to evaluate Pytorch model script on XPU backend for Intel® Extension for PyTorch*, but it is not a product-level tool.
+It provides implicit and explicit modes.
+
 
 ## Implicit Mode
+
+This mode won't change model script, but will change behavior silently during runtime of application, users won't aware the change details.
 
 ### Install
 ```console
@@ -11,7 +16,7 @@ $ python setup.py install
 
 ### Usage Example
 
-try following commands step by step to be familar to this tool, you will see that after import model_convert, you can run cuda code successfully on XPU device or you will get warning if one API is not supported by XPU backend.
+Try following commands step by step to be familar to this tool, you will see that after import model_convert, you can run code successfully on XPU device or you will get warning if one API is not supported by XPU backend.
 
 
 ```console
@@ -49,6 +54,7 @@ $ mpirun -n 2 python test_ddp.py
 ```
 
 ### Enable Verbose Mode
+You need to enable VERBOSE_MODEL_CONVERT flag in order to dump detailed info.
 
 ```console
 $ export VERBOSE_MODEL_CONVERT=1
@@ -56,50 +62,34 @@ $ export VERBOSE_MODEL_CONVERT=1
 
 ## Explicit Mode
 
-change model script explicitly
+This mode can generate modified model script directly. 
 
 
 ### Usage Examples
 
-Following steps show how to use this tool
+Following will explain how to use each option.
 
-#### safety mode
-
-Only touch .py and '.ipynb' files, won't convert the unsupported cuda api.
+* path option: you need to create a directory and then put all files into it.
 
 ```console
-$ python model_script_convert.py -p ./demo
+$ python export.py -p ./demo
 ```
 
-#### aggressive mode
-
-Modify string 'cuda' to 'xpu' in all files
+* aggressive option: aggressively change behavior, might not safe sometimes. 
 
 ```console
-$ python model_script_convert.py -p ./demo -a
+$ python export.py -p ./demo -a
 ```
-#### in-place mode
 
-Change the file directly if add option '-i' or '--in-place'
-
-in-place mode with safety mode
-
-Notice: in-place mode will change the files silently, not im-place mode will dump the difference
+* in-place option: change the file directly if add option '-i' or '--in-place', won't generate new file.
 
 ```console
-$ python model_script_convert.py -p ./demo -i
+$ python export.py -p ./demo -i
 ```
 
-in-place mode with aggressive mode
+* verbose option: turn on verbose if add option '-i' or '--in-place'
 
 ```console
-$ python model_script_convert.py -p ./demo -i -a
+$ python export.py -p ./demo -v
 ```
 
-#### verbose mode
-
-Turn on verbose if add option '-i' or '--in-place'
-
-```console
-$ python model_script_convert.py -p ./demo -v
-```
