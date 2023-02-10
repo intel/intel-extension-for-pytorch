@@ -41,7 +41,7 @@ def get_api_info(save_yaml=False):
         cuda_list = yaml.load(f.read(), Loader=yaml.Loader)
     with open(torch_pass_file_path, 'r', encoding='utf-8') as f:
         pass_list = yaml.load(f.read(), Loader=yaml.Loader)
-    with open(torch_failure_file_path, 'r', encoding=yaml.Loader) as f:
+    with open(torch_failure_file_path, 'r', encoding='utf-8') as f:
         failure_list = yaml.load(f.read(), Loader=yaml.Loader)
     with open(torch_ccl_file_path, 'r', encoding='utf-8') as f:
         ccl_list = yaml.load(f.read(), Loader=yaml.Loader)
