@@ -26,6 +26,24 @@ std::vector<int64_t> calc_conv_output_size(
   return output_size;
 }
 
+c10::SymDimVector calc_conv_output_size(
+    c10::SymIntArrayRef input_size,
+    at::IntArrayRef kernel_size,
+    at::IntArrayRef padding,
+    at::IntArrayRef stride,
+    at::IntArrayRef dilation) {
+  auto dim = input_size.size();
+  c10::SymDimVector output_size(dim);
+  output_size[0] = input_size[0];
+  output_size[1] = kernel_size[0];
+  for (size_t d = 2; d < dim; ++d) {
+    auto kernel = dilation[d - 2] * (kernel_size[d] - 1) + 1;
+    output_size[d] =
+        (input_size[d] + (2 * padding[d - 2]) - kernel) / stride[d - 2] + 1;
+  }
+  return output_size;
+}
+
 void convolution_kernel_output(
     const at::Tensor& input,
     const ideep::tensor& mkldnn_weight,
@@ -492,14 +510,14 @@ at::Tensor convolution_forward_meta(
       kernel_size.has_value() && padding.has_value() && stride.has_value() &&
           dilation.has_value(),
       "kernel_size, padding, stride and dilation must have value for convolution_forward_meta");
-  auto input_size = input.sizes();
-  std::vector<int64_t> output_sizes = calc_conv_output_size(
+  auto input_size = input.sym_sizes();
+  c10::SymDimVector output_sizes = calc_conv_output_size(
       input_size,
       kernel_size.value(),
       padding.value(),
       stride.value(),
       dilation.value());
-  auto output = at::empty(output_sizes, input.options());
+  auto output = at::empty_symint(output_sizes, input.options());
   return output;
 }
 

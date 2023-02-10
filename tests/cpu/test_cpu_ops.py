@@ -512,6 +512,7 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last_3d))
                 self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last_3d))
 
+    @unittest.skipIf(True, "temporary disable before https://github.com/pytorch/pytorch/pull/92668 merged")
     def test_groupnorm_nhwc(self):
         def helper(self, size, groups, memory_format, dtype, prec=1e-5):
             channels = size[1]

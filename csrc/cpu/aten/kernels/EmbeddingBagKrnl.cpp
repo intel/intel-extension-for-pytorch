@@ -117,13 +117,13 @@ static inline at::Tensor expand_values_if_needed(const at::Tensor& values) {
 static inline at::Tensor _sparse_coo_tensor_unsafe(
     const at::Tensor& indices,
     const at::Tensor& values_,
-    c10::ArrayRef<int64_t> size,
+    c10::ArrayRef<SymInt> size,
     const at::TensorOptions& options) {
   at::Tensor values = expand_values_if_needed(values_);
   assert(options.has_layout() && options.layout() == c10::kSparse);
   int64_t sparse_dim = indices.size(0);
   int64_t dense_dim = values.dim() - 1;
-  return at::native::new_with_dims_and_tensor_sparse(
+  return at::native::new_with_dims_and_tensor_sparse_symint(
       sparse_dim,
       dense_dim,
       size,
@@ -165,20 +165,21 @@ static inline at::Tensor embedding_bag_sparse_backward_sum_fast(
   });
 
   int64_t num_features = index_grad.size(-1);
-  auto weight_size = std::array<int64_t, 2>{{num_weights, num_features}};
+  auto weight_size = std::array<SymInt, 2>{{num_weights, num_features}};
   auto dense_options = index_grad.options();
 
   if (index_grad.numel() == 0) {
     return _sparse_coo_tensor_unsafe(
         at::empty({1, 0}, indices.options()),
         at::empty({0, num_features}, dense_options),
-        weight_size);
+        weight_size,
+        {});
   }
 
   auto index = indices.reshape({1, -1});
   auto values = index_grad.reshape({-1, num_features});
 
-  return _sparse_coo_tensor_unsafe(index, values, weight_size);
+  return _sparse_coo_tensor_unsafe(index, values, weight_size, {});
 }
 
 static inline int64_t count_and_map_uniq(

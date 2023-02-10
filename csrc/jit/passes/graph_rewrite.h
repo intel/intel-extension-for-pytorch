@@ -60,6 +60,7 @@ void insertPrePackedLinearOp(
 void fuseLinearWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseLinearAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
 
+void FuseRMSNorm(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseAddLayerNorm(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseMatmulDivOrMul(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseConcatBnRelu(std::shared_ptr<torch::jit::Graph>& graph);

@@ -43,6 +43,15 @@ class DeconvNd(torch.nn.Module):
     def forward(self, x):
         return self.deconv(x)
 
+class Lstm(torch.nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, bidirectional, bias, dropout, batch_first):
+        super(Lstm, self).__init__()
+        self.lstm = torch.nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
+
+    def forward(self, x, h=None):
+        x, h = self.lstm(x, h)
+        return x, h
+
 class TestFakeCases(TestCase):
     def test_conv_inference(self):
         for dim in [1, 2, 3]:
@@ -154,7 +163,73 @@ class TestFakeCases(TestCase):
                     self.assertTrue(isinstance(y_fake, FakeTensor))
                     self.assertTrue(y_fake.size() == y.size())
                     self.assertTrue(y_fake.dtype == dtype)
-                
+
+    def _lstm_params_list(self):
+        params_dict = {
+            "input_size": [1, 2],
+            "hidden_size": [5, 16],
+            "num_layers": [1, 3],
+            "bidirectional": [False, True],
+            "bias": [False, True],
+            "empty_state": [False, True],
+            "batch_first": [False, True],
+            "dropout": [0, 0.4, 0.7, 1],
+            "batch_size": [1, 2],
+            "seq_len": [1, 3]
+        }
+
+        params_list = []
+        for key, value in params_dict.items():
+            params_list.append(value)
+        return params_list
+
+    def test_lstm_inference(self):
+        params_list = self._lstm_params_list()
+        for input_size, hidden_size, num_layers, bidirectional, bias, empty_state, batch_first, dropout, batch_size, seq_len in itertools.product(*params_list):
+            # dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1
+            if dropout > 0 and num_layers == 1:
+                continue
+
+            num_directions = 2 if bidirectional else 1
+
+            if batch_first:
+                x = torch.randn(batch_size, seq_len, input_size)
+            else:
+                x = torch.randn(seq_len, batch_size, input_size)
+            h = torch.randn(num_layers * num_directions, batch_size, hidden_size)
+            c = torch.randn(num_layers * num_directions, batch_size, hidden_size)
+
+            model = Lstm(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first).eval()
+
+            for dtype in [torch.float32, torch.bfloat16]:
+                ipex_model = ipex.optimize(model, dtype=dtype, level='O1')
+                with torch.cpu.amp.autocast(enabled=(dtype == torch.bfloat16), dtype=torch.bfloat16), torch.no_grad():
+                    if empty_state:
+                        y, hy = ipex_model(x)
+                    else:
+                        y, hy = ipex_model(x, (h, c))
+                mode = FakeTensorMode(allow_fallback_kernels=False)
+                with torch._subclasses.fake_tensor.FakeCopyMode(mode):
+                    ipex_model_fake = copy.deepcopy(ipex_model)
+                with mode:
+                    x_fake = mode.from_tensor(x)
+                    h_fake = mode.from_tensor(h)
+                    c_fake = mode.from_tensor(c)
+                    with torch.cpu.amp.autocast(enabled=(dtype == torch.bfloat16), dtype=torch.bfloat16), torch.no_grad():
+                        if empty_state:
+                            y_fake, hy_fake = ipex_model_fake(x_fake)
+                        else:
+                            y_fake, hy_fake = ipex_model_fake(x_fake, (h_fake, c_fake))
+                    self.assertTrue(isinstance(x_fake, FakeTensor))
+                    self.assertTrue(isinstance(y_fake, FakeTensor))
+                    self.assertTrue(isinstance(hy_fake[0], FakeTensor))
+                    self.assertTrue(isinstance(hy_fake[1], FakeTensor))
+                    self.assertTrue(y_fake.size() == y.size())
+                    self.assertTrue(hy_fake[0].size() == hy[0].size())
+                    self.assertTrue(hy_fake[1].size() == hy[1].size())
+                    self.assertTrue(y_fake.dtype == dtype)
+                    self.assertTrue(hy_fake[0].dtype == dtype)
+                    self.assertTrue(hy_fake[1].dtype == dtype)
 
 if __name__ == '__main__':
     torch.manual_seed(2020)

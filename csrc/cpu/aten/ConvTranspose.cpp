@@ -33,6 +33,28 @@ std::vector<int64_t> conv_input_size(
   return input_size;
 }
 
+c10::SymDimVector conv_input_size(
+    c10::SymIntArrayRef output_size,
+    at::IntArrayRef weight_size,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding,
+    at::IntArrayRef stride,
+    at::IntArrayRef dilation,
+    int64_t groups) {
+  // ASSERT(output_size.size() > 2)
+  // ASSERT(output_size.size() == weight_size.size())
+  auto dim = output_size.size();
+  c10::SymDimVector input_size(dim);
+  input_size[0] = output_size[output_batch_size_dim];
+  input_size[1] = weight_size[weight_input_channels_dim] * groups;
+  for (size_t d = 2; d < dim; ++d) {
+    int kernel = dilation[d - 2] * (weight_size[d] - 1) + 1;
+    input_size[d] = (output_size[d] - 1) * stride[d - 2] -
+        (2 * padding[d - 2]) + kernel + output_padding[d - 2];
+  }
+  return input_size;
+}
+
 static inline std::vector<int64_t> padding_r(
     at::IntArrayRef padding,
     at::IntArrayRef output_padding) {
@@ -522,16 +544,16 @@ at::Tensor conv_transpose_forward_meta(
           output_padding.has_value() && stride.has_value() &&
           dilation.has_value() && groups.has_value(),
       "weight_size, padding, output_padding, stride, dilation and groups must have value for conv_transpose_forward_meta");
-  auto input_size = input.sizes();
-  std::vector<int64_t> output_sizes = conv_input_size(
-      input.sizes(),
+  auto input_size = input.sym_sizes();
+  c10::SymDimVector output_sizes = conv_input_size(
+      input_size,
       weight_size.value(),
       padding.value(),
       output_padding.value(),
       stride.value(),
       dilation.value(),
       groups.value());
-  auto output = at::empty(output_sizes, input.options());
+  auto output = at::empty_symint(output_sizes, input.options());
   return output;
 }
 
