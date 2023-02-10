@@ -21,18 +21,14 @@ std::pair<float, float> _add_and_compute_mean_var(
     float* out) {
   // compute add and mean/var of the value after add
   // we should firstly store add value
-  auto vec_a = _loadu(a_ptr);
-  auto vec_b = _loadu(b_ptr);
-  auto vec_add = _mm512_add_ps(vec_a, vec_b);
-  auto vec_acc_mean = vec_add;
-  auto vec_acc_pow = _mm512_mul_ps(vec_add, vec_add);
-  _mm512_storeu_ps(out, vec_add);
+  auto vec_acc_mean = _mm512_set1_ps(0.0);
+  auto vec_acc_pow = _mm512_set1_ps(0.0);
 
-  int i = 16;
+  int i = 0;
   for (; i <= size - 16; i += 16) {
-    vec_a = _loadu(a_ptr + i);
-    vec_b = _loadu(b_ptr + i);
-    vec_add = _mm512_add_ps(vec_a, vec_b);
+    auto vec_a = _loadu(a_ptr + i);
+    auto vec_b = _loadu(b_ptr + i);
+    auto vec_add = _mm512_add_ps(vec_a, vec_b);
     vec_acc_mean = _mm512_add_ps(vec_add, vec_acc_mean);
     _mm512_storeu_ps(out + i, vec_add);
     vec_acc_pow = _mm512_fmadd_ps(vec_add, vec_add, vec_acc_pow);
@@ -40,9 +36,9 @@ std::pair<float, float> _add_and_compute_mean_var(
 
   if (i < size) {
     __mmask16 mask = (1 << (size - i)) - 1;
-    vec_a = _maskz_loadu(a_ptr + i, mask);
-    vec_b = _maskz_loadu(b_ptr + i, mask);
-    vec_add = _mm512_add_ps(vec_a, vec_b);
+    auto vec_a = _maskz_loadu(a_ptr + i, mask);
+    auto vec_b = _maskz_loadu(b_ptr + i, mask);
+    auto vec_add = _mm512_add_ps(vec_a, vec_b);
     auto vec_zero = _mm512_set1_ps(0);
 
     vec_acc_mean = _mm512_add_ps(vec_add, vec_acc_mean);
