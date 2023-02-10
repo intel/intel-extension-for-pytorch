@@ -6,8 +6,13 @@ General
 
 .. currentmodule:: intel_extension_for_pytorch
 .. autofunction:: optimize
-.. autofunction:: enable_onednn_fusion
 .. autoclass:: verbose
+
+Graph Optimization
+******************
+
+.. currentmodule:: intel_extension_for_pytorch
+.. autofunction:: enable_onednn_fusion
 
 Quantization
 ************

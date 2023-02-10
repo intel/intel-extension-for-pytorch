@@ -85,6 +85,10 @@ Intel® Extension for PyTorch* also optimizes operators and implements several c
 .. currentmodule:: intel_extension_for_pytorch.nn.functional
 .. autofunction:: interaction
 
+.. currentmodule:: intel_extension_for_pytorch.nn.modules
+.. autoclass:: MergedEmbeddingBag
+.. autoclass:: MergedEmbeddingBagWithSGD
+
 **Auto kernel selection** is a feature that enables users to tune for better performance with GEMM operations. It is provided as parameter –auto_kernel_selection, with boolean value, of the ipex.optimize() function. By default, the GEMM kernel is computed with oneMKL primitives. However, under certain circumstances oneDNN primitives run faster. Users are able to set –auto_kernel_selection to True to run GEMM kernels with oneDNN primitives.” -> "We aims to provide good default performance by leveraging the best of math libraries and enabled weights_prepack, and it has been verified with broad set of models. If you would like to try other alternatives, you can use auto_kernel_selection toggle in ipex.optimize to switch, and you can diesable weights_preack in ipex.optimize if you are concerning the memory footprint more than performance gain. However in majority cases, keeping default is what we recommend.
 
 Optimizer Optimization
@@ -127,7 +131,9 @@ For more detailed information, check `Runtime Extension <features/runtime_extens
 INT8 Quantization
 -----------------
 
-Intel® Extension for PyTorch* provides built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models. On top of that, if users would like to tune for a higher accuracy than what the default recipe provides, a recipe tuning API powered by Intel® Neural Compressor is provided for users to try.
+Intel® Extension for PyTorch* provides built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models.
+
+Users are always recommended to try quantization with the built-in quantization recipe first with Intel® Extension for PyTorch* quantization APIs. For even higher accuracy demandings, users can try with separate `recipe tuning APIs <features/int8_recipe_tuning_api.md>`_. The APIs are powered by Intel® Neural Compressor to take advantage of its tuning feature.
 
 Check more detailed information for `INT8 Quantization <features/int8_overview.md>`_ and `INT8 recipe tuning API guide (Experimental, *NEW feature in 1.13.0*) <features/int8_recipe_tuning_api.md>`_.
 
@@ -138,8 +144,8 @@ Check more detailed information for `INT8 Quantization <features/int8_overview.m
    features/int8_overview
    features/int8_recipe_tuning_api
 
-Codeless Optimization (Experimental, *NEW feature in 1.13.0*)
--------------------------------------------------------------
+Codeless Optimization (Experimental, *NEW feature from 1.13.0*)
+---------------------------------------------------------------
 
 This feature enables users to get performance benefits from Intel® Extension for PyTorch* without changing Python scripts. It hopefully eases the usage and has been verified working well with broad scope of models, though in few cases there could be small overhead comparing to applying optimizations with Intel® Extension for PyTorch* APIs.
 
@@ -151,8 +157,8 @@ For more detailed information, check `Codeless Optimization <features/codeless_o
 
    features/codeless_optimization.md
 
-Graph Capture (Experimental, *NEW feature in 1.13.0*)
------------------------------------------------------
+Graph Capture (Experimental, *NEW feature from 1.13.0*)
+-------------------------------------------------------
 
 Since graph mode is key for deployment performance, this feature automatically captures graphs based on set of technologies that PyTorch supports, such as TorchScript and TorchDynamo. Users won't need to learn and try different PyTorch APIs to capture graphs, instead, they can turn on a new boolean flag `--graph_mode` (default off) in `ipex.optimize` to get the best of graph optimization.
 
@@ -164,8 +170,8 @@ For more detailed information, check `Graph Capture <features/graph_capture.md>`
 
    features/graph_capture
 
-HyperTune (Experimental, *NEW feature in 1.13.0*)
--------------------------------------------------
+HyperTune (Experimental, *NEW feature from 1.13.0*)
+---------------------------------------------------
 
 HyperTune is an experimental feature to perform hyperparameter/execution configuration searching. The searching is used in various areas such as optimization of hyperparameters of deep learning models. The searching is extremely useful in real situations when the number of hyperparameters, including configuration of script execution, and their search spaces are huge that manually tuning these hyperparameters/configuration is impractical and time consuming. Hypertune automates this process of execution configuration searching for the `launcher <performance_tuning/launch_script.md>`_ and Intel® Extension for PyTorch*.
 

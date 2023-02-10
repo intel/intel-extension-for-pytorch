@@ -1,6 +1,17 @@
 Releases
 =============
 
+## 1.13.100
+
+### Highlights
+
+- Quantization optimization with more fusion, op and auto channels last support [#1318](https://github.com/intel/intel-extension-for-pytorch/commit/0921af9635aca88c55586385c30eb3119f38dafd) [#1353](https://github.com/intel/intel-extension-for-pytorch/commit/b4e75db0e24bed96f0f16a579de0deb2f30c5364) [#1328](https://github.com/intel/intel-extension-for-pytorch/commit/3805edaddf47213d5723bdbe1246a6c2b62b381c) [#1355](https://github.com/intel/intel-extension-for-pytorch/commit/6f1797226d2b2df881be4cfc25f9b6155440c618) [#1367](https://github.com/intel/intel-extension-for-pytorch/commit/975d019415ef1fafe25cc64b8d9d1cdbca3258ec) [#1384](https://github.com/intel/intel-extension-for-pytorch/commit/e8941b5767715a0535241394e6d456c53ab0440f)
+- Installation and build enhancement [#1295](https://github.com/intel/intel-extension-for-pytorch/commit/bb66f86d02d3dab83efe3493d48b21a0bc48b282) [#1392](https://github.com/intel/intel-extension-for-pytorch/commit/c8896c7fea8de853e35433731ce6fb64cecb1e1d)
+- OneDNN graph and OneDNN update [#1376](https://github.com/intel/intel-extension-for-pytorch/commit/6b03578c101746e7dcf048a5cc3958b77cfdceb3)
+- Misc fix and enhancement [#1373](https://github.com/intel/intel-extension-for-pytorch/commit/177359ff0bd1b9b78bb2b48fdeb621daa435cb1d) [#1338](https://github.com/intel/intel-extension-for-pytorch/commit/736479f41a1222103e1f4052e1ed25c42c35405d) [#1391](https://github.com/intel/intel-extension-for-pytorch/commit/155986d3874c1ba1f1b4397edb5bdecca5bd7fe3) [#1321](https://github.com/intel/intel-extension-for-pytorch/commit/36aa4cb94d2a67149821576a4afa7b6c141c343d) [#1319](https://github.com/intel/intel-extension-for-pytorch/commit/6fe7e36922615f74b4365c4dbb3fdad26a5f20b0)
+
+**Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v1.13.0+cpu...v1.13.100+cpu
+
 ## 1.13.0
 
 We are pleased to announce the release of Intel® Extension for PyTorch\* 1.13.0-cpu which accompanies PyTorch 1.13. This release is highlighted with quite a few usability features which help users to get good performance and accuracy on CPU with less effort. We also added a couple of performance features as always. Check out the feature summary below.

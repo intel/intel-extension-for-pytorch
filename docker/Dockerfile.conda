@@ -1,6 +1,3 @@
-# syntax = docker/dockerfile:1
-# based onhttps://github.com/pytorch/pytorch/blob/master/Dockerfile
-#
 # NOTE: To build this you will need a docker version >= 19.03 and DOCKER_BUILDKIT=1
 #
 #       If you do not use buildkit you are not going to have a good time
@@ -41,13 +38,13 @@ RUN curl -fsSL -v -o ~/miniconda.sh -O  https://repo.anaconda.com/miniconda/Mini
     /opt/conda/bin/conda clean -ya
 
 FROM dev-base AS build
-ARG IPEX_VERSION=v1.13.0
-ARG PYTORCH_VERSION=v1.13.0
-ARG TORCHVISION_VERSION=0.14.0+cpu
-ARG TORCHAUDIO_VERSION=0.13.0+cpu
+ARG IPEX_VERSION=v1.13.100+cpu
+ARG PYTORCH_VERSION=v1.13.1
+ARG TORCHVISION_VERSION=0.14.1
+ARG TORCHAUDIO_VERSION=0.13.1
 COPY --from=conda /opt/conda /opt/conda
 RUN --mount=type=cache,target=/opt/ccache \
-    python -m pip install --no-cache-dir torch==${PYTORCH_VERSION}+cpu torchvision==${TORCHVISION_VERSION} torchaudio==${TORCHAUDIO_VERSION} -f https://download.pytorch.org/whl/torch_stable.html && \
+    python -m pip install --no-cache-dir torch==${PYTORCH_VERSION}+cpu torchvision==${TORCHVISION_VERSION}+cpu torchaudio==${TORCHAUDIO_VERSION}+cpu -f https://download.pytorch.org/whl/torch_stable.html && \
     git clone https://github.com/intel/intel-extension-for-pytorch && \
     cd intel-extension-for-pytorch && \
     git checkout ${IPEX_VERSION} && \
