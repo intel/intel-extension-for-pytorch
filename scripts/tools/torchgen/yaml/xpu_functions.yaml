@@ -557,6 +557,8 @@ supported:
   - special_ndtri.out
   - special_xlog1py.out
   - special_zeta.out
+  - special_bessel_j0.out
+  - special_bessel_j1.out
   - sqrt.out
   - std.correction
   - std.correction_out

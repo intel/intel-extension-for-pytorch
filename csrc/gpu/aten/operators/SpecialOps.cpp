@@ -175,6 +175,30 @@ Tensor& special_xlog1py_out(
   return out;
 }
 
+Tensor& special_bessel_j0_out(const Tensor& self, at::Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.common_dtype(), "bessel_j0", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t a) -> scalar_t { return bessel_j0_forward(a); });
+      });
+  return out;
+}
+
+Tensor& special_bessel_j1_out(const Tensor& self, at::Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.common_dtype(), "bessel_j1", [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+          if (a < scalar_t(0.0f)) {
+            return -bessel_j1_forward(-a);
+          }
+          return bessel_j1_forward(a);
+        });
+      });
+  return out;
+}
+
 Tensor& special_zeta_out(const Tensor& self, const Tensor& other, Tensor& out) {
   auto iter = TensorIterator::binary_float_op(out, self, other);
   IPEX_DISPATCH_FLOATING_TYPES_AND(

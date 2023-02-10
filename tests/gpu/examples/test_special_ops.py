@@ -72,3 +72,19 @@ class TestTorchMethod(TestCase):
             t = torch.tensor([min, max, eps, tiny], dtype=dtype, device=device)
             check_equal(t, torch.special.ndtri, special.ndtri)
             check_equal(t, torch.special.entr, special.entr)
+
+    def test_bessel_j0(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        result_cpu = torch.special.bessel_j0(input0)
+        result_xpu = torch.special.bessel_j0(input0_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
+    def test_bessel_j1(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        result_cpu = torch.special.bessel_j1(input0)
+        result_xpu = torch.special.bessel_j1(input0_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
