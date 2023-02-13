@@ -40,10 +40,10 @@ Verified Hardware Platforms:
 Please refer to [Install oneAPI Base Toolkit Packages](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit).
 
 Need to install components of Intel® oneAPI Base Toolkit:
- - Intel® oneAPI DPC++ Compiler (`DPCPP_ROOT` as its installation path)
- - Intel® oneAPI Math Kernel Library (oneMKL) (`MKL_ROOT` as its installation path)
+ - Intel® oneAPI DPC++ Compiler (`DPCPPROOT` as its installation path)
+ - Intel® oneAPI Math Kernel Library (oneMKL) (`MKLROOT` as its installation path)
 
-Default installation location *{ONEAPI_ROOT}* is `/opt/intel/oneapi` for root account, `${HOME}/intel/oneapi` for other accounts. Generally, `DPCPP_ROOT` is `{ONEAPI_ROOT}/compiler/latest`, `MKL_ROOT` is `{ONEAPI_ROOT}/mkl/latest`.
+Default installation location *{ONEAPI_ROOT}* is `/opt/intel/oneapi` for root account, `${HOME}/intel/oneapi` for other accounts. Generally, `DPCPPROOT` is `{ONEAPI_ROOT}/compiler/latest`, `MKLROOT` is `{ONEAPI_ROOT}/mkl/latest`.
 
 **_NOTE:_** You need to activate oneAPI environment when using Intel® Extension for PyTorch\* on Intel GPU.
 
@@ -54,8 +54,8 @@ source {ONEAPI_ROOT}/setvars.sh
 **_NOTE:_** You need to activate ONLY DPC++ compiler and oneMKL environment when compiling Intel® Extension for PyTorch\* from source on Intel GPU.
 
 ```bash
-source {DPCPP_ROOT}/env/vars.sh
-source {MKL_ROOT}/env/vars.sh
+source {DPCPPROOT}/env/vars.sh
+source {MKLROOT}/env/vars.sh
 ```
 
 ## PyTorch-Intel® Extension for PyTorch\* Version Mapping
@@ -102,48 +102,59 @@ python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 intel_extension_for_
 
 ## Install via compiling from source
 
-### Download source code of PyTorch and Intel® Extension for PyTorch\*:
-
-```bash
-$ git clone https://github.com/pytorch/pytorch.git
-$ cd pytorch
-$ git checkout v1.13.0
-
-$ git clone https://github.com/intel/intel-extension-for-pytorch.git 
-$ cd intel-extension-for-pytorch
-$ git checkout v1.13.10+xpu
-```
-
-### Install PyTorch:
-
-```bash
-$ cd pytorch
-$ git apply ${intel_extension_for_pytorch_directory}/torch_patches/*.patch 
-$ git submodule sync
-$ git submodule update --init --recursive
-$ conda install numpy ninja cmake
-$ pip install -r requirements.txt
-$ export GLIBCXX_USE_CXX11_ABI=1
-$ python setup.py bdist_wheel
-$ pip install dist/*.whl
-```
-
 ### Configure the AOT (Optional)
 
 Please refer to [AOT documentation](./AOT.md) for how to configure `USE_AOT_DEVLIST`. Without configuring AOT, the start-up time for processes using Intel® Extension for PyTorch\* will be long, so this step is important.
 
-### Install Intel® Extension for PyTorch\*:
+### Compile the bundle (PyTorch\*, torchvision, torchaudio, Intel® Extension for PyTorch\*) with script
+
+To ensure a smooth compilation of the bundle, including PyTorch\*, torchvision, torchaudio, Intel® Extension for PyTorch\*, a script is provided in the Github repo. If you would like to compile the binaries from source, it is highly recommended to utilize this script.
 
 ```bash
-$ cd intel-extension-for-pytorch
-$ git submodule sync
-$ git submodule update --init --recursive
-$ pip install -r requirements.txt
-$ source {DPCPP_ROOT}/env/vars.sh
-$ source {MKL_ROOT}/env/vars.sh
-$ export USE_AOT_DEVLIST="..." # Set values accordingly
-$ python setup.py bdist_wheel
-$ pip install dist/*.whl
+$ wget https://github.com/intel/intel-extension-for-pytorch/blob/v1.13.10%2Bxpu/scripts/compile_bundle.sh
+$ bash compile_bundle.sh <DPCPPROOT> <MKLROOT> [AOT]
+  DPCPPROOT and MKLROOT are mandatory, should be absolute or relative path to the root directory of DPC++ compiler and oneMKL respectively.
+  AOT is optional, should be the text string for environment variable USE_AOT_DEVLIST.
+```
+
+**Note:** Recommend to use the `compile_bundle.sh` script in a clean docker container.
+
+**Note:** Use the `compile_bundle.sh` script under a `conda` environment.
+
+**Note:** Depends on what applications are available on your OS, you probably need to install some Linux commands, like `patch`, `git`, etc. Installation of these Linux commands are not included in this script.
+
+**Note:** The `compile_bundle.sh` script downloads source code of PyTorch\*, torchvision, torchaudio, Intel® Extension for PyTorch\* into individual folders in its directory. You can consider to create a specific folder to use this script. Wheel files will be generated under `dist` folder of each source code directory. Besides, compilation progress is dumped into a log file `build.log` in each source code directory. The log file is helpful to identify errors occurred during compilation. Should any failure happened, after addressing the issue, you can simply run the `compile_bundle.sh` script again with the same command.
+
+```bash
+$ mkdir ipex_bundle
+$ cd ipex_bundle
+$ wget .../compile_bundle.sh
+$ bash compile_bundle.sh ...
+$ ls
+audio  compile_bundle.sh  intel_extension_for_pytorch  torch  vision
+$ tree -L 3 .
+.
+├── audio
+│   ├── dist
+│   │   └── torchaudio-....whl
+│   ├ build.log
+│   └ ...
+├── compile_bundle.sh
+├── intel_extension_for_pytorch
+│   ├── dist
+│   │   └── intel_extension_for_pytorch-....whl
+│   ├ build.log
+│   └ ...
+├── torch
+│   ├── dist
+│   │   └── torch-....whl
+│   ├ build.log
+│   └ ...
+└── vision
+    ├── dist
+    │   └── torchvision-....whl
+    ├ build.log
+    └ ...
 ```
 
 
