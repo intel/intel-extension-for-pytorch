@@ -7,8 +7,9 @@ def check_minimal_isa_support():
     def get_cpu_info():
         cpu_info_path = "/proc/cpuinfo"
         if os.path.exists(cpu_info_path):
-            cpu_info_command = "cat {}".format(cpu_info_path)
-            all_sub_cpu_info = subprocess.getoutput(cpu_info_command).strip()
+            all_sub_cpu_info = ""
+            with open(cpu_info_path, "r") as f:
+                all_sub_cpu_info = f.read().strip()
             for sub_cpu_info in all_sub_cpu_info.split("\n"):
                 if sub_cpu_info.startswith("flags"):
                     cpu_flags = sub_cpu_info.replace("\t", '').upper().split(":")
