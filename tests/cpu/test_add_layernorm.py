@@ -10,7 +10,7 @@ class add_layernorm(torch.nn.Module):
         self.layer_norm = torch.nn.LayerNorm(size)
 
     def forward(self, a, b):
-        x= torch.add(a, b)
+        x = torch.add(a, b)
         x = self.layer_norm(x)
         return x
 
@@ -42,7 +42,9 @@ class AddLayerNormTester(TestCase):
                     y2_bf16 = trace_model(a_bf16, b_bf16)
                     self.assertEqual(y1_bf16.dtype, torch.bfloat16)
                     self.assertEqual(y2_bf16.dtype, torch.bfloat16)
-                    self.assertEqual(y1_bf16, y2_bf16)
+                    # Add a custom threshold for bf16 test because of fused add_layernorm in jit has higher precision 
+                    # and causes mismatch with eager mode.
+                    self.assertEqual(y1_bf16, y2_bf16, prec=5e-2)
 
 if __name__ == '__main__':
     test = unittest.main()
