@@ -54,7 +54,6 @@ typedef struct randStatePhilox4_32_10 {
   int boxmuller_flag;
   int boxmuller_flag_double;
   float boxmuller_extra;
-  double boxmuller_extra_double;
 } randStatePhilox4_32_10_t;
 
 static inline void Philox_State_Incr(
