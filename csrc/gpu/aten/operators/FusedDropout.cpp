@@ -59,7 +59,7 @@ inline void fused_dropout_kernel_vec(
   // Helps align the total number of times rand_uniform4 is called by each
   // thread for the same totalElements in the vec=2 and vec=4 cases.
   bool gxvec_loop_state = 0;
-  accscalar_t scale = 1.0 / p;
+  accscalar_t scale = 1.0f / p;
 
   float4 rand;
 
@@ -132,7 +132,7 @@ inline void fused_dropout_kernel(
   IndexType idx = item.get_linear_id();
   randStatePhilox4_32_10_t state;
   rand_init(std::get<0>(seeds), idx, std::get<1>(seeds), &state);
-  accscalar_t scale = 1.0 / p;
+  accscalar_t scale = 1.0f / p;
 
   float rand = _rand_uniform(state.output.x);
   rand = rand < p;
@@ -164,7 +164,7 @@ inline void fused_dropout_kernel_unroll(
   IndexType idx = group_idx * thread_range + thread_idx;
   randStatePhilox4_32_10_t state;
   rand_init(std::get<0>(seeds), idx, std::get<1>(seeds), &state);
-  accscalar_t scale = 1.0 / p;
+  accscalar_t scale = 1.0f / p;
 
   IndexType rounded_size =
       ((totalElements - 1) / (thread_range * group_range * UNROLL) + 1) *
