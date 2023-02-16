@@ -82,7 +82,7 @@ import expecttest
 import torch
 import torch.cuda
 from torch._utils_internal import get_writable_path
-from torch._six import string_classes, inf
+from torch import inf
 import torch.backends.cudnn
 import torch.backends.mkl
 from torch.autograd import gradcheck
@@ -117,7 +117,7 @@ def shell(command, cwd=None):
     #      `p.wait()` in a `final` block for the code to be portable.
     #
     # https://github.com/python/cpython/blob/71b6c1af727fbe13525fb734568057d78cea33f3/Lib/subprocess.py#L309-L323
-    assert not isinstance(command, torch._six.string_classes), "Command to shell should be a list or tuple of tokens"
+    assert not isinstance(command, str), "Command to shell should be a list or tuple of tokens"
     p = subprocess.Popen(command, universal_newlines=True, cwd=cwd)
     try:
         return p.wait()
@@ -793,7 +793,7 @@ class TestCase(expecttest.TestCase):
                                  message=message, allow_inf=allow_inf)
             else:
                 assertTensorsEqual(x, y)
-        elif isinstance(x, string_classes) and isinstance(y, string_classes):
+        elif isinstance(x, str) and isinstance(y, str):
             super(TestCase, self).assertEqual(x, y, message)
         elif type(x) == set and type(y) == set:
             super(TestCase, self).assertEqual(x, y, message)
