@@ -88,3 +88,36 @@ class TestTorchMethod(TestCase):
         result_xpu = torch.special.bessel_j1(input0_xpu)
 
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
+    def test_modified_bessel_i0(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        result_cpu = torch.special.modified_bessel_i0(input0)
+        result_xpu = torch.special.modified_bessel_i0(input0_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
+    def test_modified_bessel_i1(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        result_cpu = torch.special.modified_bessel_i1(input0)
+        result_xpu = torch.special.modified_bessel_i1(input0_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
+    def test_modified_bessel_k0(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        result_cpu = torch.special.modified_bessel_k0(input0)
+        result_xpu = torch.special.modified_bessel_k0(input0_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
+    def test_modified_bessel_k1(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        result_cpu = torch.special.modified_bessel_k1(input0)
+        result_xpu = torch.special.modified_bessel_k1(input0_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+

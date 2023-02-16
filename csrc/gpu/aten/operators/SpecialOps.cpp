@@ -210,5 +210,45 @@ Tensor& special_zeta_out(const Tensor& self, const Tensor& other, Tensor& out) {
   return out;
 }
 
+Tensor& special_modified_bessel_i0_out(const Tensor& self, at::Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.common_dtype(), "modified_bessel_i0", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t a) -> scalar_t { return modified_bessel_i0_forward(a); });
+      });
+  return out;
+}
+
+Tensor& special_modified_bessel_i1_out(const Tensor& self, at::Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.common_dtype(), "modified_bessel_i1", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t a) -> scalar_t { return modified_bessel_i1_forward(a); });
+      });
+  return out;
+}
+
+Tensor& special_modified_bessel_k0_out(const Tensor& self, at::Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.common_dtype(), "modified_bessel_k0", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t a) -> scalar_t { return modified_bessel_k0_forward(a); });
+      });
+  return out;
+}
+
+Tensor& special_modified_bessel_k1_out(const Tensor& self, at::Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.common_dtype(), "modified_bessel_k1", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t a) -> scalar_t { return modified_bessel_k1_forward(a); });
+      });
+  return out;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
