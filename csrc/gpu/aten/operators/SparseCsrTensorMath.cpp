@@ -49,6 +49,48 @@ void convert_indices_from_coo_to_csr_kernel_dpcpp(
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <typename input_t, typename output_t>
+void convert_indices_from_csr_to_coo_kernel_dpcpp(
+    const Tensor& indices,
+    const Tensor& crow_indices,
+    const Tensor& col_indices,
+    const bool transpose = false) {
+  int64_t nrows = crow_indices.numel() - 1;
+
+  if (nrows == 0) {
+    indices.zero_();
+    return;
+  }
+
+  auto crow_indices_ = crow_indices.expect_contiguous();
+  const input_t* crow_indices_data_in = crow_indices_->data_ptr<input_t>();
+  TORCH_INTERNAL_ASSERT(indices.is_contiguous());
+  auto row0 = indices.select(0, transpose ? 1 : 0);
+  auto row1 = indices.select(0, transpose ? 0 : 1);
+  output_t* data_out = row0.data_ptr<output_t>();
+  row1.copy_(*col_indices.expect_contiguous());
+
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  const auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
+  const auto ngroups = (nrows + wgroup_size - 1) / wgroup_size;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    cgh.parallel_for(
+        sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size),
+        [=](sycl::nd_item<1> itemId) {
+          int64_t linear_id = itemId.get_global_linear_id();
+          if (linear_id < nrows) {
+            for (int64_t i = crow_indices_data_in[linear_id];
+                 i < crow_indices_data_in[linear_id + 1];
+                 i++)
+              data_out[i] = static_cast<output_t>(linear_id);
+          }
+        });
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
 } // namespace impl
 
 Tensor& _convert_indices_from_coo_to_csr_out(
@@ -72,5 +114,30 @@ Tensor& _convert_indices_from_coo_to_csr_out(
   return result;
 }
 
+Tensor& _convert_indices_from_csr_to_coo_out(
+    const Tensor& crow_indices,
+    const Tensor& col_indices,
+    const bool out_int32,
+    const bool transpose,
+    Tensor& result) {
+  if (out_int32) {
+    IPEX_DISPATCH_INTEGRAL_TYPES(
+        crow_indices.scalar_type(),
+        "convert_indices_from_csr_to_coo_dpcpp",
+        [&] {
+          impl::convert_indices_from_csr_to_coo_kernel_dpcpp<scalar_t, int>(
+              result, crow_indices, col_indices, transpose);
+        });
+  } else {
+    IPEX_DISPATCH_INTEGRAL_TYPES(
+        crow_indices.scalar_type(),
+        "convert_indices_from_coo_to_csr_dpcpp",
+        [&] {
+          impl::convert_indices_from_csr_to_coo_kernel_dpcpp<scalar_t, int64_t>(
+              result, crow_indices, col_indices, transpose);
+        });
+  }
+  return result;
+}
 } // namespace AtenIpexTypeXPU
 } // namespace at

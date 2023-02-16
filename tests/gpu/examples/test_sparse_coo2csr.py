@@ -50,3 +50,23 @@ class TestTorchMethod(TestCase):
             row_indices_coo_xpu, sparse_coo.shape[0], out_int32=row_indices_coo_xpu.dtype == torch.int32)
 
         self.assertEqual(row_indices_csr, row_indices_csr_xpu.to(cpu_device))
+
+    def test_csr_to_coo_convert(self, dtype=torch.float):
+        sizes = [(6, 4), (5, 5), (9, 7)]
+        for size in sizes:
+            # dense = torch.randn(size, dtype=dtype, device=dpcpp_device)
+            # coo_sparse = dense.to_sparse_coo()
+            # self.assertEqual(coo_sparse.to_sparse_csr().to_sparse_coo(), coo_sparse)
+
+            dense = torch.randn(size)
+            sparse = dense.to_sparse_csr()
+            # ----------------------cpu--------------------    
+            crow_indices = sparse.crow_indices()
+            col_indices = sparse.col_indices()
+            indices = torch._convert_indices_from_csr_to_coo(crow_indices, col_indices, out_int32=crow_indices.dtype == torch.int32)
+            # ----------------------xpu--------------------     
+            crow_indices_xpu = crow_indices.to(dpcpp_device)
+            col_indices_xpu = col_indices.to(dpcpp_device)
+            indices_xpu = torch._convert_indices_from_csr_to_coo(crow_indices_xpu, col_indices_xpu, out_int32=crow_indices_xpu.dtype == torch.int32)
+
+            self.assertEqual(indices_xpu.to(cpu_device), indices)
