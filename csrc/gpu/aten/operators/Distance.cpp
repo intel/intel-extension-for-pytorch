@@ -34,7 +34,7 @@ class dists {
   // Zero norm
   struct zero {
     static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
-      agg += diff != 0.0;
+      agg += diff != 0.0f;
     }
     static scalar_t finish(const scalar_t agg, const scalar_t p) {
       return agg;
@@ -71,10 +71,10 @@ class dists {
         const scalar_t grad,
         const scalar_t dist,
         const scalar_t p) {
-      return dist == 0.0 ? static_cast<scalar_t>(0)
-                         : sign(diff) *
-              Numerics<scalar_t>::pow(Numerics<scalar_t>::abs(diff), p - 1) *
-              grad / Numerics<scalar_t>::pow(dist, p - 1);
+      return (dist == 0.0f || (diff == 0.0f && p < 1.f))
+          ? static_cast<scalar_t>(0)
+          : (sign(diff) * Numerics<scalar_t>::pow(std::abs(diff), p - 1) *
+             grad / Numerics<scalar_t>::pow(dist, p - 1));
     }
   };
 
@@ -129,8 +129,8 @@ class dists {
         const scalar_t grad,
         const scalar_t dist,
         const scalar_t p) {
-      return dist == 0.0 ? static_cast<scalar_t>(0)
-                         : diff *
+      return dist == 0.0f ? static_cast<scalar_t>(0)
+                          : diff *
               Numerics<scalar_t>::pow(Numerics<scalar_t>::abs(diff), p - 2) *
               grad / Numerics<scalar_t>::pow(dist, p - 1);
     }
