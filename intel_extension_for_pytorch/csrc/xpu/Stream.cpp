@@ -39,7 +39,7 @@ static PyObject* THDPStream_pynew(
             /* isHighPriority */ priority < 0 ? true : false, current_device);
 
   THDPStream* self = (THDPStream*)ptr.get();
-  self->base.cdata = stream.pack();
+  self->cdata = stream.pack();
   new (&self->dpcpp_stream) xpu::dpcpp::DPCPPStream(stream);
 
   return (PyObject*)ptr.release();
@@ -57,15 +57,9 @@ static PyObject* THDPStream_get_device(THDPStream* self, void* unused) {
   END_HANDLE_TH_ERRORS
 }
 
-static PyObject* THDPStream_get_xpu_stream(THDPStream* self, void* unused) {
+static PyObject* THDPStream_get_sycl_queue(THDPStream* self, void* unused) {
   HANDLE_TH_ERRORS
-  return PyCapsule_New(
-      self->dpcpp_stream.opaque(), "SyclQueueRef", [](PyObject* cap) {
-        if (PyCapsule_IsValid(cap, "SyclQueueRef")) {
-          // void* ptr = PyCapsule_GetPointer(cap,
-          // "SyclQueueRef"); Do NOTHING
-        }
-      });
+  return PyLong_FromVoidPtr(self->dpcpp_stream.opaque());
   END_HANDLE_TH_ERRORS
 }
 
@@ -110,8 +104,8 @@ static PyObject* THDPStream_eq(THDPStream* self, THDPStream* other) {
 static struct PyMemberDef THDPStream_members[] = {{nullptr}};
 
 static struct PyGetSetDef THDPStream_properties[] = {
-    {"xpu_stream",
-     (getter)THDPStream_get_xpu_stream,
+    {"sycl_queue",
+     (getter)THDPStream_get_sycl_queue,
      nullptr,
      nullptr,
      nullptr},
@@ -177,8 +171,7 @@ void THDPStream_init(PyObject* module) {
   Py_INCREF(THPStreamClass);
   THDPStreamType.tp_base = THPStreamClass;
   THDPStreamClass = (PyObject*)&THDPStreamType;
-  auto ret = PyType_Ready(&THDPStreamType);
-  if (ret < 0) {
+  if (PyType_Ready(&THDPStreamType) < 0) {
     throw python_error();
   }
   Py_INCREF(&THDPStreamType);

@@ -6,8 +6,7 @@
 
 namespace xpu {
 
-struct THDPStream {
-  struct THPStream base;
+struct THDPStream : THPStream {
   xpu::dpcpp::DPCPPStream dpcpp_stream;
 };
 extern PyObject* THDPStreamClass;

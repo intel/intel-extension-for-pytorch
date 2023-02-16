@@ -7,17 +7,21 @@ class Stream(intel_extension_for_pytorch._C._XPUStreamBase):
         with intel_extension_for_pytorch.xpu.device(device):
             return super(Stream, cls).__new__(cls, priority=priority, **kwargs)
 
+    @property
+    def _as_parameter_(self):
+        return ctypes.c_void_p(self.sycl_queue)
+
     def __eq__(self, o):
         if isinstance(o, Stream):
             return super(Stream, self).__eq__(o)
         return False
 
     def __hash__(self):
-        return hash((self._cdata, self.device))
+        return hash((self.sycl_queue, self.device))
 
     def __repr__(self):
-        return ('<intel_extension_for_pytorch.Stream device={0} xpu_stream={1}>'
-                .format(self.device, self.xpu_stream))
+        return ('<intel_extension_for_pytorch.Stream device={0} sycl_queue={1:#x}>'
+                .format(self.device, self.sycl_queue))
 
     def wait_event(self, event):
         r"""Makes all future work submitted to the stream wait for an event.
