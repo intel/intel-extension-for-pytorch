@@ -512,24 +512,47 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last_3d))
                 self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last_3d))
 
-    @unittest.skipIf(True, "temporary disable before https://github.com/pytorch/pytorch/pull/92668 merged")
+    def test_GroupNorm_memory_format(self):
+        def helper(input_format, grad_format, B=2, C=4, W=4, H=4):
+            net_orig = torch.nn.GroupNorm(B, C)
+            net = copy.deepcopy(net_orig)
+            x_orig = torch.rand(B, C, W, H, requires_grad=True)
+            grad_orig = torch.rand(B, C, W, H)
+            x = x_orig.clone().detach().to(memory_format=input_format).requires_grad_(True)
+            grad = grad_orig.detach().to(memory_format=grad_format)
+            y = net(x)
+            y.backward(grad)
+            y_orig = net_orig(x_orig)
+            y_orig.backward(grad_orig)
+
+            self.assertEqual(y, y_orig)
+            self.assertEqual(x.grad, x_orig.grad)
+        for input_format in [torch.contiguous_format, torch.channels_last]:
+            for grad_format in [torch.contiguous_format, torch.channels_last]:
+                helper(input_format, grad_format)
+
     def test_groupnorm_nhwc(self):
-        def helper(self, size, groups, memory_format, dtype, prec=1e-5):
+        def helper(self, size, groups, memory_format, dtype, is_mixed):
             channels = size[1]
             input = torch.randn(size, dtype=dtype, requires_grad=True)
             input = input.contiguous(memory_format=memory_format)
             input.retain_grad()
             grad = torch.randn(size, dtype=dtype)
             grad = grad.contiguous(memory_format=memory_format)
-            gn = nn.GroupNorm(groups, channels).to(dtype)
+            if dtype == torch.bfloat16 and is_mixed:
+                gn = nn.GroupNorm(groups, channels).to(torch.float)
+            else:
+                gn = nn.GroupNorm(groups, channels).to(dtype)
             gn.weight.data.uniform_()
             gn.bias.data.uniform_()
 
             ref_input = input.detach().clone().contiguous().requires_grad_(True)
             ref_grad = grad.detach().clone().contiguous()
-            ref_gn = nn.GroupNorm(groups, channels).to(dtype)
+            if dtype == torch.bfloat16 and is_mixed:
+                ref_gn = nn.GroupNorm(groups, channels).to(torch.float)
+            else:
+                ref_gn = nn.GroupNorm(groups, channels).to(dtype)
             ref_gn.load_state_dict(gn.state_dict())
-
             out = gn(input)
             out.backward(grad)
             ref_out = ref_gn(ref_input)
@@ -537,51 +560,24 @@ class CPUOPsTester(TestCase):
 
             self.assertTrue(out.is_contiguous(memory_format=memory_format))
             self.assertTrue(ref_out.is_contiguous())
-            self.assertTrue(out.dtype == dtype)
-            self.assertTrue(input.grad.dtype == dtype)
-            self.assertEqual(out, ref_out, prec = prec)
-            self.assertEqual(input.grad, ref_input.grad, prec = prec)
-            if (dtype == torch.float32):
-                self.assertEqual(gn.weight.grad, ref_gn.weight.grad, prec=1e-04)
-                self.assertEqual(gn.bias.grad, ref_gn.bias.grad, prec=1e-04)
+            torch.testing.assert_close(out, ref_out)
+            # training: parameters in bfloat16 is not recommended
+            if (dtype != torch.bfloat16) or is_mixed:
+                torch.testing.assert_close(gn.weight.grad, ref_gn.weight.grad, atol=5e-4, rtol=5e-4)
+                torch.testing.assert_close(gn.bias.grad, ref_gn.bias.grad, atol=5e-4, rtol=5e-4)
+                torch.testing.assert_close(input.grad, ref_input.grad, atol=5e-4, rtol=8e-3)
 
-            # test mixed data type
-            if (dtype == torch.bfloat16):
-                # contiguous
-                ref_gn_fp32 = copy.deepcopy(ref_gn).to(torch.float32)
-                ref_input_bf16 = ref_input.clone().detach().requires_grad_()
-                ref_grad_bf16 = ref_grad.clone().detach()
-                ref_out_bf16 = ref_gn_fp32(ref_input_bf16)
-                ref_out_bf16.backward(ref_grad_bf16)
-
-                self.assertTrue(ref_out_bf16.is_contiguous())
-                self.assertTrue(ref_out_bf16.dtype == dtype)
-                self.assertEqual(ref_out_bf16, ref_out, prec = prec)
-                self.assertTrue(ref_input_bf16.grad.dtype == dtype)
-                self.assertEqual(ref_input_bf16.grad, ref_input.grad, prec = prec)
-
-                # channels last
-                gn_fp32 = copy.deepcopy(gn).to(torch.float32)
-                input_bf16 = input.clone().detach().requires_grad_()
-                grad_bf16 = grad.clone().detach()
-                out_bf16 = gn_fp32(input_bf16)
-                out_bf16.backward(grad_bf16)
-
-                self.assertTrue(out_bf16.is_contiguous(memory_format=memory_format))
-                self.assertTrue(out_bf16.dtype == dtype)
-                self.assertEqual(out_bf16, ref_out, prec = prec)
-                self.assertTrue(input_bf16.grad.dtype == dtype)
-                self.assertEqual(input_bf16.grad, ref_input.grad, prec = prec)
-
-        helper(self, (4, 8, 10, 10), 4, torch.channels_last, torch.float32)
-        helper(self, (2, 30, 9, 9), 3, torch.channels_last, torch.float32)
-        helper(self, (2, 9, 7, 11, 15), 3, torch.channels_last_3d, torch.float32)
-        helper(self, (4, 8, 10, 10), 4, torch.channels_last, torch.bfloat16, prec=0.04)
-        helper(self, (2, 30, 9, 9), 3, torch.channels_last, torch.bfloat16, prec=0.04)
-        helper(self, (2, 9, 7, 11, 15), 3, torch.channels_last_3d, torch.bfloat16, prec=0.04)
-        helper(self, (4, 8, 10, 10), 4, torch.channels_last, torch.double)
-        helper(self, (2, 30, 9, 9), 3, torch.channels_last, torch.double)
-        helper(self, (2, 9, 7, 11, 15), 3, torch.channels_last_3d, torch.double)
+        for dtype in [torch.float, torch.double, torch.bfloat16]:
+            for is_mixed in [True, False]:
+                helper(self, (4, 8, 10, 10), 4, torch.channels_last, dtype, is_mixed)
+                helper(self, (2, 30, 9, 9), 3, torch.channels_last, dtype, is_mixed)
+                helper(self, (4, 8, 40, 40), 4, torch.channels_last, dtype, is_mixed)
+                helper(self, (4, 40, 40, 40), 2, torch.channels_last, dtype, is_mixed)
+                helper(self, (2, 30, 50, 50), 3, torch.channels_last, dtype, is_mixed)
+                helper(self, (2, 60, 50, 50), 3, torch.channels_last, dtype, is_mixed)
+                helper(self, (2, 9, 7, 11, 15), 3, torch.channels_last_3d, dtype, is_mixed)
+                helper(self, (2, 9, 7, 200, 15), 3, torch.channels_last_3d, dtype, is_mixed)
+                helper(self, (2, 60, 7, 200, 15), 3, torch.channels_last_3d, dtype, is_mixed)
 
     def test_groupnorm_nwc(self):
         size = (4, 20, 20)

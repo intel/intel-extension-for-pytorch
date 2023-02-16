@@ -133,7 +133,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_group_norm_backward(
   c10::MaybeOwned<at::Tensor> gamma_maybe_owned =
       at::borrow_from_optional_tensor(gamma_opt);
   const at::Tensor& gamma = *gamma_maybe_owned;
-
+  TORCH_CHECK(
+      X.suggest_memory_format() == dY.suggest_memory_format(),
+      "Expected memory formats of X and dY are same.");
   at::Tensor dX;
   at::Tensor dgamma;
   at::Tensor dbeta;
@@ -144,7 +146,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_group_norm_backward(
         c10::nullopt /* layout */,
         c10::nullopt /* device */,
         c10::nullopt /* pin_memory */,
-        at::MemoryFormat::Contiguous);
+        X.suggest_memory_format());
   }
   if (grad_input_mask[1]) {
     dgamma = at::native::empty_like(
