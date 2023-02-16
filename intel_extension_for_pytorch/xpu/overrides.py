@@ -1,5 +1,6 @@
 import torch
 import intel_extension_for_pytorch  # noqa
+from functools import wraps
 
 from torch.overrides import (
     handle_torch_function,
@@ -44,7 +45,6 @@ def set_default_tensor_type(tensor_type):
             if kwargs is None:
                 kwargs = {}
 
-            print("johnlu function:", func)
             if func in HANDLED_FUNCTIONS_SUB:
                 return partial(func, device="xpu", dtype=self.dtype)(*args, **kwargs)
 
@@ -74,18 +74,13 @@ def enable_cl_to():
                 kwargs = {}
 
             if func in [torch.Tensor.to]:
-                print("johnlu catched:", func)
-                # print("kwargs", kwargs)
                 if "memory_format" in kwargs:
-                    print("got memory_format=", kwargs["memory_format"])
                     if kwargs["memory_format"] is torch.channels_last:
-                        print("to CL 2D")
                         # This is very hacking code for PoC
                         if args[0].dim == 4:
                             # Error: Correct this for moving the 2nd dim to the last one
                             return args[0].transpose(1, -1).contiguous().transpose(1, -1)
                     if kwargs["memory_format"] is torch.channels_last_3d:
-                        print("to CL 3D")
                         pass
             return func(*args, **kwargs)
 
@@ -99,3 +94,19 @@ def enable_cl_to():
 
     mode = partial(XPUDefaultTensorTypeMode)(inner=inner)
     mode_info.set_mode(mode)
+
+def fp64_tensor_totype_wrapper(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        for arg in args:
+            if torch.is_tensor(arg) and arg.is_xpu:
+                return arg.to(torch.float)
+        for k, kwarg in kwargs.items():
+            if torch.is_tensor(kwarg) and kwarg.is_xpu:
+                return kwarg.to(torch.float)
+        return f(*args, **kwargs)
+    return wrapper
+
+def override_tensor_totype():
+    r"""Override _tensor_totype to avoid triggering fp64 error when printing XPU tensor on ATS-M"""
+    torch._tensor_str.tensor_totype = fp64_tensor_totype_wrapper(torch._tensor_str.tensor_totype)

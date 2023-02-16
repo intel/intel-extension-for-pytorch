@@ -21,6 +21,7 @@ from .random import *
 from .memory import *
 from .overrides import set_default_tensor_type as set_default_tensor_type
 from .overrides import enable_cl_to as enable_cl_to
+from .overrides import override_tensor_totype
 from .generator import Generator
 
 from torch._utils import _get_device_index
@@ -491,3 +492,6 @@ if hasattr(intel_extension_for_pytorch._C, '_postInitExtension'):
 # class DoubleTensor:
 #     def __new__(cls, e):
 #         return torch.tensor(e, device='xpu', dtype=torch.float64)
+
+if intel_extension_for_pytorch._C._has_xpu() and not has_fp64_dtype():
+    override_tensor_totype()
