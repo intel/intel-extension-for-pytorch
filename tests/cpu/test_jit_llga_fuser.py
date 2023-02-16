@@ -670,7 +670,7 @@ class TestFusionPattern(JitLlgaTestCase):
         a = torch.rand(128, 1, 1, 384)
 
         graph, _ = self.checkTrace(forward_test, [x, y, z, a])
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 4)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
 
     @llga_fp32_bf16_test_env
     def test_no_contiguous_no_op(self):

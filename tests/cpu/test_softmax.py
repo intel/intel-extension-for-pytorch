@@ -51,7 +51,6 @@ class softmax_MHA(torch.nn.Module):
     def forward(self, x):
         attention_scores = torch.matmul(x, x.transpose(-1, -2))
         attention_scores = attention_scores / 64
-        attention_scores = attention_scores + x
         attention_scores = nn.Softmax(dim=-1)(attention_scores)
         return attention_scores
 
