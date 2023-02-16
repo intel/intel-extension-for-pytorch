@@ -18,7 +18,7 @@ TEST_MODULE_CONVERT_LIST = [torch.nn.Conv2d,
                             torch.nn.LSTM]
 
 # TODO: for now, only support SGD and AdamW
-SUPPORTED_FUSION_OPTIMIZER = ['SGD', 'AdamW']
+SUPPORTED_FUSION_OPTIMIZER = ['SGD', 'AdamW', 'Lars']
 
 
 class InferenceModel(nn.Module):
@@ -181,6 +181,17 @@ class TestTorchMethod(TestCase):
             elif optimizer_string.lower() == 'sgd':
                 optimizer_xpu_no_fuse = torch.optim.SGD(model_xpu_no_fuse.parameters(), lr=lr)
                 optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr)
+            elif optimizer_string.lower() == 'lars':
+                momentum = 0.9
+                epsilon = 0.001
+                optimizer_xpu_no_fuse = torch.xpu.optim.Lars(model_xpu_no_fuse.parameters(),
+                                                             lr=lr, weight_decay=weight_decay,
+                                                             momentum=momentum,
+                                                             epsilon=epsilon)
+                optimizer_xpu = torch.xpu.optim.Lars(model_xpu.parameters(),
+                                                     lr=lr, weight_decay=weight_decay,
+                                                     momentum=momentum,
+                                                     epsilon=epsilon)
             else:
                 raise RuntimeError("found unknown optimizer {}".format(optimizer_string))
 

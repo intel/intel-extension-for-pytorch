@@ -5,8 +5,9 @@ import warnings
 from copy import deepcopy
 from itertools import chain
 from collections import defaultdict
-from ._functional import sgd_step, adagrad_step, lamb_step, adam_step, adamw_step
+from ._functional import sgd_step, adagrad_step, lamb_step, adam_step, adamw_step, lars_step
 from ._lamb import Lamb
+from .lars import Lars
 from ..nn import utils
 
 IPEX_FUSED_OPTIMIZER_LIST_CPU = [
@@ -28,10 +29,10 @@ OPTIMIZER_FUSED_STEP_MAPPING_CPU = {
     Lamb: lamb_step,
 }
 
-# TODO: For align frontend and pass build, the xpu code is temp commented
 OPTIMIZER_FUSED_STEP_MAPPING_XPU = {
     torch.optim.SGD: sgd_step,
     torch.optim.AdamW: adamw_step,
+    Lars: lars_step,
 }
 
 
@@ -343,7 +344,6 @@ def optimizer_fusion(optimizer, master_weight_split, device_type):
     r"""
     Patch "step" method to choose IPEX optimized fused update kernel.
     """
-    setattr(optimizer, 'fused', True) # noqa B010
     if not hasattr(optimizer, 'params_attr'):
         setattr(optimizer, 'params_attr', {}) # noqa B010
     try:
@@ -359,6 +359,7 @@ def optimizer_fusion(optimizer, master_weight_split, device_type):
         if not hasattr(optimizer, '_original_step'):
             setattr(optimizer, '_original_step', optimizer.step) # noqa B010
         setattr(optimizer, 'step', types.MethodType(step, optimizer)) # noqa B010
+        setattr(optimizer, 'fused', True) # noqa B010
     except KeyError:
         warnings.warn("Does not suport fused step for " + str(type(optimizer)) + ", will use non-fused step")
     return optimizer

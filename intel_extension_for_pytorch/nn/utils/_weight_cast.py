@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from intel_extension_for_pytorch.optim import _optimizer_utils, _lamb # noqa F401
+from intel_extension_for_pytorch.optim import _optimizer_utils, _lamb, lars # noqa F401
 import types
 from ._model_convert import _LSTM
 from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBag as MergedEmbeddingBag
