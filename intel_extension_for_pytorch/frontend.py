@@ -1,4 +1,6 @@
 import copy
+import sys
+import pkg_resources
 
 import torch
 import torch._dynamo
@@ -13,6 +15,11 @@ from intel_extension_for_pytorch.utils.channels_last_1d import to_channels_last_
 from intel_extension_for_pytorch.utils.linear_bn_folding import linear_bn_fuse
 from enum import IntEnum
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl
+import intel_extension_for_pytorch._C as torch_ipex_cpp
+try:
+    from . import tpp 
+except:
+    warnings.warn("pls install transformers repo when you want to use fast_bert API")
 
 from typing import List
 import functools
@@ -659,3 +666,102 @@ def get_fp32_math_mode(device="cpu"):
         return torch.xpu.get_fp32_math_mode()
     else:
         raise RuntimeError("Unexpected device type {}. ".format(device) + "Supported are 'cpu', 'xpu'.")
+
+def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
+    r"""
+    Use TPP to speedup training/inference. fast_bert API is still a experimental 
+    feature and now only optimized for bert model. 
+
+    Args:
+        model (torch.nn.Module): User model to apply optimizations on.
+        dtype (torch.dtype): Only works for ``torch.bfloat16`` and ``torch.float`` .
+            The default value is torch.float.
+        optimizer (torch.optim.Optimizer): User optimizer to apply optimizations
+            on, such as SGD. The default value is ``None``, meaning inference case.
+        unpad(bool): Unpad the squence to reduce the sparsity. 
+        seed(string): The seed used for the libxsmm kernel. In general it should be same 
+            to the torch.seed   
+
+    .. warning::
+
+        Please invoke ``fast_bert`` function AFTER loading weights to model via
+        ``model.load_state_dict(torch.load(PATH))``.
+
+    .. warning::
+        
+        This API can't be used when you have applied the ipex.optimize.
+
+    .. warning::
+
+        Please invoke ``optimize`` function BEFORE invoking DDP in distributed
+        training scenario. 
+
+    Examples:
+
+        >>> # bfloat16 inference case.
+        >>> model = ...
+        >>> model.load_state_dict(torch.load(PATH))
+        >>> model.eval()
+        >>> optimized_model = ipex.tpp_bert(model, dtype=torch.bfloat16)
+        >>> # running evaluation step.
+        >>> # bfloat16 training case.
+        >>> optimizer = ...
+        >>> model.train()
+        >>> optimized_model, optimized_optimizer = ipex.fast_bert(model, dtype=torch.bfloat16, optimizer=optimizer, unpad=True, seed=args.seed)
+        >>> # running training step.
+
+    """
+    #tpp bert optimization depends on the transformers repo to implementate the related module
+    installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
+    min_version = '4.6.0'
+    max_version = '4.20.0'
+    if 'transformers' not in installed_pkg:
+        raise RuntimeError("Please installed the transformers with version: between {} and {}".format(min_version, max_version))
+    
+    import transformers
+    from packaging import version 
+    trans_version = transformers.__version__
+    if version.parse(trans_version) < version.parse(min_version) or version.parse(trans_version) > version.parse(max_version):
+        raise RuntimeError("Please installed the transformers with version: between {} and {} while now transformers== {}".format(min_version, max_version, trans_version))
+    PT_OPTIMIZER_TO_TPP_OPTIMIZER = {torch.optim.AdamW : tpp.optim.AdamW,
+                                      transformers.optimization.AdamW : tpp.optim.AdamW,
+                                      torch.optim.SGD : tpp.optim.SGD}
+    assert(dtype == torch.float or dtype == torch.bfloat16, "TPP only support torch.float and torch.bfloat16")    
+       
+    #setup the seed for libxsmm which will imapct some ops using seed. e.g., dropout         
+    torch_ipex_cpp.xsmm_manual_seed(torch.initial_seed())
+    #replace the original transfomers module object with tpp module which has the same functionality but with more 
+    #operator fusion optimization 
+    new_model = copy.deepcopy(model)
+    tpp.fused_bert.layer_use_bf16 = True if dtype == torch.bfloat16 else False
+    if unpad:        
+        tpp.fused_bert.unpad = True        
+    else:
+        tpp.fused_bert.unpad = False
+    assert(isinstance(new_model.bert.embeddings, transformers.models.bert.modeling_bert.BertEmbeddings))
+    new_model.bert.embeddings = tpp.fused_bert.BertEmbeddings(model.bert.config)
+    assert(isinstance(new_model.bert.encoder, transformers.models.bert.modeling_bert.BertEncoder))
+    new_model.bert.encoder =  tpp.fused_bert.BertEncoder(model.bert.config)
+    new_model.load_state_dict(model.state_dict())#copy the original params into the tpp module  
+    tpp.block(new_model)#get block format weights/bias
+    if optimizer is None:
+        return new_model
+    if optimizer is not None and type(optimizer) not in PT_OPTIMIZER_TO_TPP_OPTIMIZER and dtype == torch.bfloat16:
+        warnings.warn("Still return the origin optimize, the fast_bert can only replace the SGD, AdamW optimizer") 
+        return new_model, optimizer
+    #replace the original pytorch/transformer optimizer with tpp optimizer 
+    #keep the original optimizer state and replace the params with the blocked tpp params
+    param_pair = {}
+    for param_ori, param_tpp in zip(model.parameters(), new_model.parameters()):
+        param_pair[param_ori] = param_tpp
+    tpp_optimizer = PT_OPTIMIZER_TO_TPP_OPTIMIZER[type(optimizer)]([{'params':[]}])
+    tpp_optimizer.state = optimizer.state
+    tpp_optimizer.param_groups = optimizer.param_groups
+    for group in tpp_optimizer.param_groups:
+        for i, p in enumerate(group['params']):
+            if p in param_pair:
+                new_param = param_pair[p]
+                group['params'][i] = new_param
+
+    return new_model, tpp_optimizer
+

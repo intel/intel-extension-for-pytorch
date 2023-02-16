@@ -21,13 +21,17 @@ if torch_version == '' or ipex_version == '' or torch_version != ipex_version:
   print('ERROR! Intel® Extension for PyTorch* needs to work with PyTorch {0}.*, but PyTorch {1} is found. Please switch to the matching version and run again.'.format(ipex_version, torch.__version__))
   exit(127)
 
+
 from . import cpu
 from . import quantization
 from . import nn
 from . import jit
 
+from . import tpp
+
+
 from .utils.verbose import verbose
-from .frontend import optimize, enable_auto_channels_last, disable_auto_channels_last, enable_onednn_fusion, set_fp32_math_mode, get_fp32_math_mode, FP32MathMode
+from .frontend import optimize, enable_auto_channels_last, disable_auto_channels_last, enable_onednn_fusion, set_fp32_math_mode, get_fp32_math_mode, FP32MathMode, fast_bert
 from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl
 
 # for xpu
