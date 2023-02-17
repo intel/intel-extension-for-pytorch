@@ -201,6 +201,7 @@ class AutocastCPUTestLists(object):
         self.nn_fp16 = [
         ]
         self.torch_fp16_fp32 = [
+            ("relu", mat0_fp16),
             ("conv1d", conv_args_fp16[0]),
             ("conv2d", conv_args_fp16[1]),
             ("conv3d", conv_args_fp16[2]),
