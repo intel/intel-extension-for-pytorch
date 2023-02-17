@@ -36,6 +36,7 @@ if(CLANG_FORMAT)
   add_custom_target(CL_FORMAT_FRONT_END_NATIVE_CSRC COMMAND ${CLANG_FORMAT_EXEC} -i -style=file ${ALL_NATIVE_CSRC_FILES})
   add_dependencies(intel-ext-pt-python CL_FORMAT_FRONT_END_NATIVE_CSRC)
 endif()
+include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/include)
 
 target_include_directories(intel-ext-pt-python PUBLIC ${TORCH_INCLUDE_DIRS})
 target_include_directories(intel-ext-pt-python PUBLIC ${PYTHON_INCLUDE_DIR})

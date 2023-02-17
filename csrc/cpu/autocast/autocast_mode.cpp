@@ -370,6 +370,8 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
       fp32)
   // fallthrough and fp32 cast policies
   MAKE_REGISTER_FUNC_TWO_POLICIES(
+      ADD_NS(relu), "relu", Tensor(const Tensor&), fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(
       ADD_NS(mish), "mish", Tensor(const Tensor&), fallthrough, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       ADD_NS(batch_norm),
