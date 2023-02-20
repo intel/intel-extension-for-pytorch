@@ -2624,7 +2624,6 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_linear_tanh_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
         model = LinearTanh(4, 4)
@@ -2633,7 +2632,7 @@ class TestNNMethod(TestCase):
 
         x = x.to("xpu")
         model.to("xpu")
-        modelJit = torch.jit.trace(model, x, check_trace=True)
+        modelJit = torch.jit.trace(model, x)
 
         with torch.no_grad():
             for i in range(3):
