@@ -17,7 +17,7 @@ Besides, DPC++ extension also supports compilation with `CMake`. We’ll discuss
 ### Building with setuptools
 
 For building with `setuptools`, we build our DPC++ extension by writing a `setup.py` script that uses `setuptools` to compile our C++ code. For the Long-Long-Term-Memory unit (LLTM), it looks like this:
-```
+```python
 from setuptools import setup
 import torch
 import intel_extension_for_pytorch
@@ -36,7 +36,7 @@ setup(
     })
 ```
 In this code, `DPCPPExtension` is a convenience wrapper around `setuptools.Extension` that passes the correct include paths and sets the language of the extension to C++. The equivalent vanilla `setuptools` code would simply be:
-```
+```python
 Extension(
    name='lltm_xpu',
    sources=['lltm_xpu.cpp', 'lltm_xpu_kernel.cpp',],
@@ -47,7 +47,7 @@ Extension(
 
  Let’s take a look at the implementation of our DPC++ extension, which goes into `lltm_xpu.cpp` and `lltm_xpu_kernel.cpp`.
 After building the Python module with DPC++ extension, the `lltm_xpu` is available for importing as an extension plug-in.
-```
+```python
 import lltm_xpu
 ```
 
@@ -56,7 +56,7 @@ import lltm_xpu
 
 Previously, we mentioned that there were two ways of building DPC++ extensions: use setuptools as AOT or compile with JIT. Having the former one introduced, let’s elaborate on the latter one. The JIT compilation mechanism provides a methodology to compile and load your extensions on the fly by invoking a simple `torch` API function `torch.xpu.cpp_extension.load()`. For the LLTM, this would look as simple as this:
 
-```
+```python
 import torch
 import intel_extension_for_pytorch
 from torch.xpu.cpp_extension import load
@@ -82,7 +82,7 @@ The resulting Python module are exactly the same as the ones produced by `setupt
 
 For building with `CMake`, we build our DPC++ extension by writing a `CMakeLists.txt` file that uses CMake to build our C++ code. For the same example we showed using `setuptools`, the `CMakeLists.txt` looks like this:
 CMakeLists.txt
-```
+```cmake
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 project(lltm_xpu)
 
@@ -115,23 +115,43 @@ $ python
 >>> import lltm_xpu
 ```
 
-### Requesting the current c10 stream
+### Requesting the current c10::Stream
 
-If you need to get the current c10 stream on the current XPU device to do synchronization. You can implement it as below.
-```
+If you need to get the current `c10::Stream` on the current XPU device to do synchronization. You can implement it as below.
+```cpp
 auto device_type = c10::DeviceType::XPU;
 c10::impl::VirtualGuardImpl impl(device_type);
 c10::Stream c10_stream = impl.getStream(c10::Device(device_type));
 c10_stream.synchronize();
 ```
 
-In addition, we provide the `xpu::get_queue_from_stream` API to fetch the sycl::queue from the c10 stream. You can submit a customized kernel via sycl::queue by yourself. Refer to [Writing the DPC++ Op](#writing-the-dpc-op) for more details.
+### Fetching the corresponding sycl::queue
+
+We provide some APIs to fetch the corresponding `sycl::queue` associated with the 
+current `c10::Stream`.
+In C++ code, you can fetch a `sycl::queue` reference as below.
+```cpp
+auto device_type = c10::DeviceType::XPU;
+c10::impl::VirtualGuardImpl impl(device_type);
+c10::Stream c10_stream = impl.getStream(c10::Device(device_type));
+auto& queue = xpu::get_queue_fromSo_stream(c10_stream);
+```
+In python code, you can use the below codes to get a `sycl::queue` pointer, which
+is stored by `PyLong_FromVoidPtr`.
+```python
+import torch
+import intel_extension_for_pytorch
+stream = torch.xpu.current_stream()
+queue = stream.sycl_queue # queue is a sycl::queue pointer
+```
+Subsequently, you can submit a customized kernel via `sycl::queue` by yourself. Refer to [Writing the DPC++ Op](#writing-the-dpc-op) for more details.
+
 ### Writing the DPC++ Op
 
 The general strategy for writing a DPC++ extension is to write a C++ file that defines the functions that are called from Python, and binds those functions to Python with pybind11. The C++ functions do some checks and ultimately forward the calls to submit SYCL kernels. The `ipex.cpp_extension` package then takes care of compiling the C++ sources with a DPC++ compiler. 
 
 Let's consider the PyTorch CUDA examples https://pytorch.org/tutorials/advanced/cpp_extension.html#writing-a-mixed-c-cuda-extension. Here is how we implement it in DPC++ style:
-```
+```cpp
 #include <torch/extension.h>
 
 #include <vector>
@@ -218,7 +238,7 @@ The bridge code checks and forwards the calls to functions that we’ll define i
 
 Let’s go through the DPC++ code step by step:
 
-```
+```cpp
 #include <torch/extension.h>
 
 #include <ipex.h>
@@ -233,7 +253,7 @@ scalar_t sigmoid(scalar_t z) {
 
 At the beginning of the code, we include `<torch/extension.h>` that will introduce all the torch definitions into the code. After that, the `<ipex.h>` line includes the SYCL header in DPC++. With the `<torch/extension.h>` and `<ipex.h>`, all the essential declarations have been included for writing the DPC++ kernel to run on the XPU device. The helper function `sigmoid` does the math calculation with the more efficient C++ language. Next are some more helper functions for LLTM:
 
-```
+```cpp
 template <typename scalar_t>
 scalar_t d_sigmoid(scalar_t z) {
   const auto s = sigmoid(z);
@@ -265,8 +285,7 @@ Now we can implement the actual code for our extension with two functions in DPC
 
 For the forward pass, the first function looks like this:
 
-```
-
+```cpp
 std::vector<torch::Tensor> lltm_xpu_forward(
         torch::Tensor input,
         torch::Tensor weights,
@@ -306,7 +325,7 @@ The purpose of `AT_DISPATCH_FLOATING_TYPES` is to take care of this dispatch for
 
 Here's how to submit the actual kernel to the XPU device:
 
-```
+```cpp
 template <typename scalar_t>
 void lltm_xpu_forward_kernel(
         const scalar_t* gates,
@@ -352,7 +371,7 @@ void lltm_xpu_forward_kernel(
   auto device_type = c10::DeviceType::XPU;
   c10::impl::VirtualGuardImpl impl(device_type);
   c10::Stream c10_stream = impl.getStream(c10::Device(device_type));
-  auto queue = xpu::get_queue_from_stream(c10_stream);
+  auto& queue = xpu::get_queue_from_stream(c10_stream);
 
   queue.submit(cgf);
 }
@@ -370,7 +389,7 @@ However, this comes at a cost of ease of use and readability, especially for hig
 
 The backwards pass follows much the same pattern but with the `torch::PackedTensorAccessor32`. You can get more information about these utils in torch documents:
 
-```
+```cpp
 template <typename scalar_t>
 void lltm_xpu_backward_kernel(
         torch::PackedTensorAccessor32<scalar_t,2> d_old_cell,
@@ -428,7 +447,7 @@ void lltm_xpu_backward_kernel(
   auto device_type = c10::DeviceType::XPU;
   c10::impl::VirtualGuardImpl impl(device_type);
   c10::Stream c10_stream = impl.getStream(c10::Device(device_type));
-  auto queue = xpu::get_queue_from_stream(c10_stream);
+  auto& queue = xpu::get_queue_from_stream(c10_stream);
 
   queue.submit(cgf);
 }
