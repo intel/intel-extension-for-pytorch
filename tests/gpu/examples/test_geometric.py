@@ -32,7 +32,6 @@ class TestTorchMethod(TestCase):
         self.assertRaises(ValueError, lambda: Geometric(0))
         self.assertRaises(NotImplementedError, Geometric(r).rsample)
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_basic_geometric(self, dtype=torch.float):
         device = sycl_device
         # This function is directly ported from 1.13 test_torch.py
@@ -40,7 +39,6 @@ class TestTorchMethod(TestCase):
         self.assertEqual(a.dtype, dtype)
         self.assertEqual(a.size(), torch.Size([1]))
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     @dtypes(torch.float)
     def test_geometric_kstest(self, dtype=torch.int8):
 

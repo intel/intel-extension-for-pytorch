@@ -29,7 +29,8 @@ void geometric_scalar_dpcpp(
         auto geometric_func = [p](accscalar_t rand) {
           // https://en.wikipedia.org/wiki/Geometric_distribution#Related_distributions
           return static_cast<scalar_t>(Numerics<accscalar_t>::ceil(
-              at::log(rand) / at::log(static_cast<accscalar_t>(1.0) - p)));
+              Numerics<accscalar_t>::log(rand) /
+              Numerics<accscalar_t>::log(static_cast<accscalar_t>(1.0) - p)));
         };
         uniform_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
             iter, gen, geometric_func);
