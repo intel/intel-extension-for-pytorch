@@ -159,13 +159,13 @@ void compute_grad_weight_bags(
       const int idx_end =
           (id == num_of_segments - 1) ? numel : segment_offsets_ptr[id + 1];
 
-      acc_type<scalar_t> weight = 0;
+      acc_type<scalar_t> weight = 0.f;
       for (int idx = idx_begin; idx < idx_end; ++idx) {
         const int orig_row = indices_ptr[idx];
         const int seq_number = offset2bag_ptr[orig_row];
         const int grad_output_row = seq_number * stride;
 
-        acc_type<scalar_t> scale = count_ptr ? 1.0 / count_ptr[idx] : 1.0;
+        acc_type<scalar_t> scale = count_ptr ? 1.f / count_ptr[idx] : 1.f;
         if (per_sample_weight_defined) {
           scale *= per_sample_weights_ptr[orig_row * per_sample_weights_stride];
         }
@@ -241,11 +241,11 @@ void compute_grad_weight(
       const int idx_end =
           (id == num_of_segments - 1) ? numel : segment_offsets_ptr[id + 1];
 
-      acc_type<scalar_t> weight = 0;
+      acc_type<scalar_t> weight = 0.f;
       for (int idx = idx_begin; idx < idx_end; idx++) {
         const index_t target_row = indices_ptr[idx];
 
-        const acc_type<scalar_t> scale = count_ptr ? 1.0 / count_ptr[idx] : 1.0;
+        const acc_type<scalar_t> scale = count_ptr ? 1.f / count_ptr[idx] : 1.f;
         weight += grad_output_ptr[target_row * stride + startFeature] * scale;
       }
       grad_weight_per_segment_ptr[id * stride + startFeature] = weight;
@@ -309,7 +309,7 @@ void sum_and_scatter(
       const int idx_end = (id == num_of_segments - 1)
           ? num_of_partial_segments
           : segment_sizes_offsets_ptr[id + 1];
-      acc_type<scalar_t> weight = 0;
+      acc_type<scalar_t> weight = 0.f;
       for (int idx = idx_begin; idx < idx_end; idx++) {
         weight += grad_weight_per_segment_ptr[idx * stride + startFeature];
       }
