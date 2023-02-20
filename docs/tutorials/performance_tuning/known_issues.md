@@ -1,6 +1,8 @@
 Known Issues
 ============
 
+- There might be Python packages having PyTorch as their hard dependency. If you installed `+cpu` version of PyTorch, installation of these packages might replace the `+cpu` version with the default version released on Pypi.org. If anything goes wrong, please reinstall the `+cpu` version back.
+
 - If you found the workload runs with Intel® Extension for PyTorch\* occupies a remarkably large amount of memory, you can try to reduce the occupied memory size by setting the `--weights_prepack` parameter of the `ipex.optimize()` function to `False`.
 
 - Supporting of EmbeddingBag with INT8 when bag size > 1 is working in progress.

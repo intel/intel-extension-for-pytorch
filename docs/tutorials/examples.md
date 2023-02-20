@@ -3,6 +3,8 @@ Examples
 
 **_NOTE:_** Check individual feature page for examples of feature usage. All features are listed in the [feature page](./features.rst).
 
+**_NOTE:_** Feature examples and examples below are available at Github source tree, under `examples` directory.
+
 ## Training
 
 ### Single-instance Training

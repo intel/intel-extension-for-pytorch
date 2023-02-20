@@ -1,6 +1,8 @@
-## Auto Channels Last
+Auto Channels Last
+==================
+
 Channels last memory format is known to have performance advantage over channels first memory format. Refer to [Channels Last](./nhwc.md) for details.
-Intel® Extension for PyTorch* automatically converts the model to channels last memory format by default when users optimize their model with `ipex.optimize(model)`. 
+Intel® Extension for PyTorch\* automatically converts the model to channels last memory format by default when users optimize their model with `ipex.optimize(model)`.
 
 ## Ease-of-use auto channels last API
 #### default

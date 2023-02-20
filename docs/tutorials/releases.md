@@ -1,6 +1,17 @@
 Releases
 =============
 
+## 1.13.100
+
+### Highlights
+
+- Quantization optimization with more fusion, op and auto channels last support [#1318](https://github.com/intel/intel-extension-for-pytorch/commit/5dd3a6ed9017197dea5c05c3af6d330336ed8eff) [#1353](https://github.com/intel/intel-extension-for-pytorch/commit/461b867021e1471c93a1a2a96255247c9d2ab45b) [#1328](https://github.com/intel/intel-extension-for-pytorch/commit/ff3f527025d2102898df9d02977df955e31ddf69) [#1355](https://github.com/intel/intel-extension-for-pytorch/commit/d21111565a179bb8f7ef6db3c04fafbe94871b61) [#1367](https://github.com/intel/intel-extension-for-pytorch/commit/2b898a935e597cfa92ee01a064a626763657c952) [#1384](https://github.com/intel/intel-extension-for-pytorch/commit/a81bd7023e9a119d1ce5f86307865b443034909e)
+- Installation and build enhancement [#1295](https://github.com/intel/intel-extension-for-pytorch/commit/9da7844b75b7cf22d9f4f5401178948919c40914) [#1392](https://github.com/intel/intel-extension-for-pytorch/commit/ef12c70c3ed496e723ac087ea5703dae7df0358d)
+- OneDNN graph and OneDNN update [#1376](https://github.com/intel/intel-extension-for-pytorch/commit/dab9dc18659da53e624637166283ccc8db1373f9)
+- Misc fix and enhancement [#1373](https://github.com/intel/intel-extension-for-pytorch/commit/085ba5d93773ab283e954a4fce75468708b74d3a) [#1338](https://github.com/intel/intel-extension-for-pytorch/commit/0bdf4b27dc445eb8fd0d59f46d157949db597953) [#1391](https://github.com/intel/intel-extension-for-pytorch/commit/2e8289967472553a049158d55e60835371829925) [#1322](https://github.com/intel/intel-extension-for-pytorch/commit/f69492345eb8a9383a67d9416146c2b73de19d8d)
+
+**Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v1.13.0+cpu...v1.13.100+cpu
+
 ## 1.13.0
 
 We are pleased to announce the release of Intel® Extension for PyTorch\* 1.13.0-cpu which accompanies PyTorch 1.13. This release is highlighted with quite a few usability features which help users to get good performance and accuracy on CPU with less effort. We also added a couple of performance features as always. Check out the feature summary below.

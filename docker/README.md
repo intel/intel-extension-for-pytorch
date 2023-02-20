@@ -4,20 +4,20 @@
 
   If you use linux kernerl under version 5.4 in host, upgrade it.
 
-* How to build image
+* How to build an image
 
-  Run the following commands to build the `Pip` based deployment container:
+  Run the following commands to build a `pip` based container with the latest stable version prebuilt wheel files:
 
   ```console
   $ cd $DOCKERFILE_DIR
-  $ DOCKER_BUILDKIT=1 docker build -f Dockerfile.pip -t intel-extension-for-pytorch:pip .
-  $ docker run --rm intel-extension-for-pytorch:pip python -c "import torch; import intel_extension_for_pytorch as ipex; print('torch:', torch.__version__,' ipex:',ipex.__version__)"
+  $ DOCKER_BUILDKIT=1 docker build -f Dockerfile.prebuilt -t intel-extension-for-pytorch:prebuilt .
+  $ docker run --rm intel-extension-for-pytorch:prebuilt python -c "import torch; import intel_extension_for_pytorch as ipex; print('torch:', torch.__version__,' ipex:',ipex.__version__)"
   ```
 
-  Run the following commands to build the `Conda` based development container:
+  Run the following commands to build a `conda` based container with Intel® Extension for PyTorch\* compiled from source:
 
   ```console
   $ cd $DOCKERFILE_DIR
-  $ DOCKER_BUILDKIT=1 docker build -f Dockerfile.conda -t intel-extension-for-pytorch:conda .
-  $ docker run --rm intel-extension-for-pytorch:conda python -c "import torch; import intel_extension_for_pytorch as ipex; print('torch:', torch.__version__,' ipex:',ipex.__version__)"
+  $ DOCKER_BUILDKIT=1 docker build -f Dockerfile.compile -t intel-extension-for-pytorch:compile .
+  $ docker run --rm intel-extension-for-pytorch:compile python -c "import torch; import intel_extension_for_pytorch as ipex; print('torch:', torch.__version__,' ipex:',ipex.__version__)"
   ```
