@@ -90,6 +90,86 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::_convolution', 'aten::dequantize'])
                 self.checkPatterns(graph, patterns)
 
+    def test_deconv_int8_in_f32_out(self):
+        class M(nn.Module):
+            def __init__(self, in_channels, out_channels, kernel_size, padding, stride, dilation, groups, bias, module):
+                super(M, self).__init__()
+                self.conv = module(in_channels=in_channels * groups,
+                              out_channels=out_channels * groups,
+                              kernel_size=kernel_size,
+                              padding=padding,
+                              stride=stride,
+                              dilation=dilation,
+                              groups=groups,
+                              bias=bias)
+                inverse_module = torch.nn.ConvTranspose2d if (module == torch.nn.Conv2d) else torch.nn.ConvTranspose3d
+                self.deconv = inverse_module(in_channels=out_channels * groups,
+                              out_channels=in_channels * groups,
+                              kernel_size=kernel_size,
+                              padding=padding,
+                              stride=stride,
+                              dilation=dilation,
+                              groups=groups,
+                              bias=bias)
+
+            def forward(self, x):
+                y = self.conv(x)
+                return self.deconv(y)
+
+        for [
+                spatial,
+                in_channels,
+                out_channels,
+                kernel,
+                padding,
+                stride,
+                dilation,
+                g,
+                bias,
+                memory_format,
+                module,
+            ] in itertools.product(
+                [7],
+                [8],
+                [7],
+                [3],
+                [0, 2],
+                [1, 2],
+                [1, 2],
+                [1, 2],
+                [True, False],
+                [torch.contiguous_format, torch.channels_last],
+                [torch.nn.Conv2d, torch.nn.Conv3d]):
+
+                m =  M(in_channels=in_channels,
+                              out_channels=out_channels,
+                              kernel_size=kernel,
+                              padding=padding,
+                              stride=stride,
+                              dilation=dilation,
+                              groups=g,
+                              bias=bias,
+                              module=module)
+
+                input_shape = [1, in_channels * g, spatial, spatial]
+                if module == torch.nn.Conv3d:
+                    input_shape.append(spatial)
+                    if memory_format == torch.channels_last:
+                        memory_format = torch.channels_last_3d
+                x = torch.rand(input_shape).to(memory_format=memory_format)
+
+                patterns = [
+                    ["aten::dequantize", "aten::_convolution"], ["aten::dequantize", "aten::_convolution"]
+                ]
+
+                #TODO: enable more config case.
+                for qconfig in static_qconfig:
+                    input_shape[0] = 5
+                    graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=qconfig)
+                    self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+                    self.assertFused(graph, ['aten::_convolution', 'aten::dequantize'])
+                    self.checkPatterns(graph, patterns)
+
     def test_conv_no_freeze(self):
         m = nn.Conv2d(in_channels=3,
                         out_channels=3,
@@ -520,11 +600,13 @@ class TestFusionPattern(JitLlgaTestCase):
         for inplace in [False, True]:
             m = M(inplace)
             x = torch.rand(1, 3, 28, 28)
-            silu_op = 'aten::silu_' if inplace else 'aten::silu'
             graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
-            # TODO: deconv is unsupported in the bridge, thus conv-silu will be fused by IPEX
-            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
-            self.assertGraphContainsExactly(graph, silu_op, 1)         
+
+            patterns = [
+                ["aten::dequantize", "aten::_convolution", 'aten::sigmoid', 'aten::mul']
+            ]
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+            self.checkPatterns(graph, patterns)
 
     def test_ensure_tensor_is_rewrapped(self):
         class M(nn.Module):
@@ -938,6 +1020,31 @@ class TestFusionPattern(JitLlgaTestCase):
                 graph = self.checkQuantizeTrace(m, [x])
                 self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
                 self.assertFused(graph, ['aten::_convolution', 'aten::quantize_per_channel', 'aten::dequantize'])
+                self.checkPatterns(graph, patterns)
+
+    def test_conv2d_hardsigmoid_mul_(self):
+        class M(nn.Module):
+            def __init__(self, in_channels, out_channels, kernel_size, image_size):
+                super(M, self).__init__()
+                self.conv = torch.nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+                self.activation = torch.nn.Hardsigmoid()
+
+            def forward(self, x):
+                a = self.conv(x)
+                b = self.activation(a)
+                res = a.mul_(b)
+                return res
+
+        for memory_format in [torch.contiguous_format, torch.channels_last]:
+            m = M(3, 16, 3, 224).eval()
+            x = torch.rand(1, 3, 224, 224, requires_grad=False).to(memory_format=memory_format)
+            patterns = [
+                ["aten::dequantize", "aten::_convolution", "aten::hardsigmoid", "aten::mul"],
+            ]
+            for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+                graph = self.checkQuantizeTrace(m, [x])
+                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+                self.assertFused(graph, ['aten::_convolution', 'aten::hardsigmoid', 'aten::mul', 'aten::quantize_per_channel', 'aten::dequantize'])
                 self.checkPatterns(graph, patterns)
 
     def test_linear_dropout_sum(self):
@@ -1695,6 +1802,34 @@ class TestShapeFallback(JitLlgaTestCase):
 
                 # TODO: enable this check when size peephole optimization is enabled
                 # self.assertGraphContainsExactly(graph, "aten::size", 0)
+
+    def test_add_recipe(self):
+        class ConvAddRelu(nn.Module):
+            def __init__(self, in_channels, out_channels, kernel_size, image_size):
+                super(ConvAddRelu, self).__init__()
+                self.conv = torch.nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+
+            def forward(self, x1, x2):
+                return torch.relu(torch.add(self.conv(x1), x2))
+
+        class ConvAdd(nn.Module):
+            def __init__(self, in_channels, out_channels, kernel_size, image_size):
+                super(ConvAdd, self).__init__()
+                self.conv = torch.nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+
+            def forward(self, x1, x2):
+                return torch.add(self.conv(x1), x2)
+
+        for memory_format in [torch.contiguous_format, torch.channels_last]:
+            conv_add_relu = ConvAddRelu(3, 16, 3, 2)
+            conv_add = ConvAdd(3, 16, 3, 2)
+            x1 = torch.rand(1, 3, 224, 224, requires_grad=False).to(memory_format=memory_format)
+            x2 = torch.rand(1, 16, 111, 111, requires_grad=False).to(memory_format=memory_format)
+            input = [x1, x2]
+            graph1 = self.checkQuantizeTrace(conv_add_relu, input, atol=1e-2)
+            self.assertGraphContainsExactly(graph1, 'aten::quantize_per_tensor', 2)
+            graph2 = self.checkQuantizeTrace(conv_add, input, atol=1e-2)
+            self.assertGraphContainsExactly(graph2, 'aten::quantize_per_tensor', 1)
 
 class TestModel(JitLlgaTestCase):
     @skipIfNoTorchVision

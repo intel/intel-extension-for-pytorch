@@ -86,7 +86,9 @@ void IpexQuantFusion(std::shared_ptr<torch::jit::Graph>& graph) {
   GRAPH_DUMP(
       "After preprocessSizeForQLstm. Before replaceLstmWithQLstm", graph);
   graph_rewrite::replaceLstmWithQLstm(graph);
-  GRAPH_DUMP("After replaceLstmWithQLstm. End of IpexQuantFusion", graph);
+  GRAPH_DUMP("After replaceLstmWithQLstm. Before replaceAddWithQAdd", graph);
+  graph_rewrite::replaceAddWithQAdd(graph);
+  GRAPH_DUMP("After replaceAddWithQAdd. End of IpexQuantFusion", graph);
 }
 
 } // namespace jit

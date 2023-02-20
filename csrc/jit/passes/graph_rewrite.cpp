@@ -870,6 +870,40 @@ void replaceLstmWithQLstm(std::shared_ptr<Graph>& graph) {
   }
 }
 
+void replaceAddWithQAdd(std::shared_ptr<Graph>& graph) {
+  std::string qadd = R"(
+      graph(%add_a, %add_b, %alpha, %o_scale, %o_zp, %o_dtype):
+        %r = quantized::add(%add_a, %add_b, %o_scale, %o_zp)
+        return (%r) )";
+
+  std::string add_with_quant_dequant = R"(
+      graph(%add_a, %add_b, %alpha, %o_scale, %o_zp, %o_dtype):
+        %dqadd_a = aten::dequantize(%add_a)
+        %dqadd_b = aten::dequantize(%add_b)
+        %r = aten::add(%dqadd_a, %dqadd_b, %alpha)
+        %qout = aten::quantize_per_tensor(%r, %o_scale, %o_zp, %o_dtype)
+        return (%qout) )";
+
+  // fliter the unsupported case
+  auto fusion_filter = [](const Match& match,
+                          const std::unordered_map<std::string, Value*>& vmap) {
+    auto alpha = match.values_map.at(vmap.at("alpha"));
+    if (alpha->node()->kind() == prim::Constant) {
+      auto alpha_value = toIValue(alpha).value();
+      if (alpha_value.isDouble() && alpha_value.toDouble() == 1.0) {
+        return true;
+      } else if (alpha_value.isInt() && alpha_value.toInt() == 1) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  SubgraphRewriter rewriter_qadd;
+  rewriter_qadd.RegisterRewritePattern(add_with_quant_dequant, qadd);
+  rewriter_qadd.runOnGraph(graph, fusion_filter);
+}
+
 void fuseBmmAdd(std::shared_ptr<Graph>& graph) {
   std::array<std::string, 2> add_operators = {"add", "add_"};
 

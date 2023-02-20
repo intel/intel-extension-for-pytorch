@@ -14,7 +14,7 @@ struct ContextConvTranspose final {
   // at_weight will share same memory with weight_packed_
   // at_weight is used for autograd and optimizer update
   at::Tensor at_weight_;
-  c10::optional<at::Tensor> bias_;
+  c10::optional<at::Tensor> at_bias_;
   // paddings_, strided_, dilation_, output_padding_ here are expanded and
   // might different with those stored on ConvTransposeOpContext.
   // For example, aten deconv2d can accept padding = 2, but onednn deconv2d need
@@ -48,7 +48,7 @@ struct ContextConvTranspose final {
       : original_desc_(std::move(original_desc)),
         weight_packed_(std::move(weight_packed)),
         at_weight_(std::move(at_weight)),
-        bias_(std::move(bias)),
+        at_bias_(std::move(bias)),
         padding_(padding),
         output_padding_(output_padding),
         stride_(stride),

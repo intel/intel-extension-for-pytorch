@@ -34,6 +34,9 @@ void replaceFrozenIPEXConvWithAtenConv(
                                    ->cast<TensorType>()
                                    ->sizes()
                                    .concrete_sizes();
+      if (!input_size_option.has_value()) {
+        continue;
+      }
       auto prepack_node = n->inputs().at(3)->node()->inputs().at(0);
       // For graph before "freeze", cannot get custom class to repack
       if (!toIValue(prepack_node).has_value())

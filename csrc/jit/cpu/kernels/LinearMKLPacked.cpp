@@ -60,7 +60,7 @@ at::Tensor run(ContextLinearMKL& context, const at::Tensor& input) {
       "Check the shapes of mat1 and mat2, they cannot be multiplied!");
   auto input_ = input.contiguous();
   c10::MaybeOwned<at::Tensor> bias_maybe_owned =
-      at::borrow_from_optional_tensor(context.bias_);
+      at::borrow_from_optional_tensor(context.at_bias_);
   const at::Tensor& bias = *bias_maybe_owned;
   int64_t input_batch = (int64_t)(input_.numel() / K);
 
@@ -71,7 +71,7 @@ at::Tensor run(ContextLinearMKL& context, const at::Tensor& input) {
   if (input_batch != context.sgemm_sizes_[0])
     return mkl_sgemm_kernel(input_, context.ori_weight_, bias);
   return mkl_prepack_sgemm_kernel(
-      input_, context.mkl_weight_, bias, context.sgemm_sizes_[2]);
+      input_, context.at_weight_, bias, context.sgemm_sizes_[2]);
 }
 
 at::Tensor& run(
@@ -84,14 +84,14 @@ at::Tensor& run(
       "Check the shapes of mat1 and mat2, they cannot be multiplied!");
   auto input_ = input.contiguous();
   c10::MaybeOwned<at::Tensor> bias_maybe_owned =
-      at::borrow_from_optional_tensor(context.bias_);
+      at::borrow_from_optional_tensor(context.at_bias_);
   const at::Tensor& bias = *bias_maybe_owned;
   int64_t input_batch = (int64_t)(input_.numel() / K);
   if (input_batch != context.sgemm_sizes_[0]) {
     mkl_sgemm_kernel_output(input_, context.ori_weight_, bias, accumu);
   } else {
     mkl_prepack_sgemm_kernel_output(
-        input_, context.mkl_weight_, bias, context.sgemm_sizes_[2], accumu);
+        input_, context.at_weight_, bias, context.sgemm_sizes_[2], accumu);
   }
   return accumu;
 }
