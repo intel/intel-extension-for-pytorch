@@ -29,7 +29,12 @@ namespace AtenIpexTypeXPU {
 
 namespace impl {
 
-template <typename scalar_t, int unroll_factor, typename F, typename item_t>
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    int unroll_factor,
+    typename F,
+    typename item_t>
 inline void rrelu_with_noise_kernel(
     item_t& item,
     int numel,
@@ -37,8 +42,8 @@ inline void rrelu_with_noise_kernel(
     scalar_t* output,
     scalar_t* input,
     scalar_t* noise,
-    double lower,
-    double upper,
+    accscalar_t lower,
+    accscalar_t upper,
     const F& random_func) {
   auto thread_idx = item.get_local_id(0);
   auto thread_range = item.get_local_range(0);
@@ -52,7 +57,7 @@ inline void rrelu_with_noise_kernel(
 
   int range_stride = thread_range * group_range * unroll_factor;
   int rounded_size = ((numel - 1) / range_stride + 1) * range_stride;
-  double range = upper - lower;
+  accscalar_t range = upper - lower;
 
   for (int linear_index = idx; linear_index < rounded_size;
        linear_index += range_stride) {
@@ -120,7 +125,7 @@ inline void _rrelu_with_noise_train(
   if (std::is_same<scalar_t, double>::value) {
     auto cgf = DPCPP_Q_CGF(cgh) {
       auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        rrelu_with_noise_kernel<scalar_t, 2>(
+        rrelu_with_noise_kernel<scalar_t, double, 2>(
             item,
             numel,
             rng_engine_inputs,
@@ -138,18 +143,20 @@ inline void _rrelu_with_noise_train(
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
   } else {
+    auto lower_ = static_cast<float>(lower);
+    auto upper_ = static_cast<float>(upper);
     // half and float
     auto cgf = DPCPP_Q_CGF(cgh) {
       auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        rrelu_with_noise_kernel<scalar_t, 4>(
+        rrelu_with_noise_kernel<scalar_t, float, 4>(
             item,
             numel,
             rng_engine_inputs,
             output_data,
             input_data,
             noise_data,
-            lower,
-            upper,
+            lower_,
+            upper_,
             [](randStatePhilox4_32_10_t* state) {
               return rand_uniform4(state);
             });
