@@ -1164,7 +1164,7 @@ void masked_fill_kernel(TensorIterator& iter, const Scalar& value) {
       "masked_fill_",
       [&] {
         const auto value_ = value.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter(
+        dpcpp_fast_mode_kernel_for_tensor_iter(
             iter, [=](scalar_t self, mask_t mask) -> scalar_t {
               if (mask) {
                 return value_;
