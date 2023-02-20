@@ -157,6 +157,7 @@ git config --global --unset safe.directory
 #  TorchVision
 cd ../vision
 git config --global --add safe.directory `pwd`
+conda install -y libpng jpeg
 python setup.py clean
 python setup.py bdist_wheel 2>&1 | tee build.log
 python -m pip install --force-reinstall --no-deps dist/*.whl
@@ -165,6 +166,7 @@ git config --global --unset safe.directory
 #  TorchAudio
 cd ../audio
 git config --global --add safe.directory `pwd`
+conda install -y bzip2
 python -m pip install -r requirements.txt
 python setup.py clean
 python setup.py bdist_wheel 2>&1 | tee build.log
