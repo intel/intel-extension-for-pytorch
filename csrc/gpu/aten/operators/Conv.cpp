@@ -615,7 +615,8 @@ Attr get_onednn_conv_sum_attr(
     double scale,
     Tensor& output,
     bool& is_fused,
-    Attr attr = Attr()) {
+    Attr attr = Attr(),
+    bool force_inplace = false) {
   is_fused = true;
   if (scale == 0.f)
     return attr;
@@ -653,7 +654,7 @@ Attr get_onednn_conv_sum_attr(
         attr.kind_with_linear);
 
   accumu = contiguous_if_needed(accumu, mem_fmt);
-  if (accumu.sizes() == output_size) {
+  if (force_inplace) {
     // If sizes are the same, post sum is used.
     output = accumu;
     attr.append_post_sum(/* sum_scale */ 1.f);
@@ -1678,6 +1679,48 @@ Tensor _convolution_elu(
       att);
 }
 
+Tensor convolution_sum_inplace(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const c10::optional<Tensor>& bias,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    int64_t groups_,
+    Tensor& accumu,
+    Scalar scale) {
+  bool is_fused;
+  Tensor output;
+  Tensor bias_r = bias.has_value() ? bias.value() : at::Tensor();
+  Attr attr = get_onednn_conv_sum_attr(
+      input_r,
+      weight_r,
+      stride_,
+      padding_,
+      dilation_,
+      accumu,
+      scale.to<float>(),
+      output,
+      is_fused,
+      Attr(),
+      true);
+  Tensor res = _convolution_out(
+      output,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
+      groups_,
+      attr);
+  if (!is_fused)
+    res = at::AtenIpexTypeXPU::add_(res, accumu, 1.f);
+  return res;
+}
+
 Tensor convolution_sum(
     const Tensor& input_r,
     const Tensor& weight_r,
@@ -1869,6 +1912,54 @@ Tensor _convolution_sum(
       attr);
   if (!is_fused)
     res = at::AtenIpexTypeXPU::add_out(res, accumu, 1.f, accumu);
+  return res;
+}
+
+Tensor _convolution_sum_inplace(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const c10::optional<Tensor>& bias,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32,
+    Tensor& accumu,
+    Scalar scale) {
+  bool is_fused;
+  Tensor output;
+  Tensor bias_r = bias.has_value() ? bias.value() : at::Tensor();
+  Attr attr = get_onednn_conv_sum_attr(
+      input_r,
+      weight_r,
+      stride_,
+      padding_,
+      dilation_,
+      accumu,
+      scale.to<float>(),
+      output,
+      is_fused,
+      Attr(),
+      true);
+  Tensor res = _convolution_out(
+      output,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      attr);
+  if (!is_fused)
+    res = at::AtenIpexTypeXPU::add_(res, accumu, 1.f);
   return res;
 }
 
@@ -2623,6 +2714,7 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_CONVOLUTION(hardtanh);
   IPEX_OP_REGISTER_CONVOLUTION(elu);
   IPEX_OP_REGISTER_CONVOLUTION(sum);
+  IPEX_OP_REGISTER_CONVOLUTION(sum_inplace);
   IPEX_OP_REGISTER_CONVOLUTION(sum_relu);
   IPEX_OP_REGISTER_CONVOLUTION(mish_compound);
   IPEX_OP_REGISTER_CONVOLUTION(mish_compound_add);

@@ -545,7 +545,7 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
      xpu::_convolution_sum_relu_sym},
     // RN50/RCAN: conv + add
     {{aten::conv2d, aten::add}, xpu::conv2d_sum_sym},
-    {{aten::conv2d, aten::add_}, xpu::conv2d_sum_sym},
+    {{aten::conv2d, aten::add_}, xpu::conv2d_sum_inplace_sym},
     // RCAN: mul + add
     {{aten::mul, aten::add_}, xpu::mul_add_sym},
     {{aten::mul, aten::add}, xpu::mul_add_sym},
@@ -638,7 +638,7 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
 
     // YOLOv4 fp16: conv + add_
     {{Symbol::fromQualString("aten::_convolution"), aten::add_},
-     xpu::_convolution_sum_sym},
+     xpu::_convolution_sum_inplace_sym},
     {{Symbol::fromQualString("aten::_convolution"), aten::add},
      xpu::_convolution_sum_sym},
     {{xpu::_convolution_sum_sym, Symbol::fromQualString("aten::relu_")},

@@ -163,10 +163,14 @@ static auto reorder_sym = Symbol::fromQualString("torch_ipex::reorder");
 static auto batch_norm_sym = Symbol::fromQualString("torch_ipex::batch_norm");
 static auto pad_conv2d_sym = Symbol::fromQualString("torch_ipex::pad_conv2d");
 static auto conv2d_sum_sym = Symbol::fromQualString("torch_ipex::conv2d_sum");
+static auto conv2d_sum_inplace_sym =
+    Symbol::fromQualString("torch_ipex::conv2d_sum_inplace");
 static auto conv2d_relu_sum_sym =
     Symbol::fromQualString("torch_ipex::conv2d_relu_sum");
 static auto _convolution_sum_sym =
     Symbol::fromQualString("torch_ipex::_convolution_sum");
+static auto _convolution_sum_inplace_sym =
+    Symbol::fromQualString("torch_ipex::_convolution_sum_inplace");
 static auto _convolution_sum_relu_sym =
     Symbol::fromQualString("torch_ipex::_convolution_sum_relu");
 static auto conv2d_sum_relu_sym =

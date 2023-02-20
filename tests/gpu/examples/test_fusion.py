@@ -418,7 +418,7 @@ class Conv2dSum(torch.nn.Module):
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        x = self.conv(x).add_(a)
+        x = self.conv(x).add(a)
         return x
 
 
@@ -1621,7 +1621,7 @@ class TestNNMethod(TestCase):
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script)
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
-        self.assertEqual(y, y_script, atol=1, rtol=1)
+        self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
     def test_conv_sum_relu_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
@@ -1637,7 +1637,7 @@ class TestNNMethod(TestCase):
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script)
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
-        self.assertEqual(y, y_script, atol=1, rtol=1)
+        self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
     def test_conv_sigmoid_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
@@ -1670,7 +1670,7 @@ class TestNNMethod(TestCase):
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script)
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
-        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+        self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
     def test_conv_sigmoid_binary_mul_add_relu_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
@@ -1686,7 +1686,7 @@ class TestNNMethod(TestCase):
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script)
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
-        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+        self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
     def test_conv_sigmoid_binary_mul_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
@@ -1702,7 +1702,7 @@ class TestNNMethod(TestCase):
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script)
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
-        self.assertEqual(y, y_script, atol=1e3, rtol=1e3)
+        self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
     def test_conv_leaky_relu_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
