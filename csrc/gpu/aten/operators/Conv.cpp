@@ -992,8 +992,9 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
   }
 
   // ensure the tensors are contiguous
-  auto mfmt = is_channels_last_suggested ? get_cl_tag_by_ndim(ndim)
-                                         : at::MemoryFormat::Contiguous;
+  auto mfmt = is_channels_last_suggested
+      ? get_cl_tag_by_ndim(input_.ndimension())
+      : at::MemoryFormat::Contiguous;
   input_ = contiguous_if_needed(input_, mfmt);
   weight_ = contiguous_if_needed(weight_, mfmt);
   grad_output_ = contiguous_if_needed(grad_output_, mfmt);
