@@ -429,6 +429,134 @@ static inline DPCPP_BOTH scalar_t bessel_j1_forward(scalar_t x) {
 } // bessel_j1_forward(scalar_t x)
 
 template <typename scalar_t>
+static inline DPCPP_BOTH scalar_t
+hermite_polynomial_he_forward(scalar_t x, scalar_t _n) {
+  int n = static_cast<int64_t>(_n);
+  if (n < 0) {
+    return scalar_t(0.0);
+  }
+
+  if (n == 0) {
+    return scalar_t(1.0);
+  }
+
+  if (n == 1) {
+    return x;
+  }
+
+  scalar_t p = scalar_t(1.0);
+  scalar_t q = x;
+  scalar_t r;
+
+  for (int64_t k = 1; k < n; k++) {
+    r = x * q - k * p;
+    p = q;
+    q = r;
+  }
+
+  return r;
+}
+
+template <typename scalar_t>
+static inline DPCPP_BOTH scalar_t
+hermite_polynomial_h_forward(scalar_t x, scalar_t _n) {
+  int n = static_cast<int64_t>(_n);
+  if (n < 0) {
+    return scalar_t(0.0);
+  }
+
+  if (n == 0) {
+    return scalar_t(1.0);
+  }
+
+  if (n == 1) {
+    return x + x;
+  }
+
+  scalar_t p = scalar_t(1.0);
+  scalar_t q = x + x;
+  scalar_t r;
+
+  for (int64_t k = 2; k < n + n; k += 2) {
+    r = (x + x) * q - k * p;
+    p = q;
+    q = r;
+  }
+
+  return r;
+}
+
+template <typename scalar_t>
+static inline DPCPP_BOTH scalar_t
+laguerre_polynomial_l_forward(scalar_t x, scalar_t _n) {
+  int n = static_cast<int64_t>(_n);
+  if (n < 0) {
+    return scalar_t(0.0);
+  }
+
+  if (std::abs(x) == scalar_t(0.0)) {
+    return scalar_t(1.0);
+  }
+
+  if (n == 0) {
+    return scalar_t(1.0);
+  }
+
+  if (n == 1) {
+    return scalar_t(1.0) - x;
+  }
+
+  scalar_t p = scalar_t(1.0);
+  scalar_t q = scalar_t(1.0) - x;
+  scalar_t r;
+
+  for (int64_t k = 1; k < n; k++) {
+    r = (((k + k) + (scalar_t(1.0) - x)) * q - k * p) / (k + 1);
+    p = q;
+    q = r;
+  }
+
+  return r;
+}
+
+template <typename scalar_t>
+static inline DPCPP_BOTH scalar_t
+legendre_polynomial_p_forward(scalar_t x, scalar_t _n) {
+  int n = static_cast<int64_t>(_n);
+  if (n < 0) {
+    return scalar_t(0.0);
+  }
+
+  if (Numerics<scalar_t>::abs(x) == scalar_t(1.0)) {
+    if (x > scalar_t(0.0) || n % 2 == 0) {
+      return scalar_t(1.0);
+    }
+
+    return scalar_t(-1.0);
+  }
+
+  if (n == 0) {
+    return scalar_t(1.0);
+  }
+
+  if (n == 1) {
+    return x;
+  }
+
+  scalar_t p = scalar_t(1.0);
+  scalar_t q = x;
+  scalar_t r;
+
+  for (int64_t k = 1; k < n; k++) {
+    r = ((k + k + 1) * x * q - k * p) / (k + 1);
+    p = q;
+    q = r;
+  }
+
+  return r;
+}
+
+template <typename scalar_t>
 static inline DPCPP_BOTH scalar_t modified_bessel_i0_forward(scalar_t x) {
   const scalar_t A[] = {
       -4.41534164647933937950e-18, +3.33079451882223809783e-17,

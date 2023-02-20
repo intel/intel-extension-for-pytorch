@@ -121,3 +121,43 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
 
+    def test_hermite_polynomial_he(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input1 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        input1_xpu = input1.clone().to("xpu")
+        result_cpu = torch.special.hermite_polynomial_he(input0, input1)
+        result_xpu = torch.special.hermite_polynomial_he(input0_xpu, input1_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+    
+    def test_hermite_polynomial_h(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input1 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        input1_xpu = input1.clone().to("xpu")
+        result_cpu = torch.special.hermite_polynomial_h(input0, input1)
+        result_xpu = torch.special.hermite_polynomial_h(input0_xpu, input1_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+    
+    def test_laguerre_polynomial_l(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input1 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        input1_xpu = input1.clone().to("xpu")
+        result_cpu = torch.special.laguerre_polynomial_l(input0, input1)
+        result_xpu = torch.special.laguerre_polynomial_l(input0_xpu, input1_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+    
+    def test_legendre_polynomial_p(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input1 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        input1_xpu = input1.clone().to("xpu")
+        result_cpu = torch.special.legendre_polynomial_p(input0, input1)
+        result_xpu = torch.special.legendre_polynomial_p(input0_xpu, input1_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+

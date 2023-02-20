@@ -566,6 +566,10 @@ supported:
   - special_modified_bessel_i1.out
   - special_modified_bessel_k0.out
   - special_modified_bessel_k1.out
+  - special_hermite_polynomial_h.out
+  - special_hermite_polynomial_he.out
+  - special_laguerre_polynomial_l.out
+  - special_legendre_polynomial_p.out
   - sqrt.out
   - std.correction
   - std.correction_out
