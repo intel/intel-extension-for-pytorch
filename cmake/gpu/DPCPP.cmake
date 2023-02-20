@@ -89,14 +89,19 @@ set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
 
 set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} ${SYCL_FLAGS}")
 
-# The fast-math will be enabled by default in ICX
-# We enable below flags here to be warn about NaN and Infinity,
+# The fast-math will be enabled by default in ICPX.
+# Refer to [https://clang.llvm.org/docs/UsersManual.html#cmdoption-fno-fast-math]
+# 1. We enable below flags here to be warn about NaN and Infinity,
 # which will be hidden by fast-math by default.
-# The associative-math in fast-math allows floating point
+# 2. The associative-math in fast-math allows floating point
 # operations to be reassociated, which will lead to non-deterministic results.
+# 3. The approx-func allows certain math function calls (such as log, sqrt, pow, etc)
+# to be replaced with an approximately equivalent set of instructions or
+# alternative math function calls, which have great errors.
 set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fhonor-nans")
 set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fhonor-infinities")
 set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fno-associative-math")
+set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fno-approx-func")
 
 # Explicitly limit the index range (< Max int32) in kernel
 # set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-id-queries-fit-in-int")
