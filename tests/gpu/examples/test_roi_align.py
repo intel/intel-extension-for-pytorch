@@ -95,7 +95,7 @@ class TestNNMethod(TestCase):
             x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1, device=device, dtype=x_dtype
         )
         tol = 1e-2 if (x_dtype is torch.half or rois_dtype is torch.half) else 1e-5
-        torch.testing.assert_close(gt_y.to(y), y, rtol=tol, atol=tol)
+        torch.testing.assert_close(gt_y.cpu(), y.cpu(), rtol=tol, atol=tol)
 
     def test_roi_align_forward(self):
         for dtype in [torch.float, torch.half]:

@@ -34,15 +34,15 @@ inline T bilinear_interpolate(
     T x,
     int index /* index for debug only*/) {
   // deal with cases that inverse elements are out of feature map boundary
-  if (y < -1.0 || y > height || x < -1.0 || x > width) {
+  if (y < -1.0f || y > height || x < -1.0f || x > width) {
     // empty
     return 0;
   }
 
-  if (y <= 0)
-    y = 0;
-  if (x <= 0)
-    x = 0;
+  if (y <= 0.f)
+    y = 0.f;
+  if (x <= 0.f)
+    x = 0.f;
 
   int y_low = (int)y;
   int x_low = (int)x;
@@ -65,7 +65,7 @@ inline T bilinear_interpolate(
 
   T ly = y - y_low;
   T lx = x - x_low;
-  T hy = 1. - ly, hx = 1. - lx;
+  T hy = 1.f - ly, hx = 1.f - lx;
 
   // do bilinear interpolation
   T v1 = input[y_low * width + x_low];
@@ -107,7 +107,7 @@ inline void roi_align_forward_kernel_impl(
     int roi_batch_ind = offset_rois[0];
 
     // Do not using rounding; this implementation detail is critical
-    T offset = aligned ? (T)0.5 : (T)0.0;
+    T offset = aligned ? (T)0.5f : (T)0.0f;
     T roi_start_w = offset_rois[1] * spatial_scale - offset;
     T roi_start_h = offset_rois[2] * spatial_scale - offset;
     T roi_end_w = offset_rois[3] * spatial_scale - offset;
@@ -117,8 +117,8 @@ inline void roi_align_forward_kernel_impl(
     T roi_height = roi_end_h - roi_start_h;
     if (!aligned) {
       // Force malformed ROIs to be 1x1
-      roi_width = std::max(roi_width, (T)1.);
-      roi_height = std::max(roi_height, (T)1.);
+      roi_width = std::max(roi_width, (T)1.f);
+      roi_height = std::max(roi_height, (T)1.f);
     }
 
     T bin_size_h = static_cast<T>(roi_height) / static_cast<T>(pooled_height);
@@ -128,10 +128,10 @@ inline void roi_align_forward_kernel_impl(
         input + (roi_batch_ind * channels + c) * height * width;
 
     // We use roi_bin_grid to sample the grid and mimic integral
-    int roi_bin_grid_h = (sampling_ratio > 0)
+    int roi_bin_grid_h = (sampling_ratio > 0.f)
         ? sampling_ratio
         : std::ceil(roi_height / pooled_height); // e.g., = 2
-    int roi_bin_grid_w = (sampling_ratio > 0)
+    int roi_bin_grid_w = (sampling_ratio > 0.f)
         ? sampling_ratio
         : std::ceil(roi_width / pooled_width);
 
@@ -139,7 +139,7 @@ inline void roi_align_forward_kernel_impl(
     // When the grid is empty, output zeros.
     const T count = std::max(roi_bin_grid_h * roi_bin_grid_w, 1); // e.g. = 4
 
-    T output_val = 0.;
+    T output_val = 0.f;
     for (int iy = 0; iy < roi_bin_grid_h; iy++) // e.g., iy = 0, 1
     {
       const T y = roi_start_h + ph * bin_size_h +
@@ -176,17 +176,17 @@ inline void bilinear_interpolate_gradient(
     int& y_high,
     int index /* index for debug only*/) {
   // deal with cases that inverse elements are out of feature map boundary
-  if (y < -1.0 || y > height || x < -1.0 || x > width) {
+  if (y < -1.0f || y > height || x < -1.0f || x > width) {
     // empty
-    w1 = w2 = w3 = w4 = 0.;
+    w1 = w2 = w3 = w4 = 0.f;
     x_low = x_high = y_low = y_high = -1;
     return;
   }
 
-  if (y <= 0)
-    y = 0;
-  if (x <= 0)
-    x = 0;
+  if (y <= 0.f)
+    y = 0.f;
+  if (x <= 0.f)
+    x = 0.f;
 
   y_low = (int)y;
   x_low = (int)x;
@@ -207,7 +207,7 @@ inline void bilinear_interpolate_gradient(
 
   T ly = y - y_low;
   T lx = x - x_low;
-  T hy = 1. - ly, hx = 1. - lx;
+  T hy = 1.f - ly, hx = 1.f - lx;
 
   w1 = hy * hx, w2 = hy * lx, w3 = ly * hx, w4 = ly * lx;
 }
@@ -244,7 +244,7 @@ inline void roi_align_backward_kernel_impl(
     int roi_batch_ind = offset_rois[0];
 
     // Do not using rounding; this implementation detail is critical
-    T offset = aligned ? (T)0.5 : (T)0.0;
+    T offset = aligned ? (T)0.5f : (T)0.0f;
     T roi_start_w = offset_rois[1] * spatial_scale - offset;
     T roi_start_h = offset_rois[2] * spatial_scale - offset;
     T roi_end_w = offset_rois[3] * spatial_scale - offset;
@@ -254,8 +254,8 @@ inline void roi_align_backward_kernel_impl(
     T roi_height = roi_end_h - roi_start_h;
     if (!aligned) {
       // Force malformed ROIs to be 1x1
-      roi_width = std::max(roi_width, (T)1.);
-      roi_height = std::max(roi_height, (T)1.);
+      roi_width = std::max(roi_width, (T)1.f);
+      roi_height = std::max(roi_height, (T)1.f);
     }
 
     T bin_size_h = static_cast<T>(roi_height) / static_cast<T>(pooled_height);
@@ -272,10 +272,10 @@ inline void roi_align_backward_kernel_impl(
         offset_grad_output[ph * h_stride + pw * w_stride];
 
     // We use roi_bin_grid to sample the grid and mimic integral
-    int roi_bin_grid_h = (sampling_ratio > 0)
+    int roi_bin_grid_h = (sampling_ratio > 0.f)
         ? sampling_ratio
         : std::ceil(roi_height / pooled_height); // e.g., = 2
-    int roi_bin_grid_w = (sampling_ratio > 0)
+    int roi_bin_grid_w = (sampling_ratio > 0.f)
         ? sampling_ratio
         : std::ceil(roi_width / pooled_width);
 
@@ -376,6 +376,7 @@ at::Tensor roi_align_forward_kernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       input.scalar_type(), "roi_align_forward_kernel", [&] {
+        auto spatial_scale_ = static_cast<scalar_t>(spatial_scale);
         auto cgf = DPCPP_Q_CGF(cgh) {
           auto input_ptr = (scalar_t*)input_.data_ptr();
           auto rois_ptr = (scalar_t*)rois_.data_ptr();
@@ -385,7 +386,7 @@ at::Tensor roi_align_forward_kernel(
                 item,
                 output_size,
                 input_ptr,
-                spatial_scale,
+                spatial_scale_,
                 channels,
                 height,
                 width,
@@ -449,6 +450,7 @@ at::Tensor roi_align_backward_kernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       grad.scalar_type(), "roi_align_backward_kernel", [&] {
+        auto spatial_scale_ = static_cast<scalar_t>(spatial_scale);
         auto cgf = DPCPP_Q_CGF(cgh) {
           auto grad_ptr = (scalar_t*)grad.data_ptr();
           auto grad_input_ptr = (scalar_t*)grad_input.data_ptr();
@@ -459,7 +461,7 @@ at::Tensor roi_align_backward_kernel(
                 item,
                 grad_numel,
                 grad_ptr,
-                spatial_scale,
+                spatial_scale_,
                 channels,
                 height,
                 width,
