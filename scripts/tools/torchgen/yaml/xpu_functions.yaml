@@ -25,6 +25,7 @@ supported:
   - _ctc_loss_backward.Tensor
   - cumprod.out
   - cumsum.out  # newly added
+  - _efficientzerotensor
   - _embedding_bag
   - _embedding_bag_dense_backward
   - _embedding_bag_forward_only

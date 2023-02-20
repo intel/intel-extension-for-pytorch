@@ -3,6 +3,8 @@ from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch # noqa
 
+cpu_device = torch.device("cpu")
+dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     def test_sparse(self, dtype=torch.float):
@@ -41,3 +43,12 @@ class TestTorchMethod(TestCase):
             src_xpu = src_cpu.clone().to('xpu')
             self.assertEqual(src_cpu.to_sparse(), src_xpu.to_sparse().to('cpu'))
             self.assertEqual(src_cpu.to_sparse().sparse_dim(), src_xpu.to_sparse().sparse_dim())
+
+    def test_efficientzerotensor(self, dtype=torch.float):
+        sizes = [(10, 10), (10, 1), (4, 5, 6)]
+        for size in sizes:
+            x_cpu = torch._efficientzerotensor(size)
+            x_xpu = torch._efficientzerotensor(size, device=dpcpp_device)
+            self.assertEqual(x_cpu, x_xpu.cpu())
+            self.assertEqual(x_cpu.dim(), x_xpu.dim())
+
