@@ -596,6 +596,8 @@ supported:
   - to_sparse.sparse_dim
   - topk.values
   - trace
+  - _transformer_decoder_only_layer_fwd
+  - _transformer_encoder_layer_fwd
   - triangular_solve
   - triangular_solve.X
   - tril.out
