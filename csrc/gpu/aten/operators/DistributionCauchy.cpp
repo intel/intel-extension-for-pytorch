@@ -33,7 +33,7 @@ Tensor& cauchy_(
           return static_cast<scalar_t>(
               median +
               sigma *
-                  at::tan(
+                  Numerics<accscalar_t>::tan(
                       Numerics<accscalar_t>::pi() *
                       (rand - static_cast<accscalar_t>(0.5))));
         };
