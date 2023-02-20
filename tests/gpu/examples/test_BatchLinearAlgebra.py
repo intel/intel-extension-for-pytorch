@@ -133,6 +133,18 @@ class TestTorchMethod(TestCase):
         self.assertEqual(A_det_log.to(cpu_device), A_dpcpp_det_log.to(cpu_device))
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
+    def test_lu_out(self, dtype=torch.float):
+        for size in [(3, 3), (5, 5), (10, 10)]:
+            A = torch.rand(size)
+            P, L, U = torch.linalg.lu(A)
+            A_xpu = A.to('xpu')
+            P_xpu, L_xpu, U_xpu = torch.linalg.lu(A_xpu)
+            self.assertEqual(P_xpu.to(cpu_device), P)
+            self.assertEqual(L_xpu.to(cpu_device), L)
+            self.assertEqual(U_xpu.to(cpu_device), U)
+
+
+    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     def test_lu(self, dtype=torch.float):
         def _validate(A, LU, pivot):
             P, L, U = torch.lu_unpack(LU, pivot)

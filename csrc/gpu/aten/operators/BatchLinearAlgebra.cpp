@@ -3283,7 +3283,6 @@ std::tuple<Tensor&, Tensor&, Tensor&, Tensor&> _linalg_slogdet_out(
   at::native::squareCheckInputs(A, "linalg.slogdet");
   at::native::checkFloatingOrComplex(
       A, "linalg.slogdet", /*low_precision*/ false);
-
   auto shape = A.sizes();
   auto ndim = shape.size();
 
@@ -3595,5 +3594,40 @@ std::tuple<Tensor&, Tensor&, Tensor&> linalg_lu_factor_ex_out(
   return std::tuple<Tensor&, Tensor&, Tensor&>(LU, pivots, info);
 }
 
+std::tuple<Tensor&, Tensor&, Tensor&> linalg_lu_out(
+    const Tensor& A,
+    bool pivot,
+    Tensor& P,
+    Tensor& L,
+    Tensor& U) {
+  const auto m = A.sizes().end()[-2];
+  const auto n = A.sizes().end()[-1];
+
+  // A.shape[-2:] == (m, n)
+  // P.shape[-2:] == (m, m)
+  // L.shape[-2:] == (m, k)
+  // U.shape[-2:] == (k, n)
+  // with k = min(m, n)
+
+  // Use L as it has the correct size
+  const bool use_L = m > n;
+  auto pivots = at::empty({0}, A.options().dtype(kInt));
+  auto info = at::empty({0}, A.options().dtype(kInt));
+  at::AtenIpexTypeXPU::linalg_lu_factor_ex_out(
+      A,
+      pivot,
+      /*check_errors=*/false,
+      const_cast<Tensor&>(use_L ? L : U),
+      const_cast<Tensor&>(pivots),
+      const_cast<Tensor&>(info));
+  return at::lu_unpack_out(
+      const_cast<Tensor&>(P),
+      const_cast<Tensor&>(L),
+      const_cast<Tensor&>(U),
+      use_L ? L : U,
+      pivots,
+      /*unpack_lu=*/true,
+      /*unpack_pivots=*/pivot);
+}
 } // namespace AtenIpexTypeXPU
 } // namespace at
