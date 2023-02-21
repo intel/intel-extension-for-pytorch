@@ -3,32 +3,49 @@ import platform
 import sys
 import os
 
-def check_minimal_isa_support():
-    def get_cpu_info():
-        cpu_info_path = "/proc/cpuinfo"
-        if os.path.exists(cpu_info_path):
-            all_sub_cpu_info = ""
-            with open(cpu_info_path, "r") as f:
-                all_sub_cpu_info = f.read().strip()
-            for sub_cpu_info in all_sub_cpu_info.split("\n"):
-                if sub_cpu_info.startswith("flags"):
-                    cpu_flags = sub_cpu_info.replace("\t", '').upper().split(":")
-                    assert len(cpu_flags) >= 2
-                    all_cpu_flags = cpu_flags[1].split(" ")
-                    return all_cpu_flags
+def check_avx2_support():
+    def get_normalized_bit(value, bit_index):
+        return (value >> bit_index) & 1
 
-            return []
-        else:
-            sys.exit("The extension does not support current platform - {}.".format(platform.system()))
+    try:
+        # https://pypi.org/project/cpuid/ 
+        import cpuid
+    except ImportError:
+        raise Exception(f"unable to import cpuid, please install it via pypi.")
 
-    def check_avx2_support():
-        cpu_flags = get_cpu_info()
-        minimal_binary_isa = "AVX2"
-        if minimal_binary_isa not in cpu_flags:
+    eax, ebx, ecx, edx = cpuid.cpuid(0)
+    max_basic_id =eax
+    if max_basic_id >= 7:
+        # https://github.com/fpelliccioni/cpuid-py/blob/master/cpuid.py#L8
+        eax, ebx, ecx, edx = cpuid.cpuid_count(7, 0)
+        support_avx2 = get_normalized_bit(ebx, 5)
+
+        if support_avx2 == 0:
             return False
+        
+        xcrFeatureMask = cpuid.xgetbv(0)
+        '''
+        Intel® 64 and IA-32 Architectures
+        Software Developer’s Manual
+        Combined Volumes:
+        1, 2A, 2B, 2C, 2D, 3A, 3B, 3C, 3D and 4
+        Order Number: 325462-075US
+        June 2021
+        ----------------------------------------------------
+        13.1 XSAVE-SUPPORTED FEATURES AND STATE-COMPONENT BITMAPS
+        ......
+        Bit 1 corresponds to the state component used for registers used by the
+        streaming SIMD extensions (SSE state). See Section 13.5.2. 
+        Bit 2 corresponds to the state component used for the additional register 
+        state used by the Intel® Advanced Vector Extensions (AVX state). 
+        See Section 13.5.3
+        '''
+        if get_normalized_bit(xcrFeatureMask, 1) and get_normalized_bit(xcrFeatureMask, 2):
+            return True
 
-        return True
+    return False
 
+def check_minimal_isa_support():
     err_msg = "ERROR! Intel® Extension for PyTorch* only works on machines with instruction sets equal or newer than AVX2, which are not detected on the current machine."
     if not check_avx2_support():
         sys.exit(err_msg)
