@@ -1,5 +1,6 @@
 #include <ATen/ExpandUtils.h>
 #include <ATen/NativeFunctions.h>
+#include "ATen/OpMathType.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
@@ -13,31 +14,50 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-template <typename scalar_t>
-void lerp(
-    at::Tensor& ret,
-    const at::Tensor& self,
-    const at::Tensor& end,
-    const at::Tensor& weight) {
-  auto iter = TensorIteratorConfig()
-                  .set_check_mem_overlap(true)
-                  .add_output(ret)
-                  .add_input(self)
-                  .add_input(end)
-                  .add_input(weight)
-                  .build();
-  dpcpp_kernel_for_tensor_iter(
-      iter, [=](scalar_t a, scalar_t b, scalar_t weight) -> scalar_t {
-        return (Numerics<scalar_t>::abs(weight) < 0.5)
-            ? Numerics<scalar_t>::add(
-                  a,
-                  Numerics<scalar_t>::mul(
-                      weight, Numerics<scalar_t>::sub(b, a)))
-            : Numerics<scalar_t>::sub(
-                  b,
-                  Numerics<scalar_t>::mul(
-                      Numerics<scalar_t>::sub(b, a),
-                      Numerics<scalar_t>::sub(1, weight)));
+void lerp_tensor_kernel(at::TensorIteratorBase& iter) {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "lerp_tensor_kernel",
+      [&] {
+        using opmath_t = at::opmath_type<scalar_t>;
+        dpcpp_kernel_for_tensor_iter(
+            iter,
+            [](scalar_t self_val,
+               scalar_t end_val,
+               scalar_t weight_val) -> scalar_t {
+              opmath_t self_val_f = self_val;
+              opmath_t end_val_f = end_val;
+              opmath_t weight_val_f = weight_val;
+              return (Numerics<scalar_t>::abs(weight_val_f) < 0.5f)
+                  ? self_val_f + weight_val_f * (end_val_f - self_val_f)
+                  : end_val_f -
+                      (end_val_f - self_val_f) * (opmath_t{1} - weight_val_f);
+            });
+      });
+}
+
+void lerp_scalar_kernel(
+    at::TensorIteratorBase& iter,
+    const c10::Scalar& weight) {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "lerp_tensor_kernel",
+      [&] {
+        using opmath_t = at::opmath_type<scalar_t>;
+        auto weight_val = weight.to<opmath_t>();
+        dpcpp_kernel_with_scalars(
+            iter, [=](scalar_t self_val, scalar_t end_val) {
+              opmath_t self_val_f = self_val;
+              opmath_t end_val_f = end_val;
+              return (Numerics<scalar_t>::abs(weight_val) < 0.5f)
+                  ? self_val_f + weight_val * (end_val_f - self_val_f)
+                  : end_val_f -
+                      (end_val_f - self_val_f) * (opmath_t{1} - weight_val);
+            });
       });
 }
 
@@ -48,13 +68,14 @@ Tensor& lerp_out(
     const Tensor& end,
     const Tensor& weight,
     Tensor& out) {
-  c10::MaybeOwned<Tensor> b_self, b_end, b_weight;
-  std::tie(b_self, b_end, b_weight) =
-      expand_outplace(self, end, weight, "lerp_out");
-  out.resize_as_(*b_self);
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(self.scalar_type(), "lerp_out", [&] {
-    impl::lerp<scalar_t>(out, *b_self, *b_end, *b_weight);
-  });
+  auto iter = TensorIteratorConfig()
+                  .set_check_mem_overlap(true)
+                  .add_output(out)
+                  .add_input(self)
+                  .add_input(end)
+                  .add_input(weight)
+                  .build();
+  impl::lerp_tensor_kernel(iter);
   return out;
 }
 
@@ -63,54 +84,25 @@ Tensor& lerp_out(
     const Tensor& end,
     const Scalar& weight,
     Tensor& out) {
-  c10::MaybeOwned<Tensor> b_self, b_end;
-  std::tie(b_self, b_end) = expand_outplace(self, end, "lerp_out");
-  out.resize_as_(*b_self);
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(self.scalar_type(), "lerp_out", [&] {
-    impl::lerp<scalar_t>(
-        out,
-        *b_self,
-        *b_end,
-        wrapped_scalar_tensor(weight, at::kXPU).to(self.dtype()));
-  });
+  auto iter = TensorIterator::binary_op(out, self, end);
+  impl::lerp_scalar_kernel(iter, weight);
   return out;
 }
 
 Tensor& lerp_(Tensor& self, const Tensor& end, const Tensor& weight) {
-  c10::MaybeOwned<Tensor> b_self, b_end, b_weight;
-  std::tie(b_self, b_end, b_weight) =
-      expand_outplace(self, end, weight, "lerp_");
-  TORCH_CHECK(
-      (*b_self).sizes() == self.sizes(),
-      "output with shape ",
-      self.sizes(),
-      " doesn't match the broadcast shape ",
-      (*b_self).sizes());
-  TORCH_CHECK(
-      weight.dim() <= std::max(self.dim(), end.dim()),
-      "weight should be of dimension max(self.dim(), end.dim()) or lesser");
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(self.scalar_type(), "lerp_", [&] {
-    impl::lerp<scalar_t>(self, *b_self, *b_end, *b_weight);
-  });
+  auto iter = TensorIteratorConfig()
+                  .add_output(self)
+                  .add_input(self)
+                  .add_input(end)
+                  .add_input(weight)
+                  .build();
+  impl::lerp_tensor_kernel(iter);
   return self;
 }
 
 Tensor& lerp_(Tensor& self, const Tensor& end, const Scalar& weight) {
-  c10::MaybeOwned<Tensor> b_self, b_end;
-  std::tie(b_self, b_end) = expand_outplace(self, end, "lerp_");
-  TORCH_CHECK(
-      (*b_self).sizes() == self.sizes(),
-      "output with shape ",
-      self.sizes(),
-      " doesn't match the broadcast shape ",
-      (*b_self).sizes());
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(self.scalar_type(), "lerp_", [&] {
-    impl::lerp<scalar_t>(
-        self,
-        *b_self,
-        *b_end,
-        wrapped_scalar_tensor(weight, kXPU).to(self.dtype()));
-  });
+  auto iter = TensorIterator::binary_op(self, self, end);
+  impl::lerp_scalar_kernel(iter, weight);
   return self;
 }
 
@@ -121,8 +113,7 @@ Tensor lerp(const Tensor& self, const Tensor& end, const Tensor& weight) {
 
 Tensor lerp(const Tensor& self, const Tensor& end, const Scalar& weight) {
   Tensor result = at::empty_like(self);
-  return at::AtenIpexTypeXPU::lerp_out(
-      self, end, wrapped_scalar_tensor(weight, kXPU).to(self.dtype()), result);
+  return at::AtenIpexTypeXPU::lerp_out(self, end, weight, result);
 }
 
 } // namespace AtenIpexTypeXPU
