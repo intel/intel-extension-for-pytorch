@@ -60,6 +60,7 @@ supported:
   - _pdist_forward
   - _pin_memory
   - _reshape_alias  # newly added
+  - _segment_reduce_backward
   - _softmax.out
   - _softmax_backward_data.out
   - _linalg_svd.U
@@ -517,6 +518,7 @@ supported:
   - scatter.src_out
   - scatter.value_reduce_out
   - scatter_add.out  # newly added
+  - segment_reduce
   - set_
   - set_.source_Storage
   - set_.source_Storage_storage_offset
