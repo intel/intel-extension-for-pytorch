@@ -95,12 +95,12 @@ void MultilabelMarginCriterion_updateOutput(
         auto is_target_ptr = is_target_data;
         auto local_item_id = item_id.get_id(0);
         for (int i = local_item_id; i < nframe; i += local_size) {
-          scalar_t sum = 0;
+          scalar_t sum = 0.f;
           for (int64_t ddt = 0; ddt < dim; ddt++) {
             auto target_idx = target_ptr[i * dim + ddt];
             if (target_idx < 0)
               break;
-            is_target_ptr[i * dim + target_idx] = 1;
+            is_target_ptr[i * dim + target_idx] = 1.f;
           }
           for (int64_t dt = 0; dt < dim; dt++) {
             auto target_idx = target_ptr[i * dim + dt];
@@ -110,8 +110,8 @@ void MultilabelMarginCriterion_updateOutput(
             auto input_target = input_ptr[i * dim + target_idx];
             for (int64_t d = 0; d < dim; d++) {
               if (!is_target_ptr[i * dim + d]) {
-                scalar_t z = 1.0 - input_target + input_ptr[i * dim + d];
-                if (z > 0)
+                scalar_t z = 1.0f - input_target + input_ptr[i * dim + d];
+                if (z > 0.f)
                   sum += z;
               }
             }
@@ -128,14 +128,14 @@ void MultilabelMarginCriterion_updateOutput(
         auto output_ptr = output_data;
         auto is_target_ptr = is_target_data;
         auto local_item_id = item_id.get_local_id(0);
-        local_output_data[local_item_id] = 0.0;
+        local_output_data[local_item_id] = 0.0f;
         for (int i = local_item_id; i < nframe; i += local_size) {
-          scalar_t sum = 0;
+          scalar_t sum = 0.f;
           for (int64_t ddt = 0; ddt < dim; ddt++) {
             auto target_idx = target_ptr[i * dim + ddt];
             if (target_idx < 0)
               break;
-            is_target_ptr[i * dim + target_idx] = 1;
+            is_target_ptr[i * dim + target_idx] = 1.f;
           }
           for (int64_t dt = 0; dt < dim; dt++) {
             auto target_idx = target_ptr[i * dim + dt];
@@ -145,8 +145,8 @@ void MultilabelMarginCriterion_updateOutput(
             auto input_target = input_ptr[i * dim + target_idx];
             for (int64_t d = 0; d < dim; d++) {
               if (!is_target_ptr[i * dim + d]) {
-                scalar_t z = 1.0 - input_target + input_ptr[i * dim + d];
-                if (z > 0)
+                scalar_t z = 1.0f - input_target + input_ptr[i * dim + d];
+                if (z > 0.f)
                   sum += z;
               }
             }
@@ -274,8 +274,8 @@ void MultilabelMarginCriterion_updateGradInput(
           auto input_target = input_ptr[i * dim + target_idx];
           for (int64_t d = 0; d < dim; d++) {
             if (!is_target_ptr[i * dim + d]) {
-              scalar_t z = 1.0 - input_target + input_ptr[i * dim + d];
-              if (z > 0) {
+              scalar_t z = 1.0f - input_target + input_ptr[i * dim + d];
+              if (z > 0.f) {
                 grad_input_ptr[i * dim + target_idx] -= g;
                 grad_input_ptr[i * dim + d] += g;
               }
