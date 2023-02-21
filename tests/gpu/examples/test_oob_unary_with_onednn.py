@@ -189,6 +189,9 @@ class TestTorchMethod(TestCase):
     def test_gelu(self):
         self.unary_case(torch.nn.functional.gelu)
 
+    def test_silu(self):
+        self.unary_case(torch.nn.functional.silu)
+
     def test_mish(self):
         self.unary_case(torch.nn.functional.mish)
 
@@ -250,6 +253,11 @@ class TestTorchMethod(TestCase):
         self.unary_bwd_case(torch.nn.functional.gelu, torch.bfloat16)
         self.unary_bwd_case(torch.nn.functional.gelu, torch.float, True)
 
+    def test_silu_bwd(self):
+        self.unary_bwd_case(torch.nn.functional.silu)
+        # self.unary_bwd_case(torch.nn.functional.silu, torch.bfloat16)
+        self.unary_bwd_case(torch.nn.functional.silu, torch.float, True)
+
     def test_tanh_bwd(self):
         self.unary_bwd_case(torch.nn.functional.tanh)
         # self.unary_bwd_case(torch.nn.functional.tanh, torch.bfloat16)
@@ -310,6 +318,9 @@ class TestNNMethod(TestCase):
 
     def test_gelu(self):
         self.unary_case_nn(torch.nn.GELU)
+    
+    def test_silu(self):
+        self.unary_case_nn(torch.nn.SiLU)
 
     def test_mish(self):
         self.unary_case_nn(torch.nn.Mish)
