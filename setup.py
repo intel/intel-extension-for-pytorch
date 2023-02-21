@@ -34,7 +34,7 @@
 #   TORCH_VERSION
 #     specify the PyTorch version to depend on
 #
-#   TORCH_IPEX_VERSION
+#   IPEX_VERSION
 #     specify the extension version literal
 #
 #   MAX_JOBS
@@ -42,6 +42,9 @@
 #
 #   VERBOSE
 #     more output when compile
+#
+#   IPEX_VERSIONED_BUILD
+#     build wheel files versioned with a git commit number
 #
 
 ##############################################################
@@ -170,14 +173,8 @@ def get_version_num():
     return version
 
 
-def gen_ipex_version_string():
-    pkg_type = 'xpu' if _check_env_flag('BUILD_WITH_XPU') else 'cpu'
-    return "{}+{}".format(get_version_num(), pkg_type)
-
-
 PACKAGE_NAME = "intel_extension_for_pytorch"
 PYTHON_VERSION = sys.version_info
-TORCH_IPEX_VERSION = gen_ipex_version_string()
 
 
 def get_pytorch_install_dir():
@@ -253,12 +250,15 @@ def get_submodule_commit(base_dir, submodule_dir):
 
 
 def get_build_version(ipex_git_sha):
-    ipex_version = os.getenv('TORCH_IPEX_VERSION', TORCH_IPEX_VERSION)
-    if _check_env_flag('VERSIONED_IPEX_BUILD', default='0'):
+    pkg_type = 'xpu' if _check_env_flag('BUILD_WITH_XPU') else 'cpu'
+    ipex_version = os.getenv('IPEX_VERSION', get_version_num())
+    if _check_env_flag('IPEX_VERSIONED_BUILD', default='1'):
         try:
-            ipex_version += '+' + ipex_git_sha[:7]
+            ipex_version += '+git' + ipex_git_sha[:7]
         except Exception:
             pass
+    else:
+        ipex_version += '+' + pkg_type
     return ipex_version
 
 
