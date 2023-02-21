@@ -728,8 +728,8 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
                                       torch.optim.SGD : tpp.optim.SGD}
     assert(dtype == torch.float or dtype == torch.bfloat16, "TPP only support torch.float and torch.bfloat16")    
        
-    #setup the seed for libxsmm which will imapct some ops using seed. e.g., dropout         
-    torch_ipex_cpp.xsmm_manual_seed(torch.initial_seed())
+    #setup the seed for libxsmm (can be only positive int value)which will imapct some ops using seed. e.g., dropout
+    torch_ipex_cpp.xsmm_manual_seed(torch.tensor(torch.initial_seed()).to(torch.int32).abs().item())
     #replace the original transfomers module object with tpp module which has the same functionality but with more 
     #operator fusion optimization 
     new_model = copy.deepcopy(model)
@@ -746,22 +746,22 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     tpp.block(new_model)#get block format weights/bias
     if optimizer is None:
         return new_model
-    if optimizer is not None and type(optimizer) not in PT_OPTIMIZER_TO_TPP_OPTIMIZER and dtype == torch.bfloat16:
-        warnings.warn("Still return the origin optimize, the fast_bert can only replace the SGD, AdamW optimizer") 
-        return new_model, optimizer
-    #replace the original pytorch/transformer optimizer with tpp optimizer 
+    #replace the original pytorch/transformer optimizer with tpp optimizer for SGD/AdamW 
     #keep the original optimizer state and replace the params with the blocked tpp params
     param_pair = {}
     for param_ori, param_tpp in zip(model.parameters(), new_model.parameters()):
         param_pair[param_ori] = param_tpp
-    tpp_optimizer = PT_OPTIMIZER_TO_TPP_OPTIMIZER[type(optimizer)]([{'params':[]}])
-    tpp_optimizer.state = optimizer.state
-    tpp_optimizer.param_groups = optimizer.param_groups
-    for group in tpp_optimizer.param_groups:
+    if type(optimizer) not in PT_OPTIMIZER_TO_TPP_OPTIMIZER:
+        warnings.warn("Still return the origin optimize, the fast_bert can only replace the SGD, AdamW optimizer")
+        new_optimizer = optimizer
+    else:
+        new_optimizer = PT_OPTIMIZER_TO_TPP_OPTIMIZER[type(optimizer)]([{'params':[]}])
+    new_optimizer.state = optimizer.state
+    new_optimizer.param_groups = optimizer.param_groups
+    for group in new_optimizer.param_groups:
         for i, p in enumerate(group['params']):
             if p in param_pair:
                 new_param = param_pair[p]
                 group['params'][i] = new_param
 
-    return new_model, tpp_optimizer
-
+    return new_model, new_optimizer
