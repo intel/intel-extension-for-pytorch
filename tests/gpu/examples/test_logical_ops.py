@@ -5,7 +5,6 @@ import intel_extension_for_pytorch  # noqa
 import pytest
 
 
-@pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
 class TestTorchMethod(TestCase):
     def test_logical_and(self, dtype=torch.float):
         input1 = torch.tensor(
@@ -16,8 +15,9 @@ class TestTorchMethod(TestCase):
         # TODO: check for diferent dtype
         array1 = [input1, input1.half(), input1.bool()]
         array2 = [input2, input2.half(), input2.bool()]
-        array1.append(input1.double())
-        array2.append(input2.double())
+        if torch.xpu.utils.has_fp64_dtype():
+            array1.append(input1.double())
+            array2.append(input2.double())
 
         for input1, input2 in zip(array1, array2):
             # print("Testing logical_and on", input1, "and", input2)
@@ -63,8 +63,9 @@ class TestTorchMethod(TestCase):
         # TODO: check for diferent dtype
         array1 = [input1, input1.half(), input1.bool()]
         array2 = [input2, input2.half(), input2.bool()]
-        array1.append(input1.double())
-        array2.append(input2.double())
+        if torch.xpu.utils.has_fp64_dtype():
+            array1.append(input1.double())
+            array2.append(input2.double())
 
         for input1, input2 in zip(array1, array2):
             # print("Testing logical_or on", input1, "and", input2)
@@ -110,8 +111,9 @@ class TestTorchMethod(TestCase):
         # TODO: check for diferent dtype
         array1 = [input1, input1.half(), input1.bool()]
         array2 = [input2, input2.half(), input2.bool()]
-        array1.append(input1.double())
-        array2.append(input2.double())
+        if torch.xpu.utils.has_fp64_dtype():
+            array1.append(input1.double())
+            array2.append(input2.double())
 
         for input1, input2 in zip(array1, array2):
             # print("Testing logical_xor on", input1, "and", input2)
