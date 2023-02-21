@@ -210,6 +210,20 @@ Tensor& special_zeta_out(const Tensor& self, const Tensor& other, Tensor& out) {
   return out;
 }
 
+Tensor& special_spherical_bessel_j0_out(const Tensor& self, at::Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "spherical_bessel_j0",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+          return spherical_bessel_j0_forward(a);
+        });
+      });
+  return out;
+}
+
 Tensor& special_hermite_polynomial_he_out(
     const Tensor& x,
     const Tensor& n,

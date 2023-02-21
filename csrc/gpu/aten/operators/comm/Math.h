@@ -429,6 +429,31 @@ static inline DPCPP_BOTH scalar_t bessel_j1_forward(scalar_t x) {
 } // bessel_j1_forward(scalar_t x)
 
 template <typename scalar_t>
+static inline DPCPP_BOTH scalar_t spherical_bessel_j0_forward(scalar_t x) {
+  if (Numerics<scalar_t>::isinf(x)) {
+    return scalar_t(0.0);
+  }
+
+  if (Numerics<scalar_t>::abs(x) < scalar_t(0.5)) {
+    return scalar_t(1.0) +
+        x * x *
+        (scalar_t(-1.0) / scalar_t(6.0) +
+         x * x *
+             (scalar_t(1.0) / scalar_t(120.0) +
+              x * x *
+                  (scalar_t(-1.0) / scalar_t(5040.0) +
+                   x * x *
+                       (scalar_t(1.0) / scalar_t(362880.0) +
+                        x * x *
+                            (scalar_t(-1.0) / scalar_t(39916800.0) +
+                             x * x *
+                                 (scalar_t(1.0) / scalar_t(6227020800.0)))))));
+  }
+
+  return Numerics<scalar_t>::sin(x) / x;
+} // spherical_bessel_j0_forward(T x)
+
+template <typename scalar_t>
 static inline DPCPP_BOTH scalar_t
 hermite_polynomial_he_forward(scalar_t x, scalar_t _n) {
   int n = static_cast<int64_t>(_n);
