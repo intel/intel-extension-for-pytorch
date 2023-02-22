@@ -580,6 +580,39 @@ class TestPrepackCases(TestCase):
             self.assertEqual(y1, y2.float(), rtol=1e-2, atol=1e-3)
 
     @unittest.skipIf(not core.onednn_has_bf16_support(), "ipex linear bf16 is not supported on this CPU device")
+    def test_linear_unpack(self):
+        class L(torch.nn.Module):
+            def __init__(self, ic, oc):
+                super(L, self).__init__()
+                self.linear = torch.nn.Linear(ic, oc, bias=True)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        ic = 5
+        oc = 10
+        input_shapes = (4, 32, ic)
+        x = torch.randn(input_shapes)
+        dtype = torch.bfloat16
+        m = L(ic, oc).eval()
+        
+        # Example taken from GPT-J. The weight loaded from the state_dict is non-contiguous with the below size and stride:
+        m.linear.weight = torch.nn.Parameter(copy.deepcopy(m.linear.weight).as_strided([oc, ic], [1, oc]))
+        
+        optimized_m = ipex.optimize(m, dtype=dtype, inplace=True)
+        with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
+            jit_m = torch.jit.trace(optimized_m, x)
+            jit_m = torch.jit.freeze(jit_m)
+            
+            # warm up to trigger the JIT fusion pass
+            jit_m(x)
+            jit_m(x)
+
+            res = jit_m(x)
+            ref_result = m(x)
+            self.assertEqual(res, ref_result)
+
+    @unittest.skipIf(not core.onednn_has_bf16_support(), "ipex linear bf16 is not supported on this CPU device")
     def test_linear_training(self):
         linear_module = torch.nn.Linear
         out_feature = [1024, 256, 1, torch.randint(3, 10, (1, )).item()]

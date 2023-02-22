@@ -310,6 +310,7 @@ at::Tensor pack(ContextLinear& context, const at::Tensor& tensor) {
 at::Tensor unpack(ContextLinear& context, const at::Tensor& tensor) {
   auto dtype = get_mkldnn_dtype(tensor.scalar_type());
   auto expected_desc = context.weight_packed_.get_desc().to_type(dtype);
+  auto origin_desc = context.original_desc_.to_type(dtype);
   ideep::tensor blocked_tensor;
   if (ideep::data_type::f32 == dtype) {
     blocked_tensor.init(expected_desc, tensor.template data_ptr<float>());
@@ -323,7 +324,8 @@ at::Tensor unpack(ContextLinear& context, const at::Tensor& tensor) {
     blocked_tensor.init(expected_desc, tensor.template data_ptr<c10::Half>());
   }
 
-  at::Tensor result = at::empty(expected_desc.get_dims(), tensor.options());
+  at::Tensor result = at::empty_strided(
+      origin_desc.get_dims(), origin_desc.get_strides(), tensor.options());
   ideep::tensor pub_tensor;
   auto pub_tensor_desc = context.original_desc_.to_type(dtype);
   if (ideep::data_type::f32 == dtype) {
