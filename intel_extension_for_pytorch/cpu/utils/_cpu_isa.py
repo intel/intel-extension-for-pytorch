@@ -1,4 +1,5 @@
 # coding: utf-8
+import intel_extension_for_pytorch
 import subprocess
 import platform
 import sys
@@ -9,7 +10,7 @@ def check_avx2_support():
         return (value >> bit_index) & 1
 
     try:
-        # https://pypi.org/project/cpuid/ 
+        # https://pypi.org/project/cpuid/
         import cpuid
     except ImportError:
         raise Exception(f"unable to import cpuid, please install it via pypi.")
@@ -47,6 +48,8 @@ def check_avx2_support():
     return False
 
 def check_minimal_isa_support():
+    if not intel_extension_for_pytorch._C._has_cpu():
+        return
     err_msg = "ERROR! Intel® Extension for PyTorch* only works on machines with instruction sets equal or newer than AVX2, which are not detected on the current machine."
     if not check_avx2_support():
         sys.exit(err_msg)

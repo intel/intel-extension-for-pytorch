@@ -21,6 +21,8 @@ class CPUPool(object):
     """
 
     def __init__(self, core_ids: list = None, node_id: int = None):
+        if not ipex._C._has_cpu():
+            return
         if core_ids is not None:
             if node_id is not None:
                 warnings.warn("Both of core_ids and node_id are inputed. core_ids will be used with priority.")

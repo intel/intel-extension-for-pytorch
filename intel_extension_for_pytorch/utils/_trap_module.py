@@ -31,22 +31,6 @@ class trap_math_mode(object):
 # --- [ CPU traps:
 _register_trap_ops('interaction_forward')
 
-
-if not hasattr(intel_extension_for_pytorch._C, 'get_process_available_cores'):
-    def no_cores():
-        pass
-    intel_extension_for_pytorch._C.__dict__['get_process_available_cores'] = no_cores
-
-
-if not hasattr(intel_extension_for_pytorch._C, 'CPUPool'):
-    class empty_cpu_pool(object):
-        def __init__(self, ids):
-            pass
-        def get_core_list(self):
-            pass
-    intel_extension_for_pytorch._C.__dict__['CPUPool'] = empty_cpu_pool
-
-
 if not hasattr(intel_extension_for_pytorch._C, 'FP32MathMode'):
     intel_extension_for_pytorch._C.__dict__['FP32MathMode'] = trap_math_mode
 
