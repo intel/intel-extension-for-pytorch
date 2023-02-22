@@ -289,6 +289,25 @@ class TestIpexOps(JitLlgaTestCase):
         graph = self.checkQuantizeTrace(model, [seq, hid, mask])
         self.assertGraphContainsExactly(graph, 'aten::lstm', 1)
 
+    def test_linear_lstm(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = nn.Linear(512, 64)
+                self.lstm = nn.LSTM(input_size=64, hidden_size=256, num_layers=2)
+
+            def forward(self, input, hid=None):
+                x = self.linear(input)
+                x = self.lstm(x, hid)
+                return x
+
+        model = M().eval()
+        seq = torch.randn(24, 1, 512)
+
+        graph = self.checkQuantizeTrace(model, [seq], atol=3e-2, rtol=1e-1)
+        self.assertGraphContainsExactly(graph, 'ipex::quantized_lstm', 1)        
+        self.assertGraphContainsExactly(graph, 'aten::lstm', 0)        
+
 class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
     def test_inplace_preapre(self):
         class M(nn.Module):

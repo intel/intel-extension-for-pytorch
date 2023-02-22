@@ -783,8 +783,7 @@ void preprocessSizeForQLstm(std::shared_ptr<Graph>& graph) {
       op_list_construct_same_states, op_list_construct_diff_states};
 
   auto pattern = at::jit::CodeTemplate(R"(
-     graph(%x, %scale, %zero_point, %quantize_dtype, %size_dim, %ld, %hidden_size, %scalar_type, %layout, %device, %pin_memory, %weight, %has_biases, %num_layers, %dropout, %train, %bidirectional, %batch_first):
-        %quantized_input = aten::quantize_per_tensor(%x, %scale, %zero_point, %quantize_dtype)
+     graph(%quantized_input, %size_dim, %ld, %hidden_size, %scalar_type, %layout, %device, %pin_memory, %weight, %has_biases, %num_layers, %dropout, %train, %bidirectional, %batch_first):
         %ret.3 = aten::dequantize(%quantized_input)
         %max_batch_size : int = aten::size(%ret.3, %size_dim)
         %ret.tensor : Tensor = prim::NumToTensor(%max_batch_size)
@@ -795,8 +794,7 @@ void preprocessSizeForQLstm(std::shared_ptr<Graph>& graph) {
         return (%res.1, %res.2, %res.3) )");
 
   auto replacement = at::jit::CodeTemplate(R"(
-     graph(%x, %scale, %zero_point, %quantize_dtype, %size_dim, %ld, %hidden_size, %scalar_type, %layout, %device, %pin_memory, %weight, %has_biases, %num_layers, %dropout, %train, %bidirectional, %batch_first):
-        %quantized_input = aten::quantize_per_tensor(%x, %scale, %zero_point, %quantize_dtype)
+     graph(%quantized_input, %size_dim, %ld, %hidden_size, %scalar_type, %layout, %device, %pin_memory, %weight, %has_biases, %num_layers, %dropout, %train, %bidirectional, %batch_first):
         %max_batch_size : int = aten::size(%quantized_input, %size_dim)
         %ret.3 = aten::dequantize(%quantized_input)
         %ret.tensor : Tensor = prim::NumToTensor(%max_batch_size)
