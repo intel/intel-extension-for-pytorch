@@ -53,3 +53,23 @@ class TestTorchMethod(TestCase):
         print("dpcpp  index_put accmulate=true")
         print(x_dpcpp.cpu())
         self.assertEqual(x_cpu, x_dpcpp.to(cpu_device))
+
+    def test_index_put(self, dtype=torch.bfloat16):
+        cpu_device = torch.device("cpu")
+        dpcpp_device = torch.device("xpu")
+
+        accumulate=True
+        x_cpu = torch.zeros([4, 512, 128], dtype=dtype, device=cpu_device)
+        y_cpu = torch.ones([4, 15000, 128], dtype=dtype, device=cpu_device)
+        x_dpcpp = x_cpu.to(dpcpp_device)
+        y_dpcpp = y_cpu.to(dpcpp_device)
+        index_cpu = [torch.ones([4, 15000, 128], device=cpu_device).to(torch.long), torch.ones([4, 15000, 128], device=cpu_device).to(torch.long), torch.ones([4, 15000, 128], device=cpu_device).to(torch.long)]
+        index_dpcpp = [torch.ones([4, 15000, 128], device=dpcpp_device).to(torch.long), torch.ones([4, 15000, 128], device=dpcpp_device).to(torch.long), torch.ones([4, 15000, 128], device=dpcpp_device).to(torch.long)]
+
+        z_cpu = x_cpu.index_put_(index_cpu, y_cpu, accumulate)
+
+        z_xpu = x_dpcpp.index_put_(index_dpcpp, y_dpcpp, accumulate)
+
+        print("z_cpu = ", z_cpu)
+        print("z_xpu = ", z_xpu.cpu())
+        self.assertEqual(z_cpu, z_xpu.cpu())

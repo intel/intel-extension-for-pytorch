@@ -9,17 +9,19 @@
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <utils/Helpers.h>
+#include <iostream>
+#include "Indexing.h"
+#include "IndexingUtils.h"
+#include "Loops.h"
 #include "PSTLFunctions.h"
+#include "ParttenScan.h"
+#include "SortingDeviceRadixSort.h"
 #include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Atomics.h"
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
-
-#include "Indexing.h"
-#include "IndexingUtils.h"
-#include "Loops.h"
-#include "ParttenScan.h"
 
 using namespace xpu::dpcpp;
 
@@ -728,48 +730,268 @@ void index(
       });
 }
 
-void index_put_impl(
-    TensorIterator& iter,
-    IntArrayRef index_size,
-    IntArrayRef index_stride,
+template <typename scalar_t, int SZ>
+void index_put_deterministic_kernel(
+    int64_t* sorted_indices,
+    int64_t* indices,
+    scalar_t* value,
+    scalar_t* self,
+    int64_t numel,
+    int64_t stride,
+    int64_t stride_before,
+    int64_t outer_dim,
     bool accumulate) {
-  if (accumulate) {
-    IPEX_DISPATCH_ATOMIC_ALL_TYPES_AND_COMPLEX(iter.dtype(), "index_put", [&] {
-      dpcpp_index_kernel(
-          iter,
-          index_size,
-          index_stride,
-          IntArrayRef{},
-          IntArrayRef{},
-          [](char* out_data, char* in_data, int64_t offset) {
-            dpcpp_global_ptr_pt<scalar_t> out_ptr =
-                (dpcpp_global_ptr_pt<scalar_t>)(out_data + offset);
-            auto in = *(scalar_t*)in_data;
-            atomicAdd(out_ptr, in);
-          });
-    });
-  } else {
-    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-        at::ScalarType::BFloat16,
-        at::ScalarType::Half,
-        at::ScalarType::Bool,
-        iter.dtype(),
-        "index_put",
-        [&] {
-          using dtype = OpaqueType<sizeof(scalar_t)>;
-          dpcpp_index_kernel(
-              iter,
-              index_size,
-              index_stride,
-              IntArrayRef{},
-              IntArrayRef{},
-              [](char* out_data, char* in_data, int64_t offset) {
-                *(dtype*)(out_data + offset) = *(dtype*)in_data;
-              });
-        });
+  using accscalar_t = acc_type<scalar_t>;
+
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+
+  auto* dev_prop = dpcppGetDeviceProperties(getDeviceIdOfCurrentQueue());
+  auto sub_group_size = dev_prop->subgroup_sizes;
+  int group_x = sub_group_size[1];
+  const int64_t indices_per_group = 4;
+  sycl::range<3> wgroup_size = {1, indices_per_group, group_x};
+  int y_num = (numel + indices_per_group - 1) / indices_per_group;
+  int x_num = (stride + group_x * SZ - 1) / (group_x * SZ);
+  sycl::range<3> wgroup_range = {
+      outer_dim, y_num * indices_per_group, x_num * group_x * SZ};
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item_id) {
+      auto itemIdx_y = item_id.get_local_id(1);
+      auto itemIdx_x = item_id.get_local_id(2);
+      auto groupIdx_z = item_id.get_group(0);
+      auto groupIdx_y = item_id.get_group(1);
+      auto groupIdx_x = item_id.get_group(2);
+      auto groupDim_y = item_id.get_local_range(1);
+      auto groupDim_x = item_id.get_local_range(2);
+      int64_t idx = groupIdx_y * groupDim_y + itemIdx_y;
+      if (idx < numel &&
+          (idx == 0 || sorted_indices[idx] != sorted_indices[idx - 1])) {
+        do {
+          int64_t start_feature = itemIdx_x + groupIdx_x * groupDim_x * SZ;
+          const int64_t self_row = ((int64_t)sorted_indices[idx]) * stride +
+              groupIdx_z * stride_before;
+          const int64_t value_row =
+              ((int64_t)indices[idx]) * stride + groupIdx_z * numel * stride;
+#pragma unroll
+          for (int ii = 0; ii < SZ; ii++) {
+            int64_t feature_dim = start_feature + ii * group_x;
+            if (feature_dim < stride) {
+              self[self_row + feature_dim] += value[value_row + feature_dim];
+            }
+          }
+
+          idx++;
+        } while (idx < numel && sorted_indices[idx] == sorted_indices[idx - 1]);
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<3>(wgroup_range, wgroup_size), kfn);
+  };
+
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+} // namespace impl
+
+static Tensor wrapIndexOnce(
+    const Tensor& index,
+    int64_t dim,
+    int64_t dim_size,
+    bool check_range = true) {
+  if (index.numel() != 0 && check_range) {
+    auto max_idx = index.max().item<int64_t>();
+    auto min_idx = index.min().item<int64_t>();
+    if (max_idx >= dim_size) {
+      TORCH_CHECK_INDEX(
+          false,
+          "index ",
+          max_idx,
+          " is out of bounds for dimension ",
+          dim,
+          " with size ",
+          dim_size);
+    }
+    if (min_idx < -dim_size) {
+      TORCH_CHECK_INDEX(
+          false,
+          "index ",
+          min_idx,
+          " is out of bounds for dimension ",
+          dim,
+          " with size ",
+          dim_size);
+    }
   }
+  return index.remainder(dim_size);
 }
 
+static std::vector<int64_t> computeLinearStride(const Tensor& tensor) {
+  // computes the stride as if tensor were contiguous
+  auto sizes = tensor.sizes();
+  std::vector<int64_t> stride(tensor.dim());
+  stride[tensor.dim() - 1] = 1;
+  std::partial_sum(
+      sizes.rbegin(),
+      sizes.rend() - 1,
+      stride.rbegin() + 1,
+      std::multiplies<int64_t>());
+  return stride;
+}
+
+static std::tuple<Tensor, int64_t, int64_t, int64_t> computeLinearIndex(
+    const Tensor& src,
+    TensorList indices,
+    bool check_range) {
+  auto strides = computeLinearStride(src);
+  const auto& device = src.options().device();
+
+  // Compute the linear index by multiplying the indexing tensors by the
+  // stride and summing them. All the indexing tensors have the same shape at
+  // this point. We also compute the number of dimensions before and after
+  // that are not being index.
+  Tensor linearIndex;
+  int64_t nElemBefore = 1, nElemAfter = 1, strideBefore = 0;
+  for (const auto i : c10::irange(src.dim())) {
+    if (indices[i].defined()) {
+      // Cast index to the longType matching src's device
+      // This allows us to support ie indexing a xpu tensor with a cpu tensor
+      Tensor index =
+          (wrapIndexOnce(indices[i], i, src.size(i), check_range) * strides[i])
+              .to(device);
+      if (linearIndex.defined()) {
+        linearIndex += index;
+      } else {
+        linearIndex = index;
+        if (i > 0) {
+          strideBefore = src.stride(i - 1); // stride after undefined dimensions
+        }
+      }
+    } else if (linearIndex.defined()) {
+      nElemAfter *= src.size(i);
+    } else {
+      nElemBefore *= src.size(i);
+    }
+  }
+  return std::make_tuple(
+      std::move(linearIndex), nElemBefore, strideBefore, nElemAfter);
+}
+
+static std::
+    tuple<Tensor, Tensor, int64_t, int64_t, int64_t, std::vector<int64_t>>
+    makeLinearIndex(
+        Tensor self,
+        const c10::List<c10::optional<at::Tensor>>& orig,
+        bool check_range) {
+  checkIndexTensorTypes(orig);
+  // first expand BoolTensor (masks) or ByteTensor (masks) into 1 or more
+  // LongTensors
+  auto indices = expandTensors(self, orig);
+  // next broadcast all index tensors together
+  indices = expand_outplace(indices);
+  // add missing null Tensors so that it matches self.dim()
+  while (indices.size() < (size_t)self.dim()) {
+    indices.emplace_back();
+  }
+  // if the non-null indices are not all adjacent, transpose self and indices
+  // together so that they're adjacent at the front
+  std::vector<int64_t> inversePerm;
+  if (!hasContiguousSubspace(indices)) {
+    std::tie(self, indices, inversePerm) =
+        transposeToFrontAndInvPerm(self, indices);
+  }
+  int64_t nElemBefore, strideBefore, nElemAfter;
+  Tensor linearIndex;
+  std::tie(linearIndex, nElemBefore, strideBefore, nElemAfter) =
+      computeLinearIndex(self, indices, check_range);
+  return std::make_tuple(
+      linearIndex, self, nElemBefore, strideBefore, nElemAfter, inversePerm);
+}
+
+void index_put_deterministic_impl(
+    Tensor& self,
+    const c10::List<c10::optional<Tensor>>& indices,
+    const Tensor& value,
+    bool accumulate,
+    bool unsafe) {
+  if (indices.size() > (size_t)self.dim()) {
+    TORCH_CHECK_INDEX(
+        false,
+        "too many indices for tensor of dimension ",
+        self.dim(),
+        " (got ",
+        indices.size(),
+        ")");
+  }
+  bool self_contiguous = self.is_contiguous();
+  auto self_ = self_contiguous ? self : self.contiguous();
+  Tensor linearIndex, src, expandedValue = value;
+  int64_t nElemBefore, strideBefore, sliceSize;
+  std::vector<int64_t> inversePerm;
+  std::tie(
+      linearIndex, src, nElemBefore, strideBefore, sliceSize, inversePerm) =
+      makeLinearIndex(self_, indices, !unsafe);
+  int64_t num_indices = linearIndex.numel();
+
+  if (expandedValue.numel() < num_indices * nElemBefore * sliceSize) {
+    auto expanded_size = at::DimVector(expandedValue.sizes());
+    auto size1 = expandedValue.sizes();
+    auto size2 = linearIndex.sizes();
+    if (are_expandable(size1, size2)) {
+      expanded_size = infer_size_dimvector(size1, size2);
+    }
+    if (nElemBefore > 1) {
+      expanded_size.insert(expanded_size.begin(), nElemBefore);
+    }
+    expandedValue = expandedValue.expand(expanded_size);
+  }
+  expandedValue = expandedValue.contiguous();
+
+  if (num_indices > 0 && sliceSize > 0) {
+    const bool permuted = !src.is_contiguous();
+    auto src_ = permuted ? src.contiguous() : src;
+    linearIndex = linearIndex.reshape(-1);
+    auto sorted_indices =
+        at::empty_like(linearIndex, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+    auto orig_indices =
+        at::empty_like(linearIndex, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+
+    linearIndex.divide_(sliceSize, "trunc");
+
+    sorted_indices.copy_(linearIndex);
+    xpu::pstl::sort<int64_t, int64_t>(
+        linearIndex.data_ptr<int64_t>(),
+        sorted_indices.data_ptr<int64_t>(),
+        orig_indices.data_ptr<int64_t>(),
+        linearIndex.numel(),
+        false);
+    TORCH_INTERNAL_ASSERT(
+        linearIndex.numel() * sliceSize * nElemBefore == expandedValue.numel(),
+        "number of flattened indices did not match number of elements in the value tensor: ",
+        linearIndex.numel() * sliceSize * nElemBefore,
+        " vs ",
+        expandedValue.numel());
+    const int UNROLL = 4;
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+        at::ScalarType::Half,
+        at::ScalarType::Bool,
+        at::ScalarType::BFloat16,
+        expandedValue.scalar_type(),
+        "index_put_deterministic_kernel",
+        [&] {
+          index_put_deterministic_kernel<scalar_t, UNROLL>(
+              sorted_indices.data_ptr<int64_t>(),
+              orig_indices.data_ptr<int64_t>(),
+              expandedValue.data_ptr<scalar_t>(),
+              src_.data_ptr<scalar_t>(),
+              num_indices,
+              sliceSize,
+              strideBefore,
+              nElemBefore,
+              accumulate);
+        });
+    if (permuted)
+      self.copy_(src_.permute(inversePerm));
+  }
+}
 template <typename scalar_t>
 void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
   ptrdiff_t src_num_elem = src.numel();
@@ -1451,17 +1673,57 @@ Tensor& _index_put_impl_(
     }
   }
 
-  // See Note [Enabling Deterministic Operations]
-  if (accumulate && globalContext().deterministicAlgorithms()) {
-    // TODO: enable deterministic algorithm and change the condition check.
-    TORCH_CHECK(
-        false, "index_put is not implemented with deterministic algorithm.");
+  if (globalContext().deterministicAlgorithms()) {
+    impl::index_put_deterministic_impl(
+        self, indices, value, accumulate, unsafe);
+    return self;
   }
 
-  auto info = make_info(self, indices);
-  auto iter = make_index_put_iterator(info, value);
-  impl::index_put_impl(
-      iter, info.indexed_sizes, info.indexed_strides, accumulate);
+  if (accumulate) {
+    if (self.scalar_type() == at::kBFloat16) {
+      impl::index_put_deterministic_impl(
+          self, indices, value, accumulate, unsafe);
+    } else {
+      auto info = make_info(self, indices);
+      auto iter = make_index_put_iterator(info, value);
+      IPEX_DISPATCH_ATOMIC_ALL_TYPES_AND_COMPLEX(
+          iter.dtype(), "index_put_non_deterministic_acc_kernel", [&] {
+            dpcpp_index_kernel(
+                iter,
+                info.indexed_sizes,
+                info.indexed_strides,
+                IntArrayRef{},
+                IntArrayRef{},
+                [](char* out_data, char* in_data, int64_t offset) {
+                  dpcpp_global_ptr_pt<scalar_t> out_ptr =
+                      (dpcpp_global_ptr_pt<scalar_t>)(out_data + offset);
+                  auto in = *(scalar_t*)in_data;
+                  atomicAdd(out_ptr, in);
+                });
+          });
+    }
+  } else {
+    auto info = make_info(self, indices);
+    auto iter = make_index_put_iterator(info, value);
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        at::ScalarType::Bool,
+        iter.dtype(),
+        "index_put_non_deterministic_non_acc_kernel",
+        [&] {
+          using dtype = impl::OpaqueType<sizeof(scalar_t)>;
+          dpcpp_index_kernel(
+              iter,
+              info.indexed_sizes,
+              info.indexed_strides,
+              IntArrayRef{},
+              IntArrayRef{},
+              [](char* out_data, char* in_data, int64_t offset) {
+                *(dtype*)(out_data + offset) = *(dtype*)in_data;
+              });
+        });
+  }
   return self;
 }
 
