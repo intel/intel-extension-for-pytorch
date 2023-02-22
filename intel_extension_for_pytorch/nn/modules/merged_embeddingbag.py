@@ -23,7 +23,7 @@ class EmbeddingSpec(NamedTuple):
     pooling_modes: str
     dtype: torch.dtype
     weight: Optional[torch.Tensor]
-    sparse: bool 
+    sparse: bool
 
 
 def merged_embeddingbag(
@@ -133,31 +133,44 @@ class MergedEmbeddingBagSGDFunc(Function):
 
 class MergedEmbeddingBag(nn.Module):
     r"""
-    Merge multiple Pytorch EmbeddingBag (https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/sparse.py#L221) 
-    as one torch.nn.Module.
+    Merge multiple Pytorch `EmbeddingBag <https://pytorch.org/docs/stable/generated/torch.nn.EmbeddingBag.html
+    #embeddingbag>`_ objects into a single `torch.nn.Module` object.
+
     At the current stage:
-    MergedEmbeddingBag assumes constructed by nn.EmbeddingBag with sparse=False, and will return dense grad.
-    MergedEmbeddingBagWithSGD does not return any grad, backward and update are fused.
-    Native usage for multiple EmbeddingBag is:
+
+    `MergedEmbeddingBag` assumes to be constructed from `nn.EmbeddingBag` with `sparse=False`, returns dense gradients.
+
+    `MergedEmbeddingBagWithSGD` does not return gradients, backward step and weights update step are fused.
+
+    Native usage of multiple `EmbeddingBag` objects is:
+
         >>> EmbLists = torch.nn.Modulist(emb1, emb2, emb3, ..., emb_m)
         >>> inputs = [in1, in2, in3, ..., in_m]
         >>> outputs = []
         >>> for i in range(len(EmbLists)):
         >>>     outputs.append(Emb[in_i])
-    Our optimized path will be:
-        >>> merged_emb = MergedEmbeddingBagWithSGD(args)
+
+    The optimized path is:
+
+        >>> EmbLists = torch.nn.Modulist(emb1, emb2, emb3, ..., emb_m)
+        >>> merged_emb = MergedEmbeddingBagWithSGD.from_embeddingbag_list(EmbLists)
         >>> outputs = MergedEmbeddingBagWithSGD(input)
-    We will have benefits for our optimized path:
-      1). We will save Pytorch OP dispatch overhead, if the EmbeddingBag operations are not
-      heavy, this dispatch overhead will have big impact.
-    We introduce "linearize_indices_and_offsets" step to merged indices/offsets together. But consider EmbeddingBags
-    are usually the first layer of a model. So "linearize_indices_and_offsets" can be considered as "data prepocess" and
-    can be done offline.
-    This Module can not be used alone, we suggest to use MergedEmbeddingBagWith[Optimizer] instead.
-    Now we can only choose MergedEmbeddingBagWithSGD and we plan to add more optimizer support
-    in the future.
-    For the introduction of MergedEmbeddingBagWith[Optimizer], please find the comments at
-    MergedEmbeddingBagWithSGD.
+
+    Computation benefits from the optimized path:
+
+        1). Pytorch OP dispatching overhead is minimized. If `EmbeddingBag` operations are not heavy, this dispatching
+        overhead brings big impact.
+
+        2). Parallelizations over embedding tables are merged into that over a single merged embedding table. This
+        could benefit low parallelization efficiency scenarios when data size read out from embedding tables are not
+        large enough.
+
+    A `linearize_indices_and_offsets` step is introduced to merge indices/offsets together. Consider that `EmbeddingBag`
+    objects are usually the first layer of a model, the `linearize_indices_and_offsets` step can be considered as "data
+    prepocess" and can be done offline. See usage of the `linearize_indices_and_offsets` in `MergedEmbeddingBagWithSGD`.
+
+    Now `MergedEmbeddingBagWithSGD` is the only option running with an optimizer. We plan to add more optimizer support
+    in the future. Visit `MergedEmbeddingBagWithSGD` for introduction of `MergedEmbeddingBagWith[Optimizer]`.
     """
     embedding_specs: List[EmbeddingSpec]
 
@@ -194,7 +207,7 @@ class MergedEmbeddingBag(nn.Module):
             "row_offsets",
             torch.tensor([0] + list(accumulate(row_offsets)), dtype=torch.int64),
         )
-    
+
     @classmethod
     def from_embeddingbag_list(
         cls,
@@ -203,7 +216,7 @@ class MergedEmbeddingBag(nn.Module):
         embedding_specs = []
         for emb in tables:
             emb_shape = emb.weight.shape
-            assert not emb.sparse, "MergedEmbeddingBag can only be used for dense gradient EmebddingBag. Please use MergedEmbeddingBagWith[Optimizer] for sparse gradient." 
+            assert not emb.sparse, "MergedEmbeddingBag can only be used for dense gradient EmebddingBag. Please use MergedEmbeddingBagWith[Optimizer] for sparse gradient."
             embedding_specs.append(
                 EmbeddingSpec(
                     num_of_features=emb_shape[0],
@@ -234,7 +247,7 @@ class MergedEmbeddingBag(nn.Module):
         To make backward/update more balance, we only have 1 logical table in MergedEmbedingBag and
         use unified indices for access the whole logical table.
         We need to re-mark the indice from different tables to distinguish them.
-        For example, we have  2 tables with shape [200, 128] and [100, 128].
+        For example, we have 2 tables with shape [200, 128] and [100, 128].
         The indice 50 for table1 is still 50 and the indice 50 for table2 should be set to 50 + 200 = 250.
         We assume the original indice and offset will follow the usage for Pytorch EmbeddingBag:
         https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/sparse.py#L355-L382
@@ -292,7 +305,7 @@ class MergedEmbeddingBag(nn.Module):
         Returns:
             List[Tensor] output shape of `(batch_size, feature_size)` which length = num of tables.
         """
-        assert self.alldense, "MergedEmbeddingBag only support EmbeddingBag List with all dense gradient, please use MergedEmbeddingBagWith[Optimizer] for sparse gridient EmbeddingBag" 
+        assert self.alldense, "MergedEmbeddingBag only support EmbeddingBag List with all dense gradient, please use MergedEmbeddingBagWith[Optimizer] for sparse gridient EmbeddingBag"
         if need_linearize_indices_and_offsets.item():
             indices, offsets, include_last_offsets = input
             indices, offsets, indices_with_row_offsets = self.linearize_indices_and_offsets(indices, offsets, include_last_offsets)
@@ -306,9 +319,10 @@ class MergedEmbeddingBag(nn.Module):
 
 class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
     r"""
-    To support training for MergedEmbeddingBag with good performance, we fused optimizer step
-    with backward function.
+    To support training with `MergedEmbeddingBag` for good performance, optimizer step is fused with backward function.
+
     Native usage for multiple EmbeddingBag is:
+
         >>> EmbLists = torch.nn.Modulist(emb1, emb2, emb3, ..., emb_m)
         >>> sgd = torch.optim.SGD(EmbLists.parameters(), lr=lr, weight_decay=weight_decay)
         >>> inputs = [in1, in2, in3, ..., in_m]
@@ -317,28 +331,35 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
         >>>     outputs.append(Emb[in_i])
         >>> sgd.zero_grad()
         >>> for i in range(len(outputs)):
-        >>>     out.backward(grads[i]) 
+        >>>     out.backward(grads[i])
         >>> sgd.step()
-    Our optimized path will be:
+
+    The optimized path is:
+
         >>> # create MergedEmbeddingBagWithSGD module with optimizer args (lr and weight decay)
-        >>> merged_emb = MergedEmbeddingBagWithSGD(args)
+        >>> EmbLists = torch.nn.Modulist(emb1, emb2, emb3, ..., emb_m)
+        >>> merged_emb = MergedEmbeddingBagWithSGD.from_embeddingbag_list(EmbLists, lr=lr, weight_decay=weight_decay)
+        >>> # if you need to train with BF16 dtype, we provide split sgd on it
+        >>> # merged_emb.to_bfloat16_train()
         >>> merged_input = merged_emb.linearize_indices_and_offsets(inputs)
-        >>> outputs = MergedEmbeddingBagWithSGD(merged_input)
+        >>> outputs = MergedEmbeddingBagWithSGD(merged_input, need_linearize_indices_and_offsets=torch.BoolTensor([False]))
         >>> outputs.backward(grads)
-    We will get further benefits in training:
-      1). We will futher save Pytorch OP dispatch overhead in backward and weight update process.
-      2). We will make thread loading more balance during backward/weight update. In real
-      world scenario, Embedingbag are often used to represent categorical features and the 
-      categorical features will often fit power law distribution. For example, if we use one
-      Embeddingtable to represent the age range the users of a video game website. We might
-      find most of users are from 10-19 or 20-29. So we may need update the row which represent
-      10-19 or 20-29 frequently. Since update these rows need to write at the same memory address,
-      we need to write it by 1 thread (or we will have write conflict or have overhead to solve the conflict).
-      By merge multiple table together, we will have more friendly distribution to distribute
-      backward/update tasks.
-      3). We will fuse update with backward together. We can immediately update the weight after
-      we get grad from backward thus the memory pattern will be more friendly. We will have 
-      more chance to access data from cache. 
+
+    Training benefits further from this optimization:
+
+        1). Pytorch OP dispatching overhead in backward and weight update process is saved.
+
+        2). Thread loading becomes more balanced during backward/weight update. In real world scenarios, `Embedingbag`
+        are often used to represent categorical features, while the categorical features often fit power law
+        distribution. For example, if we use one embedding table to represent the age range of a video game website
+        users, we might find most of them are between 10-19 or 20-29. So we may need to update the row which represent
+        10-19 or 20-29 frequently. Since updating these rows needs to write at the same memory address, we need to write
+        it by 1 thread (otherwise we will have write conflict or overhead to solve the conflict). The potential memory
+        write conflict can be simply addressed by merging multiple tables together.
+
+        3). Weights update is fused with backward together. We can immediately update the weight right after we get
+        gradients from the backward step and thus the memory access pattern becomes more friendly. Data access will
+        happens on cache more than on memory.
     """
     embedding_specs: List[EmbeddingSpec]
 
