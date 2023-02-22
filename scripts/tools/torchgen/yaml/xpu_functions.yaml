@@ -469,6 +469,7 @@ supported:
   - quantize_per_channel
   - quantize_per_tensor
   - quantize_per_tensor.tensor_qparams
+  - quantize_per_tensor_dynamic
   - random_
   - random_.from
   - random_.to

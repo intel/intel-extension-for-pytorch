@@ -1,9 +1,48 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
+import math
+import numpy as np
 import intel_extension_for_pytorch  # noqa
 import pytest
 
+def _calculate_dynamic_qparams(X, dtype, reduce_range=False):
+    """Calculate the dynamic quantization parameters (scale, zero_point)
+    according to the min and max element of the tensor"""
+    if isinstance(X, torch.Tensor):
+        X = X.cpu().data.numpy()
+    if dtype == torch.qint8:
+        qmin, qmax = -128, 127
+    else:  # dtype == torch.quint8
+        qmin, qmax = 0, 255
+
+    min_val = X.min().astype(dtype=np.float32)
+    max_val = X.max().astype(dtype=np.float32)
+    min_val = min(0.0, min_val)
+    max_val = max(0.0, max_val)
+    scale = (np.float64(max_val) - min_val) / (qmax - qmin)
+    if scale == 0.0 or math.isinf(1.0 / scale):
+        scale = np.float64(0.1)
+        zero_point = 0
+
+    zero_point_from_min = qmin - min_val / float(scale)
+    zero_point_from_max = qmax - max_val / float(scale)
+    zero_point_from_min_error = abs(qmin) - abs(min_val / float(scale))
+    zero_point_from_max_error = abs(qmax) - abs(max_val / float(scale))
+    if zero_point_from_min_error < zero_point_from_max_error:
+        initial_zero_point = zero_point_from_min
+    else:
+        initial_zero_point = zero_point_from_max
+    nudged_zero_point = 0
+
+    if initial_zero_point < qmin:
+        nudged_zero_point = qmin
+    elif initial_zero_point > qmax:
+        nudged_zero_point = qmax
+    else:
+        nudged_zero_point = int(round(initial_zero_point))
+
+    return [scale.astype(np.float32), int(nudged_zero_point)]
 
 class TestTorchMethod(TestCase):
     def test_quantize_per_tensor(self, dtype=torch.float):
@@ -29,6 +68,20 @@ class TestTorchMethod(TestCase):
         dst_gpu = torch.quantize_per_tensor(src_gpu, scale_gpu, zero_point_gpu, dtype=data_type)
 
         self.assertEqual(dst_cpu, dst_gpu)
+
+    def test_quantize_per_tensor_dynamic(self, dtype=torch.float):
+        # test refer to torch/test/quantization/core/test_quantized_tensor.py:200
+        # result of quantize_per_tensor_dynamic not equal cpu path but meet its function.
+        for dynamic_dtype in [torch.qint8, torch.quint8]:
+            max_tensor_order = 4
+            max_dim_sz = 20
+            num_dim = np.random.randint(low=1, high=max_tensor_order)
+            dims = np.random.randint(low=1, high=max_dim_sz, size=num_dim)
+            mat2quant = torch.randn(*dims, dtype=torch.float, device=torch.device('xpu'))
+            result = torch.quantize_per_tensor_dynamic(mat2quant, dynamic_dtype, False)
+            scale, zero_pt = _calculate_dynamic_qparams(mat2quant, dynamic_dtype, False)
+            result_non_dynam = torch.quantize_per_tensor(mat2quant, scale, zero_pt, dynamic_dtype)
+            self.assertEqual(result_non_dynam.cpu(), result.cpu())
 
     def test_quantize_tensor_channels_last(self, dtype=torch.float):
         src_cpu = torch.randn(1, 3, 2, 2)

@@ -6,6 +6,11 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+Tensor quantize_per_tensor_dynamic(
+    const Tensor& self,
+    ScalarType dtype,
+    bool reduce_range);
+
 Tensor quantize_tensor_per_channel_affine(
     Tensor& qtensor,
     const Tensor& rtensor,
