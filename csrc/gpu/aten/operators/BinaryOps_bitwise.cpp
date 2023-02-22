@@ -33,7 +33,7 @@ void and_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_INTEGRAL_TYPES_AND(
       kBool, iter.dtype(), "bitwise_and_xpu", [&]() {
         BitwiseAndFunctor<scalar_t> f;
-        dpcpp_kernel_with_scalars(iter, f);
+        opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(iter, f);
       });
 }
 
@@ -55,7 +55,7 @@ void or_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_INTEGRAL_TYPES_AND(
       kBool, iter.dtype(), "bitwise_or_xpu", [&]() {
         BitwiseOrFunctor<scalar_t> f;
-        dpcpp_kernel_with_scalars(iter, f);
+        opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(iter, f);
       });
 }
 
@@ -77,7 +77,7 @@ void xor_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_INTEGRAL_TYPES_AND(
       kBool, iter.dtype(), "bitwise_xor_xpu", [&]() {
         BitwiseXorFunctor<scalar_t> f;
-        dpcpp_kernel_with_scalars(iter, f);
+        opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(iter, f);
       });
 }
 

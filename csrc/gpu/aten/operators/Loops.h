@@ -690,7 +690,7 @@ void dpcpp_loops_multiple_outputs_kernel(
   }
 }
 
-template <typename func_t, bool signed_strides = false>
+template <typename func_t, bool signed_strides = false, bool fast_mode = false>
 void dpcpp_kernel_for_tensor_iter(TensorIteratorBase& iter, const func_t& f) {
   for (int arg = 0; arg < iter.ntensors(); arg++) {
     TORCH_INTERNAL_ASSERT(
@@ -707,40 +707,20 @@ void dpcpp_kernel_for_tensor_iter(TensorIteratorBase& iter, const func_t& f) {
 
   if (!iter.can_use_32bit_indexing()) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
-      dpcpp_kernel_for_tensor_iter<func_t, signed_strides>(sub_iter, f);
+      dpcpp_kernel_for_tensor_iter<func_t, signed_strides, fast_mode>(
+          sub_iter, f);
     }
     return;
   }
 
-  dpcpp_loops_kernel<func_t, signed_strides, false>(iter, f);
+  dpcpp_loops_kernel<func_t, signed_strides, fast_mode>(iter, f);
 }
 
 template <typename func_t, bool signed_strides = false>
 void dpcpp_fast_mode_kernel_for_tensor_iter(
     TensorIteratorBase& iter,
     const func_t& f) {
-  for (int arg = 0; arg < iter.ntensors(); arg++) {
-    TORCH_INTERNAL_ASSERT(
-        iter.device(arg).type() == at::kXPU,
-        "argument ",
-        arg,
-        ": expected a XPU device but found ",
-        iter.device(arg));
-  }
-
-  if (iter.numel() == 0) {
-    return;
-  }
-
-  if (!iter.can_use_32bit_indexing()) {
-    for (auto& sub_iter : iter.with_32bit_indexing()) {
-      dpcpp_fast_mode_kernel_for_tensor_iter<func_t, signed_strides>(
-          sub_iter, f);
-    }
-    return;
-  }
-
-  dpcpp_loops_kernel<func_t, signed_strides, true>(iter, f);
+  return dpcpp_kernel_for_tensor_iter<func_t, signed_strides, true>(iter, f);
 }
 
 template <typename func_t>
@@ -839,29 +819,19 @@ void opmath_gpu_kernel_with_scalars(TensorIteratorBase& iter, const func_t& f) {
     // kernels device guards, but structured kernels do it right and
     // we can assume the device is already set correctly
     const OptionalDeviceGuard device_guard(device_of(iter.tensor(1)));
-    if constexpr (fast_mode)
-      dpcpp_fast_mode_kernel_for_tensor_iter(iter, af);
-    else
-      dpcpp_kernel_for_tensor_iter(iter, af);
+    dpcpp_kernel_for_tensor_iter<decltype(af), false, fast_mode>(iter, af);
   } else if (iter.is_cpu_scalar(2)) {
     BUnaryFunctor<arg1_t, arg2_t, return_t, func_t> bf(
         f, iter.scalar_value<opmath_arg2_t>(2));
     iter.remove_operand(2);
-    if constexpr (fast_mode)
-      dpcpp_fast_mode_kernel_for_tensor_iter(iter, bf);
-    else
-      dpcpp_kernel_for_tensor_iter(iter, bf);
+    dpcpp_kernel_for_tensor_iter<decltype(bf), false, fast_mode>(iter, bf);
   } else {
-    if constexpr (fast_mode)
-      dpcpp_fast_mode_kernel_for_tensor_iter(
-          iter, BinaryFunctor<arg1_t, arg2_t, return_t, func_t>(f));
-    else
-      dpcpp_kernel_for_tensor_iter(
-          iter, BinaryFunctor<arg1_t, arg2_t, return_t, func_t>(f));
+    BinaryFunctor<arg1_t, arg2_t, return_t, func_t> binf(f);
+    dpcpp_kernel_for_tensor_iter<decltype(binf), false, fast_mode>(iter, binf);
   }
 }
 
-template <typename func_t>
+template <typename func_t, bool fast_mode = false>
 void dpcpp_kernel_with_scalars(TensorIteratorBase& iter, const func_t& f) {
   using traits = function_traits<func_t>;
   static_assert(
@@ -870,7 +840,7 @@ void dpcpp_kernel_with_scalars(TensorIteratorBase& iter, const func_t& f) {
   using arg1_t = typename traits::template arg<0>::type;
   using arg2_t = typename traits::template arg<1>::type;
   using return_t = typename traits::result_type;
-  opmath_gpu_kernel_with_scalars<arg1_t, arg2_t, return_t, func_t, false>(
+  opmath_gpu_kernel_with_scalars<arg1_t, arg2_t, return_t, func_t, fast_mode>(
       iter, f);
 }
 
@@ -878,18 +848,14 @@ template <typename func_t>
 void dpcpp_fast_mode_kernel_with_scalars(
     TensorIteratorBase& iter,
     const func_t& f) {
-  using traits = function_traits<func_t>;
-  static_assert(
-      traits::arity == 2,
-      "dpcpp_kernel_with_scalars only supports two input arguments");
-  using arg1_t = typename traits::template arg<0>::type;
-  using arg2_t = typename traits::template arg<1>::type;
-  using return_t = typename traits::result_type;
-  opmath_gpu_kernel_with_scalars<arg1_t, arg2_t, return_t, func_t, true>(
-      iter, f);
+  return dpcpp_kernel_with_scalars<func_t, true>(iter, f);
 }
 
-template <typename scalar_t, typename return_t = scalar_t, typename func_t>
+template <
+    typename scalar_t,
+    typename return_t = scalar_t,
+    typename func_t,
+    bool fast_mode = false>
 void opmath_symmetric_gpu_kernel_with_scalars(
     TensorIteratorBase& iter,
     const func_t& f) {
@@ -925,12 +891,25 @@ void opmath_symmetric_gpu_kernel_with_scalars(
   }
 
   if (iter.ninputs() == 2) {
-    dpcpp_kernel_for_tensor_iter(
-        iter, BinaryFunctor<scalar_t, scalar_t, return_t, func_t>(f));
+    BinaryFunctor<scalar_t, scalar_t, return_t, func_t> binary_f(f);
+    dpcpp_kernel_for_tensor_iter<decltype(binary_f), false, fast_mode>(
+        iter, binary_f);
   } else {
     AUnaryFunctor<scalar_t, scalar_t, return_t, func_t> unary_f(f, scalar_val);
-    dpcpp_kernel_for_tensor_iter(iter, unary_f);
+    dpcpp_kernel_for_tensor_iter<decltype(unary_f), false, fast_mode>(
+        iter, unary_f);
   }
+}
+
+template <typename scalar_t, typename return_t = scalar_t, typename func_t>
+void fast_mode_opmath_symmetric_gpu_kernel_with_scalars(
+    TensorIteratorBase& iter,
+    const func_t& f) {
+  return opmath_symmetric_gpu_kernel_with_scalars<
+      scalar_t,
+      return_t,
+      func_t,
+      true>(iter, f);
 }
 
 } // namespace AtenIpexTypeXPU

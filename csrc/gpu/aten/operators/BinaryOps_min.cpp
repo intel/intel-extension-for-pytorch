@@ -19,7 +19,7 @@ namespace impl {
 
 void minimum_kernel(TensorIteratorBase& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_with_scalars(
+    opmath_symmetric_gpu_kernel_with_scalars<bool>(
         iter, [](bool a, bool b) -> bool { return a && b; });
   } else {
     IPEX_DISPATCH_ALL_TYPES_AND2(
@@ -28,7 +28,7 @@ void minimum_kernel(TensorIteratorBase& iter) {
         iter.dtype(),
         "min_elementwise_dpcpp",
         [&]() {
-          dpcpp_kernel_with_scalars(
+          opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
                 return Numerics<scalar_t>::min(a, b);
               });
@@ -73,7 +73,7 @@ Tensor& fmin_out(const Tensor& self, const Tensor& other, Tensor& result) {
         iter.common_dtype(),
         "fmin",
         [&]() {
-          dpcpp_kernel_with_scalars(
+          opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
                 return Numerics<scalar_t>::fmin(a, b);
               });

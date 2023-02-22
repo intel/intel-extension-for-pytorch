@@ -43,9 +43,10 @@ Tensor& hypot_out(const Tensor& self, const Tensor& other, Tensor& out) {
       iter.common_dtype(),
       "hypot",
       [&]() {
-        dpcpp_kernel_with_scalars(iter, [](scalar_t a, scalar_t b) -> scalar_t {
-          return Numerics<scalar_t>::hypot(a, b);
-        });
+        opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(
+            iter, [](scalar_t a, scalar_t b) -> scalar_t {
+              return Numerics<scalar_t>::hypot(a, b);
+            });
       });
   return out;
 }

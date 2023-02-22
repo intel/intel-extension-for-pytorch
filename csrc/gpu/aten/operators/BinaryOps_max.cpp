@@ -19,7 +19,7 @@ namespace impl {
 
 void maximum_kernel(TensorIteratorBase& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_with_scalars(
+    opmath_symmetric_gpu_kernel_with_scalars<bool>(
         iter, [](bool a, bool b) -> bool { return a || b; });
   } else {
     IPEX_DISPATCH_ALL_TYPES_AND2(
@@ -28,7 +28,7 @@ void maximum_kernel(TensorIteratorBase& iter) {
         iter.dtype(),
         "max_elementwise_dpcpp",
         [&]() {
-          dpcpp_kernel_with_scalars(
+          opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
                 return Numerics<scalar_t>::max(a, b);
               });
@@ -74,7 +74,7 @@ Tensor& fmax_out(const Tensor& self, const Tensor& other, Tensor& result) {
         iter.common_dtype(),
         "fmax",
         [&]() {
-          dpcpp_kernel_with_scalars(
+          opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
                 return Numerics<scalar_t>::fmax(a, b);
               });

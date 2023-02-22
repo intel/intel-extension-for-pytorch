@@ -25,7 +25,7 @@ static void mul_kernel_dpcpp(TensorIteratorBase& iter) {
       iter.dtype(),
       "mul",
       [&]() {
-        dpcpp_fast_mode_kernel_with_scalars(
+        fast_mode_opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(
             iter, [=](scalar_t a, scalar_t b) -> scalar_t { return a * b; });
       });
 }
