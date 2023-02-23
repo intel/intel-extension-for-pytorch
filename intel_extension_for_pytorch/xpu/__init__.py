@@ -493,5 +493,6 @@ if hasattr(intel_extension_for_pytorch._C, '_postInitExtension'):
 #     def __new__(cls, e):
 #         return torch.tensor(e, device='xpu', dtype=torch.float64)
 
-if intel_extension_for_pytorch._C._has_xpu() and not has_fp64_dtype():
-    override_tensor_totype()
+if intel_extension_for_pytorch._C._has_xpu():
+    if is_available() and not has_fp64_dtype():
+        override_tensor_totype()
