@@ -1,7 +1,9 @@
+#include "Distributions.h"
 #include <ATen/native/Distributions.h>
 #include <core/Generator.h>
 #include <utils/DPCPP.h>
 #include "DistributionTemplates.h"
+#include "Loops.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 namespace at {
@@ -85,6 +87,65 @@ void gamma_kernel_dpcpp(
           iter, philox_args, functor);
 }
 
+void launch_gamma_kernel(
+    at::Tensor& ret,
+    const at::Tensor& alpha,
+    DPCPPGeneratorImpl* gen) {
+  std::pair<uint64_t, uint64_t> rng_engine_inputs;
+  {
+    // See Note [Acquire lock when using random generators]
+    std::lock_guard<std::mutex> lock(gen->mutex_);
+    rng_engine_inputs = gen->philox_engine_inputs(1);
+  }
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      ret.scalar_type(),
+      "gamma_dpcpp",
+      [&] {
+        gamma_kernel_dpcpp<scalar_t>(
+            ret,
+            alpha,
+            at::AtenIpexTypeXPU::PhiloxState(
+                std::get<0>(rng_engine_inputs),
+                std::get<1>(rng_engine_inputs)));
+      });
+}
+
+void launch_dirichlet_kernel(at::TensorIteratorBase& iter) {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.input_dtype(),
+      "dirichlet_dpcpp",
+      [&] {
+        at::AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t gamma, scalar_t gamma_sum) {
+              auto ret_val = gamma / gamma_sum;
+              auto min_value = std::numeric_limits<scalar_t>::min();
+              auto max_value = 1 - std::numeric_limits<scalar_t>::epsilon();
+              ret_val = (min_value > ret_val) ? min_value : ret_val;
+              ret_val = (max_value < ret_val) ? max_value : ret_val;
+              return ret_val;
+            });
+      });
+}
+
+void launch_dirichlet_grad_kernel(TensorIteratorBase& iter) {
+  IPEX_DISPATCH_FLOATING_TYPES(
+      iter.input_dtype(), "_dirichlet_grad_dpcpp", [&] {
+        using accscalar_t = acc_type<scalar_t>;
+        dpcpp_kernel_for_tensor_iter(
+            iter,
+            [](scalar_t x_val,
+               scalar_t alpha_val,
+               scalar_t total_val) -> scalar_t {
+              return dirichlet_grad_one<scalar_t, accscalar_t>(
+                  x_val, alpha_val, total_val);
+            });
+      });
+}
+
 } // namespace impl
 
 Tensor binomial(
@@ -130,6 +191,38 @@ Tensor _standard_gamma(const Tensor& alpha, c10::optional<Generator> gen_) {
       [&]() {
         impl::gamma_kernel_dpcpp<scalar_t>(ret, alpha, rng_engine_inputs);
       });
+  return ret;
+}
+
+Tensor _sample_dirichlet(const Tensor& alpha, c10::optional<Generator> gen_) {
+  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
+      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+  // auto gen = get_generator_or_default<CUDAGeneratorImpl>(gen_,
+  // cuda::detail::getDefaultCUDAGenerator());
+  Tensor ret = at::empty(alpha.sizes(), alpha.options());
+  impl::launch_gamma_kernel(ret, alpha, gen);
+  auto gamma_sum = ret.sum(/*dim=*/-1, /*keepdim=*/true);
+  at::TensorIterator iter = at::TensorIteratorConfig()
+                                .add_output(ret)
+                                .add_input(ret)
+                                .add_input(gamma_sum)
+                                .build();
+  impl::launch_dirichlet_kernel(iter);
+  return ret;
+}
+
+Tensor _dirichlet_grad(
+    const Tensor& x,
+    const Tensor& alpha,
+    const Tensor& total) {
+  Tensor ret = at::empty(x.sizes(), x.options());
+  TensorIterator iter = at::TensorIteratorConfig()
+                            .add_output(ret)
+                            .add_input(x)
+                            .add_input(alpha)
+                            .add_input(total)
+                            .build();
+  impl::launch_dirichlet_grad_kernel(iter);
   return ret;
 }
 

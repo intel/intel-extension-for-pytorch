@@ -23,11 +23,12 @@ change. This file contains two types of randomized tests:
 """
 import math
 from collections import namedtuple
+from random import shuffle
 
 import torch
 from torch.autograd import gradcheck, Variable
 from torch.distributions import (Bernoulli, Exponential, Multinomial, Normal,
-                                 Uniform)
+                                 Uniform, Dirichlet)
 from torch.testing._internal.common_utils import (TestCase, load_tests,
                                                   set_rng_seed)
 
@@ -45,6 +46,7 @@ load_tests = load_tests
 
 TEST_NUMPY = True
 try:
+    import numpy as np
     import scipy.special
     import scipy.stats
 except ImportError:
@@ -76,6 +78,10 @@ EXAMPLES = [
         {'probs': torch.tensor([0.3], dtype=torch.double, requires_grad=True)},
         {'probs': 0.3},
         {'logits': torch.tensor([0.], dtype=torch.double, requires_grad=True)},
+    ]),
+    Example(Dirichlet, [
+        {'concentration': torch.randn(2, 3).exp().requires_grad_()},
+        {'concentration': torch.randn(4).exp().requires_grad_()},
     ])
 ]
 
@@ -359,3 +365,52 @@ class TestDistributions(TestCase):
             self.assertTrue((samples <= total_count.type_as(samples)).all())
             self.assertEqual(samples.mean(dim=0) / total_count, bin1.mean / total_count, atol=0.02, rtol=0)
             self.assertEqual(samples.var(dim=0) / total_count, bin1.variance / total_count, atol=0.02, rtol=0)
+
+    def test_dirichlet_shape(self):
+        alpha = torch.randn(2, 3).exp().requires_grad_().to("xpu")
+        alpha_1d = torch.randn(4).exp().requires_grad_().to("xpu")
+        self.assertEqual(Dirichlet(alpha).sample().size(), (2, 3))
+        self.assertEqual(Dirichlet(alpha).sample((5,)).size(), (5, 2, 3))
+        self.assertEqual(Dirichlet(alpha_1d).sample().size(), (4,))
+        self.assertEqual(Dirichlet(alpha_1d).sample((1,)).size(), (1, 4))
+
+    def test_dirichlet_shape(self):
+        dist = Dirichlet(torch.tensor([[0.6, 0.3], [1.6, 1.3], [2.6, 2.3]]).to("xpu"))
+        self.assertEqual(dist._batch_shape, torch.Size((3,)))
+        self.assertEqual(dist._event_shape, torch.Size((2,)))
+        self.assertEqual(dist.sample().size(), torch.Size((3, 2)))
+        self.assertEqual(dist.sample((5, 4)).size(), torch.Size((5, 4, 3, 2)))
+        self.tensor_sample_1 = torch.ones(3, 2).to("xpu")
+        self.tensor_sample_2 = torch.ones(3, 2, 3).to("xpu")
+        simplex_sample = self.tensor_sample_1 / self.tensor_sample_1.sum(-1, keepdim=True)
+        self.assertEqual(dist.log_prob(simplex_sample).size(), torch.Size((3,)))
+        self.assertRaises(ValueError, dist.log_prob, self.tensor_sample_2)
+        simplex_sample = torch.ones(3, 1, 2).to("xpu")
+        simplex_sample = simplex_sample / simplex_sample.sum(-1).unsqueeze(-1)
+        self.assertEqual(dist.log_prob(simplex_sample).size(), torch.Size((3, 3)))
+        
+    def test_dirichlet_mean_var(self):
+        num_samples = 1000000
+        alpha = torch.exp(torch.randn(3, dtype=torch.float, device=sycl_device))
+        dist = torch.distributions.Dirichlet(alpha)
+        samples_ret = dist.sample((num_samples,))
+       
+        alpha_sum = alpha.sum(dim=0);
+        ref_mean = alpha / alpha_sum;
+        ref_var = (alpha * (alpha_sum - alpha)) / (alpha_sum * alpha_sum * (alpha_sum + 1))
+        self.assertEqual(samples_ret.mean(dim=0).cpu(), ref_mean, atol=5e-3, rtol=5e-3)
+        self.assertEqual(samples_ret.var(dim=0).cpu(), ref_var, atol=5e-3, rtol=5e-3)
+
+    def test_dirichlet_grad(self):
+        concentration_cpu = torch.tensor([[0.6, 0.3], [1.6, 1.3], [2.6, 2.3]])
+        concentration_xpu = concentration_cpu.to("xpu")
+
+        x_cpu = torch._sample_dirichlet(concentration_cpu)
+        x_xpu = x_cpu.to("xpu")
+
+        total_cpu = concentration_cpu.sum(-1, True).expand_as(concentration_cpu)
+        total_xpu = total_cpu.to("xpu")
+
+        grad_cpu = torch._dirichlet_grad(x_cpu, concentration_cpu, total_cpu)
+        grad_xpu = torch._dirichlet_grad(x_xpu, concentration_xpu, total_xpu)
+        self.assertEqual(grad_xpu.to("cpu"), grad_cpu)

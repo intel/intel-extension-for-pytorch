@@ -25,6 +25,7 @@ supported:
   - _ctc_loss_backward.Tensor
   - cumprod.out
   - cumsum.out  # newly added
+  - _dirichlet_grad
   - _efficientzerotensor
   - _embedding_bag
   - _embedding_bag_dense_backward
@@ -61,6 +62,7 @@ supported:
   - _pin_memory
   - _reshape_alias  # newly added
   - _segment_reduce_backward
+  - _sample_dirichlet
   - _softmax.out
   - _softmax_backward_data.out
   - _linalg_svd.U
