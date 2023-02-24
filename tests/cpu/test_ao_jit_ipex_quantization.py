@@ -439,6 +439,24 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
                 new_json = json.load(f)
             self.assertTrue(old_json == new_json)
 
+    def test_subclass_format(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = nn.Linear(128,1)
+
+            def forward(self, x):
+                x = self.linear(x)
+                return x.sum()
+
+        x = torch.rand(1,128)
+        prepared_model = ipex.quantization.prepare(M().eval(), static_qconfig[0], example_inputs=x)
+        out = prepared_model(x)
+        print(out.__format__('.4f'))
+        converted_model = ipex.quantization.convert(prepared_model)
+        out = converted_model(x)
+        print(out.__format__('.4f'))
+
 
 class TestRemoveMutate(JitLlgaTestCase):
     def test_mutated_value_alive_after_inplace_op(self):
