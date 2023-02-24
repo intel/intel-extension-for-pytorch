@@ -365,5 +365,74 @@ Tensor& special_modified_bessel_k1_out(const Tensor& self, at::Tensor& out) {
   return out;
 }
 
+Tensor& special_shifted_chebyshev_polynomial_t_out(
+    const Tensor& self,
+    const Tensor& other,
+    at::Tensor& out) {
+  auto iter = TensorIterator::binary_float_op(out, self, other);
+  IPEX_DISPATCH_FLOATING_TYPES(
+      iter.common_dtype(), "shifted_chebyshev_polynomial_t", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t x, scalar_t n) -> scalar_t {
+              return shifted_chebyshev_polynomial_t_forward<scalar_t>(x, n);
+            });
+      });
+  return out;
+}
+
+Tensor& special_shifted_chebyshev_polynomial_u_out(
+    const Tensor& self,
+    const Tensor& other,
+    at::Tensor& out) {
+  auto iter = TensorIterator::binary_float_op(out, self, other);
+  IPEX_DISPATCH_FLOATING_TYPES(
+      iter.common_dtype(), "shifted_chebyshev_polynomial_u", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t x, scalar_t n) -> scalar_t {
+              return shifted_chebyshev_polynomial_u_forward<scalar_t>(x, n);
+            });
+      });
+  return out;
+}
+
+Tensor& special_shifted_chebyshev_polynomial_v_out(
+    const Tensor& self,
+    const Tensor& other,
+    at::Tensor& out) {
+  auto iter = TensorIterator::binary_float_op(out, self, other);
+  IPEX_DISPATCH_FLOATING_TYPES(
+      iter.common_dtype(), "shifted_chebyshev_polynomial_v", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t x, scalar_t n) -> scalar_t {
+              return shifted_chebyshev_polynomial_v_forward<scalar_t>(x, n);
+            });
+      });
+  return out;
+}
+
+Tensor& special_shifted_chebyshev_polynomial_w_out(
+    const Tensor& self,
+    const Tensor& other,
+    at::Tensor& out) {
+  auto iter = TensorIterator::binary_float_op(out, self, other);
+  IPEX_DISPATCH_FLOATING_TYPES(
+      iter.common_dtype(), "shifted_chebyshev_polynomial_w", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t x, scalar_t n) -> scalar_t {
+              return shifted_chebyshev_polynomial_w_forward<scalar_t>(x, n);
+            });
+      });
+  return out;
+}
+
+Tensor& special_airy_ai_out(const Tensor& self, at::Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES(iter.common_dtype(), "airy_ai", [&]() {
+    dpcpp_kernel_for_tensor_iter(
+        iter, [](scalar_t x) -> scalar_t { return airy_ai_forward(x); });
+  });
+  return out;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

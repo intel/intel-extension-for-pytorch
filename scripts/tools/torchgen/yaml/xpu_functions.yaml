@@ -576,6 +576,11 @@ supported:
   - special_laguerre_polynomial_l.out
   - special_legendre_polynomial_p.out
   - special_spherical_bessel_j0.out
+  - special_shifted_chebyshev_polynomial_t.out
+  - special_shifted_chebyshev_polynomial_u.out
+  - special_shifted_chebyshev_polynomial_v.out
+  - special_shifted_chebyshev_polynomial_w.out
+  - special_airy_ai.out
   - sqrt.out
   - std.correction
   - std.correction_out

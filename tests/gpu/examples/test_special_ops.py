@@ -170,3 +170,49 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
 
+    def test_shifted_chebyshev_polynomial_t(self):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.to("xpu")
+        result_cpu = torch.special.shifted_chebyshev_polynomial_t(input0, input0)
+        result_xpu = torch.special.shifted_chebyshev_polynomial_t(input0_xpu, input0_xpu)
+        result_xpu = result_xpu.to("cpu")
+
+        self.assertTrue(result_xpu.equal(result_cpu))
+
+    def test_shifted_chebyshev_polynomial_u(self):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.to("xpu")
+        result_cpu = torch.special.shifted_chebyshev_polynomial_u(input0, input0)
+        result_xpu = torch.special.shifted_chebyshev_polynomial_u(input0_xpu, input0_xpu)
+        result_xpu = result_xpu.to("cpu")
+
+        self.assertTrue(result_xpu.equal(result_cpu))
+
+    def test_shifted_chebyshev_polynomial_v(self):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.to("xpu")
+        result_cpu = torch.special.shifted_chebyshev_polynomial_v(input0, input0)
+        result_xpu = torch.special.shifted_chebyshev_polynomial_v(input0_xpu, input0_xpu)
+        result_xpu = result_xpu.to("cpu")
+
+        self.assertTrue(result_xpu.equal(result_cpu))
+
+    def test_shifted_chebyshev_polynomial_w(self):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.to("xpu")
+        result_cpu = torch.special.shifted_chebyshev_polynomial_w(input0, input0)
+        result_xpu = torch.special.shifted_chebyshev_polynomial_w(input0_xpu, input0_xpu)
+        result_xpu = result_xpu.to("cpu")
+
+        self.assertTrue(result_xpu.equal(result_cpu))
+
+    def test_special_airy_ai_out(self):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.to("xpu")
+        result_cpu = torch.special.airy_ai(input0)
+        result_xpu = torch.special.airy_ai(input0_xpu)
+        result_xpu = result_xpu.to("cpu")
+
+        loss_func = torch.nn.L1Loss(reduction='mean')
+        loss = loss_func(result_cpu, result_xpu)
+        self.assertEqual(result_cpu, result_xpu, atol=1e-4, rtol=1e-5)
