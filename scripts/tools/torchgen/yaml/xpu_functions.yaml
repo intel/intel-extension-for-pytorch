@@ -567,6 +567,8 @@ supported:
   - special_zeta.out
   - special_bessel_j0.out
   - special_bessel_j1.out
+  - special_bessel_y0.out
+  - special_bessel_y1.out
   - special_modified_bessel_i0.out
   - special_modified_bessel_i1.out
   - special_modified_bessel_k0.out

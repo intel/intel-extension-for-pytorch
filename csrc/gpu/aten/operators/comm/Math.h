@@ -429,6 +429,254 @@ static inline DPCPP_BOTH scalar_t bessel_j1_forward(scalar_t x) {
 } // bessel_j1_forward(scalar_t x)
 
 template <typename scalar_t>
+static inline scalar_t bessel_y0_forward(scalar_t x) {
+  const scalar_t PP[] = {
+      +7.96936729297347051624e-04,
+      +8.28352392107440799803e-02,
+      +1.23953371646414299388e+00,
+      +5.44725003058768775090e+00,
+      +8.74716500199817011941e+00,
+      +5.30324038235394892183e+00,
+      +9.99999999999999997821e-01,
+  };
+
+  const scalar_t PQ[] = {
+      +9.24408810558863637013e-04,
+      +8.56288474354474431428e-02,
+      +1.25352743901058953537e+00,
+      +5.47097740330417105182e+00,
+      +8.76190883237069594232e+00,
+      +5.30605288235394617618e+00,
+      +1.00000000000000000218e+00,
+  };
+
+  const scalar_t QP[] = {
+      -1.13663838898469149931e-02,
+      -1.28252718670509318512e+00,
+      -1.95539544257735972385e+01,
+      -9.32060152123768231369e+01,
+      -1.77681167980488050595e+02,
+      -1.47077505154951170175e+02,
+      -5.14105326766599330220e+01,
+      -6.05014350600728481186e+00,
+  };
+
+  const scalar_t QQ[] = {
+      +6.43178256118178023184e+01,
+      +8.56430025976980587198e+02,
+      +3.88240183605401609683e+03,
+      +7.24046774195652478189e+03,
+      +5.93072701187316984827e+03,
+      +2.06209331660327847417e+03,
+      +2.42005740240291393179e+02,
+  };
+
+  const scalar_t YP[] = {
+      +1.55924367855235737965e+04,
+      -1.46639295903971606143e+07,
+      +5.43526477051876500413e+09,
+      -9.82136065717911466409e+11,
+      +8.75906394395366999549e+13,
+      -3.46628303384729719441e+15,
+      +4.42733268572569800351e+16,
+      -1.84950800436986690637e+16,
+  };
+
+  const scalar_t YQ[] = {
+      +1.04128353664259848412e+03,
+      +6.26107330137134956842e+05,
+      +2.68919633393814121987e+08,
+      +8.64002487103935000337e+10,
+      +2.02979612750105546709e+13,
+      +3.17157752842975028269e+15,
+      +2.50596256172653059228e+17,
+  };
+
+  if (x <= scalar_t(5.0)) {
+    if (x == scalar_t(0.0)) {
+      return -std::numeric_limits<scalar_t>::infinity();
+    }
+
+    if (x < scalar_t(0.0)) {
+      return std::numeric_limits<scalar_t>::quiet_NaN();
+    }
+
+    scalar_t yp = 0.0;
+
+    for (uint8_t index = 0; index <= 7; index++) {
+      yp = yp * (x * x) + YP[index];
+    }
+
+    scalar_t yq = 0.0;
+
+    for (uint8_t index = 0; index <= 6; index++) {
+      yq = yq * (x * x) + YQ[index];
+    }
+
+    return yp / yq +
+        (scalar_t(0.636619772367581343075535053490057448) *
+         Numerics<scalar_t>::log(x) * bessel_j0_forward(x));
+  }
+
+  scalar_t pp = 0.0;
+
+  for (uint8_t index = 0; index <= 6; index++) {
+    pp = pp * (scalar_t(25.0) / (x * x)) + PP[index];
+  }
+
+  scalar_t pq = 0.0;
+
+  for (uint8_t index = 0; index <= 6; index++) {
+    pq = pq * (scalar_t(25.0) / (x * x)) + PQ[index];
+  }
+
+  scalar_t qp = 0.0;
+
+  for (uint8_t index = 0; index <= 7; index++) {
+    qp = qp * (scalar_t(25.0) / (x * x)) + QP[index];
+  }
+
+  scalar_t qq = 0.0;
+
+  for (uint8_t index = 0; index <= 6; index++) {
+    qq = qq * (scalar_t(25.0) / (x * x)) + QQ[index];
+  }
+
+  return (pp / pq *
+              Numerics<scalar_t>::sin(
+                  x - scalar_t(0.785398163397448309615660845819875721)) +
+          scalar_t(5.0) / x * (qp / qq) *
+              Numerics<scalar_t>::cos(
+                  x - scalar_t(0.785398163397448309615660845819875721))) *
+      scalar_t(0.797884560802865355879892119868763737) /
+      Numerics<scalar_t>::sqrt(x);
+} // bessel_y0_forward(scalar_t x)
+
+template <typename scalar_t>
+static inline scalar_t bessel_y1_forward(scalar_t x) {
+  const scalar_t PP[] = {
+      +7.62125616208173112003e-04,
+      +7.31397056940917570436e-02,
+      +1.12719608129684925192e+00,
+      +5.11207951146807644818e+00,
+      +8.42404590141772420927e+00,
+      +5.21451598682361504063e+00,
+      +1.00000000000000000254e+00,
+  };
+
+  const scalar_t PQ[] = {
+      +5.71323128072548699714e-04,
+      +6.88455908754495404082e-02,
+      +1.10514232634061696926e+00,
+      +5.07386386128601488557e+00,
+      +8.39985554327604159757e+00,
+      +5.20982848682361821619e+00,
+      +9.99999999999999997461e-01,
+  };
+
+  const scalar_t QP[] = {
+      +5.10862594750176621635e-02,
+      +4.98213872951233449420e+00,
+      +7.58238284132545283818e+01,
+      +3.66779609360150777800e+02,
+      +7.10856304998926107277e+02,
+      +5.97489612400613639965e+02,
+      +2.11688757100572135698e+02,
+      +2.52070205858023719784e+01,
+  };
+
+  const scalar_t QQ[] = {
+      +7.42373277035675149943e+01,
+      +1.05644886038262816351e+03,
+      +4.98641058337653607651e+03,
+      +9.56231892404756170795e+03,
+      +7.99704160447350683650e+03,
+      +2.82619278517639096600e+03,
+      +3.36093607810698293419e+02,
+  };
+
+  const scalar_t YP[] = {
+      +1.26320474790178026440e+09,
+      -6.47355876379160291031e+11,
+      +1.14509511541823727583e+14,
+      -8.12770255501325109621e+15,
+      +2.02439475713594898196e+17,
+      -7.78877196265950026825e+17,
+  };
+
+  const scalar_t YQ[] = {
+      +5.94301592346128195359e+02,
+      +2.35564092943068577943e+05,
+      +7.34811944459721705660e+07,
+      +1.87601316108706159478e+10,
+      +3.88231277496238566008e+12,
+      +6.20557727146953693363e+14,
+      +6.87141087355300489866e+16,
+      +3.97270608116560655612e+18,
+  };
+
+  if (x <= scalar_t(5.0)) {
+    if (x == scalar_t(0.0)) {
+      return -std::numeric_limits<scalar_t>::infinity();
+    }
+
+    if (x <= scalar_t(0.0)) {
+      return std::numeric_limits<scalar_t>::quiet_NaN();
+    }
+
+    scalar_t yp = 0.0;
+
+    for (uint8_t index = 0; index <= 5; index++) {
+      yp = yp * (x * x) + YP[index];
+    }
+
+    scalar_t yq = 0.0;
+
+    for (uint8_t index = 0; index <= 7; index++) {
+      yq = yq * (x * x) + YQ[index];
+    }
+
+    return x * (yp / yq) +
+        (scalar_t(0.636619772367581343075535053490057448) *
+         (bessel_j1_forward(x) * Numerics<scalar_t>::log(x) -
+          scalar_t(1.0) / x));
+  }
+
+  scalar_t pp = 0.0;
+
+  for (uint8_t index = 0; index <= 6; index++) {
+    pp = pp * (scalar_t(5.0) / x * (scalar_t(5.0) / x)) + PP[index];
+  }
+
+  scalar_t pq = 0.0;
+
+  for (uint8_t index = 0; index <= 6; index++) {
+    pq = pq * (scalar_t(5.0) / x * (scalar_t(5.0) / x)) + PQ[index];
+  }
+
+  scalar_t qp = 0.0;
+
+  for (uint8_t index = 0; index <= 7; index++) {
+    qp = qp * (scalar_t(5.0) / x * (scalar_t(5.0) / x)) + QP[index];
+  }
+
+  scalar_t qq = 0.0;
+
+  for (uint8_t index = 0; index <= 6; index++) {
+    qq = qq * (scalar_t(5.0) / x * (scalar_t(5.0) / x)) + QQ[index];
+  }
+
+  return (pp / pq *
+              Numerics<scalar_t>::sin(
+                  x - scalar_t(2.356194490192344928846982537459627163)) +
+          scalar_t(5.0) / x * (qp / qq) *
+              Numerics<scalar_t>::cos(
+                  x - scalar_t(2.356194490192344928846982537459627163))) *
+      scalar_t(0.797884560802865355879892119868763737) /
+      Numerics<scalar_t>::sqrt(x);
+} // bessel_y1_forward(scalar_t x)
+
+template <typename scalar_t>
 static inline DPCPP_BOTH scalar_t spherical_bessel_j0_forward(scalar_t x) {
   if (Numerics<scalar_t>::isinf(x)) {
     return scalar_t(0.0);

@@ -90,6 +90,22 @@ class TestTorchMethod(TestCase):
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
 
 
+    def test_bessel_y0(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        result_cpu = torch.special.bessel_y0(input0)
+        result_xpu = torch.special.bessel_y0(input0_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
+    def test_bessel_y1(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        result_cpu = torch.special.bessel_y1(input0)
+        result_xpu = torch.special.bessel_y1(input0_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
     def test_special_spherical_bessel_j0(self, dtype=torch.float):
         input0 = torch.randn(8192, 8192, device="cpu")
         input0_xpu = input0.clone().to("xpu")
