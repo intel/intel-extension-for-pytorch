@@ -3,6 +3,7 @@
 #include "Softmax.h"
 #include "aten/AddSoftmax.h"
 #include "aten/DivSoftmax.h"
+#include "aten/MultiHeadAttention.h"
 
 #include <ATen/Context.h>
 #include <ATen/InferSize.h>
@@ -139,11 +140,11 @@ at::Tensor dil_transfree_vit_mha(
     const at::Tensor& dim_per_head,
     const int64_t& softmax_dim,
     const at::IValue& dtype,
-    const int64_t& head_num,
-    const int64_t& head_size) {
+    const int64_t& num_head,
+    const int64_t& headSize) {
   auto scale = dim_per_head.data_ptr<float>()[0];
   return dil_transfree_vit_mha(
-      qkv, scale, softmax_dim, dtype, head_num, head_size);
+      qkv, scale, softmax_dim, dtype, num_head, headSize);
 }
 
 at::Tensor dil_transfree_vit_mha(
@@ -151,28 +152,26 @@ at::Tensor dil_transfree_vit_mha(
     const double& dim_per_head,
     const int64_t& softmax_dim,
     const at::IValue& dtype,
-    const int64_t& head_num,
-    const int64_t& head_size) {
+    const int64_t& num_head,
+    const int64_t& headSize) {
   RECORD_FUNCTION("dil_transfree_vit_mha", c10::ArrayRef<c10::IValue>({}));
 
   int64_t batchSize = qkv.dim() > 2 ? qkv.size(0) : 1;
   int64_t sequenceSize = qkv.dim() > 2 ? qkv.size(1) : qkv.size(0);
-  int64_t hiddenSize = head_num * head_size;
+  int64_t hiddenSize = num_head * headSize;
   at::Tensor qk =
-      at::empty({batchSize, head_num, sequenceSize, sequenceSize}, qkv.dtype());
+      at::empty({batchSize, num_head, sequenceSize, sequenceSize}, qkv.dtype());
 
   auto qkv_mat = dil_mat_split<at::BFloat16>(
       qkv, at::IntArrayRef({hiddenSize, hiddenSize, hiddenSize}));
   auto query = qkv_mat[0];
   auto key = qkv_mat[1];
   auto value = qkv_mat[2];
-  query.resize_({batchSize, sequenceSize, head_num, head_size})
-      .transpose_(1, 2);
-  key.resize_({batchSize, sequenceSize, head_num, head_size})
+  query.resize_({batchSize, sequenceSize, num_head, headSize}).transpose_(1, 2);
+  key.resize_({batchSize, sequenceSize, num_head, headSize})
       .transpose_(1, 2)
       .transpose_(2, 3);
-  value.resize_({batchSize, sequenceSize, head_num, head_size})
-      .transpose_(1, 2);
+  value.resize_({batchSize, sequenceSize, num_head, headSize}).transpose_(1, 2);
 
   bmm_impl(query, key, qk, ideep::attr_t(), {}, dim_per_head);
   qk = dil_softmax_(qk, softmax_dim, dtype);
@@ -204,6 +203,87 @@ at::Tensor dil_mha_matmul_trans(
             .transpose_(1, 2);
 
   return out;
+}
+
+/**
+ *  This kernel implements Flast attention
+ * (https://hazyresearch.stanford.edu/blog/2023-01-12-flashattention-long-sequences)
+ * on Bert models for BF16 dtype
+ */
+at::Tensor dil_bert_flash_mha(
+    const at::Tensor& qkv,
+    const at::Tensor& rel_kv,
+    const at::Scalar& alpha,
+    const at::Scalar& dim_per_head,
+    const int64_t& softmax_dim,
+    const at::IValue& dtype,
+    const int64_t& num_head,
+    const int64_t& headSize) {
+  RECORD_FUNCTION("dil_bert_flash_mha", c10::ArrayRef<c10::IValue>({}));
+  auto _dim_per_head = dim_per_head.to<float>();
+  return bert_flash_mha(qkv, rel_kv, num_head, headSize, _dim_per_head);
+}
+
+/**
+ *  This kernel implements Flast attention on stable-diffusion models (from
+ * Diffusers 0.12.1) for BF16 dtype, where qkv is from one aten::linear
+ */
+at::Tensor dil_sd_flash_mha(
+    const at::Tensor& qkv,
+    const at::IntArrayRef& split_list,
+    const double& scale,
+    const int64_t& num_head) {
+  RECORD_FUNCTION("dil_sd_flash_mha_v1", c10::ArrayRef<c10::IValue>({}));
+  int64_t headSize = qkv.size(-1) / split_list.size() / num_head;
+  return sd_flash_mha(qkv, num_head, headSize, scale);
+}
+
+/**
+ *  This kernel implements Flast attention on stable-diffusion models (from
+ * Diffusers 0.12.1) for BF16 dtype, where qkv is splited
+ */
+at::Tensor dil_sd_flash_mha(
+    const at::Tensor& query,
+    const at::Tensor& key,
+    const at::Tensor& value,
+    const double& scale,
+    const int64_t& num_head) {
+  RECORD_FUNCTION("dil_sd_flash_mha_v2", c10::ArrayRef<c10::IValue>({}));
+  int64_t headSize = query.size(-1) / num_head;
+  return sd_flash_mha(query, key, value, num_head, headSize, scale);
+}
+
+/**
+ *  This kernel implements Flast attention on stable-diffusion models (from
+ * Diffusers 0.13) for BF16 dtype, where qkv is from one aten::linear Note that
+ * aten::scaled_dot_product_attention uses the scale of sqrt(headSize) for
+ * query, where we are following
+ */
+at::Tensor dil_sd_flash_mha(
+    const at::Tensor& qkv,
+    const at::IntArrayRef& split_list,
+    const int64_t& num_head) {
+  RECORD_FUNCTION("dil_sd_flash_mha_v3", c10::ArrayRef<c10::IValue>({}));
+  int64_t headSize = qkv.size(-1) / split_list.size() / num_head;
+  auto scale = 1.f / sqrt(headSize);
+  return sd_flash_mha(qkv, num_head, headSize, scale);
+}
+
+/**
+ *  This kernel implements Flast attention on stable-diffusion models (from
+ * Diffusers 0.13) for BF16 dtype, where qkv is splited Note that
+ * aten::scaled_dot_product_attention uses the scale of sqrt(headSize) for
+ * query, where we are following
+ */
+at::Tensor dil_sd_flash_mha(
+    const at::Tensor& query,
+    const at::Tensor& key,
+    const at::Tensor& value,
+    const int64_t& num_head) {
+  RECORD_FUNCTION("dil_sd_flash_mha_v4", c10::ArrayRef<c10::IValue>({}));
+  int64_t headSize = query.size(-1) / num_head;
+  auto scale = 1.f / sqrt(headSize);
+  return sd_flash_mha(query, key, value, num_head, headSize, scale);
 }
 
 template <typename T>

@@ -77,16 +77,15 @@ inline __m512 _dil_exp_kernel(__m512 vec_src) {
   return vec_res;
 }
 
-template <typename scalar_t>
+template <typename scalar_a, typename scalar_b>
 inline void _dil_div_add_reduce_max_fusion_kernel(
-    const scalar_t* a,
-    const scalar_t* b,
+    const scalar_a* a,
+    const scalar_b* b,
     const float& dim_per_head,
     const int& size,
     float* out,
     float& max) {
   auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::min());
-  auto vec_ps_min_tail = _mm512_set1_ps(std::numeric_limits<float>::min());
   auto vec_a = vec_ps_min;
   auto vec_b = vec_ps_min;
   auto vec_out = vec_ps_min;
@@ -221,7 +220,6 @@ inline void _dil_add_reduce_max_fusion_kernel(
     float* out,
     float& max) {
   auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::min());
-  auto vec_ps_min_tail = _mm512_set1_ps(std::numeric_limits<float>::min());
   auto vec_a = vec_ps_min;
   auto vec_b = vec_ps_min;
   auto vec_out = vec_ps_min;
@@ -246,6 +244,119 @@ inline void _dil_add_reduce_max_fusion_kernel(
 
   // NOTE: _mm512_reduce_max_ps is sequence instruction
   max = _mm512_reduce_max_ps(vec_ps_min);
+}
+
+inline void _dil_mul_reduce_max_fusion_kernel(
+    const float* a,
+    const float& scale,
+    const int& size,
+    float* out,
+    float& max) {
+  auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::min());
+  auto vec_a = vec_ps_min;
+  auto vec_out = vec_ps_min;
+
+  int i = 0;
+  auto vec_scale = _mm512_set1_ps(scale);
+  for (; i <= size - 16; i += 16) {
+    vec_a = _loadu(a + i);
+    vec_out = _mm512_mul_ps(vec_a, vec_scale);
+    vec_ps_min = _mm512_max_ps(vec_ps_min, vec_out);
+    _mm512_storeu_ps(out + i, vec_out);
+  }
+
+  if (i < size) {
+    __mmask16 mask = (1 << (size - i)) - 1;
+    vec_a = _maskz_loadu(a + i, mask);
+    vec_out = _mm512_mul_ps(vec_a, vec_scale);
+    vec_ps_min = _mm512_mask_max_ps(vec_ps_min, mask, vec_out, vec_ps_min);
+    _mm512_mask_storeu_ps(out + i, mask, vec_out);
+  }
+
+  // NOTE: _mm512_reduce_max_ps is sequence instruction
+  max = _mm512_reduce_max_ps(vec_ps_min);
+}
+
+inline void _init_mha_buffer_kernel(float* max, float* sum, const int& size) {
+  auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::min());
+  auto vec_zeros = _mm512_setzero_ps();
+
+  int i = 0;
+  for (; i <= size - 16; i += 16) {
+    _storeu(max + i, vec_ps_min);
+    _storeu(sum + i, vec_zeros);
+  }
+  if (i < size) {
+    __mmask16 mask = (1 << (size - i)) - 1;
+    _mask_storeu(max + i, vec_ps_min, mask);
+    _mask_storeu(sum + i, vec_zeros, mask);
+  }
+}
+
+/**
+ * This kernel is used to reorder the data type of the MHA output
+ * from FP32 to BF16 with strides.
+ * src: MKL BF16 GEMM output buffer, dtype - FP32
+ * dst: Final MHA output, dtype - BF16
+ */
+template <typename scalar_t>
+inline void _reorder_mha_output_kernel(
+    float* src,
+    scalar_t* dst,
+    const int& rows,
+    const int& cols,
+    const int& dst_stride) {
+  for (int i = 0; i < rows; ++i) {
+    int j = 0;
+    for (; j <= cols - 16; j += 16) {
+      _storeu(dst + i * dst_stride + j, _loadu(src + i * cols + j));
+    }
+    if (j < cols) {
+      __mmask16 mask = (1 << (cols - j)) - 1;
+      _mask_storeu(dst + i * dst_stride + j, _loadu(src + i * cols + j), mask);
+    }
+  }
+}
+
+/**
+ * This kernel is used to update the MHA output with the latest MAX
+ * and SUM values block by block.
+ * exp_val: exp(max_old - max_new)
+ * In the i th block, the softmax(qk - i th) * v - i th was calculated
+ * with the old MAX and SUM values, max_old and sum_old. When moving to
+ * the i + 1 th block, since softmax(qk - i + 1 th) will be calculated
+ * with the new MAX and SUM values, max_new and sum_new, thus the MHA
+ * buffer which stores the summation of blocked softmax(qk) * v should
+ * be also updated using max_new and sum_new:
+ * a = a * sum_old / sum_new
+ * a = a * exp(max_old) / exp(max_new) = a * exp_val
+ */
+inline void _mha_update_sum_max_kernel(
+    const float* a,
+    const float& sum_old,
+    const float& sum_new,
+    const float& exp_val,
+    const int& size,
+    float* out) {
+  auto vec_sum_old = _mm512_set1_ps(sum_old);
+  auto vec_sum_new = _mm512_set1_ps(sum_new);
+  auto vec_sum_cor = _mm512_div_ps(vec_sum_old, vec_sum_new);
+  auto exp_vec = _mm512_set1_ps(exp_val);
+
+  int i = 0;
+  for (; i <= size - 16; i += 16) {
+    auto dat = _loadu(a + i);
+    auto vec_a = _mm512_mul_ps(dat, vec_sum_cor);
+    auto vec_out = _mm512_mul_ps(vec_a, exp_vec);
+    _storeu(out + i, vec_out);
+  }
+  if (i < size) {
+    __mmask16 mask = (1 << (size - i)) - 1;
+    auto dat = _mm512_maskz_loadu_ps(mask, a + i);
+    auto vec_a = _mm512_mul_ps(dat, vec_sum_cor);
+    auto vec_out = _mm512_mul_ps(vec_a, exp_vec);
+    _mask_storeu(out + i, vec_out, mask);
+  }
 }
 
 } // namespace kernel

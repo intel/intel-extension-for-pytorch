@@ -11,6 +11,7 @@ at::Tensor DivAddSoftmax(
     at::Tensor& a,
     const at::Tensor& b,
     const float& dim_per_head) {
+  RECORD_FUNCTION("dil_addsoftmax", c10::ArrayRef<c10::IValue>({}));
   // pointer to div_add_softmax_kernel_impl(a, b, dim_per_head);
   return div_add_softmax_kernel_stub(kCPU, a, b, dim_per_head);
 }

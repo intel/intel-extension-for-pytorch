@@ -3,9 +3,9 @@
 #include <torch/csrc/jit/runtime/custom_operator.h>
 #include <torch/csrc/jit/runtime/operator.h>
 
-#include "aten/RMSNorm.h"
 #include "aten/AddLayerNorm.h"
 #include "aten/ConcatBnRelu.h"
+#include "aten/RMSNorm.h"
 #include "cpu/kernels/ConvPacked.h"
 #include "cpu/kernels/ConvTransposePacked.h"
 #include "cpu/kernels/Einsum.h"
@@ -1177,6 +1177,83 @@ torch::jit::RegisterOperators op({
               peek(stack, 4, 6).toInt(),
               peek(stack, 5, 6).toInt());
           drop(stack, 6);
+          torch::jit::pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::bert_flash_mha(Tensor qkv, Tensor rel_qk, Scalar alpha, "
+        "Scalar dim_per_head, int softmax_dim, ScalarType ? dtype, "
+        "int head_num, int head_size) -> Tensor",
+        [](Stack& stack) {
+          auto result = dil_bert_flash_mha(
+              peek(stack, 0, 8).toTensor(),
+              peek(stack, 1, 8).toTensor(),
+              peek(stack, 2, 8).toScalar(),
+              peek(stack, 3, 8).toScalar(),
+              peek(stack, 4, 8).toInt(),
+              peek(stack, 5, 8),
+              peek(stack, 6, 8).toInt(),
+              peek(stack, 7, 8).toInt());
+          drop(stack, 8);
+          torch::jit::pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::sd_flash_mha(Tensor qkv, int[] list, "
+        "float scale, int head_num) -> Tensor",
+        [](Stack& stack) {
+          auto result = dil_sd_flash_mha(
+              peek(stack, 0, 4).toTensor(),
+              peek(stack, 1, 4).toIntVector(),
+              peek(stack, 2, 4).toDouble(),
+              peek(stack, 3, 4).toInt());
+          drop(stack, 4);
+          torch::jit::pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::sd_flash_mha(Tensor query, Tensor key, Tensor value, "
+        "float scale, int head_num) -> Tensor",
+        [](Stack& stack) {
+          auto result = dil_sd_flash_mha(
+              peek(stack, 0, 5).toTensor(),
+              peek(stack, 1, 5).toTensor(),
+              peek(stack, 2, 5).toTensor(),
+              peek(stack, 3, 5).toDouble(),
+              peek(stack, 4, 5).toInt());
+          drop(stack, 5);
+          torch::jit::pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::sd_flash_mha(Tensor qkv, int[] list, "
+        "int head_num) -> Tensor",
+        [](Stack& stack) {
+          auto div_input_data = 1.0f;
+          auto result = dil_sd_flash_mha(
+              peek(stack, 0, 3).toTensor(),
+              peek(stack, 1, 3).toIntVector(),
+              peek(stack, 2, 3).toInt());
+          drop(stack, 3);
+          torch::jit::pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::sd_flash_mha(Tensor query, Tensor key, Tensor value, "
+        "int head_num) -> Tensor",
+        [](Stack& stack) {
+          auto div_input_data = 1.0f;
+          auto result = dil_sd_flash_mha(
+              peek(stack, 0, 4).toTensor(),
+              peek(stack, 1, 4).toTensor(),
+              peek(stack, 2, 4).toTensor(),
+              peek(stack, 3, 4).toInt());
+          drop(stack, 4);
           torch::jit::pack(stack, std::move(result));
         },
         aliasAnalysisFromSchema()),

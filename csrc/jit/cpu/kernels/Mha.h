@@ -45,20 +45,59 @@ at::Tensor dil_transfree_vit_mha(
     const at::Tensor& dim_per_head,
     const int64_t& softmax_dim,
     const at::IValue& dtype,
-    const int64_t& head_num,
-    const int64_t& head_size);
+    const int64_t& num_head,
+    const int64_t& headSize);
 
 at::Tensor dil_transfree_vit_mha(
     const at::Tensor& qkv,
     const double& dim_per_head,
     const int64_t& softmax_dim,
     const at::IValue& dtype,
-    const int64_t& head_num,
-    const int64_t& head_size);
+    const int64_t& num_head,
+    const int64_t& headSize);
 
 at::Tensor dil_mha_matmul_trans(
     const at::Tensor& left,
     const at::Tensor& right);
+
+at::Tensor dil_bert_flash_mha(
+    const at::Tensor& qkv,
+    const at::Tensor& rel_kv,
+    const at::Scalar& alpha,
+    const at::Scalar& dim_per_head,
+    const int64_t& softmax_dim,
+    const at::IValue& dtype,
+    const int64_t& num_head,
+    const int64_t& headSize);
+
+/**
+ * For one kind of SD MHA, the query/key/value linears are fused by
+ * the ConcatLinear. Here the "split_list" stores the sizes of the
+ * dims which are connected. It is used to calculate MHA's head size.
+ */
+at::Tensor dil_sd_flash_mha(
+    const at::Tensor& qkv,
+    const at::IntArrayRef& split_list,
+    const double& scale,
+    const int64_t& num_head);
+
+at::Tensor dil_sd_flash_mha(
+    const at::Tensor& query,
+    const at::Tensor& key,
+    const at::Tensor& value,
+    const double& scale,
+    const int64_t& num_head);
+
+at::Tensor dil_sd_flash_mha(
+    const at::Tensor& qkv,
+    const at::IntArrayRef& split_list,
+    const int64_t& num_head);
+
+at::Tensor dil_sd_flash_mha(
+    const at::Tensor& query,
+    const at::Tensor& key,
+    const at::Tensor& value,
+    const int64_t& num_head);
 
 template <typename T>
 std::vector<at::Tensor> dil_mat_split(

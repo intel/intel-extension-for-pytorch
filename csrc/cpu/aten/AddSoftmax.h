@@ -14,7 +14,6 @@ at::Tensor DivAddSoftmax(
     const float& dim_per_head);
 
 namespace {
-
 at::Tensor div_add_softmax_kernel_impl(
     at::Tensor& a,
     const at::Tensor& b,

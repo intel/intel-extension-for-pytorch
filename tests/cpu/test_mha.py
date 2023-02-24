@@ -2,8 +2,165 @@ import unittest
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
+
+#(from Diffusers 0.12.1)
+class SD_MHA_Model_v1(nn.Module):
+    def __init__(self, scale, num_heads, weightsize, hiddensize):
+        super(SD_MHA_Model_v1, self).__init__()
+        self.scale = scale
+        self.heads = num_heads
+        self.weightsize = weightsize
+        self.hiddensize = hiddensize
+        self.query = nn.Linear(self.weightsize, self.hiddensize, bias=True)
+        self.key = nn.Linear(self.weightsize, self.hiddensize, bias=True)
+        self.value = nn.Linear(self.weightsize, self.hiddensize, bias=True)
+
+    def batch_to_head_dim(self, tensor):
+        head_size = self.heads
+        batch_size, seq_len, dim = tensor.shape
+        tensor = tensor.reshape(batch_size // head_size, head_size, seq_len, dim)
+        tensor = tensor.permute(0, 2, 1, 3).reshape(batch_size // head_size, seq_len, dim * head_size)
+        return tensor
+
+    def head_to_batch_dim(self, tensor):
+        head_size = self.heads
+        batch_size, seq_len, dim = tensor.shape
+        tensor = tensor.reshape(batch_size, seq_len, head_size, dim // head_size)
+        tensor = tensor.permute(0, 2, 1, 3).reshape(batch_size * head_size, seq_len, dim // head_size)
+        return tensor
+
+    def get_attention_scores(self, query, key):
+        dtype = query.dtype
+        attention_scores = torch.baddbmm(
+            torch.empty(query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device),
+            query,
+            key.transpose(-1, -2),
+            beta=0,
+            alpha=self.scale,
+        )
+        attention_probs = attention_scores.softmax(dim=-1)
+        attention_probs = attention_probs.to(dtype)
+        return attention_probs
+
+    def forward(self, x):        
+        query = self.query(x)
+        query = self.head_to_batch_dim(query)
+        key = self.key(x)
+        key = self.head_to_batch_dim(key)
+        value = self.value(x)
+        value = self.head_to_batch_dim(value)
+        attention_probs = self.get_attention_scores(query, key)
+        hidden_states = torch.bmm(attention_probs, value)
+        output = self.batch_to_head_dim(hidden_states)
+        return output
+
+#(from Diffusers 0.12.1)
+class SD_MHA_Model_v2(nn.Module):
+    def __init__(self, scale, num_heads, weightsize, hiddensize):
+        super(SD_MHA_Model_v2, self).__init__()
+        self.scale = scale
+        self.heads = num_heads
+        self.weightsize = weightsize
+        self.hiddensize = hiddensize
+        self.query = nn.Linear(self.weightsize, self.hiddensize, bias=True)
+        self.key = nn.Linear(self.weightsize, self.hiddensize, bias=True)
+        self.value = nn.Linear(self.weightsize, self.hiddensize, bias=True)
+
+    def batch_to_head_dim(self, tensor):
+        head_size = self.heads
+        batch_size, seq_len, dim = tensor.shape
+        tensor = tensor.reshape(batch_size // head_size, head_size, seq_len, dim)
+        tensor = tensor.permute(0, 2, 1, 3).reshape(batch_size // head_size, seq_len, dim * head_size)
+        return tensor
+
+    def head_to_batch_dim(self, tensor):
+        head_size = self.heads
+        batch_size, seq_len, dim = tensor.shape
+        tensor = tensor.reshape(batch_size, seq_len, head_size, dim // head_size)
+        tensor = tensor.permute(0, 2, 1, 3).reshape(batch_size * head_size, seq_len, dim // head_size)
+        return tensor
+
+    def get_attention_scores(self, query, key):
+        dtype = query.dtype
+        attention_scores = torch.baddbmm(
+            torch.empty(query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device),
+            query,
+            key.transpose(-1, -2),
+            beta=0,
+            alpha=self.scale,
+        )
+        attention_probs = attention_scores.softmax(dim=-1)
+        attention_probs = attention_probs.to(dtype)
+        return attention_probs
+
+    def forward(self, x, y):        
+        query = self.query(x)
+        query = self.head_to_batch_dim(query)
+        key = self.key(y)
+        key = self.head_to_batch_dim(key)
+        value = self.value(y)
+        value = self.head_to_batch_dim(value)
+        attention_probs = self.get_attention_scores(query, key)
+        hidden_states = torch.bmm(attention_probs, value)
+        output = self.batch_to_head_dim(hidden_states)
+        return output
+
+#(from Diffusers 0.13)
+class SD_MHA_Model_v3(nn.Module):
+    def __init__(self, num_heads, weightsize, hiddensize):
+        super(SD_MHA_Model_v3, self).__init__()
+        self.heads = num_heads
+        self.weightsize = weightsize
+        self.hiddensize = hiddensize
+        self.query = nn.Linear(self.weightsize, self.hiddensize, bias=True)
+        self.key = nn.Linear(self.weightsize, self.hiddensize, bias=True)
+        self.value = nn.Linear(self.weightsize, self.hiddensize, bias=True)
+
+    def forward(self, x):        
+        query = self.query(x)
+        key = self.key(x)
+        value = self.value(x)
+        batch_size, sequence_length, inner_dim = x.shape
+        head_dim = inner_dim // self.heads
+        query = query.view(batch_size, -1, self.heads, head_dim).transpose(1, 2)
+        key = key.view(batch_size, -1, self.heads, head_dim).transpose(1, 2)
+        value = value.view(batch_size, -1, self.heads, head_dim).transpose(1, 2)
+        hidden_states = F.scaled_dot_product_attention(
+            query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False
+        )
+        hidden_states = hidden_states.transpose(1, 2).reshape(batch_size, -1, self.heads * head_dim)
+        output = hidden_states.to(query.dtype)
+        return output
+
+#(from Diffusers 0.13)
+class SD_MHA_Model_v4(nn.Module):
+    def __init__(self, num_heads, weightsize, hiddensize):
+        super(SD_MHA_Model_v4, self).__init__()
+        self.heads = num_heads
+        self.weightsize = weightsize
+        self.hiddensize = hiddensize
+        self.query = nn.Linear(self.weightsize, self.hiddensize, bias=True)
+        self.key = nn.Linear(self.weightsize, self.hiddensize, bias=True)
+        self.value = nn.Linear(self.weightsize, self.hiddensize, bias=True)
+
+    def forward(self, x, y):        
+        query = self.query(x)
+        key = self.key(y)
+        value = self.value(y)
+        batch_size, sequence_length, inner_dim = x.shape
+        head_dim = inner_dim // self.heads
+        query = query.view(batch_size, -1, self.heads, head_dim).transpose(1, 2)
+        key = key.view(batch_size, -1, self.heads, head_dim).transpose(1, 2)
+        value = value.view(batch_size, -1, self.heads, head_dim).transpose(1, 2)
+        hidden_states = F.scaled_dot_product_attention(
+            query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False
+        )
+        hidden_states = hidden_states.transpose(1, 2).reshape(batch_size, -1, self.heads * head_dim)
+        output = hidden_states.to(query.dtype)
+        return output
 
 class MHA_Model_BERT(nn.Module):
     def __init__(self, scale, num_heads, head_dims, permute_idx, trans_a, trans_b):
@@ -109,6 +266,76 @@ head_dims = [64, 96, 17]
 
 class TransFreeMHATester(TestCase):
 
+    def test_sd_mha_bf16_v1(self):
+        mat = torch.randn(2, 4096, 320).to(torch.bfloat16)
+        sd_mha_model = SD_MHA_Model_v1(0.3, 8, 320, 320).eval()
+        mha_ipex = ipex.optimize(sd_mha_model, dtype=torch.bfloat16, level="O1")
+
+        with torch.cpu.amp.autocast(), torch.no_grad():
+            mha_ipex = torch.jit.trace(mha_ipex, (mat, ))
+            mha_ipex = torch.jit.freeze(mha_ipex)
+
+            for _ in range(2):
+                mha_jit = mha_ipex(mat)
+            mha_ref = sd_mha_model(mat)
+            self.assertEqual(mha_ref, mha_jit, prec=1e-2)
+
+            mha_graph = mha_ipex.graph_for(mat)
+            self.assertTrue(any(n.kind() == "ipex::sd_flash_mha" for n in mha_graph.nodes()))
+
+    def test_sd_mha_bf16_v2(self):
+        mat1 = torch.randn(2, 4096, 320).to(torch.bfloat16)
+        mat2 = torch.randn(2, 77, 320).to(torch.bfloat16)
+        sd_mha_model = SD_MHA_Model_v2(0.3, 8, 320, 320).eval()
+        mha_ipex = ipex.optimize(sd_mha_model, dtype=torch.bfloat16, level="O1")
+
+        with torch.cpu.amp.autocast(), torch.no_grad():
+            mha_ipex = torch.jit.trace(mha_ipex, (mat1, mat2,))
+            mha_ipex = torch.jit.freeze(mha_ipex)
+
+            for _ in range(2):
+                mha_jit = mha_ipex(mat1, mat2)
+            mha_ref = sd_mha_model(mat1, mat2)
+            self.assertEqual(mha_ref, mha_jit, prec=1e-2)
+
+            mha_graph = mha_ipex.graph_for(mat1, mat2)
+            self.assertTrue(any(n.kind() == "ipex::sd_flash_mha" for n in mha_graph.nodes()))
+
+    def test_sd_mha_bf16_v3(self):
+        mat = torch.randn(2, 4096, 320).to(torch.bfloat16)
+        sd_mha_model = SD_MHA_Model_v3(8, 320, 320).eval()
+        mha_ipex = ipex.optimize(sd_mha_model, dtype=torch.bfloat16, level="O1")
+
+        with torch.cpu.amp.autocast(), torch.no_grad():
+            mha_ipex = torch.jit.trace(mha_ipex, (mat, ))
+            mha_ipex = torch.jit.freeze(mha_ipex)
+
+            for _ in range(2):
+                mha_jit = mha_ipex(mat)
+            mha_ref = sd_mha_model(mat)
+            self.assertEqual(mha_ref, mha_jit, prec=1e-2)
+
+            mha_graph = mha_ipex.graph_for(mat)
+            self.assertTrue(any(n.kind() == "ipex::sd_flash_mha" for n in mha_graph.nodes()))
+
+    def test_sd_mha_bf16_v4(self):
+        mat1 = torch.randn(2, 4096, 320).to(torch.bfloat16)
+        mat2 = torch.randn(2, 77, 320).to(torch.bfloat16)
+        sd_mha_model = SD_MHA_Model_v4(8, 320, 320).eval()
+        mha_ipex = ipex.optimize(sd_mha_model, dtype=torch.bfloat16, level="O1")
+
+        with torch.cpu.amp.autocast(), torch.no_grad():
+            mha_ipex = torch.jit.trace(mha_ipex, (mat1, mat2,))
+            mha_ipex = torch.jit.freeze(mha_ipex)
+
+            for _ in range(2):
+                mha_jit = mha_ipex(mat1, mat2)
+            mha_ref = sd_mha_model(mat1, mat2)
+            self.assertEqual(mha_ref, mha_jit, prec=1e-2)
+
+            mha_graph = mha_ipex.graph_for(mat1, mat2)
+            self.assertTrue(any(n.kind() == "ipex::sd_flash_mha" for n in mha_graph.nodes()))
+
     def test_transfree_mha_bf16(self):
         for i in range(len(bs)):
             mat = torch.randn(bs[i], seq[i], num_heads[i] * head_dims[i]).to(torch.bfloat16)
@@ -141,8 +368,7 @@ class TransFreeMHATester(TestCase):
                 mha_graph = mha_ipex.graph_for(mat, mask_base)
                 vit_mha_graph = vit_mha_ipex.graph_for(mat)
 
-
-                self.assertTrue(any(n.kind() == "ipex::mha_scores_calc" for n in mha_graph.nodes()))
+                self.assertTrue(any(n.kind() == "ipex::bert_flash_mha" for n in mha_graph.nodes()))
                 self.assertTrue(any(n.kind() == "ipex::transfree_vit_mha" for n in vit_mha_graph.nodes()))
 
             for fill_value in [-float("inf"), torch.tensor(torch.finfo(float).min)]:
