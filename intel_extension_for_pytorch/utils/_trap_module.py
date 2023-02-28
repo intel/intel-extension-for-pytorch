@@ -51,10 +51,5 @@ _register_trap('_XPUStreamBase')
 _register_trap('_XPUEventBase')
 
 
-_register_trap_ops('convert_linear_weight_layout')
-_register_trap_ops('convert_conv_weight_layout')
-_register_trap_ops('convert_convtranspose_weight_layout')
-
-
 if not hasattr(intel_extension_for_pytorch._C, 'XPUFP32MathMode'):
     intel_extension_for_pytorch._C.__dict__['XPUFP32MathMode'] = trap_math_mode

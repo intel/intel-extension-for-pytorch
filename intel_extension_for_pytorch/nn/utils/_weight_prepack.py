@@ -272,20 +272,8 @@ IPEX_WEIGHT_PREPACK_MODULE_CPU = {
 }
 
 
-IPEX_WEIGHT_PREPACK_MODULE_XPU = {
-    torch.nn.Linear: torch.ops.torch_ipex.convert_linear_weight_layout,
-    torch.nn.Conv1d: torch.ops.torch_ipex.convert_conv_weight_layout,
-    torch.nn.Conv2d: torch.ops.torch_ipex.convert_conv_weight_layout,
-    torch.nn.Conv3d: torch.ops.torch_ipex.convert_conv_weight_layout,
-    torch.nn.ConvTranspose2d: torch.ops.torch_ipex.convert_convtranspose_weight_layout,
-    torch.nn.ConvTranspose3d: torch.ops.torch_ipex.convert_convtranspose_weight_layout,
-}
-
-
-def _should_prepack(module, is_training, is_xpu=False):
-    if type(module) not in IPEX_WEIGHT_PREPACK_MODULE_CPU and not is_xpu:
-        return False
-    if type(module) not in IPEX_WEIGHT_PREPACK_MODULE_XPU and is_xpu:
+def _should_prepack(module, is_training):
+    if type(module) not in IPEX_WEIGHT_PREPACK_MODULE_CPU:
         return False
     # If hook is on `weight` or `bias`, will not prepack.
     if module._forward_pre_hooks is not None:
@@ -320,40 +308,6 @@ def _should_prepack(module, is_training, is_xpu=False):
     if isinstance(module, torch.nn.Conv1d) and module.training:
         return False
     return True
-
-
-def weight_prepack_with_ipex_xpu(module):
-    if _should_prepack(module, is_training=False, is_xpu=True):
-        # if pass the sample input, the activation shape will be recorded
-        prepack_input_shape = module.input_shape if hasattr(module, "input_shape") else []
-        if type(module) == torch.nn.ConvTranspose2d or type(module) == torch.nn.ConvTranspose3d:
-            # Conv Transpose needs output_padding
-            IPEX_WEIGHT_PREPACK_MODULE_XPU[type(module)](module.weight.data,
-                                                         module.padding,
-                                                         module.stride,
-                                                         module.dilation,
-                                                         module.output_padding,
-                                                         module.groups,
-                                                         prepack_input_shape)
-        elif type(module) == torch.nn.Linear:
-            # After prepack, the context of weight has been changed to transpose + block(BA-block),
-            # while the stride of weight TensorImpl is not been changed(still AB-plain).
-            # So in torch addmm shape check without transpose, it will fail.
-            # If let torch now the true stride change(transpose) of the weight, the .t() is needed, it will trigger to_plain.
-            # Thus, here, use return weight method
-            module.weight.data = IPEX_WEIGHT_PREPACK_MODULE_XPU[type(module)](module.weight.data, prepack_input_shape)
-        else:
-            # For Conv1d, 2d and 3d
-            IPEX_WEIGHT_PREPACK_MODULE_XPU[type(module)](module.weight.data,
-                                                         module.padding,
-                                                         module.stride,
-                                                         module.dilation,
-                                                         module.groups,
-                                                         prepack_input_shape)
-
-    for child in module.children():
-        weight_prepack_with_ipex_xpu(child)
-    return module
 
 
 def weight_prepack_with_ipex(module, optimizer, params_attr, device_type='cpu'):
@@ -427,9 +381,6 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, device_type='cpu'):
             optim._optimizer_utils.patch_load_state_dict(opt_optmizer)
             optim._optimizer_utils.patch_state_dict(opt_optmizer)
         return opt_model, opt_optmizer, params_attr
-    elif device_type == 'xpu':
-        opt_model = weight_prepack_with_ipex_xpu(module)
-        return opt_model
 
 
 def record_input_shape_for_prepack(module, sample_input):

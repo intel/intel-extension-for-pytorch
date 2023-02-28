@@ -496,10 +496,9 @@ def optimize(
                 + " so make inplace to be true")
             # TODO: for xpu, inplace is true will add device memory pressure, so set inplace to be true
             inplace = True
-        # for XPU, weight prepack is unsupported, so sample input is useless
-        if opt_properties.weights_prepack:
+        if opt_properties.weights_prepack or sample_input is not None:
             warnings.warn(
-                "For XPU, the weight prepack and sample input are disabled. The onednn layout"
+                "For XPU, the weight prepack and sample input are both disabled. The onednn layout"
                 + " is automatically chosen to use")
             opt_properties.weights_prepack = False
             sample_input = None
@@ -583,10 +582,6 @@ def optimize(
                         "please set dtype to torch.float or set weights_prepack to False."
                 optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
                     optimized_model, optimized_optimizer, params_attr, 'cpu')
-        else:
-            assert device_type == 'xpu', "Unknown device type, only support device CPU and XPU"
-            optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
-                optimized_model, optimized_optimizer, params_attr, 'xpu')
 
     if opt_properties.graph_mode:
         _old_forward = optimized_model.forward
