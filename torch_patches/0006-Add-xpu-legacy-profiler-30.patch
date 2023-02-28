@@ -1,25 +1,25 @@
-From a52821b6d8a6c9d15f35f1adebba4b2d08ec3e0c Mon Sep 17 00:00:00 2001
+From 3274d26b245f2e221acbc64a63909a6d4d22b6b2 Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Wed, 20 Apr 2022 00:28:18 +0800
-Subject: [PATCH 06/10] Add xpu legacy profiler (#30)
+Subject: [PATCH 06/11] Add xpu legacy profiler (#30)
 
 Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
 ---
  torch/_C/_autograd.pyi                        |   1 +
  torch/autograd/profiler.py                    |  18 +-
  torch/autograd/profiler_legacy.py             | 116 ++++++++---
- torch/autograd/profiler_util.py               | 188 +++++++++++++++---
+ torch/autograd/profiler_util.py               | 189 +++++++++++++++---
  torch/csrc/autograd/init.cpp                  |  10 +
- torch/csrc/autograd/profiler_legacy.cpp       | 111 ++++++++---
+ torch/csrc/autograd/profiler_legacy.cpp       | 111 +++++++---
  torch/csrc/autograd/profiler_legacy.h         |  59 ++++--
  torch/csrc/profiler/api.cpp                   | 109 ++++------
  torch/csrc/profiler/api.h                     |  12 +-
- torch/csrc/profiler/cuda.cpp                  |  18 +-
+ torch/csrc/profiler/cuda.cpp                  |  36 +++-
  torch/csrc/profiler/itt.cpp                   |   5 +
  torch/csrc/profiler/orchestration/observer.h  |   1 +
  torch/csrc/profiler/python/init.cpp           |   1 +
  .../_internal/distributed/rpc/rpc_test.py     |   4 +-
- 14 files changed, 472 insertions(+), 181 deletions(-)
+ 14 files changed, 491 insertions(+), 181 deletions(-)
 
 diff --git a/torch/_C/_autograd.pyi b/torch/_C/_autograd.pyi
 index bddda0a8c9..9206273838 100644
@@ -364,7 +364,7 @@ index b3e875f252..14bc2a2f70 100644
  
      # Sort functions by start time then by end time ascending.
 diff --git a/torch/autograd/profiler_util.py b/torch/autograd/profiler_util.py
-index 7d0532d611..ea3e6726e8 100644
+index 7d0532d611..368f8d3316 100644
 --- a/torch/autograd/profiler_util.py
 +++ b/torch/autograd/profiler_util.py
 @@ -15,13 +15,17 @@ class EventList(list):
@@ -719,17 +719,18 @@ index 7d0532d611..ea3e6726e8 100644
  
      name_column_width = max([len(evt.key) for evt in events]) + 4
      if max_name_column_width is not None:
-@@ -711,6 +795,9 @@ def _build_table(
+@@ -711,6 +795,10 @@ def _build_table(
      DEFAULT_COLUMN_WIDTH = 12
      flops_column_width = DEFAULT_COLUMN_WIDTH
  
-+    cstack_column_width = max([len(str(evt.cstack[:max_depth])[1:-1]) for evt in events]) + 8
-+    cstack_column_width = max(cstack_column_width, 20)
++    if with_calling_stack:
++        cstack_column_width = max([len(str(evt.cstack[:max_depth])[1:-1]) for evt in events]) + 8
++        cstack_column_width = max(cstack_column_width, 20)
 +
      src_column_width = None
      stacks = []
      for evt in events:
-@@ -737,6 +824,13 @@ def _build_table(
+@@ -737,6 +825,13 @@ def _build_table(
              'CUDA total',
              'CUDA time avg',
          ])
@@ -743,7 +744,7 @@ index 7d0532d611..ea3e6726e8 100644
      if profile_memory:
          headers.extend([
              'CPU Mem',
-@@ -747,6 +841,11 @@ def _build_table(
+@@ -747,6 +842,11 @@ def _build_table(
                  'CUDA Mem',
                  'Self CUDA Mem',
              ])
@@ -755,7 +756,7 @@ index 7d0532d611..ea3e6726e8 100644
      headers.append(
          '# of Calls'
      )
-@@ -806,6 +905,10 @@ def _build_table(
+@@ -806,6 +906,10 @@ def _build_table(
          else:
              with_flops = False  # can't find any valid flops
  
@@ -766,7 +767,7 @@ index 7d0532d611..ea3e6726e8 100644
      row_format = row_format_lst[0]
      header_sep = header_sep_lst[0]
      line_length = line_length_lst[0]
-@@ -820,14 +923,19 @@ def _build_table(
+@@ -820,14 +924,19 @@ def _build_table(
  
      sum_self_cpu_time_total = sum([event.self_cpu_time_total for event in events])
      sum_self_cuda_time_total = 0
@@ -786,7 +787,7 @@ index 7d0532d611..ea3e6726e8 100644
  
      # Actual printing
      if header is not None:
-@@ -878,6 +986,14 @@ def _build_table(
+@@ -878,6 +987,14 @@ def _build_table(
                  evt.cuda_time_total_str,
                  evt.cuda_time_str,  # Cuda time avg
              ])
@@ -801,7 +802,7 @@ index 7d0532d611..ea3e6726e8 100644
          if profile_memory:
              row_values.extend([
                  # CPU Mem Total
-@@ -892,6 +1008,13 @@ def _build_table(
+@@ -892,6 +1009,13 @@ def _build_table(
                      # Self CUDA Mem Total
                      _format_memory(evt.self_cuda_memory_usage),
                  ])
@@ -815,7 +816,7 @@ index 7d0532d611..ea3e6726e8 100644
          row_values.append(
              evt.count,  # Number of calls
          )
-@@ -910,6 +1033,12 @@ def _build_table(
+@@ -910,6 +1034,12 @@ def _build_table(
              if len(evt.stack) > 0:
                  src_field = trim_path(evt.stack[0], src_column_width)
              row_values.append(src_field)
@@ -828,7 +829,7 @@ index 7d0532d611..ea3e6726e8 100644
          append(row_format.format(*row_values))
  
          if has_stack:
-@@ -919,8 +1048,11 @@ def _build_table(
+@@ -919,8 +1049,11 @@ def _build_table(
              empty_headers.append("")
              append(row_format.format(*empty_headers))
  
@@ -1408,7 +1409,7 @@ index 0414b8c323..5eb5133348 100644
  } // namespace impl
  } // namespace profiler
 diff --git a/torch/csrc/profiler/cuda.cpp b/torch/csrc/profiler/cuda.cpp
-index c64eb5e9ca..80357a29e8 100644
+index c64eb5e9ca..3c0f2b0f97 100644
 --- a/torch/csrc/profiler/cuda.cpp
 +++ b/torch/csrc/profiler/cuda.cpp
 @@ -5,6 +5,8 @@
@@ -1420,7 +1421,28 @@ index c64eb5e9ca..80357a29e8 100644
  namespace torch {
  namespace profiler {
  namespace impl {
-@@ -42,9 +44,8 @@ struct CUDAMethods : public ProfilerStubs {
+@@ -33,6 +35,20 @@ static inline void cudaCheck(cudaError_t result, const char* file, int line) {
+ }
+ #define TORCH_CUDA_CHECK(result) cudaCheck(result, __FILE__, __LINE__);
+ 
++class CUDAEventProfiler : public KernelEventBase {
++public:
++  CUDAEventProfiler(CUevent_st* evt_ptr = nullptr) : event_(evt_ptr, CUDAEventDestory) {};
++  virtual ~CUDAEventProfiler() = default;
++  CUevent_st* get() const {
++    return event_.get();
++  }
++private:
++  static void CUDAEventDestory(CUevent_st* ptr) {
++    TORCH_CUDA_CHECK(cudaEventDestroy(ptr));
++  }
++  std::unique_ptr<CUevent_st, std::function<void(CUevent_st*)>> event_;
++};
++
+ struct CUDAMethods : public ProfilerStubs {
+   void record(int* device, ProfilerEventStub* event, int64_t* cpu_ns)
+       const override {
+@@ -42,9 +58,8 @@ struct CUDAMethods : public ProfilerStubs {
      // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
      CUevent_st* cuda_event_ptr;
      TORCH_CUDA_CHECK(cudaEventCreate(&cuda_event_ptr));
@@ -1432,7 +1454,7 @@ index c64eb5e9ca..80357a29e8 100644
      auto stream = at::cuda::getCurrentCUDAStream();
      if (cpu_ns) {
        *cpu_ns = torch::profiler::impl::getTime();
-@@ -54,11 +55,16 @@ struct CUDAMethods : public ProfilerStubs {
+@@ -54,15 +69,24 @@ struct CUDAMethods : public ProfilerStubs {
  
    float elapsed(const ProfilerEventStub* event, const ProfilerEventStub* event2)
        const override {
@@ -1452,6 +1474,14 @@ index c64eb5e9ca..80357a29e8 100644
      // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-avoid-magic-numbers,cppcoreguidelines-narrowing-conversions)
      return ms * 1000.0;
    }
+ 
++  float elapsed(const ProfilerEventStub* event) const override {
++    TORCH_CHECK(false, "Profiler cannot use this method on CUDA backend.");
++  }
++
+   void mark(const char* name) const override {
+     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+     ::nvtxMark(name);
 diff --git a/torch/csrc/profiler/itt.cpp b/torch/csrc/profiler/itt.cpp
 index 3269a5784a..54bdf50320 100644
 --- a/torch/csrc/profiler/itt.cpp

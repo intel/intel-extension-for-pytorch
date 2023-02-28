@@ -1,7 +1,7 @@
-From 6738b1fa1bb8ce16ceca086f758f8c813b6a773d Mon Sep 17 00:00:00 2001
+From 9a22d1295a034a024dd7ab6a7b48db9fb93d32de Mon Sep 17 00:00:00 2001
 From: Jinghui <jinghui.gu@intel.com>
 Date: Fri, 6 Jan 2023 15:36:56 +0800
-Subject: [PATCH 10/10] [REVERTME] Use experimental namespace for bfloat16 data
+Subject: [PATCH 11/11] [REVERTME] Use experimental namespace for bfloat16 data
  type (#97)
 
 To be compatible with old compiler version
