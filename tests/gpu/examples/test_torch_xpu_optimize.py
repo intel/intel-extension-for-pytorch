@@ -18,7 +18,7 @@ TEST_MODULE_CONVERT_LIST = [torch.nn.Conv2d,
                             torch.nn.LSTM]
 
 # TODO: for now, only support SGD and AdamW
-SUPPORTED_FUSION_OPTIMIZER = ['SGD', 'AdamW', 'Lars']
+SUPPORTED_FUSION_OPTIMIZER = ['Adam', 'SGD', 'AdamW', 'Lars']
 
 
 class InferenceModel(nn.Module):
@@ -181,6 +181,23 @@ class TestTorchMethod(TestCase):
             elif optimizer_string.lower() == 'sgd':
                 optimizer_xpu_no_fuse = torch.optim.SGD(model_xpu_no_fuse.parameters(), lr=lr)
                 optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr)
+            elif optimizer_string.lower() == 'adam':
+                beta1 = 0.9
+                beta2 = 0.999
+                adam_epsilon = 1e-6
+                amsgrad = True
+                optimizer_xpu_no_fuse = torch.optim.Adam(model_xpu_no_fuse.parameters(),
+                                                          lr=lr,
+                                                          betas=(beta1, beta2),
+                                                          eps=adam_epsilon,
+                                                          weight_decay=weight_decay,
+                                                          amsgrad=amsgrad)
+                optimizer_xpu = torch.optim.Adam(model_xpu.parameters(),
+                                                  lr=lr,
+                                                  betas=(beta1, beta2),
+                                                  eps=adam_epsilon,
+                                                  weight_decay=weight_decay,
+                                                  amsgrad=amsgrad)
             elif optimizer_string.lower() == 'lars':
                 momentum = 0.9
                 epsilon = 0.001
@@ -280,6 +297,7 @@ class TestTorchMethod(TestCase):
                         print('. memory format: ', mem_format, ' dtype: ', dtype)
                         input = torch.randn(batch_size, input_channel, 7, 7).to(device=device)
                         target = torch.empty(batch_size, dtype=torch.long).random_(class_num).to(device=device)
+
                         align_all(model_xpu, model_xpu_no_fuse)
 
                         training(input, target, model_xpu_no_fuse, dtype, optimizer_xpu_no_fuse, mem_format)
