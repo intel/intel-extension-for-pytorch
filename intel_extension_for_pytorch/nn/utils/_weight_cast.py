@@ -3,7 +3,6 @@ import torch.nn as nn
 from intel_extension_for_pytorch.optim import _optimizer_utils, _lamb, lars # noqa F401
 import types
 from ._model_convert import _LSTM
-from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBag as MergedEmbeddingBag
 
 # IPEX does not cast all module parameters for acc reason, such as BN
 IPEX_WEIGHT_CAST_MODULE = {
@@ -19,23 +18,20 @@ IPEX_WEIGHT_CAST_MODULE = {
     torch.nn.EmbeddingBag,
     torch.nn.Embedding,
     _LSTM,
-    MergedEmbeddingBag,
 }
 
 
 def _save_to_state_dict(self, destination, prefix, keep_vars):
     param_dict = {}
     for name, para in self.named_parameters():
-        if not hasattr(self, name):
-            continue
         temp = para
         param_dict.update({name: para})
-        if hasattr(self, name + '_trail'):
+        if self.master_weight_split:
             temp_para = torch.nn.Parameter(
                 torch.ops.torch_ipex.cat_bfloat16_float(para.data, getattr(self, name + '_trail')),
                 requires_grad=temp.requires_grad)
             setattr(self, name, temp_para) # noqa B010
-        elif hasattr(self, 'master_' + name):
+        else:
             temp_para = torch.nn.Parameter(
                 getattr(self, 'master_' + name),
                 requires_grad=temp.requires_grad)
@@ -94,7 +90,7 @@ def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight
         # while master weight split, key is m.weight/bias, if not split, key is m.master_weight/master_bias
         attr_name = attr if master_weight_split else 'master_' + attr
         params_attr[getattr(m, attr_name)] = params_attr.pop(float_param)
-        _optimizer_utils.refresh_optimizer_params_after_cast(m, attr, float_param, master_weight_split, optimizer) 
+        _optimizer_utils.refresh_optimizer_params_after_cast(m, attr, float_param, master_weight_split, optimizer)
 
     def convert(m):
         if type(m) in IPEX_WEIGHT_CAST_MODULE:
