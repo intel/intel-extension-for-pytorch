@@ -566,6 +566,43 @@ Tensor q_conv2d_dequantize_mish_compound(
       dequantize_out, beta, threshold, input);
 }
 
+Tensor q_conv2d_dequantize_silu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  Tensor dequantize_out = at::AtenIpexTypeXPU::q_conv2d_dequantize(
+      input, packed_weight, output_scale, output_zero_point);
+  return at::silu(dequantize_out);
+}
+
+Tensor q_conv2d_dequantize_silu_quantize(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    double q_scale,
+    int64_t q_zpoint,
+    at::ScalarType dtype) {
+  auto qconv_wrapper =
+      QuantizeConvConverter<2>(packed_weight, q_scale, q_zpoint, kQInt8);
+  auto att = [=]() {
+    Attr attr(/* q_scale */ static_cast<float>(q_scale));
+    auto pack_ptr =
+        dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+    if (pack_ptr->bias.has_value()) {
+      Tensor bias = pack_ptr->bias.value();
+      attr.append_bias<2>(bias);
+    }
+    return attr.append_post_eltwise(
+        /* mish_scale */ 1.f,
+        /* alpha */ 0.f,
+        /* beta */ 0.f,
+        attr.kind_with_swish);
+  };
+  return qconv_wrapper.call(input, att);
+}
+
 at::Tensor q_conv2d_sqrt(
     const Tensor& input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
@@ -1001,6 +1038,8 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_QCONV(dequantize_mish_compound);
   IPEX_OP_REGISTER_QCONV(mish_compound);
   IPEX_OP_REGISTER_QCONV(mish_compound_add);
+  IPEX_OP_REGISTER_QCONV(dequantize_silu);
+  IPEX_OP_REGISTER_QCONV(dequantize_silu_quantize);
   IPEX_OP_REGISTER_NEED_PLAIN("softplus_tanh", softplus_tanh);
   IPEX_OP_REGISTER_NEED_PLAIN("mish_compound", mish_compound)
 }

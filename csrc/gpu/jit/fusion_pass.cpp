@@ -652,6 +652,13 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{Symbol::fromQualString("quantized::cat"),
       Symbol::fromQualString("aten::dequantize")},
      xpu::q_cat_dequantize_sym},
+    //  YOLOv7 INT8 For ATS-M: conv2d + dequantize + silu
+    {{xpu::q_conv2d_dequantize_sym, Symbol::fromQualString("aten::silu_")},
+     xpu::q_conv2d_dequantize_silu_sym},
+    //  YOLOv7 INT8 For ATS-M: conv2d + dequantize + silu + quantize
+    {{xpu::q_conv2d_dequantize_silu_sym,
+      Symbol::fromQualString("aten::quantize_per_tensor")},
+     xpu::q_conv2d_dequantize_silu_quantize_sym},
 
     IPEX_DEFINE_CONV_FUSION(sqrt),
     IPEX_DEFINE_CONV_FUSION(square),

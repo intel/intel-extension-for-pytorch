@@ -93,7 +93,20 @@ class ConvBinaryBias(torch.nn.Module):
         )
 
     def forward(self, x):
-        x = self.block(x);
+        x = self.block(x)
+        return x
+
+class ConvSiLU(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.block = torch.nn.Sequential(
+            torch.nn.Conv2d(3, 3, kernel_size=1, stride=1, padding=0, bias=False),
+            torch.nn.SiLU(inplace=True),
+            torch.nn.Conv2d(3, 3, kernel_size=1, stride=1, padding=0, bias=False),
+            torch.nn.SiLU(inplace=True)
+        )
+    def forward(self, x):
+        x = self.block(x)
         return x
 
 def impe_fp32_model(model, device, test_input):
@@ -228,3 +241,13 @@ class TestTorchMethod(TestCase):
         model = ConvBinaryBias()
         test_input = torch.rand([1, 256, 1, 1])
         xpu_res = trace_int8_model(model, "xpu", test_input.clone())
+
+    def test_conv_silu(self, dtype=torch.float):
+        model = ConvSiLU()
+        model1 = copy.deepcopy(model)
+        test_input = torch.rand([3, 3, 640, 640])
+        # impe vs. jit
+        # For model that JIT and impe path are both reachable.
+        xpu_res = trace_int8_model(model, "xpu", test_input.clone())
+        xpu_ref = impe_fp32_model(model, "xpu", test_input.clone())
+        self.assertEqual(xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol)

@@ -216,6 +216,10 @@ static auto convolution_silu_sym =
     Symbol::fromQualString("torch_ipex::_convolution_silu");
 static auto q_cat_dequantize_sym =
     Symbol::fromQualString("torch_ipex::q_cat_dequantize");
+static auto q_conv2d_dequantize_silu_sym =
+    Symbol::fromQualString("torch_ipex::q_conv2d_dequantize_silu");
+static auto q_conv2d_dequantize_silu_quantize_sym =
+    Symbol::fromQualString("torch_ipex::q_conv2d_dequantize_silu_quantize");
 
 // Fold weights of batch_norm with conv2d's
 static auto fold_weight_sym = Symbol::fromQualString("torch_ipex::fold_weight");
