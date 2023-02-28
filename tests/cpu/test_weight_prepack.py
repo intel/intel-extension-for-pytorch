@@ -133,7 +133,7 @@ class TestPrepackCases(TestCase):
             self.assertTrue(is_contiguous_channels_last_1d(y_ipex))
             self.assertTrue(is_contiguous_channels_last_1d(y_ipex_nwc))
 
-    def _test_convolution_training_base(self, dim, dtype, rtol=None, atol=None):
+    def _test_convolution_base(self, dim, dtype, is_train, rtol=None, atol=None):
         input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
         channels_last = torch.channels_last if dim ==2 else torch.channels_last_3d
         # Currently, there is no channels_last_1d format for 1d input in IPEX.
@@ -165,44 +165,81 @@ class TestPrepackCases(TestCase):
             x1 = x.clone().requires_grad_()
             x2 = x.clone().requires_grad_()
             x3 = x.clone().requires_grad_()
-            origin_model1 = copy.deepcopy(model).train()
-            origin_optimizer1 = SGD(origin_model1.parameters(), lr=0.01, momentum=0.9)
-            origin_model2 = copy.deepcopy(model).train()
-            origin_optimizer2 = SGD(origin_model2.parameters(), lr=0.01, momentum=0.9)
-            if feed_sample_input:
-                ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1', sample_input=x)
-                ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True, sample_input=x)
+            if is_train:
+                origin_model1 = copy.deepcopy(model).train()
+                origin_optimizer1 = SGD(origin_model1.parameters(), lr=0.01, momentum=0.9)
+                origin_model2 = copy.deepcopy(model).train()
+                origin_optimizer2 = SGD(origin_model2.parameters(), lr=0.01, momentum=0.9)
             else:
-                ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
-                ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
-            self.assertTrue(ipex_model1.weight.dtype == dtype)
-            self.assertTrue(ipex_model2.weight.dtype == dtype)
+                origin_model1 = copy.deepcopy(model).eval()
+                origin_model2 = copy.deepcopy(model).eval()
+
+            if feed_sample_input:
+                if dtype == torch.float16:
+                    if is_train:
+                        ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O0', weights_prepack=True, sample_input=x)
+                        ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O0', weights_prepack=True, inplace=True, sample_input=x)
+                    else:
+                        ipex_model1 = ipex.optimize(origin_model1, dtype=dtype, level='O0', weights_prepack=True, sample_input=x)
+                        ipex_model2 = ipex.optimize(origin_model2, dtype=dtype, level='O0', weights_prepack=True, inplace=True, sample_input=x)
+                else:
+                    if is_train:
+                        ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1', sample_input=x)
+                        ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True, sample_input=x)
+                    else:
+                        ipex_model1 = ipex.optimize(origin_model1, dtype=dtype, level='O1', sample_input=x)
+                        ipex_model2 = ipex.optimize(origin_model2, dtype=dtype, level='O1', inplace=True, sample_input=x)
+            else:
+                if dtype == torch.float16:
+                    if is_train:
+                        ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O0', weights_prepack=True)
+                        ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O0', weights_prepack=True, inplace=True)
+                    else:
+                        ipex_model1 = ipex.optimize(origin_model1, dtype=dtype, level='O0', weights_prepack=True)
+                        ipex_model2 = ipex.optimize(origin_model2, dtype=dtype, level='O0', weights_prepack=True, inplace=True)
+                else:
+                    if is_train:
+                        ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
+                        ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
+                    else:
+                        ipex_model1 = ipex.optimize(origin_model1, dtype=dtype, level='O1')
+                        ipex_model2 = ipex.optimize(origin_model2, dtype=dtype, level='O1', inplace=True)
+            if is_train or dtype == torch.float16:
+                self.assertTrue(ipex_model1.weight.dtype == dtype)
+                self.assertTrue(ipex_model2.weight.dtype == dtype)
 
             # original fp32 path
             y1 = origin_model1(x1)
-            loss1 = y1.sum()
-            origin_optimizer1.zero_grad()
-            loss1.backward()
-            origin_optimizer1.step()
+            grad_x = torch.randn(y1.shape, dtype=torch.float32).to(dtype=dtype).float()
+            if is_train:
+                origin_optimizer1.zero_grad()
+                y1.backward(grad_x)
+                origin_optimizer1.step()
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                 # ipex path with inplace=False
                 y2 = ipex_model1(x2)
-                loss2 = y2.sum()
-                ipex_optimizer1.zero_grad()
-                loss2.backward()
-                ipex_optimizer1.step()
                 # ipex path with inplace=True
                 y3 = ipex_model2(x3)
-                loss3 = y3.sum()
+
+            if is_train:
+                ipex_optimizer1.zero_grad()
+                y2.backward(grad_x.to(dtype=dtype))
+                ipex_optimizer1.step()
+
                 ipex_optimizer2.zero_grad()
-                loss3.backward()
+                y3.backward(grad_x.to(dtype=dtype))
                 ipex_optimizer2.step()
+
+            if not (is_train and dtype == torch.float16 and type(model) is conv_module[1]):
+                self.assertTrue(y2.dtype == dtype)
+                self.assertTrue(y3.dtype == dtype)
 
             self.assertEqual(y1, y2.float(), rtol=rtol, atol=atol)
             self.assertEqual(y1, y3.float(), rtol=rtol, atol=atol)
-            self.assertEqual(x1.grad, x2.grad, rtol=rtol, atol=atol)
-            self.assertEqual(x1.grad, x3.grad, rtol=rtol, atol=atol)
-            if bias:
+            if is_train:
+                self.assertEqual(x1.grad, x2.grad, rtol=rtol, atol=atol)
+                self.assertEqual(x1.grad, x3.grad, rtol=rtol, atol=atol)
+            if bias and is_train:
                 self.assertEqual(origin_model1.bias.grad, ipex_model1.bias.grad.float(), rtol=rtol, atol=atol)
                 self.assertEqual(origin_model1.bias.grad, ipex_model2.bias.grad.float(), rtol=rtol, atol=atol)
 
@@ -215,27 +252,36 @@ class TestPrepackCases(TestCase):
                 self.assertEqual(origin_model_state[var_name], ipex_model_state2[var_name], rtol=rtol, atol=atol)
             # compare momentum_buffer in optimizer's state(sgd)
             # TODO: other optimizer.
-            origin_optimizer_state = origin_optimizer1.state_dict()
-            ipex_optimizer_state1 = ipex_optimizer1.state_dict()
-            ipex_optimizer_state2 = ipex_optimizer2.state_dict()
+            if is_train:
+                origin_optimizer_state = origin_optimizer1.state_dict()
+                ipex_optimizer_state1 = ipex_optimizer1.state_dict()
+                ipex_optimizer_state2 = ipex_optimizer2.state_dict()
 
-            for var_name in origin_optimizer_state:
-                if var_name == 'state':
-                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state1[var_name], rtol=rtol, atol=atol)
-                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state2[var_name], rtol=rtol, atol=atol)
+                for var_name in origin_optimizer_state:
+                    if var_name == 'state':
+                        self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state1[var_name], rtol=rtol, atol=atol)
+                        self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state2[var_name], rtol=rtol, atol=atol)
 
-    def test_conv1d_training(self):
-        self._test_convolution_training_base(dim=1, dtype=torch.float)
+    def test_conv1d_training_inference(self):
+        self._test_convolution_base(dim=1, dtype=torch.float, is_train=True)
+        self._test_convolution_base(dim=1, dtype=torch.float, is_train=False)
         if core.onednn_has_bf16_support():
-            self._test_convolution_training_base(dim=1, dtype=torch.bfloat16, rtol=1e-2, atol=1e-03)
-        # TODO: add inference case.
+            self._test_convolution_base(dim=1, dtype=torch.bfloat16, is_train=True, rtol=1e-2, atol=1e-03)
+            self._test_convolution_base(dim=1, dtype=torch.bfloat16, is_train=False, rtol=1e-2, atol=1e-03)
+        if core.onednn_has_fp16_support():
+            self._test_convolution_base(dim=1, dtype=torch.float16, is_train=True, rtol=5e-4, atol=5e-04)
+            self._test_convolution_base(dim=1, dtype=torch.float16, is_train=False, rtol=5e-4, atol=5e-04)
 
-    def test_conv2d_training(self):
-        self._test_convolution_training_base(dim=2, dtype=torch.float)
+    def test_conv2d_training_inference(self):
+        self._test_convolution_base(dim=2, dtype=torch.float, is_train=True)
+        self._test_convolution_base(dim=2, dtype=torch.float, is_train=False)
         if core.onednn_has_bf16_support(): 
-            self._test_convolution_training_base(dim=2, dtype=torch.bfloat16, rtol=1e-2, atol=1e-03)
+            self._test_convolution_base(dim=2, dtype=torch.bfloat16, is_train=True, rtol=1e-2, atol=1e-03)
+            self._test_convolution_base(dim=2, dtype=torch.bfloat16, is_train=False, rtol=1e-2, atol=1e-03)
+        if core.onednn_has_fp16_support():
+            self._test_convolution_base(dim=2, dtype=torch.float16, is_train=True, rtol=5e-3, atol=5e-03)
+            self._test_convolution_base(dim=2, dtype=torch.float16, is_train=False, rtol=5e-3, atol=5e-03)
 
-        # TODO: add inference case.
 
     @unittest.skipIf(True, "temporary disable before https://github.com/pytorch/pytorch/pull/74023 merged")
     def test_conv3d_training(self):
@@ -612,60 +658,94 @@ class TestPrepackCases(TestCase):
             ref_result = m(x)
             self.assertEqual(res, ref_result)
 
-    @unittest.skipIf(not core.onednn_has_bf16_support(), "ipex linear bf16 is not supported on this CPU device")
-    def test_linear_training(self):
+    def _test_linear_base(self, dtype, is_train, rtol, atol):
         linear_module = torch.nn.Linear
         out_feature = [1024, 256, 1, torch.randint(3, 10, (1, )).item()]
         in_feature = [128, 479, torch.randint(3, 10, (1, )).item()]
         input_shapes = []
         for s in in_feature:
             input_shapes += [(128, s), (2, 64, s), (2, 2, 32, s)]
-        
-        options = itertools.product(out_feature, [True, False], input_shapes, [torch.bfloat16], [True, False])
+        options = itertools.product(out_feature, [True, False], input_shapes, [dtype], [True, False])
         for out_features, bias, x_shape, dtype, feed_sample_input in options:
             in_features = x_shape[-1]
             model = torch.nn.Linear(in_features, out_features, bias=bias).to(dtype=dtype).float().train()
             x = torch.randn(x_shape, dtype=torch.float32).to(dtype=dtype).float()
             x1 = x.clone().requires_grad_()
             x2 = x.clone().requires_grad_()
-            origin_model = copy.deepcopy(model).train()
-            origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
-            if feed_sample_input:
-                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
+            if is_train:
+                origin_model = copy.deepcopy(model).train()
+                origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
             else:
-                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
-            self.assertTrue(ipex_model.weight.dtype == dtype)
+                origin_model = copy.deepcopy(model).eval()
+            if feed_sample_input:
+                if dtype == torch.float16:
+                    if is_train:
+                        ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O0', weights_prepack=True, sample_input=x)
+                    else:
+                        ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O0', weights_prepack=True, sample_input=x)
+                else:
+                    if is_train:
+                        ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
+                    else:
+                        ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1', sample_input=x)
+            else:
+                if dtype == torch.float16:
+                    if is_train:
+                        ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O0', weights_prepack=True)
+                    else:
+                        ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O0', weights_prepack=True)
+                else:
+                    if is_train:
+                        ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
+                    else:
+                        ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
+            if is_train or dtype == torch.float16:
+                self.assertTrue(ipex_model.weight.dtype == dtype)
 
             for i in range(1):
                 # original fp32 path
                 y1 = origin_model(x1)
-                loss1 = y1.sum()
-                origin_optimizer.zero_grad()
-                loss1.backward()
-                origin_optimizer.step()
+                if is_train:
+                    loss1 = y1.sum()
+                    origin_optimizer.zero_grad()
+                    loss1.backward()
+                    origin_optimizer.step()
                 with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                     # ipex path
                     y2 = ipex_model(x2)
+                if is_train:
                     loss2 = y2.sum()
                     ipex_optimizer.zero_grad()
                     loss2.backward()
                     ipex_optimizer.step()
-            self.assertEqual(y1, y2.float(), rtol=1e-2, atol=1e-3)
-            self.assertEqual(x1.grad, x2.grad, rtol=1e-2, atol=1e-3)
-            if bias:
-                self.assertEqual(origin_model.bias.grad, ipex_model.bias.grad.float(), rtol=1e-2, atol=1e-3)
+
+            self.assertTrue(y2.dtype == dtype)
+            self.assertEqual(y1, y2.float(), rtol=rtol, atol=atol)
+            if is_train:
+                self.assertEqual(x1.grad, x2.grad, rtol=rtol, atol=atol)
+            if bias and is_train:
+                self.assertEqual(origin_model.bias.grad, ipex_model.bias.grad.float(), rtol=rtol, atol=atol)
             # compare origin_model parameters with origin_model parameters after grad updata
             origin_model_state = origin_model.state_dict()
             ipex_model_state = ipex_model.state_dict()
             for var_name in origin_model_state:
-                self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name], rtol=1e-2, atol=1e-3)
+                self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name], rtol=rtol, atol=atol)
             # compare momentum_buffer in optimizer's state(sgd)
             # TODO: other optimizer.
-            origin_optimizer_state = origin_optimizer.state_dict()
-            ipex_optimizer_state = ipex_optimizer.state_dict()
-            for var_name in origin_optimizer_state:
-                if var_name == 'state':
-                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state[var_name], rtol=1e-2, atol=1e-3)
+            if is_train:
+                origin_optimizer_state = origin_optimizer.state_dict()
+                ipex_optimizer_state = ipex_optimizer.state_dict()
+                for var_name in origin_optimizer_state:
+                    if var_name == 'state':
+                        self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state[var_name], rtol=rtol, atol=atol)
+
+    def test_linear_training_inference(self):
+        if core.onednn_has_bf16_support():
+            self._test_linear_base(dtype=torch.bfloat16, is_train=True, rtol=1e-2, atol=1e-03)
+            self._test_linear_base(dtype=torch.bfloat16, is_train=False, rtol=1e-2, atol=2e-03)
+        if core.onednn_has_fp16_support():
+            self._test_linear_base(dtype=torch.float16, is_train=True, rtol=5e-4, atol=5e-04)
+            self._test_linear_base(dtype=torch.float16, is_train=False, rtol=5e-4, atol=5e-04)
 
     def _deconv_params_list(self):
         # shapes that works:

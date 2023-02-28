@@ -109,21 +109,32 @@ def _save_to_state_dict(self, destination, prefix, keep_vars):
 
 def convert_module_data_type(module, dtype):
     # convert weights(bias) of module to dtype to reduce dtype reorder
-    module_convert_list = [torch.nn.Conv2d,
+    assert dtype in [torch.bfloat16, torch.float16], "module convert only support bf16 and fp16"
+    module_convert_list_bf16 = [torch.nn.Conv2d,
                            torch.nn.Conv3d,
                            torch.nn.ConvTranspose2d,
                            torch.nn.ConvTranspose3d,
                            torch.nn.Linear,
                            torch.nn.Embedding,
                            torch.nn.LSTM]
-    for module_cls in module_convert_list:
+
+    module_convert_list_fp16 = [torch.nn.Conv1d,
+                                torch.nn.Conv2d,
+                                torch.nn.Conv3d,
+                                torch.nn.Linear]
+
+    module_convert_lists = {
+        torch.bfloat16: module_convert_list_bf16,
+        torch.float16: module_convert_list_fp16}
+
+    for module_cls in module_convert_lists[dtype]:
         if isinstance(module, module_cls):
             setattr(module, '_save_to_state_dict', types.MethodType(_save_to_state_dict, module))
             if module_cls is torch.nn.LSTM:
                 for name, param in module.named_parameters():
                     ori_data = getattr(getattr(module, name), "data")
                     ori_data_dtype = ori_data.dtype
-                    if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16 or ori_data_dtype == torch.half:
+                    if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16:
                         casted_data = ori_data.detach().clone().to(dtype)
                         setattr(getattr(module, name), "data", casted_data)
                     else:

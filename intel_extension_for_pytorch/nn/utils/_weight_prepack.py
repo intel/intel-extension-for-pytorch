@@ -382,7 +382,8 @@ def weight_prepack_with_ipex_xpu(module):
 
 def weight_prepack_with_ipex(module, optimizer, params_attr, device_type='cpu'):
     def convert(m, optimizer, params_attr):
-        if _should_prepack(m, is_training=(optimizer!=None)) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16 or m.weight.dtype == torch.half):
+        if _should_prepack(m, is_training=(optimizer!=None)) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16 or \
+            (m.weight.dtype == torch.half and type(m) not in[torch.nn.ConvTranspose2d, torch.nn.ConvTranspose3d])):
             weight = m.master_weight if hasattr(m, "master_weight") else m.weight
             if weight not in params_attr:
                 params_attr[weight] = {}

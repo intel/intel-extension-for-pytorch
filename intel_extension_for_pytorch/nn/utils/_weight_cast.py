@@ -6,7 +6,7 @@ from ._model_convert import _LSTM
 from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBag as MergedEmbeddingBag
 
 # IPEX does not cast all module parameters for acc reason, such as BN
-IPEX_WEIGHT_CAST_MODULE = {
+IPEX_WEIGHT_CAST_MODULE_BF16 = {
     # align with auto cast white list
     torch.nn.Linear,
     torch.nn.Conv1d,
@@ -21,6 +21,17 @@ IPEX_WEIGHT_CAST_MODULE = {
     _LSTM,
     MergedEmbeddingBag,
 }
+
+IPEX_WEIGHT_CAST_MODULE_FP16 = {
+    torch.nn.Linear,
+    torch.nn.Conv1d,
+    torch.nn.Conv2d,
+    torch.nn.Conv3d,
+}
+
+IPEX_WEIGHT_CAST_MODULES = {
+    torch.bfloat16: IPEX_WEIGHT_CAST_MODULE_BF16,
+    torch.float16: IPEX_WEIGHT_CAST_MODULE_FP16}
 
 def _save_to_state_dict(self, destination, prefix, keep_vars):
     param_dict = {}
@@ -62,7 +73,7 @@ def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
                     getattr(self, name + '_trail').copy_(bot)
 
 def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight_split, convert_dtype=torch.bfloat16):
-    
+    assert convert_dtype in [torch.bfloat16, torch.float16], "weight convert only support bf16 and fp16"
     def cast_attr(m, attr, master_weight_split, params_attr, optimizer):
         # cast weight/bias for BF16 or FP16 dtype
         float_param = getattr(m, attr)
@@ -93,7 +104,7 @@ def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight
         _optimizer_utils.refresh_optimizer_params_after_cast(m, attr, float_param, master_weight_split, optimizer) 
 
     def convert(m):
-        if type(m) in IPEX_WEIGHT_CAST_MODULE:
+        if type(m) in IPEX_WEIGHT_CAST_MODULES[convert_dtype]:
             if not hasattr(m, 'master_weight_split'):
                 setattr(m, 'master_weight_split', master_weight_split)
                 # replace weight/bias
@@ -112,7 +123,7 @@ def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight
                         for name, para in sub_m.named_parameters():
                             cast_attr(sub_m, name, master_weight_split, params_attr, optimizer)
         return m
-      
+
     def convert_rec(m):
         new_m = convert(m)
         for name, sub_m in m.named_children():

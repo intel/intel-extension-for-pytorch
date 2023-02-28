@@ -4,7 +4,8 @@ import copy
 import torch
 import intel_extension_for_pytorch as ipex
 from intel_extension_for_pytorch.nn.utils._weight_cast import weight_dtype_convert_with_ipex as cast
-from intel_extension_for_pytorch.nn.utils._weight_cast import IPEX_WEIGHT_CAST_MODULE as IPEX_WEIGHT_CAST_MODULE
+from intel_extension_for_pytorch.nn.utils._weight_cast import IPEX_WEIGHT_CAST_MODULE_BF16 as IPEX_WEIGHT_CAST_MODULE_BF16
+from intel_extension_for_pytorch.nn.utils._weight_cast import IPEX_WEIGHT_CAST_MODULES as IPEX_WEIGHT_CAST_MODULES
 from intel_extension_for_pytorch.optim._optimizer_utils import IPEX_FUSED_OPTIMIZER_LIST_CPU as IPEX_FUSED_OPTIMIZER_LIST
 from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBag
 
@@ -33,14 +34,14 @@ class TestModule(torch.nn.Module):
         return
 
 class TestWeightCastCases(TestCase):
-    def is_master_weight_solution(self, module, split_master_weight):
-        return type(module) in IPEX_WEIGHT_CAST_MODULE and not split_master_weight
+    def is_master_weight_solution(self, module, dtype, split_master_weight):
+        return type(module) in IPEX_WEIGHT_CAST_MODULES[dtype] and not split_master_weight
 
     def is_master_weight_split_solution(self, module, split_master_weight):
-        return type(module) in IPEX_WEIGHT_CAST_MODULE and split_master_weight
+        return type(module) in IPEX_WEIGHT_CAST_MODULE_BF16 and split_master_weight
 
-    def is_fp32_weight_solution(self, module):
-        return type(module) not in IPEX_WEIGHT_CAST_MODULE
+    def is_fp32_weight_solution(self, module, dtype):
+        return type(module) not in IPEX_WEIGHT_CAST_MODULES[dtype]
    
     def master_weight_test(self, m, param_id, cast_dtype, optimizer_params_list):
         for name, param in m.named_parameters():
@@ -75,7 +76,7 @@ class TestWeightCastCases(TestCase):
                     optimizer_params_list = opt.param_groups[0]['params']
                     param_id = 0
                     for _, sub_m in model.named_children():
-                        if self.is_master_weight_solution(sub_m, split_master_weight_for_bf16):
+                        if self.is_master_weight_solution(sub_m, cast_dtype, split_master_weight_for_bf16):
                             param_id = self.master_weight_test(sub_m, param_id, cast_dtype, optimizer_params_list)
                             for name, ssub_m in sub_m.named_children():
                                 if isinstance(ssub_m, torch.nn.ParameterList):
@@ -86,7 +87,7 @@ class TestWeightCastCases(TestCase):
                                 if isinstance(ssub_m, torch.nn.ParameterList):
                                     param_id = self.master_weight_split_test(ssub_m, param_id, cast_dtype, optimizer_params_list)
                         else:
-                            self.assertTrue(self.is_fp32_weight_solution(sub_m))
+                            self.assertTrue(self.is_fp32_weight_solution(sub_m, cast_dtype))
                             for i, p in enumerate(sub_m.parameters()):
                                 self.assertTrue(p is optimizer_params_list[param_id])
                                 param_id += 1
