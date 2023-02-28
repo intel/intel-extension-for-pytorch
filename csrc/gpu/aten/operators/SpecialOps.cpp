@@ -317,85 +317,65 @@ Tensor& special_spherical_bessel_j0_out(const Tensor& self, at::Tensor& out) {
 }
 
 Tensor& special_hermite_polynomial_he_out(
-    const Tensor& x,
-    const Tensor& n,
+    const Tensor& self,
+    const Tensor& other,
     Tensor& out) {
-  auto iter = TensorIteratorConfig()
-                  .add_output(out)
-                  .add_input(x)
-                  .add_input(n)
-                  .resize_outputs(false)
-                  .build();
+  auto iter = TensorIterator::binary_float_op(out, self, other);
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       iter.common_dtype(),
       "hermite_polynomial_he",
       [&]() {
-        dpcpp_kernel_with_scalars(iter, [](scalar_t p, scalar_t q) -> scalar_t {
-          return hermite_polynomial_he_forward<scalar_t>(p, q);
+        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t n) -> scalar_t {
+          return hermite_polynomial_he_forward<scalar_t>(x, n);
         });
       });
   return out;
 }
 
 Tensor& special_hermite_polynomial_h_out(
-    const Tensor& x,
-    const Tensor& n,
+    const Tensor& self,
+    const Tensor& other,
     Tensor& out) {
-  auto iter = TensorIteratorConfig()
-                  .add_output(out)
-                  .add_input(x)
-                  .add_input(n)
-                  .resize_outputs(false)
-                  .build();
+  auto iter = TensorIterator::binary_float_op(out, self, other);
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.common_dtype(), "", [&]() {
-        dpcpp_kernel_with_scalars(iter, [](scalar_t p, scalar_t q) -> scalar_t {
-          return hermite_polynomial_h_forward<scalar_t>(p, q);
+        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t n) -> scalar_t {
+          return hermite_polynomial_h_forward<scalar_t>(x, n);
         });
       });
   return out;
 }
 
 Tensor& special_laguerre_polynomial_l_out(
-    const Tensor& x,
-    const Tensor& n,
+    const Tensor& self,
+    const Tensor& other,
     Tensor& out) {
-  auto iter = TensorIteratorConfig()
-                  .add_output(out)
-                  .add_input(x)
-                  .add_input(n)
-                  .resize_outputs(false)
-                  .build();
+  auto iter = TensorIterator::binary_float_op(out, self, other);
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       iter.common_dtype(),
       "laguerre_polynomial_l",
       [&]() {
-        dpcpp_kernel_with_scalars(iter, [](scalar_t p, scalar_t q) -> scalar_t {
-          return laguerre_polynomial_l_forward<scalar_t>(p, q);
+        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t n) -> scalar_t {
+          return laguerre_polynomial_l_forward<scalar_t>(x, n);
         });
       });
   return out;
 }
 
 Tensor& special_legendre_polynomial_p_out(
-    const Tensor& x,
-    const Tensor& n,
+    const Tensor& self,
+    const Tensor& other,
     Tensor& out) {
-  auto iter = TensorIteratorConfig()
-                  .add_output(out)
-                  .add_input(x)
-                  .add_input(n)
-                  .resize_outputs(false)
-                  .build();
+  auto iter = TensorIterator::binary_float_op(out, self, other);
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       iter.common_dtype(),
       "legendre_polynomial_p",
       [&]() {
-        dpcpp_kernel_with_scalars(iter, [](scalar_t p, scalar_t q) -> scalar_t {
-          return legendre_polynomial_p_forward<scalar_t>(p, q);
+        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t n) -> scalar_t {
+          return legendre_polynomial_p_forward<scalar_t>(x, n);
         });
       });
   return out;
@@ -453,6 +433,48 @@ Tensor& special_modified_bessel_k1_out(const Tensor& self, at::Tensor& out) {
         dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
           return modified_bessel_k1_forward(a);
         });
+      });
+  return out;
+}
+
+Tensor& special_scaled_modified_bessel_k0_out(
+    const Tensor& self,
+    at::Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "scaled_modified_bessel_k0",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+          return scaled_modified_bessel_k0_forward(a);
+        });
+      });
+  return out;
+}
+
+Tensor& special_scaled_modified_bessel_k1_out(
+    const Tensor& self,
+    at::Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "scaled_modified_bessel_k1",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+          return scaled_modified_bessel_k1_forward(a);
+        });
+      });
+  return out;
+}
+
+Tensor& special_log_ndtr_out(const Tensor& self, at::Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.common_dtype(), "log_ndtr", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t a) -> scalar_t { return calc_log_ndtr(a); });
       });
   return out;
 }

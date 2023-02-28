@@ -146,6 +146,38 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
 
+    def test_scaled_modified_bessel_k0(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        result_cpu = torch.special.scaled_modified_bessel_k0(input0)
+        result_xpu = torch.special.scaled_modified_bessel_k0(input0_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
+    def test_scaled_modified_bessel_k1(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        result_cpu = torch.special.scaled_modified_bessel_k1(input0)
+        result_xpu = torch.special.scaled_modified_bessel_k1(input0_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
+    def test_scaled_modified_bessel_k1(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        result_cpu = torch.special.scaled_modified_bessel_k1(input0)
+        result_xpu = torch.special.scaled_modified_bessel_k1(input0_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+    
+    def test_log_ndtr(self, dtype=torch.float):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.clone().to("xpu")
+        result_cpu = torch.special.log_ndtr(input0)
+        result_xpu = torch.special.log_ndtr(input0_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
     def test_hermite_polynomial_he(self, dtype=torch.float):
         input0 = torch.randn(8192, 8192, device="cpu")
         input1 = torch.randn(8192, 8192, device="cpu")
