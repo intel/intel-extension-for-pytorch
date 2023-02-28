@@ -666,6 +666,7 @@ supported:
   - linalg_eigh.eigvals
   - linalg_eigvalsh
   - linalg_eigvalsh.out
+  - _linalg_eigh.eigenvalues
   - linalg_householder_product
   - linalg_householder_product.out
   - linalg_vector_norm

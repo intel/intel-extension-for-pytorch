@@ -3216,6 +3216,39 @@ Tensor& linalg_eigvalsh_out(
   return result;
 }
 
+std::tuple<Tensor&, Tensor&> _linalg_eigh_out(
+    const Tensor& A,
+    c10::string_view uplo,
+    bool compute_v,
+    Tensor& L,
+    Tensor& V) {
+  if (A.numel() == 0) {
+    return;
+  }
+
+  auto uplo_uppercase =
+      static_cast<char>(std::toupper(static_cast<unsigned char>(uplo[0])));
+  bool upper = (uplo_uppercase == 'U');
+
+  Tensor V_ = V;
+  if (compute_v) {
+    V_.copy_(A);
+  } else {
+    // We need a tensor to hold A
+    V_ = at::native::cloneBatchedColumnMajor(A);
+  }
+
+  auto info =
+      at::zeros(A.sizes().slice(0, A.dim() - 2), A.options().dtype(kInt));
+
+  Tensor& L_value = const_cast<Tensor&>(L);
+  at::AtenIpexTypeXPU::linalg_eigh_impl(L_value, V_, info, upper, compute_v);
+
+  at::_linalg_check_errors(info, "linalg.eigh", /*is_matrix*/ A.dim() == 2);
+
+  return std::tuple<Tensor&, Tensor&>(L_value, V_);
+}
+
 // As P is a permutation matrix
 // det(P) = 1 if it's an even permutation and det(P) = -1 if it's an odd
 // permutation

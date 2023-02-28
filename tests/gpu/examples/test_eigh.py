@@ -269,3 +269,19 @@ class TestTorchMethod(TestCase):
             out = torch.empty(0, device=wrong_device, dtype=dtype)
             with self.assertRaisesRegex(RuntimeError, "tensors to be on the same device"):
                 torch.linalg.eigvalsh(t, out=out)
+    
+    @dtypes(torch.float32, torch.float64)
+    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
+    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    def test_linalg_eigh_out(self, device=dpcpp_device, dtype=torch.float64):
+        matrix_cpu = random_hermitian_matrix(3, 1, dtype=dtype, device=cpu_device)
+        values_cpu = torch.zeros(matrix_cpu.size())
+        vector_cpu = torch.zeros(matrix_cpu.size())
+        matrix_xpu = matrix_cpu.clone().detach().to(dpcpp_device)
+        values_xpu = values_cpu.clone().detach().to(dpcpp_device)
+        vector_xpu = vector_cpu.clone().detach().to(dpcpp_device)
+        
+        L_cpu, V_cpu = torch._linalg_eigh(matrix_cpu, "L", True)
+        L_xpu, V_xpu = torch._linalg_eigh(matrix_xpu, "L", True)
+        self.assertEqual(L_cpu, L_xpu.to(cpu_device))
+        self.assertEqual(V_cpu, V_xpu.to(cpu_device))
