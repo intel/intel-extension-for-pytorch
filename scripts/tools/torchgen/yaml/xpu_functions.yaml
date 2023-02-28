@@ -569,6 +569,10 @@ supported:
   - special_bessel_j1.out
   - special_bessel_y0.out
   - special_bessel_y1.out
+  - special_chebyshev_polynomial_t.out
+  - special_chebyshev_polynomial_u.out
+  - special_chebyshev_polynomial_v.out
+  - special_chebyshev_polynomial_w.out
   - special_modified_bessel_i0.out
   - special_modified_bessel_i1.out
   - special_modified_bessel_k0.out

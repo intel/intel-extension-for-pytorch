@@ -113,7 +113,7 @@ class TestTorchMethod(TestCase):
         result_xpu = torch._C._special.special_spherical_bessel_j0(input0_xpu)
 
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
-        
+
     def test_modified_bessel_i0(self, dtype=torch.float):
         input0 = torch.randn(8192, 8192, device="cpu")
         input0_xpu = input0.clone().to("xpu")
@@ -155,7 +155,7 @@ class TestTorchMethod(TestCase):
         result_xpu = torch.special.hermite_polynomial_he(input0_xpu, input1_xpu)
 
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
-    
+
     def test_hermite_polynomial_h(self, dtype=torch.float):
         input0 = torch.randn(8192, 8192, device="cpu")
         input1 = torch.randn(8192, 8192, device="cpu")
@@ -165,7 +165,7 @@ class TestTorchMethod(TestCase):
         result_xpu = torch.special.hermite_polynomial_h(input0_xpu, input1_xpu)
 
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
-    
+
     def test_laguerre_polynomial_l(self, dtype=torch.float):
         input0 = torch.randn(8192, 8192, device="cpu")
         input1 = torch.randn(8192, 8192, device="cpu")
@@ -175,7 +175,7 @@ class TestTorchMethod(TestCase):
         result_xpu = torch.special.laguerre_polynomial_l(input0_xpu, input1_xpu)
 
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
-    
+
     def test_legendre_polynomial_p(self, dtype=torch.float):
         input0 = torch.randn(8192, 8192, device="cpu")
         input1 = torch.randn(8192, 8192, device="cpu")
@@ -183,6 +183,46 @@ class TestTorchMethod(TestCase):
         input1_xpu = input1.clone().to("xpu")
         result_cpu = torch.special.legendre_polynomial_p(input0, input1)
         result_xpu = torch.special.legendre_polynomial_p(input0_xpu, input1_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
+    def test_chebyshev_polynomial_t(self):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input1 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.to("xpu")
+        input1_xpu = input1.to("xpu")
+        result_cpu = torch.special.chebyshev_polynomial_t(input0, input1)
+        result_xpu = torch.special.chebyshev_polynomial_t(input0_xpu, input1_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
+    def test_chebyshev_polynomial_u(self):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input1 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.to("xpu")
+        input1_xpu = input1.to("xpu")
+        result_cpu = torch.special.chebyshev_polynomial_u(input0, input1)
+        result_xpu = torch.special.chebyshev_polynomial_u(input0_xpu, input1_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
+    def test_chebyshev_polynomial_v(self):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input1 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.to("xpu")
+        input1_xpu = input1.to("xpu")
+        result_cpu = torch.special.chebyshev_polynomial_v(input0, input1)
+        result_xpu = torch.special.chebyshev_polynomial_v(input0_xpu, input1_xpu)
+
+        self.assertEqual(result_xpu.to("cpu"), result_cpu)
+
+    def test_chebyshev_polynomial_w(self):
+        input0 = torch.randn(8192, 8192, device="cpu")
+        input1 = torch.randn(8192, 8192, device="cpu")
+        input0_xpu = input0.to("xpu")
+        input1_xpu = input1.to("xpu")
+        result_cpu = torch.special.chebyshev_polynomial_w(input0, input1)
+        result_xpu = torch.special.chebyshev_polynomial_w(input0_xpu, input1_xpu)
 
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
 

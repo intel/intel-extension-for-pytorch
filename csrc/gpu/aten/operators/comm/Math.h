@@ -767,7 +767,7 @@ laguerre_polynomial_l_forward(scalar_t x, scalar_t _n) {
     return scalar_t(0.0);
   }
 
-  if (std::abs(x) == scalar_t(0.0)) {
+  if (Numerics<scalar_t>::abs(x) == scalar_t(0.0)) {
     return scalar_t(1.0);
   }
 
@@ -1914,7 +1914,7 @@ static inline DPCPP_BOTH scalar_t calc_i0(scalar_t _x) {
       "don't instantiate with low precision type");
   // Upcast input for numerical accuracy purposes
   // Needed for accurate results if input is bfloat16 or float16
-  scalar_t x = std::abs(_x);
+  scalar_t x = Numerics<scalar_t>::abs(_x);
 
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i0e_A<scalar_t>();
@@ -1946,7 +1946,7 @@ static inline DPCPP_BOTH scalar_t calc_i0(scalar_t _x) {
  */
 template <typename scalar_t>
 static inline DPCPP_BOTH scalar_t calc_i0e(scalar_t _x) {
-  scalar_t x = std::abs(_x);
+  scalar_t x = Numerics<scalar_t>::abs(_x);
 
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i0e_A<scalar_t>();
@@ -2088,7 +2088,7 @@ DPCPP_BOTH inline typename std::
 
 template <typename scalar_t>
 static inline DPCPP_BOTH scalar_t calc_i1(scalar_t _x) {
-  const auto x = std::abs(_x);
+  const auto x = Numerics<scalar_t>::abs(_x);
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i1e_A<scalar_t>();
     auto A = std::get<0>(coeff_pair);
@@ -2109,7 +2109,7 @@ static inline DPCPP_BOTH scalar_t calc_i1(scalar_t _x) {
 
 template <typename scalar_t>
 static inline DPCPP_BOTH scalar_t calc_i1e(scalar_t _x) {
-  const auto x = std::abs(_x);
+  const auto x = Numerics<scalar_t>::abs(_x);
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i1e_A<scalar_t>();
     auto A = std::get<0>(coeff_pair);
@@ -3729,6 +3729,222 @@ static inline DPCPP_BOTH scalar_t calc_erfcx(scalar_t x) {
     }
   }
 }
+
+template <typename scalar_t>
+scalar_t chebyshev_polynomial_t_forward(scalar_t x, int64_t n) {
+  if (n < 0) {
+    return scalar_t(0.0);
+  }
+
+  if (Numerics<scalar_t>::abs(x) == scalar_t(1.0)) {
+    if (x > scalar_t(0.0) || n % 2 == 0) {
+      return scalar_t(1.0);
+    }
+
+    return scalar_t(-1.0);
+  }
+
+  if ((n > 6) && (Numerics<scalar_t>::abs(x) < scalar_t(1.0))) {
+    return Numerics<scalar_t>::cos(n * Numerics<scalar_t>::acos(x));
+  }
+
+  if (n == 0) {
+    return scalar_t(1.0);
+  }
+
+  if (n == 1) {
+    return x;
+  }
+
+  scalar_t p = scalar_t(1.0);
+  scalar_t q = x;
+  scalar_t r;
+
+  for (int64_t k = 2; k <= n; k++) {
+    r = (x + x) * q - p;
+    p = q;
+    q = r;
+  }
+
+  return r;
+} // chebyshev_polynomial_t_forward(scalar_t  x, int64_t n)
+
+template <typename scalar_t>
+scalar_t chebyshev_polynomial_t_forward(scalar_t x, scalar_t n) {
+  return chebyshev_polynomial_t_forward(x, static_cast<int64_t>(n));
+} // chebyshev_polynomial_t_forward(scalar_t  x, scalar_t  n)
+
+template <typename scalar_t>
+scalar_t chebyshev_polynomial_u_forward(scalar_t x, int64_t n) {
+  if (n < 0) {
+    return scalar_t(0.0);
+  }
+
+  if (Numerics<scalar_t>::abs(x) == scalar_t(1.0)) {
+    if (x > scalar_t(0.0) || n % 2 == 0) {
+      return n + 1;
+    }
+
+    return -(n + 1);
+  }
+
+  if ((n > 8) && (Numerics<scalar_t>::abs(x) < scalar_t(1.0))) {
+    if (Numerics<scalar_t>::sin(Numerics<scalar_t>::acos(x)) != scalar_t(0.0)) {
+      return Numerics<scalar_t>::sin((n + 1) * Numerics<scalar_t>::acos(x)) /
+          Numerics<scalar_t>::sin(Numerics<scalar_t>::acos(x));
+    }
+
+    return (n + 1) *
+        Numerics<scalar_t>::cos((n + 1) * Numerics<scalar_t>::acos(x)) / x;
+  }
+
+  if (n == 0) {
+    return scalar_t(1.0);
+  }
+
+  if (n == 1) {
+    return x + x;
+  }
+
+  scalar_t p = scalar_t(1.0);
+  scalar_t q = x + x;
+  scalar_t r;
+
+  for (int64_t k = 2; k <= n; k++) {
+    r = (x + x) * q - p;
+    p = q;
+    q = r;
+  }
+
+  return r;
+} // chebyshev_polynomial_u_forward(scalar_t x, int64_t n)
+
+template <typename scalar_t>
+scalar_t chebyshev_polynomial_u_forward(scalar_t x, scalar_t n) {
+  return chebyshev_polynomial_u_forward(x, static_cast<int64_t>(n));
+} // chebyshev_polynomial_u_forward(scalar_t x, scalar_t n)
+
+template <typename scalar_t>
+scalar_t chebyshev_polynomial_v_forward(scalar_t x, int64_t n) {
+  if (n < 0) {
+    return scalar_t(0.0);
+  }
+
+  if (Numerics<scalar_t>::abs(x) == scalar_t(1.0)) {
+    if (x > scalar_t(0.0)) {
+      return scalar_t(1.0);
+    }
+
+    if (n % 2 == 0) {
+      return n + n + 1;
+    }
+
+    return -(n + n + 1);
+  }
+
+  if ((n > 8) && (Numerics<scalar_t>::abs(x) < scalar_t(1.0))) {
+    if (Numerics<scalar_t>::sin(Numerics<scalar_t>::acos(x) / scalar_t(2.0)) !=
+        scalar_t(1.0)) {
+      return Numerics<scalar_t>::cos(
+                 (n + scalar_t(0.5)) * Numerics<scalar_t>::acos(x)) /
+          Numerics<scalar_t>::cos(Numerics<scalar_t>::acos(x) / scalar_t(2.0));
+    }
+
+    if (n % 2 == 0) {
+      return n + n + 1;
+    }
+
+    return -(n + n + 1);
+  }
+
+  if (n == 0) {
+    return scalar_t(1.0);
+  }
+
+  if (n == 1) {
+    return x + x - scalar_t(1.0);
+  }
+
+  scalar_t p = scalar_t(1.0);
+  scalar_t q = x + x - scalar_t(1.0);
+  scalar_t r;
+
+  for (int64_t k = 2; k <= n; k++) {
+    r = (x + x) * q - p;
+    p = q;
+    q = r;
+  }
+
+  return r;
+} // chebyshev_polynomial_v_forward(scalar_t x, int64_t n)
+
+template <typename scalar_t>
+scalar_t chebyshev_polynomial_v_forward(scalar_t x, scalar_t n) {
+  return chebyshev_polynomial_v_forward(x, static_cast<int64_t>(n));
+} // chebyshev_polynomial_v_forward(scalar_t x, scalar_t n)
+
+template <typename scalar_t>
+scalar_t chebyshev_polynomial_w_forward(scalar_t x, int64_t n) {
+  if (n < 0) {
+    return scalar_t(0.0);
+  }
+
+  if (Numerics<scalar_t>::abs(x) == scalar_t(1.0)) {
+    if (x > scalar_t(0.0)) {
+      return n + n + 1;
+    }
+
+    if (n % 2 == 0) {
+      return scalar_t(1.0);
+    }
+
+    return scalar_t(-1.0);
+  }
+
+  if ((n > 8) && (Numerics<scalar_t>::abs(x) < scalar_t(1.0))) {
+    if (Numerics<scalar_t>::cos(Numerics<scalar_t>::acos(x) / scalar_t(2.0)) !=
+        scalar_t(1.0)) {
+      return Numerics<scalar_t>::sin(
+                 (n + scalar_t(0.5)) * Numerics<scalar_t>::acos(x)) /
+          Numerics<scalar_t>::sin(Numerics<scalar_t>::acos(x) / scalar_t(2.0));
+    }
+
+    if (x > scalar_t(0.0)) {
+      return n + n + 1;
+    }
+
+    if (n % 2 == 0) {
+      return scalar_t(1.0);
+    }
+
+    return scalar_t(-1.0);
+  }
+
+  if (n == 0) {
+    return scalar_t(1.0);
+  }
+
+  if (n == 1) {
+    return x + x + scalar_t(1.0);
+  }
+
+  scalar_t p = scalar_t(1.0);
+  scalar_t q = x + x + scalar_t(1.0);
+  scalar_t r;
+
+  for (int64_t k = 2; k <= n; k++) {
+    r = (x + x) * q - p;
+    p = q;
+    q = r;
+  }
+
+  return r;
+} // chebyshev_polynomial_w_forward(scalar_t x, int64_t n)
+
+template <typename scalar_t>
+scalar_t chebyshev_polynomial_w_forward(scalar_t x, scalar_t n) {
+  return chebyshev_polynomial_w_forward(x, static_cast<int64_t>(n));
+} // chebyshev_polynomial_w_forward(scalar_t x, scalar_t n)
 
 template <typename T>
 static inline DPCPP_BOTH T
