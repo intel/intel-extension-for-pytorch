@@ -1,8 +1,31 @@
-set(IPEX_CSRC_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+set(IPEX_CSRC_INCLUDE_DIR "${IPEX_CSRC_ROOT_DIR}/include")
 
 if(BUILD_MODULE_TYPE STREQUAL "GPU")
   add_subdirectory(${IPEX_CSRC_ROOT_DIR}/gpu)
   print_xpu_config_summary()
+
+  # Generate the IPEX All-In-One header
+  # XXX Only for GPU so far.
+  # Should be refined if CPU is needed as well
+  set(ipex_header
+"
+/*
+ * Do not modify this file manually!
+ * This is a automatically generated header file!
+ */
+
+#pragma once
+
+// IPEX headers for XPU
+")
+  FILE(GLOB IPEX_GPU_HEADERS ${IPEX_CSRC_INCLUDE_DIR}/xpu/*.h)
+  foreach(uheader ${IPEX_GPU_HEADERS})
+    get_filename_component(header ${uheader} NAME)
+    set(ipex_header "${ipex_header}#include <xpu/${header}>\n")
+  endforeach()
+  file(WRITE ${CMAKE_BINARY_DIR}/csrc/ipex.h ${ipex_header})
+  install(FILES ${CMAKE_BINARY_DIR}/csrc/ipex.h DESTINATION include)
+  install(DIRECTORY ${IPEX_CSRC_INCLUDE_DIR}/xpu DESTINATION include)
 endif()
 
 if(BUILD_MODULE_TYPE STREQUAL "CPU")
