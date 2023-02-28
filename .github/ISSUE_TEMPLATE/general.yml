@@ -1,0 +1,14 @@
+name: General Issues
+description: Create a general issue for your request
+
+body:
+- type: textarea
+  attributes:
+    label: Describe the issue
+    description:
+  validations:
+    required: true
+- type: markdown
+  attributes:
+    value: >
+      Thanks for contributing 🎉!
