@@ -118,6 +118,7 @@ supported:
   - arange.start_out
   - argmax.out
   - argmin.out
+  - argsort.stable
   - as_strided
   - asin.out
   - asinh.out

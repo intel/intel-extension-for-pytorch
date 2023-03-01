@@ -65,3 +65,33 @@ class TestNNMethod(TestCase):
         res, index = torch.sort(y, dim=1, stable=True)
         self.assertEqual(res_cpu, res.cpu())
         self.assertEqual(index_cpu, index.cpu())
+
+    def test_argsort(self):
+        x = torch.Tensor(
+            [[ 0.0785,  1.5267, -0.8521,  0.4065],
+            [ 0.1598,  0.0788, -0.0745, -1.2700],
+            [ 1.2208,  1.0722, -0.7064,  1.2564],
+            [ 0.0669, -0.2318, -0.8229, -0.9280]]
+        )
+        result = torch.Tensor(
+            [[2, 0, 3, 1],
+            [3, 2, 1, 0],
+            [2, 1, 0, 3],
+            [3, 2, 1, 0]]
+        )
+        self.assertEqual(torch.argsort(x, dim=1).int(), result.int())
+
+        x1 = torch.Tensor(
+            [[2, 0, 1],
+           [0, 1, 2]]
+        )
+        result1 = torch.Tensor(
+            [[1, 0, 0],
+            [0, 1, 1]]
+        )
+        result1_des = torch.Tensor(
+            [[0, 1, 1],
+            [1, 0, 0]]
+        )
+        self.assertEqual(torch.argsort(x1,dim=0).int(), result1.int())
+        self.assertEqual(torch.argsort(x1,dim=0,descending=False).int(), result1.int())
