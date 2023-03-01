@@ -551,20 +551,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           int64_t,
           int64_t),
       fp32)
-  KERNEL_XPU(ADD_NS(acos), "acos", Tensor(const Tensor&), fp32)
-  KERNEL_XPU(ADD_NS(asin), "asin", Tensor(const Tensor&), fp32)
-  KERNEL_XPU(ADD_NS(cosh), "cosh", Tensor(const Tensor&), fp32)
-  KERNEL_XPU(ADD_NS(erfinv), "erfinv", Tensor(const Tensor&), fp32)
-  KERNEL_XPU(ADD_NS(exp), "exp", Tensor(const Tensor&), fp32)
-  KERNEL_XPU(ADD_NS(expm1), "expm1", Tensor(const Tensor&), fp32)
-  KERNEL_XPU(ADD_NS(log), "log", Tensor(const Tensor&), fp32)
-  KERNEL_XPU(ADD_NS(log10), "log10", Tensor(const Tensor&), fp32)
-  KERNEL_XPU(ADD_NS(log2), "log2", Tensor(const Tensor&), fp32)
-  KERNEL_XPU(ADD_NS(log1p), "log1p", Tensor(const Tensor&), fp32)
   KERNEL_XPU(ADD_NS(reciprocal), "reciprocal", Tensor(const Tensor&), fp32)
-  KERNEL_XPU(ADD_NS(rsqrt), "rsqrt", Tensor(const Tensor&), fp32)
-  KERNEL_XPU(ADD_NS(sinh), "sinh", Tensor(const Tensor&), fp32)
-  KERNEL_XPU(ADD_NS(tan), "tan", Tensor(const Tensor&), fp32)
   KERNEL_XPU(
       ADD_NS(pow),
       "pow.Tensor_Scalar",
@@ -577,22 +564,6 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
       fp32)
   KERNEL_XPU(
       ADD_NS(pow), "pow.Scalar", Tensor(const Scalar&, const Tensor&), fp32)
-  KERNEL_XPU(
-      ADD_NS(softplus),
-      "softplus",
-      Tensor(const Tensor&, const Scalar&, const Scalar&),
-      fp32)
-  KERNEL_XPU(
-      ADD_NS(group_norm),
-      "group_norm",
-      Tensor(
-          const Tensor&,
-          int64_t,
-          const c10::optional<Tensor>&,
-          const c10::optional<Tensor>&,
-          double,
-          bool),
-      fp32)
   KERNEL_XPU(
       ADD_NS(frobenius_norm), "frobenius_norm", Tensor(const Tensor&), fp32)
   KERNEL_XPU(
