@@ -146,7 +146,7 @@ class MergedEmbeddingBag(nn.Module):
 
         >>> EmbLists = torch.nn.Modulist(emb1, emb2, emb3, ..., emb_m)
         >>> merged_emb = MergedEmbeddingBagWithSGD.from_embeddingbag_list(EmbLists)
-        >>> outputs = MergedEmbeddingBagWithSGD(input)
+        >>> outputs = MergedEmbeddingBagWithSGD(inputs)
 
     Computation benefits from the optimized path:
 
@@ -159,7 +159,7 @@ class MergedEmbeddingBag(nn.Module):
 
     A `linearize_indices_and_offsets` step is introduced to merge indices/offsets together. Consider that `EmbeddingBag`
     objects are usually the first layer of a model, the `linearize_indices_and_offsets` step can be considered as "data
-    prepocess" and can be done offline. See usage of the `linearize_indices_and_offsets` in `MergedEmbeddingBagWithSGD`.
+    preprocess" and can be done offline. See usage of the `linearize_indices_and_offsets` in `MergedEmbeddingBagWithSGD`.
 
     Now `MergedEmbeddingBagWithSGD` is the only option running with an optimizer. We plan to add more optimizer support
     in the future. Visit `MergedEmbeddingBagWithSGD` for introduction of `MergedEmbeddingBagWith[Optimizer]`.
@@ -351,7 +351,7 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
 
         3). Weights update is fused with backward together. We can immediately update the weight right after we get
         gradients from the backward step and thus the memory access pattern becomes more friendly. Data access will
-        happens on cache more than on memory.
+        happen on cache more than on memory.
     """
     embedding_specs: List[EmbeddingSpec]
 
