@@ -85,7 +85,7 @@ inline void _dil_div_add_reduce_max_fusion_kernel(
     const int& size,
     float* out,
     float& max) {
-  auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::min());
+  auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::lowest());
   auto vec_a = vec_ps_min;
   auto vec_b = vec_ps_min;
   auto vec_out = vec_ps_min;
@@ -219,7 +219,7 @@ inline void _dil_add_reduce_max_fusion_kernel(
     const int& size,
     float* out,
     float& max) {
-  auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::min());
+  auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::lowest());
   auto vec_a = vec_ps_min;
   auto vec_b = vec_ps_min;
   auto vec_out = vec_ps_min;
@@ -252,7 +252,7 @@ inline void _dil_mul_reduce_max_fusion_kernel(
     const int& size,
     float* out,
     float& max) {
-  auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::min());
+  auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::lowest());
   auto vec_a = vec_ps_min;
   auto vec_out = vec_ps_min;
 
@@ -278,7 +278,7 @@ inline void _dil_mul_reduce_max_fusion_kernel(
 }
 
 inline void _init_mha_buffer_kernel(float* max, float* sum, const int& size) {
-  auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::min());
+  auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::lowest());
   auto vec_zeros = _mm512_setzero_ps();
 
   int i = 0;
