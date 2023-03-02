@@ -165,7 +165,6 @@ void interaction_kernel(
           } // col-loop
 
           // Write the tail 351 results to output
-          item.barrier(dpcpp_local_fence);
           if (local_row < working_set) {
 #pragma unroll
             for (int i = 0; i < TILE_OUTPUT_COL; ++i) {
