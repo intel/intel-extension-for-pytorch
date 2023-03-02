@@ -109,7 +109,7 @@ Note: For weight observer, it only supports dtype **torch.qint8**, and the qsche
 **Suggestion**:
 
 1. For weight observer, setting **qscheme** to **torch.per_channel_symmetric** can get a better accuracy.
-2. If your CPU device doesn't support VNNI, seeting the observer's **reduce_range** to **True** can get a better accuracy, such as skylake.
+2. If your CPU device doesn't support VNNI, setting the observer's **reduce_range** to **True** can get a better accuracy, such as skylake.
 
 ### Prepare Model
 
