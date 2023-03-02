@@ -77,6 +77,25 @@ double getScale(Node* input_node) {
   return scale;
 }
 
+bool isZeroPointSupported(Value* zps) {
+  auto zps_value = toIValue(zps);
+  return (
+      zps_value.has_value() &&
+      (zps_value->isInt() ||
+       (zps_value->isTensor() &&
+        (zps_value.value().toTensor().scalar_type() == at::ScalarType::Long))));
+}
+
+bool isScaleSupported(Value* scale) {
+  auto scale_value = toIValue(scale);
+  return (
+      scale_value.has_value() &&
+      (scale_value->isDouble() ||
+       (scale_value->isTensor() &&
+        (scale_value.value().toTensor().scalar_type() ==
+         at::ScalarType::Float))));
+}
+
 } // namespace utils
 } // namespace onednn
 } // namespace fuser

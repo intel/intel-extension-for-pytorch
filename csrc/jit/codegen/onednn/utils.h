@@ -20,6 +20,10 @@ double getScale(torch::jit::Node* input_node);
 
 std::vector<int64_t> getZPSVector(torch::jit::Node* input_node);
 
+bool isZeroPointSupported(torch::jit::Value* zps);
+
+bool isScaleSupported(torch::jit::Value* scale);
+
 } // namespace utils
 } // namespace onednn
 } // namespace fuser

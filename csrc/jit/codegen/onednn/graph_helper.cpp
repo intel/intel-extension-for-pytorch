@@ -396,11 +396,12 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     //   ---/-----/-----\-----\---
     // dequant q_scale  q_zp  dtype
     // REQ(node->output(0)->uses().size() <= 2);
-    auto scale = toIValue(node->input(1));
-    REQ(scale.has_value() && scale->isDouble());
+    auto scale = node->input(1);
+    REQ(utils::isScaleSupported(scale));
 
-    auto zero_point = toIValue(node->input(2));
-    REQ(zero_point.has_value() && zero_point->isInt());
+    auto zero_point = node->input(2);
+    REQ(utils::isZeroPointSupported(zero_point));
+
     return Operator(node, opkind::Quantize)
         .setInput(0)
         .setOutput(0)

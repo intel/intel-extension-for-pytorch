@@ -1745,7 +1745,41 @@ class TestFusionPattern(JitLlgaTestCase):
         m = convert_to_reference_fx(m)
         graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
         # dequant -> linear should be mapped to LLGA
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)        
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+
+    @unittest.skipIf(True, "Poor accuracy")
+    @skipIfNoTorchVision
+    def test_fx_ao_qat_model(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv2 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.eltwise = torch.nn.ReLU()
+
+            def forward(self, x):
+                x = self.conv1(x)
+                x = self.eltwise(x)
+                x = self.conv2(x)
+                return x
+        data = torch.randn(1, 32, 224, 224).to(memory_format=torch.channels_last)
+        m = M()
+        m.eval()
+        #
+        # quantization aware training for static quantization
+        #
+        qconfig_dict = {"": torch.quantization.get_default_qat_qconfig('fbgemm')}
+        m.train()
+        model_prepared = prepare_qat_fx(m, qconfig_dict, example_inputs=data)
+        model_quantized = convert_to_reference_fx(model_prepared)
+        model_quantized=model_quantized.eval()
+        model = model_quantized.to(memory_format=torch.channels_last)
+        graph = self.checkQuantizeTrace(model, [data], atol=2e-1)
+        self.checkPatterns(graph, [['aten::dequantize', 'aten::quantize_per_channel', 'aten::_convolution',
+                                    'aten::relu', 'aten::quantize_per_tensor'],
+                                    ['aten::dequantize', 'aten::quantize_per_channel', 'aten::_convolution',
+                                     'aten::quantize_per_tensor']])
+
 
     def test_ffn_residual(self):
         class FFN_Residual(nn.Module):
