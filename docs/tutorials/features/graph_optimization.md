@@ -13,13 +13,22 @@ ipex.enable_onednn_fusion(False)
 
 ### FP32 and BF16 models
 ```
+from dataclasses import dataclass
+
 import torch
 import torchvision.models as models
 
 # Import the Intel Extension for PyTorch
 import intel_extension_for_pytorch as ipex
 
-model = models.__dict__["resnet50 "](pretrained=True)
+
+@dataclass
+class Args:
+    batch_size: int
+
+args = Args(batch_size=4)
+
+model = models.__dict__["resnet50"](pretrained=True)
 model.eval()
 
 # Apply some fusions at the front end
@@ -176,9 +185,21 @@ Here listed all the currently supported int8 patterns in Intel® Extension for P
 ### Folding
 Stock PyTorch provids constant propagation and BatchNormalization folding. These optimizations are automatically applied to the jit model by invoking `torch.jit.freeze`. Take the Resnet50 as an example:
 ```
+from dataclasses import dataclass
+
 import torch
 import torchvision.models as models
-model = models.__dict__["resnet50 "](pretrained=True)
+
+
+@dataclass
+class Args:
+    batch_size: int
+
+args = Args(batch_size=4)
+
+args = Args()
+
+model = models.__dict__["resnet50"](pretrained=True)
 model.eval()
 x = torch.randn(args.batch_size, 3, 224, 224)
 with torch.no_grad():
