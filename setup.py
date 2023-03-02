@@ -193,7 +193,6 @@ def _build_installation_dependency():
     install_requires = []
     install_requires.append('psutil')
     install_requires.append('numpy')
-    install_requires.append('cpuid')
     return install_requires
 
 
@@ -773,6 +772,50 @@ def pyi_module():
         extra_link_args=[make_relative_rpath('lib')])
     return C_ext
 
+def pyi_isa_help_module():
+    main_libraries = ['isa_help']
+    main_sources = [os.path.join(PACKAGE_NAME, "csrc", "_isa_help_main.cpp")]
+
+    include_dirs = [
+        os.path.realpath("."),
+        os.path.realpath(os.path.join(PACKAGE_NAME, "csrc")),
+        os.path.join(pytorch_install_dir, "include"),
+        os.path.join(pytorch_install_dir, "include", "torch", "csrc", "api", "include")]
+
+    library_dirs = [
+        "lib",
+        os.path.join(pytorch_install_dir, "lib")
+        ]
+
+    extra_compile_args = [
+        '-Wall',
+        '-Wextra',
+        '-Wno-strict-overflow',
+        '-Wno-unused-parameter',
+        '-Wno-missing-field-initializers',
+        '-Wno-write-strings',
+        '-Wno-unknown-pragmas',
+        # This is required for Python 2 declarations that are deprecated in 3.
+        '-Wno-deprecated-declarations',
+        # Python 2.6 requires -fno-strict-aliasing, see
+        # http://legacy.python.org/dev/peps/pep-3123/
+        # We also depend on it in our code (even Python 3).
+        '-fno-strict-aliasing',
+        # Clang has an unfixed bug leading to spurious missing
+        # braces warnings, see
+        # https://bugs.llvm.org/show_bug.cgi?id=21629
+        '-Wno-missing-braces']
+
+    C_ext = CppExtension(
+        "{}._isa_help".format(PACKAGE_NAME),
+        libraries=main_libraries,
+        sources=main_sources,
+        language='c++',
+        extra_compile_args=extra_compile_args,
+        include_dirs=include_dirs,
+        library_dirs=library_dirs,
+        extra_link_args=[make_relative_rpath('lib')])
+    return C_ext
 
 ext_modules=[]
 cmdclass = {
@@ -797,6 +840,7 @@ def fill_python_target_cmd(cmdclass, ext_modules):
     cmdclass['egg_info'] = IPEXEggInfoBuild
     cmdclass['install'] = IPEXInstallCmd
     ext_modules.append(pyi_module())
+    ext_modules.append(pyi_isa_help_module())
 
 
 if _get_build_target() == 'python':
