@@ -12,3 +12,26 @@
 # Order is important; the last matching pattern takes the most precedence.
 
 * @gujinghui @arthuryuan1987
+
+# Frontend
+/intel_extension_for_pytorch @gujinghui @wuhuikx @zejun-chen
+
+# IPEX GPU code base
+/csrc/gpu @gujinghui @arthuryuan1987 @wuhuikx @chengjunlu @majing921201
+
+# Documentation and tutorials
+/docs @gujinghui @tye1
+
+# Docker files
+/docker @tye1
+
+# Build scripts
+/cmake @gujinghui @zejun-chen @xuhancn
+
+# Tools and scripts
+/scripts @gujinghui @xunsongh
+
+# IPEX CPU code base
+/csrc/cpu @xuhancn @zejun-chen
+/intel_extension_for_pytorch/cpu @xuhancn @zejun-chen
+/intel_extension_for_pytorch/csrc/cpu @xuhancn @zejun-chen
