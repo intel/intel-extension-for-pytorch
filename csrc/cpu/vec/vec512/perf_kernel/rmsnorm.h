@@ -1,10 +1,10 @@
 #pragma once
 
-#include <immintrin.h>
 #include <ATen/ATen.h>
 #include <ATen/ExpandUtils.h>
 #include <ATen/Parallel.h>
 #include <c10/util/SmallVector.h>
+#include <immintrin.h>
 #include <limits>
 #include "utils.h"
 
@@ -32,7 +32,7 @@ void _compute_rmsnorm(
     vec_acc_pow += s;
   }
   float var_val = _mm512_reduce_add_ps(vec_acc_pow) / static_cast<float>(size);
-  float  scale = float(1.0) / std::sqrt(var_val + eps);
+  float scale = float(1.0) / std::sqrt(var_val + eps);
   auto vec_scale = _mm512_set1_ps(scale);
   for (i = 0; i <= size - 16; i += 16) {
     auto vec_input = _loadu(a_ptr + i);

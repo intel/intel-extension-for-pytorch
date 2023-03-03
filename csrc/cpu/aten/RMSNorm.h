@@ -6,10 +6,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-at::Tensor dil_RMSNorm(
-    const at::Tensor& input,
-    const at::Tensor& b,
-    float eps);
+at::Tensor dil_RMSNorm(const at::Tensor& input, const at::Tensor& b, float eps);
 
 namespace {
 
@@ -19,11 +16,9 @@ at::Tensor rmsnorm_kernel_impl(
     float eps);
 }
 
-using rms_norm_kernel_fn = at::Tensor (*)(
-    const at::Tensor&,
-    const at::Tensor&,
-    float);
-    
+using rms_norm_kernel_fn =
+    at::Tensor (*)(const at::Tensor&, const at::Tensor&, float);
+
 DECLARE_DISPATCH(rms_norm_kernel_fn, rmsnorm_kernel_stub);
 
 } // namespace cpu

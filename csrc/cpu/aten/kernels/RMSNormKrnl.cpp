@@ -35,8 +35,7 @@ void RMSNormKernelImpl(
 at::Tensor rmsnorm_kernel_impl(
     const at::Tensor& input,
     const at::Tensor& b,
-    float eps){
-
+    float eps) {
 #if defined(CPU_CAPABILITY_AVX512)
   const auto input_shape = input.sizes();
   const auto input_ndim = input.dim();
@@ -53,8 +52,7 @@ at::Tensor rmsnorm_kernel_impl(
       c10::nullopt /* device */,
       c10::nullopt /* pin_memory */,
       at::MemoryFormat::Contiguous);
-  RMSNormKernelImpl<float, float>(
-      X, b, M, N, eps, Y);
+  RMSNormKernelImpl<float, float>(X, b, M, N, eps, Y);
   return Y;
 #else
   auto variance = at::mean(at::pow(input, 2), -1, true);
@@ -63,7 +61,7 @@ at::Tensor rmsnorm_kernel_impl(
 #endif
 }
 
-}
+} // namespace
 
 REGISTER_DISPATCH(rmsnorm_kernel_stub, &rmsnorm_kernel_impl);
 } // namespace cpu

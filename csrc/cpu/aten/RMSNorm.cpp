@@ -9,12 +9,10 @@ DEFINE_DISPATCH(rmsnorm_kernel_stub);
 at::Tensor dil_RMSNorm(
     const at::Tensor& input,
     const at::Tensor& b,
-    float eps){
-        
+    float eps) {
   RECORD_FUNCTION("dil_RMSNorm", c10::ArrayRef<c10::IValue>({}));
 
-  return rmsnorm_kernel_stub(
-      kCPU, input, b, eps);
+  return rmsnorm_kernel_stub(kCPU, input, b, eps);
 }
 } // namespace cpu
 } // namespace torch_ipex
