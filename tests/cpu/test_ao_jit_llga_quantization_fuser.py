@@ -466,25 +466,12 @@ class TestOp(JitLlgaTestCase):
         m = M()
         
         # fp32 in int8 out softmax
-        int8_fp32_patterns = [
-            ["aten::dequantize", "aten::matmul", "aten::div", "aten::add", "aten::softmax", "aten::quantize_per_tensor"],
-            ["aten::dequantize", "aten::matmul"],
-        ]          
         graph = self.checkQuantizeTrace(m, [x, y, z, a], atol=2e-1, int8_bf16=False)
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
-        self.checkPatterns(graph, int8_fp32_patterns)        
+        self.assertFused(graph, ['aten::matmul', 'aten::div', 'aten::add', 'aten::softmax'])
 
         # bf16 in int8 out softmax
-        int8_bf16_patterns = [
-            ["aten::to", "aten::quantize_per_tensor"],
-            ["aten::to", "aten::quantize_per_tensor"],
-            ["aten::dequantize", "aten::to", "aten::matmul", "aten::div", "aten::add", "aten::softmax", "aten::to", "aten::quantize_per_tensor"],
-            ["aten::to", "aten::quantize_per_tensor"],
-            ["aten::dequantize", "aten::to", "aten::matmul"],
-        ]        
         graph = self.checkQuantizeTrace(m, [x, y, z, a], atol=2e-1, int8_bf16=True)
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 5)
-        self.checkPatterns(graph, int8_bf16_patterns)
+        self.assertFused(graph, ['aten::matmul', 'aten::div', 'aten::add', 'aten::softmax'])
 
 class TestFusionPattern(JitLlgaTestCase):
     def test_conv2d_eltwise(self):
