@@ -9,4 +9,3 @@ scipy
 setuptools
 types-dataclasses
 typing_extensions
-cpuid
