@@ -1376,13 +1376,11 @@ static void apply_triangular_solve(
     Tensor& B,
     bool left,
     bool upper,
-    bool transpose,
+    oneapi::mkl::transpose transpose,
     bool unitriangular) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   oneapi::mkl::uplo uplo = upper ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
-  oneapi::mkl::transpose trans =
-      transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
   oneapi::mkl::diag diag =
       unitriangular ? oneapi::mkl::diag::U : oneapi::mkl::diag::N;
   oneapi::mkl::side side =
@@ -1408,7 +1406,7 @@ static void apply_triangular_solve(
         dpcpp_queue,
         side,
         uplo,
-        trans,
+        transpose,
         diag,
         m,
         n,
@@ -1429,13 +1427,11 @@ void apply_triangular_solve<c10::complex<float>>(
     Tensor& B,
     bool left,
     bool upper,
-    bool transpose,
+    oneapi::mkl::transpose transpose,
     bool unitriangular) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   oneapi::mkl::uplo uplo = upper ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
-  oneapi::mkl::transpose trans =
-      transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
   oneapi::mkl::diag diag =
       unitriangular ? oneapi::mkl::diag::U : oneapi::mkl::diag::N;
   oneapi::mkl::side side =
@@ -1461,7 +1457,7 @@ void apply_triangular_solve<c10::complex<float>>(
         dpcpp_queue,
         side,
         uplo,
-        trans,
+        transpose,
         diag,
         m,
         n,
@@ -1482,13 +1478,11 @@ void apply_triangular_solve<c10::complex<double>>(
     Tensor& B,
     bool left,
     bool upper,
-    bool transpose,
+    oneapi::mkl::transpose transpose,
     bool unitriangular) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   oneapi::mkl::uplo uplo = upper ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
-  oneapi::mkl::transpose trans =
-      transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
   oneapi::mkl::diag diag =
       unitriangular ? oneapi::mkl::diag::U : oneapi::mkl::diag::N;
   oneapi::mkl::side side =
@@ -1514,7 +1508,7 @@ void apply_triangular_solve<c10::complex<double>>(
         dpcpp_queue,
         side,
         uplo,
-        trans,
+        transpose,
         diag,
         m,
         n,
@@ -2755,6 +2749,9 @@ std::tuple<Tensor, Tensor> _triangular_solve_helper(
   result.copy_(other);
   clone_input.copy_(input);
 
+  oneapi::mkl::transpose trans =
+      transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
+
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
       clone_input.scalar_type(), "triangular_solve_xpu", [&] {
         impl::apply_triangular_solve<scalar_t>(
@@ -2762,7 +2759,7 @@ std::tuple<Tensor, Tensor> _triangular_solve_helper(
             result,
             /*left=*/true,
             upper,
-            transpose,
+            trans,
             unitriangular);
       });
 
@@ -3625,6 +3622,259 @@ std::tuple<Tensor&, Tensor&, Tensor&> linalg_lu_factor_ex_out(
   if (LU_new.has_value())
     LU.copy_(LU_use);
   return std::tuple<Tensor&, Tensor&, Tensor&>(LU, pivots, info);
+}
+
+// support float double and complex
+void triangular_solve_kernel(
+    Tensor& A,
+    Tensor& B,
+    bool left,
+    bool upper,
+    oneapi::mkl::transpose transpose,
+    bool unitriangular) {
+  auto scalar_t = A.scalar_type();
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      scalar_t, "triangular_solve_xpu", [&] {
+        impl::apply_triangular_solve<scalar_t>(
+            A, B, left, upper, transpose, unitriangular);
+      });
+}
+
+inline oneapi::mkl::transpose to_transpose_type(
+    const bool contig,
+    const bool conj) {
+  if (conj) {
+    if (contig) {
+      TORCH_INTERNAL_ASSERT(false, "Invalid transpose type");
+    } else {
+      return oneapi::mkl::transpose::C;
+    }
+  } else {
+    if (contig) {
+      return oneapi::mkl::transpose::N;
+    } else {
+      return oneapi::mkl::transpose::T;
+    }
+  }
+}
+/*
+Solves the matrix equation AX = B for A triangular.
+'left' If true solves AX = B, if false solves XA = B
+'upper' controls the portion of input matrix to consider in computations,
+'unitriangular' if true then we assume diag(A) to be ones
+'out' The tensor with the result. If A == out, A will be modified in place
+*/
+Tensor& linalg_solve_triangular_out(
+    const Tensor& A,
+    const Tensor& B,
+    bool upper,
+    bool left,
+    bool unitriangular,
+    Tensor& out) {
+  at::native::checkInputsSolver(A, B, left, "linalg.solve_triangular");
+  Tensor A_, B_;
+  std::tie(B_, A_) = at::native::_linalg_broadcast_batch_dims(
+      B, A, /*don't check errors*/ nullptr);
+
+  // We'll write F-contig / F-transpose for FORTRAN contiguous / FORTRAN
+  // transpose etc We say that a matrix is F-ready if it's F-contig OR
+  // F-transpose At this point, A, B have been broadcasted but may or may not
+  // be F-ready
+
+  // The following algorithm minimises copies and allocations. In pseudocode:
+  // if out is wrong size:
+  //   resize_output(out)
+  // # Invariant: out is the right size
+  // Tensor out_f; # Tensor that we will pass to FORTRAN
+  // if out is F-ready:
+  //   out_f = out;
+  // else:
+  //   Allocate out_f F-ready
+  // if B != out_f:
+  //   copy B into out_f
+  // # Invariant: out_f F-ready and has B copied into it
+  // if out_f is F-transposed:
+  //   transpose equation
+  // if out_f is conj:
+  //   conjugate equation
+  // # Invariant: out_f is not conjugated and F-contig
+  // Tensor A_f; # Tensor that will be sent to FORTRAN
+  // if A is F-ready:
+  //   if A is conj and A is not transposed:
+  //     # We need to clone A in this case. See [Cloning A]
+  //     clone A F-contig into A_f
+  //   else:
+  //     A_f = A;
+  // else:
+  //   clone A F-contig into A_f
+  // # Invariant: out_f is F-contig and A_f is F-ready
+  // # We pass FORTRAN the flags indicating if A_f is transposed and or
+  // conjugated
+  //
+  // # Here we undo the conjugations / transposes on out_f if needed
+  //
+  // if out_f not same out:
+  //   copy out_f into out
+  // return out
+  //
+  // Note: The logic for the negative bit is the same as that for the
+  // conjugate bit
+  //
+  // Note: [Cloning A] If we are careful when allocating B when it needs to be
+  // allocated at the beginning of the algorithm, it is possible to always
+  // elide the copy of A here. Via this trick, the algorithm will copy at most
+  // one of A or B (never both) whenever A and B are F-ready and not
+  // A.is_neg() (which happens almost always in practice). When called as f(A,
+  // B, out=B) in most practical cases it'll perform no copies.
+
+  const bool avoid_copy_A =
+      A_.transpose(-2, -1).is_contiguous() && A_.is_conj();
+  if (avoid_copy_A) {
+    // See Note: [Cloning A]
+    at::native::resize_output(out, B_.sizes());
+  } else {
+    // poorman's reimplementation of resize_output with result F-contig
+    if (resize_output_check(out, B_.sizes())) {
+      out.resize_(B_.transpose(-2, -1).sizes(), MemoryFormat::Contiguous);
+      out.transpose_(
+          -2, -1); // make 'out' have Fortran contiguous memory layout
+    }
+  }
+  // Invariant: out has the right size, so we'll be able to copy into it later
+  // on
+
+  Tensor out_f; // the out that will go into fortran
+  // We use C10_LIKELY mostly for documentation as it helps following what's
+  // the most likely path
+  if C10_LIKELY (at::native::is_row_or_column_contiguous(out)) {
+    out_f = out;
+    if C10_LIKELY (!out.is_same(B_)) {
+      out_f.copy_(B_);
+    }
+  } else {
+    if (avoid_copy_A) {
+      // See Note: [Cloning A]
+      out_f = B_.clone(at::MemoryFormat::Contiguous);
+    } else {
+      out_f = at::native::cloneBatchedColumnMajor(B_);
+    }
+  }
+  // Invariant: out_f F-ready and has B copied into it
+
+  // out_f is F-transposed
+  bool transpose_A = false;
+  bool transpose_out_f = false;
+  if (out_f.stride(-1) == 1) {
+    left = !left;
+    transpose_A = true;
+    transpose_out_f = true;
+    out_f.transpose_(-2, -1);
+  }
+
+  // No need to conjugate anything if out_f is conj as AX = conj(B) <=>
+  // conj(A)conj(X) = B and X = B after the algortihm. We just anotate that A
+  // is conjugated later on The solution will be written into out_f, so it'll
+  // be conjugated already
+
+  Tensor A_f = A_; // The A that will go into fortran
+
+  bool A_is_conj = A_f.is_conj() != out_f.is_conj();
+  bool A_is_neg = A_f.is_neg() != out_f.is_neg();
+  bool A_is_f_contig = (A_f.stride(-1) == 1) == transpose_A;
+
+  if C10_UNLIKELY (!at::native::is_row_or_column_contiguous(A_f)) {
+    // We first anotate with flags on A_f all the conj / transpose / neg
+    // coming from out and then we clone the resulting tensor to resolve all
+    // of them in memory
+    if (out_f.is_conj()) {
+      A_f = A_f.conj();
+    }
+    A_is_conj = false;
+
+    if (out_f.is_neg()) {
+      A_f = A_f._neg_view();
+    }
+    A_is_neg = false;
+
+    // This choice is to be consistent with how we flip `upper` later on
+    // Note that this is the same reasoning we apply for neg and conj below
+    // If B has neg or out or transpose, then we need to resolve it in memory
+    A_f = transpose_A ? A_f.clone(at::MemoryFormat::Contiguous)
+                      : at::native::cloneBatchedColumnMajor(A_f);
+    A_is_f_contig = true;
+  } else if C10_UNLIKELY (A_is_f_contig && A_is_conj) {
+    if C10_UNLIKELY (A_f.is_neg() || out_f.is_neg()) {
+      // Cases A_is_neg (remember that B.is_neg() iff out_f.is_same(B))
+      // -AX = -B => A(-X) = B. Swap neg of A_f. Nothing to do on X as
+      // X.is_same(B). -AX = B. We resolve the neg in memory AX = -B => -A -X
+      // = B. We resolve the neg in memory for A,
+      //                       Since X.is_same(B), we already have that
+      //                       X.is_neg() == true
+
+      // We do the neg with a view, as this will be resolved in the clone
+      // below
+      if (out_f.is_neg()) {
+        A_f = A_f._neg_view();
+      }
+      A_is_neg = false;
+    }
+    // We resolve the transpose if necessary and then leave A_f F-transposed,
+    // as BLAS can handle the case F-transposed and conjugated
+    A_f = at::clone(transpose_A ? A_f.mT() : A_f, at::MemoryFormat::Contiguous);
+    A_is_f_contig = false;
+    if (transpose_A) {
+      upper = !upper;
+    }
+    // As we've already resolved the conj of A in the clone
+    A_is_conj = out_f.is_conj();
+  } else if C10_UNLIKELY (A_is_neg) {
+    // We follow the same logic as above, only that in this case we need to
+    // perform the negation in memory
+    if (out_f.is_neg()) {
+      A_f = -A_f;
+    } else {
+      A_f = A_f.resolve_neg();
+    }
+    A_is_neg = false;
+    // As we've already resolved the conj of A in the negationa bove
+    A_is_conj = out_f.is_conj();
+  }
+  // Invariant: out_f is F-contig and A_f is F-ready
+  // neg has been resolved
+
+  // If we pass the matrix physically F-transposed, we need to change the
+  // parity of upper
+  if (A_f.stride(-1) == 1) {
+    upper = !upper;
+  }
+
+  triangular_solve_kernel(
+      A_f,
+      out_f,
+      left,
+      upper,
+      to_transpose_type(A_is_f_contig, A_is_conj),
+      unitriangular);
+
+  if (transpose_out_f) {
+    out_f.transpose_(-2, -1);
+  }
+
+  if (!out_f.is_same(out)) {
+    out.copy_(out_f);
+  }
+  return out;
+}
+
+Tensor linalg_solve_triangular(
+    const Tensor& A,
+    const Tensor& B,
+    bool upper,
+    bool left,
+    bool unitriangular) {
+  Tensor out = at::empty({0}, A.options());
+  linalg_solve_triangular_out(A, B, upper, left, unitriangular, out);
+  return out;
 }
 
 std::tuple<Tensor&, Tensor&, Tensor&> linalg_lu_out(
