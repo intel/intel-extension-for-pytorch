@@ -294,6 +294,52 @@ with torch.no_grad():
   model(data)
 ```
 
+#### TorchDynamo Mode (Experimental, _NEW feature from 2.0.0_)
+
+##### Resnet50
+
+```
+import torch
+import torchvision.models as models
+
+model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+model.eval()
+data = torch.rand(1, 3, 224, 224)
+
+# Experimental Feature
+#################### code changes ####################
+import intel_extension_for_pytorch as ipex
+model = torch.compile(model, backend="ipex")
+######################################################
+
+with torch.no_grad():
+    model(data)
+```
+
+##### BERT
+
+```
+import torch
+from transformers import BertModel
+
+model = BertModel.from_pretrained("bert-base-uncased")
+model.eval()
+
+vocab_size = model.config.vocab_size
+batch_size = 1
+seq_length = 512
+data = torch.randint(vocab_size, size=[batch_size, seq_length])
+
+# Experimental Feature
+#################### code changes ####################
+import intel_extension_for_pytorch as ipex
+model = torch.compile(model, backend="ipex")
+######################################################
+
+with torch.no_grad():
+    model(data)
+```
+
 ### BFloat16
 
 Similar to running with FP32, the `optimize` function also works for BFloat16 data type. The only difference is setting `dtype` parameter to `torch.bfloat16`.
