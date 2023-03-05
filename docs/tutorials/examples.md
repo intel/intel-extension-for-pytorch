@@ -600,7 +600,7 @@ int main(int argc, const char* argv[]) {
 cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
 project(example-app)
 
-find_package(intel_ext_pt_cpu REQUIRED)
+find_package(IPEX REQUIRED)
 
 add_executable(example-app example-app.cpp)
 target_link_libraries(example-app "${TORCH_LIBRARIES}")
