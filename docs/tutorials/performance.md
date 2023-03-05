@@ -5,6 +5,10 @@ Performance
 
 This page shows performance boost with Intel® Extension for PyTorch\* on several popular topologies.
 
+## Performance Data for Intel® AI Data Center Products
+
+Find the latest performance data for 4th gen Intel® Xeon® Scalable processors and 3rd gen Intel® Xeon® processors, including detailed hardware and software configurations, at [Intel® Developer Zone article](https://www.intel.com/content/www/us/en/developer/topic-technology/artificial-intelligence/performance.html).
+
 ## INT8 with v1.11
 
 ### Performance Numbers

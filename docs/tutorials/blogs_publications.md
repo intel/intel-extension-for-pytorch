@@ -1,6 +1,7 @@
 Blogs & Publications
 ====================
 
+* [Intel® Deep Learning Boost - Improve Inference Performance of BERT Base Model from Hugging Face for Network Security Technology Guide](https://networkbuilders.intel.com/solutionslibrary/intel-deep-learning-boost-improve-inference-performance-of-bert-base-model-from-hugging-face-for-network-security-technology-guide)
 * [Accelerating PyTorch Transformers with Intel Sapphire Rapids, Part 1, Jan 2023](https://huggingface.co/blog/intel-sapphire-rapids)
 * [Intel® Deep Learning Boost - Improve Inference Performance of BERT Base Model from Hugging Face for Network Security Technology Guide, Jan 2023](https://networkbuilders.intel.com/solutionslibrary/intel-deep-learning-boost-improve-inference-performance-of-bert-base-model-from-hugging-face-for-network-security-technology-guide)
 * [Scaling inference on CPUs with TorchServe, PyTorch Conference, Dec 2022](https://www.youtube.com/watch?v=066_Jd6cwZg)

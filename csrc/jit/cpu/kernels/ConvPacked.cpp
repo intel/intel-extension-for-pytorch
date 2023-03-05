@@ -327,7 +327,7 @@ at::Tensor& convolution_bottleneck_run(
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context2,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context3) {
   RECORD_FUNCTION(
-      "ipex_prepack::convolution_bottleneck_runi_v1",
+      "ipex_prepack::convolution_bottleneck_run_v1",
       c10::ArrayRef<c10::IValue>({}));
 
   auto memory_format = input.dim() == 4 ? at::MemoryFormat::ChannelsLast
