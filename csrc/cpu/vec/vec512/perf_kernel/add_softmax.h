@@ -77,6 +77,14 @@ inline __m512 _dil_exp_kernel(__m512 vec_src) {
   return vec_res;
 }
 
+/**
+ * Previously vec_ps_min was set to std::numeric_limits<float>::min(),
+ * the smallest positive number (FLT_MIN). This was wrong for ReduceMax
+ * if all the input elements are negative, which will lead to exponent
+ * overflow. The correct initial number to compare the max value should
+ * be std::numeric_limits<float>::lowest() (-FLT_MAX), thus this kernel
+ * can generate the correct max value for negative inputs.
+ **/
 template <typename scalar_a, typename scalar_b>
 inline void _dil_div_add_reduce_max_fusion_kernel(
     const scalar_a* a,
