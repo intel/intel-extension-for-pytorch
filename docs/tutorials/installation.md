@@ -17,6 +17,7 @@ Make sure PyTorch is installed so that the extension will work properly. For eac
 
 |PyTorch Version|Extension Version|
 |--|--|
+|[v2.0.\*](https://github.com/pytorch/pytorch/tree/v2.0.0 "v2.0.0")|[v2.0.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v2.0.0+cpu)|
 |[v1.13.\*](https://github.com/pytorch/pytorch/tree/v1.13.0 "v1.13.0")|[v1.13.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.13.100+cpu)|
 |[v1.12.\*](https://github.com/pytorch/pytorch/tree/v1.12.0 "v1.12.0")|[v1.12.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.12.300)|
 |[v1.11.\*](https://github.com/pytorch/pytorch/tree/v1.11.0 "v1.11.0")|[v1.11.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.11.200)|
@@ -45,19 +46,20 @@ From 1.8.0, compiling PyTorch from source is not required. If you still want to 
 
 Prebuilt wheel files availability matrix for Python versions
 
-| Extension Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 | Python 3.10 |
-| :--: | :--: | :--: | :--: | :--: | :--: |
-| 1.13.100 |  | ✔️ | ✔️ | ✔️ | ✔️ |
-| 1.13.0 |  | ✔️ | ✔️ | ✔️ | ✔️ |
-| 1.12.300 |  | ✔️ | ✔️ | ✔️ | ✔️ |
-| 1.12.100 |  | ✔️ | ✔️ | ✔️ | ✔️ |
-| 1.12.0 |  | ✔️ | ✔️ | ✔️ | ✔️ |
-| 1.11.200 |  | ✔️ | ✔️ | ✔️ | ✔️ |
-| 1.11.0 |  | ✔️ | ✔️ | ✔️ | ✔️ |
-| 1.10.100 | ✔️ | ✔️ | ✔️ | ✔️ |  |
-| 1.10.0 | ✔️ | ✔️ | ✔️ | ✔️ |  |
-| 1.9.0 | ✔️ | ✔️ | ✔️ | ✔️ |  |
-| 1.8.0 |  | ✔️ |  |  |  |
+| Extension Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 | Python 3.10 | Python 3.11 |
+| :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+| 2.0.0 |  |  | ✔️ | ✔️ | ✔️ | ✔️ |
+| 1.13.100 |  | ✔️ | ✔️ | ✔️ | ✔️ |  |
+| 1.13.0 |  | ✔️ | ✔️ | ✔️ | ✔️ |  |
+| 1.12.300 |  | ✔️ | ✔️ | ✔️ | ✔️ |  |
+| 1.12.100 |  | ✔️ | ✔️ | ✔️ | ✔️ |  |
+| 1.12.0 |  | ✔️ | ✔️ | ✔️ | ✔️ |  |
+| 1.11.200 |  | ✔️ | ✔️ | ✔️ | ✔️ |  |
+| 1.11.0 |  | ✔️ | ✔️ | ✔️ | ✔️ |  |
+| 1.10.100 | ✔️ | ✔️ | ✔️ | ✔️ |  |  |
+| 1.10.0 | ✔️ | ✔️ | ✔️ | ✔️ |  |  |
+| 1.9.0 | ✔️ | ✔️ | ✔️ | ✔️ |  |  |
+| 1.8.0 |  | ✔️ |  |  |  |  |
 
 **Note:** Intel® Extension for PyTorch\* has PyTorch version requirement. Check the mapping table above.
 
@@ -86,7 +88,7 @@ python -m pip install <package_name>==<version_name> -f https://developer.intel.
 To ensure a smooth compilation, a script is provided in the Github repo. If you would like to compile the binaries from source, it is highly recommended to utilize this script.
 
 ```bash
-$ wget https://github.com/intel/intel-extension-for-pytorch/blob/master/scripts/compile_bundle.sh
+$ wget https://github.com/intel/intel-extension-for-pytorch/blob/v2.0.0+cpu/scripts/compile_bundle.sh
 $ bash compile_bundle.sh
 ```
 
@@ -120,20 +122,20 @@ $ tree -L 3 .
 
 ### Build Docker container from Dockerfile
 
-Run the following commands to build the `pip` based deployment container:
+Run the following commands to build a `pip` based container with the latest stable version prebuilt wheel files:
 
 ```console
-$ cd docker
-$ DOCKER_BUILDKIT=1 docker build -f Dockerfile.pip -t intel-extension-for-pytorch:pip .
-$ docker run --rm intel-extension-for-pytorch:pip python -c "import torch; import intel_extension_for_pytorch as ipex; print('torch:', torch.__version__,' ipex:',ipex.__version__)"
+$ cd $DOCKERFILE_DIR
+$ DOCKER_BUILDKIT=1 docker build -f Dockerfile.prebuilt -t intel-extension-for-pytorch:prebuilt .
+$ docker run --rm intel-extension-for-pytorch:prebuilt python -c "import torch; import intel_extension_for_pytorch as ipex; print('torch:', torch.__version__,' ipex:',ipex.__version__)"
 ```
 
-Run the following commands to build the `conda` based development container:
+Run the following commands to build a `conda` based container with Intel® Extension for PyTorch\* compiled from source:
 
 ```console
-$ cd docker
-$ DOCKER_BUILDKIT=1 docker build -f Dockerfile.conda -t intel-extension-for-pytorch:conda .
-$ docker run --rm intel-extension-for-pytorch:conda python -c "import torch; import intel_extension_for_pytorch as ipex; print('torch:', torch.__version__,' ipex:',ipex.__version__)"
+$ cd $DOCKERFILE_DIR
+$ DOCKER_BUILDKIT=1 docker build -f Dockerfile.compile -t intel-extension-for-pytorch:compile .
+$ docker run --rm intel-extension-for-pytorch:compile python -c "import torch; import intel_extension_for_pytorch as ipex; print('torch:', torch.__version__,' ipex:',ipex.__version__)"
 ```
 
 ### Get docker container from dockerhub
@@ -150,6 +152,7 @@ docker pull intel/intel-optimized-pytorch:latest
 
 |Version|Pre-cxx11 ABI|cxx11 ABI|
 |--|--|--|
+| 2.0.0 | [libintel-ext-pt-2.0.0+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-2.0.0%2Bcpu.run) | [libintel-ext-pt-cxx11-abi-2.0.0+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-cxx11-abi-2.0.0%2Bcpu.run) |
 | 1.13.100 | [libintel-ext-pt-1.13.100+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-1.13.100%2Bcpu.run) | [libintel-ext-pt-cxx11-abi-1.13.100+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-cxx11-abi-1.13.100%2Bcpu.run) |
 | 1.13.0 | [libintel-ext-pt-1.13.0+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-1.13.0%2Bcpu.run) | [libintel-ext-pt-cxx11-abi-1.13.0+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-cxx11-abi-1.13.0%2Bcpu.run) |
 | 1.12.300 | [libintel-ext-pt-1.12.300+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-1.12.300%2Bcpu.run) | [libintel-ext-pt-cxx11-abi-1.12.300+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-cxx11-abi-1.12.300%2Bcpu.run) |

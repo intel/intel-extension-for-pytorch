@@ -5,7 +5,7 @@ VER_LLVM="llvmorg-13.0.0"
 VER_PYTORCH=""
 VER_TORCHVISION=""
 VER_TORCHAUDIO=""
-VER_IPEX="master"
+VER_IPEX="v2.0.0+cpu"
 
 # Check existance of required Linux commands
 which python > /dev/null 2>&1
@@ -44,7 +44,7 @@ git submodule update --init --recursive
 
 # Install dependencies
 python -m pip install cmake
-python -m pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+python -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
 ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
 
 # Compile individual component
