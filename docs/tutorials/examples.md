@@ -35,6 +35,7 @@ output = model(data)
 
 #### Complete - Float32
 
+[//]: # (train_single_fp32_complete)
 ```
 import torch
 import torchvision
@@ -78,9 +79,11 @@ torch.save({
      'optimizer_state_dict': optimizer.state_dict(),
      }, 'checkpoint.pth')
 ```
+[//]: # (train_single_fp32_complete)
 
 #### Complete - BFloat16
 
+[//]: # (train_single_bf16_complete)
 ```
 import torch
 import torchvision
@@ -125,6 +128,7 @@ torch.save({
      'optimizer_state_dict': optimizer.state_dict(),
      }, 'checkpoint.pth')
 ```
+[//]: # (train_single_bf16_complete)
 
 ### Distributed Training
 
@@ -132,6 +136,7 @@ Distributed training with PyTorch DDP is accelerated by oneAPI Collective Commun
 
 **Note:** When performing distributed training with BF16 data type, use oneCCL Bindings for Pytorch\*. Due to a PyTorch limitation, distributed training with BF16 data type with Intel® Extension for PyTorch\* is not supported.
 
+[//]: # (train_ddp_complete)
 ```
 import os
 import torch
@@ -189,6 +194,7 @@ torch.save({
      'optimizer_state_dict': optimizer.state_dict(),
      }, 'checkpoint.pth')
 ```
+[//]: # (train_ddp_complete)
 
 ## Inference
 
@@ -200,6 +206,7 @@ The `optimize` function of Intel® Extension for PyTorch\* applies optimizations
 
 ##### Resnet50
 
+[//]: # (inf_rn50_imp_fp32)
 ```
 import torch
 import torchvision.models as models
@@ -216,9 +223,11 @@ model = ipex.optimize(model)
 with torch.no_grad():
   model(data)
 ```
+[//]: # (inf_rn50_imp_fp32)
 
 ##### BERT
 
+[//]: # (inf_bert_imp_fp32)
 ```
 import torch
 from transformers import BertModel
@@ -239,6 +248,7 @@ model = ipex.optimize(model)
 with torch.no_grad():
   model(data)
 ```
+[//]: # (inf_bert_imp_fp32)
 
 #### TorchScript Mode
 
@@ -246,6 +256,7 @@ We recommend you take advantage of Intel® Extension for PyTorch\* with [TorchSc
 
 ##### Resnet50
 
+[//]: # (inf_rn50_ts_fp32)
 ```
 import torch
 import torchvision.models as models
@@ -266,9 +277,11 @@ with torch.no_grad():
 
   model(data)
 ```
+[//]: # (inf_rn50_ts_fp32)
 
 ##### BERT
 
+[//]: # (inf_bert_ts_fp32)
 ```
 import torch
 from transformers import BertModel
@@ -293,11 +306,13 @@ with torch.no_grad():
 
   model(data)
 ```
+[//]: # (inf_bert_ts_fp32)
 
 #### TorchDynamo Mode (Experimental, _NEW feature from 2.0.0_)
 
 ##### Resnet50
 
+[//]: # (inf_rn50_dynamo_fp32)
 ```
 import torch
 import torchvision.models as models
@@ -315,9 +330,11 @@ model = torch.compile(model, backend="ipex")
 with torch.no_grad():
     model(data)
 ```
+[//]: # (inf_rn50_dynamo_fp32)
 
 ##### BERT
 
+[//]: # (inf_bert_dynamo_fp32)
 ```
 import torch
 from transformers import BertModel
@@ -339,6 +356,7 @@ model = torch.compile(model, backend="ipex")
 with torch.no_grad():
     model(data)
 ```
+[//]: # (inf_bert_dynamo_fp32)
 
 ### BFloat16
 
@@ -349,6 +367,7 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.
 
 ##### Resnet50
 
+[//]: # (inf_rn50_imp_bf16)
 ```
 import torch
 import torchvision.models as models
@@ -366,9 +385,11 @@ with torch.no_grad():
   with torch.cpu.amp.autocast():
     model(data)
 ```
+[//]: # (inf_rn50_imp_bf16)
 
 ##### BERT
 
+[//]: # (inf_bert_imp_bf16)
 ```
 import torch
 from transformers import BertModel
@@ -390,6 +411,7 @@ with torch.no_grad():
   with torch.cpu.amp.autocast():
     model(data)
 ```
+[//]: # (inf_bert_imp_bf16)
 
 #### TorchScript Mode
 
@@ -397,6 +419,7 @@ We recommend you take advantage of Intel® Extension for PyTorch\* with [TorchSc
 
 ##### Resnet50
 
+[//]: # (inf_rn50_ts_bf16)
 ```
 import torch
 import torchvision.models as models
@@ -417,9 +440,11 @@ with torch.no_grad():
 
     model(data)
 ```
+[//]: # (inf_rn50_ts_bf16)
 
 ##### BERT
 
+[//]: # (inf_bert_ts_f16)
 ```
 import torch
 from transformers import BertModel
@@ -445,6 +470,7 @@ with torch.no_grad():
 
     model(data)
 ```
+[//]: # (inf_bert_ts_f16)
 
 ### INT8
 
@@ -465,6 +491,7 @@ Please follow the steps below to perform static calibration:
 7. Save the INT8 model into a `pt` file.
 
 
+[//]: # (int8_static)
 ```
 import os
 import torch
@@ -494,6 +521,7 @@ with torch.no_grad():
 
 traced_model.save("quantized_model.pt")
 ```
+[//]: # (int8_static)
 
 ##### Dynamic Quantization
 
@@ -507,6 +535,7 @@ Please follow the steps below to perform static calibration:
 6. Run inference to perform dynamic quantization.
 7. Save the INT8 model into a `pt` file.
 
+[//]: # (int8_dynamic)
 ```
 import os
 import torch
@@ -534,6 +563,7 @@ with torch.no_grad():
 
 traced_model.save("quantized_model.pt")
 ```
+[//]: # (int8_dynamic)
 
 #### Deployment
 
@@ -545,6 +575,7 @@ Follow the steps below:
 2. Load the INT8 model from the saved file.
 3. Run inference.
 
+[//]: # (int8_deploy)
 ```
 import torch
 #################### code changes ####################
@@ -559,6 +590,7 @@ data = torch.rand(<shape>)
 with torch.no_grad():
   model(data)
 ```
+[//]: # (int8_deploy)
 
 oneDNN provides [oneDNN Graph Compiler](https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler) as a prototype feature that could boost performance for selective topologies. No code change is required. Install <a class="reference external" href="installation.md#installation_onednn_graph_compiler">a binary</a> with this feature enabled. We verified this feature with `Bert-large`, `bert-base-cased`, `roberta-base`, `xlm-roberta-base`, `google-electra-base-generator` and `google-electra-base-discriminator`.
 
@@ -572,6 +604,7 @@ The example code below works for all data types.
 
 **example-app.cpp**
 
+[//]: # (cppsdk_sample)
 ```cpp
 #include <torch/script.h>
 #include <iostream>
@@ -593,9 +626,11 @@ int main(int argc, const char* argv[]) {
     return 0;
 }
 ```
+[//]: # (cppsdk_sample)
 
 **CMakeLists.txt**
 
+[//]: # (cppsdk_cmake)
 ```cmake
 cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
 project(example-app)
@@ -607,6 +642,7 @@ target_link_libraries(example-app "${TORCH_LIBRARIES}")
 
 set_property(TARGET example-app PROPERTY CXX_STANDARD 14)
 ```
+[//]: # (cppsdk_cmake)
 
 **Command for compilation**
 
