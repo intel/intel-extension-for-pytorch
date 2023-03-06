@@ -180,6 +180,37 @@ class TestNNMethod(TestCase):
         self.assertEqual(output_cpu, output_xpu.to(cpu_device))
         self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
 
+    def test_adative_avg_pool2d_blk_format(self, dtype=torch.float):
+        x = torch.randn([10, 16, 30, 40])
+        grad = torch.randn([10, 16, 2, 2])
+        conv_cpu1 = nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=1, bias=False)
+        pool_cpu = nn.AdaptiveAvgPool2d((2, 2))
+        conv_cpu2 = nn.Conv2d(16, 16, kernel_size=1, stride=1, bias=False)
+
+        # 5D contiguous input
+        # CPU
+        input_cpu = x.clone()
+        input_cpu.requires_grad_(True)
+        grad_cpu = grad.clone()
+        output_cpu = conv_cpu2(pool_cpu(conv_cpu1(input_cpu)))
+        output_cpu.backward(grad_cpu)
+
+        conv_cpu1.zero_grad()
+        conv_cpu2.zero_grad()
+        # XPU
+        with torch.xpu.onednn_layout():
+            input_xpu = x.clone().to(dpcpp_device)
+            input_xpu.requires_grad_(True)
+            grad_xpu = grad.clone().to(dpcpp_device)
+            conv_dpcpp1 = conv_cpu1.to(dpcpp_device)
+            pool_dpcpp = pool_cpu.to(dpcpp_device)
+            conv_dpcpp2 = conv_cpu2.to(dpcpp_device)
+            output_xpu = conv_dpcpp2(pool_dpcpp(conv_dpcpp1(input_xpu)))
+            output_xpu.backward(grad_xpu)
+
+        self.assertEqual(output_cpu, output_xpu.to(cpu_device))
+        self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
+
     def test_adaptive_avg_pool2d_general_fwd(self, dtype=torch.float):
         x_cpu = torch.randn([1, 3, 5, 5], device=cpu_device)
         output_sz = [2, 2]
@@ -192,6 +223,15 @@ class TestNNMethod(TestCase):
 
         x_cpu = torch.randn([4, 3, 512, 512], device=cpu_device)
         output_sz = [308, 308]
+        y_cpu = torch._C._nn.adaptive_avg_pool2d(x_cpu, output_sz)
+
+        x_xpu = x_cpu.to(dpcpp_device)
+        y_xpu = torch._C._nn.adaptive_avg_pool2d(x_xpu, output_sz)
+
+        self.assertEqual(y_cpu, y_xpu.to(cpu_device))
+
+        x_cpu = torch.randn([1, 3, 25, 26], device=cpu_device)
+        output_sz = [24, 24]
         y_cpu = torch._C._nn.adaptive_avg_pool2d(x_cpu, output_sz)
 
         x_xpu = x_cpu.to(dpcpp_device)

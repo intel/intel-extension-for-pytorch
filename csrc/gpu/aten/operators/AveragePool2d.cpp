@@ -11,6 +11,7 @@
 using namespace dnnl;
 using namespace at::native;
 using namespace xpu::dpcpp;
+using namespace xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -75,14 +76,10 @@ void avg_pool2d_out_template(
      This case supports Contiguous and ChannelsLast2D memory_format. */
 
   /* get contiguous input */
-  auto smf = input.suggest_memory_format();
-  Tensor input_;
-  if (input.ndimension() == 3) {
-    input_ = input.contiguous();
-    smf = at::MemoryFormat::Contiguous;
-  } else {
-    input_ = input.contiguous(smf);
-  }
+  Tensor input_ = input.ndimension() == 3
+      ? input.contiguous()
+      : contiguous_if_needed(input, input.suggest_memory_format());
+  auto smf = input_.suggest_memory_format();
 
   pool2d_shape_check(
       input_,
@@ -348,8 +345,8 @@ Tensor& avg_pool2d_backward_out(
     grad_input.resize_as_(self);
   } else {
     auto smf = self_.suggest_memory_format();
-    self = self_.contiguous(smf);
-    grad_output = grad_output_.contiguous(smf);
+    self = contiguous_if_needed(self_, smf);
+    grad_output = contiguous_if_needed(grad_output_, smf);
     grad_input.resize_as_(self, smf);
   }
 
@@ -393,8 +390,8 @@ Tensor avg_pool2d_backward(
     grad_input = at::empty_like(self);
   } else {
     auto smf = self_.suggest_memory_format();
-    self = self_.contiguous(smf);
-    grad_output = grad_output_.contiguous(smf);
+    self = contiguous_if_needed(self_, smf);
+    grad_output = contiguous_if_needed(grad_output_, smf);
     grad_input = at::empty_like(self, smf);
   }
 

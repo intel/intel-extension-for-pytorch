@@ -12,6 +12,7 @@
 using namespace dnnl;
 using namespace at::native;
 using namespace xpu::dpcpp;
+using namespace xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -117,7 +118,7 @@ void avg_pool3d_out_template(
     // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
     // smf supports ChannelsLast3D and Contiguous cases.
     auto smf = input.suggest_memory_format();
-    input_ = input.contiguous(smf);
+    input_ = contiguous_if_needed(input, smf);
     output.resize_(
         {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
   }

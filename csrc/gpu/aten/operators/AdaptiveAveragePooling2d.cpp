@@ -14,6 +14,7 @@
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
+using namespace xpu::oneDNN;
 
 namespace {
 template <
@@ -160,7 +161,7 @@ void adaptive_avg_pool2d_out_template(
     output.resize_({nInputPlane, outputHeight, outputWidth});
   } else {
     auto smf = input.suggest_memory_format();
-    input_ = input.contiguous(smf);
+    input_ = contiguous_if_needed(input, smf);
     output.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
   }
 
@@ -643,8 +644,8 @@ Tensor _adaptive_avg_pool2d_backward(
     grad_input = at::empty_like(self);
   } else {
     auto smf = self_.suggest_memory_format();
-    self = self_.contiguous(smf);
-    grad_output = grad_output_.contiguous(smf);
+    self = contiguous_if_needed(self_, smf);
+    grad_output = contiguous_if_needed(grad_output_, smf);
     grad_input = at::empty_like(self_, smf);
   }
 

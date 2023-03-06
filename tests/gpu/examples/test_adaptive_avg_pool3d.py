@@ -38,6 +38,22 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
+    # https://jira.devtools.intel.com/browse/PYTORCHDGQ-2489
+    # oneDNN not implement yet and no SYCL backup
+    # def test_adaptive_avg_pool3d_simple_fwd(self, dtype=torch.float):
+    #     x_cpu = torch.randn([1, 4, 24, 25, 26], device=cpu_device)
+    #     x_dpcpp = x_cpu.to(dpcpp_device)
+    #     avg_pool = nn.AdaptiveAvgPool3d((24, 24, 24))
+
+    #     # cpu
+    #     y_cpu = avg_pool(x_cpu)
+    #     print("y_cpu", y_cpu)
+
+    #     avg_pool.to(dpcpp_device)
+    #     y_dpcpp = avg_pool(x_dpcpp)
+    #     print("y_dpcpp", y_dpcpp.cpu())
+    #     self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
+    
     def test_channels_last_simple_fwd(self, dtype=torch.float):
         x_cpu = torch.randn([1, 4, 4, 4, 4], device=cpu_device)
         x_dpcpp = x_cpu.to(dpcpp_device).to(memory_format=torch.channels_last_3d)
@@ -196,3 +212,36 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(output_cpu, output_xpu.to(cpu_device))
         self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
+
+    def test_adaptive_avg_pool3d_5D_blk(self, dtype=torch.float):
+        x = torch.randn([10, 16, 30, 40, 50])
+        grad = torch.randn([10, 16, 2, 2, 2])
+        conv_cpu1 = nn.Conv3d(16, 16, kernel_size=3, stride=1, padding=1, bias=False)
+        pool_cpu = nn.AdaptiveAvgPool3d((2, 2, 2))
+        conv_cpu2 = nn.Conv3d(16, 16, kernel_size=1, stride=1, bias=False)
+
+        # 5D contiguous input
+        # CPU
+        input_cpu = x.clone()
+        input_cpu.requires_grad_(True)
+        grad_cpu = grad.clone()
+        output_cpu = conv_cpu2(pool_cpu(conv_cpu1(input_cpu)))
+        output_cpu.backward(grad_cpu)
+
+        conv_cpu1.zero_grad()
+        conv_cpu2.zero_grad()
+
+        # XPU
+        with torch.xpu.onednn_layout():
+            input_xpu = x.clone().to(dpcpp_device)
+            input_xpu.requires_grad_(True)
+            grad_xpu = grad.clone().to(dpcpp_device)
+            conv_dpcpp1 = conv_cpu1.to(dpcpp_device)
+            pool_dpcpp = pool_cpu.to(dpcpp_device)
+            conv_dpcpp2 = conv_cpu2.to(dpcpp_device)
+            output_xpu = conv_dpcpp2(pool_dpcpp(conv_dpcpp1(input_xpu)))
+            output_xpu.backward(grad_xpu)
+        
+        self.assertEqual(output_cpu, output_xpu.to(cpu_device))
+        self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
+

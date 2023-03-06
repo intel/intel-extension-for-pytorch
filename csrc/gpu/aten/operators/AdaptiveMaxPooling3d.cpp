@@ -11,6 +11,7 @@
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
+using namespace xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -87,7 +88,7 @@ void adaptive_max_pool3d_out_template(
     // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
     // smf supports ChannelsLast3D and Contiguous cases.
     auto smf = input.suggest_memory_format();
-    input_ = input.contiguous(smf);
+    input_ = contiguous_if_needed(input, smf);
     output.resize_(
         {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
     indices.resize_(
@@ -219,9 +220,9 @@ Tensor& adaptive_max_pool3d_backward_out(
     // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
     // smf supports ChannelsLast3D and Contiguous cases.
     auto smf = self_.suggest_memory_format();
-    self = self_.contiguous(smf);
-    grad_output = grad_output_.contiguous(smf);
-    indices = indices_.contiguous(smf);
+    self = contiguous_if_needed(self_, smf);
+    grad_output = contiguous_if_needed(grad_output_, smf);
+    indices = contiguous_if_needed(indices_, smf);
     grad_input.resize_as_(self, smf);
   }
   IPEX_DISPATCH_FLOATING_TYPES_AND(
@@ -252,9 +253,9 @@ Tensor adaptive_max_pool3d_backward(
     // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
     // smf supports ChannelsLast3D and Contiguous cases.
     auto smf = self_.suggest_memory_format();
-    self = self_.contiguous(smf);
-    grad_output = grad_output_.contiguous(smf);
-    indices = indices_.contiguous(smf);
+    self = contiguous_if_needed(self_, smf);
+    grad_output = contiguous_if_needed(grad_output_, smf);
+    indices = contiguous_if_needed(indices_, smf);
     grad_input = at::empty_like(self, smf);
   }
 

@@ -11,6 +11,7 @@
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
+using namespace xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -85,7 +86,7 @@ void adaptive_avg_pool3d_out_template(
     // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
     // smf supports ChannelsLast3D and Contiguous cases.
     auto smf = input.suggest_memory_format();
-    input_ = input.contiguous(smf);
+    input_ = contiguous_if_needed(input, smf);
     output.resize_(
         {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
   }
@@ -94,7 +95,7 @@ void adaptive_avg_pool3d_out_template(
   std::vector<int64_t> stride_vec = {dD, dH, dW};
   std::vector<int64_t> padding_vec = {padD, padH, padW};
 
-  ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+  xpu::oneDNN::pooling<alg::pooling_avg_exclude_padding>(
       output,
       input_,
       nbatch,
@@ -143,8 +144,7 @@ Tensor& adaptive_avg_pool3d_backward_out_template(
   int padH = (dH * (gradOutputHeight - 1) + kH - gradInputHeight) / 2;
   int padW = (dW * (gradOutputWidth - 1) + kW - gradInputWidth) / 2;
 
-  ::xpu::oneDNN::pooling_backward<
-      ::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+  xpu::oneDNN::pooling_backward<alg::pooling_avg_exclude_padding>(
       gradInput,
       gradOutput,
       input,
@@ -208,8 +208,8 @@ Tensor& adaptive_avg_pool3d_backward_out(
     // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
     // smf supports ChannelsLast3D and Contiguous cases.
     auto smf = self_.suggest_memory_format();
-    self = self_.contiguous(smf);
-    grad_output = grad_output_.contiguous(smf);
+    self = contiguous_if_needed(self_, smf);
+    grad_output = contiguous_if_needed(grad_output_, smf);
     grad_input.resize_as_(self_, smf);
   }
 
@@ -239,8 +239,8 @@ Tensor _adaptive_avg_pool3d_backward(
     // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
     // smf supports ChannelsLast3D and Contiguous cases.
     auto smf = self_.suggest_memory_format();
-    self = self_.contiguous(smf);
-    grad_output = grad_output_.contiguous(smf);
+    self = contiguous_if_needed(self_, smf);
+    grad_output = contiguous_if_needed(grad_output_, smf);
     grad_input = at::empty_like(self_, smf);
   }
 

@@ -11,6 +11,7 @@
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
+using namespace xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -82,7 +83,7 @@ void adaptive_max_pool2d_out_template(
     indices.resize_({nInputPlane, outputHeight, outputWidth});
   } else {
     auto smf = input.suggest_memory_format();
-    input_ = input.contiguous(smf);
+    input_ = contiguous_if_needed(input, smf);
     output.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
     indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
   }
@@ -211,9 +212,9 @@ Tensor& adaptive_max_pool2d_backward_out(
     grad_input.resize_as_(self);
   } else {
     auto smf = self_.suggest_memory_format();
-    self = self_.contiguous(smf);
-    grad_output = grad_output_.contiguous(smf);
-    indices = indices_.contiguous(smf);
+    self = contiguous_if_needed(self_, smf);
+    grad_output = contiguous_if_needed(grad_output_, smf);
+    indices = contiguous_if_needed(indices_, smf);
     grad_input.resize_as_(self, smf);
   }
   IPEX_DISPATCH_FLOATING_TYPES_AND(
@@ -248,9 +249,9 @@ Tensor adaptive_max_pool2d_backward(
     grad_input = at::empty_like(self);
   } else {
     auto smf = self_.suggest_memory_format();
-    self = self_.contiguous(smf);
-    grad_output = grad_output_.contiguous(smf);
-    indices = indices_.contiguous(smf);
+    self = contiguous_if_needed(self_, smf);
+    grad_output = contiguous_if_needed(grad_output_, smf);
+    indices = contiguous_if_needed(indices_, smf);
     grad_input = at::empty_like(self, smf);
   }
   IPEX_DISPATCH_FLOATING_TYPES_AND(
