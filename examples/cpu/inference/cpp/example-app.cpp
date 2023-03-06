@@ -17,7 +17,7 @@ int main(int argc, const char* argv[]) {
     inputs.push_back(input);
 
     at::Tensor output = module.forward(inputs).toTensor();
-    std::cout << output_tensor.slice(/*dim=*/1, /*start=*/0, /*end=*/5) << std::endl;
+    std::cout << output.slice(/*dim=*/1, /*start=*/0, /*end=*/5) << std::endl;
 
     return 0;
 }
