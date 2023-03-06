@@ -468,6 +468,14 @@ class GroupRadixProcesser {
     }
   }
 
+  inline void convert_keys(KeyTraitsT (&ukeys)[KEYS_PER_ITEM]) {
+#pragma unroll
+    for (int ITEM = 0; ITEM < KEYS_PER_ITEM; ++ITEM) {
+      ukeys[ITEM] =
+          KeyTraits<KeyT>::convert(*reinterpret_cast<KeyT*>(&ukeys[ITEM]));
+    }
+  }
+
   inline void select_group(
       KeyT (&keys)[KEYS_PER_ITEM],
       ValueT (&values)[KEYS_PER_ITEM],
@@ -479,6 +487,7 @@ class GroupRadixProcesser {
     KeyTraitsT(&ukeys)[KEYS_PER_ITEM] =
         reinterpret_cast<KeyTraitsT(&)[KEYS_PER_ITEM]>(keys);
     KeyTraitsT* out_ukeys = reinterpret_cast<KeyTraitsT*>(out_keys);
+    convert_keys(ukeys);
     uint32_t active_mask = 0xffffffff;
     int num_selected = 0;
     while (true) {
