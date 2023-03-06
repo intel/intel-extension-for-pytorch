@@ -45,6 +45,7 @@ supported:
   - _fft_r2c.out
   - _fft_c2c.out
   - _fused_dropout
+  - _fused_moving_avg_obs_fq_helper
   - _masked_scale
   - index_copy.out
   - _index_put_impl_
