@@ -14,7 +14,7 @@ set(LIBIPEX_COMP_LIST)
 include(CMakePackageConfigHelpers)
 # CMake config file for the external project.
 configure_package_config_file(
-  ${IPEX_ROOT_DIR}/cmake/cppsdk/IPEXConfig.cmake.in
+  ${IPEX_ROOT_DIR}/cmake/IPEXConfig.cmake.in
   ${PROJECT_BINARY_DIR}/IPEXConfig.cmake
   INSTALL_DESTINATION share/cmake/IPEX)
 
