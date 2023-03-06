@@ -14,7 +14,7 @@ set(LIBIPEX_COMP_LIST)
 include(CMakePackageConfigHelpers)
 # CMake config file for the external project.
 configure_package_config_file(
-  ${IPEX_ROOT_DIR}/cmake/IPEXConfig.cmake.in
+  ${IPEX_ROOT_DIR}/cmake/cppsdk/IPEXConfig.cmake.in
   ${PROJECT_BINARY_DIR}/IPEXConfig.cmake
   INSTALL_DESTINATION share/cmake/IPEX)
 
@@ -71,9 +71,9 @@ if(BUILD_MODULE_TYPE STREQUAL "CPPSDK")
 
   include(CPack)
 
-  set(INSTALL_SCRIPT "libintel-ext-pt-${CMAKE_PROJECT_VERSION}.installer.sh")
+  set(INSTALL_SCRIPT "libintel-ext-pt-${CMAKE_PROJECT_VERSION}.run")
   if(GLIBCXX_USE_CXX11_ABI)
-    set(INSTALL_SCRIPT "libintel-ext-pt-cxx11-abi-${CMAKE_PROJECT_VERSION}.installer.sh")
+    set(INSTALL_SCRIPT "libintel-ext-pt-cxx11-abi-${CMAKE_PROJECT_VERSION}.run")
   endif()
   configure_package_config_file(
     ${IPEX_ROOT_DIR}/cmake/cppsdk/libintel-ext-pt.installer.sh.in
