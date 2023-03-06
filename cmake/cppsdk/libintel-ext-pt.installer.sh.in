@@ -118,6 +118,20 @@ elif [[ ${COMMAND} == "uninstall" ]]; then
         fi
     done
 
+    if [ -f ${LIBTORCH_PATH}/lib/libintel-ext-pt-cpu.so ]; then
+        rm -rf ${LIBTORCH_PATH}/lib/libintel-ext-pt-cpu.so
+    fi
+    if [ -f ${LIBTORCH_PATH}/lib/libintel-ext-pt-gpu.so ]; then
+        rm -rf ${LIBTORCH_PATH}/lib/libintel-ext-pt-gpu.so
+    fi
+
+    if [ -f ${LIBTORCH_PATH}/include/ipex.h ]; then
+        rm -rf ${LIBTORCH_PATH}/include/ipex.h
+    fi
+    if [ -d ${LIBTORCH_PATH}/include/xpu ]; then
+        rm -rf ${LIBTORCH_PATH}/include/xpu
+    fi
+
     if [ -d ${LIBTORCH_PATH}/share/cmake/IPEX ]; then
         rm -rf ${LIBTORCH_PATH}/share/cmake/IPEX
     fi

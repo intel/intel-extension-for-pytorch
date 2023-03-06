@@ -3,7 +3,8 @@
 #
 # Finds the Torch IPEX library
 #
-# This will define the following variables:
+# This will define the following variables. The last 3 are appended to the
+# TORCH counterpart variables respectively.
 #
 #   IPEX_FOUND        -- True if the system has the Torch IPEX library
 #   IPEX_INCLUDE_DIRS -- The include directories for torch
@@ -17,6 +18,8 @@
 
 include(FindPackageHandleStandardArgs)
 
+FIND_PACKAGE(Torch REQUIRED)
+
 if(DEFINED ENV{IPEX_INSTALL_PREFIX})
   set(IPEX_INSTALL_PREFIX $ENV{IPEX_INSTALL_PREFIX})
 else()
@@ -28,17 +31,20 @@ endif()
 # Include directories.
 if(EXISTS "${IPEX_INSTALL_PREFIX}/include")
   set(IPEX_INCLUDE_DIRS ${IPEX_INSTALL_PREFIX}/include)
+  list(APPEND TORCH_INCLUDE_DIRS ${IPEX_INCLUDE_DIRS})
 endif()
 
 # Library dependencies.
 if(@BUILD_WITH_CPU@)
   find_library(IPEX_CPU_CORE_LIBRARY intel-ext-pt-cpu PATHS "${IPEX_INSTALL_PREFIX}/lib")
   set(IPEX_LIBRARIES ${IPEX_CPU_CORE_LIBRARY})
+  list(APPEND TORCH_LIBRARIES ${IPEX_CPU_CORE_LIBRARY})
 endif()
 
 if(@BUILD_WITH_XPU@)
   find_library(IPEX_GPU_CORE_LIBRARY intel-ext-pt-gpu PATHS "${IPEX_INSTALL_PREFIX}/lib")
   list(APPEND IPEX_LIBRARIES ${IPEX_GPU_CORE_LIBRARY})
+  list(APPEND TORCH_LIBRARIES ${IPEX_GPU_CORE_LIBRARY})
 endif()
 
 find_package_handle_standard_args(IPEX DEFAULT_MSG IPEX_LIBRARIES IPEX_INCLUDE_DIRS)
