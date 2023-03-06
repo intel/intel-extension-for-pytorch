@@ -329,9 +329,10 @@ class OpFuser {
   bool aliasIsSafeForSquashingValue(Node* node, Value* v) {
     bool safe = false;
     auto prev = v->node();
-    if (aliasDb_->moveAfterTopologicallyValid(node, prev)) {
-      if (!needCheckUses(node) || v->uses().size() == 1 ||
-          aliasDb_->mayAlias /* mustAlias */ (v, node->output())) {
+
+    if (!needCheckUses(node) || v->uses().size() == 1 ||
+        aliasDb_->mayAlias /* mustAlias */ (v, node->output())) {
+      if (aliasDb_->moveAfterTopologicallyValid(node, prev)) {
         safe = true;
       }
     }
