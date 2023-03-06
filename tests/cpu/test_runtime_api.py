@@ -32,6 +32,33 @@ class SimpleNet_v2(torch.nn.Module):
         y = torch.flatten(x1, start_dim=1)
         return y
 
+class SimpleNet_dict(torch.nn.Module):
+    def __init__(self):
+        super(SimpleNet_dict, self).__init__()
+        self.conv = torch.nn.Conv2d(64, 128, (3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+
+    def forward(self, **x_dict):
+        x1 = self.conv(x_dict["x1"])
+        x2 = self.conv(x_dict["x2"])
+        y1 = x1 + x2
+        y2 = torch.flatten(y1, start_dim=1)
+        ret_dict = {"y1": y1, "y2": y2}
+        return ret_dict
+    
+class SimpleNet_tensor_dict(torch.nn.Module):
+    def __init__(self):
+        super(SimpleNet_tensor_dict, self).__init__()
+        self.conv = torch.nn.Conv2d(64, 128, (3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+
+    def forward(self, **x_dict):
+        x1 = self.conv(x_dict["x1"])
+        x2 = self.conv(x_dict["x2"])
+        y1 = x1 + x2
+        y2 = torch.flatten(y1, start_dim=1)
+        ret_dict = {"y1": y1, "y2": y2}
+        # Return a tuple of (Tensor, dict)
+        return y1, ret_dict
+
 class TestInputOutputModule(torch.nn.Module):
     def __init__(self):
         super(TestInputOutputModule, self).__init__()
@@ -195,6 +222,69 @@ class TestMultiStreamModule(TestCase):
 
         y_runtime = multi_stream_model(x)
         self.assertEqual(y, y_runtime)
+
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
+    def test_multi_stream_module_with_dict_return_type(self):
+        model = SimpleNet_dict()
+        model.eval()
+        batch_size = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
+        x1 = torch.rand(batch_size, 64, 3, 3)
+        x2 = torch.rand(batch_size, 64, 3, 3)
+        x_dict = {"x1":x1, "x2": x2}
+
+        # Calculate the reference result
+        y_dict = model(**x_dict)
+
+        # Create MultiStreamModule
+        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+
+        input_hint_object = {"x1": 0, "x2":0}
+        multi_stream_input_hint = ipex.cpu.runtime.MultiStreamModuleHint(**input_hint_object)
+        output_concat_object= {"y1": 0, "y2":0}
+        multi_stream_output_hint = ipex.cpu.runtime.MultiStreamModuleHint(**output_concat_object)
+
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(model, 
+                                                            num_streams=2, 
+                                                            cpu_pool=cpu_pool, 
+                                                            input_split_hint=multi_stream_input_hint,
+                                                            output_concat_hint=multi_stream_output_hint)
+
+        y_runtime_dict = multi_stream_model(**x_dict)
+        self.assertEqual(y_dict["y1"], y_runtime_dict["y1"])
+        self.assertEqual(y_dict["y2"], y_runtime_dict["y2"])
+        
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
+    def test_multi_stream_module_with_tensor_and_dict_return_type(self):
+        model = SimpleNet_tensor_dict()
+        model.eval()
+        batch_size = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
+        x1 = torch.rand(batch_size, 64, 3, 3)
+        x2 = torch.rand(batch_size, 64, 3, 3)
+        x_dict = {"x1":x1, "x2": x2}
+
+        # Calculate the reference result
+        y, y_dict = model(**x_dict)
+
+        # Create MultiStreamModule
+        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+
+        input_hint_object = {"x1": 0, "x2":0}
+        multi_stream_input_hint = ipex.cpu.runtime.MultiStreamModuleHint(**input_hint_object)
+        output_concat_object= (0, {"y1": 0, "y2":0})
+        multi_stream_output_hint = ipex.cpu.runtime.MultiStreamModuleHint(output_concat_object)
+
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(model, 
+                                                            num_streams=2, 
+                                                            cpu_pool=cpu_pool, 
+                                                            input_split_hint=multi_stream_input_hint,
+                                                            output_concat_hint=multi_stream_output_hint)
+
+        y_runtime, y_runtime_dict = multi_stream_model(**x_dict)
+        self.assertEqual(y, y_runtime)
+        self.assertEqual(y_dict["y1"], y_runtime_dict["y1"])
+        self.assertEqual(y_dict["y2"], y_runtime_dict["y2"])
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
     @runtime_thread_affinity_test_env
