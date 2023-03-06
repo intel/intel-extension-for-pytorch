@@ -36,98 +36,11 @@ output = model(data)
 #### Complete - Float32
 
 [//]: # (marker_train_single_fp32_complete)
-```
-import torch
-import torchvision
-import intel_extension_for_pytorch as ipex
-
-LR = 0.001
-DOWNLOAD = True
-DATA = 'datasets/cifar10/'
-
-transform = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((224, 224)),
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
-train_dataset = torchvision.datasets.CIFAR10(
-        root=DATA,
-        train=True,
-        transform=transform,
-        download=DOWNLOAD,
-)
-train_loader = torch.utils.data.DataLoader(
-        dataset=train_dataset,
-        batch_size=128
-)
-
-model = torchvision.models.resnet50()
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
-model.train()
-model, optimizer = ipex.optimize(model, optimizer=optimizer)
-
-for batch_idx, (data, target) in enumerate(train_loader):
-    optimizer.zero_grad()
-    output = model(data)
-    loss = criterion(output, target)
-    loss.backward()
-    optimizer.step()
-    print(batch_idx)
-torch.save({
-     'model_state_dict': model.state_dict(),
-     'optimizer_state_dict': optimizer.state_dict(),
-     }, 'checkpoint.pth')
-```
 [//]: # (marker_train_single_fp32_complete)
 
 #### Complete - BFloat16
 
 [//]: # (marker_train_single_bf16_complete)
-```
-import torch
-import torchvision
-import intel_extension_for_pytorch as ipex
-
-LR = 0.001
-DOWNLOAD = True
-DATA = 'datasets/cifar10/'
-
-transform = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((224, 224)),
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
-train_dataset = torchvision.datasets.CIFAR10(
-        root=DATA,
-        train=True,
-        transform=transform,
-        download=DOWNLOAD,
-)
-train_loader = torch.utils.data.DataLoader(
-        dataset=train_dataset,
-        batch_size=128
-)
-
-model = torchvision.models.resnet50()
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
-model.train()
-model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
-
-for batch_idx, (data, target) in enumerate(train_loader):
-    optimizer.zero_grad()
-    with torch.cpu.amp.autocast():
-        output = model(data)
-        loss = criterion(output, target)
-        loss.backward()
-    optimizer.step()
-    print(batch_idx)
-torch.save({
-     'model_state_dict': model.state_dict(),
-     'optimizer_state_dict': optimizer.state_dict(),
-     }, 'checkpoint.pth')
-```
 [//]: # (marker_train_single_bf16_complete)
 
 ### Distributed Training
@@ -207,47 +120,11 @@ The `optimize` function of Intel® Extension for PyTorch\* applies optimizations
 ##### Resnet50
 
 [//]: # (marker_inf_rn50_imp_fp32)
-```
-import torch
-import torchvision.models as models
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-model = ipex.optimize(model)
-######################################################
-
-with torch.no_grad():
-  model(data)
-```
 [//]: # (marker_inf_rn50_imp_fp32)
 
 ##### BERT
 
 [//]: # (marker_inf_bert_imp_fp32)
-```
-import torch
-from transformers import BertModel
-
-model = BertModel.from_pretrained(args.model_name)
-model.eval()
-
-vocab_size = model.config.vocab_size
-batch_size = 1
-seq_length = 512
-data = torch.randint(vocab_size, size=[batch_size, seq_length])
-
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-model = ipex.optimize(model)
-######################################################
-
-with torch.no_grad():
-  model(data)
-```
 [//]: # (marker_inf_bert_imp_fp32)
 
 #### TorchScript Mode
@@ -257,55 +134,11 @@ We recommend you take advantage of Intel® Extension for PyTorch\* with [TorchSc
 ##### Resnet50
 
 [//]: # (marker_inf_rn50_ts_fp32)
-```
-import torch
-import torchvision.models as models
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-model = ipex.optimize(model)
-######################################################
-
-with torch.no_grad():
-  d = torch.rand(1, 3, 224, 224)
-  model = torch.jit.trace(model, d)
-  model = torch.jit.freeze(model)
-
-  model(data)
-```
 [//]: # (marker_inf_rn50_ts_fp32)
 
 ##### BERT
 
 [//]: # (marker_inf_bert_ts_fp32)
-```
-import torch
-from transformers import BertModel
-
-model = BertModel.from_pretrained(args.model_name)
-model.eval()
-
-vocab_size = model.config.vocab_size
-batch_size = 1
-seq_length = 512
-data = torch.randint(vocab_size, size=[batch_size, seq_length])
-
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-model = ipex.optimize(model)
-######################################################
-
-with torch.no_grad():
-  d = torch.randint(vocab_size, size=[batch_size, seq_length])
-  model = torch.jit.trace(model, (d,), check_trace=False, strict=False)
-  model = torch.jit.freeze(model)
-
-  model(data)
-```
 [//]: # (marker_inf_bert_ts_fp32)
 
 #### TorchDynamo Mode (Experimental, _NEW feature from 2.0.0_)
@@ -313,49 +146,11 @@ with torch.no_grad():
 ##### Resnet50
 
 [//]: # (marker_inf_rn50_dynamo_fp32)
-```
-import torch
-import torchvision.models as models
-
-model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-# Experimental Feature
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-model = torch.compile(model, backend="ipex")
-######################################################
-
-with torch.no_grad():
-    model(data)
-```
 [//]: # (marker_inf_rn50_dynamo_fp32)
 
 ##### BERT
 
 [//]: # (marker_inf_bert_dynamo_fp32)
-```
-import torch
-from transformers import BertModel
-
-model = BertModel.from_pretrained("bert-base-uncased")
-model.eval()
-
-vocab_size = model.config.vocab_size
-batch_size = 1
-seq_length = 512
-data = torch.randint(vocab_size, size=[batch_size, seq_length])
-
-# Experimental Feature
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-model = torch.compile(model, backend="ipex")
-######################################################
-
-with torch.no_grad():
-    model(data)
-```
 [//]: # (marker_inf_bert_dynamo_fp32)
 
 ### BFloat16
@@ -368,49 +163,11 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.
 ##### Resnet50
 
 [//]: # (marker_inf_rn50_imp_bf16)
-```
-import torch
-import torchvision.models as models
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-model = ipex.optimize(model, dtype=torch.bfloat16)
-######################################################
-
-with torch.no_grad():
-  with torch.cpu.amp.autocast():
-    model(data)
-```
 [//]: # (marker_inf_rn50_imp_bf16)
 
 ##### BERT
 
 [//]: # (marker_inf_bert_imp_bf16)
-```
-import torch
-from transformers import BertModel
-
-model = BertModel.from_pretrained(args.model_name)
-model.eval()
-
-vocab_size = model.config.vocab_size
-batch_size = 1
-seq_length = 512
-data = torch.randint(vocab_size, size=[batch_size, seq_length])
-
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-model = ipex.optimize(model, dtype=torch.bfloat16)
-######################################################
-
-with torch.no_grad():
-  with torch.cpu.amp.autocast():
-    model(data)
-```
 [//]: # (marker_inf_bert_imp_bf16)
 
 #### TorchScript Mode
@@ -420,57 +177,12 @@ We recommend you take advantage of Intel® Extension for PyTorch\* with [TorchSc
 ##### Resnet50
 
 [//]: # (marker_inf_rn50_ts_bf16)
-```
-import torch
-import torchvision.models as models
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-model = ipex.optimize(model, dtype=torch.bfloat16)
-######################################################
-
-with torch.no_grad():
-  with torch.cpu.amp.autocast():
-    model = torch.jit.trace(model, torch.rand(1, 3, 224, 224))
-    model = torch.jit.freeze(model)
-
-    model(data)
-```
 [//]: # (marker_inf_rn50_ts_bf16)
 
 ##### BERT
 
-[//]: # (marker_inf_bert_ts_f16)
-```
-import torch
-from transformers import BertModel
-
-model = BertModel.from_pretrained(args.model_name)
-model.eval()
-
-vocab_size = model.config.vocab_size
-batch_size = 1
-seq_length = 512
-data = torch.randint(vocab_size, size=[batch_size, seq_length])
-
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-model = ipex.optimize(model, dtype=torch.bfloat16)
-######################################################
-
-with torch.no_grad():
-  with torch.cpu.amp.autocast():
-    d = torch.randint(vocab_size, size=[batch_size, seq_length])
-    model = torch.jit.trace(model, (d,), check_trace=False, strict=False)
-    model = torch.jit.freeze(model)
-
-    model(data)
-```
-[//]: # (marker_inf_bert_ts_f16)
+[//]: # (marker_inf_bert_ts_bf16)
+[//]: # (marker_inf_bert_ts_bf16)
 
 ### INT8
 
@@ -492,35 +204,6 @@ Please follow the steps below to perform static calibration:
 
 
 [//]: # (marker_int8_static)
-```
-import os
-import torch
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-from intel_extension_for_pytorch.quantization import prepare, convert
-######################################################
-
-model = Model()
-model.eval()
-data = torch.rand(<shape>)
-
-qconfig = ipex.quantization.default_static_qconfig
-# Alternatively, define your own qconfig:
-#from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, QConfig
-#qconfig = QConfig(activation=MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8),
-#        weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
-prepared_model = prepare(model, qconfig, example_inputs=data, inplace=False)
-
-for d in calibration_data_loader():
-  prepared_model(d)
-
-converted_model = convert(prepared_model)
-with torch.no_grad():
-  traced_model = torch.jit.trace(converted_model, data)
-  traced_model = torch.jit.freeze(traced_model)
-
-traced_model.save("quantized_model.pt")
-```
 [//]: # (marker_int8_static)
 
 ##### Dynamic Quantization
@@ -536,33 +219,6 @@ Please follow the steps below to perform static calibration:
 7. Save the INT8 model into a `pt` file.
 
 [//]: # (marker_int8_dynamic)
-```
-import os
-import torch
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-from intel_extension_for_pytorch.quantization import prepare, convert
-######################################################
-
-model = Model()
-model.eval()
-data = torch.rand(<shape>)
-
-dynamic_qconfig = ipex.quantization.default_dynamic_qconfig
-# Alternatively, define your own qconfig:
-#from torch.ao.quantization import MinMaxObserver, PlaceholderObserver, QConfig
-#qconfig = QConfig(
-#        activation = PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),
-#        weight = PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
-prepared_model = prepare(model, qconfig, example_inputs=data)
-
-converted_model = convert(prepared_model)
-with torch.no_grad():
-  traced_model = torch.jit.trace(converted_model, data)
-  traced_model = torch.jit.freeze(traced_model)
-
-traced_model.save("quantized_model.pt")
-```
 [//]: # (marker_int8_dynamic)
 
 #### Deployment
@@ -576,20 +232,6 @@ Follow the steps below:
 3. Run inference.
 
 [//]: # (marker_int8_deploy)
-```
-import torch
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-######################################################
-
-model = torch.jit.load('quantization_model.pt')
-model.eval()
-model = torch.jit.freeze(model)
-data = torch.rand(<shape>)
-
-with torch.no_grad():
-  model(data)
-```
 [//]: # (marker_int8_deploy)
 
 oneDNN provides [oneDNN Graph Compiler](https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler) as a prototype feature that could boost performance for selective topologies. No code change is required. Install <a class="reference external" href="installation.md#installation_onednn_graph_compiler">a binary</a> with this feature enabled. We verified this feature with `Bert-large`, `bert-base-cased`, `roberta-base`, `xlm-roberta-base`, `google-electra-base-generator` and `google-electra-base-discriminator`.
@@ -605,43 +247,11 @@ The example code below works for all data types.
 **example-app.cpp**
 
 [//]: # (marker_cppsdk_sample)
-```cpp
-#include <torch/script.h>
-#include <iostream>
-#include <memory>
-
-int main(int argc, const char* argv[]) {
-    torch::jit::script::Module module;
-    try {
-        module = torch::jit::load(argv[1]);
-    }
-    catch (const c10::Error& e) {
-        std::cerr << "error loading the model\n";
-        return -1;
-    }
-    std::vector<torch::jit::IValue> inputs;
-
-    at::Tensor output = module.forward(inputs).toTensor();
-
-    return 0;
-}
-```
 [//]: # (marker_cppsdk_sample)
 
 **CMakeLists.txt**
 
 [//]: # (marker_cppsdk_cmake)
-```cmake
-cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
-project(example-app)
-
-find_package(IPEX REQUIRED)
-
-add_executable(example-app example-app.cpp)
-target_link_libraries(example-app "${TORCH_LIBRARIES}")
-
-set_property(TARGET example-app PROPERTY CXX_STANDARD 14)
-```
 [//]: # (marker_cppsdk_cmake)
 
 **Command for compilation**

@@ -6,10 +6,15 @@ from intel_extension_for_pytorch.quantization import prepare, convert
 ######################################################
 
 ##### Example Model #####
-import torchvision.models as models
-model = models.resnet50(weights='ResNet50_Weights.DEFAULT')
+from transformers import BertModel
+
+model = BertModel.from_pretrained("bert-base-uncased")
 model.eval()
-data = torch.rand(1, 3, 224, 224)
+
+vocab_size = model.config.vocab_size
+batch_size = 1
+seq_length = 512
+data = torch.randint(vocab_size, size=[batch_size, seq_length])
 #########################
 
 qconfig = ipex.quantization.default_dynamic_qconfig
@@ -22,7 +27,7 @@ prepared_model = prepare(model, qconfig, example_inputs=data)
 
 converted_model = convert(prepared_model)
 with torch.no_grad():
-  traced_model = torch.jit.trace(converted_model, data)
+  traced_model = torch.jit.trace(converted_model, (data,), check_trace=False, strict=False)
   traced_model = torch.jit.freeze(traced_model)
 
 traced_model.save("quantized_model.pt")
