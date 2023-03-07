@@ -41,7 +41,7 @@ def auto_add_skip(fname, clsname, case, exitcode=0):
     skip_dict[clsname][reason].append(case)
     save_to_json(skip_dict, os.path.join(ALL_PATHS['config_path'], "skip_list.json"))
     print(f"Skipped issue case: {case},"
-          " and will re-run the test suite {fname}::{clsname}")
+          f" and will re-run the test suite {fname}::{clsname}")
 
 
 def handle_case_skip(fname, clsname, case, logfile, status):
