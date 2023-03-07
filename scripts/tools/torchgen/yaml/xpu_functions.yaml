@@ -72,6 +72,7 @@ supported:
   - linalg_lu_factor_ex.out
   - linalg_lu_solve.out
   - linalg_lu.out
+  - linalg_matrix_exp
   - _symeig_helper
   - _unique
   - _unique2
