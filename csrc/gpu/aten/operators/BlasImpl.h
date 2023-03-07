@@ -703,7 +703,8 @@ back to ND and return it
 - Otherwise, we return bmm, after broadcasting and folding the batched
 dimensions if there's more than one
 */
-static at::Tensor matmul_fusion_variants(
+static Tensor& matmul_fusion_variants(
+    Tensor& output,
     const Tensor& tensor1,
     const Tensor& tensor2,
     bool trans,
@@ -726,32 +727,46 @@ static at::Tensor matmul_fusion_variants(
   bool should_fold_tensor1 = should_fold(tensor1, dim_tensor2);
   bool should_fold_tensor2 = should_fold(tensor2, dim_tensor1);
 
-  Tensor output;
   if (dim_tensor1 == 1 && dim_tensor2 == 1) {
     // case1:
     // original size: [6] x [6] -> []
     is_fused = true;
-    output = at::empty({1, 1}, tensor1.options());
+    Tensor result = output.defined() ? output.view({1, 1})
+                                     : at::empty({1, 1}, tensor1.options());
     xpu::oneDNN::matmul(
-        output,
+        result,
         tensor1.view({1, tensor1.size(0)}),
         tensor2.view({tensor2.size(0), 1}),
         bias,
         trans,
         attr);
-    output.resize_({});
+    if (output.defined() && !output.is_alias_of(result)) {
+      output.copy_(result);
+    } else {
+      output = result;
+      output.resize_({});
+    }
+    return output;
   } else if (dim_tensor1 == 2 && dim_tensor2 == 1) {
     // case2:
     // original sizes: [4, 2] x [2] -> [4]
     // onednn sizes: [4, 2] x [2, 1] -> [4, 1]
     DimVector output_shape({tensor1.size(0)});
-    Tensor result = at::empty({tensor1.size(0), 1}, tensor1.options());
+    DimVector result_shape({tensor1.size(0), 1});
+    Tensor result = output.defined()
+        ? output.view(result_shape)
+        : at::empty(result_shape, tensor1.options());
     Tensor t2 = tensor2.view({tensor2.size(0), 1});
 
     is_fused = get_onednn_matmul_binary_attr(
         result, attr, dim_tensor1, dim_tensor2, output_shape);
     xpu::oneDNN::matmul(result, tensor1, t2, bias, trans, attr);
-    output = result.view(output_shape);
+    if (output.defined() && !output.is_alias_of(result)) {
+      output.copy_(result);
+    } else {
+      output = result.view(output_shape);
+    }
+    return output;
   } else if (dim_tensor1 == 1 && dim_tensor2 == 2) {
     // case3:
     // original sizes: [2] x [2, 6] -> [6]
@@ -760,12 +775,20 @@ static at::Tensor matmul_fusion_variants(
     if (!trans)
       output_shape[0] = tensor2.size(0);
     Tensor t1 = tensor1.unsqueeze(0);
-    Tensor result = at::empty({1, output_shape[0]}, tensor1.options());
+    DimVector result_shape({1, output_shape[0]});
+    Tensor result = output.defined()
+        ? output.view(result_shape)
+        : at::empty(result_shape, tensor1.options());
 
     is_fused = get_onednn_matmul_binary_attr(
         result, attr, dim_tensor1, dim_tensor2, output_shape);
     xpu::oneDNN::matmul(result, t1, tensor2, bias, trans, attr);
-    output = result.view(output_shape);
+    if (output.defined() && !output.is_alias_of(result)) {
+      output.copy_(result);
+    } else {
+      output = result.view(output_shape);
+    }
+    return output;
   } else if (dim_tensor1 == 2 && dim_tensor2 == 2) {
     // case4:
     // original sizes: [4, 2] x [2, 6] -> [4, 6]
@@ -774,12 +797,18 @@ static at::Tensor matmul_fusion_variants(
     if (!trans)
       output_shape[1] = tensor2.size(0);
 
-    Tensor result = at::empty(output_shape, tensor1.options());
+    Tensor result =
+        output.defined() ? output : at::empty(output_shape, tensor1.options());
 
     is_fused = get_onednn_matmul_binary_attr(
         result, attr, dim_tensor1, dim_tensor2, output_shape);
     xpu::oneDNN::matmul(result, tensor1, tensor2, bias, trans, attr);
-    output = result;
+    if (output.defined() && !output.is_alias_of(result)) {
+      output.copy_(result);
+    } else {
+      output = result;
+    }
+    return output;
   } else if (should_fold_tensor1) {
     // dim_tensor1 >=3 && (dim_tensor2 == 1 || dim_tensor2 == 2)
     // case5-1:
@@ -801,9 +830,10 @@ static at::Tensor matmul_fusion_variants(
       output_shape.push_back(t2.size(1));
     else
       output_shape.push_back(t2.size(0));
-    Tensor result = at::empty(
-        {t1.size(0), output_shape[output_shape.size() - 1]}, tensor1.options());
-
+    DimVector result_shape({t1.size(0), output_shape[output_shape.size() - 1]});
+    Tensor result = output.defined()
+        ? output.view(result_shape)
+        : at::empty(result_shape, tensor1.options());
     is_fused = get_onednn_matmul_binary_attr(
         result,
         attr,
@@ -814,8 +844,13 @@ static at::Tensor matmul_fusion_variants(
         should_fold_tensor1,
         should_fold_tensor2);
     xpu::oneDNN::matmul(result, t1, t2, bias, trans, attr);
-    output = at::_unsafe_view(result, output_shape);
+    if (output.defined() && !output.is_alias_of(result)) {
+      output.copy_(result);
+    } else {
+      output = at::_unsafe_view(result, output_shape);
+    }
     output = t2_is_matrix ? output : output.squeeze(-1);
+    return output;
   } else if (should_fold_tensor2) {
     // dim_tensor2 >=3 && (dim_tensor1 == 1 || dim_tensor1 == 2)
     // case6-1:
@@ -847,7 +882,10 @@ static at::Tensor matmul_fusion_variants(
     const auto t2_is_matrix = t2_own->dim() == 2;
     Tensor t2 = t2_is_matrix ? *t2_own : t2_own->view({t2_own->size(0), 1});
     output_shape.push_back(t2.size(1));
-    Tensor result = at::empty({t1.size(0), t2.size(1)}, tensor1.options());
+    DimVector result_shape({t1.size(0), t2.size(1)});
+    Tensor result = output.defined()
+        ? output.view(result_shape)
+        : at::empty(result_shape, tensor1.options());
 
     is_fused = get_onednn_matmul_binary_attr(
         result,
@@ -859,8 +897,13 @@ static at::Tensor matmul_fusion_variants(
         should_fold_tensor1,
         should_fold_tensor2);
     xpu::oneDNN::matmul(result, t1, t2, bias, trans, attr);
-    output = at::_unsafe_view(result, output_shape);
+    if (output.defined() && !output.is_alias_of(result)) {
+      output.copy_(result);
+    } else {
+      output = at::_unsafe_view(result, output_shape);
+    }
     output = t2_is_matrix ? output.mT().contiguous() : output.squeeze(-1);
+    return output;
   } else {
     // dim_tensor1 >= 3 || dim_tensor2 >= 3
     // case7-1:
@@ -908,16 +951,22 @@ static at::Tensor matmul_fusion_variants(
     if (dim_tensor2 > 1) {
       output_shape.push_back(p);
     }
-    auto result = at::empty({expand_batch_product, n, p}, tensor1.options());
+    DimVector result_shape({expand_batch_product, n, p});
+    Tensor result = output.defined()
+        ? output.view(result_shape)
+        : at::empty(result_shape, tensor1.options());
 
     is_fused = get_onednn_matmul_binary_attr(
         result, attr, dim_tensor1, dim_tensor2, output_shape);
     xpu::oneDNN::matmul(
         result, tensor1_expanded, tensor2_expanded, bias, trans, attr);
-    output = at::_unsafe_view(result, output_shape);
+    if (output.defined() && !output.is_alias_of(result)) {
+      output.copy_(result);
+    } else {
+      output = at::_unsafe_view(result, output_shape);
+    }
+    return output;
   }
-
-  return output;
 }
 
 } // namespace impl

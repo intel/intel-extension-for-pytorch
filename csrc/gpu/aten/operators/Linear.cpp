@@ -13,16 +13,18 @@ struct LinearConverter {
 
   // linear with post-ops
   template <typename Func>
-  Tensor call(
+  Tensor& call(
+      Tensor& result,
       const Tensor& input,
       const Tensor& weight,
       const c10::optional<Tensor>& bias,
       Func func) {
     Attr attr = func();
     Tensor _bias = bias.has_value() ? bias.value() : at::Tensor();
-    Tensor _input = input.dim() <= 2 ? input : input.contiguous();
+    Tensor _input =
+        input.dim() <= 2 ? input : xpu::oneDNN::contiguous_if_needed(input);
     return matmul_fusion_variants(
-        _input, weight, false, attr, is_fused_, _bias);
+        result, _input, weight, false, attr, is_fused_, _bias);
   }
 
   bool is_fused() {
@@ -49,7 +51,8 @@ struct LinearConverter {
           attr.kind_with_##func);                                          \
       return attr;                                                         \
     };                                                                     \
-    return linear_wrapper.call(input, weight, bias, post_op);              \
+    Tensor result;                                                         \
+    return linear_wrapper.call(result, input, weight, bias, post_op);      \
   }
 
 #define IPEX_LINEAR_BINARY_DEFINATION(func)                                \
@@ -67,11 +70,12 @@ struct LinearConverter {
       attr.append_scale_binary(attr.kind_with_binary_##func, binary, 1.f); \
       return attr;                                                         \
     };                                                                     \
-    Tensor output = linear_wrapper.call(input, weight, bias, post_op);     \
+    Tensor result;                                                         \
+    result = linear_wrapper.call(result, input, weight, bias, post_op);    \
     if (!linear_wrapper.is_fused()) {                                      \
-      output = at::func(output, binary);                                   \
+      result = at::func(result, binary);                                   \
     }                                                                      \
-    return output;                                                         \
+    return result;                                                         \
   }
 
 IPEX_LINEAR_DEFINATION(sqrt)
@@ -114,7 +118,8 @@ Tensor linear_silu(
         attr.kind_with_swish);
     return attr;
   };
-  return linear_wrapper.call(input, weight, bias, post_op);
+  Tensor result;
+  return linear_wrapper.call(result, input, weight, bias, post_op);
 }
 
 Tensor linear_scalar_mul(
@@ -134,7 +139,8 @@ Tensor linear_scalar_mul(
         attr.kind_with_linear);
     return attr;
   };
-  return linear_wrapper.call(input, weight, bias, post_op);
+  Tensor result;
+  return linear_wrapper.call(result, input, weight, bias, post_op);
 }
 
 Tensor linear_scalar_div(
@@ -155,7 +161,8 @@ Tensor linear_scalar_div(
         attr.kind_with_linear);
     return attr;
   };
-  return linear_wrapper.call(input, weight, bias, post_op);
+  Tensor result;
+  return linear_wrapper.call(result, input, weight, bias, post_op);
 }
 
 Tensor linear_scalar_add(
@@ -176,7 +183,8 @@ Tensor linear_scalar_add(
         attr.kind_with_linear);
     return attr;
   };
-  return linear_wrapper.call(input, weight, bias, post_op);
+  Tensor result;
+  return linear_wrapper.call(result, input, weight, bias, post_op);
 }
 
 Tensor linear_scalar_sub(
@@ -211,7 +219,8 @@ Tensor linear_gelu(
     attr.append_post_eltwise(1.0f, 0.0f, 0.0f, algo);
     return attr;
   };
-  return linear_wrapper.call(input, weight, bias, post_op);
+  Tensor result;
+  return linear_wrapper.call(result, input, weight, bias, post_op);
 }
 
 Tensor linear_hardsigmoid(
@@ -230,7 +239,8 @@ Tensor linear_hardsigmoid(
         attr.kind_with_hardsigmoid);
     return attr;
   };
-  return linear_wrapper.call(input, weight, bias, post_op);
+  Tensor result;
+  return linear_wrapper.call(result, input, weight, bias, post_op);
 }
 
 Tensor linear_pow(
@@ -250,7 +260,8 @@ Tensor linear_pow(
         attr.kind_with_pow);
     return attr;
   };
-  return linear_wrapper.call(input, weight, bias, post_op);
+  Tensor result;
+  return linear_wrapper.call(result, input, weight, bias, post_op);
 }
 
 Tensor linear_leaky_relu(
@@ -270,7 +281,8 @@ Tensor linear_leaky_relu(
         attr.kind_with_relu);
     return attr;
   };
-  return linear_wrapper.call(input, weight, bias, post_op);
+  Tensor result;
+  return linear_wrapper.call(result, input, weight, bias, post_op);
 }
 
 Tensor linear_hardtanh(
@@ -291,7 +303,8 @@ Tensor linear_hardtanh(
         attr.kind_with_clip);
     return attr;
   };
-  return linear_wrapper.call(input, weight, bias, post_op);
+  Tensor result;
+  return linear_wrapper.call(result, input, weight, bias, post_op);
 }
 
 Tensor linear_elu(
@@ -313,10 +326,14 @@ Tensor linear_elu(
         attr.kind_with_elu);
     return attr;
   };
-  return linear_wrapper.call(input, weight, bias, post_op);
+  Tensor result;
+  return linear_wrapper.call(result, input, weight, bias, post_op);
 }
 
-// result = (input * weight + bias + alpha * accumul)
+// accumul = (input * weight + bias + alpha * accumul)
+// accumul = Add(Linear(input, weight), accumul)
+// pattern: aten::linear, aten::add_ (inplace accumul)
+// accumul will be inplaced add
 Tensor linear_sum(
     const Tensor& input,
     const Tensor& weight,
@@ -325,11 +342,28 @@ Tensor linear_sum(
     Scalar alpha) {
   RECORD_FUNCTION(
       "linear_sum", std::vector<c10::IValue>({input, weight, bias}));
-  const auto input_sizes = input.sizes();
-  const auto weight_sizes = weight.sizes();
-  std::vector<int64_t> output_sizes = {
-      input_sizes[0], input_sizes[1], weight_sizes[1]};
+  auto post_op = [=]() {
+    Attr attr;
+    attr.append_post_sum(alpha.to<float>());
+    return attr;
+  };
+  auto linear_wrapper = LinearConverter();
+  return linear_wrapper.call(accumul, input, weight, bias, post_op);
+}
 
+// result = (input * weight + bias + alpha * accumul)
+// result = Add(Linear(input, weight), accumul)
+// pattern: aten::linear, aten::add (outplace accumul tensor)
+// pattern: aten::linear, aten::add_ (inplace conv output and outplace accumul)
+// accumul will be outplaced add
+Tensor linear_binary_add(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    Tensor& accumul,
+    Scalar alpha) {
+  RECORD_FUNCTION(
+      "linear_binary_add", std::vector<c10::IValue>({input, weight, bias}));
   auto post_op = [=]() {
     Attr attr;
     attr.append_scale_binary(
@@ -337,14 +371,16 @@ Tensor linear_sum(
     return attr;
   };
   auto linear_wrapper = LinearConverter();
-  Tensor output = linear_wrapper.call(input, weight, bias, post_op);
+  Tensor result;
+  result = linear_wrapper.call(result, input, weight, bias, post_op);
 
   if (!linear_wrapper.is_fused()) {
-    output = at::AtenIpexTypeXPU::add(output, accumul, alpha.to<float>());
+    result = at::AtenIpexTypeXPU::add(result, accumul, alpha.to<float>());
   }
-  return output;
+  return result;
 }
 
+// outplace the binary tensor
 Tensor linear_binary_sub(
     const Tensor& input,
     const Tensor& weight,
@@ -354,7 +390,7 @@ Tensor linear_binary_sub(
   RECORD_FUNCTION(
       "linear_binary_sub",
       std::vector<c10::IValue>({input, weight, bias, binary}));
-  return linear_sum(input, weight, bias, binary, -alpha);
+  return linear_binary_add(input, weight, bias, binary, -alpha);
 }
 
 Tensor dpcpp_linear(
@@ -366,7 +402,8 @@ Tensor dpcpp_linear(
     return attr;
   };
   auto linear_wrapper = LinearConverter();
-  return linear_wrapper.call(input, weight, bias, post_op);
+  Tensor result;
+  return linear_wrapper.call(result, input, weight, bias, post_op);
 }
 
 #define IPEX_OP_REGISTER_LINEAR(op) \
@@ -404,8 +441,10 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_LINEAR(binary_gt);
   IPEX_OP_REGISTER_LINEAR(binary_le);
   IPEX_OP_REGISTER_LINEAR(binary_lt);
+  IPEX_OP_REGISTER("linear_add", linear_binary_add);
   IPEX_OP_REGISTER("linear_binary_mul.Scalar", linear_scalar_mul);
   IPEX_OP_REGISTER("linear_binary_div.Scalar", linear_scalar_div);
+  IPEX_OP_REGISTER("linear_add.Scalar", linear_scalar_add);
   IPEX_OP_REGISTER("linear_sum.Scalar", linear_scalar_add);
   IPEX_OP_REGISTER("linear_binary_sub.Scalar", linear_scalar_sub);
 }

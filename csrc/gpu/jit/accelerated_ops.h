@@ -124,6 +124,7 @@ IPEX_LINEAR_SYMBOL_DECLARATION(hardtanh);
 IPEX_LINEAR_SYMBOL_DECLARATION(leaky_relu);
 
 // binary
+IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(add);
 IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(mul);
 IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(sub);
 IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(div);
@@ -187,6 +188,8 @@ static auto t_matmul_add_gelu_sym =
     Symbol::fromQualString("torch_ipex::t_matmul_add_gelu");
 static auto trans_matmul_div_sym =
     Symbol::fromQualString("torch_ipex::trans_matmul_div");
+static auto trans_matmul_div_add_sym =
+    Symbol::fromQualString("torch_ipex::trans_matmul_div_add");
 static auto mul_add_sym = Symbol::fromQualString("torch_ipex::mul_add");
 static auto q_conv2d_sum_relu_sym =
     Symbol::fromQualString("torch_ipex::q_conv2d_sum_relu");
@@ -206,6 +209,7 @@ static auto q_conv2d_dequantize_mish_compound_quantize_add_sym =
     Symbol::fromQualString(
         "torch_ipex::q_conv2d_dequantize_mish_compound_quantize_add");
 static auto linear_sum_sym = Symbol::fromQualString("torch_ipex::linear_sum");
+static auto linear_add_sym = Symbol::fromQualString("torch_ipex::linear_add");
 static auto dequant_pixelshuffle_sym =
     Symbol::fromQualString("torch_ipex::dequant_pixelshuffle");
 static auto dequant_pixelshuffle_quant_sym =

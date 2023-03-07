@@ -613,7 +613,12 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{xpu::conv2d_mish_compound_sym, aten::add},
      xpu::conv2d_mish_compound_add_sym},
     // BERT: linear with bias + add
-    {{aten::linear, aten::add}, xpu::linear_sum_sym},
+    // outplace linear output and add tensor
+    {{aten::linear, aten::add}, xpu::linear_add_sym},
+    // inplace linear output
+    // {{aten::linear, aten::add_}, xpu::linear_add_sym},
+    // inplace add tensor
+    {{aten::linear, aten::add_}, xpu::linear_sum_sym},
     // BERT: linear no bias + add standalone bias + add
     {{aten::t, aten::matmul}, xpu::t_matmul_sym},
     {{xpu::t_matmul_sym, aten::add}, xpu::t_matmul_add_sym},
@@ -627,6 +632,8 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
      xpu::trans_matmul_sym},
     {{xpu::trans_matmul_sym, Symbol::fromQualString("aten::div")},
      xpu::trans_matmul_div_sym},
+    {{xpu::trans_matmul_div_sym, Symbol::fromQualString("aten::add")},
+     xpu::trans_matmul_div_add_sym},
     // matmul(m1, m2) + add (bias or post_sum)
     {{Symbol::fromQualString("aten::matmul"), aten::add_}, xpu::matmul_add_sym},
     {{Symbol::fromQualString("aten::dequantize"), aten::pixel_shuffle},

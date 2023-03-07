@@ -538,32 +538,36 @@ Tensor& tensordot_out(
 }
 
 /************************** matmul fusion path **************************/
-#define IPEX_MATMUL_DEFINATION(func)                                        \
-  at::Tensor matmul_##func(                                                 \
-      const at::Tensor& tensor1, const at::Tensor& tensor2) {               \
-    RECORD_FUNCTION(                                                        \
-        "matmul_" #func, std::vector<c10::IValue>({tensor1, tensor2}));     \
-    Attr attr;                                                              \
-    attr.append_post_eltwise(                                               \
-        /* scale */ 1.f,                                                    \
-        /* alpha */ 0.f,                                                    \
-        /* beta */ 0.f,                                                     \
-        attr.kind_with_##func);                                             \
-    bool is_fused;                                                          \
-    return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);  \
-  }                                                                         \
-  at::Tensor t_matmul_##func(                                               \
-      const at::Tensor& tensor2, const at::Tensor& tensor1) {               \
-    RECORD_FUNCTION(                                                        \
-        "t_matmul_" #func, std::vector<c10::IValue>({tensor1, tensor2}));   \
-    Attr attr;                                                              \
-    attr.append_post_eltwise(                                               \
-        /* scale */ 1.f,                                                    \
-        /* alpha */ 0.f,                                                    \
-        /* beta */ 0.f,                                                     \
-        attr.kind_with_##func);                                             \
-    bool is_fused;                                                          \
-    return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused); \
+#define IPEX_MATMUL_DEFINATION(func)                                      \
+  at::Tensor matmul_##func(                                               \
+      const at::Tensor& tensor1, const at::Tensor& tensor2) {             \
+    RECORD_FUNCTION(                                                      \
+        "matmul_" #func, std::vector<c10::IValue>({tensor1, tensor2}));   \
+    Attr attr;                                                            \
+    attr.append_post_eltwise(                                             \
+        /* scale */ 1.f,                                                  \
+        /* alpha */ 0.f,                                                  \
+        /* beta */ 0.f,                                                   \
+        attr.kind_with_##func);                                           \
+    bool is_fused;                                                        \
+    Tensor result;                                                        \
+    return matmul_fusion_variants(                                        \
+        result, tensor1, tensor2, true, attr, is_fused);                  \
+  }                                                                       \
+  at::Tensor t_matmul_##func(                                             \
+      const at::Tensor& tensor2, const at::Tensor& tensor1) {             \
+    RECORD_FUNCTION(                                                      \
+        "t_matmul_" #func, std::vector<c10::IValue>({tensor1, tensor2})); \
+    Attr attr;                                                            \
+    attr.append_post_eltwise(                                             \
+        /* scale */ 1.f,                                                  \
+        /* alpha */ 0.f,                                                  \
+        /* beta */ 0.f,                                                   \
+        attr.kind_with_##func);                                           \
+    bool is_fused;                                                        \
+    Tensor result;                                                        \
+    return matmul_fusion_variants(                                        \
+        result, tensor1, tensor2, false, attr, is_fused);                 \
   }
 
 IPEX_MATMUL_DEFINATION(sqrt)
@@ -588,7 +592,8 @@ at::Tensor matmul_silu(const at::Tensor& tensor1, const at::Tensor& tensor2) {
       /* beta */ 0.f,
       attr.kind_with_swish);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(result, tensor1, tensor2, true, attr, is_fused);
 }
 
 at::Tensor matmul_gelu(
@@ -611,7 +616,8 @@ at::Tensor matmul_gelu(
       /* beta */ 0.f,
       algo);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(result, tensor1, tensor2, true, attr, is_fused);
 }
 
 at::Tensor matmul_hardsigmoid(
@@ -626,7 +632,8 @@ at::Tensor matmul_hardsigmoid(
       /* beta */ 1.f / 2.,
       attr.kind_with_hardsigmoid);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(result, tensor1, tensor2, true, attr, is_fused);
 }
 
 at::Tensor matmul_pow(
@@ -641,7 +648,8 @@ at::Tensor matmul_pow(
       /* beta */ exponent.toFloat(),
       attr.kind_with_pow);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(result, tensor1, tensor2, true, attr, is_fused);
 }
 
 at::Tensor matmul_leaky_relu(
@@ -657,7 +665,8 @@ at::Tensor matmul_leaky_relu(
       /* beta */ 0.f,
       attr.kind_with_relu);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(result, tensor1, tensor2, true, attr, is_fused);
 }
 
 at::Tensor matmul_hardtanh(
@@ -674,7 +683,8 @@ at::Tensor matmul_hardtanh(
       /* beta */ maxval.toFloat(),
       attr.kind_with_clip);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(result, tensor1, tensor2, true, attr, is_fused);
 }
 
 at::Tensor matmul_elu(
@@ -691,9 +701,11 @@ at::Tensor matmul_elu(
       /* beta */ 1.f,
       attr.kind_with_elu);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(result, tensor1, tensor2, true, attr, is_fused);
 }
 
+// outplace accumul1 tensor
 // res = m1 * m2 + beta * accumu
 at::Tensor matmul_add(
     const at::Tensor& tensor1,
@@ -706,12 +718,29 @@ at::Tensor matmul_add(
   attr.append_scale_binary(
       attr.kind_with_binary_add, accumul1, beta1.to<float>());
   bool is_fused;
-  Tensor output =
-      matmul_fusion_variants(tensor1, tensor2, true, attr, is_fused);
+  Tensor result;
+  result =
+      matmul_fusion_variants(result, tensor1, tensor2, true, attr, is_fused);
   if (!is_fused) {
-    output += at::mul(accumul1, beta1);
+    result += at::mul(accumul1, beta1);
   }
-  return output;
+  return result;
+}
+
+// inplace accumul tensor
+// accumu = m1 * m2 + beta * accumul
+at::Tensor matmul_sum(
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2,
+    at::Tensor& accumul,
+    Scalar beta) {
+  RECORD_FUNCTION(
+      "matmul_sum", std::vector<c10::IValue>({tensor1, tensor2, accumul}));
+  Attr attr;
+  attr.append_post_sum(beta.to<float>());
+  bool is_fused;
+  return matmul_fusion_variants(
+      accumul, tensor1, tensor2, true, attr, is_fused);
 }
 
 // res = m1 * m2.transpose()
@@ -723,7 +752,9 @@ at::Tensor trans_matmul(
   RECORD_FUNCTION("trans_matmul", std::vector<c10::IValue>({tensor1, tensor2}));
   Attr attr;
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
 }
 
 // res = m1 * m2.t()
@@ -731,7 +762,9 @@ at::Tensor t_matmul(const at::Tensor& tensor2, const at::Tensor& tensor1) {
   RECORD_FUNCTION("t_matmul", std::vector<c10::IValue>({tensor1, tensor2}));
   Attr attr;
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
 }
 
 // res = m1 * m2.t() + beta * accumu
@@ -747,12 +780,13 @@ at::Tensor t_matmul_add(
   attr.append_scale_binary(
       attr.kind_with_binary_add, accumul1, beta1.to<float>());
   bool is_fused;
-  Tensor output =
-      matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  Tensor result;
+  result =
+      matmul_fusion_variants(result, tensor1, tensor2, false, attr, is_fused);
   if (!is_fused) {
-    output += at::mul(accumul1, beta1);
+    result += at::mul(accumul1, beta1);
   }
-  return output;
+  return result;
 }
 
 // res = GELU(m1 * m2.t() + beta * accumu)
@@ -782,12 +816,13 @@ at::Tensor t_matmul_add_gelu(
       /* beta */ 0.f,
       algo);
   bool is_fused;
-  Tensor output =
-      matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  Tensor result;
+  result =
+      matmul_fusion_variants(result, tensor1, tensor2, false, attr, is_fused);
   if (!is_fused) {
-    output = at::gelu((output + at::mul(accumul1, beta1)), approximate);
+    result = at::gelu((result + at::mul(accumul1, beta1)), approximate);
   }
-  return output;
+  return result;
 }
 
 // res = alpha * (m1 * m2.t()) + beta1 * accumu1 + beta2 * accumu2
@@ -807,12 +842,13 @@ at::Tensor t_matmul_add_add(
       attr.kind_with_binary_add, accumul1, beta1.to<float>());
   attr.append_scale_binary(
       attr.kind_with_binary_add, accumul2, beta2.to<float>());
-  Tensor output =
-      matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  Tensor result;
+  result =
+      matmul_fusion_variants(result, tensor1, tensor2, false, attr, is_fused);
   if (!is_fused) {
-    output += at::mul(accumul1, beta1) + at::mul(accumul2, beta2);
+    result += at::mul(accumul1, beta1) + at::mul(accumul2, beta2);
   }
-  return output;
+  return result;
 }
 
 // res = (m1 * m2.transpose()) / oscale
@@ -832,7 +868,36 @@ at::Tensor trans_matmul_div(
       /* beta */ 0.f,
       attr.kind_with_linear);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
+}
+
+// res = (m1 * m2.transpose()) / oscale + accumul
+at::Tensor trans_matmul_div_add(
+    const at::Tensor& tensor2,
+    int64_t dim1,
+    int64_t dim2,
+    const at::Tensor& tensor1,
+    Scalar oscale,
+    Tensor& accumul,
+    Scalar alpha) {
+  RECORD_FUNCTION(
+      "trans_matmul_div_add",
+      std::vector<c10::IValue>({tensor1, tensor2, accumul}));
+  TORCH_CHECK(oscale.to<float>() != 0, "expected non-zero value of oscale");
+  Attr attr;
+  attr.append_post_eltwise( // append post linear
+      /* scale */ 1.f,
+      /* alpha */ 1.f / oscale.to<float>(),
+      /* beta */ 0.f,
+      attr.kind_with_linear);
+  attr.append_scale_binary(
+      attr.kind_with_binary_add, accumul, alpha.to<float>());
+  bool is_fused;
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_silu(const at::Tensor& tensor2, const at::Tensor& tensor1) {
@@ -845,7 +910,9 @@ at::Tensor t_matmul_silu(const at::Tensor& tensor2, const at::Tensor& tensor1) {
       /* beta */ 0.f,
       attr.kind_with_swish);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_hardsigmoid(
@@ -860,7 +927,9 @@ at::Tensor t_matmul_hardsigmoid(
       /* beta */ 1.f / 2.,
       attr.kind_with_hardsigmoid);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_pow(
@@ -875,7 +944,9 @@ at::Tensor t_matmul_pow(
       /* beta */ exponent.toFloat(),
       attr.kind_with_pow);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_leaky_relu(
@@ -891,7 +962,9 @@ at::Tensor t_matmul_leaky_relu(
       /* beta */ 0.f,
       attr.kind_with_relu);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_hardtanh(
@@ -908,7 +981,9 @@ at::Tensor t_matmul_hardtanh(
       /* beta */ maxval.toFloat(),
       attr.kind_with_clip);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_elu(
@@ -925,7 +1000,9 @@ at::Tensor t_matmul_elu(
       /* beta */ 1.f,
       attr.kind_with_elu);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
 }
 
 at::Tensor t_matmul_gelu(
@@ -949,7 +1026,9 @@ at::Tensor t_matmul_gelu(
       /* beta */ 0.f,
       algo);
   bool is_fused;
-  return matmul_fusion_variants(tensor1, tensor2, false, attr, is_fused);
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
 }
 
 } // namespace AtenIpexTypeXPU
@@ -1003,6 +1082,7 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("t_matmul_add_gelu", t_matmul_add_gelu);
   IPEX_OP_REGISTER("t_matmul_add_add", t_matmul_add_add);
   IPEX_OP_REGISTER("trans_matmul_div", trans_matmul_div);
+  IPEX_OP_REGISTER("trans_matmul_div_add", trans_matmul_div_add);
   IPEX_OP_REGISTER_MATMUL(sqrt);
   IPEX_OP_REGISTER_MATMUL(abs);
   IPEX_OP_REGISTER_MATMUL(tanh);
