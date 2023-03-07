@@ -5,7 +5,7 @@ VER_LLVM="llvmorg-13.0.0"
 VER_PYTORCH="v1.13.1"
 VER_TORCHVISION="v0.14.1"
 VER_TORCHAUDIO="v0.13.1"
-VER_IPEX="v1.13.10+xpu"
+VER_IPEX="xpu-master"
 
 if [[ $# -lt 2 ]]; then
     echo "Usage: bash $0 <DPCPPROOT> <MKLROOT> [AOT]"
