@@ -9,13 +9,10 @@
 
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
-
 #include "comm/Atomics.h"
 #include "comm/ParamUtils.h"
-
 namespace at {
 namespace AtenIpexTypeXPU {
-
 template <typename scalar_t>
 DPCPP_DEVICE inline scalar_t min(scalar_t a, scalar_t b) {
   return a < b ? a : b;
