@@ -1,34 +1,10 @@
 set(IPEX_CSRC_INCLUDE_DIR "${IPEX_CSRC_ROOT_DIR}/include")
+set(LIBIPEX_GITREV "${IPEX_GITREV}")
 
 if(BUILD_MODULE_TYPE STREQUAL "GPU")
   add_subdirectory(${IPEX_CSRC_ROOT_DIR}/gpu)
   print_xpu_config_summary()
-
-  # Generate the IPEX All-In-One header
-  # XXX Only for GPU so far.
-  # Should be refined if CPU is needed as well
-  set(ipex_header
-"
-/*
- * Do not modify this file manually!
- * This is a automatically generated header file!
- */
-
-#pragma once
-
-// IPEX headers for XPU
-")
-  FILE(GLOB IPEX_GPU_HEADERS ${IPEX_CSRC_INCLUDE_DIR}/xpu/*.h)
-  foreach(uheader ${IPEX_GPU_HEADERS})
-    get_filename_component(header ${uheader} NAME)
-    set(ipex_header "${ipex_header}#include <xpu/${header}>\n")
-  endforeach()
-  file(WRITE ${CMAKE_BINARY_DIR}/csrc/ipex.h ${ipex_header})
-  install(FILES ${CMAKE_BINARY_DIR}/csrc/ipex.h DESTINATION include)
-  install(DIRECTORY ${IPEX_CSRC_INCLUDE_DIR}/xpu DESTINATION include)
-endif()
-
-if(BUILD_MODULE_TYPE STREQUAL "CPU")
+elseif(BUILD_MODULE_TYPE STREQUAL "CPU")
   add_subdirectory(${IPEX_CSRC_ROOT_DIR}/cpu)
   print_cpu_config_summary()
 endif()
@@ -55,6 +31,43 @@ list(APPEND LIBIPEX_COMP_LIST "share/cmake/IPEX/IPEXVersionConfig.cmake")
 
 set(CPACK_RESOURCE_FILE_LICENSE "${IPEX_ROOT_DIR}/LICENSE")
 install(FILES ${CPACK_RESOURCE_FILE_LICENSE} DESTINATION .)
+
+if(BUILD_MODULE_TYPE STREQUAL "GPU" OR BUILD_MODULE_TYPE STREQUAL "CPPSDK")
+  if(BUILD_MODULE_TYPE STREQUAL "GPU")
+    # Generate the IPEX All-In-One header
+    # XXX Only for GPU so far.
+    # Should be refined if CPU is needed as well
+    set(ipex_header
+"
+/*
+ * Do not modify this file manually!
+ * This is a automatically generated header file!
+ */
+
+#pragma once
+
+// IPEX headers for XPU
+")
+  endif()
+  FILE(GLOB IPEX_GPU_HEADERS ${IPEX_CSRC_INCLUDE_DIR}/xpu/*.h)
+  foreach(uheader ${IPEX_GPU_HEADERS})
+    get_filename_component(header ${uheader} NAME)
+    if(BUILD_MODULE_TYPE STREQUAL "GPU")
+      set(ipex_header "${ipex_header}#include <xpu/${header}>\n")
+    elseif(BUILD_MODULE_TYPE STREQUAL "CPPSDK" AND BUILD_WITH_XPU)
+      install(FILES "${IPEX_CSRC_INCLUDE_DIR}/xpu/${header}" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/xpu")
+      list(APPEND LIBIPEX_COMP_LIST "${CMAKE_INSTALL_INCLUDEDIR}/xpu/${header}")
+    endif()
+  endforeach()
+  if(BUILD_MODULE_TYPE STREQUAL "GPU")
+    file(WRITE ${CMAKE_BINARY_DIR}/csrc/ipex.h ${ipex_header})
+    install(FILES ${CMAKE_BINARY_DIR}/csrc/ipex.h DESTINATION include)
+    install(DIRECTORY ${IPEX_CSRC_INCLUDE_DIR}/xpu DESTINATION include)
+  elseif(BUILD_MODULE_TYPE STREQUAL "CPPSDK" AND BUILD_WITH_XPU)
+    install(FILES "${CMAKE_BINARY_DIR}/../gpu/csrc/ipex.h" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+    list(APPEND LIBIPEX_COMP_LIST "${CMAKE_INSTALL_INCLUDEDIR}/ipex.h")
+  endif()
+endif()
 
 # XXX: All variables with prefix LIBIPEX_ will be used to set in LIBIPEX installation scripts
 if(BUILD_MODULE_TYPE STREQUAL "CPPSDK")
@@ -94,9 +107,9 @@ if(BUILD_MODULE_TYPE STREQUAL "CPPSDK")
 
   include(CPack)
 
-  set(INSTALL_SCRIPT "libintel-ext-pt-${CMAKE_PROJECT_VERSION}.installer.sh")
+  set(INSTALL_SCRIPT "libintel-ext-pt-${CMAKE_PROJECT_VERSION}.run")
   if(GLIBCXX_USE_CXX11_ABI)
-    set(INSTALL_SCRIPT "libintel-ext-pt-cxx11-abi-${CMAKE_PROJECT_VERSION}.installer.sh")
+    set(INSTALL_SCRIPT "libintel-ext-pt-cxx11-abi-${CMAKE_PROJECT_VERSION}.run")
   endif()
   configure_package_config_file(
     ${IPEX_ROOT_DIR}/cmake/cppsdk/libintel-ext-pt.installer.sh.in

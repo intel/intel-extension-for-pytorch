@@ -386,7 +386,7 @@ def get_xpu_project_build_dir():
 
 def get_xpu_compliers():
     if shutil.which('icx') is None or shutil.which('icpx') is None:
-        raise RuntimeError("Failed to find compiler path from OS PATH")
+        raise RuntimeError("Failed to find icx/icpx compiler path from OS PATH")
     return "icx", "icpx"
 
 
@@ -523,16 +523,18 @@ class IPEXCPPLibBuild(build_clib, object):
             cmake_prefix_path = torch.utils.cmake_prefix_path
 
         build_option_common = {
-            'CMAKE_BUILD_TYPE'      : get_build_type(),
-            'CMAKE_INSTALL_LIBDIR'  : 'lib',
-            'CMAKE_PREFIX_PATH'     : cmake_prefix_path,
-            'CMAKE_INSTALL_PREFIX'  : os.path.abspath(get_package_dir()),
-            'IPEX_INSTALL_LIBDIR'   : os.path.abspath(output_lib_path),
-            'CMAKE_PROJECT_VERSION' : get_version_num(),
-            'PYTHON_PLATFORM_INFO'  : platform.platform(),
-            'PYTHON_INCLUDE_DIR'    : sysconfig.get_paths()['include'],
-            'PYTHON_EXECUTABLE'     : sys.executable,
-            'IPEX_PROJ_NAME'        : PACKAGE_NAME
+            'CMAKE_BUILD_TYPE'         : get_build_type(),
+            'CMAKE_INSTALL_INCLUDEDIR' : 'include',
+            'CMAKE_INSTALL_LIBDIR'     : 'lib',
+            'CMAKE_PREFIX_PATH'        : cmake_prefix_path,
+            'CMAKE_INSTALL_PREFIX'     : os.path.abspath(get_package_dir()),
+            'IPEX_INSTALL_LIBDIR'      : os.path.abspath(output_lib_path),
+            'CMAKE_PROJECT_VERSION'    : get_version_num(),
+            'PYTHON_PLATFORM_INFO'     : platform.platform(),
+            'PYTHON_INCLUDE_DIR'       : sysconfig.get_paths()['include'],
+            'PYTHON_EXECUTABLE'        : sys.executable,
+            'IPEX_PROJ_NAME'           : PACKAGE_NAME,
+            'IPEX_GITREV'              : ipex_git_sha,
         }
 
         build_with_cpu = True   # Default ON
