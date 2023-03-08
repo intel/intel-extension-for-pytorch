@@ -12,4 +12,4 @@ model = torch.compile(model, backend="ipex")
 ######################################################
 
 with torch.no_grad():
-    model(data)
+  model(data)

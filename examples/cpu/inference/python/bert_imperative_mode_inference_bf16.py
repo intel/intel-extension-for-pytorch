@@ -14,10 +14,5 @@ import intel_extension_for_pytorch as ipex
 model = ipex.optimize(model, dtype=torch.bfloat16)
 ######################################################
 
-with torch.no_grad():
-  with torch.cpu.amp.autocast():
-    d = torch.randint(vocab_size, size=[batch_size, seq_length])
-    model = torch.jit.trace(model, (d,), check_trace=False, strict=False)
-    model = torch.jit.freeze(model)
-
-    model(data)
+with torch.no_grad(), torch.cpu.amp.autocast():
+  model(data)

@@ -25,15 +25,15 @@ DOWNLOAD = True
 DATA = 'datasets/cifar10/'
 
 transform = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((224, 224)),
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+  torchvision.transforms.Resize((224, 224)),
+  torchvision.transforms.ToTensor(),
+  torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
 train_dataset = torchvision.datasets.CIFAR10(
-        root=DATA,
-        train=True,
-        transform=transform,
-        download=DOWNLOAD,
+  root=DATA,
+  train=True,
+  transform=transform,
+  download=DOWNLOAD,
 )
 calibration_data_loader = torch.utils.data.DataLoader(
   dataset=train_dataset,
@@ -41,7 +41,7 @@ calibration_data_loader = torch.utils.data.DataLoader(
 )
 
 for batch_idx, (d, target) in enumerate(calibration_data_loader):
-  print(batch_idx)
+  print(f'calibrated on batch {batch_idx} out of {len(calibration_data_loader)}')
   prepared_model(d)
 ##############################
 
