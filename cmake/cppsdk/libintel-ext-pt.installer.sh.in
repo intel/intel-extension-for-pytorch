@@ -7,10 +7,13 @@ SCRIPT_PATH=$(dirname "$SCRIPT")
 
 COMMAND=""
 LIBTORCH_PATH=""
+LOGFILE="ipex-info"
 
 # Below values will be set automatically. DO NOT modify them manually!
 # Append new required relative_path/components in LIBIPEX_COMP_LIST in cmake scripts
 LIBIPEX_VERSION="@CMAKE_PROJECT_VERSION@"
+LIBIPEX_GITREV="@LIBIPEX_GITREV@"
+LIBIPEX_BUILD_TYPE="@CMAKE_BUILD_TYPE@"
 LIBIPEX_PACK_NAME="@CPACK_PACKAGE_NAME@"
 LIBIPEX_COMPS_LIST="@LIBIPEX_COMP_LIST@"
 
@@ -78,6 +81,10 @@ if [[ ${COMMAND} == "install" ]]; then
     ARCHIVE_NR=$(awk '/^__ARCHIVE_BELOW_ONLY__/ {print NR + 1; exit 0; }' $0)
     tail -n+${ARCHIVE_NR} $0 | tar xJfv - -C ${TMP_DIR} --strip-components=1
 
+    echo "Version: $LIBIPEX_VERSION" > ${LIBTORCH_PATH}/${LOGFILE}
+    echo "Gitrev:  $LIBIPEX_GITREV" >> ${LIBTORCH_PATH}/${LOGFILE}
+    echo "Build:   $LIBIPEX_BUILD_TYPE" >> ${LIBTORCH_PATH}/${LOGFILE}
+    echo "" >> ${LIBTORCH_PATH}/${LOGFILE}
     for comp in ${LIBIPEX_COMPS_LIST}; do
         fn=$(basename ${comp})
         fp=$(dirname ${comp})
@@ -85,6 +92,7 @@ if [[ ${COMMAND} == "install" ]]; then
         if [ ! -f ${TMP_DIR}/${comp} ]; then
             echo "Installation failed."
             echo "ERROR! Cannot find ${fn} in ${TMP_DIR}/${fp}. Uncompress failed!"
+            rm ${LIBTORCH_PATH}/${LOGFILE} 2>/dev/null
             exit 17
         fi
 
@@ -94,8 +102,10 @@ if [[ ${COMMAND} == "install" ]]; then
                 echo "Installation failed."
                 echo "ERROR! Failed to create folder ${LIBTORCH_PATH}/${fp}!"
                 echo "Please check if you have privileges to write in ${LIBTORCH_PATH}."
+                rm ${LIBTORCH_PATH}/${LOGFILE} 2>/dev/null
                 exit 18
             fi
+            echo "d|${fp}" >> ${LIBTORCH_PATH}/${LOGFILE}
         fi
 
         cp ${TMP_DIR}/${comp} ${LIBTORCH_PATH}/${comp}
@@ -103,41 +113,35 @@ if [[ ${COMMAND} == "install" ]]; then
             echo "Installation failed."
             echo "ERROR! Failed to install ${fn} into ${LIBTORCH_PATH}/${fp}!"
             echo "Please check if you have privileges to write in ${LIBTORCH_PATH}/${fp}."
+            rm ${LIBTORCH_PATH}/${LOGFILE} 2>/dev/null
             exit 19
         fi
+        echo "f|${comp}" >> ${LIBTORCH_PATH}/${LOGFILE}
     done
 
-    echo $LIBIPEX_VERSION > ${LIBTORCH_PATH}/build-version-ipex
     echo "Installation successed!"
 
 # LIBIPEX Uninstallation
 elif [[ ${COMMAND} == "uninstall" ]]; then
-    for comp in ${LIBIPEX_COMPS_LIST}; do
-        if [ -f ${LIBTORCH_PATH}/${comp} ]; then
-            rm -f ${LIBTORCH_PATH}/${comp}
+    while read -r line; do
+        FILE=$(echo ${line} | cut -d '|' -f 2)
+        if [ -f ${LIBTORCH_PATH}/${FILE} ]; then
+            rm -f ${LIBTORCH_PATH}/${FILE}
         fi
-    done
+    done < <(grep "f|" ${LIBTORCH_PATH}/${LOGFILE})
 
-    if [ -f ${LIBTORCH_PATH}/lib/libintel-ext-pt-cpu.so ]; then
-        rm -rf ${LIBTORCH_PATH}/lib/libintel-ext-pt-cpu.so
-    fi
-    if [ -f ${LIBTORCH_PATH}/lib/libintel-ext-pt-gpu.so ]; then
-        rm -rf ${LIBTORCH_PATH}/lib/libintel-ext-pt-gpu.so
-    fi
+    while read -r line; do
+        FOLDER=$(echo ${line} | cut -d '|' -f 2)
+        COUNT=$(ls -1 ${LIBTORCH_PATH}/${FOLDER} | wc -l)
+        if [ ${COUNT} -eq 0 ]; then
+            rm -rf ${LIBTORCH_PATH}/${FOLDER}
+        else
+            echo "${LIBTORCH_PATH}/${FOLDER} is not empty, skip."
+        fi
+    done < <(grep "d|" ${LIBTORCH_PATH}/${LOGFILE})
 
-    if [ -f ${LIBTORCH_PATH}/include/ipex.h ]; then
-        rm -rf ${LIBTORCH_PATH}/include/ipex.h
-    fi
-    if [ -d ${LIBTORCH_PATH}/include/xpu ]; then
-        rm -rf ${LIBTORCH_PATH}/include/xpu
-    fi
-
-    if [ -d ${LIBTORCH_PATH}/share/cmake/IPEX ]; then
-        rm -rf ${LIBTORCH_PATH}/share/cmake/IPEX
-    fi
-
-    if [ -f ${LIBTORCH_PATH}/build-version-ipex ]; then
-        rm -f ${LIBTORCH_PATH}/build-version-ipex
+    if [ -f ${LIBTORCH_PATH}/${LOGFILE} ]; then
+        rm -f ${LIBTORCH_PATH}/${LOGFILE}
     fi
 
     echo "Uninstallation successed!"
