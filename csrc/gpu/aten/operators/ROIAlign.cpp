@@ -374,8 +374,12 @@ at::Tensor roi_align_forward_kernel(
 
   auto input_ = input.contiguous(), rois_ = rois.contiguous();
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "roi_align_forward_kernel", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      input.scalar_type(),
+      "roi_align_forward_kernel",
+      [&] {
         auto spatial_scale_ = static_cast<scalar_t>(spatial_scale);
         auto cgf = DPCPP_Q_CGF(cgh) {
           auto input_ptr = (scalar_t*)input_.data_ptr();
@@ -448,8 +452,12 @@ at::Tensor roi_align_backward_kernel(
 
   auto rois_ = rois.contiguous();
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      grad.scalar_type(), "roi_align_backward_kernel", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      grad.scalar_type(),
+      "roi_align_backward_kernel",
+      [&] {
         auto spatial_scale_ = static_cast<scalar_t>(spatial_scale);
         auto cgf = DPCPP_Q_CGF(cgh) {
           auto grad_ptr = (scalar_t*)grad.data_ptr();
