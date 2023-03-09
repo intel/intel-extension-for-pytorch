@@ -568,13 +568,17 @@ modelImpe.qconfig = qconfig
 torch.quantization.prepare(modelImpe, inplace=True)
 
 with torch.no_grad():
-    for input in enumerate(calib_dataset):
-        ########## code changes ##########
-        calib = input.to("xpu")
-        ########## code changes ##########
-        modelImpe(calib)
-        if i == self.calib_iters - 1:
-            break
+    pseudo_calib_data = torch.rand(1, 3, 224, 224).to('xpu')
+    modelImpe(pseudo_calib_data)
+    # Above is a pseudo calibration process
+    # In practice we should specify a dataset for calibration
+    # and the process should be something like:
+    #for input in enumerate(calib_dataset):
+    #    calib = input.to("xpu")
+    #    modelImpe(calib)
+    #    if i == self.calib_iters - 1:
+    #        break
+
 torch.quantization.convert(modelImpe, inplace=True)
 
 modelImpe(test_data)
@@ -610,7 +614,7 @@ with torch.no_grad():
   ##### code changes #####
   d = d.to("xpu")
   ##### code changes #####
-  model = torch.jit.trace(model, d)
+  modelJit = torch.jit.trace(model, d)
 
 #################### code changes ##################################
 qconfig = torch.quantization.QConfig(
@@ -622,12 +626,18 @@ qconfig = torch.quantization.QConfig(
     weight=torch.quantization.default_weight_observer
 )
 modelJit = prepare_jit(modelJit, {'': qconfig}, True)
-for i, input in enumerate(calib_dataset):
-    calib = input.to("xpu")
-    modelJit(calib)
 
-    if i == calib_iters - 1:
-        break
+pseudo_calib_data = torch.rand(1, 3, 224, 224).to('xpu')
+modelJit(pseudo_calib_data)
+# Above is a pseudo calibration process
+# In practice we should specify a dataset for calibration
+# and the process should be something like:
+#for i, input in enumerate(calib_dataset):
+#    calib = input.to("xpu")
+#    modelJit(calib)
+#    if i == calib_iters - 1:
+#        break
+
 modelJit = convert_jit(modelJit, True)
 #################### code changes ##################################
 
