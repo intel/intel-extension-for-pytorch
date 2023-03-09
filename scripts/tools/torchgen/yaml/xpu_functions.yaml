@@ -524,6 +524,7 @@ supported:
   - scatter.src_out
   - scatter.value_reduce_out
   - scatter_add.out  # newly added
+  - scatter_reduce.two_out
   - segment_reduce
   - set_
   - set_.source_Storage

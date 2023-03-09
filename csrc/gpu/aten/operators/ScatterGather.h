@@ -18,19 +18,87 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-enum class SCATTER_GATHER_OP : uint8_t { REDUCE_ADD, REDUCE_MULTIPLY };
+enum class SCATTER_GATHER_OP : uint8_t {
+  REDUCE_ADD,
+  REDUCE_MULTIPLY,
+  REDUCE_MAXIMUM,
+  REDUCE_MINIMUM,
+  REDUCE_MEAN
+};
 
-SCATTER_GATHER_OP get_operator_enum(const c10::string_view reduce) {
-  if (reduce == "add") {
-    return SCATTER_GATHER_OP::REDUCE_ADD;
-  } else if (reduce == "multiply") {
-    return SCATTER_GATHER_OP::REDUCE_MULTIPLY;
+SCATTER_GATHER_OP get_operator_enum(
+    const c10::string_view reduce,
+    bool use_new_options = false) {
+  if (use_new_options) {
+    if (reduce == "sum") {
+      return SCATTER_GATHER_OP::REDUCE_ADD;
+    } else if (reduce == "prod") {
+      return SCATTER_GATHER_OP::REDUCE_MULTIPLY;
+    } else if (reduce == "mean") {
+      return SCATTER_GATHER_OP::REDUCE_MEAN;
+    } else if (reduce == "amax") {
+      return SCATTER_GATHER_OP::REDUCE_MAXIMUM;
+    } else if (reduce == "amin") {
+      return SCATTER_GATHER_OP::REDUCE_MINIMUM;
+    } else {
+      TORCH_CHECK(
+          false,
+          "reduce argument must be either sum, prod, mean, amax or amin.");
+    }
   } else {
-    TORCH_CHECK(false, "reduce argument must be either add or multiply.");
+    if (reduce == "add") {
+      return SCATTER_GATHER_OP::REDUCE_ADD;
+    } else if (reduce == "multiply") {
+      return SCATTER_GATHER_OP::REDUCE_MULTIPLY;
+    } else {
+      TORCH_CHECK(false, "reduce argument must be either add or multiply.")
+    }
   }
 }
 
-template <typename T, typename ReduceStub, typename FillStub>
+static void scatter_reduce_exclude_self_helper(
+    const Tensor& self,
+    int64_t dim,
+    const Tensor& index,
+    const SCATTER_GATHER_OP& op) {
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "scatter_reduce_exclude_input_init",
+      [&] {
+        scalar_t init_val;
+        switch (op) {
+          case SCATTER_GATHER_OP::REDUCE_ADD:
+            init_val = (scalar_t)0;
+            break;
+          case SCATTER_GATHER_OP::REDUCE_MULTIPLY:
+            init_val = (scalar_t)1;
+            break;
+          case SCATTER_GATHER_OP::REDUCE_MAXIMUM:
+            init_val = std::numeric_limits<scalar_t>::has_infinity
+                ? -std::numeric_limits<scalar_t>::infinity()
+                : std::numeric_limits<scalar_t>::lowest();
+            break;
+          case SCATTER_GATHER_OP::REDUCE_MINIMUM:
+            init_val = std::numeric_limits<scalar_t>::has_infinity
+                ? std::numeric_limits<scalar_t>::infinity()
+                : std::numeric_limits<scalar_t>::max();
+            break;
+          case SCATTER_GATHER_OP::REDUCE_MEAN:
+            init_val = (scalar_t)0;
+            break;
+        }
+        self.scatter_(dim, index, init_val);
+      });
+}
+
+template <
+    bool use_new_options = false,
+    typename T,
+    typename ReduceStub,
+    typename FillStub>
 void scatter_impl(
     const Tensor& self,
     int64_t dim,
@@ -39,7 +107,8 @@ void scatter_impl(
     const Tensor& out,
     ReduceStub& reduce_stub,
     FillStub& fill_stub,
-    const c10::optional<c10::string_view> reduce = nullopt) {
+    const c10::optional<c10::string_view> reduce = nullopt,
+    bool reduce_includes_self = true) {
   if (index.numel() == 0)
     return;
   dim = at::maybe_wrap_dim(dim, self.dim());
@@ -50,7 +119,12 @@ void scatter_impl(
   }
 
   if (reduce.has_value()) {
-    auto op = get_operator_enum(reduce.value());
+    auto op = get_operator_enum(reduce.value(), use_new_options);
+    if (!reduce_includes_self) {
+      // scatter inits for reduction to appropriate indices (used by
+      // scatter_reduce.two)
+      scatter_reduce_exclude_self_helper(mut_out, dim, index, op);
+    }
     reduce_stub(mut_out, dim, index, src, op);
   } else {
     fill_stub(mut_out, dim, index, src);
@@ -96,6 +170,66 @@ class ReduceAdd {
   }
 };
 static ReduceAdd reduce_add;
+
+class ReduceMean {
+ public:
+  template <typename scalar_t>
+  constexpr C10_DEVICE void operator()(
+      scalar_t* self_data_start,
+      int64_t index,
+      int64_t numel,
+      const scalar_t* src_data) const {
+    atomicAdd(
+        (dpcpp_global_ptr_pt<scalar_t>)(self_data_start + index), *src_data);
+  }
+
+  template <typename scalar_t>
+  constexpr void operator()(scalar_t* self_data, const scalar_t* src_data)
+      const {
+    atomicAdd((dpcpp_global_ptr_pt<scalar_t>)self_data, *src_data);
+  }
+};
+static ReduceMean reduce_mean;
+
+class ReduceMinimum {
+ public:
+  template <typename scalar_t>
+  constexpr C10_DEVICE void operator()(
+      scalar_t* self_data_start,
+      int64_t index,
+      int64_t numel,
+      const scalar_t* src_data) const {
+    atomicMin(
+        (dpcpp_global_ptr_pt<scalar_t>)(self_data_start + index), *src_data);
+  }
+
+  template <typename scalar_t>
+  constexpr void operator()(scalar_t* self_data, const scalar_t* src_data)
+      const {
+    atomicMin((dpcpp_global_ptr_pt<scalar_t>)self_data, *src_data);
+  }
+};
+static ReduceMinimum reduce_minimum;
+
+class ReduceMaximum {
+ public:
+  template <typename scalar_t>
+  constexpr C10_DEVICE void operator()(
+      scalar_t* self_data_start,
+      int64_t index,
+      int64_t numel,
+      const scalar_t* src_data) const {
+    atomicMax(
+        (dpcpp_global_ptr_pt<scalar_t>)(self_data_start + index), *src_data);
+  }
+
+  template <typename scalar_t>
+  constexpr void operator()(scalar_t* self_data, const scalar_t* src_data)
+      const {
+    atomicMax((dpcpp_global_ptr_pt<scalar_t>)self_data, *src_data);
+  }
+};
+static ReduceMaximum reduce_maximum;
 
 class TensorAssign {
  public:

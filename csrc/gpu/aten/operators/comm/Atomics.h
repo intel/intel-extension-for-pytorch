@@ -271,5 +271,29 @@ SYCL_ATOMIC_FP(Mul, Numerics<double>::mul(a, b), double)
 SYCL_ATOMIC_FP(Mul, Numerics<at::Half>::mul(a, b), at::Half)
 SYCL_ATOMIC_FP(Mul, Numerics<at::BFloat16>::mul(a, b), at::BFloat16)
 
+// Atomic maximum implementation.
+SYCL_ATOMIC_INTEGER(Max, Numerics<uint8_t>::max(a, b), uint8_t)
+SYCL_ATOMIC_INTEGER(Max, Numerics<int8_t>::max(a, b), int8_t)
+SYCL_ATOMIC_INTEGER(Max, Numerics<int16_t>::max(a, b), int16_t)
+SYCL_ATOMIC_INTEGER(Max, Numerics<int32_t>::max(a, b), int32_t)
+SYCL_ATOMIC_INTEGER(Max, Numerics<int64_t>::max(a, b), int64_t)
+
+SYCL_ATOMIC_FP(Max, Numerics<float>::max(a, b), float)
+SYCL_ATOMIC_FP(Max, Numerics<double>::max(a, b), double)
+SYCL_ATOMIC_FP(Max, Numerics<at::Half>::max(a, b), at::Half)
+SYCL_ATOMIC_FP(Max, Numerics<at::BFloat16>::max(a, b), at::BFloat16)
+
+// Atomic minimum implementation.
+SYCL_ATOMIC_INTEGER(Min, Numerics<uint8_t>::min(a, b), uint8_t)
+SYCL_ATOMIC_INTEGER(Min, Numerics<int8_t>::min(a, b), int8_t)
+SYCL_ATOMIC_INTEGER(Min, Numerics<int16_t>::min(a, b), int16_t)
+SYCL_ATOMIC_INTEGER(Min, Numerics<int32_t>::min(a, b), int32_t)
+SYCL_ATOMIC_INTEGER(Min, Numerics<int64_t>::min(a, b), int64_t)
+
+SYCL_ATOMIC_FP(Min, Numerics<float>::min(a, b), float)
+SYCL_ATOMIC_FP(Min, Numerics<double>::min(a, b), double)
+SYCL_ATOMIC_FP(Min, Numerics<at::Half>::min(a, b), at::Half)
+SYCL_ATOMIC_FP(Min, Numerics<at::BFloat16>::min(a, b), at::BFloat16)
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

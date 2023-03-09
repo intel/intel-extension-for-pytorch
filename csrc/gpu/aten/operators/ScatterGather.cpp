@@ -283,5 +283,74 @@ Tensor& scatter_out(
   return out;
 }
 
+void scatter_reduce_two_dpcpp_kernel(
+    const Tensor& self,
+    const int64_t dim,
+    const Tensor& index,
+    const Tensor& src,
+    const SCATTER_GATHER_OP& reduce) {
+  globalContext().alertNotDeterministic("scatter_reduce_dpcpp");
+  switch (reduce) {
+    case SCATTER_GATHER_OP::REDUCE_ADD:
+      dpcpp_scatter_gather_base_kernel<true, false>()(
+          self, dim, index, src, "scatter_reduce_cuda_sum_", reduce_add);
+      break;
+    case SCATTER_GATHER_OP::REDUCE_MULTIPLY:
+      dpcpp_scatter_gather_base_kernel<true, false>()(
+          self, dim, index, src, "scatter_reduce_cuda_prod_", reduce_multiply);
+      break;
+    case SCATTER_GATHER_OP::REDUCE_MAXIMUM:
+      dpcpp_scatter_gather_base_kernel<true, false>()(
+          self, dim, index, src, "scatter_reduce_cuda_amax_", reduce_maximum);
+      break;
+    case SCATTER_GATHER_OP::REDUCE_MINIMUM:
+      dpcpp_scatter_gather_base_kernel<true, false>()(
+          self, dim, index, src, "scatter_reduce_cuda_amin_", reduce_minimum);
+      break;
+    case SCATTER_GATHER_OP::REDUCE_MEAN:
+      dpcpp_scatter_gather_base_kernel<true, false>()(
+          self, dim, index, src, "scatter_reduce_cuda_mean_", reduce_mean);
+      break;
+  }
+}
+
+Tensor& scatter_reduce_out(
+    const Tensor& self,
+    int64_t dim,
+    const Tensor& index,
+    const Tensor& src,
+    const c10::string_view reduce,
+    bool include_self,
+    Tensor& out) {
+  // See issue https://github.com/pytorch/pytorch/issues/74770
+  TORCH_WARN_ONCE(
+      "scatter_reduce() is in beta and the API may change at any time.");
+
+  scatter_impl</*use_new_options=*/true>(
+      self,
+      dim,
+      index,
+      src,
+      out,
+      scatter_reduce_two_dpcpp_kernel,
+      scatter_dpcpp_kernel,
+      reduce,
+      include_self);
+
+  if (get_operator_enum(reduce, true) == SCATTER_GATHER_OP::REDUCE_MEAN) {
+    auto ones = at::ones_like(src);
+    auto count = include_self ? at::ones_like(out) : at::zeros_like(out);
+    count.scatter_add_(dim, index, ones);
+    count.masked_fill_(count == 0, 1);
+
+    if (out.is_floating_point() || out.is_complex()) {
+      out.div_(count);
+    } else {
+      out.div_(count, "floor");
+    }
+  }
+  return out;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
