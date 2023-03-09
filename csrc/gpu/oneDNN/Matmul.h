@@ -1,9 +1,11 @@
 #pragma once
 
 #include <ATen/ATen.h>
+
 #include <ATen/record_function.h>
 
 #include <oneDNN/Runtime.h>
+#include <quantized/QUtils.h>
 #include <runtime/Utils.h>
 #include <tensor/Tensor.h>
 #include <utils/LRUCache.h>
@@ -178,30 +180,18 @@ static inline void matmul(
   // STEP2: creat attribute
   primitive_attr pattr;
 
-  std::vector<float> weight_scales;
-  if (m2.is_quantized()) {
-    if (m2.qscheme() == kPerTensorAffine) {
-      weight_scales.push_back(static_cast<float>(m2.q_scale()));
-    } else {
-      for (int i = 0; i < m2.size(1); i++)
-        weight_scales.push_back(m2.q_per_channel_scales()[i].item<float>());
-    }
-  }
-
   if (m1.is_quantized()) {
     auto in_scale = m1.q_scale();
-    // auto out_scale = dst.is_quantized() ? dst.q_scale() : 1.f;
-    std::vector<float> matmul_scale;
-    for (int i = 0; i < weight_scales.size(); i++) {
-      matmul_scale.push_back(1.f / (1.f / (in_scale * weight_scales[i])));
-    }
     int mask_ac = 0;
-    int mask_matmul = weight_scales.size() > 1 ? 1 << 1 : 0;
-    pattr.set_output_scales(mask_matmul, matmul_scale);
-    pattr.set_zero_points(
-        DNNL_ARG_DST,
-        mask_ac,
-        {static_cast<int>(dst.is_quantized() ? dst.q_zero_point() : 0)});
+    int mask_matmul = (m2.qscheme() == kPerChannelAffine) ? 1 << 1 : 0;
+    pattr.set_scales_mask(DNNL_ARG_DST, mask_matmul);
+    pattr.set_zero_points_mask(DNNL_ARG_DST, mask_ac);
+
+    pattr.set_scales_mask(DNNL_ARG_SRC, mask_ac);
+    pattr.set_zero_points_mask(DNNL_ARG_SRC, mask_ac);
+
+    pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_matmul);
+    pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, mask_matmul);
   }
 
   std::unordered_map<int, memory> args;
@@ -222,9 +212,9 @@ static inline void matmul(
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  auto matmul_desc = matmul::desc(m1_md, m2_md, dst_md);
-
   auto is_onednn_layout_suggested = using_onednn_layout_for_matmul(m1);
+
+  matmul::primitive_desc matmul_pd;
 
   if (with_bias && (!m1.is_quantized()) && (!m2.is_quantized())) {
     // ensure getting a valid oneDNN bias md here
@@ -233,22 +223,23 @@ static inline void matmul(
 
     if (dims == 2 && is_onednn_layout_suggested) {
       // attr + blk
-      matmul_desc = matmul::desc(m1_any_md, m2_any_md, b_md, dst_any_md);
+      matmul_pd = matmul::primitive_desc(
+          engine, m1_any_md, m2_any_md, b_md, dst_any_md, pattr);
     } else {
       // attr + plain
-      matmul_desc = matmul::desc(m1_md, m2_md, b_md, dst_md);
+      matmul_pd =
+          matmul::primitive_desc(engine, m1_md, m2_md, b_md, dst_md, pattr);
     }
   } else {
     if (dims == 2 && is_onednn_layout_suggested) {
       // no attr + blk
-      matmul_desc = matmul::desc(m1_any_md, m2_any_md, dst_any_md);
+      matmul_pd = matmul::primitive_desc(
+          engine, m1_any_md, m2_any_md, dst_any_md, pattr);
     } else {
       // no attr + plain
-      matmul_desc = matmul::desc(m1_md, m2_md, dst_md);
+      matmul_pd = matmul::primitive_desc(engine, m1_md, m2_md, dst_md, pattr);
     }
   }
-
-  auto matmul_pd = matmul::primitive_desc(matmul_desc, pattr, engine);
 
 #ifdef USE_SCRATCHPAD_MODE
   int scratchpad_size = matmul_pd.scratchpad_desc().get_size();
@@ -338,7 +329,84 @@ static inline void matmul(
   args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_memory});
 #endif
 
-  DPCPP_ONEDNN_EXEC(matmul_p, strm, args);
+  // TODO: Separate quantized path from fp32 path
+  if ((!m1.is_quantized()) && (!m2.is_quantized())) {
+    // Path1: normal path for non quantized input
+    DPCPP_ONEDNN_EXEC(matmul_p, strm, args);
+  } else {
+    // Path2: quantized path, set runtime sale and zp here
+    bool is_per_tensor_quantized = (m2.qscheme() == kPerTensorAffine);
+
+    float dnn_factor =
+        ((m1.scalar_type() == at::kQUInt8) && (!is_opaque_u8(m1))) ? 0.5f : 1.f;
+    Tensor m1_sc = at::ones({1}, at::dtype(at::kFloat).device(at::kXPU)) *
+        static_cast<float>(m1.q_scale()) * dnn_factor;
+    memory::desc m1_sc_md =
+        memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+    memory m1_sc_m = dpcpp_onednn_memory(m1_sc_md, engine, m1_sc.data_ptr());
+    Tensor m1_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
+    memory::desc m1_zp_md =
+        memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+    memory m1_zp_m = dpcpp_onednn_memory(m1_zp_md, engine, m1_zp.data_ptr());
+    args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, m1_sc_m});
+    args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, m1_zp_m});
+
+    Tensor dst_sc = at::ones({1}, at::dtype(at::kFloat).device(at::kXPU));
+    memory::desc dst_sc_md =
+        memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+    memory dst_sc_m = dpcpp_onednn_memory(dst_sc_md, engine, dst_sc.data_ptr());
+    Tensor dst_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
+    if (dst.is_quantized())
+      dst_zp = at::ones({1}, at::dtype(at::kInt).device(at::kXPU)) *
+          dst.q_zero_point();
+    memory::desc dst_zp_md =
+        memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+    memory dst_zp_m = dpcpp_onednn_memory(dst_zp_md, engine, dst_zp.data_ptr());
+    args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zp_m});
+    args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, dst_sc_m});
+
+    if (is_per_tensor_quantized) {
+      Tensor wgh_sc = at::ones({1}, at::dtype(at::kFloat).device(at::kXPU)) *
+          static_cast<float>(m2.q_scale());
+      memory::desc wgh_sc_md =
+          memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+      memory wgh_sc_m =
+          dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
+
+      Tensor wgh_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
+      memory::desc wgh_zp_md =
+          memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+      memory wgh_zp_m =
+          dpcpp_onednn_memory(wgh_zp_md, engine, wgh_zp.data_ptr());
+
+      args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
+      args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, wgh_zp_m});
+
+      DPCPP_ONEDNN_EXEC(matmul_p, strm, args);
+    } else {
+      // Per-channel quantized
+      Tensor wgh_sc = m2.q_per_channel_scales().to(at::kFloat);
+      memory::desc wgh_sc_md = memory::desc(
+          get_onednn_dims(wgh_sc),
+          memory::data_type::f32,
+          memory::format_tag::x);
+      memory wgh_sc_m =
+          dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
+
+      Tensor wgh_zp = at::zeros_like(
+          m2.q_per_channel_zero_points(), at::dtype(at::kInt).device(at::kXPU));
+      memory::desc wgh_zp_md = memory::desc(
+          get_onednn_dims(wgh_zp),
+          memory::data_type::s32,
+          memory::format_tag::x);
+      memory wgh_zp_m =
+          dpcpp_onednn_memory(wgh_zp_md, engine, wgh_zp.data_ptr());
+
+      args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
+      args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, wgh_zp_m});
+      DPCPP_ONEDNN_EXEC(matmul_p, strm, args);
+    }
+  }
   if (is_onednn_layout_suggested && dst_m != dst_usr_m && dims == 2) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));

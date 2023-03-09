@@ -149,9 +149,11 @@ conv_get_plain_md(
   // 5D: n/c/d/h/w (n/d/h/w/c)
   auto fmt_src = conv_src_fmt(ndim, is_channels_last_suggested);
   auto src_usr_md = memory::desc(src.sizes().vec(), src_data_t, fmt_src);
+  auto src_md = memory::desc(src.sizes().vec(), src_data_t, fmt_src);
 
   auto dst_data_t = get_onednn_dtype_include_double(dst);
   auto dst_usr_md = memory::desc(dst.sizes().vec(), dst_data_t, fmt_src);
+  auto dst_md = memory::desc(dst.sizes().vec(), dst_data_t, fmt_src);
 
   auto ic = src.size(1);
   auto oc = dst.size(1);
@@ -166,14 +168,14 @@ conv_get_plain_md(
   // FIXME:
   // WA for ChannelsLast with FP32
   // https://jira.devtools.intel.com/browse/MFDNN-9218
-  memory::desc wgh_md = wgh_usr_md;
+  memory::desc wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
   if ((src_data_t == memory::data_type::f32 ||
        src_data_t == memory::data_type::f64) &&
       is_channels_last_suggested) {
     wgh_md = memory::desc(wgh_tz, wei_data_t, memory::format_tag::any);
   }
 
-  return {src_usr_md, wgh_usr_md, dst_usr_md, src_usr_md, wgh_md, dst_usr_md};
+  return {src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md};
 }
 
 static std::tuple<
@@ -196,7 +198,7 @@ conv_get_blocked_md(
   if (src_ctx.is_plain()) {
     auto src_tz = src.sizes().vec();
     auto src_data_t = get_onednn_dtype_include_double(src);
-    src_usr_md = memory::desc(src.sizes().vec(), src_data_t, fmt_src);
+    src_usr_md = memory::desc(src_tz, src_data_t, fmt_src);
   } else {
     src_usr_md = src_ctx.meta();
   }
@@ -227,11 +229,12 @@ conv_get_blocked_md(
   auto fmt_any = memory::format_tag::any;
   auto src_md = src.size(1) == 3
       ? src_usr_md
-      : memory::desc(src_usr_md.dims(), src_usr_md.data_type(), fmt_any);
+      : memory::desc(
+            src_usr_md.get_dims(), src_usr_md.get_data_type(), fmt_any);
   auto wgh_md =
-      memory::desc(wgh_usr_md.dims(), wgh_usr_md.data_type(), fmt_any);
+      memory::desc(wgh_usr_md.get_dims(), wgh_usr_md.get_data_type(), fmt_any);
   auto dst_md =
-      memory::desc(dst_usr_md.dims(), dst_usr_md.data_type(), fmt_any);
+      memory::desc(dst_usr_md.get_dims(), dst_usr_md.get_data_type(), fmt_any);
 
   return {src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md};
 }
@@ -258,6 +261,7 @@ static memory conv_get_expected_src_memory(
     }
   } else {
     src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
+    src_blocked = src;
   }
   return src_m;
 }
@@ -307,6 +311,7 @@ static memory conv_get_expected_wgh_memory(
     }
   } else {
     wgh_m = dpcpp_onednn_memory(wgh_usr_md, engine, wgh.data_ptr());
+    wgh_blocked = wgh;
   }
   return wgh_m;
 }
@@ -329,6 +334,7 @@ static memory conv_get_expected_dst_memory(
       xpu::oneDNN::reorder(dst, dst_blocked);
   } else {
     dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
+    dst_blocked = dst;
   }
   return dst_m;
 }
@@ -367,24 +373,13 @@ static at::Tensor convolution(
   auto bia_md = bia.defined()
       ? memory::desc(
             {dst.size(1)}, get_onednn_dtype_include_double(bia), bia_fmt)
-      : memory::desc({}, memory::data_type::undef, bia_fmt);
+      : memory::desc();
 
   // create conv primitive descriptor
   memory::dims _stride = stride.vec();
   memory::dims _padding_front_top_left = padding_front_top_left.vec();
   memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
   memory::dims _dilation = compatible_dilation(dilation);
-  auto conv_fwd_desc = convolution_forward::desc(
-      prop_kind::forward,
-      algorithm::convolution_direct,
-      src_md,
-      wgh_md,
-      bia_md,
-      dst_md,
-      _stride,
-      _dilation,
-      _padding_front_top_left,
-      _padding_back_bottom_right);
 
   // extract post ops
   primitive_attr pattr;
@@ -396,12 +391,23 @@ static at::Tensor convolution(
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
 
-  if (src_usr_md.data_type() == memory::data_type::f32) {
+  if (src_usr_md.get_data_type() == memory::data_type::f32) {
     pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
   }
 
-  auto conv_fwd_pd =
-      convolution_forward::primitive_desc(conv_fwd_desc, pattr, engine);
+  auto conv_fwd_pd = convolution_forward::primitive_desc(
+      engine,
+      prop_kind::forward,
+      algorithm::convolution_direct,
+      src_md,
+      wgh_md,
+      bia_md,
+      dst_md,
+      _stride,
+      _dilation,
+      _padding_front_top_left,
+      _padding_back_bottom_right,
+      pattr);
 
   auto weight_cache_optimization = [&]() {
     // FIXME:
@@ -410,8 +416,8 @@ static at::Tensor convolution(
     // After this issue fixed, ChannelsLast do not need weight cache
     bool flag =
         (memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast) &&
-        (src_usr_md.data_type() == memory::data_type::f32 ||
-         src_usr_md.data_type() == memory::data_type::f64);
+        (src_usr_md.get_data_type() == memory::data_type::f32 ||
+         src_usr_md.get_data_type() == memory::data_type::f64);
     return ((memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked) ||
             flag) &&
         !at::GradMode::is_enabled();
@@ -444,8 +450,8 @@ static at::Tensor convolution(
     bool is_channels_last_suggested =
         memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
     if (is_channels_last_suggested &&
-        (src_usr_md.data_type() == memory::data_type::f32 ||
-         src_usr_md.data_type() == memory::data_type::f64)) {
+        (src_usr_md.get_data_type() == memory::data_type::f32 ||
+         src_usr_md.get_data_type() == memory::data_type::f64)) {
       auto expected_wgh_md = conv_fwd_pd.weights_desc();
       wgh_m = conv_get_expected_wgh_memory(
           wgh,
@@ -523,15 +529,23 @@ static void convolution_backward_weights(
   }
   memory::format_tag bia_fmt = memory::format_tag::x;
   auto bia_md = diff_bia.defined()
-      ? memory::desc({diff_dst.size(1)}, src_md.data_type(), bia_fmt)
-      : memory::desc({}, memory::data_type::undef, bia_fmt);
+      ? memory::desc({diff_dst.size(1)}, src_md.get_data_type(), bia_fmt)
+      : memory::desc();
 
   // create fwd primitive hint
   memory::dims _stride = stride.vec();
   memory::dims _padding_front_top_left = padding_front_top_left.vec();
   memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
   memory::dims _dilation = compatible_dilation(dilation);
-  auto conv_fwd_desc = convolution_forward::desc(
+  primitive_attr pattr;
+  if (src_usr_md.get_data_type() == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+  auto conv_fwd_pd = convolution_forward::primitive_desc(
+      engine,
       prop_kind::forward,
       algorithm::convolution_direct,
       src_md,
@@ -541,19 +555,12 @@ static void convolution_backward_weights(
       _stride,
       _dilation,
       _padding_front_top_left,
-      _padding_back_bottom_right);
-  primitive_attr pattr;
-  if (src_usr_md.data_type() == memory::data_type::f32) {
-    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
-  }
-#ifdef USE_SCRATCHPAD_MODE
-  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-#endif
-  auto conv_fwd_pd =
-      convolution_forward::primitive_desc(conv_fwd_desc, pattr, engine);
+      _padding_back_bottom_right,
+      pattr);
 
   // create bwd weight primitive
-  auto conv_bwd_w_desc = convolution_backward_weights::desc(
+  auto conv_bwd_w_pd = convolution_backward_weights::primitive_desc(
+      engine,
       algorithm::convolution_direct,
       src_md,
       wgh_md,
@@ -562,9 +569,9 @@ static void convolution_backward_weights(
       _stride,
       _dilation,
       _padding_front_top_left,
-      _padding_back_bottom_right);
-  auto conv_bwd_w_pd = convolution_backward_weights::primitive_desc(
-      conv_bwd_w_desc, pattr, engine, conv_fwd_pd);
+      _padding_back_bottom_right,
+      conv_fwd_pd,
+      pattr);
 
   // create bwd memory
   Tensor expected_src, expected_diff_dst, expected_diff_wgh;
@@ -598,8 +605,8 @@ static void convolution_backward_weights(
     bool is_channels_last_suggested =
         memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
     if (is_channels_last_suggested &&
-        (src_usr_md.data_type() == memory::data_type::f32 ||
-         src_usr_md.data_type() == memory::data_type::f64)) {
+        (src_usr_md.get_data_type() == memory::data_type::f32 ||
+         src_usr_md.get_data_type() == memory::data_type::f64)) {
       if (wgh_usr_md != expected_wgh_md) {
         expected_diff_wgh = empty_opaque_tensor(
             expected_wgh_md, diff_wgh.options(), c10::nullopt);
@@ -691,12 +698,12 @@ static void convolution_backward_data(
   }
   memory::format_tag bia_fmt = memory::format_tag::x;
   auto bia_md = bias_defined
-      ? memory::desc({diff_dst.size(1)}, wgh_md.data_type(), bia_fmt)
-      : memory::desc({}, memory::data_type::undef, bia_fmt);
+      ? memory::desc({diff_dst.size(1)}, wgh_md.get_data_type(), bia_fmt)
+      : memory::desc();
 
   // create fwd primitive desc hint
   primitive_attr pattr;
-  if (dst_usr_md.data_type() == memory::data_type::f32) {
+  if (dst_usr_md.get_data_type() == memory::data_type::f32) {
     pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
   }
 #ifdef USE_SCRATCHPAD_MODE
@@ -706,7 +713,8 @@ static void convolution_backward_data(
   memory::dims _padding_front_top_left = padding_front_top_left.vec();
   memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
   memory::dims _dilation = compatible_dilation(dilation);
-  auto conv_forward_desc = convolution_forward::desc(
+  auto conv_forward_pd = convolution_forward::primitive_desc(
+      engine,
       prop_kind::forward,
       algorithm::convolution_direct,
       src_md,
@@ -716,12 +724,11 @@ static void convolution_backward_data(
       _stride,
       _dilation,
       _padding_front_top_left,
-      _padding_back_bottom_right);
-  auto conv_forward_pd =
-      convolution_forward::primitive_desc(conv_forward_desc, pattr, engine);
+      _padding_back_bottom_right,
+      pattr);
 
-  // create bwd primitive desc
-  auto conv_backward_data_desc = convolution_backward_data::desc(
+  auto conv_backward_data_pd = convolution_backward_data::primitive_desc(
+      engine,
       algorithm::convolution_direct,
       src_md,
       wgh_md,
@@ -729,9 +736,9 @@ static void convolution_backward_data(
       _stride,
       _dilation,
       _padding_front_top_left,
-      _padding_back_bottom_right);
-  auto conv_backward_data_pd = convolution_backward_data::primitive_desc(
-      conv_backward_data_desc, pattr, engine, conv_forward_pd);
+      _padding_back_bottom_right,
+      conv_forward_pd,
+      pattr);
 
   // create memory
   Tensor expected_src, expected_wei, expected_dst;
@@ -762,8 +769,8 @@ static void convolution_backward_data(
     bool is_channels_last_suggested =
         memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
     if (is_channels_last_suggested &&
-        (src_usr_md.data_type() == memory::data_type::f32 ||
-         src_usr_md.data_type() == memory::data_type::f64)) {
+        (src_usr_md.get_data_type() == memory::data_type::f32 ||
+         src_usr_md.get_data_type() == memory::data_type::f64)) {
       if (wgh_usr_md != expected_wgh_md) {
         expected_wei = empty_opaque_tensor(
             expected_wgh_md, weight.options(), c10::nullopt);

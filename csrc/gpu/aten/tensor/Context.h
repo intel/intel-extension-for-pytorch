@@ -10,8 +10,8 @@
 using namespace xpu::dpcpp;
 
 using mem_desc_t = dnnl::memory::desc;
-using mem_dims_t = dnnl::memory::dims;
 using mem_dtype_t = dnnl::memory::data_type;
+using mem_dims_t = dnnl::memory::dims;
 using mem_layout_tag_t = dnnl::memory::format_tag;
 using meta_t = mem_desc_t;
 using data_t = void*;
@@ -48,9 +48,7 @@ struct DPCPPTensorContext {
 
   // plain tensor
   DPCPPTensorContext(data_t data)
-      : data_(data),
-        meta_({}, mem_dtype_t::undef, mem_layout_tag_t::undef),
-        aten_meta_({{}, {}}) {}
+      : data_(data), meta_(), aten_meta_({{}, {}}) {}
 
   // block or plain tensor
   DPCPPTensorContext(data_t data, const meta_t& meta)
@@ -59,18 +57,19 @@ struct DPCPPTensorContext {
   int64_t padded_size() {
     if (is_plain())
       return 0;
-    int64_t* padded_dims = meta_.data.padded_dims;
-    int64_t ndims = meta_.data.ndims;
+    std::vector<int64_t> padded_dims = meta_.get_padded_dims();
+    int64_t ndims = meta_.get_ndims();
     int64_t size = 1;
     for (int64_t dim = 0; dim < ndims; dim++)
       size *= padded_dims[dim];
     return size;
   }
   bool is_plain() {
-    if (meta_.dims().size() == 0 && meta_.data_type() == mem_dtype_t::undef) {
+    if (meta_ == dnnl::memory::desc()) {
       return true;
     } else if (
-        meta_.dims().size() != 0 && meta_.data_type() != mem_dtype_t::undef) {
+        meta_.get_dims().size() != 0 &&
+        meta_.get_data_type() != mem_dtype_t::undef) {
       return false;
     } else {
       TORCH_CHECK(1, "fail to check tensor meta ...");
@@ -78,7 +77,7 @@ struct DPCPPTensorContext {
     }
   }
   void to_plain() {
-    meta_ = meta_t({}, mem_dtype_t::undef, mem_layout_tag_t::undef);
+    meta_ = dnnl::memory::desc();
   }
   void set_meta(meta_t meta) {
     meta_ = meta;
@@ -96,13 +95,13 @@ struct DPCPPTensorContext {
     return aten_meta_;
   }
   mem_dims_t dims() const {
-    return meta_.dims();
+    return meta_.get_dims();
   }
   mem_dtype_t dtype() const {
-    return meta_.data_type();
+    return meta_.get_data_type();
   }
   mem_dims_t plain_strides() const {
-    mem_dims_t dims = meta_.dims();
+    mem_dims_t dims = meta_.get_dims();
     mem_dims_t strd(dims.size());
     strd[dims.size() - 1] = 1;
     for (int i = dims.size() - 2; i >= 0; i--)

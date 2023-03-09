@@ -121,9 +121,11 @@ static std::tuple<memory::desc, memory::desc, memory::desc> qconv_get_blocked_md
   auto fmt_any = memory::format_tag::any;
   src_md = src.size(1) == 3
       ? src_usr_md
-      : memory::desc(src_usr_md.dims(), src_usr_md.data_type(), fmt_any);
-  wgh_md = memory::desc(wgh_usr_md.dims(), memory::data_type::s8, fmt_any);
-  dst_md = memory::desc(dst_usr_md.dims(), dst_usr_md.data_type(), fmt_any);
+      : memory::desc(
+            src_usr_md.get_dims(), src_usr_md.get_data_type(), fmt_any);
+  wgh_md = memory::desc(wgh_usr_md.get_dims(), memory::data_type::s8, fmt_any);
+  dst_md =
+      memory::desc(dst_usr_md.get_dims(), dst_usr_md.get_data_type(), fmt_any);
 
   return {src_md, wgh_md, dst_md};
 }
@@ -150,46 +152,6 @@ static std::tuple<memory::desc, memory::desc, memory::desc> qconv_get_plain_md(
   return {src_md, wgh_md, dst_md};
 }
 
-static inline void get_conv_scale(
-    const Tensor& src,
-    const Tensor& wgh,
-    const memory::data_type& src_data_t,
-    int oc,
-    std::vector<float>& wgh_scales,
-    std::vector<float>& conv_scale,
-    int& mask_conv) {
-  float src_scale;
-  if (wgh.qscheme() == kPerTensorAffine) {
-    wgh_scales.push_back(static_cast<float>(wgh.q_scale()));
-  } else {
-    for (int i = 0; i < oc; i++) {
-      wgh_scales.push_back(wgh.q_per_channel_scales()[i].item<float>());
-    }
-  }
-
-  // TODO: scale setting in separate functions
-  src_scale = (src_data_t == memory::data_type::u8 && src.q_zero_point() == 128)
-      ? src.q_scale() / 2
-      : src.q_scale();
-  conv_scale.clear();
-  /* Note: [Convolution requantization]
-      Suppose y = w * x. The * refer to convolution operation, and y, w, x are
-      dtype of FP32.
-      Then we have
-        y_int / y_sc =  (w_int / w_sc) * (x_int / x_sc) =>
-        y_int = [y_sc / (w_sc * x_sc)] (w_int * x_int).
-      The y_sc / (w_sc x x_sc) is requantization scale, which is also the
-      conv_scale in following line.
-      Inversion is required due to scale_onednn = 1  / scale_torch */
-  /*The requantization will be performed in Attr.h with appending post op
-   * linear to adjust the scale/zeropoint*/
-  for (int i = 0; i < wgh_scales.size(); i++) {
-    conv_scale.push_back(
-        src_scale * wgh_scales[i]); // 1.f / (1.f / (src_scale * wgh_scales[i]))
-  }
-  mask_conv = wgh_scales.size() > 1 ? 1 << 1 : 0;
-}
-
 static memory qconv_get_expected_src_memory(
     const at::Tensor& src,
     at::Tensor& src_blocked,
@@ -212,6 +174,7 @@ static memory qconv_get_expected_src_memory(
     }
   } else {
     src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
+    src_blocked = src;
   }
   return src_m;
 }
@@ -252,6 +215,7 @@ static memory qconv_get_expected_wgh_memory(
     }
   } else {
     wgh_m = dpcpp_onednn_memory(wgh_usr_md, engine, wgh.data_ptr());
+    wgh_blocked = wgh;
   }
   return wgh_m;
 }
@@ -281,6 +245,7 @@ static memory qconv_get_blocked_dst_memory(
       xpu::oneDNN::reorder(dst, dst_blocked);
   } else {
     dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
+    dst_blocked = dst;
   }
   return dst_m;
 }
@@ -326,16 +291,16 @@ static at::Tensor quantized_convolution(
   memory::dims _padding_front_top_left = padding_front_top_left.vec();
   memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
   memory::dims _dilation = compatible_dilation(dilation);
-  // conv post ops config
+  lru_key_t key_primitive;
   post_ops po;
+  // extract post ops
   attr.extract_post_ops(po, dst);
-  // conv scale and zero_point
+  // set conv primitive scale and zero_point
   std::vector<float> wgh_scales, conv_scale = {1};
   int conv_zero_point = 0, mask_ac = 0, mask_conv;
-  get_conv_scale(
-      src, wgh, src_data_t, dst.size(1), wgh_scales, conv_scale, mask_conv);
 
-  lru_key_t key_primitive;
+  primitive_attr pattr;
+  mask_conv = (wgh.qscheme() == kPerTensorAffine) ? 0 : 1 << 1;
 #ifdef USE_PRIMITIVE_CACHE
   create_key(
       key_primitive,
@@ -350,9 +315,7 @@ static at::Tensor quantized_convolution(
       _padding_back_bottom_right,
       is_onednn_layout_suggested,
       is_channels_last_suggested,
-      attr,
-      conv_scale,
-      conv_zero_point);
+      attr);
 #endif
 
   convolution_forward conv_forward;
@@ -394,7 +357,23 @@ static at::Tensor quantized_convolution(
           is_channels_last_suggested);
     }
 
-    auto conv_fwd_desc = convolution_forward::desc(
+    pattr.set_scales_mask(DNNL_ARG_DST, mask_conv);
+    pattr.set_zero_points_mask(DNNL_ARG_DST, mask_ac);
+
+    pattr.set_scales_mask(DNNL_ARG_SRC, mask_ac);
+    pattr.set_zero_points_mask(DNNL_ARG_SRC, mask_ac);
+
+    pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_conv);
+    pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_conv);
+
+    pattr.set_post_ops(po);
+#ifdef USE_SCRATCHPAD_MODE
+    pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
+    // create primitive
+    conv_fwd_pd = convolution_forward::primitive_desc(
+        engine,
         prop_kind::forward,
         algorithm::convolution_direct,
         src_md,
@@ -404,20 +383,8 @@ static at::Tensor quantized_convolution(
         _stride,
         _dilation,
         _padding_front_top_left,
-        _padding_back_bottom_right);
-
-    primitive_attr pattr;
-    pattr.set_output_scales(mask_conv, conv_scale);
-    pattr.set_zero_points(DNNL_ARG_DST, mask_ac, {conv_zero_point});
-    pattr.set_post_ops(po);
-
-#ifdef USE_SCRATCHPAD_MODE
-    pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-#endif
-
-    // create primitive
-    conv_fwd_pd =
-        convolution_forward::primitive_desc(conv_fwd_desc, pattr, engine);
+        _padding_back_bottom_right,
+        pattr);
 
 #ifdef USE_PRIMITIVE_CACHE
     conv_forward =
@@ -477,6 +444,32 @@ static at::Tensor quantized_convolution(
   args.insert({DNNL_ARG_WEIGHTS, wgh_m});
   args.insert({DNNL_ARG_DST, dst_m});
 
+  float dnn_factor =
+      ((src.scalar_type() == at::kQUInt8) && (!is_opaque_u8(src))) ? 0.5f : 1.f;
+  Tensor src_sc =
+      (at::ones({1}, at::dtype(at::kFloat).device(at::kXPU)) *
+       static_cast<float>(src.q_scale()) * dnn_factor);
+  memory::desc src_sc_md =
+      memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+  memory src_sc_m = dpcpp_onednn_memory(src_sc_md, engine, src_sc.data_ptr());
+  Tensor src_zp = at::zeros({1}, at::dtype(at::kFloat).device(at::kXPU));
+  memory::desc src_zp_md =
+      memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+  memory src_zp_m = dpcpp_onednn_memory(src_zp_md, engine, src_zp.data_ptr());
+  args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, src_sc_m});
+  args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zp_m});
+
+  Tensor dst_sc = at::ones({1}, at::dtype(at::kFloat).device(at::kXPU));
+  memory::desc dst_sc_md =
+      memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+  memory dst_sc_m = dpcpp_onednn_memory(dst_sc_md, engine, dst_sc.data_ptr());
+  Tensor dst_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
+  memory::desc dst_zp_md =
+      memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+  memory dst_zp_m = dpcpp_onednn_memory(dst_zp_md, engine, dst_zp.data_ptr());
+  args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, dst_sc_m});
+  args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zp_m});
+
 #ifdef USE_SCRATCHPAD_MODE
   int scratchpad_size = conv_fwd_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
@@ -486,7 +479,39 @@ static at::Tensor quantized_convolution(
   args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_m});
 #endif
 
-  DPCPP_ONEDNN_EXEC(conv_forward, strm, args);
+  if (wgh.qscheme() == kPerTensorAffine) {
+    Tensor wgh_sc =
+        (at::ones({1}, at::dtype(at::kFloat).device(at::kXPU)) *
+         static_cast<float>(wgh.q_scale()));
+    memory::desc wgh_sc_md =
+        memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+    memory wgh_sc_m = dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
+
+    Tensor wgh_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
+    memory::desc wgh_zp_md =
+        memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+    memory wgh_zp_m = dpcpp_onednn_memory(wgh_zp_md, engine, wgh_zp.data_ptr());
+
+    args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
+    args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, wgh_zp_m});
+    DPCPP_ONEDNN_EXEC(conv_forward, strm, args);
+  } else {
+    // Per-channel quantized
+    Tensor wgh_sc = wgh.q_per_channel_scales().to(at::kFloat);
+    memory::desc wgh_sc_md = memory::desc(
+        get_onednn_dims(wgh_sc), memory::data_type::f32, memory::format_tag::x);
+    memory wgh_sc_m = dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
+
+    Tensor wgh_zp = wgh.q_per_channel_zero_points().to(at::kInt);
+    memory::desc wgh_zp_md =
+        memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+    memory wgh_zp_m = dpcpp_onednn_memory(wgh_zp_md, engine, wgh_zp.data_ptr());
+
+    args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
+    args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, wgh_zp_m});
+    DPCPP_ONEDNN_EXEC(conv_forward, strm, args);
+  }
+
   if (is_onednn_layout_suggested && dst_blocked.data_ptr() != dst.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_blocked);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));

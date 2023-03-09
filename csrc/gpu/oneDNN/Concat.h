@@ -141,7 +141,7 @@ static void concat(
       : memory::format_tag::any;
   auto dst_md = memory::desc(dst_tz, dst_dt, dst_fmt);
   auto concat_pd = concat::primitive_desc(
-      dst_md, static_cast<int>(dimension), srcs_md, engine);
+      engine, dst_md, static_cast<int>(dimension), srcs_md);
 
   memory dst_m;
   auto expected_dst_md = concat_pd.dst_desc();

@@ -143,7 +143,6 @@ class Attr {
   algorithm kind_with_exp = algorithm::eltwise_exp;
   algorithm kind_with_log = algorithm::eltwise_log;
   algorithm kind_with_round = algorithm::eltwise_round;
-  algorithm kind_with_log_sigmoid = algorithm::eltwise_logsigmoid;
   algorithm kind_with_hardswish = algorithm::eltwise_hardswish;
   algorithm kind_with_soft_relu = algorithm::eltwise_soft_relu;
   algorithm kind_with_elu = algorithm::eltwise_elu;
@@ -198,8 +197,8 @@ class Attr {
     } else {
       md = ctx.meta();
     }
-    auto expected_md =
-        memory::desc(md.dims(), md.data_type(), memory::format_tag::any);
+    auto expected_md = memory::desc(
+        md.get_dims(), md.get_data_type(), memory::format_tag::any);
     ops_params_.push_back(
         PostOpParam(binary_, md, expected_md, algo, kind_t::binary));
     return *this;
@@ -279,11 +278,10 @@ class Attr {
       kind_t kind = ops_params_[i].kind_;
       switch (kind) {
         case kind_t::eltwise: {
-          float scale = ops_params_[i].scale_;
           algorithm algo = ops_params_[i].algo_;
           float alpha = ops_params_[i].alpha_;
           float beta = ops_params_[i].beta_;
-          dnnl_post_ops.append_eltwise(scale, algo, alpha, beta);
+          dnnl_post_ops.append_eltwise(algo, alpha, beta);
           break;
         }
         case kind_t::sum: {
@@ -327,7 +325,7 @@ class Attr {
           ? q_scale_ / 2
           : q_scale_;
       dnnl_post_ops.append_eltwise(
-          1.0, kind_with_linear, 1.f / q_scale_, q_zero_point_);
+          kind_with_linear, 1.f / q_scale_, q_zero_point_);
     }
   }
 

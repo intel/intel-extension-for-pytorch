@@ -196,11 +196,11 @@ deconv_get_blocked_md(
   // create memory desc for deconv primitive and query the blocked format
   auto fmt_any = memory::format_tag::any;
   auto src_md =
-      memory::desc(src_usr_md.dims(), src_usr_md.data_type(), fmt_any);
+      memory::desc(src_usr_md.get_dims(), src_usr_md.get_data_type(), fmt_any);
   auto wgh_md =
-      memory::desc(wgh_usr_md.dims(), wgh_usr_md.data_type(), fmt_any);
+      memory::desc(wgh_usr_md.get_dims(), wgh_usr_md.get_data_type(), fmt_any);
   auto dst_md =
-      memory::desc(dst_usr_md.dims(), dst_usr_md.data_type(), fmt_any);
+      memory::desc(dst_usr_md.get_dims(), dst_usr_md.get_data_type(), fmt_any);
 
   return {src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md};
 }
@@ -227,6 +227,7 @@ static memory deconv_get_expected_src_memory(
     }
   } else {
     src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
+    src_blocked = src;
   }
   return src_m;
 }
@@ -280,6 +281,7 @@ static memory deconv_get_expected_wgh_memory(
     }
   } else {
     wgh_m = dpcpp_onednn_memory(wgh_usr_md, engine, wgh.data_ptr());
+    wgh_blocked = wgh;
   }
   return wgh_m;
 }
@@ -301,6 +303,7 @@ static memory deconv_get_expected_dst_memory(
       xpu::oneDNN::reorder(dst, dst_blocked);
   } else {
     dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
+    dst_blocked = dst;
   }
   return dst_m;
 }
@@ -340,23 +343,12 @@ static void deconvolution(
   auto bia_md = bia.defined()
       ? memory::desc(
             {dst.size(1)}, get_onednn_dtype_include_double(bia), bia_fmt)
-      : memory::desc({}, memory::data_type::undef, bia_fmt);
+      : memory::desc();
 
   // create primitive desc
   memory::dims _stride = stride.vec();
   memory::dims _padding = padding.vec();
   memory::dims _dilation = deconv_compatible_dilation(dilation);
-  auto deconv_fwd_desc = deconvolution_forward::desc(
-      prop_kind::forward,
-      algorithm::deconvolution_direct,
-      src_md,
-      wgh_md,
-      bia_md,
-      dst_md,
-      _stride,
-      _dilation,
-      _padding,
-      _padding);
 
   // construct primitive attr
   primitive_attr pattr;
@@ -368,12 +360,23 @@ static void deconvolution(
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
 
-  if (src_usr_md.data_type() == memory::data_type::f32) {
+  if (src_usr_md.get_data_type() == memory::data_type::f32) {
     pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
   }
 
-  auto deconv_fwd_pd =
-      deconvolution_forward::primitive_desc(deconv_fwd_desc, pattr, engine);
+  auto deconv_fwd_pd = deconvolution_forward::primitive_desc(
+      engine,
+      prop_kind::forward,
+      algorithm::deconvolution_direct,
+      src_md,
+      wgh_md,
+      bia_md,
+      dst_md,
+      _stride,
+      _dilation,
+      _padding,
+      _padding,
+      pattr);
 
   auto weight_cache_optimization = [&]() {
     bool onoff = false;
@@ -466,12 +469,12 @@ static void deconvolution_backward_data(
   }
   memory::format_tag bia_fmt = memory::format_tag::x;
   auto bia_md = bias_defined
-      ? memory::desc({diff_dst.size(1)}, wgh_md.data_type(), bia_fmt)
-      : memory::desc({}, memory::data_type::undef, bia_fmt);
+      ? memory::desc({diff_dst.size(1)}, wgh_md.get_data_type(), bia_fmt)
+      : memory::desc();
 
   // create fwd primitive desc hint
   primitive_attr pattr;
-  if (dst_usr_md.data_type() == memory::data_type::f32) {
+  if (dst_usr_md.get_data_type() == memory::data_type::f32) {
     pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
   }
 #ifdef USE_SCRATCHPAD_MODE
@@ -481,7 +484,8 @@ static void deconvolution_backward_data(
   memory::dims _stride = stride.vec();
   memory::dims _padding = padding.vec();
   memory::dims _dilation = deconv_compatible_dilation(dilation);
-  auto deconv_fwd_desc = deconvolution_forward::desc(
+  auto deconv_fwd_pd = deconvolution_forward::primitive_desc(
+      engine,
       prop_kind::forward,
       algorithm::deconvolution_direct,
       src_md,
@@ -491,12 +495,12 @@ static void deconvolution_backward_data(
       _stride,
       _dilation,
       _padding,
-      _padding);
-  auto deconv_fwd_pd =
-      deconvolution_forward::primitive_desc(deconv_fwd_desc, pattr, engine);
+      _padding,
+      pattr);
 
   // create bwd primitive desc
-  auto deconv_bwd_d_desc = deconvolution_backward_data::desc(
+  auto deconv_backward_data_pd = deconvolution_backward_data::primitive_desc(
+      engine,
       algorithm::deconvolution_direct,
       src_md,
       wgh_md,
@@ -504,9 +508,8 @@ static void deconvolution_backward_data(
       _stride,
       _dilation,
       _padding,
-      _padding);
-  auto deconv_backward_data_pd = deconvolution_backward_data::primitive_desc(
-      deconv_bwd_d_desc, engine, deconv_fwd_pd);
+      _padding,
+      deconv_fwd_pd);
 
   // create memory
   Tensor expected_src, expected_wei, expected_dst;
@@ -597,14 +600,22 @@ static void deconvolution_backward_weights(
   }
   memory::format_tag bia_fmt = memory::format_tag::x;
   auto bia_md = diff_bia.defined()
-      ? memory::desc({diff_dst.size(1)}, src_md.data_type(), bia_fmt)
-      : memory::desc({}, memory::data_type::undef, bia_fmt);
+      ? memory::desc({diff_dst.size(1)}, src_md.get_data_type(), bia_fmt)
+      : memory::desc();
 
   // create fwd primitive desc hint
   memory::dims _stride = stride.vec();
   memory::dims _padding = padding.vec();
   memory::dims _dilation = deconv_compatible_dilation(dilation);
-  auto deconv_fwd_desc = deconvolution_forward::desc(
+  primitive_attr pattr;
+  if (src_usr_md.get_data_type() == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+  auto deconv_fwd_pd = deconvolution_forward::primitive_desc(
+      engine,
       prop_kind::forward,
       algorithm::deconvolution_direct,
       src_md,
@@ -614,19 +625,11 @@ static void deconvolution_backward_weights(
       _stride,
       _dilation,
       _padding,
-      _padding);
-  primitive_attr pattr;
-  if (src_usr_md.data_type() == memory::data_type::f32) {
-    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
-  }
-#ifdef USE_SCRATCHPAD_MODE
-  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-#endif
-  auto deconv_fwd_pd =
-      deconvolution_forward::primitive_desc(deconv_fwd_desc, pattr, engine);
+      _padding,
+      pattr);
 
-  // create bwd primtiive desc
-  auto deconv_bwd_w_desc = deconvolution_backward_weights::desc(
+  auto deconv_bwd_w_pd = deconvolution_backward_weights::primitive_desc(
+      engine,
       algorithm::deconvolution_direct,
       src_md,
       wgh_md,
@@ -635,10 +638,9 @@ static void deconvolution_backward_weights(
       _stride,
       _dilation,
       _padding,
-      _padding);
-
-  auto deconv_bwd_w_pd = deconvolution_backward_weights::primitive_desc(
-      deconv_bwd_w_desc, engine, deconv_fwd_pd);
+      _padding,
+      deconv_fwd_pd,
+      pattr);
 
   // create bwd memory
   Tensor expected_src, expected_diff_dst, expected_diff_wgh;

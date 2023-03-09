@@ -704,7 +704,7 @@ class Conv2dBinaryDiv(torch.nn.Module):
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return torch.div(self.conv(x), x)
+        return torch.div(self.conv(x), a)
 
 class Conv2dBinaryDivScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -2089,11 +2089,13 @@ class TestNNMethod(TestCase):
         a2 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
         a3 = torch.ones([1, 2, 1, 1], device=dpcpp_device)
 
-        a1.fill_(2)
-        a3.fill_(2)
+        a1.fill_(3)
+        a3.fill_(3)
 
+        #torch.div(conv(x), x)
         model = Conv2dBinaryDiv(2, 2, kernel_size=1, stride=1, bias=True)
         model1 = copy.deepcopy(model)
+        #torch.div(conv(x), 3)
         model_scalar = Conv2dBinaryDivScalar(2, 2, kernel_size=1, stride=1, bias=True)
         model_scalar1 = copy.deepcopy(model_scalar)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)

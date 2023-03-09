@@ -87,9 +87,7 @@ IPEX_LINEAR_DEFINATION(log)
 IPEX_LINEAR_DEFINATION(round)
 IPEX_LINEAR_DEFINATION(sigmoid)
 IPEX_LINEAR_DEFINATION(relu)
-IPEX_LINEAR_DEFINATION(hardswish)
 IPEX_LINEAR_DEFINATION(mish)
-IPEX_LINEAR_DEFINATION(log_sigmoid)
 
 IPEX_LINEAR_BINARY_DEFINATION(mul)
 IPEX_LINEAR_BINARY_DEFINATION(div)
@@ -101,6 +99,46 @@ IPEX_LINEAR_BINARY_DEFINATION(ge)
 IPEX_LINEAR_BINARY_DEFINATION(gt)
 IPEX_LINEAR_BINARY_DEFINATION(le)
 IPEX_LINEAR_BINARY_DEFINATION(lt)
+
+Tensor linear_hardswish(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias) {
+  RECORD_FUNCTION(
+      "linear_hardswish", std::vector<c10::IValue>({input, weight, bias}));
+  auto linear_wrapper = LinearConverter();
+  auto post_op = [=]() {
+    Attr attr;
+    attr.append_post_eltwise(
+        /* scale */ 1.f,
+        /* alpha */ 1.f / 6.f,
+        /* beta */ 1.f / 2.f,
+        attr.kind_with_hardswish);
+    return attr;
+  };
+  Tensor result;
+  return linear_wrapper.call(result, input, weight, bias, post_op);
+}
+
+Tensor linear_log_sigmoid(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias) {
+  RECORD_FUNCTION(
+      "linear_log_sigmoid", std::vector<c10::IValue>({input, weight, bias}));
+  auto linear_wrapper = LinearConverter();
+  auto post_op = [=]() {
+    Attr attr;
+    attr.append_post_eltwise(
+        /* scale */ 1.f,
+        /* alpha */ -1.f,
+        /* beta */ 0.f,
+        attr.kind_with_soft_relu);
+    return attr;
+  };
+  Tensor result;
+  return linear_wrapper.call(result, input, weight, bias, post_op);
+}
 
 Tensor linear_silu(
     const Tensor& input,

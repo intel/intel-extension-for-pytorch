@@ -143,7 +143,8 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
       auto dst_iter_c_md =
           memory::desc(dst_iter_c_dims, data_t, memory::format_tag::any);
 
-      auto lstm_forward_desc = lstm_forward::desc(
+      auto lstm_forward_pd = lstm_forward::primitive_desc(
+          engine,
           prop_kind::forward_inference,
           dir,
           src_layer_md,
@@ -154,11 +155,7 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
           bias_md,
           dst_layer_md,
           dst_iter_md,
-          dst_iter_c_md,
-          rnn_flags::undef);
-
-      auto lstm_forward_pd =
-          lstm_forward::primitive_desc(lstm_forward_desc, engine);
+          dst_iter_c_md);
 
       auto weights_layer_usr_memory = dpcpp_onednn_memory(
           {weights_layer_dims, data_t, format_ldigo},

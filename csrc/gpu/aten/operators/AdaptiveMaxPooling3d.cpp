@@ -98,6 +98,8 @@ void adaptive_max_pool3d_out_template(
   std::vector<int64_t> kernel_size_vec = {kD, kH, kW};
   std::vector<int64_t> stride_vec = {dD, dH, dW};
   std::vector<int64_t> padding_vec = {padD, padH, padW};
+  // per oneDNN definition, no dilation means dilation ratio is 0
+  std::vector<int64_t> dilation_vec = {0, 0, 0};
   ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
       output,
       indices,
@@ -110,6 +112,7 @@ void adaptive_max_pool3d_out_template(
       outputDepth,
       outputHeight,
       outputWidth,
+      dilation_vec,
       kernel_size_vec,
       stride_vec,
       padding_vec,
@@ -149,6 +152,7 @@ Tensor& adaptive_max_pool3d_backward_out_template(
   int padH = (dH * (gradOutputHeight - 1) + kH - gradInputHeight) / 2;
   int padW = (dW * (gradOutputWidth - 1) + kW - gradInputWidth) / 2;
 
+  // per oneDNN definition, no dilation means dilation ratio is 0
   ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
       gradOutput,
@@ -168,6 +172,9 @@ Tensor& adaptive_max_pool3d_backward_out_template(
       dD,
       dH,
       dW,
+      0,
+      0,
+      0,
       padD,
       padH,
       padW);

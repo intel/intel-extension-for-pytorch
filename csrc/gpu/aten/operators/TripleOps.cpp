@@ -77,6 +77,7 @@ Tensor mul_add_scalar(
       _self = self.expand_as(accumu);
     } else {
       _accumu = accumu;
+      _self = self;
     }
     Tensor tar = DPCPPTensorConvertor::is_opaque_tensor(_self) ? _self : accumu;
     auto ctx = AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(tar);

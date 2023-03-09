@@ -85,7 +85,7 @@ Tensor empty_opaque_tensor(
   auto* allocator = xpu::dpcpp::getDeviceAllocator();
   auto dtype = options.dtype();
 
-  at::detail::check_size_nonnegative(meta.dims());
+  at::detail::check_size_nonnegative(meta.get_dims());
 
   int64_t size_bytes = meta.get_size();
   auto storage_impl = c10::make_intrusive<StorageImpl>(
@@ -97,19 +97,19 @@ Tensor empty_opaque_tensor(
 
   auto tensor = detail::make_tensor<TensorImpl>(
       storage_impl, c10::DispatchKey::XPU, dtype);
-  if (meta.dims().size() != 1 || meta.dims().at(0) != 0) {
-    tensor.unsafeGetTensorImpl()->set_sizes_contiguous(meta.dims());
+  if (meta.get_dims().size() != 1 || meta.get_dims().at(0) != 0) {
+    tensor.unsafeGetTensorImpl()->set_sizes_contiguous(meta.get_dims());
   }
 
   auto memory_format =
       optional_memory_format.value_or(MemoryFormat::Contiguous);
   if (memory_format == CHANNELSLAST1D_DPCPP) {
     TORCH_CHECK(
-        meta.dims().size() == 3,
+        meta.get_dims().size() == 3,
         "required rank 3 tensor to use channels_last_1d format");
     tensor.unsafeGetTensorImpl()->set_sizes_and_strides(
-        meta.dims(),
-        xpu::dpcpp::get_channels_last_strides_1d_dpcpp(meta.dims()));
+        meta.get_dims(),
+        xpu::dpcpp::get_channels_last_strides_1d_dpcpp(meta.get_dims()));
   } else {
     tensor.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
   }
@@ -128,7 +128,7 @@ Tensor empty_opaque_qtensor(
     DPCPPTensorContext::Meta meta,
     c10::optional<MemoryFormat> optional_memory_format,
     QuantizerPtr quantizer) {
-  at::detail::check_size_nonnegative(meta.dims());
+  at::detail::check_size_nonnegative(meta.get_dims());
 
   auto* allocator = xpu::dpcpp::getDeviceAllocator();
   auto dtype = scalarTypeToTypeMeta(quantizer->scalar_type());
@@ -145,19 +145,19 @@ Tensor empty_opaque_qtensor(
   at::DispatchKey tensorDispatchKey = c10::DispatchKey::QuantizedXPU;
   tensor = detail::make_tensor<QTensorImpl>(
       storage_impl, at::DispatchKeySet(tensorDispatchKey), dtype, quantizer);
-  if (meta.dims().size() != 1 || meta.dims().at(0) != 0) {
-    tensor.unsafeGetTensorImpl()->set_sizes_contiguous(meta.dims());
+  if (meta.get_dims().size() != 1 || meta.get_dims().at(0) != 0) {
+    tensor.unsafeGetTensorImpl()->set_sizes_contiguous(meta.get_dims());
   }
 
   auto memory_format =
       optional_memory_format.value_or(MemoryFormat::Contiguous);
   if (memory_format == CHANNELSLAST1D_DPCPP) {
     TORCH_CHECK(
-        meta.dims().size() == 3,
+        meta.get_dims().size() == 3,
         "required rank 3 tensor to use channels_last_1d format");
     tensor.unsafeGetTensorImpl()->set_sizes_and_strides(
-        meta.dims(),
-        xpu::dpcpp::get_channels_last_strides_1d_dpcpp(meta.dims()));
+        meta.get_dims(),
+        xpu::dpcpp::get_channels_last_strides_1d_dpcpp(meta.get_dims()));
   } else {
     tensor.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
   }

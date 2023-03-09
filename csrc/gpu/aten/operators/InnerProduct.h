@@ -42,10 +42,13 @@ void inner_product(
   auto bias_md =
       use_bias ? memory::desc(bias_tz, data_t, format_any) : memory::desc();
 
-  auto ipFwd_desc = inner_product_forward::desc(
-      prop_kind::forward_inference, input_md, weight_md, bias_md, output_md);
-  auto ip_forward_pd =
-      inner_product_forward::primitive_desc(ipFwd_desc, engine);
+  auto ip_forward_pd = inner_product_forward::primitive_desc(
+      engine,
+      prop_kind::forward_inference,
+      input_md,
+      weight_md,
+      bias_md,
+      output_md);
 
   auto input_memory = dpcpp_onednn_memory(
       {input_tz, data_t, format_nc}, engine, input.data_ptr());

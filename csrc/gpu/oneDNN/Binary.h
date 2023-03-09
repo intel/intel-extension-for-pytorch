@@ -72,8 +72,8 @@ static inline Tensor bin(
   if (t1.is_quantized()) {
     float t1_scale = t1.q_scale();
     float t2_scale = t2.q_scale();
-    attr.set_scales(DNNL_ARG_SRC_0, 0, {t1_scale});
-    attr.set_scales(DNNL_ARG_SRC_1, 0, {t2_scale});
+    attr.set_scales_mask(DNNL_ARG_SRC_0, 0);
+    attr.set_scales_mask(DNNL_ARG_SRC_1, 0);
   }
 
   Tensor _t1;
@@ -126,25 +126,40 @@ static inline Tensor bin(
 
   binary::primitive_desc pd;
   if (t3.defined()) {
-    pd = binary::primitive_desc({algo, md1, md2, tar_md}, attr, engine);
+    pd = binary::primitive_desc(engine, algo, md1, md2, tar_md, attr);
   } else {
-    pd = binary::primitive_desc({algo, md1, md2, tar_md}, engine);
+    pd = binary::primitive_desc(engine, algo, md1, md2, tar_md);
   }
 
   auto prim = binary(pd);
 
+  std::unordered_map<int, memory> args;
+  args.insert({DNNL_ARG_SRC_0, m1});
+  args.insert({DNNL_ARG_SRC_1, m2});
+  args.insert({DNNL_ARG_DST, mo});
+
+  Tensor t1_sc, t2_sc;
+  memory t1_sc_m, t2_sc_m;
+  if (t1.is_quantized()) {
+    t1_sc = at::ones({1}, at::dtype(at::kFloat).device(at::kXPU)) *
+        static_cast<float>(t1.q_scale());
+    memory::desc t1_sc_md =
+        memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+    t1_sc_m = dpcpp_onednn_memory(t1_sc_md, engine, t1_sc.data_ptr());
+    t2_sc = at::ones({1}, at::dtype(at::kFloat).device(at::kXPU)) *
+        static_cast<float>(t2.q_scale());
+    memory::desc t2_sc_md =
+        memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+    t2_sc_m = dpcpp_onednn_memory(t2_sc_md, engine, t2_sc.data_ptr());
+    args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC_0, t1_sc_m});
+    args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC_1, t2_sc_m});
+  }
+
   if (t3.defined()) {
-    prim.execute(
-        strm,
-        {{DNNL_ARG_SRC_0, m1},
-         {DNNL_ARG_SRC_1, m2},
-         {DNNL_ARG_ATTR_MULTIPLE_POST_OP(0) | DNNL_ARG_SRC_1, m3_usr},
-         {DNNL_ARG_DST, mo}});
+    args.insert({DNNL_ARG_ATTR_MULTIPLE_POST_OP(0) | DNNL_ARG_SRC_1, m3_usr});
+    prim.execute(strm, args);
   } else {
-    DPCPP_ONEDNN_EXEC(
-        prim,
-        strm,
-        {{DNNL_ARG_SRC_0, m1}, {DNNL_ARG_SRC_1, m2}, {DNNL_ARG_DST, mo}});
+    DPCPP_ONEDNN_EXEC(prim, strm, args);
   }
 
   return dst;

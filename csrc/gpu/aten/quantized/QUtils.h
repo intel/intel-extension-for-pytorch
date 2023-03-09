@@ -26,7 +26,7 @@ static inline bool is_opaque_u8(const Tensor& qx) {
   if (!qx_ctx.is_plain()) {
     return (
         (qx.scalar_type() == kQUInt8) &&
-        (qx_ctx.meta().data_type() == dnnl::memory::data_type::s8));
+        (qx_ctx.meta().get_data_type() == dnnl::memory::data_type::s8));
   } else {
     return false;
   }

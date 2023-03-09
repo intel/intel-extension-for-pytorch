@@ -43,11 +43,9 @@ static void reduce(
   auto desc_src = memory::desc(src_dims, src_dt, src_format);
   auto desc_dst = memory::desc(dst_dims, dst_dt, dst_format);
 
-  auto op_desc = reduction::desc();
-  op_desc = reduction::desc(aalgorithm, desc_src, desc_dst, p, eps);
-
   auto pd = reduction::primitive_desc();
-  pd = reduction::primitive_desc(op_desc, engine);
+  pd =
+      reduction::primitive_desc(engine, aalgorithm, desc_src, desc_dst, p, eps);
 
   auto prim = reduction(pd);
 

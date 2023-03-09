@@ -90,7 +90,7 @@ static inline Tensor sum(
         {{DNNL_ARG_FROM, output_usr_mem}, {DNNL_ARG_TO, output_mem}});
   }
 
-  auto sum_p = dnnl::sum({output_desc, scales, inputs_desc, engine});
+  auto sum_p = dnnl::sum({engine, output_desc, scales, inputs_desc});
 
   std::unordered_map<int, memory> args = {{DNNL_ARG_DST, output_mem}};
   for (int i = 0; i < inputs_mem.size(); i++)

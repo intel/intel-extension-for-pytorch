@@ -71,15 +71,14 @@ Tensor quantize_tensor_per_channel_affine(
   xpu::oneDNN::ReorderAttr rattr = xpu::oneDNN::ReorderAttr();
   int mask_0 = 1 << axis;
   int mask_1 = 0;
-  std::vector<float> scls;
-  std::vector<int> zps;
-  for (int i = 0; i < scales.numel(); i++) {
-    scls.push_back(1.0f / scales[i].item().to<float>());
-  }
-  zps.push_back(zero_points[0].item().to<float>());
 
-  rattr.set_dst_sc_and_zp(mask_0, scls, mask_1, zps);
-  xpu::oneDNN::reorder(rtensor, qtensor, rattr);
+  rattr.set_dst_sc_and_zp_mask(mask_0, mask_1);
+  Tensor dnn_scale = scales.to(at::kFloat);
+  // TODO: Remove workaround for dnn symmetric quantization
+  Tensor dnn_zero_point =
+      at::zeros_like(zero_points, dtype(at::kInt).device(at::kXPU));
+  xpu::oneDNN::quantized_reorder(
+      rtensor, qtensor, dnn_scale, dnn_zero_point, rattr);
 
   return qtensor;
 }
@@ -99,18 +98,26 @@ Tensor quantize_tensor_per_tensor_affine(
     }
     // for int8 weight cache
     if (!r_ctx.is_plain() &&
-        (r_ctx.meta().data_type() != memory::data_type::f32)) {
+        (r_ctx.meta().get_data_type() != memory::data_type::f32)) {
       return rtensor;
     }
   }
 
   xpu::oneDNN::ReorderAttr rattr = xpu::oneDNN::ReorderAttr();
+  // TODO: PyTorch uses double for scale, and int64_t for zero_point
+  // fix dtype difference,
+  //    PT  oneDNN
+  // sc f64 f32
+  // zp s64 s32
   int mask = 0;
-  std::vector<float> scls = {static_cast<float>(1.0f / scale)};
-  std::vector<int> zps = {static_cast<int>(0)};
+  Tensor dnn_scale = at::ones(1, at::dtype(at::kFloat).device(at::kXPU)) *
+      static_cast<float>(scale);
+  // TODO: Remove workaround for dnnl symmetric quantization
+  Tensor dnn_zero_point = at::zeros(1, at::dtype(at::kInt).device(at::kXPU));
 
-  rattr.set_dst_sc_and_zp(mask, scls, mask, zps);
+  rattr.set_dst_sc_and_zp_mask(mask, mask);
   if (qtensor.scalar_type() == kQUInt8 && zero_point == 128) {
+    // TODO: Remove workaround for dnnl symmetric quantization
     Tensor qtensor_opt = qtensor;
     memory::dims q_dims = xpu::oneDNN::get_onednn_dims(rtensor);
     memory::format_tag q_fmt = xpu::oneDNN::get_dnnl_default_format(
@@ -127,14 +134,16 @@ Tensor quantize_tensor_per_tensor_affine(
     qtensor_opt =
         AtenIpexTypeXPU::empty_opaque_qtensor(q_md, c10::nullopt, quantizer);
 
-    xpu::oneDNN::reorder(rtensor, qtensor_opt, rattr);
+    xpu::oneDNN::quantized_reorder(
+        rtensor, qtensor_opt, dnn_scale, dnn_zero_point, rattr);
     auto q_opt_ctx =
         at::AtenIpexTypeXPU::DPCPPTensorContext::release_tensor_ctx(
             qtensor_opt);
     at::AtenIpexTypeXPU::DPCPPTensorContext::set_tensor_ctx(
         qtensor, std::move(q_opt_ctx));
   } else {
-    xpu::oneDNN::reorder(rtensor, qtensor, rattr);
+    xpu::oneDNN::quantized_reorder(
+        rtensor, qtensor, dnn_scale, dnn_zero_point, rattr);
   }
 
   return qtensor;

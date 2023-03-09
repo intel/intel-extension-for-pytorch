@@ -67,6 +67,8 @@ void adaptive_max_pool2d_out_template(
   std::vector<int64_t> kernel_size_vec = {kH, kW};
   std::vector<int64_t> stride_vec = {dH, dW};
   std::vector<int64_t> padding_vec = {padH, padW};
+  // per oneDNN definition, no dilation means dilation ratio is 0
+  std::vector<int64_t> dilation_vec = {0, 0};
 
   /* PyTorch support two cases of AdaptiveMaxPool2d:
      1. 3D: Input (C, H, W),  Output (C, H0, W0) Kernel (kH, kW)
@@ -100,6 +102,7 @@ void adaptive_max_pool2d_out_template(
       0,
       outputHeight,
       outputWidth,
+      dilation_vec,
       kernel_size_vec,
       stride_vec,
       padding_vec,
@@ -137,6 +140,7 @@ Tensor& adaptive_max_pool2d_backward_out_template(
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
 
+  // per oneDNN definition, no dilation means dilation ratio is 0
   ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
       gradOutput,
@@ -156,6 +160,9 @@ Tensor& adaptive_max_pool2d_backward_out_template(
       0,
       dH,
       dW,
+      0,
+      0,
+      0,
       0,
       padH,
       padW);

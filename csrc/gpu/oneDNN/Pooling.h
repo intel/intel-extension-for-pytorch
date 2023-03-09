@@ -52,6 +52,7 @@ static at::Tensor pooling(
     int64_t dstDepth,
     int64_t dstHeight,
     int64_t dstWidth,
+    std::vector<int64_t>& dilation_vec,
     std::vector<int64_t>& kernel_vec,
     std::vector<int64_t>& stride_vec,
     std::vector<int64_t>& padding_l_vec,
@@ -72,6 +73,7 @@ static at::Tensor pooling(
   memory::dims src_tz;
   memory::dims dst_tz;
   memory::dims kernel;
+  memory::dims dilation;
   memory::dims stride;
   memory::dims padding_l;
   memory::dims padding_r;
@@ -131,6 +133,7 @@ static at::Tensor pooling(
   }
   stride = {stride_vec.cbegin(), stride_vec.cend()};
   kernel = {kernel_vec.cbegin(), kernel_vec.cend()};
+  dilation = {dilation_vec.cbegin(), dilation_vec.cend()};
   padding_l = {padding_l_vec.cbegin(), padding_l_vec.cend()};
   padding_r = {padding_r_vec.cbegin(), padding_r_vec.cend()};
 
@@ -145,18 +148,17 @@ static at::Tensor pooling(
       ? memory::desc({dst_tz}, data_t, memory::format_tag::any)
       : dst_usr_md;
 
-  auto pooling_fwd_desc = pooling_forward::desc(
+  auto pooling_fwd_pd = pooling_forward::primitive_desc(
+      engine,
       prop_kind,
       alg_kind,
       src_usr_md,
       dst_md,
       stride,
       kernel,
+      dilation,
       padding_l,
       padding_r);
-
-  auto pooling_fwd_pd =
-      pooling_forward::primitive_desc(pooling_fwd_desc, engine);
 
   memory src_m, dst_m;
   if (!is_onednn_layout_suggested) {
@@ -203,6 +205,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
     int64_t dstDepth,
     int64_t dstHeight,
     int64_t dstWidth,
+    std::vector<int64_t> dilation_vec,
     std::vector<int64_t> kernel_vec,
     std::vector<int64_t> stride_vec,
     std::vector<int64_t> padding_l_vec,
@@ -223,6 +226,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   memory::dims dst_tz;
   memory::dims kernel;
   memory::dims stride;
+  memory::dims dilation;
   memory::dims padding_l;
   memory::dims padding_r;
 
@@ -281,6 +285,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   }
   kernel = {kernel_vec.cbegin(), kernel_vec.cend()};
   stride = {stride_vec.cbegin(), stride_vec.cend()};
+  dilation = {dilation_vec.cbegin(), dilation_vec.cend()};
   padding_l = {padding_l_vec.cbegin(), padding_l_vec.cend()};
   padding_r = {padding_r_vec.cbegin(), padding_r_vec.cend()};
 
@@ -296,18 +301,17 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
       ? memory::desc(dst_tz, data_t, memory::format_tag::any)
       : dst_usr_md;
 
-  auto pooling_fwd_desc = pooling_forward::desc(
+  auto pooling_fwd_pd = pooling_forward::primitive_desc(
+      engine,
       prop_kind,
       alg_kind,
       src_usr_md,
       dst_md,
       stride,
       kernel,
+      dilation,
       padding_l,
       padding_r);
-
-  auto pooling_fwd_pd =
-      pooling_forward::primitive_desc(pooling_fwd_desc, engine);
 
   auto expected_dst_md = pooling_fwd_pd.dst_desc();
 
@@ -398,6 +402,9 @@ static at::Tensor pooling_backward(
     int dD,
     int dH,
     int dW,
+    int dlD,
+    int dlH,
+    int dlW,
     int padD,
     int padH,
     int padW) {
@@ -417,6 +424,7 @@ static at::Tensor pooling_backward(
   memory::dims diff_dst_tz;
   memory::dims kernel;
   memory::dims stride;
+  memory::dims dilation;
   memory::dims padding;
 
   auto ndim = src.ndimension();
@@ -451,6 +459,7 @@ static at::Tensor pooling_backward(
     diff_dst_tz = {nbatch, nInputPlane, diff_dst_height, diff_dst_width};
     kernel = {kH, kW};
     stride = {dH, dW};
+    dilation = {dlH, dlW};
     padding = {padH, padW};
   } else if (ndim == 5 || (ndim == 4 && diff_src_depth != 0)) {
     /*
@@ -478,6 +487,7 @@ static at::Tensor pooling_backward(
         nbatch, nInputPlane, diff_dst_depth, diff_dst_height, diff_dst_width};
     kernel = {kD, kH, kW};
     stride = {dD, dH, dW};
+    dilation = {dlD, dlH, dlW};
     padding = {padD, padH, padW};
   }
 
@@ -496,23 +506,29 @@ static at::Tensor pooling_backward(
       ? memory::desc({diff_src_tz}, data_t, memory::format_tag::any)
       : diff_src_usr_md;
 
-  auto pooling_fwd_desc = pooling_forward::desc(
+  auto pooling_fwd_pd = pooling_forward::primitive_desc(
+      engine,
       prop_kind,
       alg_kind,
       src_usr_md,
       diff_dst_usr_md,
       stride,
       kernel,
+      dilation,
       padding,
       padding);
 
-  auto pooling_fwd_pd =
-      pooling_forward::primitive_desc(pooling_fwd_desc, engine);
-  auto pooling_bwd_desc = dnnl::pooling_backward::desc(
-      alg_kind, diff_src_md, diff_dst_usr_md, stride, kernel, padding, padding);
-
   auto pooling_bwd_pd = dnnl::pooling_backward::primitive_desc(
-      pooling_bwd_desc, engine, pooling_fwd_pd);
+      engine,
+      alg_kind,
+      diff_src_md,
+      diff_dst_usr_md,
+      stride,
+      kernel,
+      dilation,
+      padding,
+      padding,
+      pooling_fwd_pd);
 
   auto pooling_bwd = dnnl::pooling_backward(pooling_bwd_pd);
 
@@ -567,6 +583,9 @@ static at::Tensor pooling_backward(
     int dD,
     int dH,
     int dW,
+    int dlD,
+    int dlH,
+    int dlW,
     int padD,
     int padH,
     int padW) {
@@ -585,6 +604,7 @@ static at::Tensor pooling_backward(
   memory::dims diff_dst_tz;
   memory::dims kernel;
   memory::dims stride;
+  memory::dims dilation;
   memory::dims padding;
 
   auto ndim = src.ndimension();
@@ -619,6 +639,7 @@ static at::Tensor pooling_backward(
     diff_dst_tz = {nbatch, nInputPlane, diff_dst_height, diff_dst_width};
     kernel = {kH, kW};
     stride = {dH, dW};
+    dilation = {dlH, dlW};
     padding = {padH, padW};
   } else if (ndim == 5 || (ndim == 4 && diff_src_depth != 0)) {
     /*
@@ -646,6 +667,7 @@ static at::Tensor pooling_backward(
         nbatch, nInputPlane, diff_dst_depth, diff_dst_height, diff_dst_width};
     kernel = {kD, kH, kW};
     stride = {dD, dH, dW};
+    dilation = {dlD, dlH, dlW};
     padding = {padD, padH, padW};
   }
 
@@ -665,22 +687,29 @@ static at::Tensor pooling_backward(
       ? memory::desc({diff_src_tz}, data_t, memory::format_tag::any)
       : diff_src_usr_md;
 
-  auto pooling_fwd_desc = pooling_forward::desc(
+  auto pooling_fwd_pd = pooling_forward::primitive_desc(
+      engine,
       prop_kind,
       alg_kind,
       src_usr_md,
       diff_dst_usr_md,
       stride,
       kernel,
+      dilation,
       padding,
       padding);
-  auto pooling_bwd_desc = dnnl::pooling_backward::desc(
-      alg_kind, diff_src_md, diff_dst_usr_md, stride, kernel, padding, padding);
 
-  auto pooling_fwd_pd =
-      pooling_forward::primitive_desc(pooling_fwd_desc, engine);
   auto pooling_bwd_pd = dnnl::pooling_backward::primitive_desc(
-      pooling_bwd_desc, engine, pooling_fwd_pd);
+      engine,
+      alg_kind,
+      diff_src_md,
+      diff_dst_usr_md,
+      stride,
+      kernel,
+      dilation,
+      padding,
+      padding,
+      pooling_fwd_pd);
 
   auto expected_diff_src_md = pooling_bwd_pd.diff_src_desc();
   memory diff_src_usr_m, diff_dst_usr_m, idx_usr_m;
@@ -715,7 +744,7 @@ static at::Tensor pooling_backward(
 
     idx_usr_m = dpcpp_onednn_memory(
         {diff_dst_tz,
-         (memory::data_type)expexted_idx_md.data.data_type,
+         (memory::data_type)expexted_idx_md.get_data_type(),
          format},
         engine,
         idx_usr.data_ptr());

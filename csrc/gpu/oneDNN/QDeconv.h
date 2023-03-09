@@ -59,9 +59,11 @@ qdeconv_get_blocked_md(
   auto fmt_any = memory::format_tag::any;
   src_md = src.size(1) == 3
       ? src_usr_md
-      : memory::desc(src_usr_md.dims(), src_usr_md.data_type(), fmt_any);
-  wgh_md = memory::desc(wgh_usr_md.dims(), memory::data_type::s8, fmt_any);
-  dst_md = memory::desc(dst_usr_md.dims(), dst_usr_md.data_type(), fmt_any);
+      : memory::desc(
+            src_usr_md.get_dims(), src_usr_md.get_data_type(), fmt_any);
+  wgh_md = memory::desc(wgh_usr_md.get_dims(), memory::data_type::s8, fmt_any);
+  dst_md =
+      memory::desc(dst_usr_md.get_dims(), dst_usr_md.get_data_type(), fmt_any);
   return {src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md};
 }
 
@@ -111,45 +113,6 @@ qdeconv_get_plain_md(
   return {src_usr_md, wgh_usr_md, dst_usr_md, src_usr_md, wgh_md, dst_usr_md};
 }
 
-static inline void get_deconv_scale(
-    const Tensor& src,
-    const Tensor& wgh,
-    const Tensor& dst,
-    const memory::desc& src_usr_md,
-    int oc,
-    std::vector<float>& wgh_scales,
-    std::vector<float>& conv_scale,
-    int& mask_conv) {
-  if (src.is_quantized()) {
-    auto wgh_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(wgh);
-    if (wgh.qscheme() == kPerTensorAffine) {
-      wgh_scales.push_back(static_cast<float>(wgh.q_scale()));
-    } else {
-      for (int i = 0; i < oc; i++) {
-        // GPU to CPU, may be has perf issue
-        wgh_scales.push_back(wgh.q_per_channel_scales()[i].item<float>());
-      }
-    }
-  }
-
-  float src_scale;
-  // auto src_data_t = src_usr_md.data_type();
-  auto src_data_t = is_opaque_u8(src) ? memory::data_type::s8
-                                      : get_onednn_dtype_include_double(src);
-  src_scale = (src_data_t == memory::data_type::u8 && src.q_zero_point() == 128)
-      ? src.q_scale() / 2
-      : src.q_scale();
-  conv_scale.clear();
-
-  // See Note: [Convolution requantization]
-  float dst_sc = dst.q_scale();
-  for (int i = 0; i < wgh_scales.size(); i++) {
-    conv_scale.push_back(1.0 / (dst_sc / (src_scale * wgh_scales[i])));
-    // conv_scale.push_back(1.0);
-  }
-  mask_conv = wgh_scales.size() > 1 ? 1 << 1 : 0;
-}
-
 static memory qdeconv_get_expected_src_memory(
     const at::Tensor& src,
     at::Tensor& src_blocked,
@@ -173,6 +136,7 @@ static memory qdeconv_get_expected_src_memory(
     }
   } else {
     src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
+    src_blocked = src;
   }
   return src_m;
 }
@@ -213,6 +177,7 @@ static memory qdeconv_get_expected_wgh_memory(
     }
   } else {
     wgh_m = dpcpp_onednn_memory(wgh_usr_md, engine, wgh.data_ptr());
+    wgh_blocked = wgh;
   }
   return wgh_m;
 }
@@ -242,6 +207,7 @@ static memory qdeconv_get_block_dst_memory(
     //   xpu::oneDNN::reorder(dst, dst_blocked);
   } else {
     dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
+    dst_blocked = dst;
   }
   return dst_m;
 }
@@ -303,7 +269,26 @@ static Tensor quantized_deconvolution(
   auto bia_md =
       with_bias ? memory::desc(bia_tz, bia_dt, bia_fmt) : memory::desc();
 
-  auto deconv_fwd_desc = deconvolution_forward::desc(
+  // quant only
+  primitive_attr pattr;
+  std::vector<float> wgh_scales, conv_scale = {1};
+
+  int conv_zero_point = 0, mask_conv;
+  int mask_ac = 0;
+  mask_conv = (wgh.qscheme() == kPerTensorAffine) ? 0 : 1 << 1;
+  pattr.set_scales_mask(DNNL_ARG_DST, mask_conv);
+  pattr.set_zero_points_mask(DNNL_ARG_DST, mask_ac);
+  // pattr.set_output_scales(mask_conv, conv_scale);
+  // pattr.set_zero_points(DNNL_ARG_DST, mask_conv, {conv_zero_point});
+
+  pattr.set_scales_mask(DNNL_ARG_SRC, mask_ac);
+  pattr.set_zero_points_mask(DNNL_ARG_SRC, mask_ac);
+
+  pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_conv);
+  pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_conv);
+
+  auto deconv_fwd_pd = deconvolution_forward::primitive_desc(
+      engine,
       prop_kind::forward,
       algorithm::deconvolution_direct,
       src_md,
@@ -313,20 +298,8 @@ static Tensor quantized_deconvolution(
       _stride,
       _dilation,
       _padding,
-      _padding);
-
-  // quant only
-  primitive_attr pattr;
-  std::vector<float> wgh_scales, conv_scale = {1};
-
-  int conv_zero_point = 0, mask_conv;
-  get_deconv_scale(
-      src, wgh, dst, src_usr_md, oc, wgh_scales, conv_scale, mask_conv);
-  pattr.set_output_scales(mask_conv, conv_scale);
-  pattr.set_zero_points(DNNL_ARG_DST, mask_conv, {conv_zero_point});
-
-  auto deconv_fwd_pd =
-      deconvolution_forward::primitive_desc(deconv_fwd_desc, pattr, engine);
+      _padding,
+      pattr);
 
   auto weight_cache_optimization = [&]() {
     // TODO:: remove ChannelsLast option after oneDNN fix accuracy issue
@@ -383,7 +356,64 @@ static Tensor quantized_deconvolution(
 
   auto deconv_fwd = deconvolution_forward(deconv_fwd_pd);
 
-  DPCPP_ONEDNN_EXEC(deconv_fwd, strm, args);
+  float dnn_factor =
+      ((src.scalar_type() == at::kQUInt8) && (!is_opaque_u8(src))) ? 0.5f : 1.f;
+  Tensor src_sc = at::ones({1}, at::dtype(at::kFloat).device(at::kXPU)) *
+      static_cast<float>(src.q_scale()) * dnn_factor;
+  memory::desc src_sc_md =
+      memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+  memory src_sc_m = dpcpp_onednn_memory(src_sc_md, engine, src_sc.data_ptr());
+  Tensor src_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
+  memory::desc src_zp_md =
+      memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+  memory src_zp_m = dpcpp_onednn_memory(src_zp_md, engine, src_zp.data_ptr());
+  args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, src_sc_m});
+  args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zp_m});
+
+  Tensor dst_sc = at::ones({1}, at::dtype(at::kFloat).device(at::kXPU)) *
+      static_cast<float>(dst.q_scale());
+  memory::desc dst_sc_md =
+      memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+  memory dst_sc_m = dpcpp_onednn_memory(dst_sc_md, engine, dst_sc.data_ptr());
+  Tensor dst_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
+  memory::desc dst_zp_md =
+      memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+  memory dst_zp_m = dpcpp_onednn_memory(dst_zp_md, engine, dst_zp.data_ptr());
+  args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, dst_sc_m});
+  args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zp_m});
+
+  if (wgh.qscheme() == kPerTensorAffine) {
+    Tensor wgh_sc = at::ones(1, at::dtype(at::kFloat).device(at::kXPU)) *
+        static_cast<float>(wgh.q_scale());
+    memory::desc wgh_sc_md =
+        memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+    memory wgh_sc_m = dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
+
+    Tensor wgh_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
+    memory::desc wgh_zp_md =
+        memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+    memory wgh_zp_m = dpcpp_onednn_memory(wgh_zp_md, engine, wgh_zp.data_ptr());
+
+    args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
+    args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, wgh_zp_m});
+    DPCPP_ONEDNN_EXEC(deconv_fwd, strm, args);
+  } else {
+    // Per-channel quantized
+    Tensor wgh_sc = wgh.q_per_channel_scales().to(at::kFloat);
+    memory::desc wgh_sc_md = memory::desc(
+        get_onednn_dims(wgh_sc), memory::data_type::f32, memory::format_tag::x);
+    memory wgh_sc_m = dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
+
+    Tensor wgh_zp = wgh.q_per_channel_zero_points().to(at::kInt);
+    memory::desc wgh_zp_md =
+        memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+    memory wgh_zp_m = dpcpp_onednn_memory(wgh_zp_md, engine, wgh_zp.data_ptr());
+
+    args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
+    args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, wgh_zp_m});
+    DPCPP_ONEDNN_EXEC(deconv_fwd, strm, args);
+  }
+
   if (is_onednn_layout_suggested && dst_blocked.data_ptr() != dst.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_blocked);
     blk_ctx.set_aten_meta({dst.sizes().vec(), dst.strides().vec()});

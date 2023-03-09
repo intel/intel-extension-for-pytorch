@@ -192,6 +192,11 @@ void max_pool2d_with_indices_out_template(
     indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
   }
 
+  // per oneDNN definition, no dilation means dilation ratio is 0.
+  // Since dilation is already designed in the output size, no dilation
+  // is used in ::xpu::oneDNN::pooling
+  dilation_vec = {0, 0};
+
   ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
       output,
       indices,
@@ -204,6 +209,7 @@ void max_pool2d_with_indices_out_template(
       0,
       outputHeight,
       outputWidth,
+      dilation_vec,
       kernel_size_vec,
       stride_vec,
       padding_vec_l,
@@ -336,6 +342,9 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       outputWidth,
       memory_format);
 
+  // per oneDNN definition, no dilation means dilation ratio is 0.
+  // Since dilation is already designed in the output size, no dilation
+  // is used in ::xpu::oneDNN::pooling
   ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
       gradOutput,
@@ -355,6 +364,9 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       0,
       dH,
       dW,
+      0,
+      0,
+      0,
       0,
       padding_vec_l[0],
       padding_vec_l[1]);

@@ -579,9 +579,72 @@ IPEX_MATMUL_DEFINATION(log)
 IPEX_MATMUL_DEFINATION(round)
 IPEX_MATMUL_DEFINATION(sigmoid)
 IPEX_MATMUL_DEFINATION(relu)
-IPEX_MATMUL_DEFINATION(log_sigmoid)
-IPEX_MATMUL_DEFINATION(hardswish)
 IPEX_MATMUL_DEFINATION(mish)
+
+at::Tensor matmul_hardswish(
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2) {
+  RECORD_FUNCTION(
+      "matmul_hardswish", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ 1.f / 6.f,
+      /* beta */ 1.f / 2.f,
+      attr.kind_with_hardswish);
+  bool is_fused;
+  Tensor result;
+  return matmul_fusion_variants(result, tensor1, tensor2, true, attr, is_fused);
+}
+
+at::Tensor t_matmul_hardswish(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1) {
+  RECORD_FUNCTION(
+      "t_matmul_hardswish", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ 1.f / 6.f,
+      /* beta */ 1.f / 2.f,
+      attr.kind_with_hardswish);
+  bool is_fused;
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
+}
+
+at::Tensor matmul_log_sigmoid(
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2) {
+  RECORD_FUNCTION(
+      "matmul_log_sigmoid", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ -1.f,
+      /* beta */ 0.f,
+      attr.kind_with_soft_relu);
+  bool is_fused;
+  Tensor result;
+  return matmul_fusion_variants(result, tensor1, tensor2, true, attr, is_fused);
+}
+at::Tensor t_matmul_log_sigmoid(
+    const at::Tensor& tensor2,
+    const at::Tensor& tensor1) {
+  RECORD_FUNCTION(
+      "t_matmul_log_sigmoid", std::vector<c10::IValue>({tensor1, tensor2}));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* scale */ 1.f,
+      /* alpha */ -1.f,
+      /* beta */ 0.f,
+      attr.kind_with_soft_relu);
+  bool is_fused;
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
+}
 
 at::Tensor matmul_silu(const at::Tensor& tensor1, const at::Tensor& tensor2) {
   RECORD_FUNCTION("matmul_silu", std::vector<c10::IValue>({tensor1, tensor2}));

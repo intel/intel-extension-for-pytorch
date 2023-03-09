@@ -115,8 +115,9 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm(
   auto dst_iter_md = memory::desc({dst_iter_tz}, src_data_t, format_any);
   auto dst_iter_c_md = memory::desc({dst_iter_c_tz}, iter_c_data_t, format_any);
 
-  std::shared_ptr<lstm_forward::desc> lstm_forward_desc;
-  lstm_forward_desc.reset(new lstm_forward::desc(
+  std::shared_ptr<lstm_forward::primitive_desc> lstm_forward_pd;
+  lstm_forward_pd.reset(new lstm_forward::primitive_desc(
+      engine,
       train ? prop_kind::forward_training : prop_kind::forward_inference,
       dir,
       src_layer_md,
@@ -128,10 +129,6 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm(
       dst_layer_md,
       dst_iter_md,
       dst_iter_c_md));
-
-  std::shared_ptr<lstm_forward::primitive_desc> lstm_forward_pd;
-  lstm_forward_pd.reset(
-      new lstm_forward::primitive_desc(*lstm_forward_desc, engine));
 
   auto wghs_layer_usr_m = dpcpp_onednn_memory(
       {{i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, src_data_t, format_ldigo},
@@ -466,8 +463,9 @@ lstm_backward(
   rnn_direction dir = bidirectional ? rnn_direction::bidirectional_concat
                                     : rnn_direction::unidirectional_left2right;
 
-  std::shared_ptr<lstm_forward::desc> lstm_forward_desc;
-  lstm_forward_desc.reset(new lstm_forward::desc(
+  std::shared_ptr<lstm_forward::primitive_desc> lstm_forward_pd;
+  lstm_forward_pd.reset(new lstm_forward::primitive_desc(
+      engine,
       prop_kind::forward_training,
       dir,
       src_layer_md,
@@ -479,33 +477,6 @@ lstm_backward(
       dst_layer_md,
       dst_iter_md,
       dst_iter_c_md));
-
-  std::shared_ptr<lstm_forward::primitive_desc> lstm_forward_pd;
-  lstm_forward_pd.reset(
-      new lstm_forward::primitive_desc(*lstm_forward_desc, engine));
-
-  std::shared_ptr<dnnl::lstm_backward::desc> lstm_backward_desc;
-  lstm_backward_desc.reset(new dnnl::lstm_backward::desc(
-      prop_kind::backward,
-      dir,
-      src_layer_md,
-      src_iter_md,
-      src_iter_c_md,
-      wghs_layer_md,
-      wghs_iter_md,
-      bia_md,
-      dst_layer_md,
-      dst_iter_md,
-      dst_iter_c_md,
-      diff_src_layer_md,
-      diff_src_iter_md,
-      diff_src_iter_c_md,
-      diff_wghs_layer_md,
-      diff_wghs_iter_md,
-      diff_bia_md,
-      diff_dst_layer_md,
-      diff_dst_iter_md,
-      diff_dst_iter_c_md));
 
   auto src_layer_usr_m = dpcpp_onednn_memory(
       {{i == 0 ? src_layer_0_tz : src_layer_tz}, src_data_t, format_tnc},
@@ -575,7 +546,28 @@ lstm_backward(
 
   std::shared_ptr<dnnl::lstm_backward::primitive_desc> lstm_backward_pd;
   lstm_backward_pd.reset(new dnnl::lstm_backward::primitive_desc(
-      *lstm_backward_desc, engine, *lstm_forward_pd));
+      engine,
+      prop_kind::backward,
+      dir,
+      src_layer_md,
+      src_iter_md,
+      src_iter_c_md,
+      wghs_layer_md,
+      wghs_iter_md,
+      bia_md,
+      dst_layer_md,
+      dst_iter_md,
+      dst_iter_c_md,
+      diff_src_layer_md,
+      diff_src_iter_md,
+      diff_src_iter_c_md,
+      diff_wghs_layer_md,
+      diff_wghs_iter_md,
+      diff_bia_md,
+      diff_dst_layer_md,
+      diff_dst_iter_md,
+      diff_dst_iter_c_md,
+      *lstm_forward_pd));
 
   auto expected_src_layer_md = lstm_forward_pd->src_layer_desc();
   auto src_layer_m = src_layer_usr_m;

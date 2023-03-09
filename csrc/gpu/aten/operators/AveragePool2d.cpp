@@ -108,6 +108,8 @@ void avg_pool2d_out_template(
   std::vector<int64_t> kernel_size_vec = {kH, kW};
   std::vector<int64_t> stride_vec = {dH, dW};
   std::vector<int64_t> padding_vec = {padH, padW};
+  // per oneDNN definition, no dilation means dilation ratio is 0
+  std::vector<int64_t> dilation_vec = {0, 0};
   if (count_include_pad) {
     ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_include_padding>(
         output,
@@ -120,6 +122,7 @@ void avg_pool2d_out_template(
         0,
         outputHeight,
         outputWidth,
+        dilation_vec,
         kernel_size_vec,
         stride_vec,
         padding_vec,
@@ -136,6 +139,7 @@ void avg_pool2d_out_template(
         0,
         outputHeight,
         outputWidth,
+        dilation_vec,
         kernel_size_vec,
         stride_vec,
         padding_vec,
@@ -210,6 +214,7 @@ Tensor& avg_pool2d_backward_out_template(
       outputWidth,
       memory_format);
 
+  // per oneDNN definition, no dilation means dilation ratio is 0
   if (count_include_pad) {
     ::xpu::oneDNN::pooling_backward<
         ::xpu::oneDNN::alg::pooling_avg_include_padding>(
@@ -230,6 +235,9 @@ Tensor& avg_pool2d_backward_out_template(
         0,
         dH,
         dW,
+        0,
+        0,
+        0,
         0,
         padH,
         padW);
@@ -253,6 +261,9 @@ Tensor& avg_pool2d_backward_out_template(
         0,
         dH,
         dW,
+        0,
+        0,
+        0,
         0,
         padH,
         padW);

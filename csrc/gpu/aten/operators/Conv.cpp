@@ -1083,9 +1083,115 @@ IPEX_CONV_DEFINATION(log)
 IPEX_CONV_DEFINATION(round)
 IPEX_CONV_DEFINATION(sigmoid)
 IPEX_CONV_DEFINATION(relu)
-IPEX_CONV_DEFINATION(hardswish)
 IPEX_CONV_DEFINATION(mish)
-IPEX_CONV_DEFINATION(log_sigmoid)
+
+Tensor convolution_hardswish(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    int64_t groups_) {
+  Attr att;
+  att.append_post_eltwise(1.0f, 1.f / 6.f, 1.f / 2.f, att.kind_with_hardswish);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
+      groups_,
+      att);
+}
+
+Tensor _convolution_hardswish(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int64_t groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32) {
+  Attr att;
+  att.append_post_eltwise(1.0f, 1.f / 6.f, 1.f / 2.f, att.kind_with_hardswish);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      transposed,
+      output_padding_,
+      groups,
+      att);
+}
+
+Tensor convolution_log_sigmoid(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    int64_t groups_) {
+  Attr att;
+  att.append_post_eltwise(1.0f, -1.0f, 0.0f, att.kind_with_soft_relu);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      false,
+      {{0, 0}},
+      groups_,
+      att);
+}
+
+Tensor _convolution_log_sigmoid(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    std::vector<int64_t> stride_,
+    std::vector<int64_t> padding_,
+    std::vector<int64_t> dilation_,
+    bool transposed,
+    std::vector<int64_t> output_padding_,
+    int64_t groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32) {
+  Attr att;
+  att.append_post_eltwise(1.0f, -1.0, 0.0f, att.kind_with_soft_relu);
+  Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
+  return _convolution(
+      input,
+      weight,
+      bias_,
+      stride_,
+      padding_,
+      dilation_,
+      transposed,
+      output_padding_,
+      groups,
+      att);
+}
 
 Tensor convolution_gelu(
     const Tensor& input,

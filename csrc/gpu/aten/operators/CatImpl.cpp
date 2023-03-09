@@ -470,8 +470,9 @@ double AsignOneDnnQuantizeScale(
   }
   double res = t.q_scale();
   auto q_ctx = DPCPPTensorContext::get_tensor_ctx(t);
-  res = ((q_ctx.is_plain() ? get_onednn_dtype(t) : q_ctx.meta().data_type()) ==
-             memory::data_type::u8 &&
+  res = ((q_ctx.is_plain()
+              ? get_onednn_dtype(t)
+              : q_ctx.meta().get_data_type()) == memory::data_type::u8 &&
          zero_point == 128)
       ? static_cast<float>(res / 2)
       : static_cast<float>(res);

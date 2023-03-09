@@ -339,22 +339,26 @@ inline void to_bytes(bytestring& bytes, std::vector<T>& arg) {
 
 template <>
 inline void to_bytes(bytestring& bytes, dnnl::memory::desc& adesc) {
-  auto desc = adesc.data;
-  for (int i = 0; i < desc.ndims; i++) {
-    to_bytes(bytes, desc.dims[i]);
-    to_bytes(bytes, desc.padded_dims[i]);
-    to_bytes(bytes, desc.padded_offsets[i]);
-    to_bytes(bytes, desc.format_desc.blocking.strides[i]);
+  // auto desc = adesc.data;
+  for (int i = 0; i < adesc.get_ndims(); i++) {
+    to_bytes(bytes, adesc.get_dims()[i]);
+    to_bytes(bytes, adesc.get_padded_dims()[i]);
+    to_bytes(bytes, adesc.get_padded_offsets()[i]);
+    to_bytes(bytes, adesc.get_strides()[i]);
   }
 
-  for (int i = 0; i < desc.format_desc.blocking.inner_nblks; i++) {
-    to_bytes(bytes, desc.format_desc.blocking.inner_blks[i]);
-    to_bytes(bytes, desc.format_desc.blocking.inner_idxs[i]);
+  int inner_nblks = adesc.get_inner_nblks();
+  dnnl::memory::dims inner_blks = adesc.get_inner_blks();
+  dnnl::memory::dims inner_idxs = adesc.get_inner_idxs();
+  for (int i = 0; i < inner_nblks; i++) {
+    to_bytes(bytes, inner_blks[i]);
+    to_bytes(bytes, inner_idxs[i]);
   }
 
-  to_bytes(bytes, desc.data_type);
-  to_bytes(bytes, desc.offset0);
-  to_bytes(bytes, desc.format_kind);
+  to_bytes(bytes, adesc.get_data_type());
+  // to_bytes(bytes, adesc.get_offset0());
+  to_bytes(bytes, adesc.get_submemory_offset());
+  to_bytes(bytes, adesc.get_format_kind());
 }
 
 template <>

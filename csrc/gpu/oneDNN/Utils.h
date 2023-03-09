@@ -153,21 +153,31 @@ inline bool onednn_strides_check(const Tensor& src) {
   auto strides_info = xpu::oneDNN::get_onednn_strides(src);
   auto strides = strides_info.empty() ? nullptr : &strides_info[0];
 
-  auto md = dnnl_memory_desc_t();
-  md.ndims = ndims;
-  array_copy(md.dims, dims, ndims);
-  md.data_type = data_type;
-  array_copy(md.padded_dims, dims, ndims);
-  md.format_kind = dnnl_format_kind_t::dnnl_blocked;
-  if (strides == nullptr || md.ndims == 0 ||
-      md.format_kind != dnnl_format_kind_t::dnnl_blocked)
+  dnnl_memory_desc_t md;
+  dnnl_memory_desc_create_with_strides(&md, ndims, dims, data_type, strides);
+  // md->get_ndims() = ndims;
+  // array_copy(md->dims, dims, ndims);
+  // md->get_data_type() = data_type;
+  // array_copy(md->padded_dims, dims, ndims);
+  // md->get_format_kind() = dnnl_format_kind_t::dnnl_blocked;
+  dnnl_format_kind_t md_fmt_kind;
+  int md_ndims;
+  int md_inner_nblks;
+  dnnl_dims_t md_padded_dims;
+
+  dnnl_memory_desc_query(md, dnnl_query_inner_nblks_s32, &md_inner_nblks);
+  dnnl_memory_desc_query(md, dnnl_query_format_kind, &md_fmt_kind);
+  dnnl_memory_desc_query(md, dnnl_query_ndims_s32, &md_ndims);
+  dnnl_memory_desc_query(md, dnnl_query_padded_dims, &md_padded_dims);
+  if (strides == nullptr || md_ndims == 0 ||
+      md_fmt_kind != dnnl_format_kind_t::dnnl_blocked)
     return true;
 
   dnnl_dims_t blocks = {0};
   int perm[DNNL_MAX_NDIMS] = {0};
-  for (int d = 0; d < md.ndims; ++d) {
+  for (int d = 0; d < md_ndims; ++d) {
     // no strides check needed for empty tensor
-    if (md.padded_dims[d] == 0)
+    if (md_padded_dims[d] == 0)
       return true;
 
     // no strides verification for runtime dims
@@ -179,25 +189,29 @@ inline bool onednn_strides_check(const Tensor& src) {
   }
 
   auto block_size = 1;
-  const auto& blk = md.format_desc.blocking;
-  for (int iblk = 0; iblk < blk.inner_nblks; ++iblk) {
-    blocks[blk.inner_idxs[iblk]] *= blk.inner_blks[iblk];
-    block_size *= blk.inner_blks[iblk];
+  // const auto& blk = md->format_desc.blocking;
+  dnnl_dims_t md_inner_blks;
+  dnnl_dims_t md_blk_inner_idxs;
+  dnnl_memory_desc_query(md, dnnl_query_inner_idxs, &md_blk_inner_idxs);
+  dnnl_memory_desc_query(md, dnnl_query_inner_blks, &md_inner_blks);
+  for (int iblk = 0; iblk < md_inner_nblks; ++iblk) {
+    blocks[md_blk_inner_idxs[iblk]] *= md_inner_blks[iblk];
+    block_size *= md_inner_blks[iblk];
   }
 
   // A custom comparator to yield linear order on perm
   auto idx_sorter = [&](const int a, const int b) -> bool {
-    if (strides[a] == strides[b] && md.padded_dims[a] == md.padded_dims[b])
+    if (strides[a] == strides[b] && md_padded_dims[a] == md_padded_dims[b])
       return a < b;
     else if (strides[a] == strides[b])
-      return md.padded_dims[a] < md.padded_dims[b];
+      return md_padded_dims[a] < md_padded_dims[b];
     else
       return strides[a] < strides[b];
   };
-  std::sort(perm, perm + md.ndims, idx_sorter);
+  std::sort(perm, perm + md_ndims, idx_sorter);
 
   auto min_stride = block_size;
-  for (int idx = 0; idx < md.ndims; ++idx) {
+  for (int idx = 0; idx < md_ndims; ++idx) {
     const int d = perm[idx];
 
     // Make an exception for strides[d] == 0 as it has broadcast semantics
@@ -208,7 +222,7 @@ inline bool onednn_strides_check(const Tensor& src) {
       return false;
 
     // update min_stride for next iteration
-    const auto padded_dim = md.padded_dims[d];
+    const auto padded_dim = md_padded_dims[d];
     min_stride = block_size * strides[d] * (padded_dim / blocks[d]);
   }
   return true;

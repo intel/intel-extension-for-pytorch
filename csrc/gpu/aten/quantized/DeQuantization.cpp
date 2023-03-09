@@ -26,18 +26,23 @@ Tensor dequantize_tensor_per_tensor_affine(
   ReorderAttr rattr = ReorderAttr();
   int mask = 0;
   auto q_ctx = DPCPPTensorContext::get_tensor_ctx(qtensor);
-  std::vector<float> scls = {
-      ((q_ctx.is_plain() ? get_onednn_dtype(qtensor)
-                         : q_ctx.meta().data_type()) == memory::data_type::u8 &&
-       qtensor.q_zero_point() == 128)
-          ? static_cast<float>(scale / 2)
-          : static_cast<float>(scale)};
-  std::vector<int> zps = {static_cast<int>(0)};
-  rattr.set_src_sc_and_zp(mask, scls, mask, zps);
+  // TODO: Remove workaround for dnnl symmetric quantization
+  float true_scale = ((q_ctx.is_plain() ? get_onednn_dtype(qtensor)
+                                        : q_ctx.meta().get_data_type()) ==
+                          memory::data_type::u8 &&
+                      qtensor.q_zero_point() == 128)
+      ? static_cast<float>(scale / 2)
+      : static_cast<float>(scale);
+  rattr.set_src_sc_and_zp_mask(mask, mask);
+
+  Tensor dnn_scale =
+      at::ones(1, at::dtype(at::kFloat).device(at::kXPU)) * 1.f / true_scale;
+  // TODO: Remove workaround for dnnl symmetric quantization
+  Tensor dnn_zero_point = at::zeros(1, at::dtype(at::kInt).device(at::kXPU));
 
   Tensor rtensor_ = at::empty(qtensor.sizes(), rtensor.options());
-  xpu::oneDNN::reorder(qtensor, rtensor_, rattr);
-
+  xpu::oneDNN::quantized_reorder(
+      qtensor, rtensor_, dnn_scale, dnn_zero_point, rattr);
   return rtensor_;
 }
 
@@ -73,19 +78,17 @@ Tensor dequantize_tensor_per_channel_affine(
   ReorderAttr rattr = ReorderAttr();
   int mask_0 = 1 << axis;
   int mask_1 = 0;
-  std::vector<float> scls;
-  std::vector<int> zps;
-  for (int i = 0; i < scales.numel(); i++) {
-    scls.push_back(scales[i].item().to<float>());
-  }
 
-  // oneDNN only support single zero_point by currently.
-  zps.push_back(zero_points[0].item().to<float>());
+  Tensor dnn_scale = at::ones(1, at::dtype(at::kFloat).device(at::kXPU)) *
+      1.0f / scales.to(at::kFloat);
+  // TODO: Remove workaround for dnnl symmetric quantization
+  Tensor dnn_zero_point = at::zeros(1, at::dtype(at::kInt).device(at::kXPU));
 
-  rattr.set_src_sc_and_zp(mask_0, scls, mask_1, zps);
+  rattr.set_src_sc_and_zp_mask(mask_0, mask_1);
 
   Tensor rtensor_ = empty_opaque_tensor(r_md, rtensor.options(), c10::nullopt);
-  xpu::oneDNN::reorder(qtensor, rtensor_, rattr);
+  xpu::oneDNN::quantized_reorder(
+      qtensor, rtensor_, dnn_scale, dnn_zero_point, rattr);
 
   return rtensor_;
 }

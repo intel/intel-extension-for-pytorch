@@ -786,11 +786,13 @@ at::Tensor q_conv2d_log_sigmoid(
       Tensor bias = pack_ptr->bias.value();
       attr.append_bias<2>(bias);
     }
+    // logsigmoid will be removed. It can be used as current soft_relu_v2 with
+    // alpha equal to -1. Notice: soft_relu_v2 will be called soft_relu
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
-        /* alpha */ 0.f,
+        /* alpha */ -1.f,
         /* beta */ 0.f,
-        attr.kind_with_log_sigmoid);
+        attr.kind_with_soft_relu);
   };
   return qconv_wrapper.call(input, att);
 }
@@ -812,8 +814,8 @@ at::Tensor q_conv2d_hardswish(
     }
     return attr.append_post_eltwise(
         /* eltwise_scale */ 1.f,
-        /* alpha */ 0.f,
-        /* beta */ 0.f,
+        /* alpha */ 1.0f / 6.0f,
+        /* beta */ 1.0f / 2.0f,
         attr.kind_with_hardswish);
   };
   return qconv_wrapper.call(input, att);

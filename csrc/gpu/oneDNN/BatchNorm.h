@@ -95,15 +95,12 @@ static std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> batch_normalization(
   auto sft_md = memory::desc(
       {feature_num}, memory::data_type::f32, memory::format_tag::a);
 
-  auto bn_fwd_desc =
-      batch_normalization_forward::desc(prop, src_md, epsilon, flag);
-
   primitive_attr pattr;
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
-  auto bn_fwd_pd =
-      batch_normalization_forward::primitive_desc(bn_fwd_desc, pattr, engine);
+  auto bn_fwd_pd = batch_normalization_forward::primitive_desc(
+      engine, prop, src_md, src_md, epsilon, flag, pattr);
 
   auto ndim = src.ndimension();
   auto src_cl_mfmt = at::MemoryFormat::ChannelsLast;
@@ -220,8 +217,10 @@ batch_normalization_backward(
 
   auto flags = normalization_flags::use_scale | normalization_flags::use_shift;
 
-  if (!(diff_src_mask[1] && diff_src_mask[2]))
-    flags &= ~normalization_flags::use_scale_shift;
+  if (!(diff_src_mask[1] && diff_src_mask[2])) {
+    flags &= ~normalization_flags::use_scale;
+    flags &= ~normalization_flags::use_shift;
+  }
 
   auto src_tz = get_onednn_dims(src);
   auto src_dt = get_onednn_dtype(src);
@@ -239,15 +238,18 @@ batch_normalization_backward(
   auto diff_dst_usr_m =
       dpcpp_onednn_memory(diff_dst_md, engine, diff_dst.data_ptr());
 
-  batch_normalization_forward::desc bn_fwd_desc(
-      prop_kind::forward_training, src_md, epsilon, flags);
-
   primitive_attr pattr;
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
-  auto bn_fwd_pd =
-      batch_normalization_forward::primitive_desc(bn_fwd_desc, pattr, engine);
+  auto bn_fwd_pd = batch_normalization_forward::primitive_desc(
+      engine,
+      prop_kind::forward_training,
+      src_md,
+      src_md,
+      epsilon,
+      flags,
+      pattr);
 
   at::Tensor diff_dst_;
   auto diff_dst_m = diff_dst_usr_m;
@@ -268,10 +270,16 @@ batch_normalization_backward(
     p_kind = prop_kind::backward_data;
   }
 
-  auto bwd_desc = batch_normalization_backward::desc(
-      p_kind, diff_dst_md, src_md, epsilon, flags);
   auto bn_bwd_pd = batch_normalization_backward::primitive_desc(
-      bwd_desc, pattr, engine, bn_fwd_pd);
+      engine,
+      p_kind,
+      diff_dst_md,
+      diff_dst_md,
+      src_md,
+      epsilon,
+      flags,
+      bn_fwd_pd,
+      pattr);
 
   memory mean_m, var_m;
   if (training) {
@@ -322,10 +330,6 @@ batch_normalization_backward(
     auto wgh_m = dpcpp_onednn_memory(
         bn_bwd_pd.weights_desc(), engine, wgh_f32.data_ptr());
 
-    bia_f32 = at::empty_like(wgh_f32);
-    auto bia_m = dpcpp_onednn_memory(
-        bn_bwd_pd.weights_desc(), engine, bia_f32.data_ptr());
-
     if (!diff_wgh.has_storage())
       diff_wgh = at::empty_like(wgh_f32);
     auto diff_wgh_m = dpcpp_onednn_memory(
@@ -337,12 +341,12 @@ batch_normalization_backward(
         bn_bwd_pd.diff_weights_desc(), engine, diff_bia.data_ptr());
 
     args.insert({DNNL_ARG_SCALE, wgh_m});
-    args.insert({DNNL_ARG_SHIFT, bia_m});
     args.insert({DNNL_ARG_DIFF_SCALE, diff_wgh_m});
     args.insert({DNNL_ARG_DIFF_SHIFT, diff_bia_m});
+    DPCPP_ONEDNN_EXEC(bn_bwd, strm, args);
+  } else {
+    DPCPP_ONEDNN_EXEC(bn_bwd, strm, args);
   }
-
-  DPCPP_ONEDNN_EXEC(bn_bwd, strm, args);
 
   return {diff_src, diff_wgh, diff_bia};
 }

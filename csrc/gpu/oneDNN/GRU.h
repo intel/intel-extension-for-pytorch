@@ -75,7 +75,8 @@ static inline Tensor gru_forward(
   auto dst_layer_md = memory::desc({dst_layer_dims}, data_t, format_any);
   auto dst_iter_md = memory::desc({dst_iter_dims}, data_t, format_any);
 
-  auto gru_forward_desc = lbr_gru_forward::desc(
+  auto gru_forward_pd = lbr_gru_forward::primitive_desc(
+      engine,
       train ? prop_kind::forward_training : prop_kind::forward_inference,
       dir,
       src_layer_md,
@@ -85,9 +86,6 @@ static inline Tensor gru_forward(
       bias_md,
       dst_layer_md,
       dst_iter_md);
-
-  auto gru_forward_pd =
-      lbr_gru_forward::primitive_desc(gru_forward_desc, engine);
 
   auto weights_layer_usr_memory = dpcpp_onednn_memory(
       {{weights_layer_dims}, data_t, format_ldigo},
@@ -316,7 +314,8 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
   rnn_direction dir = reverse ? rnn_direction::unidirectional_right2left
                               : rnn_direction::unidirectional_left2right;
 
-  auto gru_forward_desc = lbr_gru_forward::desc(
+  auto gru_forward_pd = gru_forward::primitive_desc(
+      engine,
       prop_kind::forward_training,
       dir,
       src_layer_md,
@@ -326,27 +325,6 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
       bias_md,
       dst_layer_md,
       dst_iter_md);
-
-  auto gru_forward_pd =
-      lbr_gru_forward::primitive_desc(gru_forward_desc, engine);
-
-  auto gru_backward_desc = lbr_gru_backward::desc(
-      prop_kind::backward,
-      dir,
-      src_layer_md,
-      src_iter_md,
-      weights_layer_md,
-      weights_iter_md,
-      bias_md,
-      dst_layer_md,
-      dst_iter_md,
-      diff_src_layer_md,
-      diff_src_iter_md,
-      diff_weights_layer_md,
-      diff_weights_iter_md,
-      diff_bias_md,
-      diff_dst_layer_md,
-      diff_dst_iter_md);
 
   auto src_layer_usr_memory = dpcpp_onednn_memory(
       {{src_layer_dims}, data_dt, format_tnc}, engine, src_layer.data_ptr());
@@ -407,7 +385,24 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
       {{bias_dims}, data_dt, format_ldgo}, engine, diff_bias.data_ptr());
 
   auto gru_backward_pd = lbr_gru_backward::primitive_desc(
-      gru_backward_desc, engine, gru_forward_pd);
+      engine,
+      prop_kind::backward,
+      dir,
+      src_layer_md,
+      src_iter_md,
+      weights_layer_md,
+      weights_iter_md,
+      bias_md,
+      dst_layer_md,
+      dst_iter_md,
+      diff_src_layer_md,
+      diff_src_iter_md,
+      diff_weights_layer_md,
+      diff_weights_iter_md,
+      diff_bias_md,
+      diff_dst_layer_md,
+      diff_dst_iter_md,
+      gru_forward_pd);
 
   Tensor new_src_iter = src_iter.reshape({src_iter_dims}),
          new_dst_iter = dst_iter.reshape({dst_iter_dims}),
