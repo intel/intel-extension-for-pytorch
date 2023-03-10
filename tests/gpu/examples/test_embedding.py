@@ -61,3 +61,15 @@ class TestTorchMethod(TestCase):
             print(param._grad.to("cpu"))
         print()
         self.assertEqual(res_cpu, res_dpcpp.to(cpu_device))
+
+    def test_embeddingembedding_renorm_(self, dtype=torch.float):
+        embedding = torch.nn.Embedding(7, 5, max_norm=0.5, norm_type=1.0)
+        weight = embedding.weight
+        weight_xpu = weight.to(dpcpp_device)
+        self.assertEqual(weight, weight_xpu.to(cpu_device))
+        idx = torch.tensor([4, 3, 4, 2])
+        idx_xpu = idx.to('xpu')
+        a = torch.embedding_renorm_(weight.detach(), idx, 0.5, 1.0)
+        b = torch.embedding_renorm_(weight_xpu.detach(), idx_xpu, 0.5, 1.0)
+        self.assertEqual(weight, weight_xpu.to(cpu_device))
+        

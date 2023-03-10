@@ -225,6 +225,7 @@ supported:
   - erf.out
   - erfc.out
   - erfinv.out
+  - embedding_renorm_
   - exp.out
   - exp2.out
   - expm1.out

@@ -1,4 +1,6 @@
 #include <ATen/ATen.h>
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 #include "comm/AccumulateType.h"
 
 #include <core/Device.h>
@@ -9,13 +11,14 @@
 #include "PSTLFunctions.h"
 #include "comm/ATDispatch.h"
 #include "comm/Atomics.h"
+#include "comm/SYCLGroupAlgorithm.h"
 
 using namespace xpu::dpcpp;
 using namespace xpu::dpcpp::detail;
 
 namespace at {
 namespace AtenIpexTypeXPU {
-namespace {
+namespace impl {
 
 template <typename IdxType>
 static inline void indices_count(
@@ -98,7 +101,74 @@ static inline void embedding_dense_backward_kernel(
   launch_index_kernel(cfg);
 }
 
-} // namespace
+template <typename scalar_t, typename accscalar_t, typename index_t>
+void renorm_kernel(
+    scalar_t* weights,
+    index_t* indices,
+    accscalar_t max_norm,
+    accscalar_t norm_type,
+    int64_t dim,
+    int64_t weights_stride0,
+    int64_t weights_stride1,
+    int64_t num_unique_indices) {
+  const int64_t work_group_size = dpcppMaxWorkItemsPerEU();
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto smem = dpcpp_local_acc_t<accscalar_t>(
+        (work_group_size / 8) * sizeof(accscalar_t),
+        cgh); // We use the smallest subgroup size to ensure enough space
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
+      accscalar_t* my_smem = smem.get_pointer().get();
+
+      int tid = item.get_local_linear_id();
+      int sgSize = item.get_local_range(0);
+      auto group_idx = item.get_group(0);
+      if (group_idx >= num_unique_indices) {
+        return;
+      }
+
+      int base_index = indices[group_idx] * weights_stride0;
+
+      accscalar_t v = static_cast<accscalar_t>(0);
+      for (int i = tid; i < dim; i += sgSize) {
+        auto x =
+            static_cast<accscalar_t>(weights[base_index + i * weights_stride1]);
+        if (norm_type == 1) {
+          v += std::abs(x);
+        } else if (norm_type == 2) {
+          v += x * x;
+        } else {
+          v += std::pow(x, norm_type);
+        }
+      }
+
+      v = GroupReduceSum(item, v, my_smem);
+
+      if (tid == 0) {
+        my_smem[0] = std::pow(v, static_cast<accscalar_t>(1.0 / norm_type));
+      }
+      item.barrier(dpcpp_local_fence);
+
+      if (my_smem[0] > max_norm) {
+        auto factor = static_cast<scalar_t>(max_norm / (my_smem[0] + 1e-7));
+        for (int i = tid; i < dim; i += sgSize) {
+          weights[base_index + i * weights_stride1] *= factor;
+        }
+      }
+    };
+
+    cgh.parallel_for(
+        sycl::nd_range<1>(
+            sycl::range<1>(work_group_size * num_unique_indices),
+            sycl::range<1>(work_group_size)),
+        kfn);
+  };
+
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  dpcpp_queue.submit(cgf);
+}
+
+} // namespace impl
 
 Tensor embedding_dense_backward(
     const Tensor& grad_output,
@@ -168,6 +238,62 @@ Tensor embedding_dense_backward(
             });
       });
   return grad_weight;
+}
+
+Tensor& embedding_renorm_(
+    Tensor& self,
+    const Tensor& indices,
+    double max_norm,
+    double norm_type) {
+  auto self_arg = TensorArg(self, "self", 1);
+  auto indices_arg = TensorArg(indices, "indices", 2);
+  checkDim("embedding_renorm_", self_arg, 2);
+  checkScalarTypes("embedding_renorm_", indices_arg, {kLong, kInt});
+
+  auto indices_contig = indices.contiguous();
+  auto num_indices = indices.numel();
+
+  IPEX_DISPATCH_INDEX_TYPES(indices.scalar_type(), "embedding_renorm_", [&]() {
+    auto num_indices = indices.numel();
+    auto indices_contig = std::get<0>(indices.sort()).contiguous();
+    auto unique_indices = at::empty(indices.numel(), indices.options());
+
+    unique_indices.copy_(indices_contig);
+
+    int64_t num_unique_indices;
+    num_unique_indices = xpu::pstl::unique<index_t, index_t>(
+                             unique_indices.data_ptr<index_t>(),
+                             unique_indices.data_ptr<index_t>() + num_indices,
+                             [](auto lhs, auto rhs) -> bool {
+                               if (lhs != rhs) {
+                                 return false;
+                               }
+                               return true;
+                             }) -
+        unique_indices.data_ptr<index_t>();
+
+    int dim = self.stride(0);
+
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        self.scalar_type(),
+        "embedding_renorm_",
+        [&] {
+          using accscalar_t = acc_type<scalar_t>;
+          impl::renorm_kernel(
+              self.data_ptr<scalar_t>(),
+              unique_indices.data_ptr<index_t>(),
+              static_cast<accscalar_t>(max_norm),
+              static_cast<accscalar_t>(norm_type),
+              dim,
+              self.stride(0),
+              self.stride(1),
+              num_unique_indices);
+        });
+  });
+
+  return self;
 }
 
 } // namespace AtenIpexTypeXPU
