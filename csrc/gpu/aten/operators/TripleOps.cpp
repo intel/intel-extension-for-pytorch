@@ -73,13 +73,16 @@ Tensor mul_add_scalar(
   if (check_has_opaque_and_no_padding({self, accumu})) {
     if (self.numel() > accumu.numel()) {
       _accumu = accumu.expand_as(self);
+      _self = self;
     } else if (self.numel() < accumu.numel()) {
       _self = self.expand_as(accumu);
+      _accumu = accumu;
     } else {
       _accumu = accumu;
       _self = self;
     }
-    Tensor tar = DPCPPTensorConvertor::is_opaque_tensor(_self) ? _self : accumu;
+    Tensor tar =
+        DPCPPTensorConvertor::is_opaque_tensor(_self) ? _self : _accumu;
     auto ctx = AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(tar);
     auto converter = [&](const Tensor& tensor) {
       auto tensor_ctx =
