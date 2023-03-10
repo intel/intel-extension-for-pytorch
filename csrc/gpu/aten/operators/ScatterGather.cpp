@@ -112,6 +112,8 @@ void scatter_reduce_dpcpp_kernel(
           "scatter_reduce_dpcpp_multiply_",
           reduce_multiply);
       break;
+    default:
+      break;
   }
 }
 
@@ -143,6 +145,8 @@ void scatter_scalar_reduce_dpcpp_kernel(
           value,
           "scatter_fill_dpcpp_multiply_",
           reduce_multiply);
+      break;
+    default:
       break;
   }
 }

@@ -240,8 +240,7 @@ static inline scalar_t safe_downgrade_to_int_range(scalar_t x) {
   // -100.0 does not have special meaning. This is just to make sure
   // it's not within_bounds_2d or within_bounds_3d, and does not cause
   // undefined behavior.
-  if (x > static_cast<scalar_t>(INT_MAX - 1) || x < INT_MIN ||
-      !::isfinite(static_cast<scalar_t>(x)))
+  if (x > INT_MAX - 1 || x < INT_MIN || !::isfinite(static_cast<scalar_t>(x)))
     return static_cast<scalar_t>(-100.0);
   return x;
 }
