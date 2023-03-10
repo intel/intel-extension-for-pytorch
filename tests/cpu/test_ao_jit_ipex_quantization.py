@@ -257,8 +257,6 @@ class TestIpexOps(JitLlgaTestCase):
                 x = torch.randn(batch_size, seq_len, input_size)
             else:
                 x = torch.randn(seq_len, batch_size, input_size)
-            h = torch.randn(num_layers * num_directions, batch_size, hidden_size)
-            c = torch.randn(num_layers * num_directions, batch_size, hidden_size)
             m = M(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
             graph = self.checkQuantizeTrace(m, [x], atol=3e-2, rtol=1e-1)
             self.assertGraphContainsExactly(graph, 'ipex::quantized_lstm', 1)
@@ -303,8 +301,10 @@ class TestIpexOps(JitLlgaTestCase):
 
         model = M().eval()
         seq = torch.randn(24, 1, 512)
+        h0 = torch.zeros((2, 1, 256), dtype=seq.dtype)
+        hid = (h0, h0)
 
-        graph = self.checkQuantizeTrace(model, [seq], atol=3e-2, rtol=1e-1)
+        graph = self.checkQuantizeTrace(model, [seq, hid], atol=3e-2, rtol=1e-1)
         self.assertGraphContainsExactly(graph, 'ipex::quantized_lstm', 1)        
         self.assertGraphContainsExactly(graph, 'aten::lstm', 0)        
 
