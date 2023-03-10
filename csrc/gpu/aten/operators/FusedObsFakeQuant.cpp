@@ -29,7 +29,7 @@ void ChooseQuantizationParamsKernelImpl(
       int symmetric_qmin = -((qmax - qmin) / 2 + 1);
       int symmetric_qmax = (qmax - qmin) / 2;
 
-      double max_scale = Numerics<float>::max(
+      float max_scale = Numerics<float>::max(
           Numerics<float>::fabs(min_val / symmetric_qmin),
           Numerics<float>::fabs(max_val / symmetric_qmax));
       min_val = max_scale * symmetric_qmin;
@@ -41,7 +41,7 @@ void ChooseQuantizationParamsKernelImpl(
     // representable value.
     min_val = Numerics<float>::min(min_val, 0.f);
     max_val = Numerics<float>::max(max_val, 0.f);
-    scale[i] = (static_cast<double>(max_val) - min_val) / (qmax - qmin);
+    scale[i] = (max_val - min_val) / (qmax - qmin);
 
     // Moving this check outside this function would result in extra Device to
     // Host copy of the min and max val which would result in a perf hit.
@@ -49,13 +49,13 @@ void ChooseQuantizationParamsKernelImpl(
       scale[i] = 0.1;
     }
 
-    double zero_point_from_min = qmin - min_val / static_cast<double>(scale[i]);
-    double zero_point_from_max = qmax - max_val / static_cast<double>(scale[i]);
-    double zero_point_from_min_error = Numerics<double>::abs(qmin) +
-        Numerics<double>::abs(min_val / static_cast<double>(scale[i]));
-    double zero_point_from_max_error = Numerics<double>::abs(qmax) +
-        Numerics<double>::abs(max_val / static_cast<double>(scale[i]));
-    double initial_zero_point =
+    float zero_point_from_min = qmin - min_val / scale[i];
+    float zero_point_from_max = qmax - max_val / scale[i];
+    float zero_point_from_min_error =
+        Numerics<float>::abs(qmin) + Numerics<float>::abs(min_val / scale[i]);
+    float zero_point_from_max_error =
+        Numerics<float>::abs(qmax) + Numerics<float>::abs(max_val / scale[i]);
+    float initial_zero_point =
         zero_point_from_min_error < zero_point_from_max_error
         ? zero_point_from_min
         : zero_point_from_max;
@@ -65,7 +65,7 @@ void ChooseQuantizationParamsKernelImpl(
     // to be a middle value between qmin and qmax.
     // If either min or max is 0, then we just use 0 as zero_point.
     if (min_val < 0 && max_val > 0 && preserve_sparsity) {
-      initial_zero_point = static_cast<double>(qmin + qmax) / 2;
+      initial_zero_point = static_cast<float>(qmin + qmax) / 2;
     }
     // Now we need to nudge the zero point to be an integer
     // (our zero points are integer, and this is motivated by the

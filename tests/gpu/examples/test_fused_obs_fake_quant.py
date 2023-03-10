@@ -164,7 +164,8 @@ class TestNNMethod(TestCase):
 
             self.assertEqual(in_running_min_ref, in_running_min_op)
             self.assertEqual(in_running_max_ref, in_running_max_op)
-            torch.testing.assert_allclose(out, x_in)
+            self.assertEqual(out.cpu(), x_in.cpu())
+
 
         # Test empty input works
         x = torch.empty(0, 5, device=device)
