@@ -25,7 +25,9 @@ python -m pip install intel_extension_for_pytorch -f https://developer.intel.com
 
 **Note:** Intel® Extension for PyTorch\* has PyTorch version requirement. Please check more detailed information via the URL below.
 
-More installation methods can be found at [CPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/installation.html)
+More installation methods can be found at [CPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/installation.html).
+
+Compilation instruction of the latest CPU code base `master` branch can be found at [Installation Guide](https://github.com/intel/intel-extension-for-pytorch/blob/master/docs/tutorials/installation.md#install-via-compiling-from-source).
 
 ### GPU version
 
@@ -38,7 +40,9 @@ python -m pip install intel_extension_for_pytorch==1.13.10+xpu -f https://develo
 
 **Note:** The patched PyTorch 1.13.0a0 is required to work with Intel® Extension for PyTorch\* on Intel® graphics card for now.
 
-More installation methods can be found at [GPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html)
+More installation methods can be found at [GPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html).
+
+Compilation instruction of the latest GPU code base `xpu-master` branch can be found at [Installation Guide](https://github.com/intel/intel-extension-for-pytorch/blob/xpu-master/docs/tutorials/installation.md#install-via-compiling-from-source).
 
 ## Getting Started
 
