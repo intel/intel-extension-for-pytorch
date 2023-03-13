@@ -7,11 +7,11 @@ import pytest
 
 
 cpu_device = torch.device("cpu")
-sycl_device = torch.device("xpu")
+xpu_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
-    def test_upsamle_last_channel(self, dtype=torch.float):
+    def test_upsample_last_channel(self, dtype=torch.float):
         conv = torch.nn.Conv2d(3, 3, kernel_size=3, stride=1, padding=1, bias=False)
         upsample = torch.nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
         x_cpu = torch.randn(2, 3, 4, 5)
@@ -39,28 +39,27 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_xpu.cpu())
         self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
-    def test_upsamle(self, dtype=torch.float):
+    def test_upsample(self, dtype=torch.float):
         x_cpu = torch.tensor([[[[1, 2, 3, 4, 5], [4, 5, 6, 7, 8]], [[1, 2, 3, 4, 5], [4, 5, 6, 7, 8]]], [
                              [[1, 2, 3, 4, 5], [4, 5, 6, 7, 8]], [[1, 2, 3, 4, 5], [4, 5, 6, 7, 8]]]],
                              dtype=torch.float32, device=cpu_device)
-        # x_sycl = torch.tensor([[[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]],
+        # x_xpu = torch.tensor([[[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]],
         #                       [[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]]],
-        #                       dtype=torch.float32, device = sycl_device)
-        x_sycl = x_cpu.to("xpu")
+        #                       dtype=torch.float32, device = xpu_device)
+        x_xpu = x_cpu.to("xpu")
 
-        self.assertEqual(x_cpu, x_sycl.cpu())
+        self.assertEqual(x_cpu, x_xpu.cpu())
         self.assertEqual(torch.nn.functional.upsample_nearest(
-            x_cpu, [2, 5]), torch.nn.functional.upsample_nearest(x_sycl, [2, 5]).cpu())
+            x_cpu, [2, 5]), torch.nn.functional.upsample_nearest(x_xpu, [2, 5]).cpu())
         self.assertEqual(torch.nn.functional.upsample_nearest(
-            x_cpu, [4, 10]), torch.nn.functional.upsample_nearest(x_sycl, [4, 10]).cpu())
+            x_cpu, [4, 10]), torch.nn.functional.upsample_nearest(x_xpu, [4, 10]).cpu())
         # self.assertEqual(torch.nn.functional.upsample_nearest(x_cpu,[3,8]),
-        #                  torch.nn.functional.upsample_nearest(x_sycl,[3,8]).cpu())
+        #                  torch.nn.functional.upsample_nearest(x_xpu,[3,8]).cpu())
         # self.assertEqual(torch.nn.functional.upsample_nearest(x_cpu,[1,3]),
-        #                  torch.nn.functional.upsample_nearest(x_sycl,[1,3]).cpu())
+        #                  torch.nn.functional.upsample_nearest(x_xpu,[1,3]).cpu())
 
         x_cpu = torch.arange(8).view(1, 2, 2, 2).type(torch.FloatTensor)
-        x_sycl = x_cpu.to("xpu")
+        x_xpu = x_cpu.to("xpu")
 
         expected_out = torch.Tensor(
             [[[[-0.31641, 0.01562, 0.56250, 0.89453],
@@ -74,73 +73,73 @@ class TestNNMethod(TestCase):
                 [6.10547, 6.43750, 6.98438, 7.31641]]]])
 
         y_cpu = nn.functional.interpolate(x_cpu, scale_factor=2, mode='bicubic', align_corners=False)
-        y_sycl = nn.functional.interpolate(x_sycl, scale_factor=2, mode='bicubic', align_corners=False).cpu()
+        y_sycl = nn.functional.interpolate(x_xpu, scale_factor=2, mode='bicubic', align_corners=False).cpu()
 
-        self.assertEqual(x_cpu, x_sycl.cpu())
+        self.assertEqual(x_cpu, x_xpu.cpu())
         self.assertEqual(y_cpu, y_sycl.cpu())
 
         x_cpu = torch.tensor([[[[1, 2, 3, 4], [4, 5, 6, 7], [1, 2, 3, 4], [4, 5, 6, 7]], [[1, 2, 3, 4], [
                              4, 5, 6, 7], [1, 2, 3, 4], [4, 5, 6, 7]]]], dtype=torch.float32, device=cpu_device)
-        x_sycl = x_cpu.to("xpu")
+        x_xpu = x_cpu.to("xpu")
         x_cpu.requires_grad_(True)
-        x_sycl.requires_grad_(True)
+        x_xpu.requires_grad_(True)
         y_cpu = nn.functional.interpolate(x_cpu, scale_factor=1, mode='bicubic', align_corners=False)
-        y_sycl = nn.functional.interpolate(x_sycl, scale_factor=1, mode='bicubic', align_corners=False)
+        y_sycl = nn.functional.interpolate(x_xpu, scale_factor=1, mode='bicubic', align_corners=False)
 
         y_cpu.backward(x_cpu)
-        y_sycl.backward(x_sycl)
+        y_sycl.backward(x_xpu)
 
         self.assertEqual(y_cpu, y_sycl.cpu())
-        self.assertEqual(x_cpu.grad, x_sycl.grad.cpu())
+        self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
 
         '''only available in dpcpp build
       x_cpu = torch.tensor([[[[1,2,3,4],[4,5,6,7],[1,2,3,4],[4,5,6,7]],[[1,2,3,4],[4,5,6,7],[1,2,3,4],[4,5,6,7]]]],
       dtype=torch.double, device = cpu_device)
-      x_sycl=x_cpu.to("xpu")
+      x_xpu=x_cpu.to("xpu")
       x_cpu.requires_grad_(True)
-      x_sycl.requires_grad_(True)
+      x_xpu.requires_grad_(True)
       y_cpu = nn.functional.interpolate(x_cpu, scale_factor=1, mode='bicubic', align_corners=False)
-      y_sycl = nn.functional.interpolate(x_sycl, scale_factor=1, mode='bicubic', align_corners=False)
+      y_sycl = nn.functional.interpolate(x_xpu, scale_factor=1, mode='bicubic', align_corners=False)
 
       y_cpu.backward(x_cpu)
-      y_sycl.backward(x_sycl)
+      y_sycl.backward(x_xpu)
       '''
 
         y_cpu = nn.functional.interpolate(x_cpu, scale_factor=2, mode='nearest')
-        y_sycl = nn.functional.interpolate(x_sycl, scale_factor=2, mode='nearest').cpu()
+        y_sycl = nn.functional.interpolate(x_xpu, scale_factor=2, mode='nearest').cpu()
 
-        #  self.assertEqual(x_cpu, x_sycl.cpu())
+        #  self.assertEqual(x_cpu, x_xpu.cpu())
         self.assertEqual(y_cpu, y_sycl.cpu())
 
 
 '''
 y_cpu = nn.functional.interpolate(x_cpu, scale_factor=2, mode='bilinear', align_corners=False)
-y_sycl = nn.functional.interpolate(x_sycl, scale_factor=2, mode='bilinear', align_corners=False).cpu()
+y_sycl = nn.functional.interpolate(x_xpu, scale_factor=2, mode='bilinear', align_corners=False).cpu()
 
 print("cpu result", y_cpu)
-print("sycl result", y_sycl)
+print("xpu result", y_sycl)
 
 x_cpu = torch.arange(8).view(2, 2, 2).type(torch.FloatTensor)
-x_sycl = x_cpu.to("xpu")
+x_xpu = x_cpu.to("xpu")
 
 y_cpu = nn.functional.interpolate(x_cpu, scale_factor=2, mode='linear', align_corners=False)
-y_sycl = nn.functional.interpolate(x_sycl, scale_factor=2, mode='linear', align_corners=False).cpu()
+y_sycl = nn.functional.interpolate(x_xpu, scale_factor=2, mode='linear', align_corners=False).cpu()
 
 print("cpu result", y_cpu)
-print("sycl result", y_sycl)
+print("xpu result", y_sycl)
 
 x_cpu = torch.arange(8).view(1, 1, 2, 2, 2).type(torch.FloatTensor)
-x_sycl = x_cpu.to("xpu")
+x_xpu = x_cpu.to("xpu")
 
 y_cpu = nn.functional.interpolate(x_cpu, scale_factor=2, mode='trilinear', align_corners=False)
-y_sycl = nn.functional.interpolate(x_sycl, scale_factor=2, mode='trilinear', align_corners=False).cpu()
+y_sycl = nn.functional.interpolate(x_xpu, scale_factor=2, mode='trilinear', align_corners=False).cpu()
 
 print("cpu result", y_cpu)
-print("sycl result", y_sycl)
+print("xpu result", y_sycl)
 
 y_cpu = nn.functional.interpolate(x_cpu, scale_factor=2, mode='area')
-y_sycl = nn.functional.interpolate(x_sycl, scale_factor=2, mode='area').cpu()
+y_sycl = nn.functional.interpolate(x_xpu, scale_factor=2, mode='area').cpu()
 
 print("cpu result", y_cpu)
-print("sycl result", y_sycl)
+print("xpu result", y_sycl)
 '''

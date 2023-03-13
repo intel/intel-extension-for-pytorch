@@ -89,7 +89,7 @@ static inline accscalar_t compute_scales_value(
     const c10::optional<double> scale,
     int64_t src_size,
     int64_t dst_size) {
-  return (scale.has_value() && scale.value() > 0.)
+  return (scale.has_value() && scale.value() > 0.f)
       ? (accscalar_t)scale.value()
       : (accscalar_t)src_size / dst_size;
 }
@@ -174,15 +174,15 @@ template <typename scalar_t>
 static inline void get_cubic_upsample_coefficients(
     scalar_t coeffs[4],
     scalar_t t) {
-  scalar_t A = -0.75;
+  scalar_t A = -0.75f;
 
   scalar_t x1 = t;
-  coeffs[0] = cubic_convolution2<scalar_t>(x1 + 1.0, A);
+  coeffs[0] = cubic_convolution2<scalar_t>(x1 + 1.0f, A);
   coeffs[1] = cubic_convolution1<scalar_t>(x1, A);
 
-  scalar_t x2 = 1.0 - t;
+  scalar_t x2 = 1.0f - t;
   coeffs[2] = cubic_convolution1<scalar_t>(x2, A);
-  coeffs[3] = cubic_convolution2<scalar_t>(x2 + 1.0, A);
+  coeffs[3] = cubic_convolution2<scalar_t>(x2 + 1.0f, A);
 }
 
 template <typename scalar_t>

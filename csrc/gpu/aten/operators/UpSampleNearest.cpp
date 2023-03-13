@@ -30,9 +30,9 @@ Tensor& _upsample_nearest_exact3d_out(
       output,
       output_size,
       algorithm::resampling_nearest,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f,
+      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0f);
   return output;
 }
 
@@ -48,9 +48,9 @@ Tensor& upsample_nearest3d_out(
       output,
       output_size,
       algorithm::resampling_nearest,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f,
+      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0f);
   return output;
 }
 
@@ -68,9 +68,9 @@ Tensor _upsample_nearest_exact3d(
       output,
       osize,
       algorithm::resampling_nearest,
-      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
-      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
-      scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
+      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0f,
+      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0f,
+      scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0f);
   return output;
 }
 
@@ -88,9 +88,9 @@ Tensor upsample_nearest3d(
       output,
       osize,
       algorithm::resampling_nearest,
-      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
-      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
-      scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
+      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0f,
+      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0f,
+      scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0f);
   return output;
 }
 
@@ -108,9 +108,9 @@ Tensor& _upsample_nearest_exact3d_backward_out(
       input_size,
       output_size,
       algorithm::resampling_nearest,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f,
+      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0f);
   return grad_input;
 }
 
@@ -128,9 +128,9 @@ Tensor& upsample_nearest3d_backward_out(
       input_size,
       output_size,
       algorithm::resampling_nearest,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f,
+      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0f);
   return grad_input;
 }
 
@@ -150,9 +150,9 @@ Tensor _upsample_nearest_exact3d_backward(
       input_size,
       osize,
       algorithm::resampling_nearest,
-      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
-      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
-      scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
+      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0f,
+      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0f,
+      scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0f);
   return grad_input;
 }
 
@@ -172,9 +172,9 @@ Tensor upsample_nearest3d_backward(
       input_size,
       osize,
       algorithm::resampling_nearest,
-      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
-      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
-      scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
+      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0f,
+      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0f,
+      scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0f);
   return grad_input;
 }
 
@@ -189,8 +189,8 @@ Tensor& _upsample_nearest_exact2d_out(
       output,
       output_size,
       algorithm::resampling_nearest,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
   return output;
 }
 
@@ -205,8 +205,8 @@ Tensor& upsample_nearest2d_out(
       output,
       output_size,
       algorithm::resampling_nearest,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
   return output;
 }
 
@@ -223,8 +223,8 @@ Tensor& _upsample_nearest_exact2d_backward_out(
       input_size,
       output_size,
       algorithm::resampling_nearest,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
   return grad_input;
 }
 
@@ -241,8 +241,8 @@ Tensor& upsample_nearest2d_backward_out(
       input_size,
       output_size,
       algorithm::resampling_nearest,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
   return grad_input;
 }
 
@@ -256,7 +256,7 @@ Tensor& upsample_nearest1d_out(
       output,
       output_size,
       algorithm::resampling_nearest,
-      scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
+      scales.has_value() ? static_cast<double>(scales.value()) : 0.0f);
   return output;
 }
 
@@ -272,7 +272,7 @@ Tensor& _upsample_nearest_exact1d_backward_out(
       input_size,
       output_size,
       algorithm::resampling_nearest,
-      scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
+      scales.has_value() ? static_cast<double>(scales.value()) : 0.0f);
   return grad_input;
 }
 
@@ -288,7 +288,7 @@ Tensor& upsample_nearest1d_backward_out(
       input_size,
       output_size,
       algorithm::resampling_nearest,
-      scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
+      scales.has_value() ? static_cast<double>(scales.value()) : 0.0f);
   return grad_input;
 }
 
@@ -302,7 +302,7 @@ Tensor& _upsample_nearest_exact1d_out(
       output,
       output_size,
       algorithm::resampling_nearest,
-      scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
+      scales.has_value() ? static_cast<double>(scales.value()) : 0.0f);
   return output;
 }
 
@@ -324,8 +324,8 @@ Tensor upsample_nearest2d(
       output,
       output_size,
       algorithm::resampling_nearest,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
   return output;
 }
 
