@@ -149,11 +149,9 @@ conv_get_plain_md(
   // 5D: n/c/d/h/w (n/d/h/w/c)
   auto fmt_src = conv_src_fmt(ndim, is_channels_last_suggested);
   auto src_usr_md = memory::desc(src.sizes().vec(), src_data_t, fmt_src);
-  auto src_md = memory::desc(src.sizes().vec(), src_data_t, fmt_src);
 
   auto dst_data_t = get_onednn_dtype_include_double(dst);
   auto dst_usr_md = memory::desc(dst.sizes().vec(), dst_data_t, fmt_src);
-  auto dst_md = memory::desc(dst.sizes().vec(), dst_data_t, fmt_src);
 
   auto ic = src.size(1);
   auto oc = dst.size(1);
@@ -165,17 +163,8 @@ conv_get_plain_md(
   auto fmt_wgh = conv_wgh_fmt(ndim, groups != 1, is_channels_last_suggested);
   auto wgh_usr_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
 
-  // FIXME:
-  // WA for ChannelsLast with FP32
-  // https://jira.devtools.intel.com/browse/MFDNN-9218
-  memory::desc wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
-  if ((src_data_t == memory::data_type::f32 ||
-       src_data_t == memory::data_type::f64) &&
-      is_channels_last_suggested) {
-    wgh_md = memory::desc(wgh_tz, wei_data_t, memory::format_tag::any);
-  }
-
-  return {src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md};
+  return {
+      src_usr_md, wgh_usr_md, dst_usr_md, src_usr_md, wgh_usr_md, dst_usr_md};
 }
 
 static std::tuple<
@@ -410,16 +399,7 @@ static at::Tensor convolution(
       pattr);
 
   auto weight_cache_optimization = [&]() {
-    // FIXME:
-    // WA for ChannelsLast with FP32
-    // https://jira.devtools.intel.com/browse/MFDNN-9218
-    // After this issue fixed, ChannelsLast do not need weight cache
-    bool flag =
-        (memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast) &&
-        (src_usr_md.get_data_type() == memory::data_type::f32 ||
-         src_usr_md.get_data_type() == memory::data_type::f64);
-    return ((memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked) ||
-            flag) &&
+    return memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked &&
         !at::GradMode::is_enabled();
   }();
 
@@ -444,23 +424,6 @@ static at::Tensor convolution(
     src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
     wgh_m = dpcpp_onednn_memory(wgh_usr_md, engine, wgh.data_ptr());
     dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
-    // FIXME:
-    // WA for ChannelsLast with FP32
-    // https://jira.devtools.intel.com/browse/MFDNN-9218
-    bool is_channels_last_suggested =
-        memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
-    if (is_channels_last_suggested &&
-        (src_usr_md.get_data_type() == memory::data_type::f32 ||
-         src_usr_md.get_data_type() == memory::data_type::f64)) {
-      auto expected_wgh_md = conv_fwd_pd.weights_desc();
-      wgh_m = conv_get_expected_wgh_memory(
-          wgh,
-          wgh_blocked,
-          wgh_usr_md,
-          expected_wgh_md,
-          engine,
-          weight_cache_optimization);
-    }
   }
 
   std::unordered_map<int, memory> args;
@@ -597,23 +560,6 @@ static void convolution_backward_weights(
     src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
     diff_dst_m = dpcpp_onednn_memory(dst_usr_md, engine, diff_dst.data_ptr());
     diff_wgh_m = dpcpp_onednn_memory(wgh_usr_md, engine, diff_wgh.data_ptr());
-
-    // FIXME:
-    // WA for ChannelsLast with FP32
-    // https://jira.devtools.intel.com/browse/MFDNN-9218
-    auto expected_wgh_md = conv_bwd_w_pd.diff_weights_desc();
-    bool is_channels_last_suggested =
-        memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
-    if (is_channels_last_suggested &&
-        (src_usr_md.get_data_type() == memory::data_type::f32 ||
-         src_usr_md.get_data_type() == memory::data_type::f64)) {
-      if (wgh_usr_md != expected_wgh_md) {
-        expected_diff_wgh = empty_opaque_tensor(
-            expected_wgh_md, diff_wgh.options(), c10::nullopt);
-        diff_wgh_m = dpcpp_onednn_memory(
-            expected_wgh_md, engine, expected_diff_wgh.data_ptr());
-      }
-    }
   }
 
   // insert args
@@ -639,10 +585,7 @@ static void convolution_backward_weights(
   auto conv_bwd_w = dnnl::convolution_backward_weights(conv_bwd_w_pd);
   DPCPP_ONEDNN_EXEC(conv_bwd_w, strm, args);
 
-  // FIXME:
-  // This should only need is_onednn_layout_suggested
-  // after oneDNN fix the issue
-  if (diff_wgh_m.get_desc() != wgh_usr_md) {
+  if (is_onednn_layout_suggested && diff_wgh_m.get_desc() != wgh_usr_md) {
     // expected_diff_wgh contains the result of gw backward in blk format.
     // In training mode, plain gw output is expected for sgd update
     // Thus, we need one additional reorder here to make diff_wgh plain.
@@ -762,23 +705,6 @@ static void convolution_backward_data(
     diff_src_m = dpcpp_onednn_memory(src_usr_md, engine, diff_src.data_ptr());
     wei_m = dpcpp_onednn_memory(wgh_usr_md, engine, weight.data_ptr());
     diff_dst_m = dpcpp_onednn_memory(dst_usr_md, engine, diff_dst.data_ptr());
-    // FIXME:
-    // WA for ChannelsLast with FP32
-    // https://jira.devtools.intel.com/browse/MFDNN-9218
-    auto expected_wgh_md = conv_backward_data_pd.weights_desc();
-    bool is_channels_last_suggested =
-        memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
-    if (is_channels_last_suggested &&
-        (src_usr_md.get_data_type() == memory::data_type::f32 ||
-         src_usr_md.get_data_type() == memory::data_type::f64)) {
-      if (wgh_usr_md != expected_wgh_md) {
-        expected_wei = empty_opaque_tensor(
-            expected_wgh_md, weight.options(), c10::nullopt);
-        wei_m = dpcpp_onednn_memory(
-            expected_wgh_md, engine, expected_wei.data_ptr());
-        xpu::oneDNN::reorder(weight, expected_wei);
-      }
-    }
   }
 
   // insert args

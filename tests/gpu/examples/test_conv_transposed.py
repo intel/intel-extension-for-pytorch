@@ -81,17 +81,14 @@ class TestTorchMethod(TestCase):
         x_xpu.retain_grad()
         gy_xpu = gy_cpu.to('xpu')
         y_xpu = deconv(x_xpu)
-        # FIXME:
-        # crash with current oneDNN, Floating point exception (core dumped)
-        # and will be fixed after oneDNN upgraded to internal master branch with commit df0b87c2e14
-        # y_xpu.backward(gy_xpu)
-        # gw_xpu = deconv.weight.grad
-        # gb_xpu = deconv.bias.grad
+        y_xpu.backward(gy_xpu)
+        gw_xpu = deconv.weight.grad
+        gb_xpu = deconv.bias.grad
 
         self.assertEqual(y_cpu, y_xpu.cpu())
-        # self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
-        # self.assertEqual(gw_cpu, gw_xpu.cpu(), rtol=1e-3, atol=1e-2)
-        # self.assertEqual(gb_cpu, gb_xpu.cpu(), rtol=1e-3, atol=1e-2)
+        self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
+        self.assertEqual(gw_cpu, gw_xpu.cpu(), rtol=1e-3, atol=1e-2)
+        self.assertEqual(gb_cpu, gb_xpu.cpu(), rtol=1e-3, atol=1e-2)
 
     def test_group_deconv1d_bias_blk(self, dtype=torch.float):
         deconv = nn.ConvTranspose1d(16, 32, kernel_size=3, stride=1, padding=1, groups=2, bias=True)
@@ -112,17 +109,14 @@ class TestTorchMethod(TestCase):
             x_xpu.retain_grad()
             gy_xpu = gy_cpu.to('xpu')
             y_xpu = deconv(x_xpu)
-            # FIXME:
-            # crash with current oneDNN, Floating point exception (core dumped)
-            # and will be fixed after oneDNN upgraded to internal master branch with commit df0b87c2e14
-            # y_xpu.backward(gy_xpu)
-            # gw_xpu = deconv.weight.grad
-            # gb_xpu = deconv.bias.grad
+            y_xpu.backward(gy_xpu)
+            gw_xpu = deconv.weight.grad
+            gb_xpu = deconv.bias.grad
 
         self.assertEqual(y_cpu, y_xpu.cpu())
-        # self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
-        # self.assertEqual(gw_cpu, gw_xpu.cpu(), rtol=1e-3, atol=1e-2)
-        # self.assertEqual(gb_cpu, gb_xpu.cpu(), rtol=1e-3, atol=1e-2)
+        self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
+        self.assertEqual(gw_cpu, gw_xpu.cpu(), rtol=1e-3, atol=1e-2)
+        self.assertEqual(gb_cpu, gb_xpu.cpu(), rtol=1e-3, atol=1e-2)
 
     def test_deconv2d_bias(self, dtype=torch.float):
         deconv = nn.ConvTranspose2d(16, 32, kernel_size=3, stride=1, padding=1, bias=True)
@@ -254,17 +248,14 @@ class TestTorchMethod(TestCase):
             x_xpu.retain_grad()
             gy_xpu = gy_cpu.to('xpu')
             y_xpu = deconv(x_xpu)
-            # FIXME:
-            # crash with current oneDNN, Floating point exception (core dumped)
-            # and will be fixed after oneDNN upgraded to internal master branch with commit df0b87c2e14
-            # y_xpu.backward(gy_xpu)
-            # gw_xpu = deconv.weight.grad
-            # gb_xpu = deconv.bias.grad
+            y_xpu.backward(gy_xpu)
+            gw_xpu = deconv.weight.grad
+            gb_xpu = deconv.bias.grad
 
         self.assertEqual(y_cpu, y_xpu.cpu())
-        # self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
-        # self.assertEqual(gw_cpu, gw_xpu.cpu(), rtol=1e-3, atol=1e-2)
-        # self.assertEqual(gb_cpu, gb_xpu.cpu(), rtol=1e-3, atol=1e-2)
+        self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
+        self.assertEqual(gw_cpu, gw_xpu.cpu(), rtol=1e-3, atol=1e-2)
+        self.assertEqual(gb_cpu, gb_xpu.cpu(), rtol=1e-3, atol=1e-2)
 
     def test_group_deconv2d_bias_channels_last(self, dtype=torch.float):
         deconv = nn.ConvTranspose2d(16, 32, kernel_size=3, stride=1, padding=1, groups=2, bias=True).to(memory_format=torch.channels_last)
@@ -428,17 +419,14 @@ class TestTorchMethod(TestCase):
             x_xpu.retain_grad()
             gy_xpu = gy_cpu.to('xpu')
             y_xpu = deconv(x_xpu)
-            # FIXME:
-            # crash with current oneDNN, Floating point exception (core dumped)
-            # and will be fixed after oneDNN upgraded to internal master branch with commit df0b87c2e14
-            # y_xpu.backward(gy_xpu)
-            # gw_xpu = deconv.weight.grad
-            # gb_xpu = deconv.bias.grad
+            y_xpu.backward(gy_xpu)
+            gw_xpu = deconv.weight.grad
+            gb_xpu = deconv.bias.grad
 
         self.assertEqual(y_cpu, y_xpu.cpu())
-        # self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
-        # self.assertEqual(gw_cpu, gw_xpu.cpu(), rtol=1e-3, atol=1e-2)
-        # self.assertEqual(gb_cpu, gb_xpu.cpu(), rtol=1e-3, atol=1e-2)
+        self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
+        self.assertEqual(gw_cpu, gw_xpu.cpu(), rtol=1e-3, atol=1e-2)
+        self.assertEqual(gb_cpu, gb_xpu.cpu(), rtol=1e-3, atol=1e-2)
 
     def test_group_deconv3d_bias_channels_last(self, dtype=torch.float):
         deconv = nn.ConvTranspose3d(16, 32, kernel_size=3, stride=1, padding=1, groups=2, bias=True).to(memory_format=torch.channels_last_3d)
