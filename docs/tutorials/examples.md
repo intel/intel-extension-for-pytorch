@@ -269,7 +269,7 @@ $ cmake -DCMAKE_PREFIX_PATH=<LIBPYTORCH_PATH> ..
 $ make
 ```
 
-If *Found INTEL_EXT_PT_CPU* is shown as *TRUE*, the extension had been linked into the binary. This can be verified with Linux command *ldd*.
+If *Found IPEX* is shown as with a dynamic library path, the extension had been linked into the binary. This can be verified with Linux command *ldd*.
 
 ```bash
 $ cmake -DCMAKE_PREFIX_PATH=/workspace/libtorch ..
