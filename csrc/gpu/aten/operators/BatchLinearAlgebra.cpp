@@ -3220,7 +3220,7 @@ std::tuple<Tensor&, Tensor&> _linalg_eigh_out(
     Tensor& L,
     Tensor& V) {
   if (A.numel() == 0) {
-    return;
+    return std::tuple<Tensor&, Tensor&>(L, V);
   }
 
   auto uplo_uppercase =
