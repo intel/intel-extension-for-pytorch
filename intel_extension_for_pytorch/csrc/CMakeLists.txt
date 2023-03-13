@@ -18,8 +18,6 @@ endif()
 
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PYBIND11_CL_FLAGS}")
 
-add_subdirectory(cpu/isa_help)
-
 if(BUILD_WITH_CPU)
   add_subdirectory(cpu)
   list(APPEND PY_CPP_OBJS $<TARGET_OBJECTS:PY_CPU_OBJ>)
