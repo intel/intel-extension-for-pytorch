@@ -435,7 +435,7 @@ def set_node_output_quantized(nodes):
                     _reset_post_node_input_infos(node)
             else:
                 # TODO: enable PackedSequence input for LSTM.
-                if not (node.type in [nn.LSTM] and len(node.input_tensor_infos) > 2):
+                if not (node.type in [nn.LSTM] and len(node.input_tensor_infos) > 2 and node.input_tensor_infos[1].orig_dtype == torch.int64):
                     if node.input_tensor_force_inf_dtype[0] in [torch.qint8, torch.quint8] and not post_node_are_quantized:
                         node.output_tensor_infos[0].inf_dtype = node.input_tensor_force_inf_dtype[0]
                         node.insert_fake_quant_after_outputs[0] = True
