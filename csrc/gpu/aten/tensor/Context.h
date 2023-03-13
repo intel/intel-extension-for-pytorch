@@ -139,11 +139,24 @@ struct DPCPPTensorContext {
   }
 
   static DPCPPTensorContext release_tensor_ctx(const at::Tensor& t) {
-    return *(DPCPPTensorContext*)t.unsafeGetTensorImpl()
-                ->storage()
-                .unsafeGetStorageImpl()
-                ->data_ptr()
-                .release_context();
+    auto deleter_ptr = t.unsafeGetTensorImpl()
+                           ->storage()
+                           .unsafeGetStorageImpl()
+                           ->data_ptr()
+                           .get_deleter();
+    TORCH_INTERNAL_ASSERT(
+        deleter_ptr == getDeviceAllocator()->raw_deleter(),
+        "Not to release tensor context from a tensor created externally. ",
+        "The behavior to retrieve an unknown context is unsafe ...");
+
+    DPCPPTensorContext* ctx = (DPCPPTensorContext*)t.unsafeGetTensorImpl()
+                                  ->storage()
+                                  .unsafeGetStorageImpl()
+                                  ->data_ptr()
+                                  .release_context();
+    DPCPPTensorContext copy = *ctx;
+    delete ctx;
+    return copy;
   }
 
   static DPCPPTensorContext get_tensor_ctx(const at::Tensor& t) {
