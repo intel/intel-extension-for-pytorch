@@ -8,6 +8,12 @@ General
 .. autofunction:: optimize
 .. autoclass:: verbose
 
+Fast Bert (Experimental)
+************************
+
+.. currentmodule:: intel_extension_for_pytorch
+.. autofunction:: fast_bert
+
 Graph Optimization
 ******************
 

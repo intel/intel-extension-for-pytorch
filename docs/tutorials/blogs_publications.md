@@ -1,6 +1,7 @@
 Blogs & Publications
 ====================
 
+* [Accelerate PyTorch\* INT8 Inference with New “X86” Quantization Backend on X86 CPUs](https://www.intel.com/content/www/us/en/developer/articles/technical/accelerate-pytorch-int8-inf-with-new-x86-backend.html)
 * [Intel® Deep Learning Boost - Improve Inference Performance of BERT Base Model from Hugging Face for Network Security Technology Guide](https://networkbuilders.intel.com/solutionslibrary/intel-deep-learning-boost-improve-inference-performance-of-bert-base-model-from-hugging-face-for-network-security-technology-guide)
 * [Accelerating PyTorch Transformers with Intel Sapphire Rapids, Part 1, Jan 2023](https://huggingface.co/blog/intel-sapphire-rapids)
 * [Intel® Deep Learning Boost - Improve Inference Performance of BERT Base Model from Hugging Face for Network Security Technology Guide, Jan 2023](https://networkbuilders.intel.com/solutionslibrary/intel-deep-learning-boost-improve-inference-performance-of-bert-base-model-from-hugging-face-for-network-security-technology-guide)

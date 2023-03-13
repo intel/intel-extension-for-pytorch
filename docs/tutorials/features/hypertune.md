@@ -95,7 +95,7 @@ This is the script as an optimization function.
 'target_val'                               # optional. Target value of the objective function. Default is -float('inf')
 ```
 
-Have a look at the [example script](https://github.com/intel/intel-extension-for-pytorch/tree/v1.13.100+cpu/intel_extension_for_pytorch/cpu/hypertune/example/resnet50.py).
+Have a look at the [example script](https://github.com/intel/intel-extension-for-pytorch/tree/v2.0.0+cpu/intel_extension_for_pytorch/cpu/hypertune/example/resnet50.py).
 
 ## Usage Examples
 
@@ -103,7 +103,7 @@ Have a look at the [example script](https://github.com/intel/intel-extension-for
 
 Suppose we want to tune `ncore_per_instance` for a single instance to minimize latency for resnet50 on a machine with two Intel(R) Xeon(R) Platinum 8180M CPUs. Each socket has 28 physical cores and another 28 logical cores.
 
-Run the following command with [example.yaml](https://github.com/intel/intel-extension-for-pytorch/tree/v1.13.100+cpu/intel_extension_for_pytorch/cpu/example/example.yaml) and [resnet50.py](https://github.com/intel/intel-extension-for-pytorch/tree/v1.13.100+cpu/intel_extension_for_pytorch/cpu/hypertune/example/resnet50.py):
+Run the following command with [example.yaml](https://github.com/intel/intel-extension-for-pytorch/tree/v2.0.0+cpu/intel_extension_for_pytorch/cpu/example/example.yaml) and [resnet50.py](https://github.com/intel/intel-extension-for-pytorch/tree/v2.0.0+cpu/intel_extension_for_pytorch/cpu/hypertune/example/resnet50.py):
 ```
 python -m intel_extension_for_pytorch.cpu.hypertune --conf_file <hypertune_directory>/example/example.yaml <hypertune_directory>/example/resnet50.py
 ```
@@ -115,6 +115,6 @@ latency: 12.339081764221191
 ```
 15 `ncore_per_instance` gave the minimum latency.
 
-You will also find the tuning history in `<output_dir>/record.csv`. You can take [a sample csv file](https://github.com/intel/intel-extension-for-pytorch/tree/v1.13.100+cpu/intel_extension_for_pytorch/cpu/hypertune/example/record.csv) as a reference.
+You will also find the tuning history in `<output_dir>/record.csv`. You can take [a sample csv file](https://github.com/intel/intel-extension-for-pytorch/tree/v2.0.0+cpu/intel_extension_for_pytorch/cpu/hypertune/example/record.csv) as a reference.
 
 Hypertune can also optimize multi-objective function. Add as many objectives as you would like to your script.

@@ -19,7 +19,7 @@ import intel_extension_for_pytorch._C as torch_ipex_cpp
 try:
     from . import tpp
 except:
-    warnings.warn("pls install transformers repo when you want to use fast_bert API")
+    warnings.warn("Please install transformers repo when you want to use fast_bert API.")
 
 from typing import List
 import functools
@@ -728,10 +728,13 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     PT_OPTIMIZER_TO_TPP_OPTIMIZER = {torch.optim.AdamW : tpp.optim.AdamW,
                                       transformers.optimization.AdamW : tpp.optim.AdamW,
                                       torch.optim.SGD : tpp.optim.SGD}
-    assert(dtype == torch.float or dtype == torch.bfloat16, "TPP only support torch.float and torch.bfloat16")
+    assert(dtype == torch.float or dtype == torch.bfloat16, "TPP only supports torch.float and torch.bfloat16.")
 
     #setup the seed for libxsmm (can be only positive int value)which will imapct some ops using seed. e.g., dropout
-    torch_ipex_cpp.xsmm_manual_seed(torch.tensor(torch.initial_seed()).to(torch.int32).abs().item())
+    try:
+        torch_ipex_cpp.xsmm_manual_seed(torch.tensor(torch.initial_seed()).to(torch.int32).abs().item())
+    except:
+        warnings.warn("Set seed failed for libxsmm which may impact the training loss, you can call torch.manual_seed(N) before invoking fast_bert.")
     #replace the original transfomers module object with tpp module which has the same functionality but with more
     #operator fusion optimization
     new_model = copy.deepcopy(model)
@@ -740,10 +743,19 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         tpp.fused_bert.unpad = True
     else:
         tpp.fused_bert.unpad = False
-    assert(isinstance(new_model.bert.embeddings, transformers.models.bert.modeling_bert.BertEmbeddings))
-    new_model.bert.embeddings = tpp.fused_bert.BertEmbeddings(model.bert.config)
-    assert(isinstance(new_model.bert.encoder, transformers.models.bert.modeling_bert.BertEncoder))
-    new_model.bert.encoder =  tpp.fused_bert.BertEncoder(model.bert.config)
+    if isinstance(model, transformers.models.bert.modeling_bert.BertModel):
+        assert(isinstance(new_model.embeddings, transformers.models.bert.modeling_bert.BertEmbeddings))
+        new_model.embeddings = tpp.fused_bert.BertEmbeddings(model.config)
+        assert(isinstance(new_model.encoder, transformers.models.bert.modeling_bert.BertEncoder))
+        new_model.encoder =  tpp.fused_bert.BertEncoder(model.config)
+    elif hasattr(model, "bert") and isinstance(model.bert, transformers.models.bert.modeling_bert.BertModel):
+        assert(isinstance(new_model.bert.embeddings, transformers.models.bert.modeling_bert.BertEmbeddings))
+        new_model.bert.embeddings = tpp.fused_bert.BertEmbeddings(model.bert.config)
+        assert(isinstance(new_model.bert.encoder, transformers.models.bert.modeling_bert.BertEncoder))
+        new_model.bert.encoder =  tpp.fused_bert.BertEncoder(model.bert.config)
+    else:
+        warnings.warn("fast_bert only supports instance of transformers.models.bert.modeling_bert.BertModel")
+        return model, optimizer
     new_model.load_state_dict(model.state_dict())#copy the original params into the tpp module
     tpp.block(new_model)#get block format weights/bias
     if optimizer is None:

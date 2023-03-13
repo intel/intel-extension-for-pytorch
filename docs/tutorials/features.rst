@@ -18,6 +18,21 @@ Check the `API Documentation`_ for details of API functions. `Examples <examples
 Here are detailed discussions of specific feature topics, summarized in the rest
 of this document:
 
+torch.compile (Experimental, *NEW feature from 2.0.0*)
+------------------------------------------------------
+
+PyTorch* 2.0 introduces a new feature, `torch.compile`, to speed up PyTorch* code. It makes PyTorch code run faster by JIT-compiling PyTorch code into optimized kernels, all while requiring minimal code changes. Intel® Extension for PyTorch\* enables a backend, `ipex`, in the `torch.compile` to optimize generation of the graph model.
+
+Usage is as simple as importing Intel® Extension for PyTorch\* and setting `backend` parameter of the `torch.compile` to `ipex`. While optimizations with `torch.compile` applies to backend, invocation of `ipex.optimize` function is highly recommended as well to apply optimizations in frontend.
+
+.. code-block:: python
+
+   import torch
+   import intel_extension_for_pytorch as ipex
+   ...
+   model = ipex.optimize(model)
+   model = torch.compile(model, backend='ipex')
+
 ISA Dynamic Dispatching
 -----------------------
 
@@ -182,3 +197,18 @@ For more detailed information, check `HyperTune <features/hypertune.md>`_.
    :maxdepth: 1
 
    features/hypertune
+
+Fast BERT Optimization (Experimental, *NEW feature from 2.0.0*)
+---------------------------------------------------------------
+
+Intel proposed a technique, Tensor Processing Primitives (TPP), a programming abstraction striving for efficient, portable implementation of DL workloads with high-productivity. TPPs define a compact, yet versatile set of 2D-tensor operators (or a virtual Tensor ISA), which subsequently can be utilized as building-blocks to construct complex operators on high-dimensional tensors.
+
+Implementation of TPP is integrated into Intel® Extension for PyTorch\*. BERT could benefit from this new technique. An API `ipex.fast_bert` is provided for a simple usage.
+
+For more detailed information, check `Fast BERT <features/fast_bert.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/fast_bert

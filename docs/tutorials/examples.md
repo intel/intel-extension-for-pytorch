@@ -184,6 +184,11 @@ We recommend you take advantage of Intel® Extension for PyTorch\* with [TorchSc
 [//]: # (marker_inf_bert_ts_bf16)
 [//]: # (marker_inf_bert_ts_bf16)
 
+### Fast Bert (*Experimental*)
+
+[//]: # (marker_inf_bert_fast_bf16)
+[//]: # (marker_inf_bert_fast_bf16)
+
 ### INT8
 
 Starting from Intel® Extension for PyTorch\* 1.12.0, quantization feature supports both static and dynamic modes.
@@ -257,6 +262,9 @@ The example code below works for all data types.
 **Command for compilation**
 
 ```bash
+$ cd examples/cpu/inference/cpp
+$ mkdir build
+$ cd build
 $ cmake -DCMAKE_PREFIX_PATH=<LIBPYTORCH_PATH> ..
 $ make
 ```
@@ -265,34 +273,31 @@ If *Found INTEL_EXT_PT_CPU* is shown as *TRUE*, the extension had been linked in
 
 ```bash
 $ cmake -DCMAKE_PREFIX_PATH=/workspace/libtorch ..
--- The C compiler identification is GNU 9.3.0
--- The CXX compiler identification is GNU 9.3.0
--- Check for working C compiler: /usr/bin/cc
--- Check for working C compiler: /usr/bin/cc -- works
+-- The C compiler identification is GNU 11.2.1
+-- The CXX compiler identification is GNU 11.2.1
 -- Detecting C compiler ABI info
 -- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
 -- Detecting C compile features
 -- Detecting C compile features - done
--- Check for working CXX compiler: /usr/bin/c++
--- Check for working CXX compiler: /usr/bin/c++ -- works
 -- Detecting CXX compiler ABI info
 -- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
 -- Detecting CXX compile features
 -- Detecting CXX compile features - done
--- Looking for pthread.h
--- Looking for pthread.h - found
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
--- Looking for pthread_create in pthreads
--- Looking for pthread_create in pthreads - not found
--- Looking for pthread_create in pthread
--- Looking for pthread_create in pthread - found
--- Found Threads: TRUE
+CMake Warning at /workspace/libtorch/share/cmake/Torch/TorchConfig.cmake:22 (message):
+  static library kineto_LIBRARY-NOTFOUND not found.
+Call Stack (most recent call first):
+  /workspace/libtorch/share/cmake/Torch/TorchConfig.cmake:127 (append_torchlib_if_found)
+  /workspace/libtorch/share/cmake/IPEX/IPEXConfig.cmake:84 (FIND_PACKAGE)
+  CMakeLists.txt:4 (find_package)
+
+
 -- Found Torch: /workspace/libtorch/lib/libtorch.so
--- Found INTEL_EXT_PT_CPU: TRUE
+-- Found IPEX: /workspace/libtorch/lib/libintel-ext-pt-cpu.so
 -- Configuring done
 -- Generating done
--- Build files have been written to: /workspace/build
+-- Build files have been written to: examples/cpu/inference/cpp/build
 
 $ ldd example-app
         ...
@@ -307,4 +312,4 @@ $ ldd example-app
 
 ## Model Zoo
 
-Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/pytorch-r1.13-models). A bunch of PyTorch use cases for benchmarking are also available on the [GitHub page](https://github.com/IntelAI/models/tree/pytorch-r1.13-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
+Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/pytorch-r2.0-models). A bunch of PyTorch use cases for benchmarking are also available on the [GitHub page](https://github.com/IntelAI/models/tree/pytorch-r2.0-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
