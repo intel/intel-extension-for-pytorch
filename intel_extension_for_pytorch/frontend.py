@@ -227,6 +227,7 @@ class GraphCapture(object):
                                 except:
                                     warnings.warn("Both JIT and TorchDynamo failed, fallback to original model.")
                                     self.method = RunMethods.EagerInfer
+                                    torch._dynamo.reset()
                                     return self.model(*input, **kwargs)
 
         return forward
