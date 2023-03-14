@@ -395,8 +395,23 @@ class TestTorchMethod(TestCase):
                 'optimizer_state_dict' : new_optimizer.state_dict(),
             }
 
-        self.assertEqual(state['model_state_dict'], load_state['model_state_dict'])
-        self.assertEqual(state['optimizer_state_dict'], load_state['optimizer_state_dict'])
+        for state_name in state['model_state_dict']:
+            original_model_state = state['model_state_dict'][state_name]
+            loaded_model_state = load_state['model_state_dict'][state_name]
+            if isinstance(original_model_state, torch.Tensor) and isinstance(loaded_model_state, torch.Tensor):
+                # For ATS-M, comparing xpu floating tensor will to double in comparing mechanism, so here to cpu
+                self.assertEqual(original_model_state.cpu(), loaded_model_state.cpu())
+            else:
+                self.assertEqual(original_model_state, loaded_model_state)
+
+        for state_name in state['optimizer_state_dict']:
+            original_optimizer_state = state['optimizer_state_dict'][state_name]
+            loaded_optimizer_state = load_state['optimizer_state_dict'][state_name]
+            if isinstance(original_optimizer_state, torch.Tensor) and isinstance(loaded_optimizer_state, torch.Tensor):
+                # For ATS-M, comparing xpu floating tensor will to double in comparing mechanism, so here to cpu
+                self.assertEqual(original_optimizer_state.cpu(), loaded_optimizer_state.cpu())
+            else:
+                self.assertEqual(original_optimizer_state, loaded_optimizer_state)
         os.remove(filename)
 
     def test_reentrancy_of_ipex_optimize(self):
