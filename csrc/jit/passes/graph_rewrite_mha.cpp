@@ -372,10 +372,10 @@ void FusedTransFreeMha(std::shared_ptr<Graph>& graph) {
       graph(%query0: Tensor, %key0: Tensor, %value0: Tensor, %zero, %neg_one, %neg_two, %one, %two, %idx, %scale: float, %no, %device, %dtype, %headsize, %num_head, %permutelist): )";
 
   std::string sd_mha_graph_v3 = R"(
-      graph(%qkv: Tensor, %split_idx: int[], %one, %two, %neg_one, %num_head, %batchsize, %headsize, %hiddensize, %dropout, %idx, %no, %dtype): )";
+      graph(%qkv: Tensor, %split_idx: int[], %one, %two, %neg_one, %num_head, %batchsize, %headsize, %hiddensize, %dropout, %idx, %no, %dtype, %scale): )";
 
   std::string sd_mha_graph_v4 = R"(
-      graph(%query0: Tensor, %key0: Tensor, %value0: Tensor, %one, %two, %neg_one, %num_head, %batchsize, %headsize, %hiddensize, %dropout, %idx, %no, %dtype): )";
+      graph(%query0: Tensor, %key0: Tensor, %value0: Tensor, %one, %two, %neg_one, %num_head, %batchsize, %headsize, %hiddensize, %dropout, %idx, %no, %dtype, %scale): )";
 
   std::string sd_qkv_split = R"(
         %qkv_list = ipex::split_tensor(%qkv, %split_idx)
@@ -464,7 +464,7 @@ void FusedTransFreeMha(std::shared_ptr<Graph>& graph) {
         %key2 = aten::transpose(%key1, %one, %two)
         %value1 = aten::view(%value0, %viewlist)
         %value2 = aten::transpose(%value1, %one, %two)
-        %hidden_states = aten::scaled_dot_product_attention(%query2, %key2, %value2, %dtype, %dropout, %no)
+        %hidden_states = aten::scaled_dot_product_attention(%query2, %key2, %value2, %dtype, %dropout, %no, %scale)
         %out0 = aten::transpose(%hidden_states, %one, %two)
         %reshapelist = prim::ListConstruct(%batchsize, %neg_one, %hiddensize)
         %out1 = aten::reshape(%out0, %reshapelist)
@@ -479,14 +479,6 @@ void FusedTransFreeMha(std::shared_ptr<Graph>& graph) {
         %output = ipex::sd_flash_mha(%query0, %key0, %value0, %scale, %num_head)
         return (%output) )";
 
-  std::string sd_fused_mha_main_v3 = R"(
-        %output = ipex::sd_flash_mha(%qkv, %split_idx, %num_head)
-        return (%output) )";
-
-  std::string sd_fused_mha_main_v4 = R"(
-        %output = ipex::sd_flash_mha(%query0, %key0, %value0, %num_head)
-        return (%output) )";
-
   auto sd_mha_pattern_v1 = sd_mha_graph_v1 + sd_qkv_split + sd_mha_query +
       sd_mha_key + sd_mha_value + sd_mha_main_v1;
   auto sd_mha_pattern_v2 = sd_mha_graph_v2 + sd_mha_query + sd_mha_key +
@@ -495,8 +487,8 @@ void FusedTransFreeMha(std::shared_ptr<Graph>& graph) {
   auto sd_mha_pattern_v4 = sd_mha_graph_v4 + sd_mha_main_v2;
   auto sd_fused_mha_pattern_v1 = sd_mha_graph_v1 + sd_fused_mha_main_v1;
   auto sd_fused_mha_pattern_v2 = sd_mha_graph_v2 + sd_fused_mha_main_v2;
-  auto sd_fused_mha_pattern_v3 = sd_mha_graph_v3 + sd_fused_mha_main_v3;
-  auto sd_fused_mha_pattern_v4 = sd_mha_graph_v4 + sd_fused_mha_main_v4;
+  auto sd_fused_mha_pattern_v3 = sd_mha_graph_v3 + sd_fused_mha_main_v1;
+  auto sd_fused_mha_pattern_v4 = sd_mha_graph_v4 + sd_fused_mha_main_v2;
   SubgraphRewriter sd_mha_fusion_v1, sd_mha_fusion_v2, sd_mha_fusion_v3,
       sd_mha_fusion_v4;
   sd_mha_fusion_v1.RegisterRewritePattern(

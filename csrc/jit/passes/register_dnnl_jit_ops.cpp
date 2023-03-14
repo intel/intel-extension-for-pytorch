@@ -1202,12 +1202,12 @@ torch::jit::RegisterOperators op({
 
     Operator(
         "ipex::sd_flash_mha(Tensor qkv, int[] list, "
-        "float scale, int head_num) -> Tensor",
+        "float ? scale, int head_num) -> Tensor",
         [](Stack& stack) {
           auto result = dil_sd_flash_mha(
               peek(stack, 0, 4).toTensor(),
               peek(stack, 1, 4).toIntVector(),
-              peek(stack, 2, 4).toDouble(),
+              peek(stack, 2, 4),
               peek(stack, 3, 4).toInt());
           drop(stack, 4);
           torch::jit::pack(stack, std::move(result));
@@ -1216,44 +1216,15 @@ torch::jit::RegisterOperators op({
 
     Operator(
         "ipex::sd_flash_mha(Tensor query, Tensor key, Tensor value, "
-        "float scale, int head_num) -> Tensor",
+        "float ? scale, int head_num) -> Tensor",
         [](Stack& stack) {
           auto result = dil_sd_flash_mha(
               peek(stack, 0, 5).toTensor(),
               peek(stack, 1, 5).toTensor(),
               peek(stack, 2, 5).toTensor(),
-              peek(stack, 3, 5).toDouble(),
+              peek(stack, 3, 5),
               peek(stack, 4, 5).toInt());
           drop(stack, 5);
-          torch::jit::pack(stack, std::move(result));
-        },
-        aliasAnalysisFromSchema()),
-
-    Operator(
-        "ipex::sd_flash_mha(Tensor qkv, int[] list, "
-        "int head_num) -> Tensor",
-        [](Stack& stack) {
-          auto div_input_data = 1.0f;
-          auto result = dil_sd_flash_mha(
-              peek(stack, 0, 3).toTensor(),
-              peek(stack, 1, 3).toIntVector(),
-              peek(stack, 2, 3).toInt());
-          drop(stack, 3);
-          torch::jit::pack(stack, std::move(result));
-        },
-        aliasAnalysisFromSchema()),
-
-    Operator(
-        "ipex::sd_flash_mha(Tensor query, Tensor key, Tensor value, "
-        "int head_num) -> Tensor",
-        [](Stack& stack) {
-          auto div_input_data = 1.0f;
-          auto result = dil_sd_flash_mha(
-              peek(stack, 0, 4).toTensor(),
-              peek(stack, 1, 4).toTensor(),
-              peek(stack, 2, 4).toTensor(),
-              peek(stack, 3, 4).toInt());
-          drop(stack, 4);
           torch::jit::pack(stack, std::move(result));
         },
         aliasAnalysisFromSchema()),
