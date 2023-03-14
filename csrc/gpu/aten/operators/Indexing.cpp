@@ -110,11 +110,20 @@ void indexSelect(
         tensorInfoIfScalar(getTensorInfo<scalar_t, int64_t>(src.contiguous()));
     int new_indexing_dim = src_info.collapseDims(dim);
 
-    _index_select_kernel<
-        decltype(src_info),
-        decltype(dst_info),
-        decltype(indices_info),
-        true>(src_info, dst_info, indices_info, new_indexing_dim);
+    if (dst.is_contiguous())
+      _index_select_kernel<
+          decltype(src_info),
+          decltype(dst_info),
+          decltype(indices_info),
+          /* TrivialOffCal */ true>(
+          src_info, dst_info, indices_info, new_indexing_dim);
+    else
+      _index_select_kernel<
+          decltype(src_info),
+          decltype(dst_info),
+          decltype(indices_info),
+          /* TrivialOffCal */ false>(
+          src_info, dst_info, indices_info, new_indexing_dim);
   });
   return;
 }

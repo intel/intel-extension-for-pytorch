@@ -52,6 +52,20 @@ class TestTorchMethod(TestCase):
 
         _test_index_select(torch.transpose(x, 2, 3), indices)
 
+    def test_index_select_out_non_contiguous(self, dtype=torch.float):
+        # Transformer case
+        src_xpu = torch.rand((400*202,), device=torch.device('xpu'))
+        src_xpu = src_xpu.as_strided((400,1), (202,1))
+        src_cpu = src_xpu.cpu()
+        dst_xpu = torch.rand((400*202,), device=torch.device('xpu'))
+        dst_xpu = dst_xpu.as_strided((400,1), (202,1))
+        dst_cpu = dst_xpu.cpu()
+        idx_xpu = torch.randint(0, 400, (400,), dtype=torch.long, device=torch.device('xpu'))
+        idx_cpu = idx_xpu.cpu()
+        torch.index_select(src_cpu, dim=0, index=idx_cpu, out=dst_cpu)
+        torch.index_select(src_xpu, dim=0, index=idx_xpu, out=dst_xpu)
+        self.assertEqual(dst_cpu, dst_xpu.cpu())
+
 # indcies transposed
 # test_index_select(x, torch.transpose(indices, 0, 1))
 
