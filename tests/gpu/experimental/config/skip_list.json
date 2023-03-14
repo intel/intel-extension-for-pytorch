@@ -1656,16 +1656,8 @@
       "test_fn_gradgrad_istft_xpu_float64",
       "test_fn_gradgrad_stft_xpu_float64"
     ],
-    "Hang issue due to compiler upgrade. (CMPLRLLVM-45400)": [
-      "test_fn_fwgrad_bwgrad_linalg",
-      "test_fn_grad_linalg",
-      "test_fn_gradgrad_linalg"
-    ],
     "Exitcode is 8": [
       "test_fn_grad_nn_functional_pdist_xpu_float64"
-    ],
-    "extremely slow": [
-      "test_fn_grad_nn_functional_ctc_loss_xpu_float64"
     ]
   },
   "TestFFTXPU": {
@@ -2462,20 +2454,23 @@
   "TestMathBitsXPU": {
     "Segmentation fault": [
       "test_neg_view_stft_xpu_float64"
+    ],
+    "Exitcode is 8": [
+      "test_neg_view_nn_functional_pdist_xpu_float64"
     ]
   },
   "TestCompositeComplianceXPU": {
     "Segmentation fault": [
       "test_forward_ad_istft_xpu_float32"
+    ],
+    "Exitcode is 8": [
+      "test_backward_nn_functional_pdist_xpu_float32"
     ]
   },
   "TestFakeTensorXPU": {
     "Meta specific issues will be skipped for temp. (PYTORCHDGQ-2517)": [
       "test_fake_autocast_nn_functional_cross_entropy_xpu_float32",
       "test_fake_nn_functional_cross_entropy_xpu_float32"
-    ],
-    "Hang issue due to compiler upgrade. (CMPLRLLVM-45400)": [
-      "test_fake_autocast_linalg"
     ]
   },
   "TestScatterGatherXPU": {
