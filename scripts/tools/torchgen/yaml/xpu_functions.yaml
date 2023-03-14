@@ -175,6 +175,7 @@ supported:
   - cholesky_inverse
   - cholesky_inverse.out
   - _cholesky_solve_helper
+  - linalg_cholesky_ex.L
   - clamp.out
   - clamp_max.out
   - clamp_min.out

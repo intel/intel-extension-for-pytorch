@@ -3912,5 +3912,53 @@ std::tuple<Tensor&, Tensor&, Tensor&> linalg_lu_out(
       /*unpack_lu=*/true,
       /*unpack_pivots=*/pivot);
 }
+
+std::tuple<Tensor&, Tensor&> linalg_cholesky_ex_out(
+    const Tensor& A,
+    bool upper,
+    bool check_errors,
+    Tensor& L,
+    Tensor& info) {
+  // Nothing to do there
+  if (L.numel() == 0) {
+    info.zero_();
+    return;
+  }
+
+  L.copy_(A);
+  if (A.dtype() == at::ScalarType::BFloat16) {
+    L.to(at::ScalarType::Float);
+  }
+  std::vector<int32_t> infos(native::batchCount(A), 0);
+
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      A.scalar_type(), "linalg_cholesky_ex_out", [&] {
+        impl::apply_cholesky_dpcpp<scalar_t>(L, upper, infos);
+      });
+
+  auto info_shape =
+      IntArrayRef(A.sizes().cbegin(), A.sizes().cend() - 2); // self.shape[:-2]
+  info =
+      at::empty({info_shape}, A.options().dtype(kInt).device(DeviceType::CPU));
+
+  std::copy(infos.begin(), infos.end(), info.template data_ptr<int32_t>());
+
+  if (A.dtype() == at::ScalarType::BFloat16 &&
+      L.dtype() == at::ScalarType::Float) {
+    L.to(at::ScalarType::BFloat16);
+  }
+
+  if (upper) {
+    L.triu_();
+  } else {
+    L.tril_();
+  }
+
+  if (check_errors) {
+    at::_linalg_check_errors(info, "linalg.cholesky_ex", A.dim() == 2);
+  }
+  return std::tuple<Tensor&, Tensor&>{L, info};
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

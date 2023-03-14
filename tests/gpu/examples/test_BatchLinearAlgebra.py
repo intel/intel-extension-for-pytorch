@@ -8,6 +8,7 @@ from functools import partial
 import intel_extension_for_pytorch # noqa
 from torch.testing import make_tensor
 import pytest
+import numpy as np
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -322,6 +323,24 @@ class TestTorchMethod(TestCase):
             # validate
             self.assertEqual(c__cpu, c__xpu)
 
+
+    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX")
+    def test_cholesky_ex(self, device=dpcpp_device, dtype=torch.float32):
+        from torch.testing._internal.common_utils import random_hermitian_pd_matrix
+
+        def run_test(n, batch):
+            A_CPU = random_hermitian_pd_matrix(n, *batch, dtype=dtype, device=cpu_device)
+            A_XPU = A_CPU.detach().to(dpcpp_device)
+            L_CPU, info_CPU = torch.linalg.cholesky_ex(A_CPU)
+            L_XPU, info_XPU = torch.linalg.cholesky_ex(A_XPU)
+            self.assertEqual(L_CPU, L_XPU.to("cpu"))
+            self.assertEqual(info_CPU, info_XPU.to('cpu'))
+            
+        ns = (0, 3, 5)
+        batches = ((), (2, ), (2, 1))
+        for n, batch in itertools.product(ns, batches):
+            run_test(n, batch)
+
     def _gen_shape_inputs_linalg_triangular_solve(self, shape, dtype, device, well_conditioned=False):
         make_arg = partial(make_tensor, dtype=dtype, device=device)
         make_randn = partial(torch.randn, dtype=dtype, device=device)
@@ -410,3 +429,4 @@ class TestTorchMethod(TestCase):
         for b, n, k in itertools.product(bs, ns, ks):
             for A, B, left, upper, uni in gen_inputs((b, n, k), dtype, device):
                 self._test_linalg_solve_triangular(A, B, upper, left, uni)
+
