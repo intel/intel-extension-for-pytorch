@@ -243,7 +243,7 @@ static inline scalar_t _beta_grad_alpha_mid(
   const accscalar_t total = alpha + beta;
   const accscalar_t mean = alpha / total;
   const accscalar_t std = compat_sqrt(alpha * beta / (total + 1)) / total;
-  if (mean - 0.1 * std <= x && x <= mean + 0.1 * std) {
+  if (mean - 0.1f * std <= x && x <= mean + 0.1f * std) {
     // Avoid the singularity at x = mean.
     const accscalar_t poly = 47 * x * (beta * beta) * (beta * beta) +
         alpha *
