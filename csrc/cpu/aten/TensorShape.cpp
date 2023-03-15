@@ -5,12 +5,12 @@
 #include <ATen/MemoryOverlap.h>
 #include <ATen/NamedTensorUtils.h>
 #include <ATen/NativeFunctions.h>
-#include <ATen/SparseTensorUtils.h>
 #include <ATen/WrapDimUtils.h>
 #include <ATen/core/DimVector.h>
 #include <ATen/core/IListRef.h>
 #include <ATen/native/Copy.h>
 #include <ATen/native/Resize.h>
+#include <ATen/native/SparseTensorUtils.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/TensorShape.h>
 #include <ATen/native/TypeProperties.h>
