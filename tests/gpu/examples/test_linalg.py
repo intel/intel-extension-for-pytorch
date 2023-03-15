@@ -35,7 +35,8 @@ class TestTorchMethod(TestCase):
             tensors_exp_batch = torch.linalg.matrix_exp(tensors_batch)
 
             for i, tensor_exp in enumerate(tensors_exp_map):
-                self.assertEqual(tensors_exp_batch[i, ...], tensor_exp)
+                # compute on cpu avoid unexpected error on atsm
+                self.assertEqual(tensors_exp_batch[i, ...].to('cpu'), tensor_exp)
 
         # small batch of matrices
         run_test(3, 2, 2)
@@ -262,7 +263,7 @@ class TestTorchMethod(TestCase):
                 mexp = torch.linalg.matrix_exp(x)
                 mexp_taylor = scale_square(x, deg)
 
-                self.assertEqual(mexp, mexp_taylor, atol=1e-2, rtol=0.0)
+                self.assertEqual(mexp.to('cpu'), mexp_taylor, atol=1e-2, rtol=0.0)
 
         # single matrix
         run_test(2, 2)
