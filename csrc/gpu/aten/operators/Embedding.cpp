@@ -150,7 +150,9 @@ void renorm_kernel(
       item.barrier(dpcpp_local_fence);
 
       if (my_smem[0] > max_norm) {
-        auto factor = static_cast<scalar_t>(max_norm / (my_smem[0] + 1e-7));
+        auto factor = static_cast<scalar_t>(
+            max_norm /
+            (my_smem[0] + std::numeric_limits<accscalar_t>::epsilon()));
         for (int i = tid; i < dim; i += sgSize) {
           weights[base_index + i * weights_stride1] *= factor;
         }
