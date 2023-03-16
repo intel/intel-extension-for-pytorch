@@ -402,25 +402,30 @@ class TestTorchMethod(TestCase):
 
         X_xpu = torch.linalg.solve_triangular(A, B, upper=upper, left=left, unitriangular=uni)
         if left:
-            self.assertEqual(A @ X_xpu, B)
+            result = A @ X_xpu
+            result.to('cpu')
+            self.assertEqual(result, B_cpu, atol=1e-3, rtol=1e-4)
         else:
-            self.assertEqual(X_xpu @ A, B)
+            result = X_xpu @ A
+            result.to('cpu')
+            self.assertEqual(result, B_cpu, atol=1e-3, rtol=1e-4)
         out_xpu = B
         # B may be expanded
         if not B.is_contiguous() and not B.transpose(-2, -1).is_contiguous():
             out_xpu = B.clone()
 
         torch.linalg.solve_triangular(A, B, upper=upper, left=left, unitriangular=uni, out=out_xpu)
-        self.assertEqual(X_xpu, out_xpu)
+        self.assertEqual(X_xpu.to('cpu'), out_xpu, atol=1e-3, rtol=1e-4)
 
         X_cpu = torch.linalg.solve_triangular(A_cpu, B_cpu, upper=upper, left=left, unitriangular=uni)
-        self.assertEqual(X_cpu, X_xpu)
+        self.assertEqual(X_cpu, X_xpu, atol=1e-3, rtol=1e-4)
 
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX")
     def test_linalg_solve_triangular(self):
         device = dpcpp_device
-        dtype = torch.float64
+        # turn to fp32 avoid fp64 error on atsm
+        dtype = torch.float32
         ks = (3, 1, 0)
         ns = (5, 0)
         bs = (1, 2, 0)
