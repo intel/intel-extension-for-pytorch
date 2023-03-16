@@ -2,10 +2,15 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 import random
 from itertools import permutations, product
+import pytest
 
 import intel_extension_for_pytorch  # noqa
 
 SIZE = 100
+
+
+if not torch.xpu.utils.has_fp64_dtype():
+    pytest.skip(allow_module_level=True)
 
 
 class dtypes:
@@ -364,8 +369,12 @@ class TestNNMethod(TestCase):
                     continue
                 top1, idx1 = t.topk(k)
                 top2, idx2 = t.contiguous().topk(k)
+                top3, idx3 = t.cpu().topk(k)
                 self.assertEqual(top1, top2)
                 self.assertEqual(idx1, idx2)
+                self.assertEqual(top1, top3)
+                # cpu topk is stable, however xpu topk is not
+                self.assertEqual(idx1.sort()[0], idx3.sort()[0])
 
     def _test_topk_dtype(self, device, dtype, integral, size):
         if integral:

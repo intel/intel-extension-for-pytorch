@@ -96,7 +96,7 @@ inline void fast_group_radix_select_impl_(
             offset += num_start - ntopk;
             if (offset < nelements) {
               keys[ITEM] = key_in_begin[offset];
-              values[ITEM] = value_in_begin[offset];
+              values[ITEM] = USE_INDICES ? offset : value_in_begin[offset];
             } else {
               keys[ITEM] = padding_key;
             }
