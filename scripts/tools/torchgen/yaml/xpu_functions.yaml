@@ -820,6 +820,8 @@ supported:
   - where.self
   - _weight_norm_interface_backward
   - _weight_norm_interface
+  - _validate_compressed_sparse_indices
+  - index.Tensor_out
 autograd:
   - cdist
   - lstm.input

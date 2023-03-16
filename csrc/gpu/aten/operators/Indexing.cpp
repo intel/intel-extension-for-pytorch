@@ -1782,5 +1782,61 @@ Tensor take(const Tensor& self, const Tensor& index) {
   return at::AtenIpexTypeXPU::take_out(self, index, out);
 }
 
+static TensorIterator make_index_out_iterator(
+    const AdvancedIndex& info,
+    Tensor& result) {
+  TensorIteratorConfig config;
+  // info.src is a restrided view of result
+  config.set_check_mem_overlap(false)
+      .check_all_same_dtype(false)
+      .add_output(result)
+      .add_input(info.src);
+  for (auto& index : info.indices) {
+    config.add_input(index);
+  }
+  return config.build();
+}
+
+Tensor& index_out(
+    const Tensor& self,
+    const c10::List<c10::optional<Tensor>>& indices,
+    Tensor& result) {
+  TORCH_CHECK(
+      indices.size() <= (size_t)self.dim(),
+      "too many indices for tensor of dimension ",
+      self.dim(),
+      " (got ",
+      indices.size(),
+      ")");
+
+  check_indices_on_cpu_or_selfdevice(self, indices);
+  at::assert_no_internal_overlap(result);
+  at::assert_no_overlap(result, self);
+
+  for (const c10::optional<Tensor>& index : indices) {
+    if (index.has_value()) {
+      at::assert_no_overlap(result, *index);
+    }
+  }
+
+  auto info = make_info(self, indices);
+  auto iter = make_index_out_iterator(info, result);
+
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
+      kComplexHalf, kHalf, kBool, kBFloat16, iter.dtype(), "index_dpcpp", [&] {
+        using dtype = impl::OpaqueType<sizeof(scalar_t)>;
+        dpcpp_index_kernel(
+            iter,
+            info.indexed_sizes,
+            info.indexed_strides,
+            info.non_indexed_sizes,
+            info.non_indexed_strides,
+            [](char* out_data, char* in_data, int64_t offset) {
+              *(dtype*)out_data = *(dtype*)(in_data + offset);
+            });
+      });
+  return result;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
