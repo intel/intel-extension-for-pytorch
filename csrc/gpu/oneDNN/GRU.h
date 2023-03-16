@@ -314,7 +314,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
   rnn_direction dir = reverse ? rnn_direction::unidirectional_right2left
                               : rnn_direction::unidirectional_left2right;
 
-  auto gru_forward_pd = gru_forward::primitive_desc(
+  auto gru_forward_pd = lbr_gru_forward::primitive_desc(
       engine,
       prop_kind::forward_training,
       dir,
