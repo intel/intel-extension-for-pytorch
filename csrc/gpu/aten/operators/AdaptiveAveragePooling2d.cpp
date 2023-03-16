@@ -170,7 +170,7 @@ void adaptive_avg_pool2d_out_template(
 
   if (xpu::oneDNN::is_valid_pooling(
           {inputHeight, inputWidth},
-          {outputHeight, inputHeight},
+          {outputHeight, outputWidth},
           {kH, kW},
           {dH, dW},
           {padH, padW})) {
