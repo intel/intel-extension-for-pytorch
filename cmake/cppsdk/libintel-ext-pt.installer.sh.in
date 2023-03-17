@@ -11,7 +11,7 @@ LOGFILE="ipex-info"
 
 # Below values will be set automatically. DO NOT modify them manually!
 # Append new required relative_path/components in LIBIPEX_COMP_LIST in cmake scripts
-LIBIPEX_VERSION="@CMAKE_PROJECT_VERSION@"
+LIBIPEX_VERSION="@LIBIPEX_VERSION@"
 LIBIPEX_GITREV="@LIBIPEX_GITREV@"
 LIBIPEX_BUILD_TYPE="@CMAKE_BUILD_TYPE@"
 LIBIPEX_PACK_NAME="@CPACK_PACKAGE_NAME@"

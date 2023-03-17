@@ -533,7 +533,8 @@ class IPEXCPPLibBuild(build_clib, object):
             'PYTHON_INCLUDE_DIR'    : sysconfig.get_paths()['include'],
             'PYTHON_EXECUTABLE'     : sys.executable,
             'IPEX_PROJ_NAME'        : PACKAGE_NAME,
-            'IPEX_GITREV'           : ipex_git_sha,
+            'LIBIPEX_GITREV'        : ipex_git_sha,
+            'LIBIPEX_VERSION'       : ipex_build_version,
         }
 
         build_with_cpu = True   # Default ON
