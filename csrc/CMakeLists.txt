@@ -1,5 +1,4 @@
 set(IPEX_CSRC_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-set(LIBIPEX_GITREV "${IPEX_GITREV}")
 
 if(BUILD_MODULE_TYPE STREQUAL "GPU")
   add_subdirectory(${IPEX_CSRC_ROOT_DIR}/gpu)
@@ -72,9 +71,9 @@ if(BUILD_MODULE_TYPE STREQUAL "CPPSDK")
 
   include(CPack)
 
-  set(INSTALL_SCRIPT "libintel-ext-pt-${CMAKE_PROJECT_VERSION}.run")
+  set(INSTALL_SCRIPT "libintel-ext-pt-${LIBIPEX_VERSION}.run")
   if(GLIBCXX_USE_CXX11_ABI)
-    set(INSTALL_SCRIPT "libintel-ext-pt-cxx11-abi-${CMAKE_PROJECT_VERSION}.run")
+    set(INSTALL_SCRIPT "libintel-ext-pt-cxx11-abi-${LIBIPEX_VERSION}.run")
   endif()
   configure_package_config_file(
     ${IPEX_ROOT_DIR}/cmake/cppsdk/libintel-ext-pt.installer.sh.in
