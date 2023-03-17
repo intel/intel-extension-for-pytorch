@@ -133,6 +133,20 @@ void adaptive_avg_pool2d_out_template(
   auto outputWidth = output_size[1];
   auto outputHeight = output_size[0];
 
+  if (!input.is_quantized() && outputWidth == 1 && outputHeight == 1) {
+    // in this case, adaptive pooling is just computing mean over hw
+    // dimensions, which can be done more efficiently
+
+    output = input.mean({-1, -2}, /* keepdim = */ true);
+    if (input.suggest_memory_format() == at::MemoryFormat::ChannelsLast) {
+      // assert ndim == 4, since ndim = 3 doesn't give channels_last
+      const int n = input.size(0);
+      const int c = input.size(1);
+      output.as_strided_({n, c, 1, 1}, {c, 1, c, c});
+    }
+    return;
+  }
+
   /* sizes */
   const int64_t nbatch = input.ndimension() == 4 ? input.size(-4) : 1;
   const auto nInputPlane = input.size(-3);

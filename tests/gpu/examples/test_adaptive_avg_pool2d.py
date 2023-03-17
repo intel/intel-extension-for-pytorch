@@ -41,6 +41,17 @@ class TestNNMethod(TestCase):
         print("x_dpcpp.grad", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
+        # test output_size(0) == output_size(1) == 1 case
+        stride=[5760000, 1, 19200, 64]
+        shape=[64, 64, 300, 300]
+        avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+        a = torch.randn(shape[0] *stride[0] +1, dtype=torch.bfloat16).to(dpcpp_device).as_strided(shape, stride)
+        a_cpu = a.to(cpu_device)
+
+        result = avg_pool(a)
+        result_cpu = avg_pool(a_cpu)
+        self.assertEqual(result_cpu, result.to(cpu_device))
+
     def test_channels_last_simple_fwd(self, dtype=torch.float):
         x_cpu = torch.ones([1, 1, 8, 8], device=cpu_device)
         x_dpcpp = x_cpu.to(dpcpp_device).to(memory_format=torch.channels_last)
