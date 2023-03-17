@@ -664,5 +664,22 @@ static inline bool binary_forward_valid(
   }
 }
 
+#ifdef BUILD_PRIOR_SYMM_QUANT
+static inline bool requires_runtime_zp(const Tensor& src) {
+  TORCH_CHECK(src.is_quantized(), "Only qtensor needs runtime zero_point")
+  // IF only Symeetric in IPEX, alwasy no zp
+  return false;
+
+  // IF Asymmetric path is enabled in IPEX, check zp for kernel choosing
+  // IF Tensor has a non-zero zp, then need runtime zp for oneDNN.
+  // See [Note: Use symmetric quant implementation when zp is 0]
+  // if (src.qscheme() == kPerTensorAffine) {
+  //   return (src.q_zero_point() != 0);
+  // } else if (src.qscheme() == kPerChannelAffine) {
+  //   return ((src.q_per_channel_zero_points().nonzero().numel()) != 0);
+  // }
+}
+#endif
+
 } // namespace oneDNN
 } // namespace xpu

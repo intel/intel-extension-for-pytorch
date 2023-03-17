@@ -327,6 +327,25 @@ static at::Tensor quantized_convolution(
   bool load_from_cache = false;
 #endif
 
+// [Note: Use symmetric quant implementation when zp is 0]
+// (JIRA: https://jira.devtools.intel.com/browse/MFDNN-9633)
+// Due to asymmetric quant has perf gap compared to symm quant, we need to avoid
+// dnn kernel goes into asymm path if tensor zp is 0. We expect following
+// behaviour:
+// 1. IF IPEX is Symmetric only: Alwasy refuse to use runtime zp. Use symmetric
+// kernel.
+// 2. IF IPEX is Asymmetric supported:
+//      a. Check src&dzp&wgh zp, if all are zero, we go into symmetric path for
+//      perf. With this WA, operate like conv_relu fusion would maintin high
+//      perf even the overall config is asymm.
+//      b. If zp is not zero, using asymmetric kernel. Perf regression should
+//      then happen.
+#ifdef BUILD_PRIOR_SYMM_QUANT
+  bool src_need_zp = requires_runtime_zp(src);
+  bool dst_need_zp = requires_runtime_zp(dst);
+  bool wgh_need_zp = requires_runtime_zp(wgh);
+#endif
+
   if (is_onednn_layout_suggested) {
     std::tie(src_usr_md, wgh_usr_md, dst_usr_md) =
         qconv_get_blocked_usr_md(src, wgh, dst, groups);
@@ -358,13 +377,19 @@ static at::Tensor quantized_convolution(
     }
 
     pattr.set_scales_mask(DNNL_ARG_DST, mask_conv);
-    pattr.set_zero_points_mask(DNNL_ARG_DST, mask_ac);
-
     pattr.set_scales_mask(DNNL_ARG_SRC, mask_ac);
-    pattr.set_zero_points_mask(DNNL_ARG_SRC, mask_ac);
+    pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_conv);
 
-    pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_conv);
-    pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_conv);
+#ifdef BUILD_PRIOR_SYMM_QUANT
+    // Only setting zp mask when zp is not zero
+    // See: [Note: Use symmetric quant implementation when zp is 0]
+    if (src_need_zp)
+      pattr.set_zero_points_mask(DNNL_ARG_DST, mask_ac);
+    if (dst_need_zp)
+      pattr.set_zero_points_mask(DNNL_ARG_SRC, mask_ac);
+    if (wgh_need_zp)
+      pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, mask_conv);
+#endif
 
     pattr.set_post_ops(po);
 #ifdef USE_SCRATCHPAD_MODE
@@ -452,23 +477,43 @@ static at::Tensor quantized_convolution(
   memory::desc src_sc_md =
       memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
   memory src_sc_m = dpcpp_onednn_memory(src_sc_md, engine, src_sc.data_ptr());
-  Tensor src_zp = at::zeros({1}, at::dtype(at::kFloat).device(at::kXPU));
-  memory::desc src_zp_md =
-      memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
-  memory src_zp_m = dpcpp_onednn_memory(src_zp_md, engine, src_zp.data_ptr());
   args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, src_sc_m});
-  args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zp_m});
+
+#ifdef BUILD_PRIOR_SYMM_QUANT
+  // Only setting zp when zp is not zero
+  // See: [Note: Use symmetric quant implementation when zp is 0]
+  Tensor srz_zp;
+  memory::desc src_zp_md;
+  memory src_zp_m;
+  if (src_need_zp) {
+    Tensor src_zp = at::zeros({1}, at::dtype(at::kFloat).device(at::kXPU));
+    src_zp_md =
+        memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+    src_zp_m = dpcpp_onednn_memory(src_zp_md, engine, src_zp.data_ptr());
+    args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zp_m});
+  }
+#endif
 
   Tensor dst_sc = at::ones({1}, at::dtype(at::kFloat).device(at::kXPU));
   memory::desc dst_sc_md =
       memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
   memory dst_sc_m = dpcpp_onednn_memory(dst_sc_md, engine, dst_sc.data_ptr());
-  Tensor dst_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
-  memory::desc dst_zp_md =
-      memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
-  memory dst_zp_m = dpcpp_onednn_memory(dst_zp_md, engine, dst_zp.data_ptr());
   args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, dst_sc_m});
-  args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zp_m});
+
+#ifdef BUILD_PRIOR_SYMM_QUANT
+  // Only setting zp when zp is not zero
+  // See: [Note: Use symmetric quant implementation when zp is 0]
+  Tensor dst_zp;
+  memory::desc dst_zp_md;
+  memory dst_zp_m;
+  if (dst_need_zp) {
+    Tensor dst_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
+    dst_zp_md =
+        memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+    dst_zp_m = dpcpp_onednn_memory(dst_zp_md, engine, dst_zp.data_ptr());
+    args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zp_m});
+  }
+#endif
 
 #ifdef USE_SCRATCHPAD_MODE
   size_t scratchpad_size = conv_fwd_pd.scratchpad_desc().get_size();
@@ -486,14 +531,23 @@ static at::Tensor quantized_convolution(
     memory::desc wgh_sc_md =
         memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
     memory wgh_sc_m = dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
-
-    Tensor wgh_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
-    memory::desc wgh_zp_md =
-        memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
-    memory wgh_zp_m = dpcpp_onednn_memory(wgh_zp_md, engine, wgh_zp.data_ptr());
-
     args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
-    args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, wgh_zp_m});
+
+#ifdef BUILD_PRIOR_SYMM_QUANT
+    // Only setting zp when zp is not zero
+    // See: [Note: Use symmetric quant implementation when zp is 0]
+    Tensor wgh_zp;
+    memory::desc wgh_zp_md;
+    memory wgh_zp_m;
+    if (wgh_need_zp) {
+      Tensor wgh_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
+      wgh_zp_md =
+          memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+      wgh_zp_m = dpcpp_onednn_memory(wgh_zp_md, engine, wgh_zp.data_ptr());
+      args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, wgh_zp_m});
+    }
+#endif
+
     DPCPP_ONEDNN_EXEC(conv_forward, strm, args);
   } else {
     // Per-channel quantized
@@ -501,14 +555,22 @@ static at::Tensor quantized_convolution(
     memory::desc wgh_sc_md = memory::desc(
         get_onednn_dims(wgh_sc), memory::data_type::f32, memory::format_tag::x);
     memory wgh_sc_m = dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
-
-    Tensor wgh_zp = wgh.q_per_channel_zero_points().to(at::kInt);
-    memory::desc wgh_zp_md =
-        memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
-    memory wgh_zp_m = dpcpp_onednn_memory(wgh_zp_md, engine, wgh_zp.data_ptr());
-
     args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
-    args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, wgh_zp_m});
+
+#ifdef BUILD_PRIOR_SYMM_QUANT
+    // Only setting zp when zp is not zero
+    // See: [Note: Use symmetric quant implementation when zp is 0]
+    Tensor wgh_zp;
+    memory::desc wgh_zp_md;
+    memory wgh_zp_m;
+    if (wgh_need_zp) {
+      wgh_zp = wgh.q_per_channel_zero_points().to(at::kInt);
+      wgh_zp_md =
+          memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+      wgh_zp_m = dpcpp_onednn_memory(wgh_zp_md, engine, wgh_zp.data_ptr());
+      args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, wgh_zp_m});
+    }
+#endif
     DPCPP_ONEDNN_EXEC(conv_forward, strm, args);
   }
 
