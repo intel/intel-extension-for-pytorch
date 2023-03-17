@@ -1,7 +1,8 @@
+#include "Indexing.h"
 #include <ATen/ATen.h>
-#include <ATen/native/TensorIterator.h>
-
 #include <ATen/MemoryOverlap.h>
+#include <ATen/ceil_div.h>
+#include <ATen/native/TensorIterator.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <core/detail/IndexUtils.h>
@@ -10,7 +11,6 @@
 #include <utils/DPCPP.h>
 #include <utils/Helpers.h>
 #include <iostream>
-#include "Indexing.h"
 #include "IndexingUtils.h"
 #include "Loops.h"
 #include "PSTLFunctions.h"
@@ -750,8 +750,6 @@ void index_put_deterministic_kernel(
     int64_t stride_before,
     int64_t outer_dim,
     bool accumulate) {
-  using accscalar_t = acc_type<scalar_t>;
-
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
 
@@ -759,12 +757,20 @@ void index_put_deterministic_kernel(
   auto sub_group_size = dev_prop->subgroup_sizes;
   int group_x = sub_group_size[1];
   const int64_t indices_per_group = 4;
-  sycl::range<3> wgroup_size = {1, indices_per_group, group_x};
-  int y_num = (numel + indices_per_group - 1) / indices_per_group;
-  int x_num = (stride + group_x * SZ - 1) / (group_x * SZ);
-  sycl::range<3> wgroup_range = {
-      outer_dim, y_num * indices_per_group, x_num * group_x * SZ};
+  int hw_max_work_items = dpcppMaxWorkItemsPerTile();
 
+  sycl::range<3> wgroup_size = {1, indices_per_group, group_x};
+
+  int x_num = ceil_div(numel, (int64_t)indices_per_group);
+  int y_num = ceil_div(stride, (int64_t)group_x * SZ);
+  int z_num = std::min(
+      std::max<int>(1, outer_dim),
+      ceil_div(
+          hw_max_work_items,
+          std::min<int>(numel, (x_num * indices_per_group)) *
+              std::min<int>(stride, (y_num * group_x * SZ))));
+  sycl::range<3> wgroup_range = {
+      z_num, y_num * group_x * SZ, x_num * indices_per_group};
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item_id) {
       auto itemIdx_y = item_id.get_local_id(1);
@@ -774,25 +780,31 @@ void index_put_deterministic_kernel(
       auto groupIdx_x = item_id.get_group(2);
       auto groupDim_y = item_id.get_local_range(1);
       auto groupDim_x = item_id.get_local_range(2);
-      int64_t idx = groupIdx_y * groupDim_y + itemIdx_y;
-      if (idx < numel &&
-          (idx == 0 || sorted_indices[idx] != sorted_indices[idx - 1])) {
-        do {
-          int64_t start_feature = itemIdx_x + groupIdx_x * groupDim_x * SZ;
-          const int64_t self_row = ((int64_t)sorted_indices[idx]) * stride +
-              groupIdx_z * stride_before;
-          const int64_t value_row =
-              ((int64_t)indices[idx]) * stride + groupIdx_z * numel * stride;
+      for (int64_t z = groupIdx_z; z < outer_dim; z += z_num) {
+        int64_t idx = groupIdx_x * groupDim_y + itemIdx_y;
+        if (idx < numel &&
+            (idx == 0 || sorted_indices[idx] != sorted_indices[idx - 1])) {
+          do {
+            int64_t start_feature = itemIdx_x + groupIdx_y * groupDim_x * SZ;
+            const int64_t self_row =
+                ((int64_t)sorted_indices[idx]) * stride + z * stride_before;
+            const int64_t value_row =
+                ((int64_t)indices[idx]) * stride + z * numel * stride;
+            while (start_feature < stride) {
 #pragma unroll
-          for (int ii = 0; ii < SZ; ii++) {
-            int64_t feature_dim = start_feature + ii * group_x;
-            if (feature_dim < stride) {
-              self[self_row + feature_dim] += value[value_row + feature_dim];
+              for (int ii = 0; ii < SZ; ii++) {
+                int64_t feature_dim = start_feature + ii * group_x;
+                if (feature_dim < stride) {
+                  self[self_row + feature_dim] +=
+                      value[value_row + feature_dim];
+                }
+              }
+              start_feature += y_num * groupDim_x * SZ;
             }
-          }
-
-          idx++;
-        } while (idx < numel && sorted_indices[idx] == sorted_indices[idx - 1]);
+            idx++;
+          } while (idx < numel &&
+                   sorted_indices[idx] == sorted_indices[idx - 1]);
+        }
       }
     };
     cgh.parallel_for(sycl::nd_range<3>(wgroup_range, wgroup_size), kfn);
