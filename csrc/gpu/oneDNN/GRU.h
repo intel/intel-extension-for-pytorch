@@ -75,6 +75,11 @@ static inline Tensor gru_forward(
   auto dst_layer_md = memory::desc({dst_layer_dims}, data_t, format_any);
   auto dst_iter_md = memory::desc({dst_iter_dims}, data_t, format_any);
 
+  primitive_attr pattr;
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
   auto gru_forward_pd = lbr_gru_forward::primitive_desc(
       engine,
       train ? prop_kind::forward_training : prop_kind::forward_inference,
@@ -85,7 +90,8 @@ static inline Tensor gru_forward(
       weights_iter_md,
       bias_md,
       dst_layer_md,
-      dst_iter_md);
+      dst_iter_md,
+      pattr);
 
   auto weights_layer_usr_memory = dpcpp_onednn_memory(
       {{weights_layer_dims}, data_t, format_ldigo},
@@ -189,38 +195,36 @@ static inline Tensor gru_forward(
     xpu::oneDNN::reorder(dst_iter, dst_iter_);
   }
 
+  std::unordered_map<int, memory> args;
+  args.insert({DNNL_ARG_SRC_LAYER, src_layer_memory});
+  args.insert({DNNL_ARG_SRC_ITER, src_iter_memory});
+  args.insert({DNNL_ARG_WEIGHTS_LAYER, weights_layer_memory});
+  args.insert({DNNL_ARG_WEIGHTS_ITER, weights_iter_memory});
+  args.insert({DNNL_ARG_BIAS, bias_memory});
+  args.insert({DNNL_ARG_DST_LAYER, dst_layer_memory});
+  args.insert({DNNL_ARG_DST_ITER, dst_iter_memory});
+
+#ifdef USE_SCRATCHPAD_MODE
+  size_t scratchpad_size = gru_forward_pd.scratchpad_desc().get_size();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
+      {scratchpad_size}, src_layer.options().dtype(at::kByte), c10::nullopt);
+  auto scratchpad_m = dpcpp_onednn_memory(
+      gru_forward_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_m});
+#endif
+
   Tensor workspace;
-  auto gru_forward_p = lbr_gru_forward(gru_forward_pd);
   if (train) {
     auto workspace_md = gru_forward_pd.workspace_desc();
     auto w_size = workspace_md.get_size();
     workspace = at::empty(w_size, src_layer.options().dtype(at::kByte));
     auto workspace_memory =
         dpcpp_onednn_memory(workspace_md, engine, workspace.data_ptr());
-
-    DPCPP_ONEDNN_EXEC(
-        gru_forward_p,
-        strm,
-        {{DNNL_ARG_SRC_LAYER, src_layer_memory},
-         {DNNL_ARG_SRC_ITER, src_iter_memory},
-         {DNNL_ARG_WEIGHTS_LAYER, weights_layer_memory},
-         {DNNL_ARG_WEIGHTS_ITER, weights_iter_memory},
-         {DNNL_ARG_BIAS, bias_memory},
-         {DNNL_ARG_DST_LAYER, dst_layer_memory},
-         {DNNL_ARG_DST_ITER, dst_iter_memory},
-         {DNNL_ARG_WORKSPACE, workspace_memory}});
-  } else {
-    DPCPP_ONEDNN_EXEC(
-        gru_forward_p,
-        strm,
-        {{DNNL_ARG_SRC_LAYER, src_layer_memory},
-         {DNNL_ARG_SRC_ITER, src_iter_memory},
-         {DNNL_ARG_WEIGHTS_LAYER, weights_layer_memory},
-         {DNNL_ARG_WEIGHTS_ITER, weights_iter_memory},
-         {DNNL_ARG_BIAS, bias_memory},
-         {DNNL_ARG_DST_LAYER, dst_layer_memory},
-         {DNNL_ARG_DST_ITER, dst_iter_memory}})
+    args.insert({DNNL_ARG_WORKSPACE, workspace_memory});
   }
+
+  auto gru_forward_p = lbr_gru_forward(gru_forward_pd);
+  DPCPP_ONEDNN_EXEC(gru_forward_p, strm, args);
 
   if (dst_layer_memory != dst_layer_usr_memory) {
     xpu::oneDNN::reorder(dst_layer_, dst_layer);
@@ -314,6 +318,11 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
   rnn_direction dir = reverse ? rnn_direction::unidirectional_right2left
                               : rnn_direction::unidirectional_left2right;
 
+  primitive_attr pattr;
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
   auto gru_forward_pd = lbr_gru_forward::primitive_desc(
       engine,
       prop_kind::forward_training,
@@ -324,7 +333,8 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
       weights_iter_md,
       bias_md,
       dst_layer_md,
-      dst_iter_md);
+      dst_iter_md,
+      pattr);
 
   auto src_layer_usr_memory = dpcpp_onednn_memory(
       {{src_layer_dims}, data_dt, format_tnc}, engine, src_layer.data_ptr());
@@ -402,7 +412,8 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
       diff_bias_md,
       diff_dst_layer_md,
       diff_dst_iter_md,
-      gru_forward_pd);
+      gru_forward_pd,
+      pattr);
 
   Tensor new_src_iter = src_iter.reshape({src_iter_dims}),
          new_dst_iter = dst_iter.reshape({dst_iter_dims}),
@@ -583,26 +594,34 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
   auto workspace_memory = dpcpp_onednn_memory(
       gru_backward_pd.workspace_desc(), engine, workspace.data_ptr());
 
-  auto gru_backward_p = lbr_gru_backward(gru_backward_pd);
+  std::unordered_map<int, memory> args;
+  args.insert({DNNL_ARG_SRC_LAYER, src_layer_memory});
+  args.insert({DNNL_ARG_SRC_ITER, src_iter_memory});
+  args.insert({DNNL_ARG_WEIGHTS_LAYER, bwd_weights_layer_memory});
+  args.insert({DNNL_ARG_WEIGHTS_ITER, bwd_weights_iter_memory});
+  args.insert({DNNL_ARG_BIAS, bias_memory});
+  args.insert({DNNL_ARG_DST_LAYER, dst_layer_memory});
+  args.insert({DNNL_ARG_DST_ITER, dst_iter_memory});
+  args.insert({DNNL_ARG_DIFF_DST_LAYER, diff_dst_layer_memory});
+  args.insert({DNNL_ARG_DIFF_DST_ITER, diff_dst_iter_memory});
+  args.insert({DNNL_ARG_WORKSPACE, workspace_memory});
+  args.insert({DNNL_ARG_DIFF_SRC_LAYER, diff_src_layer_memory});
+  args.insert({DNNL_ARG_DIFF_SRC_ITER, diff_src_iter_memory});
+  args.insert({DNNL_ARG_DIFF_WEIGHTS_LAYER, diff_weights_layer_memory});
+  args.insert({DNNL_ARG_DIFF_WEIGHTS_ITER, diff_weights_iter_memory});
+  args.insert({DNNL_ARG_DIFF_BIAS, diff_bias_memory});
 
-  DPCPP_ONEDNN_EXEC(
-      gru_backward_p,
-      strm,
-      {{DNNL_ARG_SRC_LAYER, src_layer_memory},
-       {DNNL_ARG_SRC_ITER, src_iter_memory},
-       {DNNL_ARG_WEIGHTS_LAYER, bwd_weights_layer_memory},
-       {DNNL_ARG_WEIGHTS_ITER, bwd_weights_iter_memory},
-       {DNNL_ARG_BIAS, bias_memory},
-       {DNNL_ARG_DST_LAYER, dst_layer_memory},
-       {DNNL_ARG_DST_ITER, dst_iter_memory},
-       {DNNL_ARG_DIFF_DST_LAYER, diff_dst_layer_memory},
-       {DNNL_ARG_DIFF_DST_ITER, diff_dst_iter_memory},
-       {DNNL_ARG_WORKSPACE, workspace_memory},
-       {DNNL_ARG_DIFF_SRC_LAYER, diff_src_layer_memory},
-       {DNNL_ARG_DIFF_SRC_ITER, diff_src_iter_memory},
-       {DNNL_ARG_DIFF_WEIGHTS_LAYER, diff_weights_layer_memory},
-       {DNNL_ARG_DIFF_WEIGHTS_ITER, diff_weights_iter_memory},
-       {DNNL_ARG_DIFF_BIAS, diff_bias_memory}});
+#ifdef USE_SCRATCHPAD_MODE
+  size_t scratchpad_size = gru_backward_pd.scratchpad_desc().get_size();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
+      {scratchpad_size}, src_layer.options().dtype(at::kByte), c10::nullopt);
+  auto scratchpad_m = dnnl::memory(
+      gru_backward_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_m});
+#endif
+
+  auto gru_backward_p = lbr_gru_backward(gru_backward_pd);
+  DPCPP_ONEDNN_EXEC(gru_backward_p, strm, args);
 
   if (diff_src_layer_usr_memory != diff_src_layer_memory) {
     xpu::oneDNN::reorder(diff_src_layer_, diff_src_layer);

@@ -421,7 +421,7 @@ static void deconvolution(
     attr.construct_post_binary(deconv_fwd_pd, po, args);
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = deconv_fwd_pd.scratchpad_desc().get_size();
+  size_t scratchpad_size = deconv_fwd_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
       {scratchpad_size}, src.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_m = dpcpp_onednn_memory(
@@ -543,7 +543,7 @@ static void deconvolution_backward_data(
   // insert args
   std::unordered_map<int, memory> args;
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = deconv_backward_data_pd.scratchpad_desc().get_size();
+  size_t scratchpad_size = deconv_backward_data_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
       {scratchpad_size}, diff_dst.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_memory = dpcpp_onednn_memory(

@@ -440,7 +440,7 @@ static at::Tensor convolution(
   args.insert({DNNL_ARG_DST, dst_m});
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = conv_fwd_pd.scratchpad_desc().get_size();
+  size_t scratchpad_size = conv_fwd_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
       {scratchpad_size}, src.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_m = dpcpp_onednn_memory(
@@ -573,7 +573,7 @@ static void convolution_backward_weights(
     args.insert({DNNL_ARG_DIFF_BIAS, diff_bia_m});
   }
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = conv_bwd_w_pd.scratchpad_desc().get_size();
+  size_t scratchpad_size = conv_bwd_w_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
       {scratchpad_size}, src.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_m = dnnl::memory(
@@ -710,7 +710,7 @@ static void convolution_backward_data(
   // insert args
   std::unordered_map<int, memory> args;
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = conv_backward_data_pd.scratchpad_desc().get_size();
+  size_t scratchpad_size = conv_backward_data_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
       {scratchpad_size}, diff_dst.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_memory = dpcpp_onednn_memory(

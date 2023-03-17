@@ -471,7 +471,7 @@ static at::Tensor quantized_convolution(
   args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zp_m});
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = conv_fwd_pd.scratchpad_desc().get_size();
+  size_t scratchpad_size = conv_fwd_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
       {scratchpad_size}, src.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_m = dpcpp_onednn_memory(
