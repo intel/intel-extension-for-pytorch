@@ -63,6 +63,87 @@ enum DPCPP_STATUS {
     }                                                                          \
   }
 
+const char* const USES_FP64_MATH = "uses-fp64-math";
+const char* const ASPECT_FP64_IS_NOT_SUPPORTED = "aspect fp64 is not supported";
+const char* const FP64_ERROR_FROM_MKL = "double type is not supported";
+
+#ifdef UNIFY_FP64_ERROR
+#define DPCPP_EXT_SUBMIT(q, str, ker_submit)                                   \
+  {                                                                            \
+    static auto verbose = xpu::dpcpp::Settings::I().get_verbose_level();       \
+    if (verbose) {                                                             \
+      IPEX_TIMER(t, verbose, __func__);                                        \
+      auto start_evt = xpu::dpcpp::queue_barrier(q);                           \
+      t.now("start barrier");                                                  \
+      sycl::event e{};                                                         \
+      try {                                                                    \
+        e = (ker_submit);                                                      \
+      } catch (const sycl::exception& e) {                                     \
+        const std::string& err_msg = e.what();                                 \
+        if (err_msg.find(USES_FP64_MATH) != std::string::npos ||               \
+            err_msg.find(ASPECT_FP64_IS_NOT_SUPPORTED) != std::string::npos || \
+            err_msg.find(FP64_ERROR_FROM_MKL) != std::string::npos) {          \
+          throw new std::runtime_error(                                        \
+              " op uses fp64 data type, while fp64 instructions are "          \
+              "not supported on current platform.");                           \
+        } else {                                                               \
+          throw e;                                                             \
+        }                                                                      \
+      }                                                                        \
+      t.now("submit");                                                         \
+      auto end_evt = xpu::dpcpp::queue_barrier(q);                             \
+      t.now("end barrier");                                                    \
+      e.wait_and_throw();                                                      \
+      t.now("event wait");                                                     \
+      xpu::dpcpp::dpcpp_log((str), start_evt, end_evt);                        \
+      start_evt.wait_and_throw();                                              \
+      end_evt.wait_and_throw();                                                \
+      auto se_end =                                                            \
+          start_evt.template get_profiling_info<dpcpp_event_profiling_end>();  \
+      auto ee_start =                                                          \
+          end_evt.template get_profiling_info<dpcpp_event_profiling_start>();  \
+      t.event_duration((ee_start - se_end) / 1000.0);                          \
+    } else if (is_profiler_enabled()) {                                        \
+      auto start_evt = xpu::dpcpp::queue_barrier(q);                           \
+      sycl::event e{};                                                         \
+      try {                                                                    \
+        e = (ker_submit);                                                      \
+      } catch (const sycl::exception& e) {                                     \
+        const std::string& err_msg = e.what();                                 \
+        if (err_msg.find(USES_FP64_MATH) != std::string::npos ||               \
+            err_msg.find(ASPECT_FP64_IS_NOT_SUPPORTED) != std::string::npos || \
+            err_msg.find(FP64_ERROR_FROM_MKL) != std::string::npos) {          \
+          throw new std::runtime_error(                                        \
+              " op uses fp64 data type, while fp64 instructions are "          \
+              "not supported on current platform.");                           \
+        } else {                                                               \
+          throw e;                                                             \
+        }                                                                      \
+      }                                                                        \
+      auto end_evt = xpu::dpcpp::queue_barrier(q);                             \
+      dpcpp_mark((str), start_evt, end_evt);                                   \
+      DPCPP_E_SYNC_FOR_DEBUG(e);                                               \
+    } else {                                                                   \
+      sycl::event e{};                                                         \
+      try {                                                                    \
+        e = (ker_submit);                                                      \
+      } catch (const sycl::exception& e) {                                     \
+        const std::string& err_msg = e.what();                                 \
+        if (err_msg.find(USES_FP64_MATH) != std::string::npos ||               \
+            err_msg.find(ASPECT_FP64_IS_NOT_SUPPORTED) != std::string::npos || \
+            err_msg.find(FP64_ERROR_FROM_MKL) != std::string::npos) {          \
+          throw new std::runtime_error(                                        \
+              " op uses fp64 data type, while fp64 instructions are "          \
+              "not supported on current platform.");                           \
+        } else {                                                               \
+          throw e;                                                             \
+        }                                                                      \
+      }                                                                        \
+      DPCPP_E_SYNC_FOR_DEBUG(e);                                               \
+    }                                                                          \
+    (q).throw_asynchronous();                                                  \
+  }
+#else
 #define DPCPP_EXT_SUBMIT(q, str, ker_submit)                                  \
   {                                                                           \
     static auto verbose = xpu::dpcpp::Settings::I().get_verbose_level();      \
@@ -96,7 +177,59 @@ enum DPCPP_STATUS {
     }                                                                         \
     (q).throw_asynchronous();                                                 \
   }
+#endif
 
+#ifdef UNIFY_FP64_ERROR
+#define DPCPP_Q_SUBMIT(q, cgf, ...)                                            \
+  {                                                                            \
+    static auto verbose = xpu::dpcpp::Settings::I().get_verbose_level();       \
+    if (verbose) {                                                             \
+      sycl::event e{};                                                         \
+      IPEX_TIMER(t, verbose, __func__);                                        \
+      try {                                                                    \
+        e = (q).submit((cgf), ##__VA_ARGS__);                                  \
+      } catch (const sycl::exception& e) {                                     \
+        const std::string& err_msg = e.what();                                 \
+        if (err_msg.find(USES_FP64_MATH) != std::string::npos ||               \
+            err_msg.find(ASPECT_FP64_IS_NOT_SUPPORTED) != std::string::npos || \
+            err_msg.find(FP64_ERROR_FROM_MKL) != std::string::npos) {          \
+          throw new std::runtime_error(                                        \
+              " op uses fp64 data type, while fp64 instructions are "          \
+              "not supported on current platform.");                           \
+        } else {                                                               \
+          throw e;                                                             \
+        }                                                                      \
+      }                                                                        \
+      t.now("submit");                                                         \
+      e.wait_and_throw();                                                      \
+      t.now("event wait");                                                     \
+      xpu::dpcpp::dpcpp_log("dpcpp_kernel", e);                                \
+      auto e_start =                                                           \
+          e.template get_profiling_info<dpcpp_event_profiling_start>();        \
+      auto e_end = e.template get_profiling_info<dpcpp_event_profiling_end>(); \
+      t.event_duration((e_end - e_start) / 1000.0);                            \
+    } else {                                                                   \
+      sycl::event e{};                                                         \
+      try {                                                                    \
+        e = (q).submit((cgf), ##__VA_ARGS__);                                  \
+      } catch (const sycl::exception& e) {                                     \
+        const std::string& err_msg = e.what();                                 \
+        if (err_msg.find(USES_FP64_MATH) != std::string::npos ||               \
+            err_msg.find(ASPECT_FP64_IS_NOT_SUPPORTED) != std::string::npos || \
+            err_msg.find(FP64_ERROR_FROM_MKL) != std::string::npos) {          \
+          throw new std::runtime_error(                                        \
+              " op uses fp64 data type, while fp64 instructions are "          \
+              "not supported on current platform.");                           \
+        } else {                                                               \
+          throw e;                                                             \
+        }                                                                      \
+      }                                                                        \
+      (q).throw_asynchronous();                                                \
+      xpu::dpcpp::dpcpp_log("dpcpp_kernel", e);                                \
+      DPCPP_E_SYNC_FOR_DEBUG(e);                                               \
+    }                                                                          \
+  }
+#else
 #define DPCPP_Q_SUBMIT(q, cgf, ...)                                            \
   {                                                                            \
     static auto verbose = xpu::dpcpp::Settings::I().get_verbose_level();       \
@@ -118,6 +251,7 @@ enum DPCPP_STATUS {
       DPCPP_E_SYNC_FOR_DEBUG(e);                                               \
     }                                                                          \
   }
+#endif
 
 // the descriptor as entity attribute
 #define DPCPP_HOST // for host only
