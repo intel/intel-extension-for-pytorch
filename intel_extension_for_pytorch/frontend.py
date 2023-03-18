@@ -502,6 +502,10 @@ def optimize(
                 + " is automatically chosen to use")
             opt_properties.weights_prepack = False
             sample_input = None
+        if opt_properties.optimize_lstm is not None:
+            warnings.warn(
+                "For XPU, the optimize_lstm(replace lstm with ipex_lstm) is unsupported, so disable it")
+            opt_properties.optimize_lstm = False
 
     if inplace:
         optimized_model = model
