@@ -16,11 +16,6 @@ else()
     message(STATUS "pybind11 found")
 endif()
 
-if (DEFINED ENV{UNIFY_FP64_ERROR})
-  set(UNIFY_FP64 "YES")
-  message("Will unify fp64 error +++++++++++++++++++++++++++++++++++++")
-endif()
-
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PYBIND11_CL_FLAGS}")
 
 if(BUILD_WITH_CPU)

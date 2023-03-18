@@ -59,6 +59,8 @@
 # USE_AOT_DEVLIST       - to set device list for AOT build option, for example, bdw,tgl,ats,..."
 # USE_SYCL_ASSERT       - to enable assert in sycl kernel
 # USE_ITT_ANNOTATION    - to enable ITT annotation in sycl kernel
+# USE_SPLIT_FP64_LOOPS  - to split FP64 loops into separate kernel for element-wise kernels
+# USE_FP64_EXCE_HINT    - to catch and hint all FP64 exceptions
 # BUILD_STATIC_ONEMKL   - to link static oneMKL libraries
 # BUILD_STATS           - to count statistics for each component during build process
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)
