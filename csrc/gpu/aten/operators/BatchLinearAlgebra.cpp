@@ -3922,7 +3922,7 @@ std::tuple<Tensor&, Tensor&> linalg_cholesky_ex_out(
   // Nothing to do there
   if (L.numel() == 0) {
     info.zero_();
-    return;
+    return std::tuple<Tensor&, Tensor&>{L, info};
   }
 
   L.copy_(A);
