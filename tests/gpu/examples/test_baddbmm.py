@@ -10,8 +10,8 @@ checking_rtol = 3e-2
 
 class TestTorchMethod(TestCase):
     def test_baddbmm_scale(self, dtype=torch.float):
-        m1_cpu = torch.randn([6, 3, 4], dtype=dtype)
-        m2_cpu = torch.randn([6, 4, 2], dtype=dtype)
+        m1_cpu = torch.ones([6, 3, 4], dtype=dtype) * 0.25
+        m2_cpu = torch.ones([6, 4, 2], dtype=dtype) * 1.5
         m1_xpu = m1_cpu.to(xpu_device)
         m2_xpu = m2_cpu.to(xpu_device)
         x_cpu = torch.ones([6, 3, 2], dtype=dtype)
