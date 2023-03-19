@@ -16,6 +16,7 @@ __all__ = ["handle_torch_function", "has_torch_function", "get_overridable_funct
 
 import functools  # noqa
 from functools import partial
+from torch.testing._internal.common_utils import TestCase
 
 # The dispatch table for tensor factory's __torch_function__ implementation.
 HANDLED_FUNCTIONS_SUB = {}
@@ -110,3 +111,27 @@ def fp64_tensor_totype_wrapper(f):
 def override_tensor_totype():
     r"""Override _tensor_totype to avoid triggering fp64 error when printing XPU tensor on ATS-M"""
     torch._tensor_str.tensor_totype = fp64_tensor_totype_wrapper(torch._tensor_str.tensor_totype)
+
+def fp64_assert_equal_wrapper(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        args_list = list(args)
+        for i, arg in enumerate(args_list):
+            if torch.is_tensor(arg) and arg.is_xpu:
+                args_list[i] = arg.to("cpu")
+            elif isinstance(arg, (tuple, list)) and len(arg) > 0 and torch.is_tensor(arg[0]):
+                tensors = list(arg)
+                for j, tensor in enumerate(tensors):
+                    if tensor.is_xpu:
+                        tensors[j] = tensor.to("cpu")
+                if isinstance(arg, (tuple)):
+                    args_list[i] = tuple(tensors)
+                else:
+                    args_list[i] = tensor
+        args = tuple(args_list)
+        return f(*args, **kwargs)
+    return wrapper
+
+def override_assert_equal():
+    r"""Override assertEqual to avoid triggering fp64 error on tensor comparison in test case"""
+    TestCase.assertEqual = fp64_assert_equal_wrapper(TestCase.assertEqual)
