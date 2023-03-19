@@ -123,9 +123,10 @@ static inline void group_reduce(
   for (int i = 1; i < SIMD; i <<= 1) {
     val = bin_op(val, static_cast<accscalar_t>(sg.shuffle_down(val, i)));
   }
-  if (sub_group_num == 1)
+  if (sub_group_num == 1) {
+    val = sycl::group_broadcast(sg, val, 0);
     return;
-
+  }
   uint32_t sg_local_id = sg.get_local_linear_id();
   uint32_t sg_id = sg.get_group_linear_id();
   // reduce internal each subgroup, each subgroup will generate one result
@@ -279,7 +280,8 @@ template <
     typename scalar_t,
     typename accscalar_t,
     typename IndexType,
-    bool LogSoftMax>
+    bool LogSoftMax,
+    int outer_loop>
 void dispatch_softmax_forward_kernel(
     scalar_t* in_data,
     scalar_t* out_data,
@@ -288,11 +290,8 @@ void dispatch_softmax_forward_kernel(
   using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
-  // SIMD16 will use less register numbers than SIMD32
-  // if the SIMD = SIMD16, then NUM will be enlarged 2x
-  constexpr int NUM = INNER_LOOP / vec_size * (SIMD32 / SIMD);
   int sub_group_num, global_size_row, local_size_row, range, local_size;
-  get_wgroup_size<SIMD, vec_size, NUM>(
+  get_wgroup_size<SIMD, vec_size, outer_loop>(
       dim_size,
       outer_size,
       sub_group_num,
@@ -313,17 +312,24 @@ void dispatch_softmax_forward_kernel(
           if (local_size == 1 && item_id.get_global_id(0) >= outer_size)
             return;
 
-          uint32_t lid_row = item_id.get_local_id(0) / local_size;
-          uint32_t lid_col = item_id.get_local_id(0) % local_size;
-          uint32_t group_offset =
-              (item_id.get_group(0) * local_size_row + lid_row) * dim_size;
+          uint32_t lid_row = 0;
+          uint32_t lid_col = item_id.get_local_id(0);
+          uint32_t group_offset = item_id.get_group(0) * dim_size;
+          if (local_size_row != 1) {
+            lid_row = item_id.get_local_id(0) / local_size;
+            lid_col = item_id.get_local_id(0) % local_size;
+            group_offset =
+                (item_id.get_group(0) * local_size_row + lid_row) * dim_size;
+          }
+          vec_t reg_in[outer_loop];
+          auto lid_offset = lid_col * vec_size;
+          auto local_stride = local_size * vec_size;
 
-          vec_t reg_in[NUM];
           // load data and get max value
           accscalar_t max_value = std::numeric_limits<accscalar_t>::lowest();
-#pragma unroll(NUM)
-          for (int i = 0; i < NUM; ++i) {
-            auto index = (lid_col + i * local_size) * vec_size;
+#pragma unroll(outer_loop)
+          for (int i = 0; i < outer_loop; ++i) {
+            auto index = i * local_stride + lid_offset;
             if (index >= dim_size)
               break;
 
@@ -350,9 +356,9 @@ void dispatch_softmax_forward_kernel(
 
           // get sum value
           accscalar_t sum_value = 0;
-#pragma unroll(NUM)
+#pragma unroll(outer_loop)
           for (int i = 0;
-               i < NUM && (lid_col + i * local_size) * vec_size < dim_size;
+               i < outer_loop && ((i * local_stride + lid_offset) < dim_size);
                ++i) {
 #pragma unroll(vec_size)
             for (int j = 0; j < vec_size; ++j) {
@@ -369,21 +375,21 @@ void dispatch_softmax_forward_kernel(
                 local_sum,
                 [](accscalar_t a, accscalar_t b) { return a + b; });
           }
-          if (LogSoftMax)
+          if constexpr (LogSoftMax)
             sum_value = Numerics<accscalar_t>::log(sum_value);
           else
             sum_value = accscalar_t(1) / sum_value;
 
         // update result
-#pragma unroll(NUM)
-          for (int i = 0; i < NUM; ++i) {
-            auto index = (lid_col + i * local_size) * vec_size;
+#pragma unroll(outer_loop)
+          for (int i = 0; i < outer_loop; ++i) {
+            auto index = i * local_stride + lid_offset;
             if (index >= dim_size)
               break;
 
 #pragma unroll(vec_size)
             for (int j = 0; j < vec_size; ++j) {
-              if (LogSoftMax) {
+              if constexpr (LogSoftMax) {
                 reg_in[i][j] =
                     static_cast<scalar_t>(reg_in[i][j] - max_value - sum_value);
               } else {
@@ -994,20 +1000,21 @@ void SpatialSoftMaxForward(Tensor& output, Tensor& input, int dim) {
       SIMD = SIMD16;
   }
 
-#define DISPATCH_SOFTMAX_FORWARD_IMPL(vec_size, SIMD) \
-  {                                                   \
-    dispatch_softmax_forward_kernel<                  \
-        INNER_LOOP,                                   \
-        vec_size,                                     \
-        SIMD,                                         \
-        scalar_t,                                     \
-        accscalar_t,                                  \
-        uint32_t,                                     \
-        LogSoftMax>(                                  \
-        input.data_ptr<scalar_t>(),                   \
-        output.data_ptr<scalar_t>(),                  \
-        dim_size,                                     \
-        outer_size);                                  \
+#define DISPATCH_SOFTMAX_FORWARD_IMPL(vec_size, SIMD, outer_loop) \
+  {                                                               \
+    dispatch_softmax_forward_kernel<                              \
+        INNER_LOOP,                                               \
+        vec_size,                                                 \
+        SIMD,                                                     \
+        scalar_t,                                                 \
+        accscalar_t,                                              \
+        uint32_t,                                                 \
+        LogSoftMax,                                               \
+        outer_loop>(                                              \
+        input.data_ptr<scalar_t>(),                               \
+        output.data_ptr<scalar_t>(),                              \
+        dim_size,                                                 \
+        outer_size);                                              \
   }
 
 #define SOFTMAX_FORWARD_IMPL(vec_size, IndexType) \
@@ -1046,22 +1053,45 @@ void SpatialSoftMaxForward(Tensor& output, Tensor& input, int dim) {
     auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
     int max_group_size = dpcppMaxWorkGroupSize(dev_id);
     if (can_use_32bit_index && max_group_size * INNER_LOOP >= dim_size) {
+      // it assumes vec_size * outer_loop * work_group_size >= dim_size
+
       if (SIMD == SIMD32) {
         // Ensure input/output tensor are aligned with max_vec_size
         if (input_start == 0 && output_start == 0 &&
             dim_size % max_vec_size == 0) {
+          constexpr int outer_loop = INNER_LOOP / max_vec_size;
           DISPATCH_SOFTMAX_FORWARD_IMPL(
-              /*vec_size*/ max_vec_size, /*SIMD*/ SIMD32);
+              /*vec_size*/ max_vec_size, /*SIMD*/ SIMD32, outer_loop);
         } else {
-          DISPATCH_SOFTMAX_FORWARD_IMPL(/*vec_size*/ 1, /*SIMD*/ SIMD32);
+          constexpr int outer_loop = INNER_LOOP;
+          DISPATCH_SOFTMAX_FORWARD_IMPL(
+              /*vec_size*/ 1, /*SIMD*/ SIMD32, outer_loop);
         }
       } else {
         if (input_start == 0 && output_start == 0 &&
             dim_size % max_vec_size == 0) {
-          DISPATCH_SOFTMAX_FORWARD_IMPL(
-              /*vec_size*/ max_vec_size, /*SIMD*/ SIMD16);
+          if (max_vec_size >= 4 && dim_size <= 4 * SIMD) {
+            // if vec_size >= 4 and dim_size <= 4 * SIMD, take smaller vec_size
+            // and 1 outer_loop
+            constexpr int outer_loop = 1;
+            DISPATCH_SOFTMAX_FORWARD_IMPL(
+                /*vec_size*/ 4, /*SIMD*/ SIMD16, outer_loop);
+          } else if (dim_size <= max_vec_size * SIMD) {
+            // if dim_size <= max_vec_size * SIMD , take 1 outer_loop
+            constexpr int outer_loop = 1;
+            DISPATCH_SOFTMAX_FORWARD_IMPL(
+                /*vec_size*/ max_vec_size, /*SIMD*/ SIMD16, outer_loop);
+          } else {
+            // SIMD16 will use less register numbers than SIMD32
+            // if the SIMD = SIMD16, then outer_loop will be enlarged 2x
+            constexpr int outer_loop = INNER_LOOP / max_vec_size * 2;
+            DISPATCH_SOFTMAX_FORWARD_IMPL(
+                /*vec_size*/ max_vec_size, /*SIMD*/ SIMD16, outer_loop);
+          }
         } else {
-          DISPATCH_SOFTMAX_FORWARD_IMPL(/*vec_size*/ 1, /*SIMD*/ SIMD16);
+          constexpr int outer_loop = INNER_LOOP * 2;
+          DISPATCH_SOFTMAX_FORWARD_IMPL(
+              /*vec_size*/ 1, /*SIMD*/ SIMD16, outer_loop);
         }
       }
     } else {

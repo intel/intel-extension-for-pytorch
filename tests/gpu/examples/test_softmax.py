@@ -68,7 +68,7 @@ class TestNNMethod(TestCase):
         x_dpcpp.requires_grad_()
         self.softmax_basic(x_cpu, y_cpu_output, x_dpcpp, y_dpcpp_output)
 
-        shape = [[8], [7, 8], [7, 8, 512], [16, 7, 8, 512], [16, 7, 8, 512, 35]]
+        shape = [[8], [7, 8], [8192, 64], [8192, 8192], [7, 8, 512], [16, 7, 8, 512], [16, 7, 8, 512, 35]]
         for i in range(len(shape)):
             for j in range(len(shape[i])):
                 dim = j - 1
