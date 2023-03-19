@@ -2,6 +2,7 @@ import torch
 import intel_extension_for_pytorch # noqa
 import warnings
 import numpy as np
+import pytest
 from torch.testing._internal.common_utils import (TestCase, freeze_rng_state)
 from torch.testing._internal.common_device_type import dtypes
 
@@ -9,6 +10,7 @@ cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_2d_block_array(), reason="Skipped temporarily on ATS-M")
     def test_tensorinv_empty(self, device=dpcpp_device, dtype=torch.float64):
         for ind in range(1, 4):
             # Check for empty inputs. NumPy does not work for these cases.

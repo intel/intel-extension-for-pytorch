@@ -295,6 +295,7 @@ class TestTorchMethod(TestCase):
 
         self.assertTrue(result_xpu.equal(result_cpu))
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_2d_block_array(), reason="Skipped temporarily on ATS-M")
     def test_special_airy_ai_out(self):
         input0 = torch.randn(8192, 8192, device="cpu")
         input0_xpu = input0.to("xpu")
