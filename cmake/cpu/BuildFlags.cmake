@@ -16,7 +16,7 @@ if(env_cxx_standard GREATER -1)
       WARNING "C++ standard version definition detected in environment variable."
       "PyTorch requires -std=c++14. Please remove -std=c++ settings in your environment.")
 endif()
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
