@@ -144,7 +144,7 @@ void fractional_max_pool2d_out_frame(
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
-template <typename scalar_t>
+template <typename scalar_t, bool is_channels_last>
 void fractional_max_pool2d_backward_out_frame(
     scalar_t* gradInput,
     scalar_t* gradOutput,
@@ -154,56 +154,20 @@ void fractional_max_pool2d_backward_out_frame(
     int gradInputSizeH,
     int gradInputSizeW,
     int gradOutputSizeH,
-    int gradOutputSizeW,
-    const bool is_channels_last) {
+    int gradOutputSizeW) {
   auto& queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
-  int64_t max_sg_size = SYCL_MAX_SUB_GROUP_SIZE;
-  int gradOutputPlaneSize =
+  int64_t max_wg_size = dpcppMaxWorkItemsPerEU(dev_id);
+  int64_t gradOutputSize =
       numBatch * numPlane * gradOutputSizeH * gradOutputSizeW;
   int work_group_size =
-      gradOutputPlaneSize > max_wg_size ? max_wg_size : gradOutputPlaneSize;
-  auto eu_num = dpcppGetCurrentDeviceProperties()->max_compute_units;
-  // One full device launch could launch en_num * SMID32 * HD threads as below
-  const auto target_global_size =
-      eu_num * max_sg_size /* SIMD32 */ * 8 /* HD threads */;
-  // Each work group size is work_group_size, one full device launch is
-  // target_global_size, so we can calculate max work group num as below
-  const int max_work_group_num = target_global_size / work_group_size;
-  int work_group_num =
-      gradOutputPlaneSize / work_group_size < max_work_group_num
-      ? gradOutputPlaneSize / work_group_size
-      : max_work_group_num;
-  int draft_work_group_num =
-      (gradOutputPlaneSize + work_group_size - 1) / work_group_size;
-  // work item in each work group calculates loops' elements
-  int draft_loops = draft_work_group_num / work_group_num + 1;
-  constexpr int min_loops_per_wi = 16;
-  constexpr int max_loops_per_wi = 256;
-  int loops = draft_loops;
-  // if (min_loops_per_wi <= draft_loops && draft_loops <= max_loops_per_wi)
-  // It means that draft_loops hit the best interval, so we don't adjust loops
-  // and work_group_num above
-
-  // if draft_loops < min_loops_per_wi, we increase the loops, and re-calculate
-  // work_group_num. This would cause work_group_num become smaller than before.
-  // However, we should make sure that work_group_num >= 1
-  if (draft_loops < min_loops_per_wi) {
-    loops = min_loops_per_wi;
-    // adjust work_group_num
-    int adjust_work_group_num = draft_work_group_num / (loops - 1);
-    work_group_num = adjust_work_group_num > 1 ? adjust_work_group_num : 1;
-  }
-
-  // if max_loops_per_wi < draft_loops, we decrease the loops, and re-calculate
-  // work_group_num. This would cause work_group_num become bigger than before
-  if (max_loops_per_wi < draft_loops) {
-    loops = max_loops_per_wi;
-    // adjust work_group_num
-    work_group_num = draft_work_group_num / (loops - 1);
-  }
-
+      gradOutputSize > max_wg_size ? max_wg_size : gradOutputSize;
+  int global_range =
+      ((gradOutputSize - 1) / work_group_size + 1) * work_group_size;
+  auto out_cf_c_stride = gradOutputSizeH * gradOutputSizeW;
+  auto in_cf_c_stride = gradInputSizeH * gradInputSizeW;
+  auto out_n_stride = numPlane * out_cf_c_stride;
+  auto in_n_stride = numPlane * in_cf_c_stride;
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto gradInput_data = gradInput;
     auto gradOutput_data = gradOutput;
@@ -213,51 +177,36 @@ void fractional_max_pool2d_backward_out_frame(
       auto gradOutput_ptr = gradOutput_data;
       auto indices_ptr = indices_data;
 
-      int linearIndex = item.get_global_id()[0];
-      for (int l = 0; l < loops; ++l) {
-        int outputIndex = linearIndex + l * (work_group_size * work_group_num);
-        int batch =
-            outputIndex / (numPlane * gradOutputSizeH * gradOutputSizeW);
-        int plane = is_channels_last
-            ? outputIndex % numPlane
-            : (outputIndex / gradOutputSizeH / gradOutputSizeW) % numPlane;
-        int outputH = is_channels_last
-            ? outputIndex / numPlane / gradOutputSizeW % gradOutputSizeH
-            : outputIndex / gradOutputSizeW % gradOutputSizeH;
-        int outputW = is_channels_last
-            ? outputIndex / numPlane % gradOutputSizeW
-            : outputIndex % gradOutputSizeW;
-        if (batch < numBatch && plane < numPlane && outputH < gradOutputSizeH &&
-            outputW < gradOutputSizeW) {
-          int64_t gO_offset = is_channels_last
-              ? batch * gradOutputSizeH * gradOutputSizeW * numPlane + plane +
-                  outputH * gradOutputSizeW * numPlane + outputW * numPlane
-              : batch * numPlane * gradOutputSizeH * gradOutputSizeW +
-                  plane * gradOutputSizeH * gradOutputSizeW +
-                  outputH * gradOutputSizeW + outputW;
-          int index = indices_ptr[gO_offset];
-          int inputW = index % gradInputSizeW;
-          int inputH = index / gradInputSizeW;
-          int64_t gI_offset = is_channels_last
-              ? batch * gradInputSizeH * gradInputSizeW * numPlane + plane +
-                  inputH * gradInputSizeW * numPlane + inputW * numPlane
-              : batch * numPlane * gradInputSizeH * gradInputSizeW +
-                  plane * gradInputSizeH * gradInputSizeW +
-                  inputH * gradInputSizeW + inputW;
+      int64_t outputIndex = item.get_global_id()[0];
+      if (outputIndex < gradOutputSize) {
+        int batch = outputIndex / out_n_stride;
+        if constexpr (is_channels_last) {
+          int plane = outputIndex % numPlane;
+          int64_t index = indices_ptr[outputIndex];
+          int64_t gI_offset = batch * in_n_stride + plane + index * numPlane;
           atomicAdd(
               (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr[gI_offset],
-              gradOutput_ptr[gO_offset]);
+              gradOutput_ptr[outputIndex]);
+        } else {
+          int plane = outputIndex / out_cf_c_stride % numPlane;
+          int64_t index = indices_ptr[outputIndex];
+          int inputW = index % gradInputSizeW;
+          int inputH = index / gradInputSizeW;
+          int64_t gI_offset =
+              batch * in_n_stride + plane * in_cf_c_stride + index;
+          atomicAdd(
+              (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr[gI_offset],
+              gradOutput_ptr[outputIndex]);
         }
       }
     };
     cgh.parallel_for(
         sycl::nd_range<1>(
-            sycl::range<1>(work_group_size * work_group_num),
-            sycl::range<1>(work_group_size)),
+            sycl::range<1>(global_range), sycl::range<1>(work_group_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
-}
+} // namespace impl
 
 void fractional_max_pool2d_out_template(
     Tensor& output,
@@ -396,7 +345,6 @@ void fractional_max_pool2d_backward_out_template(
   auto gradInput_ = gradInput;
   auto gradOutput_ = gradOutput.contiguous(smf);
   auto indices_ = indices;
-
   if (ndims == 3) {
     gradInput_ = gradInput_.reshape({1, input.size(0), inputH, inputW});
     gradOutput_ =
@@ -410,17 +358,29 @@ void fractional_max_pool2d_backward_out_template(
       gradOutput.scalar_type(),
       "fractional_max_pool2d_backward_out_frame",
       [&] {
-        fractional_max_pool2d_backward_out_frame<scalar_t>(
-            gradInput_.data_ptr<scalar_t>(),
-            gradOutput_.data_ptr<scalar_t>(),
-            indices_.data_ptr<int64_t>(),
-            gradInput_.size(0),
-            gradInput_.size(1),
-            inputH,
-            inputW,
-            outputH,
-            outputW,
-            is_smf_channels_last(input));
+        if (is_smf_channels_last(input)) {
+          fractional_max_pool2d_backward_out_frame<scalar_t, true>(
+              gradInput_.data_ptr<scalar_t>(),
+              gradOutput_.data_ptr<scalar_t>(),
+              indices_.data_ptr<int64_t>(),
+              gradInput_.size(0),
+              gradInput_.size(1),
+              inputH,
+              inputW,
+              outputH,
+              outputW);
+        } else {
+          fractional_max_pool2d_backward_out_frame<scalar_t, false>(
+              gradInput_.data_ptr<scalar_t>(),
+              gradOutput_.data_ptr<scalar_t>(),
+              indices_.data_ptr<int64_t>(),
+              gradInput_.size(0),
+              gradInput_.size(1),
+              inputH,
+              inputW,
+              outputH,
+              outputW);
+        }
       });
 }
 
