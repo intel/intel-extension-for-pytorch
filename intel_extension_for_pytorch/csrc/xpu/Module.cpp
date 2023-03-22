@@ -508,6 +508,9 @@ static void register_xpu_device_info(PyObject* module) {
       .def_readonly("platform_name", &DeviceInfo::platform_name)
       .def_readonly("total_memory", &DeviceInfo::global_mem_size)
       .def_readonly("max_compute_units", &DeviceInfo::max_compute_units)
+      .def_readonly("max_work_group_size", &DeviceInfo::max_work_group_size)
+      .def_readonly("max_num_sub_groups", &DeviceInfo::max_num_sub_groups)
+      .def_readonly("sub_group_sizes", &DeviceInfo::sub_group_sizes)
       .def_readonly("support_fp64", &DeviceInfo::support_fp64)
       .def_property_readonly(
           "dev_type", [](const DeviceInfo& info) { return get_dev_type(info); })

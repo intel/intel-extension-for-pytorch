@@ -75,3 +75,10 @@ class TestHasDtypes(TestCase):
     def test_has_fp64_dtype(self):
         y = (torch.tensor(1, device="xpu", dtype=torch.double)**2).cpu().numpy() == np.array(1)
         assert (y == has_fp64_dtype()), "This Device Not Support FP64"
+
+class TestDeviceCapability(TestCase):
+    def test_device_capability(self):
+        capability = torch.xpu.get_device_capability()
+        assert "max_work_group_size" in capability, "key max_work_group_size not found"
+        assert "max_num_sub_groups" in capability, "key max_num_sub_groups not found"
+        assert "sub_group_sizes" in capability, "key sub_group_sizes not found"

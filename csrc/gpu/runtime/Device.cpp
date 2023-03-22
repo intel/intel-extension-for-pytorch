@@ -339,6 +339,9 @@ static void initDeviceProperty(DeviceId device_id) {
   dev_info.platform_name = device_prop.platform_name;
   dev_info.global_mem_size = device_prop.global_mem_size;
   dev_info.max_compute_units = device_prop.max_compute_units;
+  dev_info.max_work_group_size = device_prop.max_work_group_size;
+  dev_info.max_num_sub_groups = device_prop.max_num_subgroup;
+  dev_info.sub_group_sizes = device_prop.subgroup_sizes;
   dev_info.support_fp64 = device_prop.support_fp64;
 
   device_info[device_id] = dev_info;

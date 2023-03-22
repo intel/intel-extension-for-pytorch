@@ -5,7 +5,7 @@ This package is lazily initialized, so you can always import it.
 from torch import serialization
 from torch.storage import _StorageBase
 import sys
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Dict
 import torch
 import intel_extension_for_pytorch
 from .lazy_init import _lazy_init, _lazy_call
@@ -150,6 +150,24 @@ def get_device_name(device: Optional[_device_t] = None) -> str:
             if :attr:`device` is ``None`` (default).
     """
     return get_device_properties(device).name
+
+
+def get_device_capability(device: Optional[_device_t] = None) -> Dict[str, Any]:
+    r"""Gets the xpu capability of a device.
+
+    Args:
+        device (torch.device or int, optional): device for which to return the
+            device capability. It uses the current device, given by
+            :func:`~torch.xpu.current_device`, if :attr:`device` is ``None``
+            (default).
+
+    Returns:
+        Dict[str, Any]: the xpu capability dictionary of the device
+    """
+    prop = get_device_properties(device)
+    return {"max_work_group_size": prop.max_work_group_size,
+            "max_num_sub_groups": prop.max_num_sub_groups,
+            "sub_group_sizes": prop.sub_group_sizes}
 
 
 def get_device_properties(device: _device_t):
