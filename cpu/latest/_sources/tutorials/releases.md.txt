@@ -9,6 +9,8 @@ We are pleased to announce the release of Intel® Extension for PyTorch\* 2.0.0-
 
 - **Fast BERT optimization (Experimental)**: Intel introduced a new technique to speed up BERT workloads. Intel® Extension for PyTorch\* integrated this implementation, which benefits BERT model especially training. A new API `ipex.fast_bert` is provided to try this new optimization. More detailed information can be found at [Fast Bert Feature](./features/fast_bert.md).
 
+- **MHA optimization with Flash Attention**: Intel optimized MHA module with Flash Attention technique as inspired by [Stanford paper](https://arxiv.org/abs/2205.14135). This brings less memory consumption for LLM, and also provides better inference performance for models like BERT, Stable Diffusion, etc.
+
 - **Work with torch.compile as an backend (Experimental)**: PyTorch 2.0 introduces a new feature, `torch.compile`, to speed up PyTorch execution. We've enabled Intel® Extension for PyTorch as a backend of torch.compile, which can leverage this new PyTorch API's power of graph capture and provide additional optimization based on these graphs.
 The usage of this new feature is quite simple as below: 
 
