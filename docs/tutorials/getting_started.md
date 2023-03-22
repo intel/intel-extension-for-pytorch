@@ -51,7 +51,7 @@ with torch.no_grad(), torch.cpu.amp.autocast():
   model(data)
 ##########################################
 
-############ T##orchDynamo ###############
+############## TorchDynamo ###############
 model = ipex.optimize(model)
 
 model = torch.compile(model, backend="ipex")

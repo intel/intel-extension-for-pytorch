@@ -1,6 +1,38 @@
 Releases
 =============
 
+## 2.0.0
+
+We are pleased to announce the release of Intel® Extension for PyTorch\* 2.0.0-cpu which accompanies PyTorch 2.0. This release mainly brings in our latest optimization on NLP (BERT), support of PyTorch 2.0's hero API –- torch.compile as one of its backend, together with a set of bug fixing and small optimization.
+
+### Highlights
+
+- **Fast BERT optimization (Experimental)**: Intel introduced a new technique, Tensor Processing Primitives (TPP), a programming abstraction striving for efficient, portable implementation of DL workloads with high-productivity. Intel® Extension for PyTorch\* integrated this TPP implementation, which benefits BERT model especially training. A new API `ipex.fast_bert` is provided to try this new optimization. More detailed information can be found at [Fast Bert Feature](./features/fast_bert.md).
+
+- **Work with torch.compile as an backend (Experimental)**: PyTorch 2.0 introduces a new feature, `torch.compile`, to speed up PyTorch execution. We've enabled Intel® Extension for PyTorch as a backend of torch.compile, which can leverage this new PyTorch API's power of graph capture and provide additional optimization based on these graphs.
+The usage of this new feature is quite simple as below: 
+
+```python
+import torch
+import intel_extension_for_pytorch as ipex
+...
+model = ipex.optimize(model)
+model = torch.compile(model, backend='ipex')
+```
+
+- **Bug fixing and small optimization**
+
+  - Supported [RMSNorm](https://arxiv.org/abs/1910.07467) which is widely used in the t5 model of huggingface [#1341](https://github.com/intel/intel-extension-for-pytorch/commit/d1de1402a8d6b9ca49b9c9a45a92899f7566866a)
+  - Enabled BF16 Flash Attention for MHA on BERT/Stable-Diffusion [#1413](https://github.com/intel/intel-extension-for-pytorch/commit/d8857117366f5ac10f9307273816ce1a05a6708b)
+  - Optimized InstanceNorm [#1330](https://github.com/intel/intel-extension-for-pytorch/commit/8b97d2998567cc2fda6eb008194cd64f624e857f)
+  - Fixed the quantization of LSTM [#1414](https://github.com/intel/intel-extension-for-pytorch/commit/a4f93c09855679d2b424ca5be81930e3a4562cef) [#1473](https://github.com/intel/intel-extension-for-pytorch/commit/5b44996dc0fdb5c45995d403e18a44f2e1a11b3d)
+  - Fixed the correctness issue of unpacking non-contiguous Linear weight [#1419](https://github.com/intel/intel-extension-for-pytorch/commit/84d413d6c10e16c025c407b68652b1769597e016) 
+  - oneDNN update [#1488](https://github.com/intel/intel-extension-for-pytorch/commit/fd5c10b664d19c87f8d94cf293077f65f78c3937)
+
+### Known Issues
+
+Please check at [Known Issues webpage](./performance_tuning/known_issues.md).
+
 ## 1.13.100
 
 ### Highlights
