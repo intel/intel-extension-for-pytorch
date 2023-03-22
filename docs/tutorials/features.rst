@@ -201,9 +201,7 @@ For more detailed information, check `HyperTune <features/hypertune.md>`_.
 Fast BERT Optimization (Experimental, *NEW feature from 2.0.0*)
 ---------------------------------------------------------------
 
-Intel proposed a technique, Tensor Processing Primitives (TPP), a programming abstraction striving for efficient, portable implementation of DL workloads with high-productivity. TPPs define a compact, yet versatile set of 2D-tensor operators (or a virtual Tensor ISA), which subsequently can be utilized as building-blocks to construct complex operators on high-dimensional tensors.
-
-Implementation of TPP is integrated into Intel® Extension for PyTorch\*. BERT could benefit from this new technique. An API `ipex.fast_bert` is provided for a simple usage.
+Intel proposed a technique to speed up BERT workloads. Implementation is integrated into Intel® Extension for PyTorch\*. An API `ipex.fast_bert` is provided for a simple usage.
 
 For more detailed information, check `Fast BERT <features/fast_bert.md>`_.
 
