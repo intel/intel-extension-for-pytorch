@@ -78,15 +78,15 @@ static void RowwiseMomentsDPCPPKernel(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename T>
+template <typename T, typename GAMMA_T>
 static void ComputeFusedParamsDPCPPKernel(
     int64_t N,
     int64_t C,
     int64_t group,
     const T* mean,
     const T* rstd,
-    const T* gamma,
-    const T* beta,
+    const GAMMA_T* gamma,
+    const GAMMA_T* beta,
     acc_type<T>* a,
     acc_type<T>* b) {
   using T_ACC = acc_type<T>;
@@ -160,7 +160,7 @@ void GroupNormForwardDPCPPKernel(
   }
 }
 
-template <typename T>
+template <typename T, typename GAMMA_T>
 void GroupNormKernelImplInternal(
     const Tensor& X,
     const Tensor& gamma,
@@ -183,8 +183,10 @@ void GroupNormKernelImplInternal(
   const int64_t G = group;
   const int64_t D = C / G;
   const T* X_data = X.data_ptr<T>();
-  const T* gamma_data = gamma.defined() ? gamma.data_ptr<T>() : nullptr;
-  const T* beta_data = beta.defined() ? beta.data_ptr<T>() : nullptr;
+  const GAMMA_T* gamma_data =
+      gamma.defined() ? gamma.data_ptr<GAMMA_T>() : nullptr;
+  const GAMMA_T* beta_data =
+      beta.defined() ? beta.data_ptr<GAMMA_T>() : nullptr;
   T* Y_data = Y->data_ptr<T>();
   T* mean_data = mean->data_ptr<T>();
   T* rstd_data = rstd->data_ptr<T>();
@@ -197,7 +199,7 @@ void GroupNormKernelImplInternal(
   RowwiseMomentsDPCPPKernel<T>(
       N * G, D * HxW, eps, X_data, mean_data, rstd_data);
 
-  ComputeFusedParamsDPCPPKernel<T>(
+  ComputeFusedParamsDPCPPKernel<T, GAMMA_T>(
       N, C, G, mean_data, rstd_data, gamma_data, beta_data, a_data, b_data);
 
   GroupNormForwardDPCPPKernel<T>(N, C, HxW, X_data, a_data, b_data, Y_data);
@@ -249,13 +251,13 @@ void ComputeInternalGradientsDPCPPKernel(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename T>
+template <typename T, typename GAMMA_T>
 void ComputeGradOutputCoeffientDPCPPKernel(
     int64_t N,
     int64_t C,
     int64_t group,
     const T* rstd,
-    const T* gamma,
+    const GAMMA_T* gamma,
     acc_type<T>* c1) {
   using T_ACC = acc_type<T>;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -273,7 +275,7 @@ void ComputeGradOutputCoeffientDPCPPKernel(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename T>
+template <typename T, typename GAMMA_T>
 void ComputeBackwardFusedParamsDPCPPKernel(
     int64_t N,
     int64_t C,
@@ -281,7 +283,7 @@ void ComputeBackwardFusedParamsDPCPPKernel(
     int64_t group,
     const T* mean,
     const T* rstd,
-    const T* gamma,
+    const GAMMA_T* gamma,
     const acc_type<T>* ds,
     const acc_type<T>* db,
     acc_type<T>* c2,
@@ -392,7 +394,7 @@ void GroupNormBackwardDPCPPKernel(
   }
 }
 
-template <typename T>
+template <typename T, typename GAMMA_T>
 void GammaBetaBackwardDPCPPKernel(
     int64_t N,
     int64_t C,
@@ -401,8 +403,8 @@ void GammaBetaBackwardDPCPPKernel(
     const T* rstd,
     const acc_type<T>* ds,
     const acc_type<T>* db,
-    T* dgamma,
-    T* dbeta) {
+    GAMMA_T* dgamma,
+    GAMMA_T* dbeta) {
   using T_ACC = acc_type<T>;
   // if (N < 512) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -503,7 +505,7 @@ void GammaBetaBackwardDPCPPKernel(
   }*/
 }
 
-template <typename T>
+template <typename T, typename GAMMA_T>
 void GroupNormBackwardKernelImplInternal(
     const Tensor& dY,
     const Tensor& X,
@@ -533,7 +535,8 @@ void GroupNormBackwardKernelImplInternal(
   const T* X_data = X.data_ptr<T>();
   const T* mean_data = mean.data_ptr<T>();
   const T* rstd_data = rstd.data_ptr<T>();
-  const T* gamma_data = gamma.defined() ? gamma.data_ptr<T>() : nullptr;
+  const GAMMA_T* gamma_data =
+      gamma.defined() ? gamma.data_ptr<GAMMA_T>() : nullptr;
   T* dX_data = dX->defined() ? dX->data_ptr<T>() : nullptr;
   const auto kAccType = X.scalar_type() == kHalf ? kFloat : X.scalar_type();
   Tensor ds = at::empty({N, C}, X.options().dtype(kAccType));
@@ -552,10 +555,10 @@ void GroupNormBackwardKernelImplInternal(
     T_ACC* c2_data = c2.data_ptr<T_ACC>();
     T_ACC* c3_data = c3.data_ptr<T_ACC>();
 
-    ComputeGradOutputCoeffientDPCPPKernel<T>(
+    ComputeGradOutputCoeffientDPCPPKernel<T, GAMMA_T>(
         N, C, G, rstd_data, gamma_data, c1_data);
 
-    ComputeBackwardFusedParamsDPCPPKernel<T>(
+    ComputeBackwardFusedParamsDPCPPKernel<T, GAMMA_T>(
         N,
         C,
         HxW,
@@ -572,9 +575,11 @@ void GroupNormBackwardKernelImplInternal(
         N, C, HxW, G, dY_data, X_data, c1_data, c2_data, c3_data, dX_data);
   }
   if (dgamma->defined() || dbeta->defined()) {
-    T* dgamma_data = dgamma->defined() ? dgamma->data_ptr<T>() : nullptr;
-    T* dbeta_data = dbeta->defined() ? dbeta->data_ptr<T>() : nullptr;
-    GammaBetaBackwardDPCPPKernel<T>(
+    GAMMA_T* dgamma_data =
+        dgamma->defined() ? dgamma->data_ptr<GAMMA_T>() : nullptr;
+    GAMMA_T* dbeta_data =
+        dbeta->defined() ? dbeta->data_ptr<GAMMA_T>() : nullptr;
+    GammaBetaBackwardDPCPPKernel<T, GAMMA_T>(
         N,
         C,
         G,
@@ -605,18 +610,33 @@ void GroupNormKernelImpl(
       X.scalar_type(),
       "GroupNormKernelImpl",
       [&]() {
-        GroupNormKernelImplInternal<scalar_t>(
-            X,
-            gamma,
-            beta,
-            N,
-            C,
-            HxW,
-            group,
-            static_cast<scalar_t>(eps),
-            Y,
-            mean,
-            rstd);
+        if (gamma.scalar_type() == kFloat) {
+          GroupNormKernelImplInternal<scalar_t, float>(
+              X,
+              gamma,
+              beta,
+              N,
+              C,
+              HxW,
+              group,
+              static_cast<scalar_t>(eps),
+              Y,
+              mean,
+              rstd);
+        } else {
+          GroupNormKernelImplInternal<scalar_t, scalar_t>(
+              X,
+              gamma,
+              beta,
+              N,
+              C,
+              HxW,
+              group,
+              static_cast<scalar_t>(eps),
+              Y,
+              mean,
+              rstd);
+        }
       });
 }
 
@@ -639,8 +659,13 @@ void GroupNormBackwardKernelImpl(
       X.scalar_type(),
       "GroupNormBackwardKernelImpl",
       [&]() {
-        GroupNormBackwardKernelImplInternal<scalar_t>(
-            dY, X, mean, rstd, gamma, N, C, HxW, group, dX, dgamma, dbeta);
+        if (gamma.scalar_type() == kFloat) {
+          GroupNormBackwardKernelImplInternal<scalar_t, float>(
+              dY, X, mean, rstd, gamma, N, C, HxW, group, dX, dgamma, dbeta);
+        } else {
+          GroupNormBackwardKernelImplInternal<scalar_t, scalar_t>(
+              dY, X, mean, rstd, gamma, N, C, HxW, group, dX, dgamma, dbeta);
+        }
       });
 }
 
@@ -661,6 +686,10 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm(
   c10::MaybeOwned<Tensor> beta_maybe_owned =
       at::borrow_from_optional_tensor(beta_opt);
   const Tensor& beta = *beta_maybe_owned;
+
+  TORCH_CHECK(
+      gamma.scalar_type() == kFloat || X.scalar_type() == gamma.scalar_type(),
+      "Input and weight should be of the same datatype.");
 
   Tensor X_cont = X.contiguous();
   Tensor Y = at::empty_like(X_cont);
@@ -690,6 +719,9 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_backward(
   c10::MaybeOwned<Tensor> gamma_maybe_owned =
       at::borrow_from_optional_tensor(gamma_opt);
   const Tensor& gamma = *gamma_maybe_owned;
+  TORCH_CHECK(
+      gamma.scalar_type() == kFloat || X.scalar_type() == gamma.scalar_type(),
+      "Input and weight should be of the same datatype.");
   Tensor dX;
   Tensor dgamma;
   Tensor dbeta;
