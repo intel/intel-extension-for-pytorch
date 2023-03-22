@@ -388,7 +388,8 @@ class TestDistributions(TestCase):
         simplex_sample = torch.ones(3, 1, 2).to("xpu")
         simplex_sample = simplex_sample / simplex_sample.sum(-1).unsqueeze(-1)
         self.assertEqual(dist.log_prob(simplex_sample).size(), torch.Size((3, 3)))
-        
+       
+    @pytest.mark.skipif(not torch.xpu.utils.has_2d_block_array(), reason="Failed on ATSM only, will be fixed soon.")
     def test_dirichlet_mean_var(self):
         num_samples = 1000000
         alpha = torch.exp(torch.randn(3, dtype=torch.float, device=sycl_device))

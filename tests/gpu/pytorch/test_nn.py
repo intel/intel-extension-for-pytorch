@@ -9116,6 +9116,7 @@ class TestNNDeviceType(NNTestCase):
 
     @dtypesIfDPCPP(torch.float, torch.double) # We skip bfloat16 and float16 because the "exponential_dpcpp_" not implemented for 'BFloat16'
     @dtypes(torch.float, torch.double)
+    @skipDPCPPIf(not torch.xpu.utils.has_fp64_dtype(), "fp64 not support by this device")
     def test_gumbel_softmax(self, device, dtype):
         self._test_gumbel_softmax_st_shapes(device, dtype, shape=[5], dim=0, count_expected=1)
         self._test_gumbel_softmax_st_shapes(device, dtype, shape=[5], dim=-1, count_expected=1)
@@ -9183,6 +9184,7 @@ class TestNNDeviceType(NNTestCase):
         out = m(inp)
 
     @onlyDPCPP
+    @skipDPCPPIf(not torch.xpu.utils.has_fp64_dtype(), "fp64 not support by this device")
     def test_CTCLoss_dpcpp(self, device):
         target_lengths = [30, 25, 20]
         input_lengths = [50, 50, 50]

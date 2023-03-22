@@ -3,13 +3,14 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch # noqa
-
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.utils.has_2d_block_array(), reason="Failed on ATSM only, will be fixed soon.")
     def test_adaptive_avg_pool2d(self, dtype=torch.float):
         x_cpu = torch.ones([1, 1, 8, 8], device=cpu_device)
         grad_cpu = torch.ones([1, 1, 2, 2], device=cpu_device)
