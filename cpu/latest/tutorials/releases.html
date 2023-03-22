@@ -174,10 +174,9 @@ The usage of this new feature is quite simple as below:</p></li>
 </pre></div>
 </div>
 <ul class="simple">
-<li><p><strong>Bug fixing and small optimization</strong></p>
+<li><p><strong>Bug fixing and other optimization</strong></p>
 <ul>
 <li><p>Supported <a class="reference external" href="https://arxiv.org/abs/1910.07467">RMSNorm</a> which is widely used in the t5 model of huggingface <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/d1de1402a8d6b9ca49b9c9a45a92899f7566866a">#1341</a></p></li>
-<li><p>Enabled BF16 Flash Attention for MHA on BERT/Stable-Diffusion <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/d8857117366f5ac10f9307273816ce1a05a6708b">#1413</a></p></li>
 <li><p>Optimized InstanceNorm <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/8b97d2998567cc2fda6eb008194cd64f624e857f">#1330</a></p></li>
 <li><p>Fixed the quantization of LSTM <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/a4f93c09855679d2b424ca5be81930e3a4562cef">#1414</a> <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/5b44996dc0fdb5c45995d403e18a44f2e1a11b3d">#1473</a></p></li>
 <li><p>Fixed the correctness issue of unpacking non-contiguous Linear weight <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/84d413d6c10e16c025c407b68652b1769597e016">#1419</a></p></li>

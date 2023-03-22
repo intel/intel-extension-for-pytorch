@@ -22,10 +22,9 @@ model = ipex.optimize(model)
 model = torch.compile(model, backend='ipex')
 ```
 
-- **Bug fixing and small optimization**
+- **Bug fixing and other optimization**
 
   - Supported [RMSNorm](https://arxiv.org/abs/1910.07467) which is widely used in the t5 model of huggingface [#1341](https://github.com/intel/intel-extension-for-pytorch/commit/d1de1402a8d6b9ca49b9c9a45a92899f7566866a)
-  - Enabled BF16 Flash Attention for MHA on BERT/Stable-Diffusion [#1413](https://github.com/intel/intel-extension-for-pytorch/commit/d8857117366f5ac10f9307273816ce1a05a6708b)
   - Optimized InstanceNorm [#1330](https://github.com/intel/intel-extension-for-pytorch/commit/8b97d2998567cc2fda6eb008194cd64f624e857f)
   - Fixed the quantization of LSTM [#1414](https://github.com/intel/intel-extension-for-pytorch/commit/a4f93c09855679d2b424ca5be81930e3a4562cef) [#1473](https://github.com/intel/intel-extension-for-pytorch/commit/5b44996dc0fdb5c45995d403e18a44f2e1a11b3d)
   - Fixed the correctness issue of unpacking non-contiguous Linear weight [#1419](https://github.com/intel/intel-extension-for-pytorch/commit/84d413d6c10e16c025c407b68652b1769597e016) 
