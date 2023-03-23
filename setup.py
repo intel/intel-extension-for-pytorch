@@ -774,11 +774,14 @@ def pyi_module():
     return C_ext
 
 def pyi_isa_help_module():
-    main_libraries = ['isa_help']
-    main_sources = [os.path.join(PACKAGE_NAME, "csrc", "_isa_help_main.cpp")]
+    main_libraries = []
+    main_sources = [os.path.join(PACKAGE_NAME, "csrc", "_isa_help_main.cpp"),
+                    os.path.join(PACKAGE_NAME, "csrc", "cpu", "isa_help", "isa_help.cpp"),
+                    os.path.join("csrc", "cpu", "isa", "cpu_feature.cpp")]
 
     include_dirs = [
         os.path.realpath("."),
+        os.path.realpath(os.path.join("csrc", "cpu", "isa")),
         os.path.realpath(os.path.join(PACKAGE_NAME, "csrc")),
         os.path.join(pytorch_install_dir, "include"),
         os.path.join(pytorch_install_dir, "include", "torch", "csrc", "api", "include")]
