@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+
 #include <ATen/ATen.h>
 #include <core/MemoryFormat.h>
 #include <core/detail/TensorInfo.h>
@@ -8,7 +10,6 @@
 #include <tensor/Context.h>
 #include <utils/Macros.h>
 #include <utils/Settings.h>
-
 using namespace dnnl;
 
 // FIXME: In some cases, for example, concat, reorder, and etc.
@@ -662,6 +663,69 @@ static inline bool binary_forward_valid(
       return false;
     }
   }
+}
+
+template <typename T>
+static void print_vec_xpu(const char* str, T* vec, int size) {
+  printf("%s", str);
+
+  for (int d = 0; d < size; ++d)
+    printf("%d ", (int)vec[d]);
+
+  printf("\n");
+}
+
+static void dump_md_data_type(memory::data_type dt) {
+  switch (dt) {
+    case memory::data_type::undef:
+      std::cout << "data_type undef";
+      break;
+    case memory::data_type::f16:
+      std::cout << "data type:f16" << std::endl;
+      break;
+    case memory::data_type::bf16:
+      std::cout << "data type:bf16" << std::endl;
+      break;
+    case memory::data_type::f32:
+      std::cout << "data type:f32" << std::endl;
+      break;
+    case memory::data_type::f64:
+      std::cout << "data type:f64" << std::endl;
+      break;
+    case memory::data_type::s32:
+      std::cout << "data type:s32" << std::endl;
+      break;
+    case memory::data_type::s8:
+      std::cout << "data type:s8" << std::endl;
+      break;
+    case memory::data_type::u8:
+      std::cout << "data type:u8" << std::endl;
+      break;
+    default:
+      std::cout << "unknown dtype" << std::endl;
+  };
+}
+
+static void dump_md(const char* str, memory::desc& md) {
+  printf("%s\n", str);
+
+  print_vec_xpu("\tdims : ", md.get_dims().data(), md.get_ndims());
+
+  print_vec_xpu("\tpdims: ", md.get_padded_dims().data(), md.get_ndims());
+
+  print_vec_xpu("\toffs : ", md.get_padded_offsets().data(), md.get_ndims());
+
+  dump_md_data_type(md.get_data_type());
+
+  print_vec_xpu("\tstrs : ", md.get_strides().data(), md.get_strides().size());
+
+  printf("\t\tnblks : %d\n", md.get_inner_nblks());
+
+  print_vec_xpu(
+      "\t\tidxs  : ", md.get_inner_idxs().data(), md.get_inner_nblks());
+
+  print_vec_xpu(
+      "\t\tblks  : ", md.get_inner_blks().data(), md.get_inner_nblks());
 }
 
 #ifdef BUILD_PRIOR_SYMM_QUANT
