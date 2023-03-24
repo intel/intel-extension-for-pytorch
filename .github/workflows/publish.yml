@@ -59,6 +59,9 @@ jobs:
         fi
         ln -s cpu/latest latest
         rm versions_scan.py
+        if [ ! -f .nojekyll ]; then
+            touch .nojekyll
+        fi
     - name: Push the docs
       uses: peaceiris/actions-gh-pages@v3
       with:
