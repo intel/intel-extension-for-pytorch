@@ -115,6 +115,15 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm(
   auto dst_iter_md = memory::desc({dst_iter_tz}, src_data_t, format_any);
   auto dst_iter_c_md = memory::desc({dst_iter_c_tz}, iter_c_data_t, format_any);
 
+  primitive_attr pattr;
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
+  if (src_data_t == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+
   std::shared_ptr<lstm_forward::primitive_desc> lstm_forward_pd;
   lstm_forward_pd.reset(new lstm_forward::primitive_desc(
       engine,
@@ -128,7 +137,8 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm(
       bia_md,
       dst_layer_md,
       dst_iter_md,
-      dst_iter_c_md));
+      dst_iter_c_md,
+      pattr));
 
   auto wghs_layer_usr_m = dpcpp_onednn_memory(
       {{i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, src_data_t, format_ldigo},
@@ -251,41 +261,37 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm(
         {{DNNL_ARG_FROM, dst_iter_c_usr_m}, {DNNL_ARG_TO, dst_iter_c_m}});
   }
 
-  std::shared_ptr<lstm_forward> lstm1_forward;
-  lstm1_forward.reset(new lstm_forward(*lstm_forward_pd));
+  std::unordered_map<int, memory> args;
+  args.insert({DNNL_ARG_SRC_LAYER, src_layer_m});
+  args.insert({DNNL_ARG_SRC_ITER, src_iter_m});
+  args.insert({DNNL_ARG_SRC_ITER_C, src_iter_c_m});
+  args.insert({DNNL_ARG_WEIGHTS_LAYER, wghs_layer_m});
+  args.insert({DNNL_ARG_WEIGHTS_ITER, wghs_iter_m});
+  args.insert({DNNL_ARG_BIAS, bia_m});
+  args.insert({DNNL_ARG_DST_LAYER, dst_layer_m});
+  args.insert({DNNL_ARG_DST_ITER, dst_iter_m});
+  args.insert({DNNL_ARG_DST_ITER_C, dst_iter_c_m});
+
+#ifdef USE_SCRATCHPAD_MODE
+  size_t scratchpad_size = lstm_forward_pd->scratchpad_desc().get_size();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
+      {scratchpad_size}, src.options().dtype(at::kByte), c10::nullopt);
+  auto scratchpad_m = dpcpp_onednn_memory(
+      lstm_forward_pd->scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_m});
+#endif
+
   if (train) {
     auto workspace_md = lstm_forward_pd->workspace_desc();
     workspace_t = at::zeros(workspace_md.get_size(), src.options());
     auto workspace =
         dpcpp_onednn_memory(workspace_md, engine, workspace_t.data_ptr());
-
-    DPCPP_ONEDNN_EXEC(
-        *lstm1_forward,
-        strm,
-        {{DNNL_ARG_SRC_LAYER, src_layer_m},
-         {DNNL_ARG_SRC_ITER, src_iter_m},
-         {DNNL_ARG_SRC_ITER_C, src_iter_c_m},
-         {DNNL_ARG_WEIGHTS_LAYER, wghs_layer_m},
-         {DNNL_ARG_WEIGHTS_ITER, wghs_iter_m},
-         {DNNL_ARG_BIAS, bia_m},
-         {DNNL_ARG_DST_LAYER, dst_layer_m},
-         {DNNL_ARG_DST_ITER, dst_iter_m},
-         {DNNL_ARG_DST_ITER_C, dst_iter_c_m},
-         {DNNL_ARG_WORKSPACE, workspace}});
-  } else {
-    DPCPP_ONEDNN_EXEC(
-        *lstm1_forward,
-        strm,
-        {{DNNL_ARG_SRC_LAYER, src_layer_m},
-         {DNNL_ARG_SRC_ITER, src_iter_m},
-         {DNNL_ARG_SRC_ITER_C, src_iter_c_m},
-         {DNNL_ARG_WEIGHTS_LAYER, wghs_layer_m},
-         {DNNL_ARG_WEIGHTS_ITER, wghs_iter_m},
-         {DNNL_ARG_BIAS, bia_m},
-         {DNNL_ARG_DST_LAYER, dst_layer_m},
-         {DNNL_ARG_DST_ITER, dst_iter_m},
-         {DNNL_ARG_DST_ITER_C, dst_iter_c_m}});
+    args.insert({DNNL_ARG_WORKSPACE, workspace});
   }
+
+  std::shared_ptr<lstm_forward> lstm1_forward;
+  lstm1_forward.reset(new lstm_forward(*lstm_forward_pd));
+  DPCPP_ONEDNN_EXEC(*lstm1_forward, strm, args);
 
   if (dst_layer_m != dst_layer_usr_m) {
     DPCPP_ONEDNN_EXEC(
@@ -463,6 +469,15 @@ lstm_backward(
   rnn_direction dir = bidirectional ? rnn_direction::bidirectional_concat
                                     : rnn_direction::unidirectional_left2right;
 
+  primitive_attr pattr;
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
+  if (src_data_t == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+
   std::shared_ptr<lstm_forward::primitive_desc> lstm_forward_pd;
   lstm_forward_pd.reset(new lstm_forward::primitive_desc(
       engine,
@@ -476,7 +491,8 @@ lstm_backward(
       bia_md,
       dst_layer_md,
       dst_iter_md,
-      dst_iter_c_md));
+      dst_iter_c_md,
+      pattr));
 
   auto src_layer_usr_m = dpcpp_onednn_memory(
       {{i == 0 ? src_layer_0_tz : src_layer_tz}, src_data_t, format_tnc},
@@ -567,7 +583,8 @@ lstm_backward(
       diff_dst_layer_md,
       diff_dst_iter_md,
       diff_dst_iter_c_md,
-      *lstm_forward_pd));
+      *lstm_forward_pd,
+      pattr));
 
   auto expected_src_layer_md = lstm_forward_pd->src_layer_desc();
   auto src_layer_m = src_layer_usr_m;
@@ -731,31 +748,42 @@ lstm_backward(
   auto workspace = dpcpp_onednn_memory(
       lstm_backward_pd->workspace_desc(), engine, workspace_arr.data_ptr());
 
+  std::unordered_map<int, memory> args;
+  args.insert({DNNL_ARG_SRC_LAYER, src_layer_m});
+  args.insert({DNNL_ARG_SRC_ITER, src_iter_m});
+  args.insert({DNNL_ARG_SRC_ITER_C, src_iter_c_m});
+  args.insert({DNNL_ARG_WEIGHTS_LAYER, bwd_wghs_layer_m});
+  args.insert({DNNL_ARG_WEIGHTS_ITER, bwd_wghs_iter_m});
+  args.insert({DNNL_ARG_BIAS, bia_m});
+  args.insert({DNNL_ARG_DST_LAYER, dst_layer_m});
+  args.insert({DNNL_ARG_DST_ITER, dst_iter_m});
+  args.insert({DNNL_ARG_DST_ITER_C, dst_iter_c_m});
+  args.insert({DNNL_ARG_DIFF_DST_LAYER, diff_dst_layer_m});
+  args.insert({DNNL_ARG_DIFF_DST_ITER, diff_dst_iter_m});
+  args.insert({DNNL_ARG_DIFF_DST_ITER_C, diff_dst_iter_c_m});
+  args.insert({DNNL_ARG_WORKSPACE, workspace});
+  args.insert({DNNL_ARG_DIFF_SRC_LAYER, diff_src_layer_m});
+  args.insert({DNNL_ARG_DIFF_SRC_ITER, diff_src_iter_m});
+  args.insert({DNNL_ARG_DIFF_SRC_ITER_C, diff_src_iter_c_m});
+  args.insert({DNNL_ARG_DIFF_WEIGHTS_LAYER, diff_wghs_layer_m});
+  args.insert({DNNL_ARG_DIFF_WEIGHTS_ITER, diff_wghs_iter_m});
+  args.insert({DNNL_ARG_DIFF_BIAS, diff_bia_m});
+
+#ifdef USE_SCRATCHPAD_MODE
+  size_t scratchpad_size = lstm_backward_pd->scratchpad_desc().get_size();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
+      {scratchpad_size}, src.options().dtype(at::kByte), c10::nullopt);
+  auto scratchpad_m = dnnl::memory(
+      lstm_backward_pd->scratchpad_desc(),
+      engine,
+      scratchpad_tensor.data_ptr());
+  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_m});
+#endif
+
   std::shared_ptr<dnnl::lstm_backward> lstm_backward_p;
   lstm_backward_p.reset(new dnnl::lstm_backward(*lstm_backward_pd));
 
-  DPCPP_ONEDNN_EXEC(
-      *lstm_backward_p,
-      strm,
-      {{DNNL_ARG_SRC_LAYER, src_layer_m},
-       {DNNL_ARG_SRC_ITER, src_iter_m},
-       {DNNL_ARG_SRC_ITER_C, src_iter_c_m},
-       {DNNL_ARG_WEIGHTS_LAYER, bwd_wghs_layer_m},
-       {DNNL_ARG_WEIGHTS_ITER, bwd_wghs_iter_m},
-       {DNNL_ARG_BIAS, bia_m},
-       {DNNL_ARG_DST_LAYER, dst_layer_m},
-       {DNNL_ARG_DST_ITER, dst_iter_m},
-       {DNNL_ARG_DST_ITER_C, dst_iter_c_m},
-       {DNNL_ARG_DIFF_DST_LAYER, diff_dst_layer_m},
-       {DNNL_ARG_DIFF_DST_ITER, diff_dst_iter_m},
-       {DNNL_ARG_DIFF_DST_ITER_C, diff_dst_iter_c_m},
-       {DNNL_ARG_WORKSPACE, workspace},
-       {DNNL_ARG_DIFF_SRC_LAYER, diff_src_layer_m},
-       {DNNL_ARG_DIFF_SRC_ITER, diff_src_iter_m},
-       {DNNL_ARG_DIFF_SRC_ITER_C, diff_src_iter_c_m},
-       {DNNL_ARG_DIFF_WEIGHTS_LAYER, diff_wghs_layer_m},
-       {DNNL_ARG_DIFF_WEIGHTS_ITER, diff_wghs_iter_m},
-       {DNNL_ARG_DIFF_BIAS, diff_bia_m}});
+  DPCPP_ONEDNN_EXEC(*lstm_backward_p, strm, args);
 
   if (diff_src_layer_usr_m != diff_src_layer_m) {
     DPCPP_ONEDNN_EXEC(
