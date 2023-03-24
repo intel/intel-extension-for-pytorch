@@ -150,6 +150,7 @@ docker pull intel/intel-optimized-pytorch:latest
 
 |Version|Pre-cxx11 ABI|cxx11 ABI|
 |--|--|--|
+| 2.0.0 | [libintel-ext-pt-2.0.0+cpu.run](https://intel-extension-for-pytorch.s3.amazonaws.com/libipex/cpu/libintel-ext-pt-2.0.0%2Bcpu.run) | [libintel-ext-pt-cxx11-abi-2.0.0+cpu.run](https://intel-extension-for-pytorch.s3.amazonaws.com/libipex/cpu/libintel-ext-pt-cxx11-abi-2.0.0%2Bcpu.run) |
 | 1.13.100 | [libintel-ext-pt-1.13.100+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-1.13.100%2Bcpu.run) | [libintel-ext-pt-cxx11-abi-1.13.100+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-cxx11-abi-1.13.100%2Bcpu.run) |
 | 1.13.0 | [libintel-ext-pt-1.13.0+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-1.13.0%2Bcpu.run) | [libintel-ext-pt-cxx11-abi-1.13.0+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-cxx11-abi-1.13.0%2Bcpu.run) |
 | 1.12.300 | [libintel-ext-pt-1.12.300+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-1.12.300%2Bcpu.run) | [libintel-ext-pt-cxx11-abi-1.12.300+cpu.run](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/libipex/cpu/libintel-ext-pt-cxx11-abi-1.12.300%2Bcpu.run) |

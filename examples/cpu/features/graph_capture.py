@@ -11,4 +11,4 @@ model = ipex.optimize(model, graph_mode=True)
 ######################################################
 
 with torch.no_grad():
-    model(data)
+  model(data)

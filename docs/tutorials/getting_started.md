@@ -26,36 +26,38 @@ In general, APIs invocation should follow orders below.
 
 1. `import intel_extension_for_pytorch as ipex`
 2. Invoke `optimize()` function to apply optimizations.
-3. For Torchscript, invoke `torch.jit.trace()` and `torch.jit.freeze()`.
+3. Convert the imperative model to a graph model.
+    - For TorchScript, invoke `torch.jit.trace()` and `torch.jit.freeze()`.
+    - For TorchDynamo, invoke `torch.compile(model, backend="ipex")`. (*Experimental feature*, FP32 ONLY)
 
 **Note:** It is highly recommended to `import intel_extension_for_pytorch` right after `import torch`, prior to importing other packages.
 
 ```python
 import torch
-####### import ipex ########
+############## import ipex ###############
 import intel_extension_for_pytorch as ipex
-############################
+##########################################
 
 model = Model()
 model.eval()
 data = ...
-dtype=torch.float32 # torch.bfloat16
 
-##### ipex.optimize() ######
-model = ipex.optimize(model, dtype=dtype)
-############################
+############## TorchScript ###############
+model = ipex.optimize(model, dtype=torch.bfloat16)
 
-########## FP32 ############
-with torch.no_grad():
-####### BF16 on CPU ########
-with torch.no_grad(), with torch.cpu.amp.autocast():
-############################
-  ###### Torchscript #######
+with torch.no_grad(), torch.cpu.amp.autocast():
   model = torch.jit.trace(model, data)
   model = torch.jit.freeze(model)
-  ###### Torchscript #######
-
   model(data)
+##########################################
+
+############## TorchDynamo ###############
+model = ipex.optimize(model)
+
+model = torch.compile(model, backend="ipex")
+with torch.no_grad():
+  model(data)
+##########################################
 ```
 
 More examples, including training and usage of low precision data types are available at [Examples](./examples.md).

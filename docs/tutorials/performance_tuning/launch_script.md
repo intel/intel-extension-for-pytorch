@@ -69,7 +69,7 @@ run_20210712212258_instance_0_cores_0-43.log
 
 ## Usage Examples
 
-Example script [resnet50.py](https://github.com/intel/intel-extension-for-pytorch/tree/v1.13.100+cpu/examples/cpu/inference/resnet50_general_inference_script.py) will be used in this guide.
+Example script [resnet50.py](https://github.com/intel/intel-extension-for-pytorch/tree/v2.0.0+cpu/examples/cpu/inference/resnet50_general_inference_script.py) will be used in this guide.
 
 - Single instance for inference
   - [I. Use all physical cores](#i-use-all-physical-cores)

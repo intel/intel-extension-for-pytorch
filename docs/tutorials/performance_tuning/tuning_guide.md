@@ -3,9 +3,9 @@ Performance Tuning Guide
 
 ## Overview
 
-Intel® Extension for PyTorch\* (IPEX) is a Python package to extend official PyTorch. It makes the out-of-box user experience of PyTorch CPU better while achieving good performance. To fully utilize the power of Intel® architecture and thus yield high performance, PyTorch, as well as IPEX, are powered by [oneAPI Deep Neural Network Library (oneDNN)](https://github.com/oneapi-src/oneDNN), an open-source cross-platform performance library of basic building blocks for deep learning applications. It is developed and optimized for Intel Architecture Processors, Intel Processor Graphics, and Xe architecture-based Graphics.
+Intel® Extension for PyTorch\* is a Python package to extend official PyTorch. It makes the out-of-box user experience of PyTorch CPU better while achieving good performance. To fully utilize the power of Intel® architecture and thus yield high performance, PyTorch, as well as Intel® Extension for PyTorch\*, are powered by [oneAPI Deep Neural Network Library (oneDNN)](https://github.com/oneapi-src/oneDNN), an open-source cross-platform performance library of basic building blocks for deep learning applications. It is developed and optimized for Intel Architecture Processors, Intel Processor Graphics, and Xe architecture-based Graphics.
 
-Although default primitives of PyTorch and IPEX are highly optimized, there are things users can do improve performance. Most optimized configurations can be automatically set by the launcher script. This article introduces common methods recommended by Intel developers.
+Although default primitives of PyTorch and Intel® Extension for PyTorch\* are highly optimized, there are things users can do improve performance. Most optimized configurations can be automatically set by the launcher script. This article introduces common methods recommended by Intel developers.
 
 ## Contents of this Document
 * [Hardware Configuration](#hardware-configuration)
@@ -16,6 +16,7 @@ Although default primitives of PyTorch and IPEX are highly optimized, there are 
   * [Numactl](#numactl)
   * [OpenMP](#openmp)
     * [OMP_NUM_THREADS](#omp-num-threads)
+    * [OMP_THREAD_LIMIT](#omp-thread-limit)
     * [GNU OpenMP](#gnu-openmp)
     * [Intel OpenMP](#intel-openmp)
   * [Memory Allocator](#memory-allocator)
@@ -60,7 +61,8 @@ Figure 3: An ASUS Z11PA-D8 Intel® Xeon® server motherboard. It contains two so
 
 It is a good thing that more and more CPU cores are provided to users in one socket, because this brings more computation resources. However, this also brings memory access competitions. Program can stall because memory is busy to visit. To address this problem, Non-Uniform Memory Access (NUMA) was introduced. Comparing to Uniform Memory Access (UMA), in which scenario all memories are connected to all cores equally, NUMA tells memories into multiple groups. Certain number of memories are directly attached to one socket's integrated memory controller to become local memory of this socket. As described in the previous section, local memory access is much faster than remote memory access.
 
-Users can get CPU information with ```lscpu``` command on Linux to learn how many cores, sockets there on the machine. Also, NUMA information like how CPU cores are distributed can also be retrieved. The following is an example of ```lscpu``` execution on a machine with two Intel(R) Xeon(R) Platinum 8180M CPUs. 2 sockets were detected. Each socket has 28 physical cores onboard. Since Hyper-Threading is enabled, each core can run 2 threads. I.e. each socket has another 28 logical cores. Thus, there are 112 CPU cores on service. When indexing CPU cores, usually physical cores are indexed before logical core. In this case, the first 28 cores (0-27) are physical cores on the first NUMA socket (node), the second 28 cores (28-55) are physical cores on the second NUMA socket (node). Logical cores are indexed afterward. 56-83 are 28 logical cores on the first NUMA socket (node), 84-111 are the second 28 logical cores on the second NUMA socket (node). Typically, running IPEX should avoid using logical cores to get a good performance.
+Users can get CPU information with `lscpu` command on Linux to learn how many cores, sockets there on the machine. Also, NUMA information like how CPU cores are distributed can also be retrieved. The following is an example of `lscpu` execution on a machine with two Intel(R) Xeon(R) Platinum 8180M CPUs. 2 sockets were detected. Each socket has 28 physical cores onboard. Since Hyper-Threading is enabled, each core can run 2 threads. I.e. each socket has another 28 logical cores. Thus, there are 112 CPU cores on service. When indexing CPU cores, usually physical cores are indexed before logical core. In this case, the first 28 cores (0-27) are physical cores on the first NUMA socket (node), the second 28 cores (28-55) are physical cores on the second NUMA socket (node). Logical cores are indexed afterward. 56-83 are 28 logical cores on the first NUMA socket (node), 84-111 are the second 28 logical cores on the second NUMA socket (node). Typically, running Intel® Extension for PyTorch\* should avoid using logical cores to get a good performance.
+
 ```
 $ lscpu
 ...
@@ -92,7 +94,7 @@ Since NUMA largely influences memory access performance, this functionality shou
 
 During development of Linux kernels, more and more sophisticated implementations/optimizations/strategies had been brought out. Version 2.5 of the Linux kernel already contained basic NUMA support, which was further improved in subsequent kernel releases. Version 3.8 of the Linux kernel brought a new NUMA foundation that allowed development of more efficient NUMA policies in later kernel releases. Version 3.13 of the Linux kernel brought numerous policies that aim at putting a process near its memory, together with the handling of cases such as having memory pages shared between processes, or the use of transparent huge pages. New sysctl settings allow NUMA balancing to be enabled or disabled, as well as the configuration of various NUMA memory balancing parameters.[1] Behavior of Linux kernels are thus different according to kernel version. Newer Linux kernels may contain further optimizations of NUMA strategies, and thus have better performances. For some workloads, NUMA strategy influences performance great.
 
-Linux provides a tool, ```numactl```, that allows user control of NUMA policy for processes or shared memory. It runs processes with a specific NUMA scheduling or memory placement policy. As described in previous section, cores share high-speed cache in one socket, thus it is a good idea to avoid cross socket computations. From a memory access perspective, bounding memory access locally is much faster than accessing remote memories.
+Linux provides a tool, `numactl`, that allows user control of NUMA policy for processes or shared memory. It runs processes with a specific NUMA scheduling or memory placement policy. As described in previous section, cores share high-speed cache in one socket, thus it is a good idea to avoid cross socket computations. From a memory access perspective, bounding memory access locally is much faster than accessing remote memories.
 
 The following is an example of numactl usage to run a workload on the Nth socket and limit memory access to its local memories on the Nth socket. More detailed description of numactl command can be found [on the numactl man page](https://linux.die.net/man/8/numactl).
 
@@ -118,13 +120,13 @@ Figure 4: A number of parallel block execution threads are forked from primary t
 
 Users can control OpenMP behaviors through some environment variables to fit for their workloads. Also, beside GNU OpenMP library ([libgomp](https://gcc.gnu.org/onlinedocs/libgomp/)), Intel provides another OpenMP implementation [libiomp](https://software.intel.com/content/www/us/en/develop/documentation/cpp-compiler-developer-guide-and-reference/top/optimization-and-programming-guide/openmp-support.html) for users to choose from. Environment variables that control behavior of OpenMP threads may differ from libgomp and libiomp. They will be introduced separately in sections below.
 
-GNU OpenMP (libgomp) is the default multi-threading library for both PyTorch and IPEX.
+GNU OpenMP (libgomp) is the default multi-threading library for both PyTorch and Intel® Extension for PyTorch\*.
 
 [2] [Wikipedia - OpenMP](https://en.wikipedia.org/wiki/OpenMP)
 
 #### OMP_NUM_THREADS
 
-Environment variable OMP_NUM_THREADS sets the number of threads used for parallel regions. By default, it is set to be the number of available physical cores. It can be used along with numactl settings, as the following example. If cores 0-3 are on socket 0, this example command runs \<script\> on cores 0-3, with 4 OpenMP threads.
+Environment variable `OMP_NUM_THREADS` sets the number of threads used for parallel regions. By default, it is set to be the number of available physical cores. It can be used along with numactl settings, as the following example. If cores 0-3 are on socket 0, this example command runs \<script\> on cores 0-3, with 4 OpenMP threads.
 
 This environment variable works on both libgomp and libiomp.
 
@@ -133,13 +135,19 @@ export OMP_NUM_THREADS=4
 numactl -C 0-3 --membind 0 python <script>
 ```
 
+#### OMP_THREAD_LIMIT
+
+Environment variable `OMP_THREAD_LIMIT` specifies the number of threads to use for the whole program. The value of this variable shall be a positive integer. If undefined, the number of threads is not limited.
+
+Please make sure `OMP_THREAD_LIMIT` is set to a number equal to or larger than `OMP_NUM_THREADS` to avoid backward propagation hanging issues.
+
 #### GNU OpenMP
 
-Beside OMP_NUM_THREADS, other GNU OpenMP specific environment variables are commonly used to improve performance:
+Beside `OMP_NUM_THREADS`, other GNU OpenMP specific environment variables are commonly used to improve performance:
 
-- GOMP_CPU_AFFINITY: Binds threads to specific CPUs. The variable should contain a space-separated or comma-separated list of CPUs.
-- OMP_PROC_BIND: Specifies whether threads may be moved between processors. Setting it to CLOSE keeps OpenMP threads close to the primary thread in contiguous place partitions.
-- OMP_SCHEDULE: Determine how OpenMP threads are scheduled.
+- `GOMP_CPU_AFFINITY`: Binds threads to specific CPUs. The variable should contain a space-separated or comma-separated list of CPUs.
+- `OMP_PROC_BIND`: Specifies whether threads may be moved between processors. Setting it to CLOSE keeps OpenMP threads close to the primary thread in contiguous place partitions.
+- `OMP_SCHEDULE`: Determine how OpenMP threads are scheduled.
 
 Here are recommended settings of these environment variables:
 
@@ -151,17 +159,17 @@ export OMP_SCHEDULE=STATIC
 
 #### Intel OpenMP
 
-By default, PyTorch uses GNU OpenMP (GNU libgomp) for parallel computation. On Intel platforms, Intel OpenMP Runtime Library (libiomp) provides OpenMP API specification support. It sometimes brings more performance benefits compared to libgomp. Utilizing environment variable LD_PRELOAD can switch OpenMP library to libiomp:
+By default, PyTorch uses GNU OpenMP (GNU libgomp) for parallel computation. On Intel platforms, Intel OpenMP Runtime Library (libiomp) provides OpenMP API specification support. It sometimes brings more performance benefits compared to libgomp. Utilizing environment variable `LD_PRELOAD` can switch OpenMP library to libiomp:
 
 ```
 export LD_PRELOAD=<path>/libiomp5.so:$LD_PRELOAD
 ```
 
-Similar to GNU OpenMP, beside OMP_NUM_THREADS, there are other Intel OpenMP specific environment variables that control behavior of OpenMP threads:
+Similar to GNU OpenMP, beside `OMP_NUM_THREADS`, there are other Intel OpenMP specific environment variables that control behavior of OpenMP threads:
 
-- KMP_AFFINITY
+- `KMP_AFFINITY`
 
-  KMP_AFFINITY controls how to to bind OpenMP threads to physical processing units. Depending on the system (machine) topology, application, and operating system, thread affinity can have a dramatic effect on the application speed.
+  `KMP_AFFINITY` controls how to to bind OpenMP threads to physical processing units. Depending on the system (machine) topology, application, and operating system, thread affinity can have a dramatic effect on the application speed.
 
   A common usage scenario is to bind consecutive threads close together, as is done with KMP_AFFINITY=compact. By doing this, communication overhead, cache line invalidation overhead, and page thrashing are minimized. Now, suppose the application also had a number of parallel regions that did not utilize all of the available OpenMP threads. A thread normally executes faster on a core where it is not competing for resources with another active thread on the same core. It is always good to avoid binding multiple threads to the same core while leaving other cores unused. This can be achieved by the following command. Figure 5 illustrates this strategy.
 
@@ -186,13 +194,13 @@ Similar to GNU OpenMP, beside OMP_NUM_THREADS, there are other Intel OpenMP spec
   export KMP_AFFINITY=granularity=fine,proclist=[N-M],explicit
   ```
 
-  More detailed information about KMP_AFFINITY can be found in the [Intel CPP Compiler Developer Guide](https://software.intel.com/content/www/us/en/develop/documentation/cpp-compiler-developer-guide-and-reference/top/optimization-and-programming-guide/openmp-support/openmp-library-support/thread-affinity-interface-linux-and-windows.html).
+  More detailed information about `KMP_AFFINITY` can be found in the [Intel CPP Compiler Developer Guide](https://software.intel.com/content/www/us/en/develop/documentation/cpp-compiler-developer-guide-and-reference/top/optimization-and-programming-guide/openmp-support/openmp-library-support/thread-affinity-interface-linux-and-windows.html).
 
-- KMP_BLOCKTIME
+- `KMP_BLOCKTIME`
 
-  KMP_BLOCKTIME sets the time, in milliseconds, that a thread, after completing the execution of a parallel region, should wait before sleeping. The default value is 200ms.
+  `KMP_BLOCKTIME` sets the time, in milliseconds, that a thread, after completing the execution of a parallel region, should wait before sleeping. The default value is 200ms.
 
-  After completing the execution of a parallel region, threads wait for new parallel work to become available. After a certain period of time has elapsed, they stop waiting and sleep. Sleeping allows the threads to be used, until more parallel work becomes available, by non-OpenMP threaded code that may execute between parallel regions, or by other applications. A small KMP_BLOCKTIME value may offer better overall performance if application contains non-OpenMP threaded code that executes between parallel regions. A larger KMP_BLOCKTIME value may be more appropriate if threads are to be reserved solely for use for OpenMP execution, but may penalize other concurrently-running OpenMP or threaded applications. It is suggested to be set to 0 or 1 for convolutional neural network (CNN) based models.
+  After completing the execution of a parallel region, threads wait for new parallel work to become available. After a certain period of time has elapsed, they stop waiting and sleep. Sleeping allows the threads to be used, until more parallel work becomes available, by non-OpenMP threaded code that may execute between parallel regions, or by other applications. A small `KMP_BLOCKTIME` value may offer better overall performance if application contains non-OpenMP threaded code that executes between parallel regions. A larger `KMP_BLOCKTIME` value may be more appropriate if threads are to be reserved solely for use for OpenMP execution, but may penalize other concurrently-running OpenMP or threaded applications. It is suggested to be set to 0 or 1 for convolutional neural network (CNN) based models.
 
   ```
   export KMP_BLOCKTIME=0 (or 1)
@@ -202,7 +210,7 @@ Similar to GNU OpenMP, beside OMP_NUM_THREADS, there are other Intel OpenMP spec
 
 Memory allocator plays an important role from performance perspective as well. A more efficient memory usage reduces overhead on unnecessary memory allocations or destructions, and thus results in a faster execution. From practical experiences, for deep learning workloads, Jemalloc or TCMalloc can get better performance by reusing memory as much as possible than default malloc function.
 
-It is as simple as adding path of Jemalloc/TCMalloc dynamic library to environment variable LD_PRELOAD to switch memory allocator to one of them.
+It is as simple as adding path of Jemalloc/TCMalloc dynamic library to environment variable `LD_PRELOAD` to switch memory allocator to one of them.
 
 ```
 export LD_PRELOAD=<jemalloc.so/tcmalloc.so>:$LD_PRELOAD
@@ -212,7 +220,7 @@ export LD_PRELOAD=<jemalloc.so/tcmalloc.so>:$LD_PRELOAD
 
 [Jemalloc](https://github.com/jemalloc/jemalloc) is a general purpose malloc implementation that emphasizes fragmentation avoidance and scalable concurrency support. More detailed introduction of performance tuning with Jemalloc can be found at [Jemalloc tuning guide](https://android.googlesource.com/platform/external/jemalloc_new/+/6e6a93170475c05ebddbaf3f0df6add65ba19f01/TUNING.md)
 
-A recommended setting for ``MALLOC_CONF`` is ``oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:9000000000,muzzy_decay_ms:9000000000`` from performance perspective. However, in some cases the ``dirty_decay_ms:9000000000,mmuzzy_decay_ms:9000000000`` may cause Out-of-Memory crash. Try ``oversize_threshold:1,background_thread:true,metadata_thp:auto`` instead in this case.
+A recommended setting for `MALLOC_CONF` is `oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:9000000000,muzzy_decay_ms:9000000000` from performance perspective. However, in some cases the `dirty_decay_ms:9000000000,mmuzzy_decay_ms:9000000000` may cause Out-of-Memory crash. Try `oversize_threshold:1,background_thread:true,metadata_thp:auto` instead in this case.
 
 Getting Jemalloc is straight-forward.
 
@@ -240,13 +248,13 @@ torch.set_flush_denormal(True)
 
 ### OneDNN primitive cache
 
-IPEX is using OneDNN backend for those most computing bound PyTorch operators such as Linear and Convolution.
+Intel® Extension for PyTorch\* is using OneDNN backend for those most computing bound PyTorch operators such as Linear and Convolution.
 
-To achieve better performance, OneDNN backend is using its [primitive cache](https://oneapi-src.github.io/oneDNN/dev_guide_primitive_cache.html) to store those created primitives for different input shapes during warm-up stage (default primitive cache size is 1024, i.e., 1024 cached primitives). Therefore, when the total size of the primitives created by all the input shapes is within the default threshold, IPEX could get fully computation performance from OneDNN kernels.
+To achieve better performance, OneDNN backend is using its [primitive cache](https://oneapi-src.github.io/oneDNN/dev_guide_primitive_cache.html) to store those created primitives for different input shapes during warm-up stage (default primitive cache size is 1024, i.e., 1024 cached primitives). Therefore, when the total size of the primitives created by all the input shapes is within the default threshold, Intel® Extension for PyTorch\* could get fully computation performance from OneDNN kernels.
 
 Different input shapes usualy come from dynamic shapes of datasets. Dynamic shapes commonly exist in [MaskRCNN model](https://github.com/matterport/Mask_RCNN) (object detection), [Transformers](https://github.com/huggingface/transformers/) Wav2vec2 model (speech-recognition) and other speech/text-generation related Transformers models.
 
-However, we might meet the fact that model would need to cache a large amount of various input shapes, which would even exceed the default primitive cache size. In such case, we recommend tuning the OneDNN primitive cache by setting ONEDNN_PRIMITIVE_CACHE_CAPACITY environment variable to get better performance (Note that it is at the cost of increased memory usage):
+However, we might meet the fact that model would need to cache a large amount of various input shapes, which would even exceed the default primitive cache size. In such case, we recommend tuning the OneDNN primitive cache by setting `ONEDNN_PRIMITIVE_CACHE_CAPACITY` environment variable to get better performance (Note that it is at the cost of increased memory usage):
 
 ```
 export ONEDNN_PRIMITIVE_CACHE_CAPACITY = {Tuning size}
