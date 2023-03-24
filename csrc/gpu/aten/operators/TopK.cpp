@@ -13,8 +13,10 @@
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
+#include "PSTLFunctions.h"
 #include "SortingFastGroupSelect.h"
 #include "SortingFastGroupSort.h"
+#include "SortingSingleTile.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -36,11 +38,43 @@ void topk_out_with_sort(
   indices.copy_(sorted_indices.narrow(dim, 0, k));
 }
 
-bool should_use_sort(const Tensor& self, int64_t dim, int64_t k) {
-  // Affected by L1 cache capacity, too large k value cannot be used for fast
-  // path.
-  // TODO: Use radix sort for large problem size.
-  return k > 256;
+void topk_out_with_single_tile_sort(
+    const Tensor& self,
+    int64_t k,
+    int64_t dim,
+    bool largest,
+    const Tensor& values,
+    const Tensor& indices) {
+  Tensor sorted_values, sorted_indices;
+  sorted_values =
+      at::empty_strided(self.sizes(), self.strides(), self.options());
+  sorted_indices = at::empty_strided(
+      self.sizes(), self.strides(), self.options().dtype(kLong));
+  sorted_values.copy_(self);
+  int64_t nsort = self.sizes()[dim];
+
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      sorted_values.scalar_type(),
+      "topk_sort",
+      [&]() {
+        scalar_t* values_ptr = sorted_values.data_ptr<scalar_t>();
+        int64_t* indices_ptr = sorted_indices.data_ptr<int64_t>();
+        xpu::pstl::iota(indices_ptr, indices_ptr + nsort, (int64_t)0);
+#define ONETILE(DESCENDING)                              \
+  radix_sort_single_tile<scalar_t, int64_t, DESCENDING>( \
+      (scalar_t*)values_ptr, (int64_t*)indices_ptr, nsort);
+
+        if (largest) {
+          ONETILE(true);
+        } else {
+          ONETILE(false);
+        }
+      });
+  values.copy_(sorted_values.narrow(dim, 0, k));
+  indices.copy_(sorted_indices.narrow(dim, 0, k));
 }
 
 std::tuple<at::Tensor&, at::Tensor&> topk_out(
@@ -65,8 +99,12 @@ std::tuple<at::Tensor&, at::Tensor&> topk_out(
   int64_t ndim = self.dim();
   dim = maybe_wrap_dim(dim, ndim);
   int64_t nelements = self.sizes()[dim];
+  int64_t nsegments = numel / nelements;
 
-  if (should_use_sort(self, dim, k)) {
+  if (nsegments == 1 && self.is_contiguous() && nelements > 4096) {
+    topk_out_with_single_tile_sort(self, k, dim, largest, values, indices);
+    return std::forward_as_tuple(values, indices);
+  } else if (k > 256) {
     topk_out_with_sort(self, k, dim, largest, values, indices);
     return std::forward_as_tuple(values, indices);
   }
@@ -110,8 +148,6 @@ std::tuple<at::Tensor&, at::Tensor&> topk_out(
     indices_ = at::empty(out_sizes, indices.options());
     newindices = true;
   }
-
-  int64_t nsegments = numel / nelements;
 
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,

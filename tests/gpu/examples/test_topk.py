@@ -65,3 +65,12 @@ class TestNNMethod(TestCase):
         self.assertEqual(x_cpu1, x_dpcpp1.cpu())
         self.assertEqual(y_cpu0, y_dpcpp0.cpu())
         self.assertEqual(y_cpu1, y_dpcpp1.cpu())
+
+        # case for GPT-J
+        a = torch.randn([1, 201600])
+        a_xpu = a.to('xpu')
+        sort_cpu, index_cpu = torch.topk(a, 5)
+        sort_xpu, index_xpu = torch.topk(a_xpu, 5)
+
+        self.assertEqual(sort_cpu, sort_xpu.cpu())
+        self.assertEqual(index_cpu, index_xpu.cpu())
