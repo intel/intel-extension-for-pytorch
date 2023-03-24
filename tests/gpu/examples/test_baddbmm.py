@@ -1,6 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch # noqa
+import pytest
 
 xpu_device = torch.device("xpu")
 cpu_device = torch.device("cpu")
