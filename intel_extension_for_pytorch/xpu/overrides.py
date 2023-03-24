@@ -16,7 +16,6 @@ __all__ = ["handle_torch_function", "has_torch_function", "get_overridable_funct
 
 import functools  # noqa
 from functools import partial
-from torch.testing._internal.common_utils import TestCase
 
 # The dispatch table for tensor factory's __torch_function__ implementation.
 HANDLED_FUNCTIONS_SUB = {}
@@ -134,4 +133,21 @@ def fp64_assert_equal_wrapper(f):
 
 def override_assert_equal():
     r"""Override assertEqual to avoid triggering fp64 error on tensor comparison in test case"""
+    override_disable_global_flags();
+    from torch.testing._internal.common_utils import TestCase
     TestCase.assertEqual = fp64_assert_equal_wrapper(TestCase.assertEqual)
+
+def _disable_global_flags():
+    pass
+
+def override_disable_global_flags():
+    r"""
+    In PyTorch design, `__allow_nonbracketed_mutation_flag` is a flag to forbid bare assignment 
+    to torch.backends.<cudnn|mkldnn>.enabled and friends when running test suite. This flag will 
+    be forced to set to False by function `disable_global_flags` which is defined in 
+    torch.testing._internal.common_utils when overriding TestCase.assertEqual. It may result in 
+    a runtime error on subsequent cudnn|mkldnn setting, if any. The function here is to override 
+    `disable_global_flags` with an empty one to keep the flag `__allow_nonbracketed_mutation_flag` 
+    from being changed.
+    """
+    torch.backends.disable_global_flags = _disable_global_flags
