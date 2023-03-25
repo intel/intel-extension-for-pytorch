@@ -133,6 +133,7 @@ bool CPUFeature::os_avx() {
     return false;
   }
 
+#ifdef ENABLE_XCR_CHECK
   uint64_t xcrFeatureMask = 0;
   bool ret = read_xcr(_XCR_XFEATURE_ENABLED_MASK, &xcrFeatureMask);
   if (!ret) {
@@ -155,11 +156,12 @@ bool CPUFeature::os_avx() {
     Intel® Advanced Vector Extensions (AVX state). See Section 13.5.3
   */
   uint32_t avx_feature_bits = BIT_M_TO_N_64(xcrFeatureMask, 1, 2);
-  if (avx_feature_bits == 0b11) {
-    return true;
+  if (avx_feature_bits != 0b11) {
+    return false;
   }
+#endif
 
-  return false;
+  return true;
 }
 
 bool CPUFeature::os_avx2() {
@@ -182,6 +184,7 @@ bool CPUFeature::os_avx2() {
     return false;
   }
 
+#ifdef ENABLE_XCR_CHECK
   uint64_t xcrFeatureMask = 0;
   bool ret = read_xcr(_XCR_XFEATURE_ENABLED_MASK, &xcrFeatureMask);
   if (!ret) {
@@ -204,14 +207,16 @@ bool CPUFeature::os_avx2() {
     Intel® Advanced Vector Extensions (AVX state). See Section 13.5.3
   */
   uint32_t avx_feature_bits = BIT_M_TO_N_64(xcrFeatureMask, 1, 2);
-  if (avx_feature_bits == 0b11) {
-    return true;
+  if (avx_feature_bits != 0b11) {
+    return false;
   }
+#endif
 
-  return false;
+  return true;
 }
 
 bool CPUFeature::os_avx512() {
+#ifdef ENABLE_XCR_CHECK
   uint64_t xcrFeatureMask = 0;
   bool ret = read_xcr(_XCR_XFEATURE_ENABLED_MASK, &xcrFeatureMask);
   if (!ret) {
@@ -237,14 +242,16 @@ bool CPUFeature::os_avx512() {
   component 7 is used for the 16 512-bit registers ZMM16–ZMM31 (Hi16_ZMM state).
   */
   uint32_t avx512_feature_bits = BIT_M_TO_N_64(xcrFeatureMask, 5, 7);
-  if (avx512_feature_bits == 0b111) {
-    return true;
+  if (avx512_feature_bits != 0b111) {
+    return false;
   }
+#endif
 
-  return false;
+  return true;
 }
 
 bool CPUFeature::os_amx() {
+#ifdef ENABLE_XCR_CHECK
   uint64_t xcrFeatureMask = 0;
   bool ret = read_xcr(_XCR_XFEATURE_ENABLED_MASK, &xcrFeatureMask);
   if (!ret) {
@@ -275,11 +282,12 @@ bool CPUFeature::os_amx() {
   tile data (XTILEDATA state).
   */
   uint32_t avx512_feature_bits = BIT_M_TO_N_64(xcrFeatureMask, 17, 18);
-  if (avx512_feature_bits == 0b11) {
-    return true;
+  if (avx512_feature_bits != 0b11) {
+    return false;
   }
+#endif
 
-  return false;
+  return true;
 }
 
 #ifdef __linux__
