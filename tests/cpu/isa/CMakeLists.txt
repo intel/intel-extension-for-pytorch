@@ -11,4 +11,5 @@ set(IPEX_PROJECT_TOP_DIR "${PROJECT_SOURCE_DIR}/../../../")
 set(CPU_FEATURE_SRC "${IPEX_PROJECT_TOP_DIR}/csrc/cpu/isa/")
 
 add_definitions (-DCPU_FEATURE_EXEC)
+add_definitions (-DENABLE_XCR_CHECK)
 add_executable (cpu_features ${CPU_FEATURE_SRC}/cpu_feature.cpp ${CPU_FEATURE_SRC}/cpu_feature_main.cpp)
