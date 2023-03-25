@@ -625,7 +625,8 @@ static bool get_onednn_matmul_binary_attr(
       }
     }
 
-    if (!binary_valid(result, binary_final)) {
+    if (!binary_valid(result, binary_final, true)) {
+      attr = Attr();
       return false;
     }
 

@@ -363,7 +363,8 @@ static inline bool is_broadcast_from_other_to_self(
 
 static inline bool binary_valid(
     const at::Tensor& self,
-    const at::Tensor& other) {
+    const at::Tensor& other,
+    bool is_fusion = false) {
   // FIXME: update onednn
   if (self.sizes() != other.sizes() &&
       !is_broadcast_from_other_to_self(self, other))
@@ -412,9 +413,20 @@ static inline bool binary_valid(
       return false;
   };
 
-  // 5. self and other should be in the same datatype.
-  if (self.scalar_type() != other.scalar_type())
-    return false;
+  // 5. datatype check
+  if (is_fusion) {
+    // for fusion case, the fusion can be performed on scalar_type or Float
+    // datatype.
+    if (self.scalar_type() != other.scalar_type() &&
+        other.scalar_type() != at::ScalarType::Float) {
+      return false;
+    }
+  } else {
+    if (self.scalar_type() != other.scalar_type()) {
+      // for non-fusion case: self and other should be in the same datatype.
+      return false;
+    }
+  }
 
   // 6. self and other should be contiguous or channel-last contiguous.
   const auto ndim = self.ndimension();
