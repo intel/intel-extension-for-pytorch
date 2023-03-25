@@ -272,7 +272,8 @@ std::tuple<Tensor, Tensor> _unique(
     const Tensor& self,
     const bool sorted,
     const bool return_inverse) {
-  return IPEX_DISPATCH_ALL_TYPES_AND2(
+  return IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::BFloat16,
       at::ScalarType::Half,
       at::ScalarType::Bool,
       self.scalar_type(),
@@ -290,7 +291,8 @@ std::tuple<Tensor, Tensor, Tensor> _unique2(
     const bool sorted,
     const bool return_inverse,
     const bool return_counts) {
-  return IPEX_DISPATCH_ALL_TYPES_AND2(
+  return IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::BFloat16,
       at::ScalarType::Half,
       at::ScalarType::Bool,
       self.scalar_type(),
@@ -307,7 +309,8 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim(
     const bool sorted,
     const bool return_inverse,
     const bool return_counts) {
-  return IPEX_DISPATCH_ALL_TYPES_AND2(
+  return IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::BFloat16,
       at::ScalarType::Half,
       at::ScalarType::Bool,
       self.scalar_type(),
@@ -323,7 +326,8 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_consecutive(
     const int64_t dim,
     const bool return_inverse,
     const bool return_counts) {
-  return IPEX_DISPATCH_ALL_TYPES_AND2(
+  return IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::BFloat16,
       at::ScalarType::Half,
       at::ScalarType::Bool,
       self.scalar_type(),
@@ -340,7 +344,8 @@ std::tuple<Tensor, Tensor, Tensor> unique_consecutive(
     const bool return_counts,
     c10::optional<int64_t> dim) {
   if (!dim.has_value()) {
-    return IPEX_DISPATCH_ALL_TYPES_AND2(
+    return IPEX_DISPATCH_ALL_TYPES_AND3(
+        at::ScalarType::BFloat16,
         at::ScalarType::Half,
         at::ScalarType::Bool,
         self.scalar_type(),

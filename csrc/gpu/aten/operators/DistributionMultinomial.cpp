@@ -67,21 +67,30 @@ inline void renormRows(Tensor& t) {
   num_groups = num_groups > hw_max_groups ? hw_max_groups : num_groups;
 
   auto& sycl_queue = dpcppGetCurrentQueue();
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(t.scalar_type(), "renormRows", [&] {
-    auto cgf = DPCPP_Q_CGF(cgh) {
-      auto slm = dpcpp_local_acc_t<scalar_t>(
-          (group_size / 8) * sizeof(scalar_t),
-          cgh); // We use the smallest subgroup size to ensure enough space
-      auto t_ptr = t.data_ptr<scalar_t>();
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        renormRowsL1<scalar_t>(
-            item, t_ptr, rows, cols, (unsigned char*)slm.get_pointer().get());
-      };
-      cgh.parallel_for(
-          sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
-    };
-    DPCPP_Q_SUBMIT(sycl_queue, cgf);
-  });
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      t.scalar_type(),
+      "renormRows",
+      [&] {
+        auto cgf = DPCPP_Q_CGF(cgh) {
+          auto slm = dpcpp_local_acc_t<scalar_t>(
+              (group_size / 8) * sizeof(scalar_t),
+              cgh); // We use the smallest subgroup size to ensure enough space
+          auto t_ptr = t.data_ptr<scalar_t>();
+          auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
+            renormRowsL1<scalar_t>(
+                item,
+                t_ptr,
+                rows,
+                cols,
+                (unsigned char*)slm.get_pointer().get());
+          };
+          cgh.parallel_for(
+              sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
+        };
+        DPCPP_Q_SUBMIT(sycl_queue, cgf);
+      });
 }
 
 template <typename scalar_t>
@@ -191,8 +200,12 @@ void multinomial_with_replacement_kernel_impl(
 
   result.resize_({numDist, n_sample});
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self_v.scalar_type(), "multinomial_kernel", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      self_v.scalar_type(),
+      "multinomial_kernel",
+      [&] {
         using accscalar_t = acc_type<scalar_t>;
 
         Tensor origDist = at::empty_like(self_v);

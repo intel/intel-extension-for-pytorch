@@ -307,8 +307,12 @@ std::tuple<Tensor&, Tensor&> median_with_indices_impl(
   if (self.numel() > 0) {
     Tensor vals = keepdim && self.dim() > 0 ? values : values.unsqueeze(dim);
     Tensor inds = keepdim && self.dim() > 0 ? indices : indices.unsqueeze(dim);
-    IPEX_DISPATCH_ALL_TYPES_AND(
-        at::ScalarType::Half, self.scalar_type(), "median_out_impl", [&] {
+    IPEX_DISPATCH_ALL_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        self.scalar_type(),
+        "median_out_impl",
+        [&] {
           if (canUse32BitIndexMath(vals) && canUse32BitIndexMath(inds) &&
               canUse32BitIndexMath(in)) {
             run_launcher<scalar_t, uint32_t>(
@@ -341,7 +345,7 @@ Tensor median_impl(const Tensor& self, bool ignore_nan) {
   } else {
     // For torch.nanmedian return the middle element among the non-nan values
     Tensor k = ((size - 1) - sorted.isnan().sum()) / 2;
-    return sorted[k.toType(kLong)];
+    return sorted[k.toType(kLong)].clone();
   }
 }
 
@@ -579,8 +583,12 @@ std::tuple<Tensor&, Tensor&> mode_out(
       indices.scalar_type(),
       "' for indices output");
 
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, self.scalar_type(), "mode", [&] {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      self.scalar_type(),
+      "mode",
+      [&] {
         impl::mode_out_template<scalar_t>(values, indices, self, dim, keepdim);
       });
   return std::forward_as_tuple(values, indices);
@@ -653,8 +661,12 @@ std::tuple<Tensor&, Tensor&> kthvalue_out(
     bool keepdim,
     Tensor& values,
     Tensor& indices) {
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, self.scalar_type(), "kthvalue", [&] {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      self.scalar_type(),
+      "kthvalue",
+      [&] {
         impl::kthvalue_template<scalar_t>(
             self, k, dim, keepdim, values, indices);
       });
