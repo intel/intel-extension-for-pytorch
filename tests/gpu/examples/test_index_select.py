@@ -66,6 +66,16 @@ class TestTorchMethod(TestCase):
         torch.index_select(src_xpu, dim=0, index=idx_xpu, out=dst_xpu)
         self.assertEqual(dst_cpu, dst_xpu.cpu())
 
+    def test_index_select_out_single_batch(self, dtype=torch.float):
+        # Transformer case
+        src_xpu = torch.rand(1, 333, dtype=torch.float, device=torch.device('xpu'))
+        src_cpu = src_xpu.cpu()
+        idx_xpu = torch.tensor((0, 0, 0, 0), dtype=torch.long, device=torch.device('xpu'))
+        idx_cpu = idx_xpu.cpu()
+        dst_xpu = src_xpu.index_select(0, idx_xpu)
+        dst_cpu = src_cpu.index_select(0, idx_cpu)
+        self.assertEqual(dst_cpu, dst_xpu.cpu())
+
 # indcies transposed
 # test_index_select(x, torch.transpose(indices, 0, 1))
 
