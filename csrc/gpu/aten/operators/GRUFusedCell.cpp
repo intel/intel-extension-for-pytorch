@@ -69,14 +69,14 @@ static inline void fuse_ops_kernel(
           for (int64_t loc = lid; loc < COL; loc += GROUP_SIZE) {
             int64_t index = gid * COL + loc;
             if (has_bias) {
-              T reset_gate = 1.0 /
-                  (1.0 +
+              T reset_gate = 1.0f /
+                  (1.0f +
                    Numerics<T>::exp(
                        -(igates[gate0_index + loc] + hgates[gate0_index + loc] +
                          ibias[loc] + hbias[loc])));
 
-              T input_gate = 1.0 /
-                  (1.0 +
+              T input_gate = 1.0f /
+                  (1.0f +
                    Numerics<T>::exp(
                        -(igates[gate1_index + loc] + hgates[loc + gate1_index] +
                          ibias[loc + COL] + hbias[loc + COL])));
@@ -88,7 +88,7 @@ static inline void fuse_ops_kernel(
                   reset_gate * hn_bn);
 
               output[index] =
-                  (1.0 - input_gate) * new_gate + input_gate * hidden[index];
+                  (1.0f - input_gate) * new_gate + input_gate * hidden[index];
               // save for the backward computation
               workspace[loc + workspace0_index] = reset_gate;
               workspace[workspace1_index + loc] = input_gate;
@@ -96,13 +96,13 @@ static inline void fuse_ops_kernel(
               workspace[workspace3_index + loc] = hidden[index];
               workspace[workspace4_index + loc] = hn_bn;
             } else {
-              T reset_gate = 1.0 /
-                  (1.0 +
+              T reset_gate = 1.0f /
+                  (1.0f +
                    Numerics<T>::exp(-(
                        igates[gate0_index + loc] + hgates[gate0_index + loc])));
 
-              T input_gate = 1.0 /
-                  (1.0 +
+              T input_gate = 1.0f /
+                  (1.0f +
                    Numerics<T>::exp(-(
                        igates[gate1_index + loc] + hgates[loc + gate1_index])));
 
@@ -112,7 +112,7 @@ static inline void fuse_ops_kernel(
                   igates[gate2_index + loc] + reset_gate * hn_bn);
 
               output[index] =
-                  (1.0 - input_gate) * new_gate + input_gate * hidden[index];
+                  (1.0f - input_gate) * new_gate + input_gate * hidden[index];
               // save for the backward computation
               workspace[loc + workspace0_index] = reset_gate;
               workspace[workspace1_index + loc] = input_gate;
@@ -170,18 +170,18 @@ static inline void fuse_ops_kernel_backward(
 
             // grad_input_1 = A*(1-z)*(1-n^2)*hn*(1-r)*r
             grad_input_gates[grad_0 + loc] = grad_hy[index_] *
-                (1.0 - workspace[workspacez_index + loc]) *
-                (1.0 -
+                (1.0f - workspace[workspacez_index + loc]) *
+                (1.0f -
                  workspace[workspacen_index + loc] *
                      workspace[workspacen_index + loc]) *
                 workspace[workspacehbn_index + loc] *
-                (1.0 - workspace[workspacer_index + loc]) *
+                (1.0f - workspace[workspacer_index + loc]) *
                 workspace[workspacer_index + loc];
             // grad_input_2 = A*(h-n)*(1-z)*z
             grad_input_gates[grad_1 + loc] = grad_hy[index_] *
                 (workspace[workspaceh_index + loc] -
                  workspace[workspacen_index + loc]) *
-                (1.0 - workspace[workspacez_index + loc]) *
+                (1.0f - workspace[workspacez_index + loc]) *
                 workspace[workspacez_index + loc];
             // grad_input_3 = A*(1-z)*(1-n^2)
             grad_input_gates[grad_2 + loc] = grad_hy[index_] *
@@ -191,12 +191,12 @@ static inline void fuse_ops_kernel_backward(
                      workspace[workspacen_index + loc]);
             // grad_hidden_1 = A*(1-z)*(1-n^2)*hn*(1-r)*r
             grad_hidden_gates[grad_0 + loc] = grad_hy[index_] *
-                (1.0 - workspace[workspacez_index + loc]) *
-                (1.0 -
+                (1.0f - workspace[workspacez_index + loc]) *
+                (1.0f -
                  workspace[workspacen_index + loc] *
                      workspace[workspacen_index + loc]) *
                 workspace[workspacehbn_index + loc] *
-                (1.0 - workspace[workspacer_index + loc]) *
+                (1.0f - workspace[workspacer_index + loc]) *
                 workspace[workspacer_index + loc];
             // grad_hidden_2 = A*(h-n)*(1-z)*z
             grad_hidden_gates[grad_1 + loc] = grad_hy[index_] *
@@ -206,8 +206,8 @@ static inline void fuse_ops_kernel_backward(
                 workspace[workspacez_index + loc];
             // grad_hidden_3 = A*(1-z)*(1-n^2)*r
             grad_hidden_gates[grad_2 + loc] = grad_hy[index_] *
-                (1.0 - workspace[workspacez_index + loc]) *
-                (1.0 -
+                (1.0f - workspace[workspacez_index + loc]) *
+                (1.0f -
                  workspace[workspacen_index + loc] *
                      workspace[workspacen_index + loc]) *
                 workspace[workspacer_index + loc];

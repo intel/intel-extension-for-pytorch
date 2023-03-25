@@ -8,7 +8,6 @@ import intel_extension_for_pytorch  # noqa
 import pytest
 
 
-@pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
 class TestNNMethod(TestCase):
     def test_gru(self, dtype=torch.float):
         rnn = nn.GRU(2, 3, 2, bias=True, bidirectional=False)
