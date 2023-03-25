@@ -122,6 +122,20 @@ int64_t q_per_channel_axis(const Tensor& self) {
   return at::native::q_per_channel_axis(self);
 }
 
+Tensor q_scale_tensor(const Tensor& self) {
+  auto quantizer = get_qtensorimpl(self)->quantizer();
+  TORCH_CHECK(quantizer->qscheme() == kPerTensorAffine);
+  return static_cast<DPCPPPerTensorAffineQuantizer*>(quantizer.get())
+      ->scale_tensor();
+}
+
+Tensor q_zero_point_tensor(const Tensor& self) {
+  auto quantizer = get_qtensorimpl(self)->quantizer();
+  TORCH_CHECK(quantizer->qscheme() == kPerTensorAffine);
+  return static_cast<DPCPPPerTensorAffineQuantizer*>(quantizer.get())
+      ->zero_point_tensor();
+}
+
 Tensor& set_(
     Tensor& self,
     Storage storage,

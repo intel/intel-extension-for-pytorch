@@ -36,6 +36,10 @@ Tensor q_per_channel_zero_points(const Tensor& self);
 
 int64_t q_per_channel_axis(const Tensor& self);
 
+Tensor q_scale_tensor(const Tensor& self);
+
+Tensor q_zero_point_tensor(const Tensor& self);
+
 Tensor& set_(
     Tensor& self,
     Storage storage,
