@@ -33,7 +33,7 @@ Tensor& frac_out(const Tensor& self, Tensor& result) {
 
 Tensor& trunc_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_op(out, self);
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
