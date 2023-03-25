@@ -9,6 +9,55 @@ import intel_extension_for_pytorch._C as core # noqa F401
 
 logger = logging.getLogger(__name__)
 
+def _save_weight_bias_to_state_dict(self, destination, prefix):
+    if self.bias is not None:
+        if hasattr(self, 'master_bias'):
+            bias = self.master_bias
+        elif hasattr(self, 'bias_trail'):
+            bias = torch.ops.torch_ipex.cat_bfloat16_float(self.bias, self.bias_trail)
+        else:
+            bias = self.bias.float()
+        destination[prefix + 'bias'] = bias.detach()
+    if hasattr(self, 'master_weight'):
+        weight = self.master_weight
+    elif hasattr(self, 'weight_trail'):
+        weight = torch.ops.torch_ipex.cat_bfloat16_float(self.weight, self.weight_trail)
+    else:
+        weight = self.weight.float()
+    destination[prefix + 'weight'] = self.ctx.to_public(weight.detach())
+
+def _load_from_state_dict_pre_hook(self, state_dict, prefix):
+    w_name = prefix + 'weight'
+    b_name = prefix + 'bias'
+    fp32_loaded_weight = state_dict[w_name]
+    weight_trail = None
+    if hasattr(self, 'master_weight'):
+        loaded_weight = fp32_loaded_weight.bfloat16()
+    elif hasattr(self, 'weight_trail'):
+        loaded_weight, weight_trail = torch.ops.torch_ipex.split_float_bfloat16(fp32_loaded_weight)
+    else:
+        loaded_weight = fp32_loaded_weight.to(self.weight.dtype)
+    if b_name in state_dict:
+        loaded_bias = state_dict[b_name]
+        if hasattr(self, 'master_bias'):
+            self.master_bias.copy_(loaded_bias)
+            loaded_bias = loaded_bias.bfloat16()
+        elif hasattr(self, 'bias_trail'):
+            loaded_bias, bias_trail = torch.ops.torch_ipex.split_float_bfloat16(loaded_bias)
+            self.bias_trail.copy_(bias_trail)
+        else:
+            loaded_bias = loaded_bias.to(self.bias.dtype)
+    else:
+        loaded_bias = None
+    return loaded_weight, loaded_bias, fp32_loaded_weight, weight_trail
+
+def _load_from_state_dict_post_hook(self, loaded_ctx, fp32_loaded_weight, weight_trail):
+    _load_from_state_dict_pre_hook
+    self.ctx.load_from_ctx(loaded_ctx)
+    if hasattr(self, 'master_weight'):
+        self.master_weight.copy_(self.ctx.pack(fp32_loaded_weight))
+    elif hasattr(self, 'weight_trail'):
+        self.weight_trail.copy_(self.ctx.pack(weight_trail))
 
 class _IPEXConvNd(nn.Module):
     __constants__ = ['stride', 'padding', 'dilation', 'groups',
@@ -60,25 +109,18 @@ class _IPEXConvNd(nn.Module):
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
         assert not keep_vars, "can not using keep_vars true when to save _IPEXConvNd's parameters"
-        if self.bias is not None:
-            if hasattr(self, 'master_bias'):
-                bias = self.master_bias
-            elif hasattr(self, 'bias_trail'):
-                bias = torch.ops.torch_ipex.cat_bfloat16_float(self.bias, self.bias_trail)
-            else:
-                bias = self.bias
-            destination[prefix + 'bias'] = bias.detach()
-        if hasattr(self, 'master_weight'):
-            weight = self.master_weight
-        elif hasattr(self, 'weight_trail'):
-            weight = torch.ops.torch_ipex.cat_bfloat16_float(self.weight, self.weight_trail)
-        else:
-            weight = self.weight
-        destination[prefix + 'weight'] = self.ctx.to_public(weight.detach())
+        _save_weight_bias_to_state_dict(self, destination, prefix)
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
                               missing_keys, unexpected_keys, error_msgs):
-        assert False, "_IPEXConvNd does not support _load_from_state_dict method" # noqa B011
+        with torch.no_grad():
+            loaded_weight, loaded_bias, fp32_loaded_weight, weight_trail = _load_from_state_dict_pre_hook(self, state_dict, prefix)
+            loaded_ctx = torch.ops.ipex_prepack.convolution_prepack(
+                loaded_weight, loaded_bias, self.stride, self.padding,
+                self.dilation, self.groups,
+                self.weight_channels_last, self.prepack_input_shape
+            )
+            _load_from_state_dict_post_hook(self, loaded_ctx, fp32_loaded_weight, weight_trail)
 
     def forward(self, x):
         return torch.ops.torch_ipex.convolution_forward(x, self.weight, self.bias, self.ctx.get_data_handle())
@@ -154,26 +196,15 @@ class _IPEXLinear(torch.nn.Module):
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
         assert not keep_vars, "can not using keep_vars true when to save _IPEXLinear's parameters"
-        if self.bias is not None:
-            if hasattr(self, 'master_bias'):
-                bias = self.master_bias
-            elif hasattr(self, 'bias_trail'):
-                bias = torch.ops.torch_ipex.cat_bfloat16_float(self.bias, self.bias_trail)
-            else:
-                bias = self.bias
-            destination[prefix + 'bias'] = bias.detach()
-
-        if hasattr(self, 'master_weight'):
-            weight = self.master_weight
-        elif hasattr(self, 'weight_trail'):
-            weight = torch.ops.torch_ipex.cat_bfloat16_float(self.weight, self.weight_trail)
-        else:
-            weight = self.weight
-        destination[prefix + 'weight'] = self.ctx.to_public(weight.detach())
+        _save_weight_bias_to_state_dict(self, destination, prefix)
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
                               missing_keys, unexpected_keys, error_msgs):
-        assert False, "_IPEXLinear does not support _load_from_state_dict method" # noqa B011
+        with torch.no_grad():
+            loaded_weight, loaded_bias, fp32_loaded_weight, weight_trail = _load_from_state_dict_pre_hook(self, state_dict, prefix)
+            pack_fn = torch.ops.ipex_prepack.linear_prepack if self.use_dnnl else torch.ops.ipex_prepack.mkl_sgemm_prepack
+            loaded_ctx = pack_fn(loaded_weight, loaded_bias, self.batch_size_collapsed)
+            _load_from_state_dict_post_hook(self, loaded_ctx, fp32_loaded_weight, weight_trail)
 
 
 class _IPEXConvTransposeNd(nn.Module):
@@ -224,25 +255,18 @@ class _IPEXConvTransposeNd(nn.Module):
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
         assert not keep_vars, "can not using keep_vars true when to save _IPEXConvTransposeNd's parameters"
-        if self.bias is not None:
-            if hasattr(self, 'master_bias'):
-                bias = self.master_bias
-            elif hasattr(self, 'bias_trail'):
-                bias = torch.ops.torch_ipex.cat_bfloat16_float(self.bias, self.bias_trail)
-            else:
-                bias = self.bias
-            destination[prefix + 'bias'] = bias.detach()
-        if hasattr(self, 'master_weight'):
-            weight = self.master_weight
-        elif hasattr(self, 'weight_trail'):
-            weight = torch.ops.torch_ipex.cat_bfloat16_float(self.weight, self.weight_trail)
-        else:
-            weight = self.weight
-        destination[prefix + 'weight'] = self.ctx.to_public(weight.detach())
+        _save_weight_bias_to_state_dict(self, destination, prefix)
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
                               missing_keys, unexpected_keys, error_msgs):
-        assert False, "_IPEXConvTransposeNd does not support _load_from_state_dict method" # noqa B011
+        with torch.no_grad():
+            loaded_weight, loaded_bias, fp32_loaded_weight, weight_trail = _load_from_state_dict_pre_hook(self, state_dict, prefix)
+            loaded_ctx = torch.ops.ipex_prepack.conv_transpose_prepack(
+                loaded_weight, loaded_bias, self.stride, self.padding,
+                self.output_padding, self.groups, self.dilation,
+                self.weight_channels_last, self.prepack_input_shape
+            )
+            _load_from_state_dict_post_hook(self, loaded_ctx, fp32_loaded_weight, weight_trail)
 
     def forward(self, x):
         return torch.ops.torch_ipex.conv_transpose(
