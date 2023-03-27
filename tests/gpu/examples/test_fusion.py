@@ -65,7 +65,27 @@ class MulAddScalar(torch.nn.Module):
 
     def forward(self, input, m1, m2):
         input = F.relu(self.conv(input))
-        ret = input * 3.0 + m2
+        ret = input * m1 + 1.0
+        return ret
+
+class MulScalarAddScalar(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MulScalarAddScalar, self).__init__()
+        self.conv = nn.Conv2d(2, 2, 1, 1)
+
+    def forward(self, input, m1, m2):
+        input = F.relu(self.conv(input))
+        ret = input * 3.0 + 1.0
+        return ret
+
+class MulScalarAdd(torch.nn.Module):
+    def __init__(self) -> None:
+        super(MulScalarAdd, self).__init__()
+        self.conv = nn.Conv2d(2, 2, 1, 1)
+
+    def forward(self, input, m1, m2):
+        input = F.relu(self.conv(input))
+        ret = input * 2.0 + m2
         return ret
 
 class MulAdd(torch.nn.Module):
@@ -1483,40 +1503,33 @@ class TestNNMethod(TestCase):
 
 
     def test_mul_add(self, dtype=torch.float):
-        m1 = torch.randn((4, 2, 2, 2), device=cpu_device)
-        m2 = torch.randn((4, 2, 2, 2), device=cpu_device)
-        add1 = torch.randn((4, 2, 2, 2), device=cpu_device)
-        add2 = add1.clone()
+        def model_check(model):
+            m1 = torch.randn((4, 2, 2, 2), device=cpu_device)
+            m2 = torch.randn((2, 2), device=cpu_device)
+            add1 = torch.randn((1, 2, 1, 1), device=cpu_device)
+            add2 = add1.clone()
 
-        model = MulAdd()
-        model1 = copy.deepcopy(model)
-        model_scalar = MulAddScalar()
-        model_scalar1 = copy.deepcopy(model_scalar)
-        raw = model(m1, m2, add1)
-        raw_scalar = model_scalar(m1, m2, add1)
-        print("raw: ", raw)
+            model1 = copy.deepcopy(model)
+            raw = model(m1, m2, add1)
 
-        m1_dpcpp = m1.to(dpcpp_device)
-        m2_dpcpp = m2.to(dpcpp_device)
-        add1_dpcpp = add2.to(dpcpp_device)
-        add2_dpcpp = add1_dpcpp.clone()
-        model1 = model1.to("xpu")
-        model_scalar1 = model_scalar1.to("xpu")
+            m1_dpcpp = m1.to(dpcpp_device)
+            m2_dpcpp = m2.to(dpcpp_device)
+            add1_dpcpp = add2.to(dpcpp_device)
+            add2_dpcpp = add1_dpcpp.clone()
+            model1 = model1.to("xpu")
 
-        modelJit = torch.jit.script(model1)
-        modelJit_scalar = torch.jit.script(model_scalar1)
-        with torch.no_grad():
-            for i in range(5):
-                modelJit(m1_dpcpp, m2_dpcpp, add1_dpcpp)
-                modelJit_scalar(m1_dpcpp, m2_dpcpp, add1_dpcpp)
-            print(modelJit.graph_for(m1_dpcpp, m2_dpcpp, add1_dpcpp))
-            print(modelJit_scalar.graph_for(m1_dpcpp, m2_dpcpp, add1_dpcpp))
-            real = modelJit(m1_dpcpp, m2_dpcpp, add2_dpcpp)
-            real_scalar = modelJit_scalar(m1_dpcpp, m2_dpcpp, add2_dpcpp)
-            print("real:", real.to(cpu_device))
-        self.assertEqual(raw, real.to(cpu_device))
-        self.assertEqual(raw_scalar, real_scalar.to(cpu_device))
-        del modelJit
+            modelJit = torch.jit.script(model1)
+            with torch.no_grad():
+                for i in range(5):
+                    modelJit(m1_dpcpp, m2_dpcpp, add1_dpcpp)
+                print(modelJit.graph_for(m1_dpcpp, m2_dpcpp, add1_dpcpp))
+                real = modelJit(m1_dpcpp, m2_dpcpp, add2_dpcpp)
+            self.assertEqual(raw, real.to(cpu_device))
+            del modelJit
+        model_check(MulAdd())
+        model_check(MulAddScalar())
+        model_check(MulScalarAdd())
+        model_check(MulScalarAddScalar())
 
     def test_trans_matmul_add(self, dtype=torch.float):
         m1 = torch.randn((4, 2), device=cpu_device)

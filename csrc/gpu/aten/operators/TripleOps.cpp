@@ -59,30 +59,93 @@ static inline void dim_check(
       "The dimensions of three inputs tensor not equal is not supported. ");
 }
 
+std::vector<int64_t> dim_expand(
+    const Tensor& a_tensor,
+    const Tensor& b_tensor,
+    const Tensor& c_tensor,
+    Tensor& view_a,
+    Tensor& view_b,
+    Tensor& view_c) {
+  IntArrayRef a = a_tensor.sizes();
+  IntArrayRef b = b_tensor.sizes();
+  IntArrayRef c = c_tensor.sizes();
+  size_t dimA = a.size();
+  size_t dimB = b.size();
+  size_t dimC = c.size();
+  size_t max_dim = dimA > dimB ? dimA : dimB;
+  max_dim = max_dim > dimC ? max_dim : dimC;
+  std::vector<int64_t> view_size_a(max_dim);
+  std::vector<int64_t> view_size_b(max_dim);
+  std::vector<int64_t> view_size_c(max_dim);
+  std::vector<int64_t> target_size(max_dim);
+
+  for (int i = max_dim - 1; i >= 0; --i) {
+    int offset = max_dim - 1 - i;
+    int a_idx = dimA - 1 - offset;
+    int b_idx = dimB - 1 - offset;
+    int c_idx = dimC - 1 - offset;
+    int sizeA = (a_idx >= 0) ? a[a_idx] : 1;
+    int sizeB = (b_idx >= 0) ? b[b_idx] : 1;
+    int sizeC = (c_idx >= 0) ? c[c_idx] : 1;
+
+    view_size_a[i] = sizeA;
+    view_size_b[i] = sizeB;
+    view_size_c[i] = sizeC;
+    target_size[i] = sizeA == 1 ? (sizeB == 1 ? sizeC : sizeB) : sizeA;
+  }
+  view_a = dimA != max_dim ? at::native::view(a_tensor, view_size_a) : a_tensor;
+  view_b = dimB != max_dim ? at::native::view(b_tensor, view_size_b) : b_tensor;
+  view_c = dimC != max_dim ? at::native::view(c_tensor, view_size_c) : c_tensor;
+
+  return target_size;
+}
+
 } // namespace impl
 
-Tensor mul_add_scalar(
+Tensor mul_scalar_add_scalar(
     const Tensor& self,
     Scalar other,
-    const Tensor& accumu,
+    Scalar accumu,
     Scalar alpha) {
-  TORCH_CHECK(
-      self.ndimension() == accumu.ndimension(),
-      "The dimensions of two inputs tensor is not equal ");
-  Tensor _self, result, _accumu;
-  if (check_has_opaque_and_no_padding({self, accumu})) {
-    if (self.numel() > accumu.numel()) {
-      _accumu = accumu.expand_as(self);
-      _self = self;
-    } else if (self.numel() < accumu.numel()) {
-      _self = self.expand_as(accumu);
-      _accumu = accumu;
-    } else {
-      _accumu = accumu;
-      _self = self;
+  Tensor result = empty_like(self);
+  auto iter = TensorIteratorConfig()
+                  .set_check_mem_overlap(true)
+                  .add_output(result)
+                  .add_input(self)
+                  .build();
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "mul_scalar_add_scalar",
+      [&]() {
+        auto add_scalar = alpha.to<scalar_t>() * accumu.to<scalar_t>();
+        auto other_scalar = other.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
+          return a * other_scalar + add_scalar;
+        });
+      });
+  return result;
+}
+
+Tensor binary_format_convert(
+    const Tensor& a,
+    const Tensor& b,
+    Tensor& a_,
+    Tensor& b_) {
+  Tensor c_, result;
+  std::vector<int64_t> target_size =
+      impl::dim_expand(a, b, at::empty({0}), a_, b_, c_);
+  if (check_has_opaque_and_no_padding({a_, b_})) {
+    int64_t target_numel =
+        std::accumulate(target_size.begin(), target_size.end(), 0);
+    if (a_.numel() < target_numel) {
+      a_ = a_.expand(target_size);
     }
-    Tensor tar =
-        DPCPPTensorConvertor::is_opaque_tensor(_self) ? _self : _accumu;
+    if (b_.numel() < target_numel) {
+      b_ = b_.expand(target_size);
+    }
+    Tensor tar = DPCPPTensorConvertor::is_opaque_tensor(a_) ? a_ : b_;
     auto ctx = AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(tar);
     auto converter = [&](const Tensor& tensor) {
       auto tensor_ctx =
@@ -95,14 +158,52 @@ Tensor mul_add_scalar(
       }
       return tensor;
     };
-    _self = converter(_self);
-    _accumu = converter(_accumu);
-    result = empty_opaque_tensor(ctx.meta(), _self.options(), c10::nullopt);
+    a_ = converter(a_);
+    b_ = converter(b_);
+    result = empty_like(a_);
   } else {
-    _self = to_plain_if_needed(self);
-    _accumu = to_plain_if_needed(accumu);
-    result = empty_like(self);
+    a_ = to_plain_if_needed(a);
+    b_ = to_plain_if_needed(b);
+    result = empty_like(a_);
   }
+  return result;
+}
+
+Tensor mul_add_scalar(
+    const Tensor& self,
+    const Tensor& other,
+    Scalar accumu,
+    Scalar alpha) {
+  Tensor _self, _other;
+  Tensor result = binary_format_convert(self, other, _self, _other);
+  auto iter = TensorIteratorConfig()
+                  .set_check_mem_overlap(true)
+                  .add_output(result)
+                  .add_input(_self)
+                  .add_input(_other)
+                  .build();
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "mul_add_scalar",
+      [&]() {
+        auto add_scalar = alpha.to<scalar_t>() * accumu.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter(
+            iter, [=](scalar_t a, scalar_t b) -> scalar_t {
+              return a * b + add_scalar;
+            });
+      });
+  return result;
+}
+
+Tensor mul_scalar_add(
+    const Tensor& self,
+    Scalar other,
+    const Tensor& accumu,
+    Scalar alpha) {
+  Tensor _self, _accumu;
+  Tensor result = binary_format_convert(self, accumu, _self, _accumu);
   auto iter = TensorIteratorConfig()
                   .set_check_mem_overlap(true)
                   .add_output(result)
@@ -130,30 +231,23 @@ Tensor mul_add(
     const Tensor& other,
     const Tensor& accumu,
     Scalar alpha) {
-  impl::dim_check(self, other, accumu);
   Tensor _self, _other, _accumu, result;
-  if (check_has_opaque_and_no_padding({self, other, accumu})) {
+  std::vector<int64_t> target_size =
+      impl::dim_expand(self, other, accumu, _self, _other, _accumu);
+  if (check_has_opaque_and_no_padding({_self, _other, _accumu})) {
     std::vector<Tensor> inputs;
 
-    Tensor target_tensor = self;
-    int target_numel = self.numel();
-    if (target_numel < other.numel()) {
-      target_tensor = other;
-      target_numel = other.numel();
-    }
-    if (target_numel < accumu.numel()) {
-      target_tensor = accumu;
-      target_numel = accumu.numel();
-    }
-    self.numel() == target_numel
-        ? inputs.push_back(self)
-        : inputs.push_back(self.expand_as(target_tensor));
-    other.numel() == target_numel
-        ? inputs.push_back(other)
-        : inputs.push_back(other.expand_as(target_tensor));
-    accumu.numel() == target_numel
-        ? inputs.push_back(accumu)
-        : inputs.push_back(accumu.expand_as(target_tensor));
+    int64_t target_numel =
+        std::accumulate(target_size.begin(), target_size.end(), 0);
+
+    _self.numel() == target_numel ? inputs.push_back(_self)
+                                  : inputs.push_back(_self.expand(target_size));
+    _other.numel() == target_numel
+        ? inputs.push_back(_other)
+        : inputs.push_back(_other.expand(target_size));
+    _accumu.numel() == target_numel
+        ? inputs.push_back(_accumu)
+        : inputs.push_back(_accumu.expand(target_size));
 
     // align format
     std::vector<Tensor> _inputs;
@@ -392,7 +486,9 @@ Tensor packed_add(
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mul_add", mul_add);
-  IPEX_OP_REGISTER("mul_add.Scalar", mul_add_scalar);
+  IPEX_OP_REGISTER("mul_add.Scalar_Tensor", mul_add_scalar);
+  IPEX_OP_REGISTER("mul_add.Tensor_Scalar", mul_scalar_add);
+  IPEX_OP_REGISTER("mul_add.Scalar_Scalar", mul_scalar_add_scalar);
   IPEX_OP_REGISTER_DISPATCH(
       "packed_add", at::AtenIpexTypeXPU::packed_add, c10::DispatchKey::XPU);
   IPEX_OP_REGISTER_DISPATCH(
