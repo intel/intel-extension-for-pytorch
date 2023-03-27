@@ -181,7 +181,7 @@ static at::Tensor pooling(
       }
       dst_m = dpcpp_onednn_memory(expected_dst_md, engine, dst.data_ptr());
     } else {
-      dst_m = dpcpp_onednn_memory(dst_md, engine, dst.data_ptr());
+      dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
     }
   }
 
