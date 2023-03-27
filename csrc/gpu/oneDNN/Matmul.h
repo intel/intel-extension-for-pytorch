@@ -191,8 +191,10 @@ static inline void matmul(
   if (m1.is_quantized()) {
     auto in_scale = m1.q_scale();
     int mask_ac = 0;
-    int mask_matmul = (m2.qscheme() == kPerChannelAffine) ? 1 << 1 : 0;
-    pattr.set_scales_mask(DNNL_ARG_DST, mask_matmul);
+    int mask_matmul = (m2.qscheme() == kPerChannelAffine) ? 2 : 0;
+    // 2 = 2^1, quantize on second channel of weight aka n in [k, n]
+    if (dst.is_quantized())
+      pattr.set_scales_mask(DNNL_ARG_DST, mask_ac);
     pattr.set_scales_mask(DNNL_ARG_SRC, mask_ac);
     pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_matmul);
 
@@ -351,14 +353,39 @@ static inline void matmul(
     // Path2: quantized path, set runtime sale and zp here
     bool is_per_tensor_quantized = (m2.qscheme() == kPerTensorAffine);
 
-    float dnn_factor =
-        ((m1.scalar_type() == at::kQUInt8) && (!is_opaque_u8(m1))) ? 0.5f : 1.f;
-    Tensor m1_sc = at::ones({1}, at::dtype(at::kFloat).device(at::kXPU)) *
-        static_cast<float>(m1.q_scale()) * dnn_factor;
+    Tensor m1_sc;
+    memory m1_sc_m;
     memory::desc m1_sc_md =
         memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
-    memory m1_sc_m = dpcpp_onednn_memory(m1_sc_md, engine, m1_sc.data_ptr());
+    if (is_opaque_u8(m1)) {
+      m1_sc = at::empty({1}, at::dtype(at::kFloat).device(at::kXPU))
+                  .fill_(m1.q_scale());
+      m1_sc_m = dpcpp_onednn_memory(m1_sc_md, engine, m1_sc.data_ptr());
+    } else {
+      m1_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(m1);
+      m1_sc_m = dpcpp_onednn_memory(m1_sc_md, engine, m1_sc.data_ptr());
+    }
     args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, m1_sc_m});
+
+    Tensor m2_sc;
+    memory m2_sc_m;
+    if (m2.is_quantized()) {
+      memory::desc m2_sc_md =
+          memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+      m2_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(m2);
+      m2_sc_m = dpcpp_onednn_memory(m2_sc_md, engine, m2_sc.data_ptr());
+      args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, m2_sc_m});
+    }
+
+    Tensor dst_sc;
+    memory dst_sc_m;
+    if (dst.is_quantized()) {
+      memory::desc dst_sc_md =
+          memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+      dst_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(dst);
+      dst_sc_m = dpcpp_onednn_memory(dst_sc_md, engine, dst_sc.data_ptr());
+      args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, dst_sc_m});
+    }
 
 #ifdef BUILD_PRIOR_SYMM_QUANT
     // Only setting zp when zp is not zero
@@ -374,12 +401,6 @@ static inline void matmul(
       args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, m1_zp_m});
     }
 #endif
-
-    Tensor dst_sc = at::ones({1}, at::dtype(at::kFloat).device(at::kXPU));
-    memory::desc dst_sc_md =
-        memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
-    memory dst_sc_m = dpcpp_onednn_memory(dst_sc_md, engine, dst_sc.data_ptr());
-    args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, dst_sc_m});
 
 #ifdef BUILD_PRIOR_SYMM_QUANT
     // Only setting zp when zp is not zero
@@ -397,10 +418,9 @@ static inline void matmul(
 #endif
 
     if (is_per_tensor_quantized) {
-      Tensor wgh_sc = at::ones({1}, at::dtype(at::kFloat).device(at::kXPU)) *
-          static_cast<float>(m2.q_scale());
       memory::desc wgh_sc_md =
           memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+      Tensor wgh_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(m2);
       memory wgh_sc_m =
           dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
       args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});

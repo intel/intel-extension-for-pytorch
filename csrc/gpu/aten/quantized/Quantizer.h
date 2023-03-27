@@ -4,6 +4,7 @@
 #include <quantized/DeQuantization.h>
 #include <quantized/QTensor.h>
 #include <quantized/Quantization.h>
+#include <utils/LRUCache.h>
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
@@ -13,7 +14,27 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
       ScalarType scalar_type,
       double scale,
       int64_t zero_point)
-      : AffineQuantizer(scalar_type), scale_(scale), zero_point_(zero_point) {}
+      : AffineQuantizer(scalar_type), scale_(scale), zero_point_(zero_point) {
+    xpu::dpcpp::lru_key_t key_sc_zp;
+    float dnn_scale = scale;
+    if (scalar_type == kQUInt8) {
+      dnn_scale = scale / 2.f;
+    }
+    // TODO: Modify this line after asymmetric enabled
+    xpu::dpcpp::create_key(key_sc_zp, dnn_scale, 0);
+    bool key_found = xpu::dpcpp::find_key<std::pair<Tensor, Tensor>>(key_sc_zp);
+    if (key_found) {
+      std::tie(scale_tensor_, zero_point_tensor_) =
+          xpu::dpcpp::fetch_m<std::pair<Tensor, Tensor>>(key_sc_zp);
+    } else {
+      scale_tensor_ = at::empty({1}, at::dtype(kFloat).device(at::kXPU))
+                          .fill_(static_cast<float>(dnn_scale));
+      // TODO: Modify this line after asymmetric enabled
+      zero_point_tensor_ = at::zeros({1}, at::dtype(kInt).device(at::kXPU));
+      xpu::dpcpp::fetch_or_create_m<std::pair<Tensor, Tensor>>(
+          key_sc_zp, scale_tensor_, zero_point_tensor_);
+    }
+  }
 
   Tensor quantize(const Tensor& rtensor) override {
     TORCH_CHECK(
@@ -59,6 +80,14 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
     return zero_point_;
   }
 
+  Tensor scale_tensor() {
+    return scale_tensor_;
+  }
+
+  Tensor zero_point_tensor() {
+    return zero_point_tensor_;
+  }
+
   bool equalTo(QuantizerPtr other) const override {
     if (!other.get() || other->qscheme() != kPerTensorAffine) {
       return false;
@@ -78,6 +107,8 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
   const double scale_;
   // We use int64_t for consistency with Python
   const int64_t zero_point_;
+  Tensor scale_tensor_;
+  Tensor zero_point_tensor_;
 };
 
 struct DPCPPPerChannelAffineQuantizer : public AffineQuantizer {

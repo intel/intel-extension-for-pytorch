@@ -376,7 +376,6 @@ static at::Tensor quantized_convolution(
           is_channels_last_suggested);
     }
 
-    pattr.set_scales_mask(DNNL_ARG_DST, mask_conv);
     pattr.set_scales_mask(DNNL_ARG_SRC, mask_ac);
     pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_conv);
 
@@ -469,14 +468,18 @@ static at::Tensor quantized_convolution(
   args.insert({DNNL_ARG_WEIGHTS, wgh_m});
   args.insert({DNNL_ARG_DST, dst_m});
 
-  float dnn_factor =
-      ((src.scalar_type() == at::kQUInt8) && (!is_opaque_u8(src))) ? 0.5f : 1.f;
-  Tensor src_sc =
-      (at::ones({1}, at::dtype(at::kFloat).device(at::kXPU)) *
-       static_cast<float>(src.q_scale()) * dnn_factor);
-  memory::desc src_sc_md =
-      memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
-  memory src_sc_m = dpcpp_onednn_memory(src_sc_md, engine, src_sc.data_ptr());
+  Tensor src_sc;
+  memory::desc src_sc_md;
+  memory src_sc_m;
+  src_sc_md = memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+  if (is_opaque_u8(src)) {
+    src_sc = at::empty({1}, at::dtype(at::kFloat).device(at::kXPU))
+                 .fill_(static_cast<float>(src.q_scale()));
+    src_sc_m = dpcpp_onednn_memory(src_sc_md, engine, src_sc.data_ptr());
+  } else {
+    src_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(src);
+    src_sc_m = dpcpp_onednn_memory(src_sc_md, engine, src_sc.data_ptr());
+  }
   args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, src_sc_m});
 
 #ifdef BUILD_PRIOR_SYMM_QUANT
@@ -493,12 +496,6 @@ static at::Tensor quantized_convolution(
     args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zp_m});
   }
 #endif
-
-  Tensor dst_sc = at::ones({1}, at::dtype(at::kFloat).device(at::kXPU));
-  memory::desc dst_sc_md =
-      memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
-  memory dst_sc_m = dpcpp_onednn_memory(dst_sc_md, engine, dst_sc.data_ptr());
-  args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, dst_sc_m});
 
 #ifdef BUILD_PRIOR_SYMM_QUANT
   // Only setting zp when zp is not zero
@@ -525,9 +522,7 @@ static at::Tensor quantized_convolution(
 #endif
 
   if (wgh.qscheme() == kPerTensorAffine) {
-    Tensor wgh_sc =
-        (at::ones({1}, at::dtype(at::kFloat).device(at::kXPU)) *
-         static_cast<float>(wgh.q_scale()));
+    Tensor wgh_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(wgh);
     memory::desc wgh_sc_md =
         memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
     memory wgh_sc_m = dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
