@@ -24,6 +24,7 @@ class IndexKernelConfig : public BatchKernelConfig {
       int64_t index_num,
       int64_t indexing_dimension_size,
       bool indexing_dst,
+      bool problem_inner,
       FuncType func,
       int64_t batch,
       int64_t problem,
@@ -43,6 +44,7 @@ class IndexKernelConfig : public BatchKernelConfig {
         index_num_(index_num),
         indexing_dimension_size_(indexing_dimension_size),
         indexing_dst_(indexing_dst),
+        problem_inner_(problem_inner),
         func_(func) {}
 
   template <class TarInfo>
@@ -56,7 +58,8 @@ class IndexKernelConfig : public BatchKernelConfig {
       int64_t& problem,
       int64_t& stride,
       int64_t& problem_batch,
-      bool& problem_along_x) {
+      bool& problem_along_x,
+      bool& problem_inner) {
     int64_t outer = tinfo.outerSize(dim);
     int64_t inner = tinfo.innerSize(dim);
 
@@ -66,18 +69,21 @@ class IndexKernelConfig : public BatchKernelConfig {
       batch = 1;
       problem_batch = index_num;
       problem_along_x = tinfo.strides[dim] == 1 ? false : true;
+      problem_inner = false;
     } else if (outer == 1) {
       problem = inner;
       stride = 1;
       batch = indexing_dimension_size;
       problem_batch = index_num;
       problem_along_x = tinfo.strides[tinfo.dims - 1] == 1 ? true : false;
+      problem_inner = true;
     } else {
       problem = inner;
       stride = 1;
       batch = outer * indexing_dimension_size;
       problem_batch = outer * index_num;
       problem_along_x = tinfo.strides[tinfo.dims - 1] == 1 ? true : false;
+      problem_inner = true;
     }
     return;
   }
@@ -93,7 +99,7 @@ class IndexKernelConfig : public BatchKernelConfig {
     int64_t index_num = index_info.sizes[0];
     int64_t indexing_dimension_size;
 
-    bool problem_along_x;
+    bool problem_along_x, problem_inner;
     int64_t batch, problem, stride, problem_batch;
 
     TORCH_CHECK(
@@ -112,7 +118,8 @@ class IndexKernelConfig : public BatchKernelConfig {
           problem,
           stride,
           problem_batch,
-          problem_along_x);
+          problem_along_x,
+          problem_inner);
     } else {
       indexing_dimension_size = src_info.sizes[dim];
       indexing_problem_mapping(
@@ -125,7 +132,8 @@ class IndexKernelConfig : public BatchKernelConfig {
           problem,
           stride,
           problem_batch,
-          problem_along_x);
+          problem_along_x,
+          problem_inner);
     }
 
     return {
@@ -136,6 +144,7 @@ class IndexKernelConfig : public BatchKernelConfig {
         index_num,
         indexing_dimension_size,
         indexing_dst,
+        problem_inner,
         func,
         batch,
         problem,
@@ -152,6 +161,7 @@ class IndexKernelConfig : public BatchKernelConfig {
   int64_t index_num_;
   int64_t indexing_dimension_size_;
   bool indexing_dst_;
+  bool problem_inner_;
   FuncType func_;
 };
 
@@ -189,7 +199,7 @@ class IndexKernel {
     int64_t glb_batch_group_glb_off =
         glb_batch_group * cfg_.indexing_dimension_size_ +
         glb_batch_group_loc_off;
-    if (cfg_.batch_ != 1) {
+    if (cfg_.problem_inner_) {
       si = 0;
       pi = id.chunk * id.chunk_size + id.chunk_off;
       bi = glb_batch_group_glb_off;
@@ -208,7 +218,7 @@ class IndexKernel {
     int64_t si, pi, bi, stride;
     int64_t glb_batch_group_glb_off =
         glb_batch_group * cfg_.index_num_ + idx_logical_off;
-    if (cfg_.batch_ != 1) {
+    if (cfg_.problem_inner_) {
       si = 0;
       pi = id.chunk * id.chunk_size + id.chunk_off;
       bi = glb_batch_group_glb_off;
