@@ -761,16 +761,17 @@ void index_put_deterministic_kernel(
 
   sycl::range<3> wgroup_size = {1, indices_per_group, group_x};
 
-  int x_num = ceil_div(numel, (int64_t)indices_per_group);
-  int y_num = ceil_div(stride, (int64_t)group_x * SZ);
+  int x_num = ceil_div(stride, (int64_t)group_x * SZ);
+  int y_num = ceil_div(numel, (int64_t)indices_per_group);
   int z_num = std::min(
       std::max<int>(1, outer_dim),
       ceil_div(
           hw_max_work_items,
-          std::min<int>(numel, (x_num * indices_per_group)) *
-              std::min<int>(stride, (y_num * group_x * SZ))));
+          std::min<int>(stride, (x_num * group_x * SZ)) *
+              std::min<int>(numel, (y_num * indices_per_group))));
   sycl::range<3> wgroup_range = {
-      z_num, y_num * group_x * SZ, x_num * indices_per_group};
+      z_num, y_num * indices_per_group, x_num * group_x * SZ};
+
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item_id) {
       auto itemIdx_y = item_id.get_local_id(1);
@@ -781,11 +782,11 @@ void index_put_deterministic_kernel(
       auto groupDim_y = item_id.get_local_range(1);
       auto groupDim_x = item_id.get_local_range(2);
       for (int64_t z = groupIdx_z; z < outer_dim; z += z_num) {
-        int64_t idx = groupIdx_x * groupDim_y + itemIdx_y;
+        int64_t idx = groupIdx_y * groupDim_y + itemIdx_y;
         if (idx < numel &&
             (idx == 0 || sorted_indices[idx] != sorted_indices[idx - 1])) {
           do {
-            int64_t start_feature = itemIdx_x + groupIdx_y * groupDim_x * SZ;
+            int64_t start_feature = itemIdx_x + groupIdx_x * groupDim_x * SZ;
             const int64_t self_row =
                 ((int64_t)sorted_indices[idx]) * stride + z * stride_before;
             const int64_t value_row =
@@ -799,7 +800,7 @@ void index_put_deterministic_kernel(
                       value[value_row + feature_dim];
                 }
               }
-              start_feature += y_num * groupDim_x * SZ;
+              start_feature += x_num * groupDim_x * SZ;
             }
             idx++;
           } while (idx < numel &&
