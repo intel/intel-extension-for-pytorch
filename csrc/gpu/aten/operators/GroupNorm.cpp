@@ -689,9 +689,11 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm(
       at::borrow_from_optional_tensor(beta_opt);
   const Tensor& beta = *beta_maybe_owned;
 
-  TORCH_CHECK(
-      gamma.scalar_type() == kFloat || X.scalar_type() == gamma.scalar_type(),
-      "Input and weight should be of the same datatype.");
+  if (gamma.defined()) {
+    TORCH_CHECK(
+        gamma.scalar_type() == kFloat || X.scalar_type() == gamma.scalar_type(),
+        "Input and weight should be of the same datatype.");
+  }
 
   Tensor X_cont = X.contiguous();
   Tensor Y = at::empty_like(X_cont);
@@ -721,9 +723,11 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_backward(
   c10::MaybeOwned<Tensor> gamma_maybe_owned =
       at::borrow_from_optional_tensor(gamma_opt);
   const Tensor& gamma = *gamma_maybe_owned;
-  TORCH_CHECK(
-      gamma.scalar_type() == kFloat || X.scalar_type() == gamma.scalar_type(),
-      "Input and weight should be of the same datatype.");
+  if (gamma.defined()) {
+    TORCH_CHECK(
+        gamma.scalar_type() == kFloat || X.scalar_type() == gamma.scalar_type(),
+        "Input and weight should be of the same datatype.");
+  }
   Tensor dX;
   Tensor dgamma;
   Tensor dbeta;
