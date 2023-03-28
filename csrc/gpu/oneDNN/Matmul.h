@@ -191,12 +191,13 @@ static inline void matmul(
   if (m1.is_quantized()) {
     auto in_scale = m1.q_scale();
     int mask_ac = 0;
-    int mask_matmul = (m2.qscheme() == kPerChannelAffine) ? 2 : 0;
-    // 2 = 2^1, quantize on second channel of weight aka n in [k, n]
+    // See [Note: Per-channel quantization mask setting]
+    // 1<<1 = 2^1, quantize on second channel of weight aka n in [k, n]
+    int mask_wgh = (m2.qscheme() == kPerChannelAffine) ? 1 << 1 : 0;
     if (dst.is_quantized())
       pattr.set_scales_mask(DNNL_ARG_DST, mask_ac);
     pattr.set_scales_mask(DNNL_ARG_SRC, mask_ac);
-    pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_matmul);
+    pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_wgh);
 
 #ifdef BUILD_PRIOR_SYMM_QUANT
     // Only setting zp mask when zp is not zero
@@ -206,7 +207,7 @@ static inline void matmul(
     if (dst_need_zp)
       pattr.set_zero_points_mask(DNNL_ARG_SRC, mask_ac);
     if (wgh_need_zp)
-      pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, mask_matmul);
+      pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, mask_wgh);
 #endif
   }
 

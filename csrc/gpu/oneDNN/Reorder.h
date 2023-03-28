@@ -23,14 +23,17 @@ struct ReorderAttr {
   ReorderAttr(bool is_group = false) : pattr_(primitive_attr()) {}
 
  public:
-  void set_src_sc_and_zp_mask(int scmask, int zpmask) {
-    pattr_.set_scales_mask(DNNL_ARG_DST, scmask);
-    pattr_.set_zero_points_mask(DNNL_ARG_SRC, zpmask);
+  // [Note: Scale setting for reorder]
+  // For no post op on reorder, dst = src_scale * src / dst_scale;
+  // dst_scale should be set carefully.
+  void set_src_sc_and_zp_mask(int mask) {
+    pattr_.set_scales_mask(DNNL_ARG_SRC, mask);
+    pattr_.set_zero_points_mask(DNNL_ARG_SRC, mask);
   }
 
-  void set_dst_sc_and_zp_mask(int scmask, int zpmask) {
-    pattr_.set_scales_mask(DNNL_ARG_DST, scmask);
-    pattr_.set_zero_points_mask(DNNL_ARG_DST, zpmask);
+  void set_dst_sc_and_zp_mask(int mask) {
+    pattr_.set_scales_mask(DNNL_ARG_DST, mask);
+    pattr_.set_zero_points_mask(DNNL_ARG_DST, mask);
   }
 
   primitive_attr pattr() const {
@@ -147,7 +150,6 @@ static inline void quantized_reorder(
 
   std::unordered_map<int, memory> reorder_args;
 
-  reorder_args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, sc_mem});
   reorder_args.insert({DNNL_ARG_SRC, src_mem});
   reorder_args.insert({DNNL_ARG_DST, dst_mem});
 
@@ -160,6 +162,7 @@ static inline void quantized_reorder(
         memory::format_tag::x);
     auto src_zp_mem =
         dpcpp_onednn_memory(src_zp_md, engine, zero_point.data_ptr());
+    reorder_args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, sc_mem});
     reorder_args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zp_mem});
     DPCPP_ONEDNN_EXEC(prim, strm, reorder_args);
   } else {
@@ -170,6 +173,7 @@ static inline void quantized_reorder(
         get_onednn_strides(zero_point));
     auto dst_zp_mem =
         dpcpp_onednn_memory(dst_zp_md, engine, zero_point.data_ptr());
+    reorder_args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, sc_mem});
     reorder_args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zp_mem});
     DPCPP_ONEDNN_EXEC(prim, strm, reorder_args);
   }

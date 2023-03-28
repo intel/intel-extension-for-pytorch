@@ -69,10 +69,9 @@ Tensor quantize_tensor_per_channel_affine(
     const Tensor& zero_points,
     int64_t axis) {
   xpu::oneDNN::ReorderAttr rattr = xpu::oneDNN::ReorderAttr();
-  int mask_0 = 1 << axis;
-  int mask_1 = 0;
-
-  rattr.set_dst_sc_and_zp_mask(mask_0, mask_1);
+  int mask = (1 << axis);
+  // See [Note: Scale setting for reorder]
+  rattr.set_dst_sc_and_zp_mask(mask);
   Tensor dnn_scale = scales.to(at::kFloat);
   // TODO: Remove workaround for dnn symmetric quantization
   Tensor dnn_zero_point =
@@ -114,8 +113,8 @@ Tensor quantize_tensor_per_tensor_affine(
       static_cast<float>(scale);
   // TODO: Remove workaround for dnnl symmetric quantization
   Tensor dnn_zero_point = at::zeros(1, at::dtype(at::kInt).device(at::kXPU));
-
-  rattr.set_dst_sc_and_zp_mask(mask, mask);
+  // See [Note: Scale setting for reorder]
+  rattr.set_dst_sc_and_zp_mask(mask);
   if (qtensor.scalar_type() == kQUInt8 && zero_point == 128) {
     // TODO: Remove workaround for dnnl symmetric quantization
     Tensor qtensor_opt = qtensor;
