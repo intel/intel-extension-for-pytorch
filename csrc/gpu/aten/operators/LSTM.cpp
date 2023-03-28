@@ -145,7 +145,8 @@ std::tuple<Tensor, Tensor, Tensor> lstm(
     bool train,
     bool bidirectional,
     bool batch_first) {
-  if (Settings::I().is_force_onednn_primitive_enabled()) {
+  auto compute_eng = Settings::I().get_compute_eng();
+  if (compute_eng == xpu::COMPUTE_ENG::ONEDNN) {
     Variable input_v = input;
     if (batch_first) {
       input_v = input_v.transpose(0, 1).contiguous();

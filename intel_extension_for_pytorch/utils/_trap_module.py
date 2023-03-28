@@ -53,3 +53,14 @@ _register_trap('_XPUEventBase')
 
 if not hasattr(intel_extension_for_pytorch._C, 'XPUFP32MathMode'):
     intel_extension_for_pytorch._C.__dict__['XPUFP32MathMode'] = trap_math_mode
+
+
+class trap_xpu_compute_eng(object):
+    RECOMMEND   = -1
+    BASIC       = -2
+    ONEDNN      = -3
+    ONEMKL      = -4
+    XETLA       = -5
+
+if not hasattr(intel_extension_for_pytorch._C, 'XPUComputeEng'):
+    intel_extension_for_pytorch._C.__dict__['XPUComputeEng'] = trap_xpu_compute_eng

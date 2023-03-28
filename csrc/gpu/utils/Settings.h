@@ -14,6 +14,21 @@ static const char* VERBOSE_LEVEL_STR[]{"DISABLE", "DEBUG"};
 enum XPU_BACKEND { GPU = 0, CPU = 1, AUTO = 2, XPU_BACKEND_MAX = AUTO };
 static const char* XPU_BACKEND_STR[]{"GPU", "CPU", "AUTO"};
 
+enum COMPUTE_ENG {
+  RECOMMEND = 0,
+  BASIC = 1,
+  ONEDNN = 2,
+  ONEMKL = 3,
+  XETLA = 4,
+  COMPUTE_ENG_MAX = XETLA
+};
+static const char* COMPUTE_ENG_STR[]{
+    "RECOMMEND",
+    "BASIC",
+    "ONEDNN",
+    "ONEMKL",
+    "XETLA"};
+
 namespace dpcpp {
 
 class Settings final {
@@ -32,6 +47,9 @@ class Settings final {
   XPU_BACKEND get_backend() const;
   bool set_backend(XPU_BACKEND backend);
 
+  COMPUTE_ENG get_compute_eng() const;
+  bool set_compute_eng(COMPUTE_ENG eng);
+
   bool is_sync_mode_enabled() const;
   void enable_sync_mode();
   void disable_sync_mode();
@@ -43,10 +61,6 @@ class Settings final {
   bool is_onednn_layout_enabled() const;
   void enable_onednn_layout();
   void disable_onednn_layout();
-
-  bool is_force_onednn_primitive_enabled() const;
-  void enable_force_onednn_primitive();
-  void disable_force_onednn_primitive();
 
   FP32_MATH_MODE get_fp32_math_mode() const;
   bool set_fp32_math_mode(FP32_MATH_MODE mode);
@@ -67,12 +81,12 @@ class Settings final {
  private:
   VERBOSE_LEVEL verbose_level;
   XPU_BACKEND xpu_backend;
+  COMPUTE_ENG compute_eng;
   FP32_MATH_MODE fp32_math_mode;
 
   ENV_VAL sync_mode_enabled;
   ENV_VAL tile_as_device_enabled;
   ENV_VAL onednn_layout_enabled;
-  ENV_VAL force_onednn_primitive_enabled;
 
 #ifdef BUILD_SIMPLE_TRACE
   ENV_VAL simple_trace_enabled;

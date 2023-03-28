@@ -344,34 +344,38 @@ class onednn_layout(OnOff):
         super().__init__(using_onednn_layout, enable_onednn_layout, disable_onednn_layout)
 
 
-# force oneDNN primivite
-def using_force_onednn_primitive():
-    r"""
-    Get the current force onednn primitive setting.
-
-    Return:
-        Force onednn primitive mode
-        The value will be ``ON`` or ``OFF``.
-        ``ON`` means enabled force onednn primitive mode;
-        ``OFF`` means disabled force onednn primitive mode;
-
-    Supported operator list:
-        GRU
-    """
-    return _C._is_force_onednn_primitive_enabled()
+# For several primitive implementations, force to set compute engine
+class XPUComputeEng(EnumBase):
+    RECOMMEND   = intel_extension_for_pytorch._C.XPUComputeEng.RECOMMEND
+    BASIC       = intel_extension_for_pytorch._C.XPUComputeEng.BASIC
+    ONEDNN      = intel_extension_for_pytorch._C.XPUComputeEng.ONEDNN
+    ONEMKL      = intel_extension_for_pytorch._C.XPUComputeEng.ONEMKL
+    XETLA       = intel_extension_for_pytorch._C.XPUComputeEng.XETLA
 
 
-def enable_force_onednn_primitive():
-    _C._enable_force_onednn_primitive()
+def get_compute_eng():
+    return XPUComputeEng.get_value(intel_extension_for_pytorch._C._get_compute_eng)
 
 
-def disable_force_onednn_primitive():
-    _C._disable_force_onednn_primitive()
+def set_compute_eng(eng):
+    st = XPUComputeEng.set_value(intel_extension_for_pytorch._C._set_compute_eng, eng)
+    assert bool(st), "WARNING: Failed to set XPU compute engine!"
 
 
-class force_onednn_primitive(OnOff):
-    def __init__(self):
-        super().__init__(using_force_onednn_primitive, enable_force_onednn_primitive, disable_force_onednn_primitive)
+class compute_eng(object):
+    def __init__(self, eng):
+        self.eng = XPUComputeEng.convert(eng)
+
+    def __enter__(self):
+        current_compute_eng = get_compute_eng()
+        if self.eng != current_compute_eng:
+            set_compute_eng(self.eng)
+            self.eng = current_compute_eng
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        set_compute_eng(self.eng)
+        return False
 
 
 # Simple Trace

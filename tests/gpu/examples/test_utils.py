@@ -51,9 +51,13 @@ class TestVerbose(TestCase):
         with torch.xpu.onednn_layout():
             assert torch.xpu.using_onednn_layout(), 'Fail to set onednn layout'
 
-    def test_force_onednn_primitive(self):
-        with torch.xpu.force_onednn_primitive():
-            assert torch.xpu.using_force_onednn_primitive(), 'Fail to force onednn primitive'
+    def test_compute_eng(self):
+        eng_list = [torch.xpu.XPUComputeEng.RECOMMEND, torch.xpu.XPUComputeEng.BASIC, torch.xpu.XPUComputeEng.ONEDNN,
+                torch.xpu.XPUComputeEng.ONEMKL, torch.xpu.XPUComputeEng.XETLA]
+        for eng in eng_list:
+            torch.xpu.set_compute_eng(eng)
+            assert torch.xpu.get_compute_eng() == eng, 'Fail to enable XPU Compute Engine: ' + eng
+
 
 class TestDevicdeListForCard(TestCase):
     def test_devicelist_empty(self):

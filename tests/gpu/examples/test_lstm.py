@@ -152,7 +152,7 @@ class TestNNMethod(TestCase):
 
     @pytest.mark.skip("Unstable case. Will be fixed soon.")
     def test_lstm_rnnt_onednn(self, dtype=torch.float):
-        with torch.xpu.force_onednn_primitive():
+        with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.ONEDNN):
             rnn = nn.LSTM(240, 1024, num_layers=2)
             rnn_xpu = copy.deepcopy(rnn).to("xpu")
             input = torch.randn(128, 2, 240)
