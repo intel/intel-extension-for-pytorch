@@ -146,7 +146,6 @@ static memory qdeconv_get_expected_wgh_memory(
     at::Tensor& wgh_blocked,
     memory::desc& wgh_usr_md,
     memory::desc& expected_wgh_md,
-    std::vector<float>& wgh_scales,
     dnnl::engine& engine,
     bool weight_cache_optimization) {
   memory wgh_m;
@@ -271,14 +270,14 @@ static Tensor quantized_deconvolution(
 
   // quant only
   primitive_attr pattr;
-  std::vector<float> wgh_scales, conv_scale = {1};
 
-  int conv_zero_point = 0, mask_conv;
+  int mask_wgh;
   int mask_ac = 0;
-  mask_conv = (wgh.qscheme() == kPerTensorAffine) ? 0 : 1 << 1;
-  pattr.set_scales_mask(DNNL_ARG_DST, mask_conv);
+  // See [Note: Per-channel quantization mask setting]
+  mask_wgh = (wgh.qscheme() == kPerTensorAffine) ? 0 : 1;
+  pattr.set_scales_mask(DNNL_ARG_DST, mask_ac);
   pattr.set_scales_mask(DNNL_ARG_SRC, mask_ac);
-  pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_conv);
+  pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_wgh);
 
 #ifdef BUILD_PRIOR_SYMM_QUANT
   // Only setting zp mask when zp is not zero
@@ -291,7 +290,7 @@ static Tensor quantized_deconvolution(
   if (dst_need_zp)
     pattr.set_zero_points_mask(DNNL_ARG_DST, mask_ac);
   if (wgh_need_zp)
-    pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, mask_conv);
+    pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, mask_wgh);
 #endif
 
   auto deconv_fwd_pd = deconvolution_forward::primitive_desc(
@@ -316,7 +315,6 @@ static Tensor quantized_deconvolution(
   }();
 
   memory src_m, wgh_m, dst_m;
-  // Tensor src_, wgh_, bia_;
   Tensor src_blocked, wgh_blocked, dst_blocked = dst;
 
   if (is_onednn_layout_suggested) {
@@ -330,7 +328,6 @@ static Tensor quantized_deconvolution(
         wgh_blocked,
         wgh_usr_md,
         expected_wgh_md,
-        wgh_scales,
         engine,
         weight_cache_optimization);
     dst_m = qdeconv_get_block_dst_memory(
@@ -347,7 +344,6 @@ static Tensor quantized_deconvolution(
           wgh_blocked,
           wgh_usr_md,
           expected_wgh_md,
-          wgh_scales,
           engine,
           weight_cache_optimization);
     }

@@ -297,10 +297,18 @@ static at::Tensor quantized_convolution(
   attr.extract_post_ops(po, dst);
   // set conv primitive scale and zero_point
   std::vector<float> wgh_scales, conv_scale = {1};
-  int conv_zero_point = 0, mask_ac = 0, mask_conv;
+  int mask_ac = 0, mask_wgh;
 
+  // [Note: Per-channel quantization mask setting]
+  // Per-channel quantization is on weight output channel mostly, mask_wgh= 1
+  // here means 2^0. 0 means the 0th dimension of wgh tensor, aka output
+  // channel. DNN requires mask = 2^k for the kth axis to be quantized. Only one
+  // axis quantization is supported in IPEX. Multi channel quantization is not
+  // supported. In addition, src, dst should still be per-tensor quant, aka
+  // mask=0. Per-channel quantization on activation is not supported in conv.
+  mask_wgh = (wgh.qscheme() == kPerTensorAffine) ? 0 : 1;
   primitive_attr pattr;
-  mask_conv = (wgh.qscheme() == kPerTensorAffine) ? 0 : 1 << 1;
+
 #ifdef USE_PRIMITIVE_CACHE
   create_key(
       key_primitive,
@@ -377,7 +385,7 @@ static at::Tensor quantized_convolution(
     }
 
     pattr.set_scales_mask(DNNL_ARG_SRC, mask_ac);
-    pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_conv);
+    pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_wgh);
 
 #ifdef BUILD_PRIOR_SYMM_QUANT
     // Only setting zp mask when zp is not zero
@@ -387,7 +395,7 @@ static at::Tensor quantized_convolution(
     if (dst_need_zp)
       pattr.set_zero_points_mask(DNNL_ARG_SRC, mask_ac);
     if (wgh_need_zp)
-      pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, mask_conv);
+      pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, mask_wgh);
 #endif
 
     pattr.set_post_ops(po);

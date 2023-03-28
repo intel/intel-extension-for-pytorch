@@ -33,10 +33,11 @@ Tensor dequantize_tensor_per_tensor_affine(
                       qtensor.q_zero_point() == 128)
       ? static_cast<float>(scale / 2)
       : static_cast<float>(scale);
-  rattr.set_src_sc_and_zp_mask(mask, mask);
+  rattr.set_src_sc_and_zp_mask(mask);
 
+  // See [Note: Scale setting for reorder]
   Tensor dnn_scale =
-      at::ones(1, at::dtype(at::kFloat).device(at::kXPU)) * 1.f / true_scale;
+      at::ones(1, at::dtype(at::kFloat).device(at::kXPU)) * true_scale;
   // TODO: Remove workaround for dnnl symmetric quantization
   Tensor dnn_zero_point = at::zeros(1, at::dtype(at::kInt).device(at::kXPU));
 
@@ -75,16 +76,18 @@ Tensor dequantize_tensor_per_channel_affine(
   engine r_eng = q_eng;
   memory::desc r_md = memory::desc(r_dims, r_dt, r_fmt);
 
-  ReorderAttr rattr = ReorderAttr();
-  int mask_0 = 1 << axis;
-  int mask_1 = 0;
-
-  Tensor dnn_scale = at::ones(1, at::dtype(at::kFloat).device(at::kXPU)) *
-      1.0f / scales.to(at::kFloat);
+  int num_channels = qtensor.size(axis);
+  ReorderAttr rattr;
+  int mask = (1 << axis);
+  // See [Note: Scale setting for reorder]
+  Tensor dnn_scale =
+      at::ones({num_channels}, at::dtype(at::kFloat).device(at::kXPU)) *
+      scales.to(at::kFloat);
   // TODO: Remove workaround for dnnl symmetric quantization
-  Tensor dnn_zero_point = at::zeros(1, at::dtype(at::kInt).device(at::kXPU));
+  Tensor dnn_zero_point =
+      at::zeros({num_channels}, at::dtype(at::kInt).device(at::kXPU));
 
-  rattr.set_src_sc_and_zp_mask(mask_0, mask_1);
+  rattr.set_src_sc_and_zp_mask(mask);
 
   Tensor rtensor_ = empty_opaque_tensor(r_md, rtensor.options(), c10::nullopt);
   xpu::oneDNN::quantized_reorder(

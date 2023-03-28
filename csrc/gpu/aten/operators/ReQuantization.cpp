@@ -32,7 +32,7 @@ Tensor requantize(
   // TODO: Remove workaround for dnnl symmetric quantization
   Tensor dnn_zero_point =
       at::ones(1, at::dtype(at::kInt).device(at::kXPU)) * zero_point_out;
-  reorder_attr.set_dst_sc_and_zp_mask(mask, 0);
+  reorder_attr.set_dst_sc_and_zp_mask(mask);
   xpu::oneDNN::quantized_reorder(
       src, dst_, dnn_scale, dnn_zero_point, reorder_attr);
 
