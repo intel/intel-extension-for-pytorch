@@ -350,7 +350,7 @@ class Launcher():
                 logger.warning("Unable to find the {} library file lib{}.so in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib"
                                " or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
                                "{}/.local/lib/ so the LD_PRELOAD environment variable will not be set."
-                               "you can use 'conda install intel-openm' to install intel openMP"
+                               "you can use 'conda install intel-openmp' to install intel openMP"
                                .format("iomp", "iomp5", expanduser("~")))
             else:
                 logger.info("Using Intel OpenMP")
