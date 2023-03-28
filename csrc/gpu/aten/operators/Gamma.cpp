@@ -34,8 +34,12 @@ void digamma_kernel_xpu(TensorIterator& iter) {
 }
 
 void igamma_kernel_xpu(TensorIterator& iter) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16, iter.common_dtype(), "igamma_xpu", [&]() {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.common_dtype(),
+      "igamma_xpu",
+      [&]() {
         dpcpp_kernel_for_tensor_iter(
             iter, [=](scalar_t a, scalar_t b) -> scalar_t {
               return calc_igamma(a, b);

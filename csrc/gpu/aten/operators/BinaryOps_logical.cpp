@@ -16,7 +16,7 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 void logical_and_kernel_dpcpp(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       kBool,
       kHalf,
       kBFloat16,
@@ -29,7 +29,7 @@ void logical_and_kernel_dpcpp(TensorIterator& iter) {
 }
 
 void logical_or_kernel_dpcpp(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       kBool, kHalf, kBFloat16, iter.common_dtype(), "logical_or_kernel", [&]() {
         opmath_symmetric_gpu_kernel_with_scalars<scalar_t, bool>(
             iter, [](scalar_t a, scalar_t b) -> bool { return a || b; });
@@ -37,7 +37,7 @@ void logical_or_kernel_dpcpp(TensorIterator& iter) {
 }
 
 void logical_xor_kernel_dpcpp(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       kBool,
       kHalf,
       kBFloat16,

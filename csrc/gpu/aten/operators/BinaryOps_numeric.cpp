@@ -57,8 +57,8 @@ Tensor& fmod_out(const Tensor& self, const Tensor& other, Tensor& out) {
           iter, [](scalar_t a, scalar_t b) -> scalar_t { return a % b; });
     });
   } else {
-    IPEX_DISPATCH_FLOATING_TYPES_AND(
-        kHalf, iter.common_dtype(), "fmod_xpu", [&]() {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        kHalf, kBFloat16, iter.common_dtype(), "fmod_xpu", [&]() {
           dpcpp_kernel_with_scalars(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
                 return Numerics<scalar_t>::fmod(a, b);

@@ -409,10 +409,11 @@ static void cat(
       all32BitIndexable && allSameType &&
       (inputs[0].get().scalar_type() == result.scalar_type()) &&
       (!inputs[0].get().is_quantized())) {
-    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
         at::ScalarType::Half,
         at::ScalarType::Bool,
         at::ScalarType::BFloat16,
+        kComplexHalf,
         result.scalar_type(),
         "cat_dpcpp",
         [&]() {
