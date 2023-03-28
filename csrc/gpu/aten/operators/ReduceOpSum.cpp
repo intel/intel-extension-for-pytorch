@@ -40,7 +40,8 @@ void sum_kernel_impl(TensorIterator& iter) {
 }
 
 void sum_kernel(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      at::ScalarType::Bool,
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),

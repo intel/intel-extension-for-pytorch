@@ -279,23 +279,24 @@ static void upsample_bicubic2d_out_template(
   output.resize_({nbatch, channels, output_height, output_width});
   output.zero_();
 
-  IPEX_DISPATCH_FLOATING_TYPES(input.scalar_type(), "upsample_bicubic2d", [&] {
-    auto* idata = input.data_ptr<scalar_t>();
-    auto* odata = output.data_ptr<scalar_t>();
-    auto onum = output.numel();
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, input.scalar_type(), "upsample_bicubic2d", [&] {
+        auto* idata = input.data_ptr<scalar_t>();
+        auto* odata = output.data_ptr<scalar_t>();
+        auto onum = output.numel();
 
-    upsample_bicubic2d_out_frame<scalar_t>(
-        odata,
-        idata,
-        input_height,
-        input_width,
-        output_height,
-        output_width,
-        nbatch,
-        channels,
-        onum,
-        align_corners);
-  });
+        upsample_bicubic2d_out_frame<scalar_t>(
+            odata,
+            idata,
+            input_height,
+            input_width,
+            output_height,
+            output_width,
+            nbatch,
+            channels,
+            onum,
+            align_corners);
+      });
 }
 
 static void upsample_bicubic2d_backward_out_template(

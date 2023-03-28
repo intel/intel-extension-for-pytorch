@@ -27,8 +27,12 @@ Tensor& tanh_backward_out(
       grad_output,
       output,
       [=](TensorIteratorBase& iter) {
-        IPEX_DISPATCH_ALL_TYPES_AND(
-            at::ScalarType::BFloat16, iter.dtype(), "tanh_backward_out", [&]() {
+        IPEX_DISPATCH_ALL_TYPES_AND2(
+            at::ScalarType::Half,
+            at::ScalarType::BFloat16,
+            iter.dtype(),
+            "tanh_backward_out",
+            [&]() {
               dpcpp_kernel_for_tensor_iter(
                   iter, [](scalar_t output, scalar_t z) -> scalar_t {
                     return output * (scalar_t{1} - z * z);

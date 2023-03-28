@@ -1321,8 +1321,9 @@ Tensor host_softmax_backward(
   Tensor output = output_;
   if (output.dim() == 0)
     output = output.view(1);
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
+      at::ScalarType::Half,
       grad.scalar_type(),
       "host_softmax_backward",
       [&] {

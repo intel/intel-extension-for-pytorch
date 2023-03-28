@@ -77,9 +77,12 @@ void GatedLinearUnit_updateGradInput(
 
 // namespace AtenIpexTypeXPU
 Tensor& glu_out(const Tensor& self, int64_t dim, Tensor& out) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "glu_out", [&] {
-    impl::GatedLinearUnit_updateOutput<scalar_t>(out, self, dim);
-  });
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      self.scalar_type(),
+      "glu_out",
+      [&] { impl::GatedLinearUnit_updateOutput<scalar_t>(out, self, dim); });
   return out;
 }
 

@@ -135,6 +135,24 @@ struct TopKTypeConfig<at::Half> {
   }
 };
 
+template <>
+struct TopKTypeConfig<at::BFloat16> {
+  using RadixType = uint32_t;
+
+  static inline RadixType convert(at::BFloat16 v) {
+    RadixType x = v.x;
+    RadixType mask = (x & 0x00008000) ? 0x0000ffff : 0x00008000;
+    return (v == v) ? (x ^ mask) : 0xffff;
+  }
+
+  static inline at::BFloat16 deconvert(RadixType v) {
+    RadixType mask = (v & 0x00008000) ? 0x00008000 : 0x0000ffff;
+    at::BFloat16 r;
+    r.x = (v ^ mask);
+    return r;
+  }
+};
+
 template <typename T>
 struct Bitfield {};
 
