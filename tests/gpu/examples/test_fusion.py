@@ -2800,35 +2800,37 @@ class TestNNMethod(TestCase):
         del modelJit
 
 
-    def test_linear_binary_mul_fusion(self, dtype=torch.float):
-        x = torch.randn([2, 4], device=cpu_device)
-        a = torch.randn([2, 4], device=cpu_device)
-        model = LinearBinaryMul(4, 4)
-        model_scalar = LinearBinaryMulScalar(4, 4)
-        y = model(x, a)
-        y_scalar = model_scalar(x, a)
-        print("raw: ", y)
+    def test_linear_binary_mul_fusion(self):
+        dtypes = [torch.float, torch.bfloat16] 
+        for dtype in dtypes:
+            x = torch.randn([2, 4], device=cpu_device).to(dtype)
+            a = torch.randn([2, 4], device=cpu_device)
+            model = LinearBinaryMul(4, 4).to(dtype)
+            model_scalar = LinearBinaryMulScalar(4, 4).to(dtype)
+            y = model(x, a)
+            y_scalar = model_scalar(x, a)
+            print("raw: ", y)
 
-        x = x.to("xpu")
-        a = a.to("xpu")
-        model.to("xpu")
-        model_scalar.to("xpu")
-        modelJit = torch.jit.script(model)
-        modelJit_scalar = torch.jit.script(model_scalar)
+            x = x.to("xpu")
+            a = a.to("xpu")
+            model.to("xpu")
+            model_scalar.to("xpu")
+            modelJit = torch.jit.script(model)
+            modelJit_scalar = torch.jit.script(model_scalar)
 
-        with torch.no_grad(): 
-            for i in range(2):
-                modelJit(x, a)
-                modelJit_scalar(x, a)
-            if print_graph:
-                print(modelJit.graph_for(x, a))
-                print(modelJit_scalar.graph_for(x, a))
-            y_dpcpp = modelJit(x, a)
-            y_dpcpp_scalar = modelJit_scalar(x, a)
-            print("fusion:", y_dpcpp.cpu())
-        self.assertEqual(y, y_dpcpp.to(cpu_device))
-        self.assertEqual(y_scalar, y_dpcpp_scalar.to(cpu_device))
-        del modelJit
+            with torch.no_grad(): 
+                for i in range(2):
+                    modelJit(x, a)
+                    modelJit_scalar(x, a)
+                if print_graph:
+                    print(modelJit.graph_for(x, a))
+                    print(modelJit_scalar.graph_for(x, a))
+                y_dpcpp = modelJit(x, a)
+                y_dpcpp_scalar = modelJit_scalar(x, a)
+                print("fusion:", y_dpcpp.cpu())
+            self.assertEqual(y.to(dtype), y_dpcpp.to(dtype).to(cpu_device))
+            self.assertEqual(y_scalar.to(dtype), y_dpcpp_scalar.to(cpu_device))
+            del modelJit
 
     def test_linear_binary_sub_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)

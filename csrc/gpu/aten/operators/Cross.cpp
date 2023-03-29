@@ -26,8 +26,12 @@ void launch_cross_kernel(
   int64_t work_group_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t work_group_num = (N + work_group_size - 1) / work_group_size;
 
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND(
-      kHalf, iter.common_dtype(), "cross_xpu", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.common_dtype(),
+      "cross_xpu",
+      [&]() {
         auto cgf = DPCPP_Q_CGF(cgh) {
           auto out = static_cast<scalar_t*>(iter.data_ptr(0));
           auto x = static_cast<const scalar_t*>(iter.data_ptr(1));
@@ -139,10 +143,12 @@ Tensor& cross_out(
     out.resize_as_(input);
   }
 
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND(
-      at::ScalarType::Half, input.scalar_type(), "cross", [&]() {
-        impl::cross(out, input, other, dim);
-      });
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      input.scalar_type(),
+      "cross",
+      [&]() { impl::cross(out, input, other, dim); });
 
   return out;
 }
