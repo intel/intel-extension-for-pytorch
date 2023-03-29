@@ -351,7 +351,9 @@ std::tuple<Tensor, Tensor> gru(
     bool batch_first) {
   //  TORCH_CHECK(!train || dropout == 0.0, "onednn_rnn doesn't support
   //  dropout");
-  if (Settings::I().is_force_onednn_primitive_enabled()) {
+  auto compute_eng = Settings::I().get_compute_eng();
+  if (compute_eng == xpu::COMPUTE_ENG::RECOMMEND ||
+      compute_eng == xpu::COMPUTE_ENG::ONEDNN) {
     auto input = input_;
     if (batch_first) {
       input = input.transpose(0, 1);

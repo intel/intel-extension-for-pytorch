@@ -636,16 +636,19 @@ void init_xpu_module(pybind11::module& m) {
     Settings::I().disable_onednn_layout();
   });
 
-  m.def("_is_force_onednn_primitive_enabled", []() {
-    return Settings::I().is_force_onednn_primitive_enabled();
-  });
+  py::enum_<xpu::COMPUTE_ENG>(m, "XPUComputeEng")
+      .value("RECOMMEND", xpu::COMPUTE_ENG::RECOMMEND)
+      .value("BASIC", xpu::COMPUTE_ENG::BASIC)
+      .value("ONEDNN", xpu::COMPUTE_ENG::ONEDNN)
+      .value("ONEMKL", xpu::COMPUTE_ENG::ONEMKL)
+      .value("XETLA", xpu::COMPUTE_ENG::XETLA)
+      .export_values();
 
-  m.def("_enable_force_onednn_primitive", []() {
-    Settings::I().enable_force_onednn_primitive();
+  m.def("_get_compute_eng", []() {
+    return static_cast<int>(Settings::I().get_compute_eng());
   });
-
-  m.def("_disable_force_onednn_primitive", []() {
-    Settings::I().disable_force_onednn_primitive();
+  m.def("_set_compute_eng", [](const int eng) {
+    return Settings::I().set_compute_eng(static_cast<xpu::COMPUTE_ENG>(eng));
   });
 
   m.def("_set_onednn_verbose", [](const int level) {

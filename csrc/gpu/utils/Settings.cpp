@@ -37,15 +37,16 @@ namespace dpcpp {
 
  * Internal options:
  * ==========INT==========
- *   IPEX_XPU_BACKEND:
- *      Default = 0 (GPU) | Set XPU_BACKEND as global IPEX backend
  *   IPEX_SHOW_OPTION:
  *      Default = 0 | Set 1 to show all launch option values
  *   IPEX_XPU_ONEDNN_LAYOUT:
  *      Default = 0 | Set 1 to enable onednn specific layouts
- *   IPEX_FORCE_ONEDNN_PRIMITIVE:
- *      Default = 0 | Set 1 to force oneDNN primitive solution for below
- *      operators: GRU
+ *   IPEX_XPU_BACKEND:
+ *      Default = 0 (GPU) | Set XPU_BACKEND as global IPEX backend
+ *   IPEX_COMPUTE_ENG:
+ *      Default = 0 (RECOMMEND) | Set RECOMMEND to select recommended compute
+ engine
+ *      operators: RECOMMEND, BASIC, ONEDNN, ONEMKL, XETLA
  * ==========INT==========
  */
 
@@ -121,12 +122,8 @@ Settings::Settings() {
   DPCPP_INIT_ENV_VAL(
       XPU_ONEDNN_LAYOUT, onednn_layout_enabled, ENV_VAL, show_opt);
 
-  force_onednn_primitive_enabled = ENV_VAL::OFF;
-  DPCPP_INIT_ENV_VAL(
-      FORCE_ONEDNN_PRIMITIVE,
-      force_onednn_primitive_enabled,
-      ENV_VAL,
-      show_opt);
+  compute_eng = COMPUTE_ENG::RECOMMEND;
+  DPCPP_INIT_ENV_VAL(COMPUTE_ENG, compute_eng, COMPUTE_ENG, show_opt);
 
   fp32_math_mode = FP32_MATH_MODE::FP32;
   DPCPP_INIT_ENV_VAL(FP32_MATH_MODE, fp32_math_mode, FP32_MATH_MODE, show_opt);
@@ -184,6 +181,20 @@ bool Settings::set_backend(XPU_BACKEND backend) {
   return false;
 }
 
+COMPUTE_ENG Settings::get_compute_eng() const {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  return compute_eng;
+}
+
+bool Settings::set_compute_eng(COMPUTE_ENG eng) {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  if ((eng >= COMPUTE_ENG::RECOMMEND) && (eng <= COMPUTE_ENG_MAX)) {
+    compute_eng = eng;
+    return true;
+  }
+  return false;
+}
+
 bool Settings::is_sync_mode_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
   return sync_mode_enabled == ENV_VAL::ON;
@@ -231,21 +242,6 @@ void Settings::enable_onednn_layout() {
 void Settings::disable_onednn_layout() {
   std::lock_guard<std::mutex> lock(s_mutex);
   onednn_layout_enabled = ENV_VAL::OFF;
-}
-
-bool Settings::is_force_onednn_primitive_enabled() const {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  return force_onednn_primitive_enabled == ENV_VAL::ON;
-}
-
-void Settings::enable_force_onednn_primitive() {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  force_onednn_primitive_enabled = ENV_VAL::ON;
-}
-
-void Settings::disable_force_onednn_primitive() {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  force_onednn_primitive_enabled = ENV_VAL::OFF;
 }
 
 FP32_MATH_MODE Settings::get_fp32_math_mode() const {
