@@ -1,6 +1,6 @@
 #include <c10/util/Exception.h>
 #include <runtime/CachingHostAllocator.h>
-#include <runtime/Device.h>
+#include <runtime/Exception.h>
 #include <utils/Macros.h>
 
 #include <deque>
@@ -20,6 +20,10 @@ CachingHostAllocator* CachingHostAllocator::Instance() {
 
 void* CachingHostAllocator::Block::getPtr() const {
   return mPtr;
+}
+
+DeviceId CachingHostAllocator::Block::getDevice() const {
+  return mDevId;
 }
 
 bool CachingHostAllocator::BlockState::hasEvent() {
@@ -67,8 +71,21 @@ void CachingHostAllocator::processEvents() {
 }
 
 bool CachingHostAllocator::isHostPtr(void* ptr) {
+#if defined(USE_MULTI_CONTEXT)
+  int count;
+  AT_DPCPP_CHECK(dpcppGetDeviceCount(&count));
+  // We can NOT guarantee the ptr is allocated with the current device context.
+  for (auto i = 0; i < count; i++) {
+    if (sycl::usm::alloc::host ==
+        sycl::get_pointer_type(ptr, dpcppGetDeviceContext(i))) {
+      return true;
+    }
+  }
+  return false;
+#else
   return sycl::usm::alloc::host ==
       sycl::get_pointer_type(ptr, dpcppGetDeviceContext());
+#endif
 }
 
 void CachingHostAllocator::emptyCache() {
@@ -78,7 +95,7 @@ void CachingHostAllocator::emptyCache() {
   for (auto& blk : mAvailable) {
     auto it = mBlocks.find(blk.getPtr());
     AT_ASSERT(it != mBlocks.end() && !it->second.isAllocated());
-    sycl::free(blk.getPtr(), dpcppGetDeviceContext());
+    sycl::free(blk.getPtr(), dpcppGetDeviceContext(blk.getDevice()));
     mBlocks.erase(it);
   }
 
@@ -106,9 +123,12 @@ int CachingHostAllocator::malloc(void** ptr, size_t size) {
     return DPCPP_SUCCESS;
   }
 
-  Block block_search(size);
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+
+  Block block_search(curDevID, size);
   auto it = mAvailable.lower_bound(block_search);
-  if (it != mAvailable.end()) {
+  if (it != mAvailable.end() && it->getDevice() == curDevID) {
     auto& block = mBlocks.at(it->getPtr());
     AT_ASSERT(!block.isAllocated() && !block.hasEvent());
     block.setAllocated(true);
@@ -127,7 +147,7 @@ int CachingHostAllocator::malloc(void** ptr, size_t size) {
     }
   }
 
-  mBlocks.insert({*ptr, {size, *ptr, true}});
+  mBlocks.insert({*ptr, {curDevID, size, *ptr, true}});
   return DPCPP_SUCCESS;
 }
 
