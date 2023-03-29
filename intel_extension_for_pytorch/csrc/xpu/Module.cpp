@@ -557,7 +557,7 @@ at::Scalar scalar_slow(PyObject* object) {
 void init_xpu_module(pybind11::module& m) {
   // For Runtime API, still use pybind
   m.def("_synchronize", [](const int& device_index) {
-    getCurrentDPCPPStream(device_index).synchronize();
+    xpu::dpcpp::deviceSynchronize(device_index);
   });
 
   m.def("dump_memory_stat", [](const int& device_index) {

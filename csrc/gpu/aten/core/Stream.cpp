@@ -130,6 +130,25 @@ DPCPPStream getDPCPPStreamOnDevice(DeviceIndex device_index, int stream_index) {
   return QueueToDPCPPStream(getQueueOnDevice(device_index, stream_index));
 }
 
+void deviceSynchronize(DeviceIndex device_index) {
+  // For each device, we have 1 default queue + 32 (QueuePerPool) reserved
+  // queues.
+  std::array<sycl::event, QueuePerPool + 1> events;
+  for (auto i = 0; i < QueuePerPool + 1; i++) {
+    auto& queue = getQueueOnDevice(device_index, i)->getDpcppQueue();
+    /**
+     * Why need a barrier here? The deviceSynchronize's behavior should wait
+     * until all preceding commands in all queues of all host threads have
+     * completed. It avoids another thread submitting a kernel while
+     * deviceSynchronize() is running.
+     */
+    events[i] = xpu::dpcpp::queue_barrier(queue);
+  }
+  for (auto i = 0; i < QueuePerPool + 1; i++) {
+    events[i].wait();
+  }
+}
+
 } // namespace dpcpp
 
 sycl::queue& get_queue_from_stream(c10::Stream stream) {
