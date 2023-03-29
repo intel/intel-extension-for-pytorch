@@ -2,7 +2,7 @@
 
 #include <ATen/Context.h>
 #include <ATen/core/ATenGeneral.h>
-#include <core/Device.h>
+#include <runtime/Device.h>
 #include <utils/DPCPP.h>
 
 namespace xpu {
@@ -12,9 +12,13 @@ class CachingHostAllocator final {
  private:
   class Block {
    public:
-    Block(size_t size, void* ptr = nullptr) : mSize(size), mPtr(ptr) {}
+    Block(DeviceId device, size_t size, void* ptr = nullptr)
+        : mDevId(device), mSize(size), mPtr(ptr) {}
 
     static bool Comparator(const Block& ablock, const Block& bblock) {
+      if (ablock.mDevId != bblock.mDevId) {
+        return ablock.mDevId < bblock.mDevId;
+      }
       if (ablock.mSize != bblock.mSize) {
         return ablock.mSize < bblock.mSize;
       }
@@ -22,16 +26,18 @@ class CachingHostAllocator final {
     }
 
     void* getPtr() const;
+    DeviceId getDevice() const;
 
    private:
+    DeviceId mDevId;
     size_t mSize;
     void* mPtr;
   };
 
   class BlockState : public Block {
    public:
-    BlockState(size_t size, void* ptr, bool allocated = false)
-        : Block(size, ptr), mAllocated(allocated), mEvents() {}
+    BlockState(DeviceId device, size_t size, void* ptr, bool allocated = false)
+        : Block(device, size, ptr), mAllocated(allocated), mEvents() {}
 
     bool hasEvent();
 

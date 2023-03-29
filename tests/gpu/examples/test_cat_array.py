@@ -121,3 +121,13 @@ class TestTorchMethod(TestCase):
             self.assertEqual(
                 res_cpu.is_contiguous(memory_format=torch.channels_last),
                 res_xpu.is_contiguous(memory_format=torch.channels_last))
+
+    @pytest.mark.skipif(torch.xpu.device_count() == 1, reason="doesn't support with one device")
+    def test_cat_multi_device(self, dtype=torch.float):
+        x_cpu1 = torch.randn([1, 2, 28, 28], device=cpu_device)
+        x_cpu2 = torch.randn([1, 2, 28, 28], device=cpu_device)
+        res_cpu = torch.cat((x_cpu1, x_cpu2))
+        x_xpu1 = x_cpu1.clone().to("xpu:1")
+        x_xpu2 = x_cpu2.clone().to("xpu:1")
+        res_xpu = torch.cat((x_xpu1, x_xpu2))
+        self.assertEqual(res_cpu, res_xpu.cpu())
