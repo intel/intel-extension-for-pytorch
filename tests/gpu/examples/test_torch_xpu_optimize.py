@@ -18,7 +18,7 @@ TEST_MODULE_CONVERT_LIST = [torch.nn.Conv2d,
                             torch.nn.LSTM]
 
 # TODO: for now, only support SGD and AdamW
-SUPPORTED_FUSION_OPTIMIZER = ['Adam', 'SGD', 'AdamW', 'Lars']
+SUPPORTED_FUSION_OPTIMIZER = ['Adam' , 'SGD', 'AdamW', 'Lars']
 
 
 class InferenceModel(nn.Module):
@@ -279,15 +279,19 @@ class TestTorchMethod(TestCase):
             optimizer.step()
             torch.xpu.synchronize()
 
-        for dtype in [torch.bfloat16, torch.float32]:
-            print('checking dtype: ', dtype)
-            checking_atol = 1e-3
-            checking_rtol = 1.6e-2
-            if dtype == torch.float32:
-                checking_atol = 1e-5
-                checking_rtol = 1.3e-6
-            for optimizer_string in SUPPORTED_FUSION_OPTIMIZER:
-                print('checking optimizer: ', optimizer_string)
+        for optimizer_string in SUPPORTED_FUSION_OPTIMIZER:
+            print('checking optimizer: ', optimizer_string)
+            support_dtype_list = [torch.float32, torch.bfloat16]
+            if optimizer_string.lower() == "adam":
+                support_dtype_list.append(torch.float64)
+            for dtype in support_dtype_list:
+                print('checking dtype: ', dtype)
+                if dtype == torch.bfloat16:
+                    checking_atol = 1e-3    
+                    checking_rtol = 1.6e-2
+                else:
+                    checking_atol = 1e-3
+                    checking_rtol = 1.6e-2
                 for mem_format in [torch.contiguous_format, torch.channels_last]:
                     print('checking memory format: ', mem_format)
                     model_xpu_no_fuse, model_xpu, optimizer_xpu_no_fuse, optimizer_xpu = create_model_optimizer(

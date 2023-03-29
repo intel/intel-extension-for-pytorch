@@ -12,10 +12,11 @@
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 
+#include <aten/operators/MemoryAccess.h>
+#include "Loops.h"
+#include "LoopsTemplates.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
-
-#include <aten/operators/MemoryAccess.h>
 #include "utils/CustomOperatorRegistration.h"
 
 namespace at {
@@ -23,324 +24,7 @@ namespace AtenIpexTypeXPU {
 
 namespace impl {
 
-template <int vec_size, typename scalar_t>
-void launch_vec_kernel_AdamMasterWeight(
-    Tensor& master_weight,
-    Tensor& weight,
-    Tensor& grad,
-    Tensor& avg,
-    Tensor& avg_sq,
-    Tensor& max_avg_sq,
-    const bool amsgrad,
-    const bool use_weight_decay,
-    const float exp_avg_ele_coefficient,
-    const float exp_avg_sq_ele_coefficient,
-    const float beta1_value,
-    const float beta2_value,
-    const float bias_correction1,
-    const float bias_correction2,
-    const float step_size,
-    const float weight_decay,
-    const float eps_value,
-    const int64_t total_element,
-    const int64_t global_range) {
-  auto& queue = dpcppGetCurrentQueue();
-
-  auto master_weight_ptr = master_weight.data_ptr<float>();
-  auto weight_ptr = weight.data_ptr<scalar_t>();
-  auto grad_ptr = grad.data_ptr<scalar_t>();
-  auto exp_avg_ptr = avg.data_ptr<float>();
-  auto exp_avg_sq_ptr = avg_sq.data_ptr<float>();
-  auto max_exp_avg_sq_ptr = amsgrad ? max_avg_sq.data_ptr<float>() : nullptr;
-
-  // vec_t is used for vectorization weight and grad
-  using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
-  // vec_mw_t is used for vectorization master weight, exp, exp_sq and
-  // max_exp_sq
-  using vec_mw_t = at::native::Memory::aligned_vector_loop<float, vec_size>;
-
-  // cast grad, weight and other memory using vector
-  vec_t* grad_vec = reinterpret_cast<vec_t*>(grad_ptr);
-  vec_t* weight_vec = reinterpret_cast<vec_t*>(weight_ptr);
-  vec_mw_t* master_weight_vec = reinterpret_cast<vec_mw_t*>(master_weight_ptr);
-  vec_mw_t* exp_avg_vec = reinterpret_cast<vec_mw_t*>(exp_avg_ptr);
-  vec_mw_t* exp_avg_sq_vec = reinterpret_cast<vec_mw_t*>(exp_avg_sq_ptr);
-
-  // if amsgrad is false, max_exp_avg_sq_vec is nullptr
-  vec_mw_t* max_exp_avg_sq_vec =
-      amsgrad ? reinterpret_cast<vec_mw_t*>(max_exp_avg_sq_ptr) : nullptr;
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(sycl::range<1>{global_range}, [=](sycl::item<1> item) {
-      auto id = item.get_id(0);
-
-      auto remaining = total_element - id * vec_size;
-
-      if (remaining < vec_size) {
-        // for the remaining tail elements
-        for (auto v_index = 0; v_index < remaining; v_index++) {
-          // compute the real index
-          auto linear_idx = id * vec_size + v_index;
-          // master weight grad should be fp32 to involve in computation to keep
-          // acc.
-          auto grad_elm = static_cast<float>(grad_ptr[linear_idx]);
-
-          auto master_weight_elm = master_weight_ptr[linear_idx];
-          if (use_weight_decay) {
-            grad_elm += master_weight_elm * weight_decay;
-          }
-
-          // exp_avg
-          auto exp_avg_elm = exp_avg_ptr[linear_idx];
-          exp_avg_elm =
-              exp_avg_elm * beta1_value + grad_elm * exp_avg_ele_coefficient;
-          exp_avg_ptr[linear_idx] = exp_avg_elm;
-
-          // exp_avg_sq
-          auto exp_avg_sq_elm = exp_avg_sq_ptr[linear_idx];
-          exp_avg_sq_elm = exp_avg_sq_elm * beta2_value +
-              grad_elm * grad_elm * exp_avg_sq_ele_coefficient;
-          exp_avg_sq_ptr[linear_idx] = exp_avg_sq_elm;
-
-          // amsgrad
-          if (amsgrad) {
-            auto max_exp_avg_sq_elm = max_exp_avg_sq_ptr[linear_idx];
-            max_exp_avg_sq_elm = max_exp_avg_sq_elm < exp_avg_sq_elm
-                ? exp_avg_sq_elm
-                : max_exp_avg_sq_elm;
-            max_exp_avg_sq_ptr[linear_idx] = max_exp_avg_sq_elm;
-            master_weight_elm -= step_size * exp_avg_elm /
-                (Numerics<float>::sqrt(max_exp_avg_sq_elm / bias_correction2) +
-                 eps_value);
-          } else {
-            master_weight_elm -= step_size * exp_avg_elm /
-                (Numerics<float>::sqrt(exp_avg_sq_elm / bias_correction2) +
-                 eps_value);
-          }
-
-          // update master weight fp32
-          master_weight_ptr[linear_idx] = static_cast<float>(master_weight_elm);
-          // update real weight bf16/fp16
-          weight_ptr[linear_idx] = static_cast<scalar_t>(master_weight_elm);
-        }
-      } else {
-        // can use vectorization
-        vec_mw_t exp_avg_value = exp_avg_vec[id];
-        vec_mw_t exp_avg_sq_value = exp_avg_sq_vec[id];
-        vec_mw_t master_weight_value = master_weight_vec[id];
-
-        // for vector write back
-        vec_t temp_weight;
-        vec_mw_t temp_master_weight;
-        vec_mw_t temp_exp_avg;
-        vec_mw_t temp_exp_avg_sq;
-
-#pragma unroll(vec_size)
-        for (auto v_index = 0; v_index < vec_size; v_index++) {
-          auto grad_elm = static_cast<float>(grad_vec[id][v_index]);
-
-          auto master_weight_elm = master_weight_value[v_index];
-          if (use_weight_decay) {
-            grad_elm += master_weight_elm * weight_decay;
-          }
-          // exp_avg
-          auto exp_avg_elm = exp_avg_value[v_index];
-          exp_avg_elm =
-              exp_avg_elm * beta1_value + exp_avg_ele_coefficient * grad_elm;
-          temp_exp_avg[v_index] = exp_avg_elm;
-
-          // exp_avg_sq
-          auto exp_avg_sq_elm = exp_avg_sq_value[v_index];
-          exp_avg_sq_elm = exp_avg_sq_elm * beta2_value +
-              grad_elm * grad_elm * exp_avg_sq_ele_coefficient;
-          temp_exp_avg_sq[v_index] = exp_avg_sq_elm;
-
-          // amsgrad
-          if (amsgrad) {
-            auto max_exp_avg_sq_elm = max_exp_avg_sq_vec[id][v_index];
-            max_exp_avg_sq_elm = max_exp_avg_sq_elm < exp_avg_sq_elm
-                ? exp_avg_sq_elm
-                : max_exp_avg_sq_elm;
-            max_exp_avg_sq_vec[id][v_index] = max_exp_avg_sq_elm;
-            master_weight_elm -= step_size * exp_avg_elm /
-                (Numerics<float>::sqrt(max_exp_avg_sq_elm / bias_correction2) +
-                 eps_value);
-          } else {
-            master_weight_elm -= step_size * exp_avg_elm /
-                (Numerics<float>::sqrt(exp_avg_sq_elm / bias_correction2) +
-                 eps_value);
-          }
-
-          // update master weight with fp32
-          temp_master_weight[v_index] = static_cast<float>(master_weight_elm);
-          // update real weight with bf16/fp16
-          temp_weight[v_index] = static_cast<scalar_t>(master_weight_elm);
-        }
-
-        // write_back
-        // update exp_avg
-        exp_avg_vec[id] = temp_exp_avg;
-        // update exp_avg_sq
-        exp_avg_sq_vec[id] = temp_exp_avg_sq;
-        // update master weight
-        master_weight_vec[id] = temp_master_weight;
-        // update real weight
-        weight_vec[id] = temp_weight;
-      }
-    });
-  };
-
-  DPCPP_Q_SUBMIT(queue, cgf);
-}
-
-template <int vec_size>
-void launch_vec_kernel_Adam(
-    Tensor& weight,
-    Tensor& grad,
-    Tensor& avg,
-    Tensor& avg_sq,
-    Tensor& max_avg_sq,
-    const bool amsgrad,
-    const bool use_weight_decay,
-    const int step,
-    const float exp_avg_ele_coefficient,
-    const float exp_avg_sq_ele_coefficient,
-    const float beta1_value,
-    const float beta2_value,
-    const float bias_correction1,
-    const float bias_correction2,
-    const float step_size,
-    const float weight_decay,
-    const float eps_value,
-    const int64_t total_element,
-    const int64_t global_range) {
-  auto& queue = dpcppGetCurrentQueue();
-  auto weight_ptr = weight.data_ptr<float>();
-  auto grad_ptr = grad.data_ptr<float>();
-  auto exp_avg_ptr = avg.data_ptr<float>();
-  auto exp_avg_sq_ptr = avg_sq.data_ptr<float>();
-  auto max_exp_avg_sq_ptr = amsgrad ? max_avg_sq.data_ptr<float>() : nullptr;
-
-  using vec_t = at::native::Memory::aligned_vector_loop<float, vec_size>;
-
-  // cast grad, weight and other memory using vector
-  vec_t* weight_vec = reinterpret_cast<vec_t*>(weight_ptr);
-  vec_t* grad_vec = reinterpret_cast<vec_t*>(grad_ptr);
-  vec_t* exp_avg_vec = reinterpret_cast<vec_t*>(exp_avg_ptr);
-  vec_t* exp_avg_sq_vec = reinterpret_cast<vec_t*>(exp_avg_sq_ptr);
-  vec_t* max_exp_avg_sq_vec =
-      amsgrad ? reinterpret_cast<vec_t*>(max_exp_avg_sq_ptr) : nullptr;
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(sycl::range<1>{global_range}, [=](sycl::item<1> item) {
-      auto id = item.get_id(0);
-      auto remaining = total_element - id * vec_size;
-
-      // for handling remaining tail
-      if (remaining < vec_size) {
-        for (auto v_index = 0; v_index < remaining; v_index++) {
-          // compute element index
-          auto linear_idx = id * vec_size + v_index;
-          auto grad_elm = grad_ptr[linear_idx];
-          auto weight_elm = weight_ptr[linear_idx];
-
-          if (use_weight_decay) {
-            grad_elm += weight_elm * weight_decay;
-          }
-
-          // exp_avg
-          auto exp_avg_elm = exp_avg_ptr[linear_idx];
-          exp_avg_elm =
-              exp_avg_elm * beta1_value + grad_elm * exp_avg_ele_coefficient;
-          exp_avg_ptr[linear_idx] = exp_avg_elm;
-
-          // exp_avg_sq
-          auto exp_avg_sq_elm = exp_avg_sq_ptr[linear_idx];
-          exp_avg_sq_elm = exp_avg_sq_elm * beta2_value +
-              exp_avg_sq_ele_coefficient * grad_elm * grad_elm;
-          exp_avg_sq_ptr[linear_idx] = exp_avg_sq_elm;
-
-          // amsgrad
-          if (amsgrad) {
-            auto max_exp_avg_sq_elm = max_exp_avg_sq_ptr[linear_idx];
-            max_exp_avg_sq_elm = max_exp_avg_sq_elm < exp_avg_sq_elm
-                ? exp_avg_sq_elm
-                : max_exp_avg_sq_elm;
-            max_exp_avg_sq_ptr[linear_idx] = max_exp_avg_sq_elm;
-            weight_elm = weight_elm -
-                step_size * exp_avg_elm /
-                    (Numerics<float>::sqrt(
-                         max_exp_avg_sq_elm / bias_correction2) +
-                     eps_value);
-          } else {
-            weight_elm = weight_elm -
-                step_size * exp_avg_elm /
-                    (Numerics<float>::sqrt(exp_avg_sq_elm / bias_correction2) +
-                     eps_value);
-          }
-
-          weight_ptr[linear_idx] = static_cast<float>(weight_elm);
-        }
-      } else {
-        // vector read
-        vec_t weight_value = weight_vec[id];
-        vec_t grad_value = grad_vec[id];
-        vec_t exp_avg_value = exp_avg_vec[id];
-        vec_t exp_avg_sq_value = exp_avg_sq_vec[id];
-        // for vector write back
-        vec_t temp_weight;
-        vec_t temp_exp_avg;
-        vec_t temp_exp_avg_sq;
-
-#pragma unroll
-        for (auto v_index = 0; v_index < vec_size; v_index++) {
-          auto grad_elm = grad_value[v_index];
-          auto weight_elm = weight_value[v_index];
-
-          if (use_weight_decay) {
-            grad_elm += weight_elm * weight_decay;
-          }
-
-          // exp_avg
-          auto exp_avg_elm = exp_avg_value[v_index];
-          exp_avg_elm =
-              beta1_value * exp_avg_elm + grad_elm * exp_avg_ele_coefficient;
-          temp_exp_avg[v_index] = exp_avg_elm;
-
-          // exp_avg_sq
-          auto exp_avg_sq_elm = exp_avg_sq_value[v_index];
-          exp_avg_sq_elm = beta2_value * exp_avg_sq_elm +
-              exp_avg_sq_ele_coefficient * grad_elm * grad_elm;
-          temp_exp_avg_sq[v_index] = exp_avg_sq_elm;
-
-          // amsgrad
-          if (amsgrad) {
-            auto max_exp_avg_sq_elm = max_exp_avg_sq_vec[id][v_index];
-            max_exp_avg_sq_elm =
-                Numerics<float>::max(exp_avg_sq_elm, max_exp_avg_sq_elm);
-            weight_elm -= step_size * exp_avg_elm /
-                (Numerics<float>::sqrt(max_exp_avg_sq_elm / bias_correction2) +
-                 eps_value);
-            max_exp_avg_sq_vec[id][v_index] = max_exp_avg_sq_elm;
-          } else {
-            weight_elm = weight_elm -
-                (step_size * exp_avg_elm /
-                 (Numerics<float>::sqrt(exp_avg_sq_elm / bias_correction2) +
-                  eps_value));
-          }
-          temp_weight[v_index] = static_cast<float>(weight_elm);
-        }
-
-        // data write back
-        weight_vec[id] = temp_weight;
-        exp_avg_vec[id] = temp_exp_avg;
-        exp_avg_sq_vec[id] = temp_exp_avg_sq;
-      }
-    });
-  };
-  DPCPP_Q_SUBMIT(queue, cgf);
-}
-
+template <typename scalar_t>
 static void ComputeAdamKernel(
     Tensor& weight,
     Tensor& avg,
@@ -349,7 +33,6 @@ static void ComputeAdamKernel(
     Tensor& grad,
     const bool amsgrad,
     const bool use_weight_decay,
-    const int step,
     const float exp_avg_ele_coefficient,
     const float exp_avg_sq_ele_coefficient,
     const float beta1_value,
@@ -359,95 +42,55 @@ static void ComputeAdamKernel(
     const float step_size,
     const float weight_decay,
     const float eps_value) {
-  auto& queue = dpcppGetCurrentQueue();
+  at::TensorIterator iter = TensorIteratorConfig()
+                                .add_output(avg)
+                                .add_output(avg_sq)
+                                .add_output(max_avg_sq)
+                                .add_output(weight)
+                                .add_input(weight)
+                                .add_input(grad)
+                                .add_input(avg)
+                                .add_input(avg_sq)
+                                .add_input(max_avg_sq)
+                                .build();
 
-  auto vec_size_weight = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
-      reinterpret_cast<char*>(weight.data_ptr<float>()));
+  dpcpp_kernel_multiple_outputs_for_tensor_iter(
+      iter,
+      [=](scalar_t weight_elem,
+          scalar_t grad_elem,
+          scalar_t avg_elem,
+          scalar_t avg_sq_elem,
+          scalar_t max_avg_sq_elem)
+          -> std::tuple<scalar_t, scalar_t, scalar_t, scalar_t> {
+        if (use_weight_decay) {
+          grad_elem += weight_elem * weight_decay;
+        }
+        avg_elem = avg_elem * beta1_value + grad_elem * exp_avg_ele_coefficient;
 
-  auto vec_size_grad = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
-      reinterpret_cast<char*>(grad.data_ptr<float>()));
+        avg_sq_elem = avg_sq_elem * beta2_value +
+            exp_avg_sq_ele_coefficient * grad_elem * grad_elem;
 
-  auto vec_size_avg = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
-      reinterpret_cast<char*>(avg.data_ptr<float>()));
+        // amsgrad
+        if (amsgrad) {
+          max_avg_sq_elem =
+              max_avg_sq_elem < avg_sq_elem ? avg_sq_elem : max_avg_sq_elem;
 
-  auto vec_size_avg_sq = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
-      reinterpret_cast<char*>(avg_sq.data_ptr<float>()));
-
-  auto vec_size_avg_max_sq = vec_size_avg_sq;
-  if (amsgrad) {
-    vec_size_avg_max_sq = at::native::Memory::can_vectorize_up_to_loop<float>(
-        getDeviceIdOfCurrentQueue(),
-        reinterpret_cast<char*>(max_avg_sq.data_ptr<float>()));
-  }
-  // for non-dense
-  auto vec_size = vec_size_weight;
-  if (!weight.is_non_overlapping_and_dense() ||
-      !grad.is_non_overlapping_and_dense() ||
-      !avg.is_non_overlapping_and_dense() ||
-      !avg_sq.is_non_overlapping_and_dense() ||
-      (amsgrad && !max_avg_sq.is_non_overlapping_and_dense())) {
-    vec_size = 1;
-  } else {
-    vec_size = std::min(
-        {vec_size_weight,
-         vec_size_grad,
-         vec_size_avg,
-         vec_size_avg_sq,
-         vec_size_avg_max_sq});
-  }
-
-  auto total_element = weight.numel();
-
-  auto global_range = (total_element % vec_size == 0)
-      ? (total_element / vec_size)
-      : (total_element / vec_size + 1);
-
-#define VEC_ADAM_KERNEL(vec_size)     \
-  {                                   \
-    launch_vec_kernel_Adam<vec_size>( \
-        weight,                       \
-        grad,                         \
-        avg,                          \
-        avg_sq,                       \
-        max_avg_sq,                   \
-        amsgrad,                      \
-        use_weight_decay,             \
-        step,                         \
-        exp_avg_ele_coefficient,      \
-        exp_avg_sq_ele_coefficient,   \
-        beta1_value,                  \
-        beta2_value,                  \
-        bias_correlation1,            \
-        bias_correlation2,            \
-        step_size,                    \
-        weight_decay,                 \
-        eps_value,                    \
-        total_element,                \
-        global_range);                \
-  }
-
-  switch (vec_size) {
-    case 4:
-      VEC_ADAM_KERNEL(4);
-      break;
-    case 2:
-      VEC_ADAM_KERNEL(2);
-      break;
-    case 1:
-      VEC_ADAM_KERNEL(1);
-      break;
-    default:
-      TORCH_INTERNAL_ASSERT(
-          false,
-          "Unexpected vectorization size for Adam kernel. vec size ",
-          vec_size);
-  }
-#undef VEC_ADAM_KERNEL
+          weight_elem = weight_elem -
+              step_size * avg_elem /
+                  (Numerics<float>::sqrt(max_avg_sq_elem / bias_correlation2) +
+                   eps_value);
+        } else {
+          weight_elem = weight_elem -
+              step_size * avg_elem /
+                  (Numerics<float>::sqrt(avg_sq_elem / bias_correlation2) +
+                   eps_value);
+        }
+        return std::tuple<scalar_t, scalar_t, scalar_t, scalar_t>(
+            avg_elem, avg_sq_elem, max_avg_sq_elem, weight_elem);
+      });
 }
+
+// scalar_t is for fp16 or bf16, master weight is fp32
 template <typename scalar_t>
 static void ComputeAdamKernelMasterWeight(
     Tensor& master_weight,
@@ -467,109 +110,63 @@ static void ComputeAdamKernelMasterWeight(
     const float step_size,
     const float weight_decay,
     const float eps_value) {
-  auto& queue = dpcppGetCurrentQueue();
+  at::TensorIterator iter = TensorIteratorConfig()
+                                .add_output(avg)
+                                .add_output(avg_sq)
+                                .add_output(max_avg_sq)
+                                .add_output(master_weight)
+                                .add_output(weight)
+                                .add_input(grad)
+                                .add_input(avg)
+                                .add_input(avg_sq)
+                                .add_input(max_avg_sq)
+                                .add_input(master_weight)
+                                .check_all_same_dtype(false)
+                                .build();
 
-  auto vec_size_master_weight =
-      at::native::Memory::can_vectorize_up_to_loop<float>(
-          getDeviceIdOfCurrentQueue(),
-          reinterpret_cast<char*>(master_weight.data_ptr<float>()));
+  dpcpp_kernel_multiple_outputs_for_tensor_iter(
+      iter,
+      [=](scalar_t grad_elem,
+          float avg_elem,
+          float avg_sq_elem,
+          float max_avg_sq_elem,
+          float master_weight_elem)
+          -> std::tuple<float, float, float, float, scalar_t> {
+        auto grad_float_elem = static_cast<float>(grad_elem);
+        if (use_weight_decay) {
+          grad_float_elem += master_weight_elem * weight_decay;
+        }
+        avg_elem =
+            avg_elem * beta1_value + grad_float_elem * exp_avg_ele_coefficient;
 
-  auto vec_size_weight = at::native::Memory::can_vectorize_up_to_loop<scalar_t>(
-      getDeviceIdOfCurrentQueue(),
-      reinterpret_cast<char*>(weight.data_ptr<scalar_t>()));
+        avg_sq_elem = avg_sq_elem * beta2_value +
+            exp_avg_sq_ele_coefficient * grad_float_elem * grad_float_elem;
 
-  auto vec_size_grad = at::native::Memory::can_vectorize_up_to_loop<scalar_t>(
-      getDeviceIdOfCurrentQueue(),
-      reinterpret_cast<char*>(grad.data_ptr<scalar_t>()));
+        // amsgrad
+        if (amsgrad) {
+          max_avg_sq_elem =
+              max_avg_sq_elem < avg_sq_elem ? avg_sq_elem : max_avg_sq_elem;
 
-  auto vec_size_avg = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
-      reinterpret_cast<char*>(avg.data_ptr<float>()));
-
-  auto vec_size_avg_sq = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
-      reinterpret_cast<char*>(avg_sq.data_ptr<float>()));
-
-  auto vec_size_max_avg_sq = vec_size_avg_sq;
-  if (amsgrad) {
-    vec_size_max_avg_sq = at::native::Memory::can_vectorize_up_to_loop<float>(
-        getDeviceIdOfCurrentQueue(),
-        reinterpret_cast<char*>(max_avg_sq.data_ptr<float>()));
-  }
-
-  auto vec_size = vec_size_master_weight;
-  if (!master_weight.is_non_overlapping_and_dense() ||
-      !weight.is_non_overlapping_and_dense() ||
-      !grad.is_non_overlapping_and_dense() ||
-      !avg.is_non_overlapping_and_dense() ||
-      !avg_sq.is_non_overlapping_and_dense() ||
-      (amsgrad && !max_avg_sq.is_non_overlapping_and_dense())) {
-    vec_size = 1;
-  } else {
-    vec_size = std::min(
-        {vec_size_master_weight,
-         vec_size_weight,
-         vec_size_grad,
-         vec_size_avg,
-         vec_size_avg_sq,
-         vec_size_max_avg_sq});
-  }
-
-  auto total_element = master_weight.numel();
-  auto global_range = (total_element % vec_size == 0)
-      ? (total_element / vec_size)
-      : (total_element / vec_size + 1);
-
-#define VEC_ADAMMW_KERNEL(vec_size)                         \
-  {                                                         \
-    launch_vec_kernel_AdamMasterWeight<vec_size, scalar_t>( \
-        master_weight,                                      \
-        weight,                                             \
-        grad,                                               \
-        avg,                                                \
-        avg_sq,                                             \
-        max_avg_sq,                                         \
-        amsgrad,                                            \
-        use_weight_decay,                                   \
-        exp_avg_ele_coefficient,                            \
-        exp_avg_sq_ele_coefficient,                         \
-        beta1_value,                                        \
-        beta2_value,                                        \
-        bias_correction1,                                   \
-        bias_correction2,                                   \
-        step_size,                                          \
-        weight_decay,                                       \
-        eps_value,                                          \
-        total_element,                                      \
-        global_range);                                      \
-  }
-  switch (vec_size) {
-    case 8: {
-      VEC_ADAMMW_KERNEL(8);
-      break;
-    }
-    case 4: {
-      VEC_ADAMMW_KERNEL(4);
-      break;
-    }
-    case 2: {
-      VEC_ADAMMW_KERNEL(2);
-      break;
-    }
-    case 1: {
-      VEC_ADAMMW_KERNEL(1);
-      break;
-    }
-    default:
-      TORCH_INTERNAL_ASSERT(
-          false,
-          "Unexpected vectorization size for Adam Master Weight kernel. vec size ",
-          vec_size);
-  }
-#undef VEC_ADAMMW_KERNEL
+          master_weight_elem = master_weight_elem -
+              step_size * avg_elem /
+                  (Numerics<float>::sqrt(max_avg_sq_elem / bias_correction2) +
+                   eps_value);
+        } else {
+          master_weight_elem = master_weight_elem -
+              step_size * avg_elem /
+                  (Numerics<float>::sqrt(avg_sq_elem / bias_correction2) +
+                   eps_value);
+        }
+        return std::tuple<float, float, float, float, scalar_t>(
+            avg_elem,
+            avg_sq_elem,
+            max_avg_sq_elem,
+            master_weight_elem,
+            static_cast<scalar_t>(master_weight_elem));
+      });
 }
-
 } // namespace impl
+
 void adam_fused_step(
     at::Tensor& param_,
     at::Tensor& exp_avg_,
@@ -697,25 +294,26 @@ void adam_fused_step(
               eps_value);
         });
   } else {
-    // normal mode, param_ is fp32
-    impl::ComputeAdamKernel(
-        param_,
-        exp_avg_,
-        exp_avg_sq_,
-        max_exp_avg_sq_,
-        grad_,
-        amsgrad,
-        use_weight_decay,
-        step,
-        exp_avg_ele_coefficient,
-        exp_avg_sq_ele_coefficient,
-        beta1_value,
-        beta2_value,
-        bias_correction1,
-        bias_correction2,
-        step_size,
-        weight_decay_value,
-        eps_value);
+    // normal mode, param_ is fp32 or fp64
+    IPEX_DISPATCH_FLOATING_TYPES(param_.scalar_type(), "adam_fused_step", [&] {
+      impl::ComputeAdamKernel<scalar_t>(
+          param_,
+          exp_avg_,
+          exp_avg_sq_,
+          max_exp_avg_sq_,
+          grad_,
+          amsgrad,
+          use_weight_decay,
+          exp_avg_ele_coefficient,
+          exp_avg_sq_ele_coefficient,
+          beta1_value,
+          beta2_value,
+          bias_correction1,
+          bias_correction2,
+          step_size,
+          weight_decay_value,
+          eps_value);
+    });
   }
 }
 
