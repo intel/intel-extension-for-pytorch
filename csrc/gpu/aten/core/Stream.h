@@ -56,6 +56,15 @@ DPCPPStream getCurrentDPCPPStream(DeviceIndex device_index = -1);
 
 void setCurrentDPCPPStream(DPCPPStream stream);
 
+/**
+ * Block all queues on the device, and wait their synchronizations. We emulate
+ * the semantics via a loop through the queue pool of the specified device and
+ * make each command queue synchronization sequentially. Obviously, the latency
+ * depends on the most time-consuming queue as each of the queue is executed
+ * asynchronously.
+ */
+void deviceSynchronize(DeviceIndex device_index = -1);
+
 } // namespace dpcpp
 } // namespace xpu
 
