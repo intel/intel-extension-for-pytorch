@@ -61,9 +61,8 @@ std::vector<Tensor> merged_embeddingbag_backward_cpu_kernel_impl(
       indices_with_row_offset,
       pooling_modes,
       row_offset_data[n_tables]);
-#if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION(__FUNCTION__, std::vector<c10::IValue>({}));
-#endif
+
   std::vector<int> vector_sizes;
   std::vector<void*> grad_weights_ptr;
   std::vector<Tensor> grad_weights;

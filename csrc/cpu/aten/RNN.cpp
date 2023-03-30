@@ -1068,9 +1068,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> quantized_lstm(
     double scale,
     int64_t zp,
     int64_t dtype) {
-#if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("ipex::quantized_lstm", c10::ArrayRef<c10::IValue>({}));
-#endif
 
   auto hx_ = hx.vec();
   auto weights_ = weights.vec();
