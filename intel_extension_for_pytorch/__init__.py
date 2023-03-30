@@ -8,6 +8,7 @@ except ImportError:
 from .utils._trap_module import *
 from . import cpu
 from . import xpu
+from . import launcher
 from . import quantization
 from . import nn
 from . import jit

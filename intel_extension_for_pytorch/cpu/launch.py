@@ -766,32 +766,11 @@ def add_kmp_iomp_params(parser):
     group.add_argument("--disable_iomp", action='store_true', default=False,
                        help="By default, we use Intel OpenMP and libiomp5.so will be add to LD_PRELOAD")
 
-def parse_args():
+def init_parser(parser):
     """
     Helper function parsing the command line options
     @retval ArgumentParser
     """
-    parser = ArgumentParser(description="This is a script for launching PyTorch training and inference on Intel Xeon CPU "
-                                        "with optimal configurations. Now, single instance inference/training, multi-instance "
-                                        "inference/training and distributed training with oneCCL backend is enabled. "
-                                        "To get the peak performance on Intel Xeon CPU, the script optimizes the configuration "
-                                        "of thread and memory management. For thread management, the script configures thread "
-                                        "affinity and the preload of Intel OMP library. For memory management, it configures "
-                                        "NUMA binding and preload optimized memory allocation library (e.g. tcmalloc, jemalloc) "
-                                        "\n################################# Basic usage ############################# \n"
-                                        "\n 1. single instance\n"
-                                        "\n   >>> ipexrun python_script args \n"
-                                        "\n2. multi-instance \n"
-                                        "\n    >>> ipexrun --ninstances xxx --ncore_per_instance xx python_script args\n"
-                                        "\n3. Single-Node multi-process distributed training\n"
-                                        "\n    >>> python  -m intel_extension_for_pytorch.cpu.launch --distributed  python_script args\n"
-                                        "\n4. Multi-Node multi-process distributed training: (e.g. two nodes)\n"
-                                        "\n   rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*\n"
-                                        "\n   >>> ipexrun --distributed --nproc_per_node=2\n"
-                                        "\n       --nnodes=2 --hostfile hostfile python_script args\n"
-                                        "\n############################################################################# \n",
-                                        formatter_class=RawTextHelpFormatter)
-
     parser.add_argument("--multi_instance", action='store_true', default=False,
                         help="Enable multi-instance, by default one instance per node")
 
@@ -821,15 +800,13 @@ def parse_args():
 
     # rest from the training program
     parser.add_argument('program_args', nargs=REMAINDER)
-    return parser.parse_args()
+    return parser
 
-def main():
-
+def run_main_with_args(args):
     env_before = set(os.environ.keys())
     if platform.system() == "Windows":
         raise RuntimeError("Windows platform is not supported!!!")
 
-    args = parse_args()
     if args.log_path:
         path = os.path.dirname(args.log_path if args.log_path.endswith('/') else args.log_path + '/')
         if not os.path.exists(path):
@@ -880,6 +857,31 @@ def main():
     launcher.launch(args)
     for x in sorted(set(os.environ.keys()) - env_before):
         logger.debug('{0}={1}'.format(x, os.environ[x]))
+
+def main():
+    parser = ArgumentParser(description="This is a script for launching PyTorch training and inference on Intel Xeon CPU "
+                                        "with optimal configurations. Now, single instance inference/training, multi-instance "
+                                        "inference/training and distributed training with oneCCL backend is enabled. "
+                                        "To get the peak performance on Intel Xeon CPU, the script optimizes the configuration "
+                                        "of thread and memory management. For thread management, the script configures thread "
+                                        "affinity and the preload of Intel OMP library. For memory management, it configures "
+                                        "NUMA binding and preload optimized memory allocation library (e.g. tcmalloc, jemalloc) "
+                                        "\n################################# Basic usage ############################# \n"
+                                        "\n 1. single instance\n"
+                                        "\n   >>> ipexrun python_script args \n"
+                                        "\n2. multi-instance \n"
+                                        "\n    >>> ipexrun --ninstances xxx --ncore_per_instance xx python_script args\n"
+                                        "\n3. Single-Node multi-process distributed training\n"
+                                        "\n    >>> python  -m intel_extension_for_pytorch.cpu.launch --distributed  python_script args\n"
+                                        "\n4. Multi-Node multi-process distributed training: (e.g. two nodes)\n"
+                                        "\n   rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*\n"
+                                        "\n   >>> ipexrun --distributed --nproc_per_node=2\n"
+                                        "\n       --nnodes=2 --hostfile hostfile python_script args\n"
+                                        "\n############################################################################# \n",
+                                        formatter_class=RawTextHelpFormatter)
+    parser = init_parser(parser)
+    args = parser.parse_args()
+    run_main_with_args(args)
 
 if __name__ == "__main__":
     main()

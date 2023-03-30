@@ -2,16 +2,19 @@ r"""
 This package is lazily initialized, so you can always import it.
 """
 
-from torch import serialization
-from torch.storage import _StorageBase
 import sys
+import warnings
 from typing import List, Optional, Tuple, Union, Dict
+
 import torch
 import intel_extension_for_pytorch
-from .lazy_init import _lazy_init, _lazy_call
-from torch import device as _device
-from torch._utils import classproperty
 
+from torch import serialization
+from torch.storage import _StorageBase
+from torch import device as _device
+from torch._utils import classproperty, _get_device_index
+
+from .lazy_init import _lazy_init, _lazy_call
 from .streams import Stream, Event
 from .intrinsic import *
 from .cpp_extension import *
@@ -19,14 +22,24 @@ from .amp import *
 from .utils import *
 from .random import *
 from .memory import *
-from .overrides import set_default_tensor_type as set_default_tensor_type
-from .overrides import enable_cl_to as enable_cl_to
-from .overrides import override_tensor_totype, override_assert_equal
+
+from .overrides import (
+    set_default_tensor_type as set_default_tensor_type,
+    enable_cl_to as enable_cl_to,
+    override_tensor_totype,
+    override_assert_equal,
+    WrapAPI
+    )
+
 from .generator import Generator
 
-from torch._utils import _get_device_index
 import intel_extension_for_pytorch.optim as optim
-from intel_extension_for_pytorch._version import (__version__, __ipex_gitrev__, __torch_gitrev__, __gpu_onednn_gitrev__, __build_type__) # noqa B950
+from intel_extension_for_pytorch._version import (
+    __version__,
+    __ipex_gitrev__,
+    __torch_gitrev__,
+    __gpu_onednn_gitrev__,
+    __build_type__) # noqa B950
 
 default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
