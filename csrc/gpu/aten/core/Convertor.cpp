@@ -14,7 +14,7 @@ at::Device getATenDeviceFromUSM(void* src, const DeviceIndex device_id) {
   // which tile the src is allocated in.
   TORCH_INTERNAL_ASSERT(false);
 #endif
-  auto default_ctx = xpu::dpcpp::dpcppGetDeviceContext();
+  auto& default_ctx = xpu::dpcpp::dpcppGetDeviceContext();
   // Check that pointer is known in the context
   sycl::usm::alloc alloc_type = sycl::get_pointer_type(src, default_ctx);
 

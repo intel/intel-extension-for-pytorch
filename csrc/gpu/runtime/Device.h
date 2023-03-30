@@ -32,7 +32,7 @@ DeviceInfo* dpcppGetCurrentDeviceInfo();
 
 DeviceInfo* dpcppGetDeviceInfo(DeviceId device_id = -1);
 
-sycl::context dpcppGetDeviceContext(DeviceId device_id = -1);
+sycl::context& dpcppGetDeviceContext(DeviceId device_id = -1);
 
 DeviceId dpcppGetDeviceIndex(sycl::device device);
 

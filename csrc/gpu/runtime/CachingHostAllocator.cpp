@@ -22,8 +22,8 @@ void* CachingHostAllocator::Block::getPtr() const {
   return mPtr;
 }
 
-DeviceId CachingHostAllocator::Block::getDevice() const {
-  return mDevId;
+sycl::context& CachingHostAllocator::Block::getContext() const {
+  return dpcppGetDeviceContext(mDevId);
 }
 
 bool CachingHostAllocator::BlockState::hasEvent() {
@@ -95,7 +95,7 @@ void CachingHostAllocator::emptyCache() {
   for (auto& blk : mAvailable) {
     auto it = mBlocks.find(blk.getPtr());
     AT_ASSERT(it != mBlocks.end() && !it->second.isAllocated());
-    sycl::free(blk.getPtr(), dpcppGetDeviceContext(blk.getDevice()));
+    sycl::free(blk.getPtr(), blk.getContext());
     mBlocks.erase(it);
   }
 
@@ -128,7 +128,7 @@ int CachingHostAllocator::malloc(void** ptr, size_t size) {
 
   Block block_search(curDevID, size);
   auto it = mAvailable.lower_bound(block_search);
-  if (it != mAvailable.end() && it->getDevice() == curDevID) {
+  if (it != mAvailable.end() && it->getContext() == dpcppGetDeviceContext()) {
     auto& block = mBlocks.at(it->getPtr());
     AT_ASSERT(!block.isAllocated() && !block.hasEvent());
     block.setAllocated(true);

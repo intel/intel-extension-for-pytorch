@@ -205,7 +205,7 @@ bool dpcppIsDevPoolInit() {
   return gDevPool.devices.size() > 0;
 }
 
-sycl::context dpcppGetDeviceContext(DeviceId device) {
+sycl::context& dpcppGetDeviceContext(DeviceId device) {
   initDevicePoolCallOnce();
 #if defined(USE_MULTI_CONTEXT)
   DeviceId device_id = device;
