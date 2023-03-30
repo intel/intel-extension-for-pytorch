@@ -510,10 +510,11 @@ Tensor& upsample_bilinear2d_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& output) {
-  if (align_corners)
+  if (align_corners) {
+    at::AtenIpexTypeXPU::to_plain_if_needed_(input);
     upsample_bilinear2d_out_dpcpp_template(
         output, input, output_size, true, scales_h, scales_w);
-  else
+  } else {
     xpu::oneDNN::resample(
         input,
         output,
@@ -521,6 +522,7 @@ Tensor& upsample_bilinear2d_out(
         algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
+  }
   return output;
 }
 
@@ -531,10 +533,11 @@ Tensor upsample_bilinear2d(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
   auto output = at::empty({0}, input.options());
-  if (align_corners)
+  if (align_corners) {
+    at::AtenIpexTypeXPU::to_plain_if_needed_(input);
     upsample_bilinear2d_out_dpcpp_template(
         output, input, output_size, true, scales_h, scales_w);
-  else
+  } else {
     xpu::oneDNN::resample(
         input,
         output,
@@ -542,6 +545,7 @@ Tensor upsample_bilinear2d(
         algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
+  }
   return output;
 }
 
@@ -554,10 +558,11 @@ Tensor upsample_bilinear2d(
   auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
   auto scales_h = get_scale_value(scale_factors, 0);
   auto scales_w = get_scale_value(scale_factors, 1);
-  if (align_corners)
+  if (align_corners) {
+    at::AtenIpexTypeXPU::to_plain_if_needed_(input);
     upsample_bilinear2d_out_dpcpp_template(
         output, input, osize, true, scales_h, scales_w);
-  else
+  } else {
     xpu::oneDNN::resample(
         input,
         output,
@@ -565,6 +570,7 @@ Tensor upsample_bilinear2d(
         algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
+  }
   return output;
 }
 
@@ -576,7 +582,8 @@ Tensor& upsample_bilinear2d_backward_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& grad_input) {
-  if (align_corners)
+  if (align_corners) {
+    at::AtenIpexTypeXPU::to_plain_if_needed_(grad_output);
     upsample_bilinear2d_backward_out_dpcpp_template(
         grad_input,
         grad_output,
@@ -585,7 +592,7 @@ Tensor& upsample_bilinear2d_backward_out(
         true, // align_corners
         scales_h,
         scales_w);
-  else
+  } else {
     xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
@@ -594,6 +601,7 @@ Tensor& upsample_bilinear2d_backward_out(
         algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
+  }
   return grad_input;
 }
 
@@ -613,7 +621,8 @@ Tensor upsample_bilinear2d_backward(
     grad_input = at::empty(input_size, grad_output.options());
   }
 
-  if (align_corners)
+  if (align_corners) {
+    at::AtenIpexTypeXPU::to_plain_if_needed_(grad_output);
     upsample_bilinear2d_backward_out_dpcpp_template(
         grad_input,
         grad_output,
@@ -622,7 +631,7 @@ Tensor upsample_bilinear2d_backward(
         true, // align_corners
         scales_h,
         scales_w);
-  else
+  } else {
     xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
@@ -631,6 +640,7 @@ Tensor upsample_bilinear2d_backward(
         algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
+  }
   return grad_input;
 }
 
@@ -652,7 +662,8 @@ Tensor upsample_bilinear2d_backward(
     grad_input = at::empty(input_size, grad_output.options());
   }
 
-  if (align_corners)
+  if (align_corners) {
+    at::AtenIpexTypeXPU::to_plain_if_needed_(grad_output);
     upsample_bilinear2d_backward_out_dpcpp_template(
         grad_input,
         grad_output,
@@ -661,7 +672,7 @@ Tensor upsample_bilinear2d_backward(
         true, // align_corners
         scales_h,
         scales_w);
-  else
+  } else {
     xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
@@ -670,6 +681,7 @@ Tensor upsample_bilinear2d_backward(
         algorithm::resampling_linear,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
+  }
   return grad_input;
 }
 
