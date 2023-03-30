@@ -44,6 +44,16 @@ from intel_extension_for_pytorch._version import (
 default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
 
+# Start of imm cmdlist workaround
+# Switch to immediate command list in LevelZero plugin to avoid resource leak.
+# The immediate command list will be default in next version of plugin.
+# Then, this workaround will be removed soon.
+import os
+# Do not use same queue with framework in oneCCL for imm cmdlist
+os.environ['CCL_USE_EXTERNAL_QUEUE']="0"
+# Enable immediate cmdlist by default
+os.environ['SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS']="1"
+# End of imm cmdlist workaround
 
 def is_initialized():
     r"""Returns whether XPU state has been initialized."""
