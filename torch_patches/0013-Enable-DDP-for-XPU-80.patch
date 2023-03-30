@@ -1,7 +1,7 @@
-From e9f04e6fd1725da94430531d5fb0ce799982a8b3 Mon Sep 17 00:00:00 2001
+From a0aa7e5a0ead9a123de9b1dda1c0efee66efd142 Mon Sep 17 00:00:00 2001
 From: zhuhong61 <95205772+zhuhong61@users.noreply.github.com>
 Date: Thu, 10 Nov 2022 22:08:51 +0800
-Subject: [PATCH 05/11] Enable DDP for XPU (#80)
+Subject: [PATCH 13/14] Enable DDP for XPU (#80)
 
 * Enable xpu distributed data parallel (DDP) in a device-agnostic way
 * Support DDP both in xpu and cuda with minor code changes.
@@ -17,7 +17,7 @@ Co-authored-by: Lu Chengjun <chengjun.lu@intel.com>
  2 files changed, 27 insertions(+), 13 deletions(-)
 
 diff --git a/torch/distributed/utils.py b/torch/distributed/utils.py
-index c559577cc8..8ae5b8ed72 100644
+index c559577cc8a..8ae5b8ed721 100644
 --- a/torch/distributed/utils.py
 +++ b/torch/distributed/utils.py
 @@ -1,6 +1,6 @@
@@ -55,7 +55,7 @@ index c559577cc8..8ae5b8ed72 100644
                      current_stream.wait_stream(stream)
                      # Ensure tensor memory is not reused until work on
 diff --git a/torch/nn/parallel/_functions.py b/torch/nn/parallel/_functions.py
-index 834d444ec8..11bde6d360 100644
+index 834d444ec86..11bde6d3608 100644
 --- a/torch/nn/parallel/_functions.py
 +++ b/torch/nn/parallel/_functions.py
 @@ -1,11 +1,22 @@

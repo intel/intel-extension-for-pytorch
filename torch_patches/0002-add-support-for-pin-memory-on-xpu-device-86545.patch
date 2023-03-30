@@ -1,7 +1,7 @@
-From 763de4eb63f883178735652545786cd0592d1a4a Mon Sep 17 00:00:00 2001
+From d3669bb6404ba61707d79d939afe647d08c165bf Mon Sep 17 00:00:00 2001
 From: leizhenyuan <zhenyuan.lei@intel.com>
 Date: Wed, 19 Oct 2022 13:24:48 +0000
-Subject: [PATCH 03/11] add support for pin memory on xpu device (#86545)
+Subject: [PATCH 02/14] add support for pin memory on xpu device (#86545)
 
 add support for pin memory on xpu device
 
@@ -13,7 +13,7 @@ Approved by: https://github.com/ezyang
  2 files changed, 9 insertions(+), 2 deletions(-)
 
 diff --git a/torch/utils/data/_utils/pin_memory.py b/torch/utils/data/_utils/pin_memory.py
-index d3aa9118cb..466cf0c70e 100644
+index d3aa9118cb6..466cf0c70e2 100644
 --- a/torch/utils/data/_utils/pin_memory.py
 +++ b/torch/utils/data/_utils/pin_memory.py
 @@ -19,7 +19,10 @@ def _pin_memory_loop(in_queue, out_queue, device_id, done_event, device):
@@ -29,7 +29,7 @@ index d3aa9118cb..466cf0c70e 100644
      def do_one_step():
          try:
 diff --git a/torch/utils/data/dataloader.py b/torch/utils/data/dataloader.py
-index eac52ba29c..5dc0358ddc 100644
+index eac52ba29c8..5dc0358ddc7 100644
 --- a/torch/utils/data/dataloader.py
 +++ b/torch/utils/data/dataloader.py
 @@ -1040,10 +1040,14 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
