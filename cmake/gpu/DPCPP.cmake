@@ -118,7 +118,12 @@ endif()
 # Fetch max processor count
 include(ProcessorCount)
 ProcessorCount(proc_cnt)
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-max-parallel-link-jobs=${proc_cnt}")
+if ((DEFINED ENV{MAX_JOBS}) AND ("$ENV{MAX_JOBS}" LESS_EQUAL ${proc_cnt}))
+  set(SYCL_MAX_PARALLEL_LINK_JOBS $ENV{MAX_JOBS})
+else()
+  set(SYCL_MAX_PARALLEL_LINK_JOBS ${proc_cnt})
+endif()
+set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-max-parallel-link-jobs=${SYCL_MAX_PARALLEL_LINK_JOBS}")
 
 # If FP64 is unsupported on certain GPU arch, warning all kernels with double
 # data type operations, and finish/return WITHOUT any computations.
