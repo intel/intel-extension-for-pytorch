@@ -287,9 +287,7 @@ at::Tensor dil_bmm_add(
     const at::Tensor& batch1,
     const at::Tensor& batch2,
     const c10::Scalar& alpha) {
-#if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("dil_bmm_add", c10::ArrayRef<c10::IValue>({}));
-#endif
   auto batch1_dim = batch1.dim();
   auto batch2_dim = batch2.dim();
   if (batch1_dim == batch2_dim && batch1_dim >= 3) {
