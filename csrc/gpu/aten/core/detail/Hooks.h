@@ -2,6 +2,7 @@
 
 #include <ATen/Generator.h>
 #include <ATen/detail/XPUHooksInterface.h>
+#include <ATen/dlpack.h>
 
 namespace xpu {
 namespace dpcpp {
@@ -14,9 +15,10 @@ struct XPUHooks : public at::XPUHooksInterface {
   bool hasXPU() const override;
   std::string showConfig() const override;
   at::Device getATenDeviceFromDLPackDevice(
-      const DLDevice& dl_device,
+      const DLDevice_& dl_device,
       void* data) const override;
-  DLDevice getDLPackDeviceFromATenDevice(
+  DLDevice_& getDLPackDeviceFromATenDevice(
+      DLDevice_& dl_device,
       const at::Device& aten_device,
       void* data) const override;
 };

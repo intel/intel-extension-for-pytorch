@@ -33,12 +33,13 @@ std::string XPUHooks::showConfig() const {
 }
 
 at::Device XPUHooks::getATenDeviceFromDLPackDevice(
-    const DLDevice& dl_device,
+    const DLDevice_& dl_device,
     void* data) const {
   return getATenDeviceFromUSM(data, dl_device.device_id);
 }
 
-DLDevice XPUHooks::getDLPackDeviceFromATenDevice(
+DLDevice_& XPUHooks::getDLPackDeviceFromATenDevice(
+    DLDevice_& dl_device,
     const at::Device& aten_device,
     void* data) const {
   TORCH_CHECK(aten_device.is_xpu(), "Only the XPU device type is expected.");
@@ -74,7 +75,9 @@ DLDevice XPUHooks::getDLPackDeviceFromATenDevice(
   TORCH_CHECK(pos != end, "Could not produce DLPack: failed finding device_id");
   std::ptrdiff_t dev_idx = std::distance(beg, pos);
 
-  return DLDevice{kDLOneAPI, dev_idx};
+  dl_device = {kDLOneAPI, dev_idx};
+
+  return dl_device;
 }
 
 REGISTER_XPU_HOOKS(XPUHooks);
