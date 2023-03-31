@@ -741,9 +741,10 @@ Tensor& tril_dpcpp_out(Tensor& result, const Tensor& self, int64_t k) {
     return result;
   }
 
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
       self.scalar_type(),
       "tril",
       TRIU_TRIL_LAMBDA(false));
@@ -762,9 +763,10 @@ Tensor& triu_dpcpp_out(Tensor& result, const Tensor& self, int64_t k) {
   if (self.numel() == 0) {
     return result;
   }
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
       self.scalar_type(),
       "triu",
       TRIU_TRIL_LAMBDA(true));

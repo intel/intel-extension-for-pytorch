@@ -302,6 +302,4 @@ class TestTorchMethod(TestCase):
         result_xpu = torch.special.airy_ai(input0_xpu)
         result_xpu = result_xpu.to("cpu")
 
-        loss_func = torch.nn.L1Loss(reduction='mean')
-        loss = loss_func(result_cpu, result_xpu)
         self.assertEqual(result_cpu, result_xpu, atol=1e-4, rtol=1e-5)

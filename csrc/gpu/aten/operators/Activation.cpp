@@ -469,7 +469,7 @@ Tensor relu(const Tensor& self) {
   Tensor result;
   return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_relu>(
       TensorIterator::unary_op, result, self, [=](TensorIteratorBase& iter) {
-        IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        IPEX_DISPATCH_ALL_TYPES_AND2(
             at::ScalarType::BFloat16,
             at::ScalarType::Half,
             iter.dtype(),

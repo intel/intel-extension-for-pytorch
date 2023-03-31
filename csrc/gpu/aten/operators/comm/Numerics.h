@@ -120,6 +120,18 @@ struct Numerics<uint8_t> {
     return a != b;
   }
 
+  static inline uint8_t ceil(uint8_t a) {
+    return a;
+  }
+  static inline uint8_t floor(uint8_t a) {
+    return a;
+  }
+  static inline uint8_t round(uint8_t a) {
+    return a;
+  }
+  static inline uint8_t trunc(uint8_t a) {
+    return a;
+  }
   static inline uint8_t neg(uint8_t a) {
     return -a;
   }
@@ -239,6 +251,18 @@ struct Numerics<int8_t> {
     return a != b;
   }
 
+  static inline int8_t ceil(int8_t a) {
+    return a;
+  }
+  static inline int8_t floor(int8_t a) {
+    return a;
+  }
+  static inline int8_t round(int8_t a) {
+    return a;
+  }
+  static inline int8_t trunc(int8_t a) {
+    return a;
+  }
   static inline int8_t neg(int8_t a) {
     return -a;
   }
@@ -305,6 +329,18 @@ struct Numerics<int16_t> {
     return a != b;
   }
 
+  static inline int16_t ceil(int16_t a) {
+    return a;
+  }
+  static inline int16_t floor(int16_t a) {
+    return a;
+  }
+  static inline int16_t round(int16_t a) {
+    return a;
+  }
+  static inline int16_t trunc(int16_t a) {
+    return a;
+  }
   static inline int16_t neg(int16_t a) {
     return -a;
   }
@@ -374,6 +410,18 @@ struct Numerics<int32_t> {
     return a != b;
   }
 
+  static inline int32_t ceil(int32_t a) {
+    return a;
+  }
+  static inline int32_t floor(int32_t a) {
+    return a;
+  }
+  static inline int32_t round(int32_t a) {
+    return a;
+  }
+  static inline int32_t trunc(int32_t a) {
+    return a;
+  }
   static inline int32_t neg(int32_t a) {
     return -a;
   }
@@ -443,6 +491,18 @@ struct Numerics<int64_t> {
     return a != b;
   }
 
+  static inline int64_t ceil(int64_t a) {
+    return a;
+  }
+  static inline int64_t floor(int64_t a) {
+    return a;
+  }
+  static inline int64_t round(int64_t a) {
+    return a;
+  }
+  static inline int64_t trunc(int64_t a) {
+    return a;
+  }
   static inline int64_t neg(int64_t a) {
     return -a;
   }

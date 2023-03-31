@@ -19,8 +19,8 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(floor_out, Numerics<scalar_t>::floor, Real);
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(ceil_out, Numerics<scalar_t>::ceil, Real);
+IPEX_OUT_ALL_UNARY_FUNC_OPS(floor_out, Numerics<scalar_t>::floor, Real);
+IPEX_OUT_ALL_UNARY_FUNC_OPS(ceil_out, Numerics<scalar_t>::ceil, Real);
 
 Tensor& round_out(const Tensor& self, Tensor& out) {
   return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_round>(
@@ -28,7 +28,7 @@ Tensor& round_out(const Tensor& self, Tensor& out) {
       out,
       self,
       [=](TensorIteratorBase& iter) {
-        IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        IPEX_DISPATCH_ALL_TYPES_AND2(
             at::ScalarType::Half,
             at::ScalarType::BFloat16,
             iter.dtype(),
