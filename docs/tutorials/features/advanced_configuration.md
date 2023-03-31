@@ -15,7 +15,7 @@ The following build options are supported by Intel® Extension for PyTorch\*. Us
 | USE_SCRATCHPAD_MODE | ON | Use oneDNN scratchpad mode |
 | USE_PRIMITIVE_CACHE | OFF | Cache oneDNN primitives by FRAMEWORK, instead of oneDNN itself |
 | USE_QUEUE_BARRIER | ON | Use queue submit_barrier, otherwise use dummy kernel |
-| USE_MULTI_CONTEXT | ON | Create DPC++ runtime context per device |
+| USE_MULTI_CONTEXT | OFF | Create DPC++ runtime context per device |
 | USE_PROFILER | ON | USE XPU Profiler in build. |
 | USE_SYCL_ASSERT | OFF | Enables assert in sycl kernel |
 | USE_ITT_ANNOTATION | OFF | Enables ITT annotation in sycl kernel |
