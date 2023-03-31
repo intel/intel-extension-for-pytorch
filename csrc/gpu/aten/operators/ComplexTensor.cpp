@@ -11,9 +11,11 @@ namespace at {
 namespace impl {
 void complex_check_floating(const Tensor& a, const Tensor& b) {
   TORCH_CHECK(
-      (a.scalar_type() == kFloat || a.scalar_type() == kDouble) &&
-          (b.scalar_type() == kFloat || b.scalar_type() == kDouble),
-      "Expected both inputs to be Float or Double tensors but got ",
+      (a.scalar_type() == kFloat || a.scalar_type() == kDouble ||
+       a.scalar_type() == kHalf) &&
+          (b.scalar_type() == kFloat || b.scalar_type() == kDouble ||
+           b.scalar_type() == kHalf),
+      "Expected both inputs to be Float or Double or Half tensors but got ",
       a.scalar_type(),
       " and ",
       b.scalar_type());
@@ -61,12 +63,13 @@ Tensor& complex_out(const Tensor& real, const Tensor& imag, Tensor& result) {
                   .add_input(imag)
                   .check_all_same_dtype(false)
                   .build();
-  IPEX_DISPATCH_FLOATING_TYPES(iter.input_dtype(), "complex_out", [&]() {
-    dpcpp_kernel_for_tensor_iter(
-        iter, [](scalar_t a, scalar_t b) -> c10::complex<scalar_t> {
-          return c10::complex<scalar_t>(a, b);
-        });
-  });
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
+      iter.input_dtype(), "complex_out", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t a, scalar_t b) -> c10::complex<scalar_t> {
+              return c10::complex<scalar_t>(a, b);
+            });
+      });
 
   return result;
 }

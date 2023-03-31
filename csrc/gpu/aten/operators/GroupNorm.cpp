@@ -190,12 +190,14 @@ void GroupNormKernelImplInternal(
   T* Y_data = Y->data_ptr<T>();
   T* mean_data = mean->data_ptr<T>();
   T* rstd_data = rstd->data_ptr<T>();
-  const auto kAccType = X.scalar_type() == kHalf ? kFloat : X.scalar_type();
+  const auto kAccType =
+      (X.scalar_type() == kHalf || X.scalar_type() == kBFloat16)
+      ? kFloat
+      : X.scalar_type();
   Tensor a = at::empty({N, C}, X.options().dtype(kAccType));
   Tensor b = at::empty({N, C}, X.options().dtype(kAccType));
   T_ACC* a_data = a.data_ptr<T_ACC>();
   T_ACC* b_data = b.data_ptr<T_ACC>();
-
   RowwiseMomentsDPCPPKernel<T>(
       N * G, D * HxW, eps, X_data, mean_data, rstd_data);
 
