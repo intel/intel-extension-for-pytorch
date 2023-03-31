@@ -20,7 +20,8 @@ class TestTorchMethod(TestCase):
 
         dqX = torch.dequantize(q_input_cpu)
         Y_ref = torch.sigmoid(dqX)
-        qY_ref = torch.quantize_per_tensor(Y_ref, 1.0/255.0, 0, torch.quint8)
+        # Here, we quantize output use opaque u8 tensor setting.
+        qY_ref = torch.quantize_per_tensor(Y_ref, 1.0/255.0*2, 0, torch.qint8)
         dqY_ref = qY_ref.dequantize()
 
         self.assertEqual(result_functional.to("cpu"), dqY_ref)

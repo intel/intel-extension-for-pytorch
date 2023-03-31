@@ -22,20 +22,20 @@ namespace AtenIpexTypeQuantizedXPU {
 
 void qsigmoid_kernel(const Tensor& qx, Tensor& qy) {
   IPEX_DISPATCH_QINT_TYPES(qx.scalar_type(), "qsigmoid_xpu", [&]() {
-    // output_scale = 1 / (2^8 - 1)
-    double output_scale = 0.00392157;
-    int64_t output_zero_point = 0;
+    // output_scale = 1 / (2^8 - 1) * 2, the scale setted like minmax observer
+    double output_scale = (0.00392157 * 2.f);
+    // Algin with PyTorch symmetric quantization. The real dtype is a QInt8
+    // See Note: [Opaque u8 tensor]
+    int64_t output_zero_point = 128;
 
     // The range of sigmoid's output is (0,1) ,therefore we quantize our data
-    // with Uint8 datatype at the end of this operator to maximize the accuracy,
-    // which is diffenent from pytorch cpu implement. The accuracy of this
-    // implementation, from our test, is almost the same as original pytorch cpu
-    // implementation
+    // with zp = 1/(2^8-1)  at the end of this operator to maximize the
+    // accuracy, which is diffenent from pytorch cpu implement(zp=1/2^8).
 
     auto data_type = at::kQUInt8;
     if (SCALAR_TYPE == at::kQInt32) {
-      // output_scale = 1 / (2^32 - 1)
-      output_scale = 2.3283064370807974e-10;
+      // output_scale = 1 / (2^32 - 1) * 2.f
+      output_scale = (2.3283064370807974e-10) * 2.f;
       data_type = at::kQInt32;
     }
     auto x = at::dequantize(qx);

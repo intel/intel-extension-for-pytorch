@@ -410,10 +410,17 @@ at::Tensor q_conv2d_sigmoid(
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double output_scale,
     int64_t output_zero_point) {
+  // [Note: Scale caching for qsigmoid]
+  // PyTorch qsigmoid uses 1.0 / 256.0 as qscale for qsigmoid rather than
+  // get scale from observer. scale&zp caching in IPEX caches torch_scale / 2
+  // for dnn symmetric qunt diff with PyTorch. To cache right value for qsimoid
+  // here, we let scale = 1.0 / 255.0 * 2.0 The output tensor would has
+  // observed-like scale, while it caches right scale inside.
+  auto scale = 1.0 / 255.0 * 2.0;
   auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, 0.00392157, 0, kQUInt8);
+      QuantizeConvConverter<2>(packed_weight, scale, 128, kQUInt8);
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    Attr attr(/* q_scale */ static_cast<float>(scale));
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
