@@ -235,7 +235,7 @@ static inline void norm_kernel(
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
-      iter.dtype(),
+      iter.input_dtype(),
       "norm",
       [&]() { norm_kernel_impl<scalar_t>(iter, p, dim); });
 }
@@ -257,8 +257,11 @@ static Tensor& norm_out(
       toString(scalarType),
       " instead.");
 
-  ScalarType dtype = get_dtype(result, self, opt_dtype, true);
-  auto iter = meta::make_reduction("norm", result, self, dim, keepdim, dtype);
+  auto in_dtype = opt_dtype.value_or(self.scalar_type());
+  auto out_dtype = result.scalar_type();
+
+  auto iter = meta::make_reduction(
+      "norm", result, self, dim, keepdim, in_dtype, out_dtype);
   if (iter.numel() == 0) {
     result.zero_();
   } else {

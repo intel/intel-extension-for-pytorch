@@ -34,3 +34,8 @@ class TestTorchMethod(TestCase):
         input = torch.tensor([-1 + 1j, -2 + 2j, 3 - 3j])
         input_xpu = input.to("xpu")
         self.assertEqual(input.conj(), input_xpu.conj().to("cpu"))
+
+    def test_complex_norm(self, dtype=torch.cfloat):
+        input = torch.tensor([0.9701+0.7078j, 0.345-1.764j])
+        input_xpu = input.to("xpu")
+        self.assertEqual(torch.norm(input), torch.norm(input_xpu).to("cpu"))
