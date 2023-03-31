@@ -61,7 +61,7 @@ def _conv_fusion(input1, input2, model, print_graph=False, dtype=torch.float):
 class MulAddScalar(torch.nn.Module):
     def __init__(self) -> None:
         super(MulAddScalar, self).__init__()
-        self.conv = nn.Conv2d(2, 2, 1, 1)
+        self.conv = nn.Conv2d(64, 63, 1, 1)
 
     def forward(self, input, m1, m2):
         input = F.relu(self.conv(input))
@@ -71,7 +71,7 @@ class MulAddScalar(torch.nn.Module):
 class MulScalarAddScalar(torch.nn.Module):
     def __init__(self) -> None:
         super(MulScalarAddScalar, self).__init__()
-        self.conv = nn.Conv2d(2, 2, 1, 1)
+        self.conv = nn.Conv2d(64, 63, 1, 1)
 
     def forward(self, input, m1, m2):
         input = F.relu(self.conv(input))
@@ -81,7 +81,7 @@ class MulScalarAddScalar(torch.nn.Module):
 class MulScalarAdd(torch.nn.Module):
     def __init__(self) -> None:
         super(MulScalarAdd, self).__init__()
-        self.conv = nn.Conv2d(2, 2, 1, 1)
+        self.conv = nn.Conv2d(64, 63, 1, 1)
 
     def forward(self, input, m1, m2):
         input = F.relu(self.conv(input))
@@ -91,7 +91,7 @@ class MulScalarAdd(torch.nn.Module):
 class MulAdd(torch.nn.Module):
     def __init__(self) -> None:
         super(MulAdd, self).__init__()
-        self.conv = nn.Conv2d(2, 2, 1, 1)
+        self.conv = nn.Conv2d(64, 63, 1, 1)
 
     def forward(self, input, m1, m2):
         ret = F.relu(self.conv(input))
@@ -1504,9 +1504,9 @@ class TestNNMethod(TestCase):
 
     def test_mul_add(self, dtype=torch.float):
         def model_check(model):
-            m1 = torch.randn((4, 2, 2, 2), device=cpu_device)
-            m2 = torch.randn((2, 2), device=cpu_device)
-            add1 = torch.randn((1, 2, 1, 1), device=cpu_device)
+            m1 = torch.randn((4, 64, 256, 256), device=cpu_device)
+            m2 = torch.randn((4, 63, 1, 1), device=cpu_device)
+            add1 = torch.randn((4, 63, 1, 1), device=cpu_device).to(memory_format=torch.contiguous_format)
             add2 = add1.clone()
 
             model1 = copy.deepcopy(model)
