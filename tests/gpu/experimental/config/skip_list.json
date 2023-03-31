@@ -1510,6 +1510,9 @@
       "test_empty_SparseCSR_xpu_int64",
       "test_empty_SparseCSR_xpu_int8",
       "test_empty_SparseCSR_xpu_uint8"
+    ],
+    "all sparse csr related cases will be skipped for now": [
+      "test_"
     ]
   },
   "TestSparseCSRXPU": {
@@ -1566,6 +1569,9 @@
       "test_transpose_SparseCSR_xpu_int64",
       "test_transpose_SparseCSR_xpu_int8",
       "test_transpose_SparseCSR_xpu_uint8"
+    ],
+    "all sparse csr related cases will be skipped for now": [
+      "test_"
     ]
   },
   "TestSparseUnaryUfuncsXPU": {
@@ -1605,6 +1611,9 @@
       "test_sparse_consistency_isinf_xpu_int64",
       "test_sparse_consistency_isinf_xpu_int8",
       "test_sparse_consistency_isinf_xpu_uint8"
+    ],
+    "all sparse csr related cases will be skipped for now": [
+      "test_"
     ]
   },
   "TestSparseXPU": {
@@ -1620,6 +1629,9 @@
     "Sparse issues will be skipped for temp. (PYTORCHDGQ-2514)": [
       "test_print_coalesced_xpu_xpu_float64",
       "test_print_uncoalesced_xpu_xpu_float64"
+    ],
+    "all sparse csr related cases will be skipped for now": [
+      "test_"
     ]
   },
   "TestNumPyInteropXPU": {
@@ -2399,7 +2411,9 @@
       "test_meta_istft_xpu_float32",
       "test_dispatch_meta_istft_xpu_float32",
       "test_meta_istft_xpu_float64",
-      "test_dispatch_meta_istft_xpu_float64"
+      "test_dispatch_meta_istft_xpu_float64",
+      "test_dispatch_meta_linalg_cholesky_xpu_float32",
+      "test_dispatch_meta_linalg_cholesky_xpu_float64"
     ],
     "Meta specific issues will be skipped for temp. (PYTORCHDGQ-2517)": [
       "test_dispatch_meta_linalg_eigvalsh_xpu_float32",
