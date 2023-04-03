@@ -22,6 +22,7 @@ struct DeviceInfo {
   std::string platform_name;
   uint64_t global_mem_size;
   uint32_t max_compute_units;
+  uint32_t gpu_eu_count;
   size_t max_work_group_size;
   uint32_t max_num_sub_groups;
   std::vector<size_t> sub_group_sizes;

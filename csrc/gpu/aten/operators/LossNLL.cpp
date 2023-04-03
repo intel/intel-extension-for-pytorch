@@ -561,9 +561,9 @@ void spatial_class_nll_criterion_update_output_kernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-  auto cu_num = dpcppMaxComputeUnitSize(dev_id);
+  auto eu_cnt = dpcppGpuEuCount(dev_id);
   auto num_groups = (numel - 1) / wgroup_size + 1;
-  num_groups = std::min(decltype(num_groups)(cu_num), num_groups);
+  num_groups = std::min(decltype(num_groups)(eu_cnt), num_groups);
 
   TensorInfo<scalar_t, uint64_t> self_info =
       getTensorInfo<scalar_t, uint64_t>(self);

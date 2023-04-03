@@ -358,11 +358,9 @@ void EmbeddingBag_updateOutputKernel(
   // determine per sample weights should be in calculation or not
   bool per_sample_weights_defined = per_sample_weights_data ? true : false;
 
-  auto maxWGSize =
-      queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
+  auto maxWGSize = dpcppMaxWorkGroupSize();
 
-  auto maxComputeUnit =
-      queue.get_device().template get_info<dpcpp_dev_max_compute_units>();
+  auto gpuEuCount = dpcppGpuEuCount();
 
   // how many work items serve for one bag in vector sight
   auto bag_wi_num = (weight_stride0 % vec_size == 0)
@@ -388,7 +386,7 @@ void EmbeddingBag_updateOutputKernel(
   // For huge bags number, limited wg number is set to avoid overhead of
   // groups over scheduling. WGNumber default in single tile in one time =
   // Max compute unit * 8 threads * SIMD32 per thread / max WG size * 512.
-  auto WGNumber = maxComputeUnit * 8 * 32 / maxWGSize * 512;
+  auto WGNumber = gpuEuCount * 8 * 32 / maxWGSize * 512;
 
   // one or multi chunks for one bag.
   // all_wi_num <= maxWGSize: one wg is enough to finish all bags

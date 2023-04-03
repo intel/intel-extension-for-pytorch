@@ -296,12 +296,16 @@ static constexpr auto dpcpp_dev_ext_intel_gpu_eu_simd_width =
     sycl::info::device::ext_intel_gpu_eu_simd_width;
 static constexpr auto dpcpp_dev_ext_intel_gpu_hw_threads_per_eu =
     sycl::info::device::ext_intel_gpu_hw_threads_per_eu;
+static constexpr auto dpcpp_dev_ext_intel_gpu_eu_count =
+    sycl::info::device::ext_intel_gpu_eu_count;
 
 // aspects for extensions
 static constexpr auto dpcpp_dev_aspect_gpu_eu_simd_width =
     sycl::aspect::ext_intel_gpu_eu_simd_width;
 static constexpr auto dpcpp_dev_aspect_hw_threads_per_eu =
     sycl::aspect::ext_intel_gpu_hw_threads_per_eu;
+static constexpr auto dpcpp_dev_aspect_gpu_eu_count =
+    sycl::aspect::ext_intel_gpu_eu_count;
 static constexpr auto dpcpp_dev_aspect_fp64 = sycl::aspect::fp64;
 static constexpr auto dpcpp_dev_aspect_atomic64 = sycl::aspect::atomic64;
 
@@ -355,8 +359,8 @@ using dpcpp_dev_is_available = sycl::info::device::is_available;
 using dpcpp_dev_max_param_size = sycl::info::device::max_parameter_size;
 // Returns the number of parallel compute units available to the device.
 using dpcpp_dev_max_compute_units = sycl::info::device::max_compute_units;
-// Returns the maximum dimensions that specify the global and local work-item
-// IDs used by the data parallel execution model.
+// Returns the maximum dimensions that specify the global and local
+// work-item IDs used by the data parallel execution model.
 using dpcpp_dev_max_work_item_dims =
     sycl::info::device::max_work_item_dimensions;
 // Returns the maximum number of workitems that are permitted in a work-group
@@ -446,12 +450,16 @@ using dpcpp_dev_ext_intel_gpu_eu_simd_width =
     sycl::ext::intel::info::device::gpu_eu_simd_width;
 using dpcpp_dev_ext_intel_gpu_hw_threads_per_eu =
     sycl::ext::intel::info::device::gpu_hw_threads_per_eu;
+using dpcpp_dev_ext_intel_gpu_eu_count =
+    sycl::ext::intel::info::device::gpu_eu_count;
 
 // aspects for extensions
 static constexpr auto dpcpp_dev_aspect_gpu_eu_simd_width =
     sycl::aspect::ext_intel_gpu_eu_simd_width;
 static constexpr auto dpcpp_dev_aspect_hw_threads_per_eu =
     sycl::aspect::ext_intel_gpu_hw_threads_per_eu;
+static constexpr auto dpcpp_dev_aspect_gpu_eu_count =
+    sycl::aspect::ext_intel_gpu_eu_count;
 static constexpr auto dpcpp_dev_aspect_fp64 = sycl::aspect::fp64;
 static constexpr auto dpcpp_dev_aspect_atomic64 = sycl::aspect::atomic64;
 

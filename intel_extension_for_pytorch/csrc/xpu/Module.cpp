@@ -508,6 +508,7 @@ static void register_xpu_device_info(PyObject* module) {
       .def_readonly("platform_name", &DeviceInfo::platform_name)
       .def_readonly("total_memory", &DeviceInfo::global_mem_size)
       .def_readonly("max_compute_units", &DeviceInfo::max_compute_units)
+      .def_readonly("gpu_eu_count", &DeviceInfo::gpu_eu_count)
       .def_readonly("max_work_group_size", &DeviceInfo::max_work_group_size)
       .def_readonly("max_num_sub_groups", &DeviceInfo::max_num_sub_groups)
       .def_readonly("sub_group_sizes", &DeviceInfo::sub_group_sizes)
@@ -520,7 +521,8 @@ static void register_xpu_device_info(PyObject* module) {
                << "', platform_name='" << info.platform_name << "', dev_type='"
                << get_dev_type(info) << ", support_fp64=" << info.support_fp64
                << ", total_memory=" << info.global_mem_size / (1024 * 1024)
-               << "MB, max_compute_units=" << info.max_compute_units << ")";
+               << "MB, max_compute_units=" << info.max_compute_units
+               << ", gpu_eu_count=" << info.gpu_eu_count << ")";
         return stream.str();
       });
 }

@@ -306,6 +306,12 @@ static void initDeviceProperty(DeviceId device_id) {
       device.get_info<dpcpp_dev_native_vec_width_half>();
 
   // intel extensions
+  // According to existing platform, default value 512 is large enough to
+  // subscribe a latest modern platform. But on possible platforms, it may get a
+  // little perf drop in some cases.
+  device_prop.gpu_eu_count = device.has(dpcpp_dev_aspect_gpu_eu_count)
+      ? device.get_info<dpcpp_dev_ext_intel_gpu_eu_count>()
+      : 512;
   device_prop.gpu_eu_simd_width = device.has(dpcpp_dev_aspect_gpu_eu_simd_width)
       ? device.get_info<dpcpp_dev_ext_intel_gpu_eu_simd_width>()
       : 8;
@@ -339,6 +345,7 @@ static void initDeviceProperty(DeviceId device_id) {
   dev_info.platform_name = device_prop.platform_name;
   dev_info.global_mem_size = device_prop.global_mem_size;
   dev_info.max_compute_units = device_prop.max_compute_units;
+  dev_info.gpu_eu_count = device_prop.gpu_eu_count;
   dev_info.max_work_group_size = device_prop.max_work_group_size;
   dev_info.max_num_sub_groups = device_prop.max_num_subgroup;
   dev_info.sub_group_sizes = device_prop.subgroup_sizes;
