@@ -478,28 +478,28 @@ def optimize(
     # when on xpu, some features are not supported
     if device_type == 'xpu':
         if opt_properties.auto_kernel_selection:
-            warnings.warn("For XPU device , the auto kernel selection is unsupported, so disable it")
+            warnings.warn("Auto Kernel Selection feature is not supported on XPU, disabled.")
             opt_properties.auto_kernel_selection = False
         if opt_properties.split_master_weight_for_bf16:
-            warnings.warn("For XPU device, the split master weight is unsupported for now, so temp to disable it")
+            warnings.warn("Split Master Weight feature is not supported on XPU for now, disabled.")
             # TODO: for xpu, the split master weight will be supported soon
             opt_properties.split_master_weight_for_bf16 = False
         if opt_properties.graph_mode:
             warnings.warn(
-                "For XPU, the oob solution for inference is to trace model outside of the torch.xpu.optimize,"
-                + " so temp to disable the graph mode")
+                "Out-of-Box (OOB) solution for inference supposes to trace a model outside "
+                + "the torch.xpu.optimize on XPU, disabled the graph mode.")
             # TODO: for xpu now, the oob solution for inference is to trace model outside of the torch.xpu.optimize.
             opt_properties.graph_mode = False
         if not inplace:
             warnings.warn(
-                "For XPU device to save valuable device memory, temp to do optimization on inplaced model,"
-                + " so make inplace to be true")
+                "To reduce device memory usage on XPU, optimization are done inplace,"
+                + " setting the inplace argument to True.")
             # TODO: for xpu, inplace is true will add device memory pressure, so set inplace to be true
             inplace = True
         if opt_properties.weights_prepack or sample_input is not None:
             warnings.warn(
-                "For XPU, the weight prepack and sample input are both disabled. The onednn layout"
-                + " is automatically chosen to use")
+                "Weight Prepack and Sample Input are both disabled on XPU. The Onednn Layout"
+                + " is automatically applied.")
             opt_properties.weights_prepack = False
             sample_input = None
 
@@ -538,22 +538,22 @@ def optimize(
         if not opt_properties.fuse_update_step:
             opt_properties.split_master_weight_for_bf16 = False
             warnings.warn(
-                "IPEX does not non-fused split master weight for bf16 training,"
-                + "have reset split_master_weight_for_bf16 flag to False."
-                + "If you want to use split_master_weight_for_bf16."
-                + "Please set both split_master_weight_for_bf16 and fuse_update_step to True")
+                "IPEX does not support non-fused split master weight for bf16 training, "
+                + "reset split_master_weight_for_bf16 flag to False. "
+                + "If you want to use split_master_weight_for_bf16, "
+                + "please set both split_master_weight_for_bf16 and fuse_update_step to True.")
         elif type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST_CPU and device_type == 'cpu':
             opt_properties.split_master_weight_for_bf16 = False
             opt_properties.fuse_update_step = False
             warnings.warn(
-                "IPEX CPU does not support fused/fused split update for" + str(type(optimizer))
-                + "will use non-fused master weight update for bf16 training on CPU")
+                "IPEX CPU does not support fused/fused split update for " + str(type(optimizer))
+                + ", use non-fused master weight update for bf16 training on CPU.")
         elif type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST_XPU and device_type == 'xpu':
             opt_properties.split_master_weight_for_bf16 = False
             opt_properties.fuse_update_step = False
             warnings.warn(
-                "IPEX XPU does not support fused/fused split update for" + str(type(optimizer))
-                + "will use non-fused master weight update for bf16 training on XPU")
+                "IPEX XPU does not support fused/fused split update for " + str(type(optimizer))
+                + ", use non-fused master weight update for bf16 training on XPU.")
 
     # convert optimizer for training case.
     params_attr = {}
@@ -564,7 +564,7 @@ def optimize(
             optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16,
             convert_dtype=torch.bfloat16)
     if dtype == torch.half and model.training:
-        assert device_type != 'xpu', "For now, XPU device does not support model training with half precision"
+        assert device_type != 'xpu', "For now, XPU device does not support model training with half precision."
         optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
             optimized_model, optimized_optimizer, params_attr, False, convert_dtype=torch.half)
     # Since TorchDynamo cannot handle custom operations yet, for the case of inference graph mode,

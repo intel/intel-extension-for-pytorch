@@ -1,6 +1,8 @@
 Blogs & Publications
 ====================
 
+* [Accelerate PyTorch\* INT8 Inference with New “X86” Quantization Backend on X86 CPUs](https://www.intel.com/content/www/us/en/developer/articles/technical/accelerate-pytorch-int8-inf-with-new-x86-backend.html)
+* [Intel® Deep Learning Boost - Improve Inference Performance of BERT Base Model from Hugging Face for Network Security Technology Guide](https://networkbuilders.intel.com/solutionslibrary/intel-deep-learning-boost-improve-inference-performance-of-bert-base-model-from-hugging-face-for-network-security-technology-guide)
 * [Accelerating PyTorch Transformers with Intel Sapphire Rapids, Part 1, Jan 2023](https://huggingface.co/blog/intel-sapphire-rapids)
 * [Intel® Deep Learning Boost - Improve Inference Performance of BERT Base Model from Hugging Face for Network Security Technology Guide, Jan 2023](https://networkbuilders.intel.com/solutionslibrary/intel-deep-learning-boost-improve-inference-performance-of-bert-base-model-from-hugging-face-for-network-security-technology-guide)
 * [Scaling inference on CPUs with TorchServe, PyTorch Conference, Dec 2022](https://www.youtube.com/watch?v=066_Jd6cwZg)
@@ -24,6 +26,7 @@ Blogs & Publications
 * [Accelerating PyTorch distributed fine-tuning with Intel technologies, Nov 2021](https://huggingface.co/blog/accelerating-pytorch)
 * [Scaling up BERT-like model Inference on modern CPU - parts 1, Apr 2021](https://huggingface.co/blog/bert-cpu-scaling-part-1)
 * [Scaling up BERT-like model Inference on modern CPU - parts 2, Nov 2021](https://huggingface.co/blog/bert-cpu-scaling-part-2)
+* [NAVER: Low-Latency Machine-Learning Inference](https://www.intel.com/content/www/us/en/customer-spotlight/stories/naver-ocr-customer-story.html)
 * [Intel® Extensions for PyTorch, Feb 2021](https://pytorch.org/tutorials/recipes/recipes/intel_extension_for_pytorch.html)
 * [Optimizing DLRM by using PyTorch with oneCCL Backend, Feb 2021](https://pytorch.medium.com/optimizing-dlrm-by-using-pytorch-with-oneccl-backend-9f85b8ef6929)
 * [Accelerate PyTorch with IPEX and oneDNN using Intel BF16 Technology, Feb 2021](https://medium.com/pytorch/accelerate-pytorch-with-ipex-and-onednn-using-intel-bf16-technology-dca5b8e6b58f)

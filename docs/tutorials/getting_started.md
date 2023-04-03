@@ -5,7 +5,7 @@
 Prebuilt wheel files are released for multiple Python versions. You can install them simply with the following pip command.
 
 ```bash
-python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 intel_extension_for_pytorch==1.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
+python -m pip install torch==1.13.1+xpu torchvision==0.14.1+xpu intel_extension_for_pytorch==1.13.120+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
 ```
 
 You can run a simple sanity test to double confirm if the correct version is installed, and if the software stack can get correct hardware information onboard your system.
@@ -66,11 +66,12 @@ More examples, including training and usage of low precision data types are avai
 
 ## Execution
 
-Execution requires an active Intel® oneAPI environment. Suppose you have the Intel® oneAPI Base Toolkit installed in `/opt/intel/oneapi` directory, activating the environment is as simple as sourcing its environment activation bash script.
+Execution requires an active Intel® oneAPI environment. Suppose you have the Intel® oneAPI Base Toolkit installed in `/opt/intel/oneapi` directory, activating the environment is as simple as sourcing its environment activation bash scripts.
 
 There are some environment variables in runtime that can be used to configure executions on GPU. Please check [Advanced Configuration](./features/advanced_configuration.html#runtime-configuration) for more detailed information.
 
 ```bash
-source /opt/intel/oneapi/setvars.sh
+source /opt/intel/oneapi/compiler/latest/env/vars.sh
+source /opt/intel/oneapi/mkl/latest/env/vars.sh
 python <script>
 ```

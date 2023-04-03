@@ -7,39 +7,5 @@ Users need to provide a prepared model and some parameters required for tuning. 
 
 ### Usage Example
 
-```python
-model = torchvision.models.resnet50(pretrained=True)
-model.eval()
-data_loader = torch.utils.data.DataLoader(
-        datasets.ImageFolder(valdir, transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize,
-        ])),
-        batch_size=batch_size, shuffle=False,
-        num_workers=workers, pin_memory=True)
-
-# prepare model, do conv+bn folding, and init model quant_state.
-qconfig = ipex.quantization.default_static_qconfig
-data = torch.randn(1, 3, 224, 224)
-prepared_model = ipex.quantization.prepare(model, qconfig, example_inputs=data, inplace=False)
-
-######################## recipe tuning with INC ########################
-def eval(prepared_model):
-    # return accuracy value
-    return evaluate(prepared_model, data_loader)
-tuned_model = ipex.quantization.autotune(prepared_model, data_loader, eval, sampling_size=[100], 
-        accuracy_criterion={'relative': 0.01}, tuning_time=0)
-########################################################################
-
-# run tuned model
-convert_model = ipex.quantization.convert(tuned_model)
-with torch.no_grad():
-    traced_model = torch.jit.trace(convert_model, data)
-    traced_model = torch.jit.freeze(traced_model)
-    traced_model(data)
-
-# save tuned qconfig file
-tuned_model.save_qconf_summary(qconf_summary = "tuned_conf.json")
-```
+[//]: # (marker_feature_int8_autotune)
+[//]: # (marker_feature_int8_autotune)
