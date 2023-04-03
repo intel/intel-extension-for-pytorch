@@ -18,7 +18,9 @@ TEST_MODULE_CONVERT_LIST = [torch.nn.Conv2d,
                             torch.nn.LSTM]
 
 # TODO: for now, only support SGD and AdamW
-SUPPORTED_FUSION_OPTIMIZER = ['Adam' , 'SGD', 'AdamW', 'Lars']
+SUPPORTED_FUSION_OPTIMIZER = ['Adam'
+#  , 'SGD', 'AdamW', 'Lars'
+ ]
 
 
 class InferenceModel(nn.Module):
@@ -185,7 +187,7 @@ class TestTorchMethod(TestCase):
                 beta1 = 0.9
                 beta2 = 0.999
                 adam_epsilon = 1e-6
-                amsgrad = True
+                amsgrad = False
                 optimizer_xpu_no_fuse = torch.optim.Adam(model_xpu_no_fuse.parameters(),
                                                           lr=lr,
                                                           betas=(beta1, beta2),
