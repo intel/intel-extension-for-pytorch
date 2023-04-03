@@ -289,3 +289,12 @@ class TestNNMethod(TestCase):
             print("x_dpcpp.grad", x_dpcpp.grad.cpu())
             self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
             self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
+
+    def test_batch_norm_gather_stats(self):
+        input = torch.randn(1, 3, 3, 3, device='xpu')
+        mean, invstd = torch.batch_norm_gather_stats(
+            input, mean=torch.ones(64, 3, device='xpu'), invstd=torch.ones(64, 3, device='xpu'),
+            running_mean=None, running_var=None  , momentum=.1, eps=1e-5, count=2
+        )
+        self.assertEqual(mean, torch.ones(3, device='xpu'))
+        self.assertEqual(invstd, torch.ones(3, device='xpu'))
