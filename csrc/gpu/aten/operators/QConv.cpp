@@ -374,7 +374,12 @@ at::Tensor q_conv2d_sum(
       Tensor bias = pack_ptr->bias.value();
       attr.append_bias<2>(bias);
     }
-    return attr.append_post_sum(1.f, accumu.q_scale());
+    return attr.append_post_sum(
+        1.f,
+        accumu.scalar_type() == kQUInt8
+            ? accumu.q_scale() / 2
+            : accumu.q_scale()); // See [Note: Gap of u8 qtensor scale between
+                                 // oneDNN and PyTorch]
   };
   return qconv_wrapper.call(input, accumu, att);
 }
@@ -399,7 +404,13 @@ at::Tensor q_conv2d_sum_relu(
       Tensor bias = pack_ptr->bias.value();
       attr.append_bias<2>(bias);
     }
-    return attr.append_post_sum(1.f, accumu.q_scale())
+    return attr
+        .append_post_sum(
+            1.f,
+            accumu.scalar_type() == kQUInt8
+                ? accumu.q_scale() / 2
+                : accumu.q_scale()) // See [Note: Gap of u8 qtensor scale
+                                    // between oneDNN and PyTorch]
         .append_post_eltwise(1.f, 0.f, 0.f, attr.kind_with_relu);
   };
   return qconv_wrapper.call(input, accumu, att);
