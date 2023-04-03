@@ -7,22 +7,5 @@ This feature automatically applies a combination of TorchScript trace technique 
 
 ### Usage Example
 
-```python
-import torch
-import torchvision.models as models
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-model = model.to(memory_format=torch.channels_last)
-data = data.to(memory_format=torch.channels_last)
-
-#################### code changes ####################
-import intel_extension_for_pytorch as ipex
-model = ipex.optimize(model, graph_mode=True)
-######################################################
-
-with torch.no_grad():
-    model(data)
-```
+[//]: # (marker_feature_graph_capture)
+[//]: # (marker_feature_graph_capture)

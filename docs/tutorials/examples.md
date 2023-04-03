@@ -41,116 +41,13 @@ with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
 
 #### Complete - Float32 Example
 
-```
-import torch
-import torchvision
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
-
-LR = 0.001
-DOWNLOAD = True
-DATA = 'datasets/cifar10/'
-
-transform = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((224, 224)),
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
-train_dataset = torchvision.datasets.CIFAR10(
-        root=DATA,
-        train=True,
-        transform=transform,
-        download=DOWNLOAD,
-)
-train_loader = torch.utils.data.DataLoader(
-        dataset=train_dataset,
-        batch_size=128
-)
-
-model = torchvision.models.resnet50()
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
-model.train()
-######################## code changes #######################
-model = model.to("xpu")
-criterion = criterion.to("xpu")
-model, optimizer = ipex.optimize(model, optimizer=optimizer)
-######################## code changes #######################
-
-for batch_idx, (data, target) in enumerate(train_loader):
-    ########## code changes ##########
-    data = data.to("xpu")
-    target = target.to("xpu")
-    ########## code changes ##########
-    optimizer.zero_grad()
-    output = model(data)
-    loss = criterion(output, target)
-    loss.backward()
-    optimizer.step()
-    print(batch_idx)
-torch.save({
-     'model_state_dict': model.state_dict(),
-     'optimizer_state_dict': optimizer.state_dict(),
-     }, 'checkpoint.pth')
-```
+[//]: # (marker_train_single_fp32_complete)
+[//]: # (marker_train_single_fp32_complete)
 
 #### Complete - BFloat16 Example
 
-```
-import torch
-import torchvision
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
-
-LR = 0.001
-DOWNLOAD = True
-DATA = 'datasets/cifar10/'
-
-transform = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((224, 224)),
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
-train_dataset = torchvision.datasets.CIFAR10(
-        root=DATA,
-        train=True,
-        transform=transform,
-        download=DOWNLOAD,
-)
-train_loader = torch.utils.data.DataLoader(
-        dataset=train_dataset,
-        batch_size=128
-)
-
-model = torchvision.models.resnet50()
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
-model.train()
-##################################### code changes ################################
-model = model.to("xpu")
-criterion = criterion.to("xpu")
-model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
-##################################### code changes ################################
-
-for batch_idx, (data, target) in enumerate(train_loader):
-    optimizer.zero_grad()
-    ######################### code changes ######################### 
-    data = data.to("xpu")
-    target = target.to("xpu")
-    with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
-    ######################### code changes ######################### 
-        output = model(data)
-        loss = criterion(output, target)
-    loss.backward()
-    optimizer.step()
-    print(batch_idx)
-torch.save({
-     'model_state_dict': model.state_dict(),
-     'optimizer_state_dict': optimizer.state_dict(),
-     }, 'checkpoint.pth')
-```
+[//]: # (marker_train_single_bf16_complete)
+[//]: # (marker_train_single_bf16_complete)
 
 ## Inference
 
@@ -162,53 +59,13 @@ The `optimize` function of Intel® Extension for PyTorch\* applies optimizations
 
 ##### Resnet50
 
-```
-import torch
-import torchvision.models as models
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-######## code changes #######
-model = model.to("xpu")
-data = data.to("xpu")
-model = ipex.optimize(model)
-######## code changes #######
-
-with torch.no_grad():
-    model(data)
-```
+[//]: # (marker_inf_rn50_imp_fp32)
+[//]: # (marker_inf_rn50_imp_fp32)
 
 ##### BERT
 
-```
-import torch
-from transformers import BertModel
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
-
-model = BertModel.from_pretrained(args.model_name)
-model.eval()
-
-vocab_size = model.config.vocab_size
-batch_size = 1
-seq_length = 512
-data = torch.randint(vocab_size, size=[batch_size, seq_length])
-
-######## code changes #######
-model = model.to("xpu")
-data = data.to("xpu")
-model = ipex.optimize(model)
-######## code changes #######
-
-with torch.no_grad():
-    model(data)
-```
+[//]: # (marker_inf_bert_imp_fp32)
+[//]: # (marker_inf_bert_imp_fp32)
 
 #### TorchScript Mode
 
@@ -216,67 +73,13 @@ We recommend you take advantage of Intel® Extension for PyTorch\* with [TorchSc
 
 ##### Resnet50
 
-```
-import torch
-import torchvision.models as models
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-######## code changes #######
-model = model.to("xpu")
-data = data.to("xpu")
-model = ipex.optimize(model)
-######## code changes #######
-
-with torch.no_grad():
-    d = torch.rand(1, 3, 224, 224)
-    ##### code changes #####  
-    d = d.to("xpu")
-    ##### code changes #####  
-    model = torch.jit.trace(model, d)
-    model = torch.jit.freeze(model)
-
-    model(data)
-```
+[//]: # (marker_inf_rn50_ts_fp32)
+[//]: # (marker_inf_rn50_ts_fp32)
 
 ##### BERT
 
-```
-import torch
-from transformers import BertModel
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
-
-model = BertModel.from_pretrained(args.model_name)
-model.eval()
-
-vocab_size = model.config.vocab_size
-batch_size = 1
-seq_length = 512
-data = torch.randint(vocab_size, size=[batch_size, seq_length])
-
-######## code changes #######
-model = model.to("xpu")
-data = data.to("xpu")
-model = ipex.optimize(model)
-######## code changes #######
-
-with torch.no_grad():
-    d = torch.randint(vocab_size, size=[batch_size, seq_length])
-    ##### code changes #####
-    d = d.to("xpu")
-    ##### code changes #####
-    model = torch.jit.trace(model, (d,), strict=False)
-    model = torch.jit.freeze(model)
-
-    model(data)
-```
+[//]: # (marker_inf_bert_ts_fp32)
+[//]: # (marker_inf_bert_ts_fp32)
 
 ### BFloat16
 
@@ -288,59 +91,13 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.
 
 ##### Resnet50
 
-```
-import torch
-import torchvision.models as models
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-#################### code changes #################
-model = model.to("xpu")
-data = data.to("xpu")
-model = ipex.optimize(model, dtype=torch.bfloat16)
-#################### code changes #################
-
-with torch.no_grad():
-    ############################# code changes #####################
-    with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):    
-    ############################ code changes ######################
-        model(data)
-```
+[//]: # (marker_inf_rn50_imp_bf16)
+[//]: # (marker_inf_rn50_imp_bf16)
 
 ##### BERT
 
-```
-import torch
-from transformers import BertModel
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
-
-model = BertModel.from_pretrained(args.model_name)
-model.eval()
-
-vocab_size = model.config.vocab_size
-batch_size = 1
-seq_length = 512
-data = torch.randint(vocab_size, size=[batch_size, seq_length])
-
-#################### code changes #################
-model = model.to("xpu")
-data = data.to("xpu")
-model = ipex.optimize(model, dtype=torch.bfloat16)
-#################### code changes #################
-
-with torch.no_grad():
-    ########################### code changes ########################
-    with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):    
-    ########################### code changes ########################
-        model(data)
-```
+[//]: # (marker_inf_bert_imp_bf16)
+[//]: # (marker_inf_bert_imp_bf16)
 
 #### TorchScript Mode
 
@@ -348,68 +105,14 @@ We recommend you take advantage of Intel® Extension for PyTorch\* with [TorchSc
 
 ##### Resnet50
 
-```
-import torch
-import torchvision.models as models
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-#################### code changes #################
-model = model.to("xpu")
-data = data.to("xpu")
-model = ipex.optimize(model, dtype=torch.bfloat16)
-#################### code changes #################
-
-with torch.no_grad():
-    d = torch.rand(1, 3, 224, 224)
-    ############################# code changes #####################
-    d = d.to("xpu")
-    with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):     
-    ############################# code changes #####################
-        model = torch.jit.trace(model, d)
-        model = torch.jit.freeze(model)
-        model(data)
-```
+[//]: # (marker_inf_rn50_ts_bf16)
+[//]: # (marker_inf_rn50_ts_bf16)
 
 ##### BERT
 
-```
-import torch
-from transformers import BertModel
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
+[//]: # (marker_inf_bert_ts_bf16)
+[//]: # (marker_inf_bert_ts_bf16)
 
-model = BertModel.from_pretrained(args.model_name)
-model.eval()
-
-vocab_size = model.config.vocab_size
-batch_size = 1
-seq_length = 512
-data = torch.randint(vocab_size, size=[batch_size, seq_length])
-
-#################### code changes #################
-model = model.to("xpu")
-data = data.to("xpu")
-model = ipex.optimize(model, dtype=torch.bfloat16)
-#################### code changes #################
-
-with torch.no_grad():
-    d = torch.randint(vocab_size, size=[batch_size, seq_length])
-    ############################# code changes #####################
-    d = d.to("xpu")
-    with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):     
-    ############################# code changes #####################
-        model = torch.jit.trace(model, (d,), strict=False)
-        model = torch.jit.freeze(model)
-    
-        model(data)
-```
 ### Float16
 
 Similar to running with Float32, the `optimize` function also works for Float16 data type. The only difference is setting `dtype` parameter to `torch.float16`.
@@ -419,59 +122,13 @@ We recommend using Auto Mixed Precision (AMP) with Float16 data type.
 
 ##### Resnet50
 
-```
-import torch
-import torchvision.models as models
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-#################### code changes ################
-model = model.to("xpu")
-data = data.to("xpu")
-model = ipex.optimize(model, dtype=torch.float16)
-#################### code changes ################
-
-with torch.no_grad():
-    ############################# code changes #####################
-    with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16):    
-    ############################# code changes #####################
-        model(data)
-```
+[//]: # (marker_inf_rn50_imp_fp16)
+[//]: # (marker_inf_rn50_imp_fp16)
 
 ##### BERT
 
-```
-import torch
-from transformers import BertModel
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
-
-model = BertModel.from_pretrained(args.model_name)
-model.eval()
-
-vocab_size = model.config.vocab_size
-batch_size = 1
-seq_length = 512
-data = torch.randint(vocab_size, size=[batch_size, seq_length])
-
-#################### code changes ################
-model = model.to("xpu")
-data = data.to("xpu")
-model = ipex.optimize(model, dtype=torch.float16)
-#################### code changes ################
-
-with torch.no_grad():
-    ############################# code changes #####################
-    with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16):    
-    ############################# code changes #####################
-        model(data)
-```
+[//]: # (marker_inf_bert_imp_fp16)
+[//]: # (marker_inf_bert_imp_fp16)
 
 #### TorchScript Mode
 
@@ -479,200 +136,29 @@ We recommend you take advantage of Intel® Extension for PyTorch\* with [TorchSc
 
 ##### Resnet50
 
-```
-import torch
-import torchvision.models as models
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-#################### code changes ################
-model = model.to("xpu")
-data = data.to("xpu")
-model = ipex.optimize(model, dtype=torch.float16)
-#################### code changes ################
-
-with torch.no_grad():
-    d = torch.rand(1, 3, 224, 224)
-    ############################# code changes #####################
-    d = d.to("xpu")
-    with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16):
-    ############################# code changes #####################
-        model = torch.jit.trace(model, d)
-        model = torch.jit.freeze(model)
-        model(data)
-```
+[//]: # (marker_inf_rn50_ts_fp16)
+[//]: # (marker_inf_rn50_ts_fp16)
 
 ##### BERT
 
-```
-import torch
-from transformers import BertModel
-############# code changes ###############
-import intel_extension_for_pytorch as ipex
-############# code changes ###############
-
-model = BertModel.from_pretrained(args.model_name)
-model.eval()
-
-vocab_size = model.config.vocab_size
-batch_size = 1
-seq_length = 512
-data = torch.randint(vocab_size, size=[batch_size, seq_length])
-
-#################### code changes ################
-model = model.to("xpu")
-data = data.to("xpu")
-model = ipex.optimize(model, dtype=torch.float16)
-#################### code changes ################
-
-with torch.no_grad():
-    d = torch.randint(vocab_size, size=[batch_size, seq_length])
-    ############################# code changes #####################
-    d = d.to("xpu")
-    with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16):
-    ############################# code changes #####################
-        model = torch.jit.trace(model, (d,), strict=False)
-        model = torch.jit.freeze(model)
-
-        model(data)
-```
+[//]: # (marker_inf_bert_ts_fp16)
+[//]: # (marker_inf_bert_ts_fp16)
 
 ### INT8
 
-#### Imperative Mode
-
-Compared to FP32 module, INT8 model requires less memory usage and usually has higher performance. To convert a FP32 model to INT8 model, statistic information of model activation and weight need be obtained firstly. `QConfig` specifies which method to calculate statistics. `torch.quantization.prepare` inserts observers in model, which is responsible for computing statistics. Then, a calibration dataset should be fed to model for collecting information from real data. At last, FP32 model is converted to INT8 model by using `torch.quantization.convert`. Then, the model can inference with testing dataset.
-
-```
-import torch
-
-########## code changes ##########
-import intel_extension_for_pytorch
-model = model.to('xpu')
-########## code changes ##########
-
-modelImpe = torch.quantization.QuantWrapper(model)
-modelImpe.eval()
-qconfig = torch.quantization.QConfig(
-        activation=torch.quantization.observer.MinMaxObserver.with_args(
-            qscheme=torch.per_tensor_symmetric),
-            weight=torch.quantization.default_weight_observer
-)
-
-modelImpe.qconfig = qconfig
-torch.quantization.prepare(modelImpe, inplace=True)
-
-with torch.no_grad():
-    pseudo_calib_data = torch.rand(1, 3, 224, 224).to('xpu')
-    modelImpe(pseudo_calib_data)
-    # Above is a pseudo calibration process
-    # In practice we should specify a dataset for calibration
-    # and the process should be something like:
-    #for input in enumerate(calib_dataset):
-    #    calib = input.to("xpu")
-    #    modelImpe(calib)
-    #    if i == self.calib_iters - 1:
-    #        break
-
-torch.quantization.convert(modelImpe, inplace=True)
-
-modelImpe(test_data)
-```
-
-#### TorchScript Mode
-
 We recommend to use TorchScript for INT8 model due to it has wider support for models. Moreover, TorchScript mode would auto enable our optimizations. For TorchScript INT8 model, inserting observer and model quantization is achieved through `prepare_jit` and `convert_jit` separately. Calibration process is required for collecting statistics from real data. After conversion, optimizations like operator fusion would be auto enabled.
 
-```
-import torch
-import torchvision.models as models
-from torch.jit._recursive import wrap_cpp_module
-from torch.quantization.quantize_jit import (
-      convert_jit,
-      prepare_jit,
-)
-########## code changes ##########
-import intel_extension_for_pytorch
-########## code changes ##########
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-##### code changes #####
-model = model.to("xpu")
-data = data.to("xpu")
-##### code changes #####
-
-with torch.no_grad():
-  d = torch.rand(1, 3, 224, 224)
-  ##### code changes #####
-  d = d.to("xpu")
-  ##### code changes #####
-  modelJit = torch.jit.trace(model, d)
-
-#################### code changes ##################################
-qconfig = torch.quantization.QConfig(
-    activation=torch.quantization.observer.MinMaxObserver.with_args(
-        qscheme=torch.per_tensor_symmetric,
-        reduce_range=False,
-        dtype=torch.quint8
-    ),
-    weight=torch.quantization.default_weight_observer
-)
-modelJit = prepare_jit(modelJit, {'': qconfig}, True)
-
-pseudo_calib_data = torch.rand(1, 3, 224, 224).to('xpu')
-modelJit(pseudo_calib_data)
-# Above is a pseudo calibration process
-# In practice we should specify a dataset for calibration
-# and the process should be something like:
-#for i, input in enumerate(calib_dataset):
-#    calib = input.to("xpu")
-#    modelJit(calib)
-#    if i == calib_iters - 1:
-#        break
-
-modelJit = convert_jit(modelJit, True)
-#################### code changes ##################################
-
-modelJit(data)
-```
+[//]: # (marker_int8_static)
+[//]: # (marker_int8_static)
 
 ### torch.xpu.optimize
 
-`torch.xpu.optimize` is an alternative of `ipex.optimize` in Intel® Extension for PyTorch*, to provide identical usage for XPU device only. The motivation of adding this alias is to unify the coding style in user scripts base on torch.xpu modular. Refer to below example for usage.
+`torch.xpu.optimize` is an alternative of `ipex.optimize` in Intel® Extension for PyTorch\*, to provide identical usage for XPU device only. The motivation of adding this alias is to unify the coding style in user scripts base on torch.xpu modular. Refer to below example for usage.
 
 #### ResNet50 FP32 imperative inference
 
-```
-import torch
-import torchvision.models as models
-############# code changes #########
-import intel_extension_for_pytorch
-############# code changes #########
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-model = model.to(memory_format=torch.channels_last)
-data = data.to(memory_format=torch.channels_last)
-
-########## code changes #########
-model = model.to("xpu")
-data = data.to("xpu")
-model = torch.xpu.optimize(model)
-########## code changes #########
-
-with torch.no_grad():
-  model(data)
-```
+[//]: # (marker_inf_rn50_imp_fp32_alt)
+[//]: # (marker_inf_rn50_imp_fp32_alt)
 
 ## C++
 

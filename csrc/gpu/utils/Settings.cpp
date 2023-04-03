@@ -15,14 +15,14 @@ namespace dpcpp {
  * [Keep the format for automatic doc generation.]
  * All available launch options for IPEX
  * ==========ALL==========
- *   IPEX_VERBOSE:
- *      Default = 0 | Set verbose level with synchronization execution mode
  *   IPEX_FP32_MATH_MODE:
  *      Default = 0 | Set values for FP32 math mode (0: FP32, 1: TF32, 2: BF32)
  * ==========ALL==========
  *
  * XPU ONLY optionos:
  * ==========GPU==========
+ *   IPEX_VERBOSE:
+ *      Default = 0 | Set verbose level with synchronization execution mode
  *   IPEX_XPU_SYNC_MODE:
  *      Default = 0 | Set 1 to enforce synchronization execution mode
  *   IPEX_TILE_AS_DEVICE:
