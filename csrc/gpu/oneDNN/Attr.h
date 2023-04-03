@@ -310,6 +310,7 @@ class Attr {
     // if output is quantized, then append the eltwise linear to adjust the
     // output scale/zero_point
     if (dst.is_quantized()) {
+      // [Note: Gap of u8 qtensor scale between oneDNN and PyTorch]
       // The /2 here is for output_scale collected by observer is different
       // from quantization requirements in oneDNN.
       // For Observer, the conv_scale (activation scale in other case) is
