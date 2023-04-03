@@ -42,36 +42,35 @@ static void ComputeAdamKernel(
     const float step_size,
     const float weight_decay,
     const float eps_value) {
-  at::TensorIterator iter = TensorIteratorConfig()
-                                .add_output(avg)
-                                .add_output(avg_sq)
-                                .add_output(max_avg_sq)
-                                .add_output(weight)
-                                .add_input(weight)
-                                .add_input(grad)
-                                .add_input(avg)
-                                .add_input(avg_sq)
-                                .add_input(max_avg_sq)
-                                .build();
+  if (amsgrad) {
+    at::TensorIterator iter = TensorIteratorConfig()
+                                  .add_output(avg)
+                                  .add_output(avg_sq)
+                                  .add_output(max_avg_sq)
+                                  .add_output(weight)
+                                  .add_input(weight)
+                                  .add_input(grad)
+                                  .add_input(avg)
+                                  .add_input(avg_sq)
+                                  .add_input(max_avg_sq)
+                                  .build();
+    dpcpp_kernel_multiple_outputs_for_tensor_iter(
+        iter,
+        [=](scalar_t weight_elem,
+            scalar_t grad_elem,
+            scalar_t avg_elem,
+            scalar_t avg_sq_elem,
+            scalar_t max_avg_sq_elem)
+            -> std::tuple<scalar_t, scalar_t, scalar_t, scalar_t> {
+          if (use_weight_decay) {
+            grad_elem += weight_elem * weight_decay;
+          }
+          avg_elem =
+              avg_elem * beta1_value + grad_elem * exp_avg_ele_coefficient;
 
-  dpcpp_kernel_multiple_outputs_for_tensor_iter(
-      iter,
-      [=](scalar_t weight_elem,
-          scalar_t grad_elem,
-          scalar_t avg_elem,
-          scalar_t avg_sq_elem,
-          scalar_t max_avg_sq_elem)
-          -> std::tuple<scalar_t, scalar_t, scalar_t, scalar_t> {
-        if (use_weight_decay) {
-          grad_elem += weight_elem * weight_decay;
-        }
-        avg_elem = avg_elem * beta1_value + grad_elem * exp_avg_ele_coefficient;
+          avg_sq_elem = avg_sq_elem * beta2_value +
+              exp_avg_sq_ele_coefficient * grad_elem * grad_elem;
 
-        avg_sq_elem = avg_sq_elem * beta2_value +
-            exp_avg_sq_ele_coefficient * grad_elem * grad_elem;
-
-        // amsgrad
-        if (amsgrad) {
           max_avg_sq_elem =
               max_avg_sq_elem < avg_sq_elem ? avg_sq_elem : max_avg_sq_elem;
 
@@ -79,15 +78,43 @@ static void ComputeAdamKernel(
               step_size * avg_elem /
                   (Numerics<float>::sqrt(max_avg_sq_elem / bias_correlation2) +
                    eps_value);
-        } else {
+          return std::tuple<scalar_t, scalar_t, scalar_t, scalar_t>(
+              avg_elem, avg_sq_elem, max_avg_sq_elem, weight_elem);
+        });
+  } else {
+    at::TensorIterator iter = TensorIteratorConfig()
+                                  .add_output(avg)
+                                  .add_output(avg_sq)
+                                  .add_output(weight)
+                                  .add_input(weight)
+                                  .add_input(grad)
+                                  .add_input(avg)
+                                  .add_input(avg_sq)
+                                  .build();
+    dpcpp_kernel_multiple_outputs_for_tensor_iter(
+        iter,
+        [=](scalar_t weight_elem,
+            scalar_t grad_elem,
+            scalar_t avg_elem,
+            scalar_t avg_sq_elem) -> std::tuple<scalar_t, scalar_t, scalar_t> {
+          if (use_weight_decay) {
+            grad_elem += weight_elem * weight_decay;
+          }
+          avg_elem =
+              avg_elem * beta1_value + grad_elem * exp_avg_ele_coefficient;
+
+          avg_sq_elem = avg_sq_elem * beta2_value +
+              exp_avg_sq_ele_coefficient * grad_elem * grad_elem;
+
           weight_elem = weight_elem -
               step_size * avg_elem /
                   (Numerics<float>::sqrt(avg_sq_elem / bias_correlation2) +
                    eps_value);
-        }
-        return std::tuple<scalar_t, scalar_t, scalar_t, scalar_t>(
-            avg_elem, avg_sq_elem, max_avg_sq_elem, weight_elem);
-      });
+
+          return std::tuple<scalar_t, scalar_t, scalar_t>(
+              avg_elem, avg_sq_elem, weight_elem);
+        });
+  }
 }
 
 // scalar_t is for fp16 or bf16, master weight is fp32
@@ -110,40 +137,40 @@ static void ComputeAdamKernelMasterWeight(
     const float step_size,
     const float weight_decay,
     const float eps_value) {
-  at::TensorIterator iter = TensorIteratorConfig()
-                                .add_output(avg)
-                                .add_output(avg_sq)
-                                .add_output(max_avg_sq)
-                                .add_output(master_weight)
-                                .add_output(weight)
-                                .add_input(grad)
-                                .add_input(avg)
-                                .add_input(avg_sq)
-                                .add_input(max_avg_sq)
-                                .add_input(master_weight)
-                                .check_all_same_dtype(false)
-                                .build();
+  if (amsgrad) {
+    at::TensorIterator iter = TensorIteratorConfig()
+                                  .add_output(avg)
+                                  .add_output(avg_sq)
+                                  .add_output(max_avg_sq)
+                                  .add_output(master_weight)
+                                  .add_output(weight)
+                                  .add_input(grad)
+                                  .add_input(avg)
+                                  .add_input(avg_sq)
+                                  .add_input(max_avg_sq)
+                                  .add_input(master_weight)
+                                  .check_all_same_dtype(false)
+                                  .build();
 
-  dpcpp_kernel_multiple_outputs_for_tensor_iter(
-      iter,
-      [=](scalar_t grad_elem,
-          float avg_elem,
-          float avg_sq_elem,
-          float max_avg_sq_elem,
-          float master_weight_elem)
-          -> std::tuple<float, float, float, float, scalar_t> {
-        auto grad_float_elem = static_cast<float>(grad_elem);
-        if (use_weight_decay) {
-          grad_float_elem += master_weight_elem * weight_decay;
-        }
-        avg_elem =
-            avg_elem * beta1_value + grad_float_elem * exp_avg_ele_coefficient;
+    dpcpp_kernel_multiple_outputs_for_tensor_iter(
+        iter,
+        [=](scalar_t grad_elem,
+            float avg_elem,
+            float avg_sq_elem,
+            float max_avg_sq_elem,
+            float master_weight_elem)
+            -> std::tuple<float, float, float, float, scalar_t> {
+          auto grad_float_elem = static_cast<float>(grad_elem);
+          if (use_weight_decay) {
+            grad_float_elem += master_weight_elem * weight_decay;
+          }
+          avg_elem = avg_elem * beta1_value +
+              grad_float_elem * exp_avg_ele_coefficient;
 
-        avg_sq_elem = avg_sq_elem * beta2_value +
-            exp_avg_sq_ele_coefficient * grad_float_elem * grad_float_elem;
+          avg_sq_elem = avg_sq_elem * beta2_value +
+              exp_avg_sq_ele_coefficient * grad_float_elem * grad_float_elem;
 
-        // amsgrad
-        if (amsgrad) {
+          // amsgrad
           max_avg_sq_elem =
               max_avg_sq_elem < avg_sq_elem ? avg_sq_elem : max_avg_sq_elem;
 
@@ -151,19 +178,56 @@ static void ComputeAdamKernelMasterWeight(
               step_size * avg_elem /
                   (Numerics<float>::sqrt(max_avg_sq_elem / bias_correction2) +
                    eps_value);
-        } else {
+
+          return std::tuple<float, float, float, float, scalar_t>(
+              avg_elem,
+              avg_sq_elem,
+              max_avg_sq_elem,
+              master_weight_elem,
+              static_cast<scalar_t>(master_weight_elem));
+        });
+  } else {
+    at::TensorIterator iter = TensorIteratorConfig()
+                                  .add_output(avg)
+                                  .add_output(avg_sq)
+                                  .add_output(master_weight)
+                                  .add_output(weight)
+                                  .add_input(grad)
+                                  .add_input(avg)
+                                  .add_input(avg_sq)
+                                  .add_input(master_weight)
+                                  .check_all_same_dtype(false)
+                                  .build();
+
+    dpcpp_kernel_multiple_outputs_for_tensor_iter(
+        iter,
+        [=](scalar_t grad_elem,
+            float avg_elem,
+            float avg_sq_elem,
+            float master_weight_elem)
+            -> std::tuple<float, float, float, scalar_t> {
+          auto grad_float_elem = static_cast<float>(grad_elem);
+          if (use_weight_decay) {
+            grad_float_elem += master_weight_elem * weight_decay;
+          }
+          avg_elem = avg_elem * beta1_value +
+              grad_float_elem * exp_avg_ele_coefficient;
+
+          avg_sq_elem = avg_sq_elem * beta2_value +
+              exp_avg_sq_ele_coefficient * grad_float_elem * grad_float_elem;
+
           master_weight_elem = master_weight_elem -
               step_size * avg_elem /
                   (Numerics<float>::sqrt(avg_sq_elem / bias_correction2) +
                    eps_value);
-        }
-        return std::tuple<float, float, float, float, scalar_t>(
-            avg_elem,
-            avg_sq_elem,
-            max_avg_sq_elem,
-            master_weight_elem,
-            static_cast<scalar_t>(master_weight_elem));
-      });
+
+          return std::tuple<float, float, float, scalar_t>(
+              avg_elem,
+              avg_sq_elem,
+              master_weight_elem,
+              static_cast<scalar_t>(master_weight_elem));
+        });
+  }
 }
 } // namespace impl
 
@@ -188,14 +252,12 @@ void adam_fused_step(
   TORCH_CHECK(beta2 >= 0 && beta2 < 1, "Expect 0.0 <= beta2 < 1.0, got", beta2);
   TORCH_CHECK(
       weight_decay >= 0, "Expect weight_decay >= 0.0, got ", weight_decay);
-
   TORCH_CHECK(
       param_.sizes() == grad_.sizes(),
       "Expect param and grad have the same sizes, param sizes: ",
       param_.sizes(),
       "; grad sizes: ",
       grad_.sizes());
-
   TORCH_CHECK(
       param_.sizes() == exp_avg_.sizes(),
       "Expect param and exp_avg have the same sizes, param sizes: ",
@@ -208,7 +270,6 @@ void adam_fused_step(
       param_.sizes(),
       "; exp_avg_sq sizes: ",
       exp_avg_sq_.sizes());
-
   if (amsgrad) {
     TORCH_CHECK(
         param_.sizes() == max_exp_avg_sq_.sizes(),
@@ -217,14 +278,12 @@ void adam_fused_step(
         "; max_exp_avg_sq sizes: ",
         max_exp_avg_sq_.sizes());
   }
-
   TORCH_CHECK(
       param2_.numel() == 0 || param_.sizes() == param2_.sizes(),
       "Expect param and param2_ have the same sizes, param sizes: ",
       param_.sizes(),
       "; param2_ sizes: ",
       param2_.sizes());
-
   RECORD_FUNCTION(
       "adam_fused_step",
       std::vector<c10::IValue>(
@@ -236,7 +295,6 @@ void adam_fused_step(
   // in block layout, so to plain now if needed
   param_ = to_plain_if_needed(param_);
   grad_ = to_plain_if_needed(grad_);
-
   // support contiguous and channels_last contiguous
   auto memory_format = param_.suggest_memory_format();
   param_ = param_.contiguous(memory_format);
@@ -246,7 +304,6 @@ void adam_fused_step(
   if (amsgrad) {
     max_exp_avg_sq_ = max_exp_avg_sq_.contiguous(memory_format);
   }
-
   // pre calculate scalar on host side
   bool use_weight_decay = false;
   if (weight_decay != 0) {
@@ -263,7 +320,6 @@ void adam_fused_step(
   const auto step_size = static_cast<float>(learning_rate / bias_correction1);
   const float weight_decay_value = static_cast<float>(weight_decay);
   const auto eps_value = static_cast<float>(eps);
-
   if (param2_.numel() != 0) {
     // should use master weight, param2_ is fp32
     param2_ = to_plain_if_needed_(param2_);

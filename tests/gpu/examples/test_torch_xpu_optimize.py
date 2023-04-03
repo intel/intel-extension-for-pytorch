@@ -185,7 +185,7 @@ class TestTorchMethod(TestCase):
                 beta1 = 0.9
                 beta2 = 0.999
                 adam_epsilon = 1e-6
-                amsgrad = True
+                amsgrad = False
                 optimizer_xpu_no_fuse = torch.optim.Adam(model_xpu_no_fuse.parameters(),
                                                           lr=lr,
                                                           betas=(beta1, beta2),
