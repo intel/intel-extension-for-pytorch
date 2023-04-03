@@ -163,7 +163,7 @@ inline bool onednn_strides_check(const Tensor& src) {
   dnnl_format_kind_t md_fmt_kind;
   int md_ndims;
   int md_inner_nblks;
-  dnnl_dims_t md_padded_dims;
+  dnnl_dims_t* md_padded_dims = nullptr;
 
   dnnl_memory_desc_query(md, dnnl_query_inner_nblks_s32, &md_inner_nblks);
   dnnl_memory_desc_query(md, dnnl_query_format_kind, &md_fmt_kind);
@@ -222,7 +222,7 @@ inline bool onednn_strides_check(const Tensor& src) {
       return false;
 
     // update min_stride for next iteration
-    const auto padded_dim = md_padded_dims[d];
+    const auto padded_dim = *md_padded_dims[d];
     min_stride = block_size * strides[d] * (padded_dim / blocks[d]);
   }
   return true;
