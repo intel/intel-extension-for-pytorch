@@ -192,7 +192,7 @@ class Attr {
     auto ctx = DPCPPTensorContext::get_tensor_ctx(binary_);
     memory::desc md;
     if (ctx.is_plain()) {
-      binary_ = binary_.contiguous();
+      binary_ = is_smf_channels_last(binary_) ? binary_ : binary_.contiguous();
       md = get_onednn_md(binary_);
     } else {
       md = ctx.meta();
