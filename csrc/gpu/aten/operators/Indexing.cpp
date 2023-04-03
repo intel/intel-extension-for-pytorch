@@ -755,7 +755,22 @@ void index_put_deterministic_kernel(
 
   auto* dev_prop = dpcppGetDeviceProperties(getDeviceIdOfCurrentQueue());
   auto sub_group_size = dev_prop->subgroup_sizes;
-  int group_x = sub_group_size[1];
+  int64_t sg_0 = sub_group_size[0];
+  int64_t sg_1 = sub_group_size[1];
+  /*In some case, stride number is smaller than sub_group_size * SZ, it would be
+   * a waste of resources if we set work_group size to a fixed number. So we set
+   * it adapt to the stride number to avoid such issue. */
+  auto get_size = [=] {
+    if (stride > 0 && stride < sg_0)
+      return stride;
+    else if (stride >= sg_0 && stride < sg_1)
+      return sg_0;
+    else if (stride >= sg_1)
+      return sg_1;
+    else
+      TORCH_CHECK(false, "the stride numer is invalid");
+  };
+  int64_t group_x = get_size();
   const int64_t indices_per_group = 4;
   int hw_max_work_items = dpcppMaxWorkItemsPerTile();
 
@@ -795,10 +810,9 @@ void index_put_deterministic_kernel(
 #pragma unroll
               for (int ii = 0; ii < SZ; ii++) {
                 int64_t feature_dim = start_feature + ii * group_x;
-                if (feature_dim < stride) {
-                  self[self_row + feature_dim] +=
-                      value[value_row + feature_dim];
-                }
+                if (feature_dim >= stride)
+                  break;
+                self[self_row + feature_dim] += value[value_row + feature_dim];
               }
               start_feature += x_num * groupDim_x * SZ;
             }
