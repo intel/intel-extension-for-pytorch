@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <core/detail/IndexUtils.h>
 #include <oneDNN/oneDNN.h>
 #include "Loops.h"
 #include "Resize.h"
@@ -299,6 +300,192 @@ at::Tensor batch_norm_elemt(
   Tensor out;
   batch_norm_elemt_out(input, weight, bias, mean, invstd, eps, out);
   return out;
+}
+
+template <typename scalar_t, typename accscalar_t, typename index_t>
+std::tuple<Tensor, Tensor> batch_norm_gather_stats_xpu_template(
+    const Tensor& mean_,
+    const Tensor& invstd_,
+    const Tensor& running_mean_,
+    const Tensor& running_var_,
+    double momentum,
+    double epsilon,
+    const Tensor& counts_) {
+  Tensor save_mean_;
+  Tensor save_invstd_;
+
+  auto features = mean_.size(1);
+  auto input_options = mean_.options();
+  if (mean_.scalar_type() == at::ScalarType::Half ||
+      mean_.scalar_type() == at::ScalarType::BFloat16) {
+    input_options = input_options.dtype(ScalarType::Float);
+  }
+  save_mean_ = at::empty({features}, input_options);
+  save_invstd_ = at::empty({features}, input_options);
+
+  auto mean = mean_.accessor<accscalar_t, 2>();
+  auto invstd = invstd_.accessor<accscalar_t, 2>();
+  auto running_mean =
+      running_mean_.defined() ? running_mean_.data_ptr<scalar_t>() : nullptr;
+  auto running_var =
+      running_var_.defined() ? running_var_.data_ptr<scalar_t>() : nullptr;
+  auto counts = counts_.data_ptr<scalar_t>();
+  auto save_mean = save_mean_.data_ptr<accscalar_t>();
+  auto save_invstd = save_invstd_.data_ptr<accscalar_t>();
+
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  const auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
+  const auto ngroups = (features + wgroup_size - 1) / wgroup_size;
+
+  int world_size = mean_.size(0);
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    cgh.parallel_for(
+        sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size),
+        [=](sycl::nd_item<1> itemId) {
+          auto tid = itemId.get_global_linear_id();
+
+          // first the reductions each thread does separately
+          if (tid < features) {
+            accscalar_t avg = 0;
+            accscalar_t var_n = 0;
+            index_t n = 0;
+            for (int j = 0; j < world_size; j++) {
+              scalar_t count = counts[j];
+              accscalar_t m = mean[j][tid];
+              accscalar_t v = accscalar_t(1.0) / (invstd[j][tid]);
+              v = (v * v - epsilon) * count;
+              accscalar_t factor = 1.0 / (n + count);
+              var_n += v + (avg - m) * (avg - m) * n * count * factor;
+              avg = n * factor * avg + count * factor * m;
+              n += count;
+            }
+            save_mean[tid] = avg;
+            save_invstd[tid] = static_cast<accscalar_t>(1) /
+                Numerics<accscalar_t>::sqrt(var_n / n + epsilon);
+            if (running_mean != nullptr) {
+              running_mean[tid] = static_cast<scalar_t>(
+                  (1 - momentum) * running_mean[tid] + momentum * avg);
+            }
+            accscalar_t unbiasedVar = var_n / (n - 1);
+            if (running_var != nullptr) {
+              running_var[tid] = static_cast<scalar_t>(
+                  (1 - momentum) * running_var[tid] + momentum * unbiasedVar);
+            }
+          }
+        });
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+  return std::make_tuple(save_mean_, save_invstd_);
+}
+
+std::tuple<Tensor, Tensor> batch_norm_gather_stats_with_counts_xpu(
+    const Tensor& self,
+    const Tensor& mean,
+    const Tensor& invstd,
+    const c10::optional<Tensor>& running_mean_opt /* optional */,
+    const c10::optional<Tensor>& running_var_opt /* optional */,
+    double momentum,
+    double epsilon,
+    const Tensor& counts) {
+  // See [Note: hacky wrapper removal for optional tensor]
+  c10::MaybeOwned<Tensor> running_mean_maybe_owned =
+      at::borrow_from_optional_tensor(running_mean_opt);
+  const Tensor& running_mean = *running_mean_maybe_owned;
+  const Tensor& running_var =
+      c10::value_or_else(running_var_opt, [] { return Tensor(); });
+
+  auto scalar_type =
+      running_mean.defined() ? running_mean.scalar_type() : self.scalar_type();
+  return IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      scalar_type,
+      "batch_norm_update_stats_xpu",
+      [&] {
+        using accscalar_t = acc_type<scalar_t>;
+        if (xpu::dpcpp::detail::canUse32BitIndexMath(self)) {
+          return batch_norm_gather_stats_xpu_template<
+              scalar_t,
+              accscalar_t,
+              int32_t>(
+              mean,
+              invstd,
+              running_mean,
+              running_var,
+              momentum,
+              epsilon,
+              counts);
+        } else {
+          return batch_norm_gather_stats_xpu_template<
+              scalar_t,
+              accscalar_t,
+              int64_t>(
+              mean,
+              invstd,
+              running_mean,
+              running_var,
+              momentum,
+              epsilon,
+              counts);
+        }
+      });
+}
+
+// accepting input(self) here to determine template data types, since
+// running_mean/running_var are optional
+std::tuple<Tensor, Tensor> batch_norm_gather_stats(
+    const Tensor& self,
+    const Tensor& mean,
+    const Tensor& invstd,
+    const c10::optional<Tensor>& running_mean_opt,
+    const c10::optional<Tensor>& running_var_opt,
+    double momentum,
+    double epsilon,
+    int64_t count) {
+  // See [Note: hacky wrapper removal for optional tensor]
+  c10::MaybeOwned<Tensor> running_mean_maybe_owned =
+      at::borrow_from_optional_tensor(running_mean_opt);
+  const Tensor& running_mean = *running_mean_maybe_owned;
+  const Tensor& running_var =
+      c10::value_or_else(running_var_opt, [] { return Tensor(); });
+
+  Tensor counts_ = at::empty(
+      mean.size(0),
+      self.options().dtype(
+          running_mean.defined() ? running_mean.dtype() : self.dtype()));
+  counts_.fill_(count);
+  return batch_norm_gather_stats_with_counts_xpu(
+      self,
+      mean,
+      invstd,
+      running_mean,
+      running_var,
+      momentum,
+      epsilon,
+      counts_);
+}
+
+std::tuple<Tensor, Tensor> batch_norm_gather_stats_with_counts(
+    const Tensor& self,
+    const Tensor& mean,
+    const Tensor& invstd,
+    const c10::optional<Tensor>& running_mean_opt /* optional */,
+    const c10::optional<Tensor>& running_var_opt /* optional */,
+    double momentum,
+    double epsilon,
+    const Tensor& counts) {
+  // See [Note: hacky wrapper removal for optional tensor]
+  return batch_norm_gather_stats_with_counts_xpu(
+      self,
+      mean,
+      invstd,
+      running_mean_opt,
+      running_var_opt,
+      momentum,
+      epsilon,
+      counts);
 }
 
 } // namespace AtenIpexTypeXPU
