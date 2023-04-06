@@ -12,12 +12,14 @@ model.eval()
 data = torch.rand(1, 3, 224, 224)
 #########################
 
-qconfig = ipex.quantization.default_static_qconfig
-# Alternatively, define your own qconfig:
-#from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, QConfig
-#qconfig = QConfig(activation=MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8),
+qconfig_mapping = ipex.quantization.default_static_qconfig_mapping
+# Alternatively, define your own qconfig_mapping:
+# from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, QConfig, QConfigMapping
+# qconfig = QConfig(
+#        activation=MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8),
 #        weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
-prepared_model = prepare(model, qconfig, example_inputs=data, inplace=False)
+# qconfig_mapping = QConfigMapping().set_global(qconfig)
+prepared_model = prepare(model, qconfig_mapping, example_inputs=data, inplace=False)
 
 ##### Example Dataloader #####
 import torchvision

@@ -17,13 +17,14 @@ seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 #########################
 
-qconfig = ipex.quantization.default_dynamic_qconfig
+qconfig_mapping = ipex.quantization.default_dynamic_qconfig_mapping
 # Alternatively, define your own qconfig:
-# from torch.ao.quantization import PerChannelMinMaxObserver, PlaceholderObserver, QConfig
+# from torch.ao.quantization import PerChannelMinMaxObserver, PlaceholderObserver, QConfig, QConfigMapping
 # qconfig = QConfig(
-#        activation = PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),
+#        activation = PlaceholderObserver.with_args(dtype=torch.float, is_dynamic=True),
 #        weight = PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
-prepared_model = prepare(model, qconfig, example_inputs=data)
+# qconfig_mapping = QConfigMapping().set_global(qconfig)
+prepared_model = prepare(model, qconfig_mapping, example_inputs=data)
 
 converted_model = convert(prepared_model)
 with torch.no_grad():

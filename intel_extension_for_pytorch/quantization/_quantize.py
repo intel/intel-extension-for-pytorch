@@ -3,7 +3,7 @@ from typing import Tuple, Any
 import warnings
 
 import torch
-from torch.ao.quantization import PlaceholderObserver
+from torch.ao.quantization import PlaceholderObserver, QConfig, QConfigMapping
 import torch.fx.experimental.optimization as optimization
 
 import intel_extension_for_pytorch._C as core
@@ -30,6 +30,15 @@ def prepare(
         torch.nn.Module
     """
     assert isinstance(model, torch.nn.Module), "Only support nn.Module prepare for quantization path"
+    assert isinstance(configure, QConfigMapping) or isinstance(configure, QConfig), \
+        f"IPEX quantization: prepare configure should be an instance of QConfigMapping or QConfig, but got {type(configure)}"
+    if isinstance(configure, QConfig):
+        warnings.warn("\nIPEX quantization: QConfig are deprecated. Please use QConfigMapping instead.\nUsage:"
+                      "\n    qconfig_mapping = ipex.quantization.default_static_qconfig_mapping # for static quantization"
+                      "\n    qconfig_mapping = ipex.quantization.default_dynamic_qconfig_mapping # for dynamic quantization"
+                      "\n    prepared_model = ipex.quantization.prepare(model_fp32, qconfig_mapping)")
+    if isinstance(configure, QConfigMapping):
+        configure = configure.global_qconfig
     # auto model channels_last memory format conversion
     from ..frontend import auto_channels_last, _convert_convNd_weight_memory_format
     if auto_channels_last:

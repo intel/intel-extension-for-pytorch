@@ -93,5 +93,50 @@ class TestDefaultRecipe(JitLlgaTestCase):
             self.checkPatterns(graph, pattern)
             FileCheck().check("aten::dequantize").run(graph)
 
+    def test_qconfig_mapping_for_static_quantization(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv = nn.Conv2d(2, 2, 1)
+                self.pool = nn.MaxPool2d(1, 1)
+
+            def forward(self, x):
+                x = self.conv(x)
+                x = self.pool(x)
+                return x
+
+        m = M()
+        x = torch.rand(1, 2, 14, 14)
+
+        qconfig_mapping = ipex.quantization.default_static_qconfig_mapping
+        graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=qconfig_mapping)
+        patterns = [
+                ["aten::dequantize", "aten::dequantize", "aten::_convolution", "aten::quantize_per_tensor"],
+                ["aten::dequantize", "aten::max_pool2d", "aten::quantize_per_tensor"],
+            ]
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+        self.checkPatterns(graph, patterns)
+
+    def test_qconfig_mapping_for_dynamic_quantization(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = nn.Linear(2, 2)
+                self.relu = nn.ReLU()
+
+            def forward(self, x):
+                x = self.linear(x)
+                x = self.relu(x)
+                return x
+
+        m = M()
+        x = torch.rand(1, 2)
+
+        qconfig_mapping = ipex.quantization.default_dynamic_qconfig_mapping
+        prepared_model = ipex.quantization.prepare(m, qconfig_mapping, x)
+        converted_model = ipex.quantization.convert(prepared_model)
+        assert hasattr(converted_model, 'linear')
+        assert isinstance(converted_model.linear, nn.quantized.dynamic.Linear)
+
 if __name__ == '__main__':
     run_tests() 
