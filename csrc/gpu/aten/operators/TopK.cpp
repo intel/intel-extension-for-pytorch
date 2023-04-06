@@ -101,14 +101,6 @@ std::tuple<at::Tensor&, at::Tensor&> topk_out(
   int64_t nelements = self.sizes()[dim];
   int64_t nsegments = numel / nelements;
 
-  if (nsegments == 1 && self.is_contiguous() && nelements > 4096) {
-    topk_out_with_single_tile_sort(self, k, dim, largest, values, indices);
-    return std::forward_as_tuple(values, indices);
-  } else if (k > 256) {
-    topk_out_with_sort(self, k, dim, largest, values, indices);
-    return std::forward_as_tuple(values, indices);
-  }
-
   TORCH_CHECK(
       nelements <= std::numeric_limits<int>::max(),
       "The dimension being select can not have more than INT_MAX elements.");
@@ -131,6 +123,14 @@ std::tuple<at::Tensor&, at::Tensor&> topk_out(
   } else {
     self_ = self.transpose(ndim - 1, dim).contiguous();
     std::swap(out_sizes[ndim - 1], out_sizes[dim]);
+  }
+
+  if (nsegments == 1 && nelements > 4096) {
+    topk_out_with_single_tile_sort(self_, k, dim, largest, values, indices);
+    return std::forward_as_tuple(values, indices);
+  } else if (k > 256) {
+    topk_out_with_sort(self_, k, dim, largest, values, indices);
+    return std::forward_as_tuple(values, indices);
   }
 
   Tensor values_, indices_;

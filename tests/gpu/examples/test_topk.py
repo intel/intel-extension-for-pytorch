@@ -74,3 +74,19 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(sort_cpu, sort_xpu.cpu())
         self.assertEqual(index_cpu, index_xpu.cpu())
+
+        # case for transformer-lt
+        a = torch.randn([1, 5, 33712])
+        key = torch.Tensor([[ -8.5410,  -8.8709,  -9.3082,  -9.3752,  -9.6210, -10.6507, -10.7050,
+                -10.9694, -11.0113, -11.0896],
+                [ -9.3133, -10.0262, -13.2868, -13.5677, -13.7332, -16.4816, -16.9183,
+                -17.2554, -17.4845, -17.5146]])
+        value = torch.Tensor([[11744, 11744,  3701, 11976,     5, 18681, 15307,    39,    93, 17219],
+                [    2,     2,     2,     2,     2,   131,   131,   131,   131,    89]]).long()
+        a_xpu = a.to("xpu")
+        key_xpu = key.to("xpu")
+        value_xpu = value.to("xpu")
+        torch.topk(a.view(1, -1), 10, out=(key, value))
+        torch.topk(a_xpu.view(1, -1), 10, out=(key_xpu, value_xpu))
+        self.assertEqual(key, key_xpu.cpu())
+        self.assertEqual(value, value_xpu.cpu())
