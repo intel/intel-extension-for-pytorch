@@ -65,6 +65,24 @@ class TestTorchMethod(TestCase):
             self.assertEqual(grad_dpcpp.is_contiguous(), True)
             self.assertEqual(grad, grad_dpcpp)
 
+    def test_group_norm_backward_autocast(self, dtype=torch.float):
+        x = torch.randn(16, 16, 64, 64, requires_grad=True, device=torch.device('cpu'))
+        x_dpcpp = x.to("xpu")
+
+        for model in [TestNet(16, 16), nn.GroupNorm(8, 16, affine=True)]:
+            model.eval()
+            y_pred = model(x)
+            grad_out = torch.randn_like(y_pred)
+            grad, = torch.autograd.grad(y_pred, x, grad_out)
+
+            model_dpcpp = model.to(torch.device('xpu'))
+            model_dpcpp.eval()
+            with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+                y_pred_dpcpp = model_dpcpp(x_dpcpp)
+            grad_dpcpp, = torch.autograd.grad(y_pred_dpcpp, x_dpcpp, grad_out.to("xpu"))
+            self.assertEqual(grad_dpcpp.is_contiguous(), True)
+            self.assertEqual(grad, grad_dpcpp, atol=1e-1, rtol=1e-1)
+
     def test_group_norm_backward_no_gamma_no_beta(self, dtype=torch.float):
         x = torch.randn(16, 16, 64, 64, requires_grad=True, device=torch.device('cpu'))
         x_dpcpp = x.to("xpu")

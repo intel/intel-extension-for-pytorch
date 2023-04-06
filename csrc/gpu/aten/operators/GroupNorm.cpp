@@ -540,7 +540,10 @@ void GroupNormBackwardKernelImplInternal(
   const GAMMA_T* gamma_data =
       gamma.defined() ? gamma.data_ptr<GAMMA_T>() : nullptr;
   T* dX_data = dX->defined() ? dX->data_ptr<T>() : nullptr;
-  const auto kAccType = X.scalar_type() == kHalf ? kFloat : X.scalar_type();
+  const auto kAccType =
+      (X.scalar_type() == kHalf || X.scalar_type() == kBFloat16)
+      ? kFloat
+      : X.scalar_type();
   Tensor ds = at::empty({N, C}, X.options().dtype(kAccType));
   Tensor db = at::empty({N, C}, X.options().dtype(kAccType));
   T_ACC* ds_data = ds.data_ptr<T_ACC>();
