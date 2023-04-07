@@ -111,23 +111,24 @@ def override_tensor_totype():
     r"""Override _tensor_totype to avoid triggering fp64 error when printing XPU tensor on ATS-M"""
     torch._tensor_str.tensor_totype = fp64_tensor_totype_wrapper(torch._tensor_str.tensor_totype)
 
+def args_to_xpu(args):
+    if torch.is_tensor(args) and args.is_xpu:
+        return args.to("cpu")
+    elif isinstance(args, (tuple, list)):
+        args_list = list(args)
+        for i, arg in enumerate(args_list):
+            args_list[i] = args_to_xpu(arg)
+        if isinstance(args, tuple):
+            return tuple(args_list)
+        else:
+            return args_list
+    else:
+        return args
+
 def fp64_assert_equal_wrapper(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        args_list = list(args)
-        for i, arg in enumerate(args_list):
-            if torch.is_tensor(arg) and arg.is_xpu:
-                args_list[i] = arg.to("cpu")
-            elif isinstance(arg, (tuple, list)) and len(arg) > 0 and torch.is_tensor(arg[0]):
-                tensors = list(arg)
-                for j, tensor in enumerate(tensors):
-                    if tensor.is_xpu:
-                        tensors[j] = tensor.to("cpu")
-                if isinstance(arg, (tuple)):
-                    args_list[i] = tuple(tensors)
-                else:
-                    args_list[i] = tensor
-        args = tuple(args_list)
+        args = args_to_xpu(args)
         return f(*args, **kwargs)
     return wrapper
 
