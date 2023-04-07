@@ -25,6 +25,7 @@ def conv2d_fusion(input1, input2, model, print_graph=False, dtype=torch.float):
     input1 = input1.to("xpu")
     input2 = input2.to("xpu")
     input3 = input2.clone()
+    input4 = input1.clone()
     model = model.to("xpu")
     modelJit = torch.jit.script(model)
     with torch.no_grad():
@@ -32,7 +33,7 @@ def conv2d_fusion(input1, input2, model, print_graph=False, dtype=torch.float):
             y_script = modelJit(input1, input2)
         if print_graph:
             print(modelJit.graph_for(input1, input2))
-        y_script = modelJit(input1, input3)
+        y_script = modelJit(input4, input3)
         # print("fusion:", y_script)
     del modelJit
     return y, y_script
@@ -44,6 +45,7 @@ def _conv_fusion(input1, input2, model, print_graph=False, dtype=torch.float):
     input1 = input1.to("xpu").half()
     input2 = input2.to("xpu").half()
     input3 = input2.clone()
+    input4 = input1.clone()
     model = model.to("xpu").half()
     jit_model = torch.jit.trace(model, (input1, input2), check_trace=False)
     jit_model = wrap_cpp_module(torch._C._jit_pass_fold_convbn(jit_model._c))
@@ -52,7 +54,7 @@ def _conv_fusion(input1, input2, model, print_graph=False, dtype=torch.float):
             y_script = jit_model(input1, input2)
         if print_graph:
             print(jit_model.graph_for(input1, input2))
-        y_script = jit_model(input1, input3)
+        y_script = jit_model(input4, input3)
     # print("fusion: ", y_script)
     del jit_model
     return y, y_script.to(torch.float32)
@@ -503,7 +505,7 @@ class Conv2dSigmoidBinaryMulAdd(torch.nn.Module):
 
     def forward(self, x, a):
         ret = torch.sigmoid(self.conv(x))
-        return ret * a + x
+        return x + ret * a
 
 class Conv2dSigmoidBinaryMulAddRelu(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):

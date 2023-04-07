@@ -2332,7 +2332,6 @@ Tensor _convolution_binary_mul_add(
         out,
         add,
         attr);
-    add = true;
   }
   Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
   Tensor ret = _convolution_out(
@@ -2397,7 +2396,6 @@ Tensor convolution_binary_mul_add(
         out,
         add,
         attr);
-    add = true;
   }
   Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
   Tensor ret = _convolution_out(
@@ -2507,7 +2505,6 @@ Tensor convolution_sigmoid_binary_mul_add(
         out,
         add,
         attr);
-    add = true;
   }
   Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
   Tensor ret = _convolution_out(
@@ -2571,9 +2568,9 @@ Tensor convolution_sigmoid_binary_mul_add_relu(
         out,
         add,
         attr);
-    add = true;
-    attr.append_post_eltwise(1.0, 0.0, 0.0, attr.kind_with_relu);
   }
+  if (add)
+    attr.append_post_eltwise(1.0, 0.0, 0.0, attr.kind_with_relu);
   Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
   Tensor ret = _convolution_out(
       out,
@@ -2695,7 +2692,6 @@ Tensor _convolution_sigmoid_binary_mul_add(
         out,
         add,
         attr);
-    add = true;
   }
   Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
   Tensor ret = _convolution_out(
@@ -2765,9 +2761,9 @@ Tensor _convolution_sigmoid_binary_mul_add_relu(
         out,
         add,
         attr);
-    add = true;
-    attr.append_post_eltwise(1.0, 0.0, 0.0, attr.kind_with_relu);
   }
+  if (add)
+    attr.append_post_eltwise(1.0, 0.0, 0.0, attr.kind_with_relu);
   Tensor bias_ = bias.has_value() ? bias.value() : at::Tensor();
   Tensor ret = _convolution_out(
       out,

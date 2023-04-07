@@ -122,6 +122,11 @@ kind of cases which will automatically fuse the aten::dequantize.
         xpu::linear_binary_##func##_sym                         \
   }
 
+#define IPEX_DEFINE_TWO_SYMBOL_FUSION(symbol1, symbol2, symbol3) \
+  {{symbol1, symbol2}, symbol3}, {                               \
+    {symbol1, symbol2##_}, symbol3                               \
+  }
+
 } // namespace
 
 namespace torch {
@@ -667,6 +672,40 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{xpu::q_conv2d_dequantize_silu_sym,
       Symbol::fromQualString("aten::quantize_per_tensor")},
      xpu::q_conv2d_dequantize_silu_quantize_sym},
+
+    IPEX_DEFINE_TWO_SYMBOL_FUSION(
+        xpu::conv2d_binary_mul_sym,
+        aten::add,
+        xpu::conv2d_binary_mul_add_sym),
+    IPEX_DEFINE_TWO_SYMBOL_FUSION(
+        xpu::_convolution_binary_mul_sym,
+        aten::add,
+        xpu::_convolution_binary_mul_add_sym),
+
+    IPEX_DEFINE_TWO_SYMBOL_FUSION(
+        xpu::conv2d_sigmoid_sym,
+        aten::mul,
+        xpu::conv2d_sigmoid_binary_mul_sym),
+    IPEX_DEFINE_TWO_SYMBOL_FUSION(
+        xpu::_convolution_sigmoid_sym,
+        aten::mul,
+        xpu::_convolution_sigmoid_binary_mul_sym),
+    IPEX_DEFINE_TWO_SYMBOL_FUSION(
+        xpu::conv2d_sigmoid_binary_mul_sym,
+        aten::add,
+        xpu::conv2d_sigmoid_binary_mul_add_sym),
+    IPEX_DEFINE_TWO_SYMBOL_FUSION(
+        xpu::_convolution_sigmoid_binary_mul_sym,
+        aten::add,
+        xpu::_convolution_sigmoid_binary_mul_add_sym),
+    IPEX_DEFINE_TWO_SYMBOL_FUSION(
+        xpu::conv2d_sigmoid_binary_mul_add_sym,
+        aten::relu,
+        xpu::conv2d_sigmoid_binary_mul_add_relu_sym),
+    IPEX_DEFINE_TWO_SYMBOL_FUSION(
+        xpu::_convolution_sigmoid_binary_mul_add_sym,
+        aten::relu,
+        xpu::_convolution_sigmoid_binary_mul_add_relu_sym),
 
     IPEX_DEFINE_CONV_FUSION(sqrt),
     IPEX_DEFINE_CONV_FUSION(square),
