@@ -1,33 +1,54 @@
 #pragma once
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
+#include <algorithm>
 
 using namespace xpu::dpcpp;
+
+static inline int64_t roundup_pow2(int64_t n) {
+  n--;
+  n |= (n >> 1);
+  n |= (n >> 2);
+  n |= (n >> 4);
+  n |= (n >> 8);
+  n |= (n >> 16);
+  return std::max<int64_t>(1, n + 1);
+}
 
 class BatchKernelConfig {
  public:
   enum class Policy : uint8_t {
-    pSegment = 0,
-    pLoop,
-    pAdaptive,
+    pSegment = 0b1 << 0,
+    pLoop = 0b1 << 1,
+    pAdaptive = 0b1 << 2,
     /* pVector */
+    pAggressiveSplit = 0b1 << 3,
   };
+
+  static Policy policy_combine(std::vector<Policy> ps) {
+    uint8_t p = 0;
+    for (Policy p_ : ps) {
+      p |= (uint8_t)p_;
+    }
+    return (Policy)p;
+  }
 
  public:
   BatchKernelConfig() = delete;
+
   BatchKernelConfig(
       int64_t batch,
       int64_t problem,
       int64_t stride,
       int64_t problem_batch,
       bool problem_along_x,
-      Policy policy = Policy::pSegment)
+      std::vector<Policy> policies)
       : batch_(batch),
         problem_(problem),
         stride_(stride),
         problem_batch_(problem_batch),
         problem_along_x_(problem_along_x),
-        policy_(policy),
+        policy_(policy_combine(policies)),
         problem_wg_range_(0),
         problem_glb_range_(0),
         problem_range_(0),
@@ -42,6 +63,9 @@ class BatchKernelConfig {
     wg_range_x_ = sg_size;
     wg_range_y_ = wg_size / wg_range_x_;
 
+    int64_t limit_x =
+        (uint8_t)policy_ & (uint8_t)Policy::pAggressiveSplit ? 1 : sg_size;
+
     if (problem_batch_ == 0)
       problem_batch_ = batch_ * stride_;
 
@@ -49,16 +73,21 @@ class BatchKernelConfig {
     // dimension
     auto range_bound_x = problem_along_x_ ? problem_ : problem_batch_;
     auto range_bound_y = problem_along_x_ ? problem_batch_ : problem_;
-    while (range_bound_y <= wg_range_y_ >> 1 && wg_range_x_ <= wg_size) {
-      wg_range_y_ = wg_range_y_ >> 1;
-      wg_range_x_ = wg_size / wg_range_y_;
-    }
 
-    while (range_bound_x <= wg_range_x_ >> 1 && sg_size <= wg_range_x_ >> 1) {
-      wg_range_x_ = wg_range_x_ >> 1;
-    }
+    // Implications,
+    // 1. assign proper x/y to accommodate workload exactly.
+    // 2. prefer enough x (at least limit_x) to access memory coalecsingly.
+    // Spare y for x if workload is not large along y.
+    wg_range_y_ = std::min<int64_t>(wg_range_y_, roundup_pow2(range_bound_y));
+    // Subscribe appropriate x at least limit_x.
+    wg_range_x_ = std::max<int64_t>(
+        std::min<int64_t>(wg_size / wg_range_y_, roundup_pow2(range_bound_x)),
+        limit_x);
+    // Retieve y if necessary, if x is not large.
+    wg_range_y_ =
+        std::min<int64_t>(wg_size / wg_range_x_, roundup_pow2(range_bound_y));
 
-    if (policy_ == Policy::pAdaptive) {
+    if ((uint8_t)policy_ & (uint8_t)Policy::pAdaptive) {
       int64_t target_glb_range = dpcppMaxWorkItemsPerTile() /
           (wg_range_x_ * wg_range_y_) * (wg_range_x_ * wg_range_y_);
       if (problem_along_x_) {
@@ -92,7 +121,7 @@ class BatchKernelConfig {
       }
     } else {
       if (problem_along_x_) {
-        glb_range_x_ = policy_ == Policy::pLoop
+        glb_range_x_ = (uint8_t)policy_ & (uint8_t)Policy::pLoop
             ? wg_range_x_
             : int64_t((problem_ + wg_range_x_ - 1) / wg_range_x_) * wg_range_x_;
         glb_range_y_ =
@@ -102,7 +131,7 @@ class BatchKernelConfig {
         glb_range_x_ =
             int64_t((problem_batch_ + wg_range_x_ - 1) / wg_range_x_) *
             wg_range_x_;
-        glb_range_y_ = policy_ == Policy::pLoop
+        glb_range_y_ = (uint8_t)policy_ & (uint8_t)Policy::pLoop
             ? wg_range_y_
             : int64_t((problem_ + wg_range_y_ - 1) / wg_range_y_) * wg_range_y_;
       }
@@ -118,6 +147,24 @@ class BatchKernelConfig {
         ? (problem_batch_ + glb_range_y_ - 1) / glb_range_y_ * glb_range_y_
         : (problem_batch_ + glb_range_x_ - 1) / glb_range_x_ * glb_range_x_;
   }
+
+  BatchKernelConfig(
+      int64_t batch,
+      int64_t problem,
+      int64_t stride,
+      int64_t problem_batch,
+      bool problem_along_x,
+      Policy policy = Policy::pSegment)
+      : BatchKernelConfig(
+            batch,
+            problem,
+            stride,
+            problem_batch,
+            problem_along_x,
+            [&policy]() {
+              std::vector<Policy> policies = {policy};
+              return policies;
+            }()) {}
 
   sycl::range<2> global_size() const {
     return {glb_range_y_, glb_range_x_};

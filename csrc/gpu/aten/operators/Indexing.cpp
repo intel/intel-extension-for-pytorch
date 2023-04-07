@@ -739,7 +739,7 @@ void index(
       });
 }
 
-template <typename scalar_t, int SZ>
+template <typename scalar_t>
 void index_put_deterministic_kernel(
     int64_t* sorted_indices,
     int64_t* indices,
@@ -750,82 +750,58 @@ void index_put_deterministic_kernel(
     int64_t stride_before,
     int64_t outer_dim,
     bool accumulate) {
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t v_stride_before = numel * stride;
+  BatchKernelConfig cfg = {
+      /* num of indices      */ numel,
+      /* num of elements to put per indices */ outer_dim * stride,
+      1,
+      numel,
+      true,
+      {BatchKernelConfig::Policy::pSegment,
+       BatchKernelConfig::Policy::pAggressiveSplit}};
 
-  auto* dev_prop = dpcppGetDeviceProperties(getDeviceIdOfCurrentQueue());
-  auto sub_group_size = dev_prop->subgroup_sizes;
-  int64_t sg_0 = sub_group_size[0];
-  int64_t sg_1 = sub_group_size[1];
-  /*In some case, stride number is smaller than sub_group_size * SZ, it would be
-   * a waste of resources if we set work_group size to a fixed number. So we set
-   * it adapt to the stride number to avoid such issue. */
-  auto get_size = [=] {
-    if (stride > 0 && stride < sg_0)
-      return stride;
-    else if (stride >= sg_0 && stride < sg_1)
-      return sg_0;
-    else if (stride >= sg_1)
-      return sg_1;
-    else
-      TORCH_CHECK(false, "the stride numer is invalid");
-  };
-  int64_t group_x = get_size();
-  const int64_t indices_per_group = 4;
-  int hw_max_work_items = dpcppMaxWorkItemsPerTile();
-
-  sycl::range<3> wgroup_size = {1, indices_per_group, group_x};
-
-  int x_num = ceil_div(stride, (int64_t)group_x * SZ);
-  int y_num = ceil_div(numel, (int64_t)indices_per_group);
-  int z_num = std::min(
-      std::max<int>(1, outer_dim),
-      ceil_div(
-          hw_max_work_items,
-          std::min<int>(stride, (x_num * group_x * SZ)) *
-              std::min<int>(numel, (y_num * indices_per_group))));
-  sycl::range<3> wgroup_range = {
-      z_num, y_num * indices_per_group, x_num * group_x * SZ};
-
+  // align with precision of CPU backend.
+  using accscalar_t = scalar_t; /* acc_type<scalar_t>; */
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item_id) {
-      auto itemIdx_y = item_id.get_local_id(1);
-      auto itemIdx_x = item_id.get_local_id(2);
-      auto groupIdx_z = item_id.get_group(0);
-      auto groupIdx_y = item_id.get_group(1);
-      auto groupIdx_x = item_id.get_group(2);
-      auto groupDim_y = item_id.get_local_range(1);
-      auto groupDim_x = item_id.get_local_range(2);
-      for (int64_t z = groupIdx_z; z < outer_dim; z += z_num) {
-        int64_t idx = groupIdx_y * groupDim_y + itemIdx_y;
-        if (idx < numel &&
-            (idx == 0 || sorted_indices[idx] != sorted_indices[idx - 1])) {
-          do {
-            int64_t start_feature = itemIdx_x + groupIdx_x * groupDim_x * SZ;
-            const int64_t self_row =
-                ((int64_t)sorted_indices[idx]) * stride + z * stride_before;
-            const int64_t value_row =
-                ((int64_t)indices[idx]) * stride + z * numel * stride;
-            while (start_feature < stride) {
-#pragma unroll
-              for (int ii = 0; ii < SZ; ii++) {
-                int64_t feature_dim = start_feature + ii * group_x;
-                if (feature_dim >= stride)
-                  break;
-                self[self_row + feature_dim] += value[value_row + feature_dim];
-              }
-              start_feature += x_num * groupDim_x * SZ;
-            }
-            idx++;
-          } while (idx < numel &&
-                   sorted_indices[idx] == sorted_indices[idx - 1]);
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
+      auto id = cfg.get_item_desc(item);
+
+      if (id.glb_batch >= cfg.problem_batch_ || id.glb_problem >= cfg.problem_)
+        return;
+
+      int64_t idx = sorted_indices[id.glb_batch];
+      if (id.glb_batch != 0 && idx == sorted_indices[id.glb_batch - 1])
+        return;
+
+      int64_t pi_ = id.glb_problem;
+      int64_t si_ = pi_ % stride;
+      int64_t bi_ = pi_ / stride;
+      int64_t s_gid = si_ + idx * stride + bi_ * stride_before;
+      int64_t v_stride = si_ + bi_ * v_stride_before;
+
+      accscalar_t acc;
+      if (accumulate)
+        acc = self[s_gid];
+      for (int64_t inner_idx = id.glb_batch;
+           sorted_indices[inner_idx] == idx && inner_idx < cfg.problem_batch_;
+           inner_idx++) {
+        int64_t idx_orig = indices[inner_idx];
+        int64_t v_gid = idx_orig * stride + v_stride;
+        if (accumulate) {
+          acc += (accscalar_t)value[v_gid];
+        } else {
+          self[s_gid] = value[v_gid];
+          break;
         }
       }
+      if (accumulate)
+        self[s_gid] = acc;
     };
-    cgh.parallel_for(sycl::nd_range<3>(wgroup_range, wgroup_size), kfn);
+    cgh.parallel_for(
+        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
 
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
 } // namespace impl
 
 static Tensor wrapIndexOnce(
@@ -993,6 +969,10 @@ void index_put_deterministic_impl(
     linearIndex.divide_(sliceSize, "trunc");
 
     sorted_indices.copy_(linearIndex);
+    xpu::pstl::iota(
+        orig_indices.data_ptr<int64_t>(),
+        orig_indices.data_ptr<int64_t>() + linearIndex.numel(),
+        (int64_t)0);
     xpu::pstl::sort<int64_t, int64_t>(
         linearIndex.data_ptr<int64_t>(),
         sorted_indices.data_ptr<int64_t>(),
@@ -1005,7 +985,6 @@ void index_put_deterministic_impl(
         linearIndex.numel() * sliceSize * nElemBefore,
         " vs ",
         expandedValue.numel());
-    const int UNROLL = 4;
     IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
         at::ScalarType::Half,
         at::ScalarType::Bool,
@@ -1013,7 +992,7 @@ void index_put_deterministic_impl(
         expandedValue.scalar_type(),
         "index_put_deterministic_kernel",
         [&] {
-          index_put_deterministic_kernel<scalar_t, UNROLL>(
+          index_put_deterministic_kernel<scalar_t>(
               sorted_indices.data_ptr<int64_t>(),
               orig_indices.data_ptr<int64_t>(),
               expandedValue.data_ptr<scalar_t>(),

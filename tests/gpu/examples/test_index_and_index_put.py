@@ -73,3 +73,25 @@ class TestTorchMethod(TestCase):
         print("z_cpu = ", z_cpu)
         print("z_xpu = ", z_xpu.cpu())
         self.assertEqual(z_cpu, z_xpu.cpu())
+
+    def test_index_put_outer_inner(self, dtype=torch.long):
+        #XXX using long to avoid accumulate error caused by order of combiniation
+        torch.use_deterministic_algorithms(True)
+        batch = 15 # outer
+        stride = 33 # inner
+        numel = 17
+        a = torch.randint(0, 5, (batch, numel, stride), dtype=dtype, device=torch.device('xpu'))
+        b = torch.randint(0, 5, (batch, numel, stride), dtype=dtype, device=torch.device('xpu'))
+        idx = a < b
+        idx_ = torch.nonzero(idx, as_tuple=True)
+        nonzero = torch.nonzero(idx)
+        idx_ = (None, idx_[1], None)
+        values = torch.randint(0, 5, (batch, nonzero.shape[0], stride), dtype=dtype, device=torch.device('xpu'))
+        a_cpu = a.cpu()
+        idx_cpu = (None, idx_[1].cpu(), None)
+        values_cpu = values.cpu()
+
+        torch.ops.aten._index_put_impl_(a, idx_, values, True)
+        torch.ops.aten._index_put_impl_(a_cpu, idx_cpu, values_cpu, True)
+        self.assertEqual(a_cpu, a.cpu())
+        torch.use_deterministic_algorithms(False)
