@@ -137,13 +137,13 @@ MACRO(CHECK_SSE lang type flags)
   MARK_AS_ADVANCED(${lang}_${type}_FOUND ${lang}_${type}_FLAGS)
 ENDMACRO()
 
-CHECK_SSE(C "AVX2" " ;-mavx2 -mfma;/arch:AVX2")
-CHECK_SSE(CXX "AVX2" " ;-mavx2 -mfma;/arch:AVX2")
+CHECK_SSE(C "AVX2" " ;-mavx2 -mfma -mf16c;/arch:AVX2")
+CHECK_SSE(CXX "AVX2" " ;-mavx2 -mfma -mf16c;/arch:AVX2")
 
 # gcc start to support avx2_vnni from version 11.2
 # https://gcc.gnu.org/onlinedocs/gcc-11.2.0/gcc/x86-Options.html#x86-Options
-CHECK_SSE(C "AVX2_VNNI" " ;-mavx2 -mavxvnni -mfma;/arch:AVX2")
-CHECK_SSE(CXX "AVX2_VNNI" " ;-mavx2 -mavxvnni -mfma;/arch:AVX2")
+CHECK_SSE(C "AVX2_VNNI" " ;-mavx2 -mavxvnni -mfma -mf16c;/arch:AVX2")
+CHECK_SSE(CXX "AVX2_VNNI" " ;-mavx2 -mavxvnni -mfma -mf16c;/arch:AVX2")
 
 CHECK_SSE(C "AVX512" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mfma;/arch:AVX512")
 CHECK_SSE(CXX "AVX512" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mfma;/arch:AVX512")
