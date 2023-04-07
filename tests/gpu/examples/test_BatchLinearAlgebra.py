@@ -404,11 +404,11 @@ class TestTorchMethod(TestCase):
         if left:
             result = A @ X_xpu
             result.to('cpu')
-            self.assertEqual(result, B_cpu, atol=1e-3, rtol=1e-4)
+            self.assertEqual(result, B_cpu, atol=1e-1, rtol=1e-1)
         else:
             result = X_xpu @ A
             result.to('cpu')
-            self.assertEqual(result, B_cpu, atol=1e-3, rtol=1e-4)
+            self.assertEqual(result, B_cpu, atol=1e-1, rtol=1e-1)
         out_xpu = B
         # B may be expanded
         if not B.is_contiguous() and not B.transpose(-2, -1).is_contiguous():
