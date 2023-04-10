@@ -134,7 +134,7 @@ In C++ code, you can fetch a `sycl::queue` reference as below.
 auto device_type = c10::DeviceType::XPU;
 c10::impl::VirtualGuardImpl impl(device_type);
 c10::Stream c10_stream = impl.getStream(c10::Device(device_type));
-auto& queue = xpu::get_queue_fromSo_stream(c10_stream);
+auto& queue = xpu::get_queue_from_stream(c10_stream);
 ```
 In python code, you can use the below codes to get a `sycl::queue` pointer, which
 is stored by `PyLong_FromVoidPtr`.
