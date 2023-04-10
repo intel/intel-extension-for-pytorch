@@ -256,8 +256,7 @@ class RoIAlignTester(TestCase):
         pool_h, pool_w = pool_size, pool_size
         torch._dynamo.allow_in_graph(ipex.nn.modules._roi_align.RoIAlign)
 
-        # TODO: add dynamic tests when 'ipex' backend supports it.
-        for dtype, backend, dynamic in itertools.product([torch.float32, torch.bfloat16], ['ipex', 'inductor'], [False]):
+        for dtype, backend, dynamic in itertools.product([torch.float32, torch.bfloat16], ['ipex', 'inductor'], [True, False]):
             torch._dynamo.reset()
             torchcompile_fn = torch.compile(torchvision_fn, backend=backend, dynamic=dynamic)
             x = x.to(dtype=dtype)

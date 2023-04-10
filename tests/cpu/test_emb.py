@@ -108,8 +108,7 @@ class TestEMB(TestCase):
         emb = Embeddingbag().eval()
         input = torch.LongTensor([1,2,4,5,4,3,2,9])
         offsets = torch.LongTensor([0,1,2,3,4,5,6,7])
-        # TODO: add dynamic tests when 'ipex' backend supports it.
-        for dtype, backend, dynamic in itertools.product([torch.float32, torch.bfloat16], ['ipex', 'inductor'], [False]):
+        for dtype, backend, dynamic in itertools.product([torch.float32, torch.bfloat16], ['ipex', 'inductor'], [True, False]):
             torch._dynamo.reset()
             emb_torchcompile = torch.compile(emb, backend=backend, dynamic=dynamic)
             with torch.cpu.amp.autocast(enabled=(dtype==torch.bfloat16)), torch.no_grad():
