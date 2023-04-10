@@ -28,7 +28,8 @@ at::Tensor convolution_kernel(
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     int64_t groups,
-    const ideep::attr_t& attr);
+    const ideep::attr_t& attr,
+    at::MemoryFormat memory_format);
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward_kernel(
     const at::Tensor& input,
@@ -70,7 +71,8 @@ class IPEXConvolutionOp : public torch::autograd::Function<IPEXConvolutionOp> {
       c10::optional<at::IntArrayRef> kernel_size,
       c10::optional<at::IntArrayRef> padding,
       c10::optional<at::IntArrayRef> stride,
-      c10::optional<at::IntArrayRef> dilation);
+      c10::optional<at::IntArrayRef> dilation,
+      c10::optional<bool> weight_channels_last);
 
   static at::Tensor forward(
       torch::autograd::AutogradContext* ctx,
@@ -81,7 +83,8 @@ class IPEXConvolutionOp : public torch::autograd::Function<IPEXConvolutionOp> {
       c10::optional<at::IntArrayRef> kernel_size,
       c10::optional<at::IntArrayRef> padding,
       c10::optional<at::IntArrayRef> stride,
-      c10::optional<at::IntArrayRef> dilation);
+      c10::optional<at::IntArrayRef> dilation,
+      c10::optional<bool> weight_channels_last);
 
   static torch::autograd::variable_list backward(
       torch::autograd::AutogradContext* ctx,
@@ -96,7 +99,8 @@ at::Tensor convolution_forward(
     c10::optional<at::IntArrayRef> kernel_size,
     c10::optional<at::IntArrayRef> padding,
     c10::optional<at::IntArrayRef> stride,
-    c10::optional<at::IntArrayRef> dilation);
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<bool> weight_channels_last);
 
 at::Tensor convolution_forward_meta(
     const at::Tensor& input,
@@ -106,7 +110,8 @@ at::Tensor convolution_forward_meta(
     c10::optional<at::IntArrayRef> kernel_size,
     c10::optional<at::IntArrayRef> padding,
     c10::optional<at::IntArrayRef> stride,
-    c10::optional<at::IntArrayRef> dilation);
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<bool> weight_channels_last);
 
 } // namespace cpu
 } // namespace torch_ipex

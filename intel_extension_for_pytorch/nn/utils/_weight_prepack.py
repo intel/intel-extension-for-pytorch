@@ -124,7 +124,16 @@ class _IPEXConvNd(nn.Module):
             _load_from_state_dict_post_hook(self, loaded_ctx, fp32_loaded_weight, weight_trail)
 
     def forward(self, x):
-        return torch.ops.torch_ipex.convolution_forward(x, self.weight, self.bias, self.ctx.get_data_handle(), self.weight_size, self.padding, self.stride, self.dilation)
+        return torch.ops.torch_ipex.convolution_forward(
+            x,
+            self.weight,
+            self.bias,
+            self.ctx.get_data_handle(),
+            self.weight_size,
+            self.padding,
+            self.stride,
+            self.dilation,
+            self.weight_channels_last)
 
 class _IPEXConv1d(_IPEXConvNd):
     def __init__(self, dense_module):
@@ -279,7 +288,8 @@ class _IPEXConvTransposeNd(nn.Module):
             self.output_padding,
             self.stride,
             self.dilation,
-            self.groups)
+            self.groups,
+            self.weight_channels_last)
 
 class _IPEXConvTranspose2d(_IPEXConvTransposeNd):
     def __init__(self, dense_module):

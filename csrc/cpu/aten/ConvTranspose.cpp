@@ -142,10 +142,12 @@ at::Tensor conv_transpose_kernel_impl(
   }
 
   if (!is_channels_last) {
-    return mkldnn_to_dense(new_with_itensor_mkldnn(
-        std::move(y),
-        optTypeMetaToScalarType(input.options().dtype_opt()),
-        input.options().device_opt()));
+    return mkldnn_to_dense(
+               new_with_itensor_mkldnn(
+                   std::move(y),
+                   optTypeMetaToScalarType(input.options().dtype_opt()),
+                   input.options().device_opt()))
+        .contiguous(memory_format);
   } else {
     return output;
   }
@@ -225,7 +227,8 @@ at::Tensor conv_transpose_forward(
     c10::optional<at::IntArrayRef> output_padding,
     c10::optional<at::IntArrayRef> stride,
     c10::optional<at::IntArrayRef> dilation,
-    c10::optional<int64_t> groups) {
+    c10::optional<int64_t> groups,
+    c10::optional<bool> weight_channels_last) {
   return reinterpret_cast<IpexConvTransposeOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run(input, ideep::attr_t());
@@ -241,7 +244,8 @@ at::Tensor IPEXConvTransposeOp::_forward(
     c10::optional<at::IntArrayRef> output_padding,
     c10::optional<at::IntArrayRef> stride,
     c10::optional<at::IntArrayRef> dilation,
-    c10::optional<int64_t> groups) {
+    c10::optional<int64_t> groups,
+    c10::optional<bool> weight_channels_last) {
   at::AutoDispatchBelowADInplaceOrView g;
   RECORD_FUNCTION(
       "IPEXConvTransposeOp::_forward", c10::ArrayRef<c10::IValue>({}));
@@ -259,7 +263,8 @@ at::Tensor IPEXConvTransposeOp::_forward(
       output_padding,
       stride,
       dilation,
-      groups);
+      groups,
+      weight_channels_last);
 }
 
 at::Tensor IPEXConvTransposeOp::forward(
@@ -273,7 +278,8 @@ at::Tensor IPEXConvTransposeOp::forward(
     c10::optional<at::IntArrayRef> output_padding,
     c10::optional<at::IntArrayRef> stride,
     c10::optional<at::IntArrayRef> dilation,
-    c10::optional<int64_t> groups) {
+    c10::optional<int64_t> groups,
+    c10::optional<bool> weight_channels_last) {
   RECORD_FUNCTION(
       "IPEXConvTransposeOp::forward", c10::ArrayRef<c10::IValue>({}));
 
@@ -294,7 +300,8 @@ at::Tensor IPEXConvTransposeOp::forward(
       output_padding,
       stride,
       dilation,
-      groups);
+      groups,
+      weight_channels_last);
 }
 
 at::Tensor conv_transpose_backward_input(
@@ -331,10 +338,12 @@ at::Tensor conv_transpose_backward_input(
       groups);
 
   if (!is_channels_last) {
-    return mkldnn_to_dense(new_with_itensor_mkldnn(
-        std::move(grad_x),
-        optTypeMetaToScalarType(grad_output.options().dtype_opt()),
-        grad_output.options().device_opt()));
+    return mkldnn_to_dense(
+               new_with_itensor_mkldnn(
+                   std::move(grad_x),
+                   optTypeMetaToScalarType(grad_output.options().dtype_opt()),
+                   grad_output.options().device_opt()))
+        .contiguous(memory_format);
   } else {
     return grad_input;
   }
@@ -488,6 +497,7 @@ torch::autograd::variable_list IPEXConvTransposeOp::backward(
       at::Tensor(),
       at::Tensor(),
       at::Tensor(),
+      at::Tensor(),
       at::Tensor()};
 }
 
@@ -501,7 +511,8 @@ at::Tensor conv_transpose(
     c10::optional<at::IntArrayRef> output_padding,
     c10::optional<at::IntArrayRef> stride,
     c10::optional<at::IntArrayRef> dilation,
-    c10::optional<int64_t> groups) {
+    c10::optional<int64_t> groups,
+    c10::optional<bool> weight_channels_last) {
   if (at::GradMode::is_enabled()) {
     return IPEXConvTransposeOp::apply(
         input,
@@ -513,7 +524,8 @@ at::Tensor conv_transpose(
         output_padding,
         stride,
         dilation,
-        groups);
+        groups,
+        weight_channels_last);
   }
   return IPEXConvTransposeOp::_forward(
       input,
@@ -525,7 +537,8 @@ at::Tensor conv_transpose(
       output_padding,
       stride,
       dilation,
-      groups);
+      groups,
+      weight_channels_last);
 }
 
 at::Tensor conv_transpose_forward_meta(
@@ -538,12 +551,14 @@ at::Tensor conv_transpose_forward_meta(
     c10::optional<at::IntArrayRef> output_padding,
     c10::optional<at::IntArrayRef> stride,
     c10::optional<at::IntArrayRef> dilation,
-    c10::optional<int64_t> groups) {
+    c10::optional<int64_t> groups,
+    c10::optional<bool> weight_channels_last) {
   TORCH_CHECK(
       weight_size.has_value() && padding.has_value() &&
           output_padding.has_value() && stride.has_value() &&
-          dilation.has_value() && groups.has_value(),
-      "weight_size, padding, output_padding, stride, dilation and groups must have value for conv_transpose_forward_meta");
+          dilation.has_value() && groups.has_value() &&
+          weight_channels_last.has_value(),
+      "weight_size, padding, output_padding, stride, dilation, groups and weight_channels_last must have value for conv_transpose_forward_meta");
   auto input_size = input.sym_sizes();
   c10::SymDimVector output_sizes = conv_input_size(
       input_size,
@@ -554,6 +569,22 @@ at::Tensor conv_transpose_forward_meta(
       dilation.value(),
       groups.value());
   auto output = at::empty_symint(output_sizes, input.options());
+
+  bool use_channels_last =
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d ||
+      weight_channels_last.value();
+  auto memory_format = at::MemoryFormat::Contiguous;
+  if (use_channels_last) {
+    // TODO: support ConvTranspose1d
+    if (input.dim() == 4) {
+      memory_format = at::MemoryFormat::ChannelsLast;
+    } else if (input.dim() == 5) {
+      memory_format = at::MemoryFormat::ChannelsLast3d;
+    }
+  }
+
+  output = output.contiguous(memory_format);
   return output;
 }
 
@@ -573,7 +604,8 @@ at::Tensor conv_transpose(
     c10::optional<at::IntArrayRef> output_padding,
     c10::optional<at::IntArrayRef> stride,
     c10::optional<at::IntArrayRef> dilation,
-    c10::optional<int64_t> groups) {
+    c10::optional<int64_t> groups,
+    c10::optional<bool> weight_channels_last) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::conv_transpose", "")
@@ -591,7 +623,8 @@ at::Tensor conv_transpose(
       output_padding,
       stride,
       dilation,
-      groups);
+      groups,
+      weight_channels_last);
 }
 
 } // namespace autocast
@@ -602,7 +635,7 @@ namespace {
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "conv_transpose(Tensor input, Tensor weight, Tensor? bias_opt, "
-      "Tensor W_prepack, int[]? weight_size, int[]? padding, int[]? output_padding, int[]? stride, int[]? dilation, int? groups) -> Tensor");
+      "Tensor W_prepack, int[]? weight_size, int[]? padding, int[]? output_padding, int[]? stride, int[]? dilation, int? groups, bool? weight_channels_last) -> Tensor");
   m.impl(
       "conv_transpose",
       c10::DispatchKey::Autograd,
