@@ -80,6 +80,10 @@ static inline Tensor gru_forward(
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
 
+  if (data_t == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+
   auto gru_forward_pd = lbr_gru_forward::primitive_desc(
       engine,
       train ? prop_kind::forward_training : prop_kind::forward_inference,
@@ -322,6 +326,10 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+
+  if (data_dt == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
 
   auto gru_forward_pd = lbr_gru_forward::primitive_desc(
       engine,
