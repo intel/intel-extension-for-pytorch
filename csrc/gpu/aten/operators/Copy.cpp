@@ -154,8 +154,14 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
             iter, [=](scalar_t src_val) { return src_val; });
       });
     } else {
-      IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-          kBool, kHalf, kBFloat16, dtype, "copy_loops_memcpy", [&] {
+      IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
+          kBool,
+          kHalf,
+          kBFloat16,
+          kComplexHalf,
+          dtype,
+          "copy_loops_memcpy",
+          [&] {
             dpcpp_kernel_loops_memcpy_for_tensor_iter(
                 iter, [=](scalar_t src_val) { return src_val; });
           });
@@ -170,26 +176,29 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
     } else {
       if (same_neg) {
         if (!same_conj && same_type) {
-          IPEX_DISPATCH_COMPLEX_TYPES(dtype, "copy_conj", [&] {
-            dpcpp_fast_mode_kernel_for_tensor_iter(
-                iter, [=](scalar_t src_val) { return std::conj(src_val); });
-          });
+          IPEX_DISPATCH_COMPLEX_TYPES_AND(
+              kComplexHalf, dtype, "copy_conj", [&] {
+                dpcpp_fast_mode_kernel_for_tensor_iter(
+                    iter, [=](scalar_t src_val) { return std::conj(src_val); });
+              });
         } else {
-          IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-              kBool, kHalf, kBFloat16, dtype, "copy_", [&] {
+          IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
+              kBool, kHalf, kBFloat16, kComplexHalf, dtype, "copy_", [&] {
                 dpcpp_fast_mode_kernel_for_tensor_iter(
                     iter, [=](scalar_t src_val) { return src_val; });
               });
         }
       } else {
         if (!same_conj && same_type) {
-          IPEX_DISPATCH_COMPLEX_TYPES(dtype, "copy_conj", [&] {
-            dpcpp_fast_mode_kernel_for_tensor_iter(
-                iter, [=](scalar_t src_val) { return std::conj(-src_val); });
-          });
+          IPEX_DISPATCH_COMPLEX_TYPES_AND(
+              kComplexHalf, dtype, "copy_conj", [&] {
+                dpcpp_fast_mode_kernel_for_tensor_iter(
+                    iter,
+                    [=](scalar_t src_val) { return std::conj(-src_val); });
+              });
         } else {
-          IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-              kBool, kHalf, kBFloat16, dtype, "copy_", [&] {
+          IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
+              kBool, kHalf, kBFloat16, kComplexHalf, dtype, "copy_", [&] {
                 dpcpp_fast_mode_kernel_for_tensor_iter(
                     iter, [=](scalar_t src_val) { return -src_val; });
               });

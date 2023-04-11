@@ -39,3 +39,11 @@ class TestTorchMethod(TestCase):
         input = torch.tensor([0.9701+0.7078j, 0.345-1.764j])
         input_xpu = input.to("xpu")
         self.assertEqual(torch.norm(input), torch.norm(input_xpu).to("cpu"))
+
+    def test_complex_copy(self, dtype=torch.chalf):
+        input = torch.tensor([0.9701+0.7078j, 0.345-1.764j], dtype=dtype)
+        print(input.type())
+        output1 = input.to("xpu")
+        output2 = output1.clone()
+        self.assertEqual(input, output1.to("cpu"))
+        self.assertEqual(input, output2.to("cpu"))
