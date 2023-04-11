@@ -5,6 +5,7 @@ import pkg_resources
 import torch
 import torch._dynamo
 import torch.fx.experimental.optimization as optimization
+from torch._dynamo.backends.common import fake_tensor_unsupported
 from torch.jit._trace import TracerWarning
 import warnings
 
@@ -162,17 +163,16 @@ class GraphCapture(object):
 
     def __call__(self, func):
 
+        @fake_tensor_unsupported
         def compiler(gm: torch.fx.GraphModule, example_inputs: List[torch.Tensor]):
-            from torch.utils._mode_utils import no_dispatch
-            with no_dispatch():
-                static_inputs = []
-                for x in example_inputs:
-                    size = [s.node.shape_env.size_hint(s.node.expr) for s in x.size()]
-                    stride = [s.node.shape_env.size_hint(s.node.expr) for s in x.stride()]
-                    static_inputs.append(torch.as_strided(torch.zeros(size, dtype=x.dtype, device=x.device), size, stride))
-            traced_gm = torch.jit.trace(gm.eval(), static_inputs).eval()
-            traced_gm = torch.jit.freeze(traced_gm)
-            return traced_gm
+            try:
+                with torch.no_grad():
+                    traced_model = torch.jit.trace(gm.eval(), example_inputs)
+                    traced_model = torch.jit.freeze(traced_model)
+                return traced_model
+            except Exception:
+                warnings.warn("JIT trace failed during the 'compiler' process.")
+                return gm
 
         @functools.wraps(func)
         def forward(*input, **kwargs):
