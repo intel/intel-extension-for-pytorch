@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Context.h>
 #include <ATen/SparseTensorUtils.h>
+#include <ATen/autocast_mode.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/record_function.h>
@@ -23,6 +24,9 @@ using namespace at::sparse;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+using autocast::cached_cast;
+using autocast::get_lower_precision_fp_from_device_type;
+using autocast::promote_type;
 
 std::tuple<Tensor, Tensor> sort(
     const Tensor& self,
@@ -38,7 +42,8 @@ static void mul_add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
       iter.dtype(),
       "mul_add",
       [&]() {
-        auto alpha = alpha_scalar.to<scalar_t>();
+        using accscalar_t = acc_type<scalar_t>;
+        auto alpha = alpha_scalar.to<accscalar_t>();
         dpcpp_kernel_for_tensor_iter(
             iter, [=](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
               return a * b + alpha * c;
@@ -141,14 +146,24 @@ Tensor mul_scalar_add_scalar(
         iter.dtype(),
         "mul_scalar_add_scalar",
         [&]() {
-          auto add_scalar = alpha.to<scalar_t>() * accumu.to<scalar_t>();
-          auto other_scalar = other.to<scalar_t>();
+          using accscalar_t = acc_type<scalar_t>;
+          auto add_scalar = alpha.to<accscalar_t>() * accumu.to<accscalar_t>();
+          auto other_scalar = other.to<accscalar_t>();
           dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
             return a * other_scalar + add_scalar;
           });
         });
   }
   return result;
+}
+
+Tensor mul_scalar_add_scalar_autocast(
+    const Tensor& self,
+    Scalar other,
+    Scalar accumu,
+    Scalar alpha) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocast(c10::DispatchKey::AutocastXPU);
+  return mul_scalar_add_scalar(self, other, accumu, alpha);
 }
 
 Tensor mul_add_scalar(
@@ -174,7 +189,8 @@ Tensor mul_add_scalar(
       iter.dtype(),
       "mul_scalar_add_scalar",
       [&]() {
-        auto add_scalar = alpha.to<scalar_t>() * accumu.to<scalar_t>();
+        using accscalar_t = acc_type<scalar_t>;
+        auto add_scalar = alpha.to<accscalar_t>() * accumu.to<accscalar_t>();
         dpcpp_kernel_for_tensor_iter(
             iter, [=](scalar_t a, scalar_t b) -> scalar_t {
               return a * b + add_scalar;
@@ -182,6 +198,24 @@ Tensor mul_add_scalar(
       });
 
   return result;
+}
+
+Tensor mul_add_scalar_autocast(
+    const Tensor& self,
+    const Tensor& other,
+    Scalar accumu,
+    Scalar alpha) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocast(c10::DispatchKey::AutocastXPU);
+  auto to_type = promote_type(
+      get_lower_precision_fp_from_device_type(c10::DeviceType::XPU),
+      c10::DeviceType::XPU,
+      self,
+      other);
+  return mul_add_scalar(
+      cached_cast(to_type, self, c10::DeviceType::XPU),
+      cached_cast(to_type, other, c10::DeviceType::XPU),
+      accumu,
+      alpha);
 }
 
 Tensor mul_scalar_add(
@@ -207,8 +241,9 @@ Tensor mul_scalar_add(
         iter.dtype(),
         "mul_scalar_add_scalar",
         [&]() {
-          auto alpha_scalar = alpha.to<scalar_t>();
-          auto other_scalar = other.to<scalar_t>();
+          using accscalar_t = acc_type<scalar_t>;
+          auto alpha_scalar = alpha.to<accscalar_t>();
+          auto other_scalar = other.to<accscalar_t>();
           dpcpp_kernel_for_tensor_iter(
               iter, [=](scalar_t a, scalar_t b) -> scalar_t {
                 return a * other_scalar + b * alpha_scalar;
@@ -216,6 +251,24 @@ Tensor mul_scalar_add(
         });
   }
   return result;
+}
+
+Tensor mul_scalar_add_autocast(
+    const Tensor& self,
+    Scalar other,
+    const Tensor& accumu,
+    Scalar alpha) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocast(c10::DispatchKey::AutocastXPU);
+  auto to_type = promote_type(
+      get_lower_precision_fp_from_device_type(c10::DeviceType::XPU),
+      c10::DeviceType::XPU,
+      self,
+      accumu);
+  return mul_scalar_add(
+      cached_cast(to_type, self, c10::DeviceType::XPU),
+      other,
+      cached_cast(to_type, accumu, c10::DeviceType::XPU),
+      alpha);
 }
 
 Tensor mul_add(
@@ -240,6 +293,25 @@ Tensor mul_add(
     TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
   }
   return result;
+}
+
+Tensor mul_add_autocast(
+    const Tensor& self,
+    const Tensor& other,
+    const Tensor& accumu,
+    Scalar alpha) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocast(c10::DispatchKey::AutocastXPU);
+  auto to_type = promote_type(
+      get_lower_precision_fp_from_device_type(c10::DeviceType::XPU),
+      c10::DeviceType::XPU,
+      self,
+      other,
+      accumu);
+  return mul_add(
+      cached_cast(to_type, self, c10::DeviceType::XPU),
+      cached_cast(to_type, other, c10::DeviceType::XPU),
+      cached_cast(to_type, accumu, c10::DeviceType::XPU),
+      alpha);
 }
 
 template <typename scalar_t>
@@ -428,10 +500,27 @@ Tensor packed_add(
 
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_REGISTER("mul_add", mul_add);
-  IPEX_OP_REGISTER("mul_add.Scalar_Tensor", mul_add_scalar);
-  IPEX_OP_REGISTER("mul_add.Tensor_Scalar", mul_scalar_add);
-  IPEX_OP_REGISTER("mul_add.Scalar_Scalar", mul_scalar_add_scalar);
+  IPEX_OP_REGISTER_DISPATCH("mul_add", mul_add, c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "mul_add", mul_add_autocast, c10::DispatchKey::AutocastXPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "mul_add.Scalar_Tensor", mul_scalar_add, c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "mul_add.Scalar_Tensor",
+      mul_scalar_add_autocast,
+      c10::DispatchKey::AutocastXPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "mul_add.Tensor_Scalar", mul_add_scalar, c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "mul_add.Tensor_Scalar",
+      mul_add_scalar_autocast,
+      c10::DispatchKey::AutocastXPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "mul_add.Scalar_Scalar", mul_scalar_add_scalar, c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "mul_add.Scalar_Scalar",
+      mul_scalar_add_scalar_autocast,
+      c10::DispatchKey::AutocastXPU);
   IPEX_OP_REGISTER_DISPATCH(
       "packed_add", at::AtenIpexTypeXPU::packed_add, c10::DispatchKey::XPU);
   IPEX_OP_REGISTER_DISPATCH(

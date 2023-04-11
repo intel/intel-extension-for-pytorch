@@ -1526,7 +1526,15 @@ class TestNNMethod(TestCase):
                     modelJit(m1_dpcpp, m2_dpcpp, add1_dpcpp)
                 print(modelJit.graph_for(m1_dpcpp, m2_dpcpp, add1_dpcpp))
                 real = modelJit(m1_dpcpp, m2_dpcpp, add2_dpcpp)
-            self.assertEqual(raw, real.to(cpu_device))
+                self.assertEqual(raw, real.to(cpu_device))
+
+                with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16):
+                    autocast_arg1 = modelJit(m1_dpcpp, m2_dpcpp, add1_dpcpp)
+                    self.assertEqual(raw, autocast_arg1.to(device=cpu_device, dtype=torch.float), atol=1e-5, rtol=1e-5)
+                with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+                    autocast_arg1 = modelJit(m1_dpcpp, m2_dpcpp, add1_dpcpp)
+                    self.assertEqual(raw, autocast_arg1.to(device=cpu_device, dtype=torch.float), atol=1e-5, rtol=1e-5)
+
             del modelJit
         model_check(MulAdd())
         model_check(MulAddScalar())

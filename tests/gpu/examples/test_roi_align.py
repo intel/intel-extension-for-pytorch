@@ -97,7 +97,30 @@ class TestNNMethod(TestCase):
         tol = 1e-2 if (x_dtype is torch.half or rois_dtype is torch.half) else 1e-5
         torch.testing.assert_close(gt_y.cpu(), y.cpu(), rtol=tol, atol=tol)
 
+    def roi_align_autocast_forward_(self, dtype_):
+        device = torch.device('xpu')
+        pool_size = 5
+        n_channels = 2 * (pool_size**2)
+        x = torch.rand(2, n_channels, 10, 10, dtype=dtype_, device=device)
+        rois = torch.tensor(
+            [[0, 0, 0, 9, 9], [0, 0, 5, 4, 9], [0, 5, 5, 9, 9], [1, 0, 0, 9, 9]],  # format is (xyxy)
+            dtype=torch.float,
+            device=device,
+        )
+        pool_h, pool_w = pool_size, pool_size
+
+        with torch.xpu.amp.autocast(enabled=True, dtype=dtype_):
+            y = torch.xpu.roi_align(x, rois, [pool_h, pool_w], spatial_scale=1, sampling_ratio=-1)
+            gt_y = expected_fn(
+                x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1, device=device, dtype=torch.float
+            )
+            tol = 1e-2 if dtype_ is torch.float16 else 1e-1
+            torch.testing.assert_close(gt_y.cpu(), y.to(torch.float).cpu(), rtol=tol, atol=tol)
+
     def test_roi_align_forward(self):
         for dtype in [torch.float, torch.half]:
             print('testing dtype:', dtype)
             self.roi_align_forward_(dtype)
+        for dtype in [torch.float16, torch.bfloat16]:
+            print('testing dtype in autocast: ', dtype)
+            self.roi_align_autocast_forward_(dtype)
