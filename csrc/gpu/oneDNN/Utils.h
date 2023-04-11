@@ -106,6 +106,38 @@ static bool is_supported_onednn_dtype(const at::Tensor& tensor) {
       : true;
 }
 
+// Here this function is used to deduce the torch tensor meta dtype from the
+// kept oqaque tensor context in case of saving tensor
+static inline c10::ScalarType opaqueTypeToScalarType(const at::Tensor& tensor) {
+  auto is_quantized = tensor.is_quantized();
+  auto ctx = *(static_cast<at::AtenIpexTypeXPU::DPCPPTensorContext*>(
+      tensor.unsafeGetTensorImpl()->storage().data_ptr().get_context()));
+  switch (ctx.dtype()) {
+    case dnnl::memory::data_type::u8:
+      // For quantized tensor, the meta dtype is QUInt8
+      return (is_quantized) ? at::ScalarType::QUInt8 : at::ScalarType::Byte;
+    case dnnl::memory::data_type::s8:
+      // For quantized tensor, the meta dtype is QInt8
+      return (is_quantized) ? at::ScalarType::QInt8 : at::ScalarType::Char;
+    case dnnl::memory::data_type::f16:
+      return at::ScalarType::Half;
+    case dnnl::memory::data_type::f32:
+      return at::ScalarType::Float;
+    case dnnl::memory::data_type::bf16:
+      return at::ScalarType::BFloat16;
+    case dnnl::memory::data_type::f64:
+      return at::ScalarType::Double;
+    default:
+      TORCH_CHECK(false, "Cannot be translated to torch dtype");
+  };
+}
+
+static inline bool check_equality_for_meta_dtype_and_ctx_dtype(
+    const at::Tensor& tensor) {
+  auto ctx_dtype = opaqueTypeToScalarType(tensor);
+  return bool(ctx_dtype == tensor.scalar_type());
+}
+
 static inline fpmath_mode get_onednn_fpmath_mode() {
   auto math_mode = Settings::I().get_fp32_math_mode();
   switch (math_mode) {

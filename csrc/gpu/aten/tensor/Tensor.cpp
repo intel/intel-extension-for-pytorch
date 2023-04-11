@@ -123,5 +123,44 @@ Tensor share_storage_and_set_strided_as(
   return result;
 }
 
+// get ctx from src and set(share) it to dst
+// [watch out] When using this function, the src and the dst will share the same
+// memory raw data with associated different storage and context, thus the src's
+// context MUST be explicitly and manually released after this calling to avoid
+// double free when the src and the dst end their life cycle.
+void unsafe_get_and_set_data_ptr(const Tensor& src, const Tensor& dst) {
+  auto src_cptr = (DPCPPTensorContext*)src.unsafeGetTensorImpl()
+                      ->storage()
+                      .unsafeGetStorageImpl()
+                      ->data_ptr()
+                      .get_context();
+  at::DataPtr src_dptr(
+      src_cptr->data(),
+      src_cptr,
+      getDeviceAllocator()->raw_deleter(),
+      dst.device());
+  dst.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->set_data_ptr(
+      std::move(src_dptr));
+}
+
+// release ctx from src and set it to dst
+// [watch out] When using this function, the src's control to its memory raw
+// data will be transfered to dst. After this calling, the src's context is
+// released and cannot be used any more.
+void unsafe_release_and_set_data_ptr(const Tensor& src, const Tensor& dst) {
+  auto src_cptr = (DPCPPTensorContext*)src.unsafeGetTensorImpl()
+                      ->storage()
+                      .unsafeGetStorageImpl()
+                      ->data_ptr()
+                      .release_context();
+  at::DataPtr dptr(
+      src_cptr->data(),
+      src_cptr,
+      getDeviceAllocator()->raw_deleter(),
+      src.device());
+  dst.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->set_data_ptr(
+      std::move(dptr));
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
