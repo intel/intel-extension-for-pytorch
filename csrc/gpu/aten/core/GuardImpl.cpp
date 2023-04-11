@@ -1,6 +1,6 @@
 #include <core/Event.h>
 #include <core/GuardImpl.h>
-#include <include/xpu/Stream.h>
+#include <core/Stream.h>
 #include "Allocator.h"
 
 namespace xpu {
@@ -126,13 +126,13 @@ Stream DPCPPGuardImpl::getStreamFromGlobalPool(
       is_high_priority == false, "xpu doesn't support prioritized steam");
 
   DPCPPStream dpcpp_stream =
-      xpu::dpcpp::getDPCPPStreamFromPool(false, device.index());
+      xpu::dpcpp::getStreamFromPool(false, device.index());
   return dpcpp_stream.unwrap();
 }
 
 void DPCPPGuardImpl::synchronizeStream(const Stream& stream) const {
-  auto& queue = get_queue_from_stream(stream);
-  queue.wait_and_throw();
+  DPCPPStream dpcpp_stream{stream};
+  dpcpp_stream.synchronize();
   return;
 }
 

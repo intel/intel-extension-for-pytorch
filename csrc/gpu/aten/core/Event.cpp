@@ -1,10 +1,10 @@
 #include <core/Event.h>
+#include <core/Stream.h>
 
 #include <cstdint>
 #include <memory>
 #include <utility>
 
-#include <include/xpu/Stream.h>
 #include <utils/Helpers.h>
 
 namespace xpu {
@@ -93,8 +93,7 @@ void DPCPPEvent::record(const DPCPPStream& stream) {
         ".");
   }
 
-  events_.push_back(
-      xpu::dpcpp::queue_barrier(get_queue_from_stream(stream.unwrap())));
+  events_.push_back(xpu::dpcpp::queue_barrier(stream.queue()));
 }
 
 void DPCPPEvent::recordOnce(const DPCPPStream& stream) {
@@ -104,7 +103,7 @@ void DPCPPEvent::recordOnce(const DPCPPStream& stream) {
 
 void DPCPPEvent::block(const DPCPPStream& stream) {
   if (!events_.empty()) {
-    xpu::dpcpp::queue_barrier(get_queue_from_stream(stream.unwrap()), events_);
+    xpu::dpcpp::queue_barrier(stream.queue(), events_);
   }
 }
 

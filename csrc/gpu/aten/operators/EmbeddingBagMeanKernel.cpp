@@ -1,5 +1,3 @@
-#include <runtime/Queue.h>
-
 #include "EmbeddingBagKernel.h"
 #include "MemoryAccess.h"
 #include "comm/ATDispatch.h"
@@ -54,7 +52,8 @@ void embedding_bag_mean_template(
               using accscalar_t = at::AtenIpexTypeXPU::acc_type<scalar_t>;
               int vec_size =
                   at::native::Memory::can_vectorize_up_to_loop<scalar_t>(
-                      getDeviceIdOfCurrentQueue(), (char*)weights.data_ptr());
+                      dpcppGetDeviceIdOfCurrentQueue(),
+                      (char*)weights.data_ptr());
               vec_size = vec_len % vec_size == 0 ? vec_size : 1;
               switch (vec_size) {
                 case 8:

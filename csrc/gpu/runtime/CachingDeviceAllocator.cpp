@@ -1,3 +1,4 @@
+#include <core/Stream.h>
 #include <runtime/CachingDeviceAllocator.h>
 #include <runtime/Device.h>
 #include <runtime/Exception.h>
@@ -82,7 +83,10 @@ void CachingDeviceAllocator::update_stat_array(
   }
 }
 
-CachingDeviceAllocator::Block::Block(DeviceId device, Queue* queue, size_t size)
+CachingDeviceAllocator::Block::Block(
+    DeviceId device,
+    sycl::queue* queue,
+    size_t size)
     : m_device(device),
       m_queue(queue),
       m_queue_uses(),
@@ -100,7 +104,7 @@ CachingDeviceAllocator::Block::Block(DeviceId device, Queue* queue, size_t size)
 
 CachingDeviceAllocator::Block::Block(
     DeviceId device,
-    Queue* queue,
+    sycl::queue* queue,
     size_t size,
     PoolType pool_type,
     void* buffer)
@@ -160,7 +164,10 @@ int CachingDeviceAllocator::malloc_with_retry(
   return DPCPP_SUCCESS;
 }
 
-void CachingDeviceAllocator::malloc(void** devPtr, size_t asize, Queue* queue) {
+void CachingDeviceAllocator::malloc(
+    void** devPtr,
+    size_t asize,
+    sycl::queue* queue) {
   std::lock_guard<std::recursive_mutex> lock(mutex);
 
   DeviceId curDevID;
@@ -332,7 +339,7 @@ void* CachingDeviceAllocator::getBaseAllocation(void* buffer, size_t* outSize) {
   return basePtr;
 }
 
-void CachingDeviceAllocator::recordQueue(void* buffer, Queue* queue) {
+void CachingDeviceAllocator::recordQueue(void* buffer, sycl::queue* queue) {
   std::lock_guard<std::recursive_mutex> lock(mutex);
 
   Block* block = find_allocated_block(buffer);
@@ -429,10 +436,10 @@ std::vector<const CachingDeviceAllocator::Block*> CachingDeviceAllocator::
 }
 
 void CachingDeviceAllocator::insert_events(Block* block) {
-  std::unordered_set<Queue*> queues(std::move(block->m_queue_uses));
+  std::unordered_set<sycl::queue*> queues(std::move(block->m_queue_uses));
   AT_ASSERT(block->m_queue_uses.empty());
   for (auto it = queues.begin(); it != queues.end(); ++it) {
-    auto event = xpu::dpcpp::queue_barrier((*it)->getDpcppQueue());
+    auto event = queue_barrier(*(*it));
     block->m_event_cnt++;
     dpcpp_events.emplace_back(event, block);
   }

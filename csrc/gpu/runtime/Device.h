@@ -2,6 +2,7 @@
 
 #include <core/DeviceInfo.h>
 #include <runtime/DeviceProp.h>
+#include <runtime/Exception.h>
 #include <utils/DPCPP.h>
 #include <utils/Macros.h>
 

@@ -211,7 +211,7 @@ int get_vector_size(at::Tensor self, at::Tensor ret, at::Tensor mask) {
     vec_size = 1;
   } else {
     vec_size = at::native::Memory::can_vectorize_up_to<scalar_t>(
-        getDeviceIdOfCurrentQueue(), (char*)self.data_ptr());
+        dpcppGetDeviceIdOfCurrentQueue(), (char*)self.data_ptr());
   }
 
   // check that we'd have no remainders - prefer a smaller vector size with no

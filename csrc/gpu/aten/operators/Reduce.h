@@ -1414,7 +1414,7 @@ inline void dpcpp_reduce_kernel(
   // loaded vector always correspond to different outputs.
   if (fastest_moving_stride == sizeof(scalar_t)) {
     auto vec_size = at::native::Memory::can_vectorize_up_to_loop<scalar_t>(
-        getDeviceIdOfCurrentQueue(), in_data);
+        dpcppGetDeviceIdOfCurrentQueue(), in_data);
     if (reduction_on_fastest_striding_dimension && dim0 > 128 &&
         iter.num_reduce_dims() == 1 && vt0 >= vec_size / 2) {
       // Case 1: "vectorize along input"
@@ -1503,7 +1503,7 @@ inline void dpcpp_reduce_kernel(
     data[0] = (char*)semaphores.get();
     auto fn = []() -> char { return 0; };
     int vec_size = at::native::Memory::can_vectorize_up_to_loop<decltype(fn)>(
-        getDeviceIdOfCurrentQueue(), data);
+        dpcppGetDeviceIdOfCurrentQueue(), data);
     auto ic = TrivialOffsetCalculator<traits::arity>();
     launch_vectorized_kernel(config.semaphore_size(), fn, data, ic, vec_size);
   }

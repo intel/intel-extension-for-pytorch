@@ -992,7 +992,7 @@ void SpatialSoftMaxForward(Tensor& output, Tensor& input, int dim) {
       canUse32BitIndexMath(input) && canUse32BitIndexMath(output);
 
   // decide SIMD: SIMD32 or SIMD16
-  auto* dev_prop = dpcppGetDeviceProperties(getDeviceIdOfCurrentQueue());
+  auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
   auto sub_group_size = dev_prop->subgroup_sizes;
   int SIMD = sub_group_size[1];
   if (SIMD == SIMD32) {
@@ -1164,7 +1164,7 @@ void SpatialSoftMaxBackward(
       canUse32BitIndexMath(output) && canUse32BitIndexMath(gradOutput);
 
   // decide SIMD: SIMD32 or SIMD16
-  auto* dev_prop = dpcppGetDeviceProperties(getDeviceIdOfCurrentQueue());
+  auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
   auto sub_group_size = dev_prop->subgroup_sizes;
   int SIMD = sub_group_size[1];
   if (SIMD == SIMD32) {

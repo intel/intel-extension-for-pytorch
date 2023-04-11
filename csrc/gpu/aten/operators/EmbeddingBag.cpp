@@ -353,7 +353,7 @@ void EmbeddingBag_updateOutputKernel(
   // vector size, query it according to machine, scalar_t and weight_data
   auto& queue = dpcppGetCurrentQueue();
   auto vec_size = at::native::Memory::can_vectorize_up_to<scalar_t>(
-      getDeviceIdOfCurrentQueue(), reinterpret_cast<char*>(weight_data));
+      dpcppGetDeviceIdOfCurrentQueue(), reinterpret_cast<char*>(weight_data));
 
   // determine per sample weights should be in calculation or not
   bool per_sample_weights_defined = per_sample_weights_data ? true : false;

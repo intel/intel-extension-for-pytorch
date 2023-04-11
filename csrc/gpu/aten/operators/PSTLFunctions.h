@@ -821,9 +821,9 @@ void copy_to_dst(
     ValueType* tmp_val_data,
     const size_t sort_sz) {
   int vec_size_key = at::native::Memory::can_vectorize_up_to_loop<KeyType>(
-      getDeviceIdOfCurrentQueue(), reinterpret_cast<char*>(key));
+      dpcppGetDeviceIdOfCurrentQueue(), reinterpret_cast<char*>(key));
   auto vec_size_val = at::native::Memory::can_vectorize_up_to_loop<ValueType>(
-      getDeviceIdOfCurrentQueue(), reinterpret_cast<char*>(val));
+      dpcppGetDeviceIdOfCurrentQueue(), reinterpret_cast<char*>(val));
   auto vec_size = std::min(vec_size_key, vec_size_val);
 
 #define VEC_COPY_KERNEL_IMPL(vec_size)                  \

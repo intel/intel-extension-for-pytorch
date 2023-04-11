@@ -3,7 +3,6 @@
 #include <runtime/CachingDeviceAllocator.h>
 #include <runtime/CachingHostAllocator.h>
 #include <runtime/Exception.h>
-#include <runtime/Queue.h>
 #include <tensor/Context.h>
 
 namespace xpu {
@@ -30,7 +29,7 @@ class DeviceAllocator final : public at::Allocator {
     void* r = nullptr;
     if (size != 0) {
       auto stream = getCurrentDPCPPStream(curDevID);
-      Instance()->alloc()->malloc(&r, size, DPCPPStreamToQueue(stream));
+      Instance()->alloc()->malloc(&r, size, &stream.queue());
     }
     auto ctx = new at::AtenIpexTypeXPU::DPCPPTensorContext(r);
     return {r, ctx, &deleter, Device(DeviceType::XPU, curDevID)};
@@ -64,7 +63,7 @@ class DeviceAllocator final : public at::Allocator {
       return;
     }
 
-    alloc()->recordQueue(ptr.get(), DPCPPStreamToQueue(stream));
+    alloc()->recordQueue(ptr.get(), &stream.queue());
   }
 
   std::mutex* getFreeMutex() {
@@ -92,20 +91,6 @@ class DeviceAllocator final : public at::Allocator {
   }
 
  private:
-  Queue* DPCPPStreamToQueue(DPCPPStream stream) const {
-    auto di = stream.device_index();
-    auto st = queueType(static_cast<QueueId>(stream.unwrap().id()));
-    auto si = queueIdIndex(static_cast<QueueId>(stream.unwrap().id()));
-    if (st == QueueType::DEFAULT) {
-      TORCH_INTERNAL_ASSERT(si == 0);
-      return getDefaultQueue(di);
-    } else if (st == QueueType::RESERVE) {
-      return getReservedQueue(di, si);
-    }
-    AT_DPCPP_CHECK(false);
-    return nullptr;
-  }
-
   CachingDeviceAllocator* alloc() {
     return CachingDeviceAllocator::Instance();
   }

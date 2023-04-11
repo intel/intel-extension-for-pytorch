@@ -89,7 +89,7 @@ void dpcpp_loops_memcpy_kernel(TensorIteratorBase& iter, const func_t& f) {
   data[0] = (char*)iter.data_ptr(0);
   data[1] = (char*)iter.data_ptr(1);
   int vec_size = at::native::Memory::can_vectorize_up_to_loop<func_t>(
-      getDeviceIdOfCurrentQueue(), data);
+      dpcppGetDeviceIdOfCurrentQueue(), data);
   auto ic = TrivialOffsetCalculator<1>();
   launch_vectorized_kernel(iter.numel(), f, data, ic, vec_size);
 }

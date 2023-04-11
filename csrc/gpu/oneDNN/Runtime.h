@@ -4,6 +4,7 @@
 
 #include <core/Device.h>
 #include <core/Memory.h>
+#include <core/Stream.h>
 #include <runtime/Utils.h>
 #include <utils/Profiler.h>
 #include <utils/Timer.h>
@@ -78,12 +79,12 @@ struct GpuStreamManager {
   dnnl::stream& get_stream() {
     int device_index = current_device();
     TORCH_INTERNAL_ASSERT(device_index < xpu::dpcpp::device_count());
-    int queue_id = getQueueId(getCurrentQueue(device_index));
+    int queue_id = getCurrentDPCPPStream(device_index).queue_id();
     if (stream_pool[device_index][queue_id] == nullptr) {
       stream_pool[device_index][queue_id] =
           std::make_shared<dnnl::stream>(dnnl::sycl_interop::make_stream(
               GpuEngineManager::Instance().get_engine({kXPU, device_index}),
-              getCurrentQueue(device_index)->getDpcppQueue()));
+              getCurrentDPCPPStream(device_index).queue()));
     }
     return *(stream_pool[device_index][queue_id].get());
   }
@@ -93,7 +94,7 @@ struct GpuStreamManager {
     TORCH_INTERNAL_ASSERT(device_index < xpu::dpcpp::device_count());
     return dnnl::sycl_interop::make_stream(
         GpuEngineManager::Instance().get_engine({kXPU, device_index}),
-        getCurrentQueue(device_index)->getDpcppQueue());
+        getCurrentDPCPPStream(device_index).queue());
   }
 #endif
 
@@ -108,7 +109,7 @@ struct GpuStreamManager {
     stream_pool.clear();
     stream_pool.resize(deviceCount);
     for (DeviceIndex dev = 0; dev < deviceCount; dev++) {
-      for (QueueId qid = 0; qid <= QueuePerPool; qid++) {
+      for (QueueIndex qid = 0; qid < kQueuesPerPool; qid++) {
         stream_pool[dev][qid] = nullptr;
       }
     }
@@ -118,9 +119,8 @@ struct GpuStreamManager {
 
  private:
 #ifdef USE_PERSIST_STREAM
-  // For each device, we have 1 default queue + 32 (QueuePerPool) reserved
-  // queues.
-  std::vector<std::array<std::shared_ptr<dnnl::stream>, QueuePerPool + 1>>
+  // For each device, we have kQueuesPerPool(32) reserved queues.
+  std::vector<std::array<std::shared_ptr<dnnl::stream>, kQueuesPerPool>>
       stream_pool;
 #endif
 };

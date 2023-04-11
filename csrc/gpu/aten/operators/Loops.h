@@ -464,7 +464,7 @@ static inline bool can_use_broadcast_vectorize(
       !iter.tensor(0).is_contiguous())
     return false;
   vec_size = at::native::Memory::can_vectorize_up_to_loop<func_t>(
-      getDeviceIdOfCurrentQueue(), data);
+      dpcppGetDeviceIdOfCurrentQueue(), data);
   if (vec_size <= 1)
     return false;
   int last_compute_dim_size = iter.shape()[0];
@@ -506,7 +506,7 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
   if (!dynamic_casting) {
     if (contiguous) {
       int vec_size = at::native::Memory::can_vectorize_up_to_loop<func_t>(
-          getDeviceIdOfCurrentQueue(), data);
+          dpcppGetDeviceIdOfCurrentQueue(), data);
       auto input_offset_calculator = TrivialOffsetCalculator<traits::arity>();
       launch_vectorized_kernel(
           numel, f, data, input_offset_calculator, vec_size);

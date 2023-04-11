@@ -1,7 +1,8 @@
 #pragma once
 
+#include <core/Stream.h>
 #include <runtime/Device.h>
-#include <runtime/Queue.h>
+#include <runtime/Exception.h>
 #include <utils/DPCPP.h>
 #include <stdexcept>
 #include <type_traits>
@@ -15,36 +16,38 @@ namespace dpcpp {
 
 static inline bool dpcppIsAvailable() {
   int count;
-  dpcppGetDeviceCount(&count);
+  AT_DPCPP_CHECK(dpcppGetDeviceCount(&count));
   return count > 0;
 }
 
+static inline DeviceId dpcppGetDeviceIdOfCurrentQueue() {
+  DeviceId cur_device;
+  AT_DPCPP_CHECK(dpcppGetDevice(&cur_device));
+  return static_cast<DeviceId>(cur_device);
+}
+
 static inline bool dpcppIsDeviceAvailable(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   return dev_prop->is_available;
 }
 
 static inline sycl::queue& dpcppGetCurrentQueue() {
-  return getCurrentQueue()->getDpcppQueue();
+  return getCurrentDPCPPStream().queue();
 }
 
-static inline DeviceId dpcppGetDeviceIdOfCurrentQueue() {
-  return getDeviceIdOfCurrentQueue();
-}
-
-static inline QueueId dpcppGetCurrentQueueId() {
-  return getQueueId(getCurrentQueue());
+static inline QueueIndex dpcppGetCurrentQueueId() {
+  return getCurrentDPCPPStream().queue_id();
 }
 
 static inline int64_t dpcppMaxWorkGroupSize(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   return dev_prop->max_work_group_size;
 }
 
 static inline int64_t dpcppMaxSubGroupSize(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   auto subgroup_sizes = dev_prop->subgroup_sizes;
   int64_t max_val = 0;
@@ -56,7 +59,7 @@ static inline int64_t dpcppMaxSubGroupSize(
 }
 
 static inline int64_t dpcppMinSubGroupSize(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   auto subgroup_sizes = dev_prop->subgroup_sizes;
   int64_t min_val = dev_prop->max_work_group_size;
@@ -68,43 +71,43 @@ static inline int64_t dpcppMinSubGroupSize(
 }
 
 static inline int64_t dpcppMaxComputeUnitSize(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   return dev_prop->max_compute_units;
 }
 
 static inline int64_t dpcppGpuEuCount(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   return dev_prop->gpu_eu_count;
 }
 
 static inline int64_t dpcppGpuEuSimdWidth(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   return dev_prop->gpu_eu_simd_width;
 }
 
 static inline int64_t dpcppGpuHWThreadsPerEU(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   return dev_prop->gpu_hw_threads_per_eu;
 }
 
 static inline bool dpcppSupportAtomic64(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   return dev_prop->support_atomic64;
 }
 
 static inline bool dpcppSupportFP64(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   return dev_prop->support_fp64;
 }
 
 static inline int64_t dpcppMaxWorkItemsPerTile(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   int64_t eu_cnt = dev_prop->gpu_eu_count;
   int64_t simd_width = dpcppMaxSubGroupSize(dev_id);
@@ -113,7 +116,7 @@ static inline int64_t dpcppMaxWorkItemsPerTile(
 }
 
 static inline int64_t dpcppMaxWorkItemsPerEU(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   int64_t simd_width = dpcppMaxSubGroupSize(dev_id);
   int64_t hw_threads = dev_prop->gpu_hw_threads_per_eu;
@@ -121,7 +124,7 @@ static inline int64_t dpcppMaxWorkItemsPerEU(
 }
 
 static inline int64_t dpcppMaxDSSNum(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   // TODO: We need to got this info from DPC++ Runtime
   // Hardcode to 32 for ATS
   int64_t dss_num = 32;
@@ -129,19 +132,20 @@ static inline int64_t dpcppMaxDSSNum(
 }
 
 static inline size_t dpcppGlobalMemSize(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   return dev_prop->global_mem_size;
 }
 
 static inline int64_t dpcppLocalMemSize(
-    DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   return dev_prop->local_mem_size;
 }
 
 template <typename T>
-uint32_t dpcppPrefVectorWidth(DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+uint32_t dpcppPrefVectorWidth(
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   if (std::is_same<T, char>::value) {
     return dev_prop->pref_vec_width_char;
@@ -169,7 +173,8 @@ uint32_t dpcppPrefVectorWidth(DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
 }
 
 template <typename T>
-uint32_t dpcppNativeVectorWidth(DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
+uint32_t dpcppNativeVectorWidth(
+    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
   if (std::is_same<T, char>::value) {
     return dev_prop->native_vec_width_char;

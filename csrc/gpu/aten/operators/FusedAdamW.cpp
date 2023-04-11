@@ -389,29 +389,29 @@ static void ComputeAdamWKernelMasterWeight(
 
   auto vec_size_master_weight =
       at::native::Memory::can_vectorize_up_to_loop<float>(
-          getDeviceIdOfCurrentQueue(),
+          dpcppGetDeviceIdOfCurrentQueue(),
           reinterpret_cast<char*>(master_weight.data_ptr<float>()));
 
   auto vec_size_weight = at::native::Memory::can_vectorize_up_to_loop<scalar_t>(
-      getDeviceIdOfCurrentQueue(),
+      dpcppGetDeviceIdOfCurrentQueue(),
       reinterpret_cast<char*>(weight.data_ptr<scalar_t>()));
 
   auto vec_size_grad = at::native::Memory::can_vectorize_up_to_loop<scalar_t>(
-      getDeviceIdOfCurrentQueue(),
+      dpcppGetDeviceIdOfCurrentQueue(),
       reinterpret_cast<char*>(grad.data_ptr<scalar_t>()));
 
   auto vec_size_avg = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
+      dpcppGetDeviceIdOfCurrentQueue(),
       reinterpret_cast<char*>(avg.data_ptr<float>()));
 
   auto vec_size_avg_sq = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
+      dpcppGetDeviceIdOfCurrentQueue(),
       reinterpret_cast<char*>(avg_sq.data_ptr<float>()));
 
   auto vec_size_max_avg_sq = vec_size_avg_sq;
   if (amsgrad) {
     vec_size_max_avg_sq = at::native::Memory::can_vectorize_up_to_loop<float>(
-        getDeviceIdOfCurrentQueue(),
+        dpcppGetDeviceIdOfCurrentQueue(),
         reinterpret_cast<char*>(max_avg_sq.data_ptr<float>()));
   }
 
@@ -509,25 +509,25 @@ static void ComputeAdamWKernel(
   auto& queue = dpcppGetCurrentQueue();
 
   auto vec_size_weight = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
+      dpcppGetDeviceIdOfCurrentQueue(),
       reinterpret_cast<char*>(weight.data_ptr<float>()));
 
   auto vec_size_grad = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
+      dpcppGetDeviceIdOfCurrentQueue(),
       reinterpret_cast<char*>(grad.data_ptr<float>()));
 
   auto vec_size_avg = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
+      dpcppGetDeviceIdOfCurrentQueue(),
       reinterpret_cast<char*>(avg.data_ptr<float>()));
 
   auto vec_size_avg_sq = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
+      dpcppGetDeviceIdOfCurrentQueue(),
       reinterpret_cast<char*>(avg_sq.data_ptr<float>()));
 
   auto vec_size_max_avg_sq = vec_size_avg_sq;
   if (amsgrad) {
     vec_size_max_avg_sq = at::native::Memory::can_vectorize_up_to_loop<float>(
-        getDeviceIdOfCurrentQueue(),
+        dpcppGetDeviceIdOfCurrentQueue(),
         reinterpret_cast<char*>(max_avg_sq.data_ptr<float>()));
   }
 

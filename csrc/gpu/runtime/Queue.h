@@ -1,74 +1,81 @@
 #pragma once
 
+#include <c10/core/Device.h>
+
 #include <cstdint>
-#include <memory>
 #include <utility>
 
-#include <runtime/Device.h>
-#include <runtime/Exception.h>
-#include <utils/DPCPP.h>
-#include <utils/Macros.h>
+/*
+ * Queue pool note.
+ *
+ * Currently, there is one pool without priority queue properties per device,
+ * and a device's pool is lazily created. In XPU runtime, there is no
+ * "default queue" semantics like the CUDA default stream.
+ * TODO: We will integrate the priority queue to this pool in the future.
+ *
+ * There are 32 queues in this pool per device, and when a queue is requested
+ * one of these queues is returned round-robin. That is, the first queue
+ * requested is at index 0, the second at index 1... to index 31, then index 0
+ * again.
+ *
+ * This means that if 33 queues are requested, the first and last queues
+ * requested are actually the same queue (under the covers) and kernels enqueued
+ * on them cannot run concurrently.
+ *
+ * Note: It is safe to enqueue a kernel on the same queue from two different
+ * threads as the SYCL specification described.
+ */
+
+// Here we use forward declaration to avoid #include <sycl/sycl.hpp>.
+namespace sycl {
+inline namespace _V1 {
+class queue;
+}
+} // namespace sycl
+
+using namespace at;
 
 namespace xpu {
 namespace dpcpp {
 
-static constexpr int QueuePoolShift = 5;
-static constexpr int QueuePerPool = 32;
+// Put them here to share with DPCPPStream and oneDNN's runtime
+static constexpr int kQueuesPerPoolBits = 5;
+static constexpr int kQueuesPerPool = 1 << kQueuesPerPoolBits;
+static constexpr int kQueueTypeBits = 3;
 
-using QueueId = int32_t;
+using QueueIndex = uint8_t;
 
 enum class QueueType : uint8_t {
-  DEFAULT = 0x0,
-  RESERVE = 0x1,
+  UNUSED = 0x0,
+  RESERVED = 0x1,
 };
 
-class Queue {
- public:
-  Queue(DeviceId di, sycl::async_handler asyncHandler = dpcppAsyncHandler)
-      : queue_(std::make_unique<sycl::queue>(sycl::queue(
-            dpcppGetDeviceContext(di),
-            dpcppGetRawDevice(di),
-            asyncHandler,
-            {sycl::property::queue::in_order(),
-             sycl::property::queue::enable_profiling()}))),
-        device_id_(di) {}
-
-  DeviceId getDeviceId() const {
-    return device_id_;
+inline std::ostream& operator<<(std::ostream& stream, QueueType q) {
+  switch (q) {
+    case QueueType::UNUSED:
+      stream << "UNUSED";
+      break;
+    case QueueType::RESERVED:
+      stream << "RESERVED";
+      break;
+    default:
+      stream << static_cast<uint8_t>(q);
+      break;
   }
+  return stream;
+}
 
-  sycl::queue& getDpcppQueue() {
-    return *queue_;
-  }
+// Init queue pool's state.
+void dpcppInitQueueStateOnce();
 
-  ~Queue() = default;
-  Queue() = default;
-  IPEX_DISABLE_COPY_AND_ASSIGN(Queue);
+// Inits queue pool on the specified device.
+void dpcppInitDeviceQueueOnce(DeviceIndex device_index);
 
- private:
-  std::unique_ptr<sycl::queue> queue_;
-  DeviceId device_id_;
-};
+// Helper to determine the index of the queue to return.
+uint32_t dpcppGetQueueIndex(DeviceIndex device_index);
 
-QueueType queueType(QueueId s);
-
-size_t queueIdIndex(QueueId s);
-
-Queue* getDefaultQueue(DeviceId device_id = -1);
-
-Queue* getReservedQueue(DeviceId device_id, QueueId queue_id);
-
-Queue* getCurrentQueue(DeviceId device_id = -1);
-
-void setCurrentQueue(Queue* queue);
-
-Queue* getQueueFromPool(const bool isDefault, DeviceId device_id);
-
-Queue* getQueueOnDevice(DeviceId device_id, QueueId queue_id);
-
-QueueId getQueueId(const Queue* ptr);
-
-DeviceId getDeviceIdOfCurrentQueue();
+// Retrieve sycl queue reference from the queue pool.
+sycl::queue& dpcppGetRawQueue(DeviceIndex device_index, QueueIndex queue_index);
 
 } // namespace dpcpp
 } // namespace xpu

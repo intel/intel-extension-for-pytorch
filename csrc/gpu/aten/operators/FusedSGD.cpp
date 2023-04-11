@@ -455,16 +455,16 @@ static void ComputeSGDKernelMasterWeight(
   auto& queue = dpcppGetCurrentQueue();
 
   auto vec_size_weight = at::native::Memory::can_vectorize_up_to_loop<scalar_t>(
-      getDeviceIdOfCurrentQueue(),
+      dpcppGetDeviceIdOfCurrentQueue(),
       reinterpret_cast<char*>(weight.data_ptr<scalar_t>()));
 
   auto vec_size_grad = at::native::Memory::can_vectorize_up_to_loop<scalar_t>(
-      getDeviceIdOfCurrentQueue(),
+      dpcppGetDeviceIdOfCurrentQueue(),
       reinterpret_cast<char*>(grad.data_ptr<scalar_t>()));
 
   auto vec_size_master_weight =
       at::native::Memory::can_vectorize_up_to_loop<float>(
-          getDeviceIdOfCurrentQueue(),
+          dpcppGetDeviceIdOfCurrentQueue(),
           reinterpret_cast<char*>(master_weight.data_ptr<float>()));
 
   auto vec_size_momentum_buffer = vec_size_master_weight;
@@ -472,7 +472,7 @@ static void ComputeSGDKernelMasterWeight(
   if (momentum) {
     vec_size_momentum_buffer =
         at::native::Memory::can_vectorize_up_to_loop<float>(
-            getDeviceIdOfCurrentQueue(),
+            dpcppGetDeviceIdOfCurrentQueue(),
             reinterpret_cast<char*>(momentum_buffer.data_ptr<float>()));
   }
 
@@ -563,11 +563,11 @@ static void ComputeSGDKernel(
   auto& queue = dpcppGetCurrentQueue();
 
   auto vec_size_weight = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
+      dpcppGetDeviceIdOfCurrentQueue(),
       reinterpret_cast<char*>(weight.data_ptr<float>()));
 
   auto vec_size_grad = at::native::Memory::can_vectorize_up_to_loop<float>(
-      getDeviceIdOfCurrentQueue(),
+      dpcppGetDeviceIdOfCurrentQueue(),
       reinterpret_cast<char*>(grad.data_ptr<float>()));
 
   auto vec_size_momentum_buffer = vec_size_weight;
@@ -575,7 +575,7 @@ static void ComputeSGDKernel(
   if (momentum) {
     vec_size_momentum_buffer =
         at::native::Memory::can_vectorize_up_to_loop<float>(
-            getDeviceIdOfCurrentQueue(),
+            dpcppGetDeviceIdOfCurrentQueue(),
             reinterpret_cast<char*>(momentum_buffer.data_ptr<float>()));
   }
 

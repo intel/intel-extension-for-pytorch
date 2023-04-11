@@ -1,7 +1,7 @@
 #include <aten/operators/comm/ScalarType.h>
 #include <runtime/CachingHostAllocator.h>
 #include <runtime/Memory.h>
-#include <runtime/Queue.h>
+#include <runtime/Utils.h>
 #include <utils/Profiler.h>
 
 namespace xpu {
@@ -15,7 +15,7 @@ void memcpyHostToDevice(
   if (n_bytes == 0)
     return;
 
-  auto& queue = getCurrentQueue()->getDpcppQueue();
+  auto& queue = dpcppGetCurrentQueue();
   auto e = queue.memcpy(dst, src, n_bytes);
 
   if (!async) {
@@ -36,7 +36,7 @@ void memcpyDeviceToHost(
   if (n_bytes == 0)
     return;
 
-  auto& queue = getCurrentQueue()->getDpcppQueue();
+  auto& queue = dpcppGetCurrentQueue();
   auto e = queue.memcpy(dst, src, n_bytes);
 
   if (!async) {
@@ -57,7 +57,7 @@ void memcpyDeviceToDevice(
   if (n_bytes == 0)
     return;
 
-  auto& queue = getCurrentQueue()->getDpcppQueue();
+  auto& queue = dpcppGetCurrentQueue();
   auto e = queue.memcpy(dst, src, n_bytes);
 
   if (!async) {
@@ -69,7 +69,7 @@ void memcpyDeviceToDevice(
 }
 
 void memsetDevice(void* dst, int value, size_t n_bytes, bool async) {
-  auto& queue = getCurrentQueue()->getDpcppQueue();
+  auto& queue = dpcppGetCurrentQueue();
   auto e = queue.memset(dst, value, n_bytes);
 
   if (!async) {

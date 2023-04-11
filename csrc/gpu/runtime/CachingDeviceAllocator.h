@@ -1,7 +1,6 @@
 #pragma once
 
 #include <runtime/Device.h>
-#include <runtime/Queue.h>
 #include <utils/DPCPP.h>
 
 #include <core/AllocationInfo.h>
@@ -31,11 +30,11 @@ class CachingDeviceAllocator final {
   };
 
   struct Block {
-    Block(DeviceId device, Queue* queue, size_t size);
+    Block(DeviceId device, sycl::queue* queue, size_t size);
 
     Block(
         DeviceId device,
-        Queue* queue,
+        sycl::queue* queue,
         size_t size,
         PoolType pool_type,
         void* buffer);
@@ -58,8 +57,8 @@ class CachingDeviceAllocator final {
     }
 
     DeviceId m_device;
-    Queue* m_queue;
-    std::unordered_set<Queue*> m_queue_uses;
+    sycl::queue* m_queue{nullptr};
+    std::unordered_set<sycl::queue*> m_queue_uses;
     size_t m_size;
     PoolType m_pool_type;
     void* m_buffer;
@@ -127,13 +126,13 @@ class CachingDeviceAllocator final {
 
   std::mutex* getDPCPPFreeMutex() const;
 
-  void malloc(void** devPtr, size_t size, Queue* queue);
+  void malloc(void** devPtr, size_t size, sycl::queue* queue);
 
   void free(void* buffer);
 
   void* getBaseAllocation(void* buffer, size_t* outSize);
 
-  void recordQueue(void* buffer, Queue* queue);
+  void recordQueue(void* buffer, sycl::queue* queue);
 
   void emptyCache();
 
