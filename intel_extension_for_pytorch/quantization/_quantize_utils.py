@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch.fx.node import map_aggregate
 from torch.ao.quantization import PlaceholderObserver
 from torch.quantization.qconfig import QConfig
+from torch.nn.utils.rnn import PackedSequence
 
 from ._utils import get_torch_function_hook_type, HookType, get_module_hook_type, OpQuantizeabilityType, \
     attach_op_convert_info_to_model, save_quant_state, attach_scale_zp_values_to_model, convert_quant_state_map_to_nodes, \
@@ -35,6 +36,25 @@ def _check_add_has_scalar_input(args):
         if not isinstance(arg, torch.Tensor):
             return True
     return False
+
+def _convert_PackedSequence_to_tuple_lstm(args):
+     if isinstance(args, tuple) and len(args) == 2:   # (PackedSequence, hx)
+        input, batch_sizes, sorted_indices, unsorted_indices = args[0]
+        args = (input, batch_sizes, sorted_indices, unsorted_indices, args[-1])
+     elif isinstance(args, tuple) and len(args) == 1:   # (PackedSequence, )
+         input, batch_sizes, sorted_indices, unsorted_indices = args[0]
+         args = (input, batch_sizes, sorted_indices, unsorted_indices)
+     else:
+         assert False, "_convert_PackedSequence_to_tuple args should be a tuple with size 2 or PackedSequence"
+     return args
+
+def _convert_tuple_to_PackedSequence_lstm(args):
+    assert isinstance(args, tuple) and len(args) >= 4 and len(args) <=5, "_convert_tuple_to_PackedSequence input should be a tuple(5=<size >=4)"
+    if len(args) == 4:
+        return (PackedSequence(*args),)
+    else:
+        return (PackedSequence(*args[:-1]), args[-1])
+    
 
 def auto_prepare(
     model : torch.nn.Module,
@@ -212,7 +232,9 @@ def auto_prepare(
                         old_global_disable_torch_function_override = \
                             global_disable_torch_function_override
                         global_disable_torch_function_override = True
-
+                        is_lstm_packed_input = isinstance(cur_module, torch.nn.LSTM) and isinstance(args[0], PackedSequence)
+                        if is_lstm_packed_input:
+                            args = _convert_PackedSequence_to_tuple_lstm(args)
                         if first_call:
                             # mypy ignore is used instead of assert because this
                             # runs on every forward and assert has a performance cost
@@ -226,6 +248,9 @@ def auto_prepare(
                             args, kwargs = parent_qstate.op_prepare_before_hook(
                                 cur_module, args, kwargs)  # type: ignore[arg-type]
 
+                        if is_lstm_packed_input:
+                            args = _convert_tuple_to_PackedSequence_lstm(args)
+
                         # original forward
                         output = orig_module_call(self, *args, **kwargs)
                         # Re-enable the overrides.
@@ -233,12 +258,18 @@ def auto_prepare(
                             old_global_disable_torch_function_override
 
                         # after hooks
+                        if is_lstm_packed_input:
+                            output = _convert_PackedSequence_to_tuple_lstm(output)
                         if first_call:
                             output = parent_qstate.first_call_op_prepare_after_hook(
                                 cur_module, output, args, qtensor_id, OpQuantizeabilityType.QUANTIZEABLE)
                         else:
                             output = parent_qstate.op_prepare_after_hook(
                                 cur_module, output, args, global_op_idx)
+                        
+                        if is_lstm_packed_input:
+                            output = _convert_tuple_to_PackedSequence_lstm(output)
+
                         parent_qstate.mark_cur_op_complete(cur_module)
                     elif hook_type is HookType.MODULE_IO_HOOKS:
                         cur_qstate = cur_module._auto_quant_state
@@ -500,17 +531,25 @@ def auto_convert(
                         old_global_disable_torch_function_override = \
                             global_disable_torch_function_override
                         global_disable_torch_function_override = True
+                        is_lstm_packed_input = isinstance(cur_module, torch.nn.LSTM) and isinstance(args[0], PackedSequence)
+                        if is_lstm_packed_input:
+                            args = _convert_PackedSequence_to_tuple_lstm(args)
                         _, args, kwargs = qstate.op_convert_before_hook(
                             cur_module, args, kwargs, cur_module)
+                        if is_lstm_packed_input:
+                            args = _convert_tuple_to_PackedSequence_lstm(args)
                         if type(cur_module) in quantized_modules_has_weights:
                             weights = qstate.op_weight_convert_before_hook(cur_module)
                             output = module_call_to_function_call(self, args, weights)
                         else:
                              output = orig_module_call(self, *args, **kwargs)
                         # after hooks
+                        if is_lstm_packed_input:
+                            output = _convert_PackedSequence_to_tuple_lstm(output)
                         output = qstate.op_convert_after_hook(
                             cur_module, output)
-
+                        if is_lstm_packed_input:
+                            output = _convert_tuple_to_PackedSequence_lstm(output)
                         # Re-enable the override.
                         global_disable_torch_function_override = \
                             old_global_disable_torch_function_override

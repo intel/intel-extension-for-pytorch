@@ -30,6 +30,10 @@ def prepare(
         torch.nn.Module
     """
     assert isinstance(model, torch.nn.Module), "Only support nn.Module prepare for quantization path"
+    # auto model channels_last memory format conversion
+    from ..frontend import auto_channels_last, _convert_convNd_deconvNd_weight_memory_format
+    if auto_channels_last:
+        _convert_convNd_deconvNd_weight_memory_format(model)
     try:
         prepare_model = optimization.fuse(model, inplace=inplace)
         prepare_model = linear_bn_fuse(prepare_model, inplace=inplace)

@@ -16,6 +16,9 @@ elt_wise_noq_ops = [str(torch.relu_), str(torch.sigmoid_), str(nn.ReLU), str(tor
 conv_gemm_ops = [str(F.conv2d), str(nn.Conv2d), str(F.conv3d), str(nn.Conv3d), str(torch.conv2d), str(torch.conv3d), \
     str(F.conv_transpose2d), str(torch.nn.ConvTranspose2d), str(F.conv_transpose3d), str(torch.nn.ConvTranspose3d),
     str(torch.conv_transpose2d), str(torch.conv_transpose2d), str(F.linear), str(nn.Linear), str(torch.matmul), str(torch.Tensor.matmul)]
+conv_ops = [str(F.conv2d), str(nn.Conv2d), str(F.conv3d), str(nn.Conv3d), str(torch.conv2d), str(torch.conv3d), \
+    str(F.conv_transpose2d), str(torch.nn.ConvTranspose2d), str(F.conv_transpose3d), str(torch.nn.ConvTranspose3d),
+    str(torch.conv_transpose2d), str(torch.conv_transpose2d)]
 rnn_ops = [str(torch.nn.LSTM)]
 
 # Those ops only support s8->s8 path, and also require the qscheme is per_tensor_symmetric.
@@ -59,6 +62,17 @@ def _default_recipe_init(nodes):
                         if tensor_info is not None:
                             tensor_info.inf_dtype = tensor_info.orig_dtype
                             node.input_tensor_force_inf_dtype[idx] = tensor_info.inf_dtype
+
+            # For LSTM, if it's input is a PackedSequence, we don't support ot now.
+            # TODO: support PackedSequence input for quantization LSTM.
+            if node.type in rnn_ops and len(node.input_tensor_infos) > 2:
+                for idx, tensor_info in enumerate(node.input_tensor_infos):
+                    if tensor_info is not None:
+                        tensor_info.inf_dtype = tensor_info.orig_dtype
+                        node.input_tensor_force_inf_dtype[idx] = tensor_info.inf_dtype
+                for idx, tensor_info in enumerate(node.weight_tensor_infos):
+                    if tensor_info is not None:
+                        tensor_info.inf_dtype = tensor_info.orig_dtype
 
 #TODO: making fusion pattern check more general.
 def _find_fused_node_with_cur_elt_wise(node, ops):
@@ -198,6 +212,20 @@ def _check_has_quantizable_node_before_node(node):
                 # for none ipex customer op, if have a qconfig, we can say it is a quantizable op.
                 return True
 
+def _check_has_quantizable_node_after_node(node):
+    r"""
+    This function is about check whether all quantizable nodes after the given node,
+    which is used to check whether insert fake quant before one quantizable node or not.
+    """
+    if len(node.post_nodes) > 0:
+        output = True
+        for i in range(len(node.post_nodes)):
+            if node.post_nodes[i].qconfig is None:
+                output = False
+        return output
+    else:
+        return False
+
 def _add_recipe(node):
     '''
     Case1: add has pre gemm node.
@@ -233,6 +261,7 @@ def _add_recipe(node):
                 node.input_tensor_force_inf_dtype[input_idx] = node.input_tensor_infos[input_idx].inf_dtype
 
     conv_gemm_node = _find_fused_node_with_cur_add(node, conv_gemm_ops)
+    conv_node = _find_fused_node_with_cur_add(node, conv_ops)
     if conv_gemm_node is None:
         #  If pre_nodes don't have gemm node, need to check whether have quantizable node before it,
         #  if does't have quantizable node before it, we will not insert fake quant before add.
@@ -255,13 +284,17 @@ def _add_recipe(node):
         if node.input_tensor_infos[0] is not None and node.input_tensor_infos[0] in conv_gemm_node.output_tensor_infos:
             node.input_tensor_infos[0].inf_dtype = node.input_tensor_infos[0].orig_dtype
             node.input_tensor_force_inf_dtype[0] = node.input_tensor_infos[0].inf_dtype
-            # set another input's dtype, if another's input is from non-quantizable op, we can remove the fake quant.
-            reset_input_inf_dtype_to_orig_dtype(node, 1)
+            # TODO: set another input's dtype for conv nodes when oneDNN is ready.
+            if conv_node is None or not _check_has_quantizable_node_after_node(node):
+                # set another input's dtype, if another's input is from non-quantizable op, we can remove the fake quant.
+                reset_input_inf_dtype_to_orig_dtype(node, 1)
         elif node.input_tensor_infos[1] is not None and node.input_tensor_infos[1] in conv_gemm_node.output_tensor_infos:
             node.input_tensor_infos[1].inf_dtype = node.input_tensor_infos[1].orig_dtype
             node.input_tensor_force_inf_dtype[1] = node.input_tensor_infos[1].inf_dtype
-            # set another input's dtype, if another's input is from non-quantizable op, we can remove the fake quant.
-            reset_input_inf_dtype_to_orig_dtype(node, 0)
+            # TODO: set another input's dtype for conv nodes when oneDNN is ready.
+            if conv_node is None or not _check_has_quantizable_node_after_node(node):
+                # set another input's dtype, if another's input is from non-quantizable op, we can remove the fake quant.
+                reset_input_inf_dtype_to_orig_dtype(node, 0)
 
 # get a default recipe
 def get_default_recipe(nodes):
