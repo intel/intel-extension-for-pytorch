@@ -24,11 +24,16 @@ from intel_extension_for_pytorch.optim._lamb import Lamb
 conv_module = {1: torch.nn.Conv1d, 2: torch.nn.Conv2d, 3: torch.nn.Conv3d}
 
 def module_found(model, type):
-    for child_name, child in model.named_children():
+    for child in model.children():
         if isinstance(child, type):
             return True
+        elif isinstance(child, torch.nn.ModuleList):
+            for module in child.children():
+                if module_found(module, type):
+                    return True
         else:
-            module_found(child, type)
+            if module_found(child, type):
+                return True
     return False
 
 def get_rand_seed():

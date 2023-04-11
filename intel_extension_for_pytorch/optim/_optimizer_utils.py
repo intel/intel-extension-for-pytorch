@@ -120,7 +120,7 @@ def patch_step_for_master_weight_training(optimizer):
         setattr(optimizer, 'step_sync_weight', types.MethodType(step_sync_weight, optimizer))
 
 def pack_state(state, state_key, state_value, attr):
-    if attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE_CPU:
+    if attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE_CPU():
         if attr['op'] is torch.nn.Conv1d or attr['op'] is torch.nn.Conv2d or attr['op'] is torch.nn.Conv3d:
             if attr['op'] is torch.nn.Conv2d:
                 memory_format = torch.channels_last
@@ -318,7 +318,7 @@ def patch_state_dict(optimizer):
                         # the parameter. Thus we need unpack the state as we did to parameters.
                         if 'op' in params_attr:
                             # Secondly, unpack releated states
-                            if params_attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE_CPU:
+                            if params_attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE_CPU():
                                 state_value = params_attr['ctx'].to_public(state_value)
                             else:
                                 assert False, "unsupported op to unpack"

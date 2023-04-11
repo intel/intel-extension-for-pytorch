@@ -1,13 +1,26 @@
+import functools
 import torch
 import torch.nn as nn
 import copy
 import logging
+import os
 
 from intel_extension_for_pytorch import optim, frontend
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _using_dnnl
 import intel_extension_for_pytorch._C as core
+import torch.distributed._functional_collectives as ft_c
 
 logger = logging.getLogger(__name__)
+
+def may_import_deepspeed_modules():
+    try:
+        # import deepspeed in a global space will raise circular import error
+        # intel-extension-for-deepspeed imports both IPEX and deepspeed         
+        import deepspeed   
+        from deepspeed.module_inject.layers import LinearAllreduce, LinearLayer
+        return LinearAllreduce, LinearLayer
+    except ImportError:
+        return None
 
 def _save_weight_bias_to_state_dict(self, destination, prefix):
     if self.bias is not None:
@@ -172,7 +185,7 @@ class _IPEXLinear(torch.nn.Module):
         else:
             self.register_parameter('bias', None)
 
-        self.out_features = dense_module.out_features
+        self.out_features = dense_module.out_features if hasattr(dense_module, 'out_features') else dense_module.weight.size()[0]
 
         # create linear op context
         if self.use_dnnl:
@@ -194,13 +207,18 @@ class _IPEXLinear(torch.nn.Module):
                 dense_module.weight_trail.detach().clone(),
             )
 
+    def post_ipex_gemm(self, output):
+        return output
+
     def forward(self, x):
         if self.use_dnnl:
-            return torch.ops.torch_ipex.ipex_linear(
+            output = torch.ops.torch_ipex.ipex_linear(
                 x, self.weight, self.bias, self.ctx.get_data_handle(), self.out_features)
         else:
-            return torch.ops.torch_ipex.ipex_MKLSGEMM(
+            output = torch.ops.torch_ipex.ipex_MKLSGEMM(
                 x, self.weight, self.bias, self.ctx.get_data_handle(), self.out_features)
+        
+        return self.post_ipex_gemm(output)
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
         assert not keep_vars, "can not using keep_vars true when to save _IPEXLinear's parameters"
@@ -213,6 +231,29 @@ class _IPEXLinear(torch.nn.Module):
             pack_fn = torch.ops.ipex_prepack.linear_prepack if self.use_dnnl else torch.ops.ipex_prepack.mkl_sgemm_prepack
             loaded_ctx = pack_fn(loaded_weight, loaded_bias, self.batch_size_collapsed)
             _load_from_state_dict_post_hook(self, loaded_ctx, fp32_loaded_weight, weight_trail)
+
+class _IPEXLinearAllreduce(_IPEXLinear):
+    def __init__(self, dense_module, use_dnnl):
+        # _IPEXLinear __init__ func will save the bias value and then use it during forward.
+        # deepspeed LinearAllreduce will firstly calculate torch.matmul(x, w), then call the all_reduce and finally add the bias to the result.
+        # reference: https://github.com/microsoft/DeepSpeed/blob/f1d2a15b50fa83beb8fb8076fae883853f83b5ad/deepspeed/module_inject/layers.py#L19-L25
+        # Thus we need to save the original bias here and use None as the bias during the __init__ func
+        module_bias = dense_module.bias
+        dense_module.bias = None
+        
+        super(_IPEXLinearAllreduce, self).__init__(dense_module, use_dnnl)
+
+        self.module_bias = module_bias
+        self.mp_group = dense_module.mp_group
+
+    def post_ipex_gemm(self, output):
+        if self.mp_group is not None:
+            ar = torch.ops.aten.all_reduce(output, 'sum', "", list(torch.arange(int(os.environ['WORLD_SIZE']))), int(os.environ['WORLD_SIZE']))
+            output = torch.ops.aten.wait_tensor(ar)
+
+        if self.module_bias is not None:
+            output += self.module_bias
+        return output
 
 class _IPEXConvTransposeNd(nn.Module):
     __constants__ = ['stride', 'padding', 'dilation', 'groups',
@@ -299,14 +340,37 @@ class _IPEXConvTranspose3d(_IPEXConvTransposeNd):
     def __init__(self, dense_module):
         super(_IPEXConvTranspose3d, self).__init__(dense_module)
 
-IPEX_WEIGHT_PREPACK_MODULE_CPU = {
-    torch.nn.Linear: _IPEXLinear,
-    torch.nn.Conv2d: _IPEXConv2d,
-    torch.nn.Conv3d: _IPEXConv3d,
-    torch.nn.Conv1d: _IPEXConv1d,
-    torch.nn.ConvTranspose2d: _IPEXConvTranspose2d,
-    torch.nn.ConvTranspose3d: _IPEXConvTranspose3d,
-}
+@functools.lru_cache(None)
+def IPEX_WEIGHT_PREPACK_MODULE_CPU():
+    torch_modules = {
+        torch.nn.Linear: _IPEXLinear,
+        torch.nn.Conv2d: _IPEXConv2d,
+        torch.nn.Conv3d: _IPEXConv3d,
+        torch.nn.Conv1d: _IPEXConv1d,
+        torch.nn.ConvTranspose2d: _IPEXConvTranspose2d,
+        torch.nn.ConvTranspose3d: _IPEXConvTranspose3d,
+    }
+
+    deepspeed_modules = may_import_deepspeed_modules()
+    if deepspeed_modules is not None:
+        LinearAllreduce, LinearLayer = deepspeed_modules
+        deepspeed_modules = {
+            LinearLayer: _IPEXLinear,
+            LinearAllreduce: _IPEXLinearAllreduce,
+        }
+        torch_modules.update(deepspeed_modules)
+
+    return torch_modules
+
+@functools.lru_cache(None)
+def IPEX_GEMM_MODULE_CPU():
+    torch_modules = [torch.nn.Linear]
+
+    deepspeed_modules = may_import_deepspeed_modules()
+    if deepspeed_modules is not None:
+        torch_modules.extend(deepspeed_modules)
+    
+    return torch_modules
 
 # TODO: For align frontend and pass build, the xpu code is temp commented
 IPEX_WEIGHT_PREPACK_MODULE_XPU = {
@@ -319,7 +383,7 @@ IPEX_WEIGHT_PREPACK_MODULE_XPU = {
 }
 
 def _should_prepack(module, is_training, is_xpu=False):
-    if type(module) not in IPEX_WEIGHT_PREPACK_MODULE_CPU and not is_xpu:
+    if type(module) not in IPEX_WEIGHT_PREPACK_MODULE_CPU() and not is_xpu:
         return False
     if type(module) not in IPEX_WEIGHT_PREPACK_MODULE_XPU and is_xpu:
         return False
@@ -397,16 +461,16 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, device_type='cpu'):
             weight = m.master_weight if hasattr(m, "master_weight") else m.weight
             if weight not in params_attr:
                 params_attr[weight] = {}
-            if type(m) is torch.nn.Linear:
+            if type(m) in IPEX_GEMM_MODULE_CPU():
                 if m.weight.dtype == torch.half:
-                    new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU[type(m)](m, use_dnnl = True)
+                    new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU()[type(m)](m, use_dnnl = True)
                 elif m.weight.dtype == torch.float32 and optimizer is None and frontend.get_fp32_math_mode(device="cpu") == frontend.FP32MathMode.FP32 and not _using_dnnl():
-                    new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU[type(m)](m, use_dnnl = False)
+                    new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU()[type(m)](m, use_dnnl = False)
                 else:
                     assert m.weight.dtype in [torch.float32, torch.bfloat16], "Only float, bf16 and fp16 are supported"
-                    new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU[type(m)](m, use_dnnl = True)
+                    new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU()[type(m)](m, use_dnnl = True)
             else:
-                new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU[type(m)](m)
+                new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU()[type(m)](m)
 
             # move original layer info to new prepacked layer
             if hasattr(m, 'master_weight_split'):
