@@ -42,23 +42,25 @@ def get_rand_seed():
 class TestPrepackCases(TestCase):
     def _test_convolution_inference_base(self, dim):
         class ConvNd(torch.nn.Module):
-            def __init__(self, dim, in_channels, out_channels, kernel_size, stride, padding, dilation, bias, groups):
+            def __init__(self, dim, in_channels, out_channels, kernel_size, stride, padding, dilation, bias, groups, padding_mode):
                 super(ConvNd, self).__init__()
-                self.conv = conv_module[dim](in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, bias=bias, groups=groups)
+                self.conv = conv_module[dim](in_channels, out_channels, kernel_size=kernel_size, stride=stride,
+                        padding=padding, dilation=dilation, bias=bias, groups=groups, padding_mode=padding_mode)
 
             def forward(self, x):
                 return self.conv(x)
         input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
+        padding_modes = ['zeros', 'reflect']
         if dim == 2:
             channels_last = torch.channels_last
         elif dim == 3:
             channels_last = torch.channels_last_3d
         if dim == 1:
-            options = itertools.product([True, False], [1, 2], [1, 4], [True, False], [torch.contiguous_format])
+            options = itertools.product([True, False], [1, 2], [1, 4], [True, False], [torch.contiguous_format], padding_modes)
         else:
-            options = itertools.product([True, False], [1, 2], [1, 4], [True, False], [torch.contiguous_format, channels_last])
+            options = itertools.product([True, False], [1, 2], [1, 4], [True, False], [torch.contiguous_format, channels_last], padding_modes)
 
-        for bias, dilation, groups, feed_sample_input, memory_format in options:
+        for bias, dilation, groups, feed_sample_input, memory_format, padding_mode in options:
             N = torch.randint(1, 10, (1,)).item()
             M = torch.randint(1, 3, (1,)).item() * groups
             C = torch.randint(1, 3, (1,)).item() * groups
@@ -73,7 +75,8 @@ class TestPrepackCases(TestCase):
                 padding=1,
                 dilation=dilation,
                 bias=bias,
-                groups=groups).float().eval()
+                groups=groups,
+                padding_mode=padding_mode).float().eval()
             model = model.to(memory_format=memory_format)
             x = x.to(memory_format=memory_format)
             if dim == 1:
@@ -141,15 +144,16 @@ class TestPrepackCases(TestCase):
     def _test_convolution_base(self, dim, dtype, is_train, rtol=None, atol=None):
         input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
         channels_last = torch.channels_last if dim ==2 else torch.channels_last_3d
+        padding_modes = ['zeros', 'reflect']
         # Currently, there is no channels_last_1d format for 1d input in IPEX.
         # After adding a python API named `to_channels_last_1d` which is to convert 1d input to channels last,
         # we will make some changes to fully support channels_last_1d.
         if dim == 1:
-            options = itertools.product([True, False], [1, 2], [1, 4], [torch.contiguous_format], [True, False])
+            options = itertools.product([True, False], [1, 2], [1, 4], [torch.contiguous_format], [True, False], padding_modes)
         else:
-            options = itertools.product([True, False], [1, 2], [1, 4], [torch.contiguous_format, channels_last], [True, False])
+            options = itertools.product([True, False], [1, 2], [1, 4], [torch.contiguous_format, channels_last], [True, False], padding_modes)
 
-        for bias, dilation, groups, memory_format, feed_sample_input in options:
+        for bias, dilation, groups, memory_format, feed_sample_input, padding_mode in options:
             N = torch.randint(3, 10, (1,)).item()
             M = torch.randint(3, 10, (1,)).item() * groups
             C = torch.randint(3, 10, (1,)).item() * groups
@@ -164,7 +168,8 @@ class TestPrepackCases(TestCase):
                 padding=1,
                 dilation=dilation,
                 bias=bias,
-                groups=groups).to(dtype=dtype).float()
+                groups=groups,
+                padding_mode=padding_mode).to(dtype=dtype).float()
             model = model.to(memory_format=memory_format)
             x = x.to(memory_format=memory_format)
             x1 = x.clone().requires_grad_()
@@ -213,20 +218,21 @@ class TestPrepackCases(TestCase):
                 self.assertTrue(ipex_model1.weight.dtype == dtype)
                 self.assertTrue(ipex_model2.weight.dtype == dtype)
 
-            # original fp32 path
-            y1 = origin_model1(x1)
-            grad_x = torch.randn(y1.shape, dtype=torch.float32).to(dtype=dtype).float()
-            if is_train:
-                origin_optimizer1.zero_grad()
-                y1.backward(grad_x)
-                origin_optimizer1.step()
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
+                # original fp32 path
+                y1 = origin_model1(x1)
                 # ipex path with inplace=False
                 y2 = ipex_model1(x2)
                 # ipex path with inplace=True
                 y3 = ipex_model2(x3)
 
             if is_train:
+                grad_x = torch.randn(y1.shape, dtype=torch.float32).to(dtype=dtype).float()
+
+                origin_optimizer1.zero_grad()
+                y1.backward(grad_x)
+                origin_optimizer1.step()
+
                 ipex_optimizer1.zero_grad()
                 y2.backward(grad_x.to(dtype=dtype))
                 ipex_optimizer1.step()
@@ -239,14 +245,14 @@ class TestPrepackCases(TestCase):
                 self.assertTrue(y2.dtype == dtype)
                 self.assertTrue(y3.dtype == dtype)
 
-            self.assertEqual(y1, y2.float(), rtol=rtol, atol=atol)
-            self.assertEqual(y1, y3.float(), rtol=rtol, atol=atol)
+            self.assertEqual(y1, y2, rtol=rtol, atol=atol)
+            self.assertEqual(y1, y3, rtol=rtol, atol=atol)
             if is_train:
                 self.assertEqual(x1.grad, x2.grad, rtol=rtol, atol=atol)
                 self.assertEqual(x1.grad, x3.grad, rtol=rtol, atol=atol)
             if bias and is_train:
-                self.assertEqual(origin_model1.bias.grad, ipex_model1.bias.grad.float(), rtol=rtol, atol=atol)
-                self.assertEqual(origin_model1.bias.grad, ipex_model2.bias.grad.float(), rtol=rtol, atol=atol)
+                self.assertEqual(origin_model1.bias.grad.float(), ipex_model1.bias.grad.float(), rtol=rtol, atol=atol)
+                self.assertEqual(origin_model1.bias.grad.float(), ipex_model2.bias.grad.float(), rtol=rtol, atol=atol)
 
             # compare origin_model parameters with origin_model parameters after grad updata
             origin_model_state = origin_model1.state_dict()
@@ -327,15 +333,14 @@ class TestPrepackCases(TestCase):
             else:
                 ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
                 ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
-
-            # train one step for origin.
-            y1 = origin_model1(x1)
-            loss1 = y1.sum()
-            origin_optimizer1.zero_grad()
-            loss1.backward()
-            origin_optimizer1.step()
-
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
+                # train one step for origin.
+                y1 = origin_model1(x1)
+                loss1 = y1.sum()
+                origin_optimizer1.zero_grad()
+                loss1.backward()
+                origin_optimizer1.step()
+
                 # train one step for ipex with inplace=False
                 y2 = ipex_model1(x2)
                 loss2 = y2.sum()
@@ -349,8 +354,8 @@ class TestPrepackCases(TestCase):
                 loss3.backward()
                 ipex_optimizer2.step()
 
-            self.assertEqual(y1, y2.float(), rtol=1e-2, atol=1e-03)
-            self.assertEqual(y1, y3.float(), rtol=1e-2, atol=1e-03)
+            self.assertEqual(y1, y2, rtol=1e-2, atol=1e-03)
+            self.assertEqual(y1, y3, rtol=1e-2, atol=1e-03)
             self.assertEqual(x1.grad, x2.grad, rtol=1e-2, atol=1e-03)
             self.assertEqual(x1.grad, x3.grad, rtol=1e-2, atol=1e-03)
             # compare origin_model parameters with origin_model parameters after grad updata
@@ -380,15 +385,16 @@ class TestPrepackCases(TestCase):
     def _test_conv_serialization_base(self, dim):
         channels_last = torch.channels_last if dim ==2 else torch.channels_last_3d
         optimizer_options = [Lamb, Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD]
+        padding_modes = ['zeros', 'reflect']
         test_dtypes = [torch.float]
         if core.onednn_has_bf16_support():
             test_dtypes.append(torch.bfloat16)
-        options = itertools.product(test_dtypes, optimizer_options, [True, False])
+        options = itertools.product(test_dtypes, optimizer_options, [True, False], padding_modes)
         input_shape = [8, 3, 56, 56]
         if dim == 3:
             input_shape.append(56)
-        for dtype, optimizer, feed_sample_input in options:
-            model = conv_module[dim](3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        for dtype, optimizer, feed_sample_input, padding_mode in options:
+            model = conv_module[dim](3, 64, kernel_size=7, stride=2, padding=3, bias=False, padding_mode=padding_mode)
             x = torch.randn(input_shape).to(dtype=dtype).float().to(memory_format=channels_last)
             model = model.to(dtype=dtype).float().to(memory_format=channels_last).train()
             origin_x = x.clone()
@@ -400,14 +406,14 @@ class TestPrepackCases(TestCase):
                 ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
             else:
                 ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
-            # train one step for origin.
-            y1 = origin_model(origin_x)
-            loss1 = y1.sum()
-            origin_optimizer.zero_grad()
-            loss1.backward()
-            torch.nn.utils.clip_grad_value_(origin_model.parameters(), 10)
-            origin_optimizer.step()
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
+                # train one step for origin.
+                y1 = origin_model(origin_x)
+                loss1 = y1.sum()
+                origin_optimizer.zero_grad()
+                loss1.backward()
+                torch.nn.utils.clip_grad_value_(origin_model.parameters(), 10)
+                origin_optimizer.step()
                 # train one step for ipex.
                 y2 = ipex_model(ipex_x)
                 loss2 = y2.sum()
@@ -423,7 +429,7 @@ class TestPrepackCases(TestCase):
                         'optimizer_state_dict': ipex_optimizer.state_dict()
                         }, 'ipex_checkpoint.pth')
 
-            self.assertEqual(y1, y2.float(), rtol=1e-4, atol=5e-02)
+            self.assertEqual(y1, y2, rtol=1e-4, atol=5e-02)
             origin_model_state = origin_model.state_dict()
             ipex_model_state = ipex_model.state_dict()
             for var_name in origin_model_state:
@@ -511,20 +517,20 @@ class TestPrepackCases(TestCase):
             xx = [torch.randn(1, 3, 224, 224).to(dtype=dtype).float().to(memory_format=torch.channels_last),
                   torch.randn(1, 3, 224, 224).to(dtype=dtype).float().to(memory_format=torch.channels_last)]
             for i in range(2):
-                x = xx[i]
-                # original case
-                y1 = origin_model(x.clone())
-                loss1 = y1.sum()
-                origin_optimizer.zero_grad()
-                loss1.backward()
-                origin_optimizer.step()
                 with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
+                    x = xx[i]
+                    # original case
+                    y1 = origin_model(x.clone())
+                    loss1 = y1.sum()
+                    origin_optimizer.zero_grad()
+                    loss1.backward()
+                    origin_optimizer.step()
                     y2 = ipex_model(x.clone())
                     loss2 = y2.sum()
                     ipex_optimizer.zero_grad()
                     loss2.backward()
                     ipex_optimizer.step()
-            self.assertEqual(y1, y2.float(), rtol=6e-2, atol=1e-2)
+            self.assertEqual(y1, y2, rtol=6e-2, atol=1e-2)
 
 
     @skipIfNoTorchVision
