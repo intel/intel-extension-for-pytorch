@@ -20,5 +20,8 @@ Tensor share_storage_and_set_strided_as(
     IntArrayRef stride,
     c10::optional<int64_t> storage_offset_);
 
+void unsafe_get_and_set_data_ptr(const Tensor& src, const Tensor& dst);
+
+void unsafe_release_and_set_data_ptr(const Tensor& src, const Tensor& dst);
 } // namespace AtenIpexTypeXPU
 } // namespace at
