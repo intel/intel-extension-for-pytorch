@@ -1,5 +1,6 @@
 [
   "_comments: This file is for skipping cases with keywords, just list those keywords who appear in case name and should be skipped here",
   "fft",
-  "inv"
+  "inv",
+  "chalf"
 ]
