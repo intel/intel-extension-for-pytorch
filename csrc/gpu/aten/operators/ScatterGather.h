@@ -531,7 +531,7 @@ struct dpcpp_scatter_gather_base_kernel {
         at::ScalarType::Half,
         at::ScalarType::Bool,
         at::ScalarType::BFloat16,
-        iter.dtype(),
+        iter.common_dtype(),
         "dpcpp_scatter_gather_base_kernel_func",
         [&] {
           using dtype = typename std::conditional<
@@ -593,7 +593,7 @@ struct dpcpp_scatter_gather_base_kernel {
         at::ScalarType::Half,
         at::ScalarType::Bool,
         at::ScalarType::BFloat16,
-        iter.dtype(),
+        iter.common_dtype(),
         "dpcpp_scatter_gather_base_kernel_func",
         [&] {
           using dtype = typename std::conditional<
@@ -655,7 +655,7 @@ struct dpcpp_scatter_gather_base_kernel {
     IPEX_DISPATCH_ALL_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
-        iter.dtype(),
+        iter.common_dtype(),
         "dpcpp_scatter_gather_base_kernel_func",
         [&] {
           using dtype = typename std::conditional<
@@ -715,7 +715,7 @@ struct dpcpp_scatter_gather_base_kernel {
     IPEX_DISPATCH_ALL_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
-        iter.dtype(),
+        iter.common_dtype(),
         "dpcpp_scatter_gather_base_kernel_reduce_multiply",
         [&] {
           using dtype = typename std::conditional<
