@@ -1,7 +1,7 @@
 From 29a49409cb2a2f02889e988d62f961e2b1535257 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Thu, 30 Mar 2023 13:26:44 +0800
-Subject: [PATCH 05/14] remove dlpack dependency (#106)
+Subject: [PATCH 05/15] remove dlpack dependency (#106)
 
 * remove dlpack dependency
 * rich comments

@@ -1,0 +1,168 @@
+From c936faf21dff15f9bbb61d81143cfdcaebb738e9 Mon Sep 17 00:00:00 2001
+From: Escapeqyq <yiqin.qiu@intel.com>
+Date: Tue, 11 Apr 2023 05:48:18 -0700
+Subject: [PATCH 15/15] Export function symbols to enable Windows build of
+ Intel Extension for PyTorch (#113)
+
+* update 1.13.1
+* update syntax
+* update for linux ci
+---
+ c10/macros/Macros.h                  | 2 +-
+ torch/csrc/Dtype.h                   | 4 +++-
+ torch/csrc/DynamicTypes.h            | 2 +-
+ torch/csrc/Exceptions.h              | 2 +-
+ torch/csrc/Stream.h                  | 3 ++-
+ torch/csrc/tensor/python_tensor.h    | 4 ++--
+ torch/csrc/utils.h                   | 4 ++--
+ torch/csrc/utils/object_ptr.h        | 3 ++-
+ torch/csrc/utils/python_arg_parser.h | 2 +-
+ 9 files changed, 15 insertions(+), 11 deletions(-)
+
+diff --git a/c10/macros/Macros.h b/c10/macros/Macros.h
+index 513def98454..c7e9c5aa133 100644
+--- a/c10/macros/Macros.h
++++ b/c10/macros/Macros.h
+@@ -347,8 +347,8 @@ __host__ __device__
+ #endif // __CUDA_ARCH__
+     void
+     _wassert(wchar_t const* _Message, wchar_t const* _File, unsigned _Line);
+-}
+ #endif // __SYCL_DEVICE_ONLY__
++}
+ #endif // NDEBUG
+ #define CUDA_KERNEL_ASSERT(cond)                                                                 \
+   if (C10_UNLIKELY(!(cond))) {                                                                   \
+diff --git a/torch/csrc/Dtype.h b/torch/csrc/Dtype.h
+index 648a8091d93..70cee858f9f 100644
+--- a/torch/csrc/Dtype.h
++++ b/torch/csrc/Dtype.h
+@@ -23,6 +23,8 @@ inline bool THPPythonScalarType_Check(PyObject* obj) {
+       obj == (PyObject*)(&PyBool_Type) || obj == (PyObject*)(&PyLong_Type);
+ }
+ 
+-PyObject* THPDtype_New(at::ScalarType scalar_type, const std::string& name);
++TORCH_API PyObject* THPDtype_New(
++    at::ScalarType scalar_type,
++    const std::string& name);
+ 
+ void THPDtype_init(PyObject* module);
+diff --git a/torch/csrc/DynamicTypes.h b/torch/csrc/DynamicTypes.h
+index 6765916634c..7a0f950637c 100644
+--- a/torch/csrc/DynamicTypes.h
++++ b/torch/csrc/DynamicTypes.h
+@@ -32,6 +32,6 @@ at::Storage createStorageGetType(
+     bool& is_typed_storage);
+ bool isStorage(PyObject* obj);
+ 
+-THPDtype* getTHPDtype(at::ScalarType scalarType);
++TORCH_API THPDtype* getTHPDtype(at::ScalarType scalarType);
+ THPLayout* getTHPLayout(at::Layout layout);
+ } // namespace torch
+diff --git a/torch/csrc/Exceptions.h b/torch/csrc/Exceptions.h
+index 89256c64bba..fdbf45a4ddd 100644
+--- a/torch/csrc/Exceptions.h
++++ b/torch/csrc/Exceptions.h
+@@ -307,7 +307,7 @@ struct TypeError : public PyTorchError {
+ // Translates to Python ValueError
+ struct ValueError : public PyTorchError {
+   using PyTorchError::PyTorchError;
+-  ValueError(const char* format, ...) TORCH_FORMAT_FUNC(2, 3);
++  TORCH_API ValueError(const char* format, ...) TORCH_FORMAT_FUNC(2, 3);
+   PyObject* python_type() override {
+     return PyExc_ValueError;
+   }
+diff --git a/torch/csrc/Stream.h b/torch/csrc/Stream.h
+index 6a61e9ca085..e49105298f0 100644
+--- a/torch/csrc/Stream.h
++++ b/torch/csrc/Stream.h
+@@ -1,12 +1,13 @@
+ #ifndef THP_STREAM_INC
+ #define THP_STREAM_INC
+ 
++#include <c10/macros/Export.h>
+ #include <torch/csrc/python_headers.h>
+ 
+ struct THPStream {
+   PyObject_HEAD uint64_t cdata;
+ };
+-extern PyTypeObject* THPStreamClass;
++extern TORCH_API PyTypeObject* THPStreamClass;
+ 
+ void THPStream_init(PyObject* module);
+ 
+diff --git a/torch/csrc/tensor/python_tensor.h b/torch/csrc/tensor/python_tensor.h
+index 5827f3b4ce3..8d74f66a2b0 100644
+--- a/torch/csrc/tensor/python_tensor.h
++++ b/torch/csrc/tensor/python_tensor.h
+@@ -28,14 +28,14 @@ void py_set_default_tensor_type(PyObject* type_obj);
+ void py_set_default_dtype(PyObject* dtype_obj);
+ 
+ // Register the tensor type for specific Backend and dtype (ScalarType).
+-PyObject* register_python_tensor_type(c10::Backend backend, c10::ScalarType scalar_type);
++TORCH_API PyObject* register_python_tensor_type(c10::Backend backend, c10::ScalarType scalar_type);
+ 
+ // Gets the DispatchKey for the default tensor type.
+ //
+ // TODO: This is nuts!  There is no reason to let the default tensor type id
+ // change.  Probably only store ScalarType, as that's the only flex point
+ // we support.
+-c10::DispatchKey get_default_dispatch_key();
++TORCH_API c10::DispatchKey get_default_dispatch_key();
+ at::Device get_default_device();
+ 
+ // Gets the ScalarType for the default tensor type.
+diff --git a/torch/csrc/utils.h b/torch/csrc/utils.h
+index fe8c8340775..dff8c41a9a1 100644
+--- a/torch/csrc/utils.h
++++ b/torch/csrc/utils.h
+@@ -158,7 +158,7 @@ TORCH_PYTHON_API void THPUtils_invalidArguments(
+ bool THPUtils_checkIntTuple(PyObject* arg);
+ std::vector<int> THPUtils_unpackIntTuple(PyObject* arg);
+ 
+-void THPUtils_addPyMethodDefs(
++TORCH_PYTHON_API void THPUtils_addPyMethodDefs(
+     std::vector<PyMethodDef>& vector,
+     PyMethodDef* methods);
+ 
+@@ -167,7 +167,7 @@ int THPUtils_getCallable(PyObject* arg, PyObject** result);
+ typedef THPPointer<THPGenerator> THPGeneratorPtr;
+ typedef class THPPointer<THPStorage> THPStoragePtr;
+ 
+-std::vector<int64_t> THPUtils_unpackLongs(PyObject* arg);
++TORCH_PYTHON_API std::vector<int64_t> THPUtils_unpackLongs(PyObject* arg);
+ PyObject* THPUtils_dispatchStateless(
+     PyObject* tensor,
+     const char* name,
+diff --git a/torch/csrc/utils/object_ptr.h b/torch/csrc/utils/object_ptr.h
+index 359e177f4f5..35302e21878 100644
+--- a/torch/csrc/utils/object_ptr.h
++++ b/torch/csrc/utils/object_ptr.h
+@@ -1,9 +1,10 @@
+ #pragma once
+ 
++#include <torch/csrc/Export.h>
+ #include <torch/csrc/python_headers.h>
+ 
+ template <class T>
+-class THPPointer {
++class TORCH_PYTHON_API THPPointer {
+  public:
+   THPPointer() : ptr(nullptr){};
+   explicit THPPointer(T* ptr) noexcept : ptr(ptr){};
+diff --git a/torch/csrc/utils/python_arg_parser.h b/torch/csrc/utils/python_arg_parser.h
+index 9b23af58297..26d58edd7e7 100644
+--- a/torch/csrc/utils/python_arg_parser.h
++++ b/torch/csrc/utils/python_arg_parser.h
+@@ -214,7 +214,7 @@ struct ParsedArgs {
+   PyObject* args[N];
+ };
+ 
+-struct PythonArgParser {
++struct PYBIND11_EXPORT PythonArgParser {
+   explicit PythonArgParser(
+       std::vector<std::string> fmts,
+       bool traceable = false);
+-- 
+2.25.1
+
