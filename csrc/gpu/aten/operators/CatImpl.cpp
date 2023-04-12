@@ -336,7 +336,7 @@ static void cat(
   bool hasSkippedInput = false;
   Tensor notSkippedTensor; // non-owning reference
   auto should_skip = [](const Tensor& t) {
-    return !t.defined() && t.dim() == 1;
+    return t.numel() == 0 && t.dim() == 1;
   };
   int nDims = 0;
 
