@@ -157,7 +157,7 @@ namespace AtenIpexTypeXPU {
     IPEX_DISPATCH_##types##_AND2(                                             \
         at::ScalarType::Half,                                                 \
         at::ScalarType::BFloat16,                                             \
-        iter.dtype(),                                                         \
+        iter.common_dtype(),                                                  \
         #op,                                                                  \
         [&]() {                                                               \
           dpcpp_kernel_with_scalars(                                          \

@@ -17,7 +17,7 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 static void gcd_kernel_dpcpp(TensorIterator& iter) {
-  IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "gcd", [&]() {
+  IPEX_DISPATCH_INTEGRAL_TYPES(iter.common_dtype(), "gcd", [&]() {
     dpcpp_fast_mode_kernel_with_scalars(
         iter,
         [=](scalar_t a, scalar_t b) -> scalar_t { return calc_gcd(a, b); });
@@ -25,7 +25,7 @@ static void gcd_kernel_dpcpp(TensorIterator& iter) {
 }
 
 static void lcm_kernel_dpcpp(TensorIterator& iter) {
-  IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "lcm", [&]() {
+  IPEX_DISPATCH_INTEGRAL_TYPES(iter.common_dtype(), "lcm", [&]() {
     dpcpp_fast_mode_kernel_with_scalars(
         iter, [=](scalar_t a, scalar_t b) -> scalar_t {
           scalar_t g = calc_gcd(a, b);
