@@ -144,8 +144,7 @@ def _read_template(template_fn: str) -> CodeTemplate:
 
 # String hash that's stable across different executions, unlike builtin hash
 def string_stable_hash(s: str) -> int:
-    sha1 = hashlib.sha1(s.encode("latin1")).digest()
-    return int.from_bytes(sha1, byteorder="little")
+    assert False
 
 
 # A small abstraction for writing out generated files and keeping track
