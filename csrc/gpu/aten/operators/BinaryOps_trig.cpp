@@ -51,7 +51,7 @@ void atan2_kernel(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
-      iter.dtype(),
+      iter.common_dtype(),
       "atan2",
       [&]() {
         dpcpp_kernel_for_tensor_iter(
