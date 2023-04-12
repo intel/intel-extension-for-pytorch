@@ -1,7 +1,7 @@
-From bedd439a1447610754c5bd4089d5498b4b419df7 Mon Sep 17 00:00:00 2001
+From d63f3ba1156f5b7a9c040b6721d5874c613f59c1 Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Mon, 28 Mar 2022 20:49:03 +0800
-Subject: [PATCH 01/11] Add DLPack oneAPI support for the XPU device for
+Subject: [PATCH 04/15] Add DLPack oneAPI support for the XPU device for
  experimental.
 
 ---
@@ -20,7 +20,7 @@ Subject: [PATCH 01/11] Add DLPack oneAPI support for the XPU device for
  create mode 100644 aten/src/ATen/detail/XPUHooksInterface.h
 
 diff --git a/aten/src/ATen/Context.h b/aten/src/ATen/Context.h
-index 43f4433b7c..ea2cb3f41d 100644
+index 43f4433b7ce..ea2cb3f41db 100644
 --- a/aten/src/ATen/Context.h
 +++ b/aten/src/ATen/Context.h
 @@ -9,6 +9,7 @@
@@ -53,7 +53,7 @@ index 43f4433b7c..ea2cb3f41d 100644
  static inline size_t getNumGPUs() {
    // WARNING: DO NOT ADD LOGIC TO HANDLE OTHER DEVICE TYPES TO THIS
 diff --git a/aten/src/ATen/DLConvertor.cpp b/aten/src/ATen/DLConvertor.cpp
-index 614dc46158..817f983913 100644
+index 614dc46158e..817f9839137 100644
 --- a/aten/src/ATen/DLConvertor.cpp
 +++ b/aten/src/ATen/DLConvertor.cpp
 @@ -90,13 +90,17 @@ DLDevice getDLDevice(const Tensor& tensor, const int64_t& device_id) {
@@ -109,7 +109,7 @@ index 614dc46158..817f983913 100644
    return at::from_blob(
        src->dl_tensor.data,
 diff --git a/aten/src/ATen/Version.cpp b/aten/src/ATen/Version.cpp
-index 4b9da640fb..350480e213 100644
+index 4b9da640fb7..350480e2139 100644
 --- a/aten/src/ATen/Version.cpp
 +++ b/aten/src/ATen/Version.cpp
 @@ -195,6 +195,10 @@ std::string show_config() {
@@ -125,7 +125,7 @@ index 4b9da640fb..350480e213 100644
      if (!pair.second.empty()) {
 diff --git a/aten/src/ATen/detail/XPUHooksInterface.cpp b/aten/src/ATen/detail/XPUHooksInterface.cpp
 new file mode 100644
-index 0000000000..d740068379
+index 00000000000..d740068379d
 --- /dev/null
 +++ b/aten/src/ATen/detail/XPUHooksInterface.cpp
 @@ -0,0 +1,29 @@
@@ -160,7 +160,7 @@ index 0000000000..d740068379
 +} // namespace at
 diff --git a/aten/src/ATen/detail/XPUHooksInterface.h b/aten/src/ATen/detail/XPUHooksInterface.h
 new file mode 100644
-index 0000000000..ff42ca60d4
+index 00000000000..ff42ca60d49
 --- /dev/null
 +++ b/aten/src/ATen/detail/XPUHooksInterface.h
 @@ -0,0 +1,75 @@
@@ -240,7 +240,7 @@ index 0000000000..ff42ca60d4
 +} // namespace detail
 +} // namespace at
 diff --git a/aten/src/ATen/dlpack.h b/aten/src/ATen/dlpack.h
-index 0ad1e119bc..3d33935d31 100644
+index 0ad1e119bcb..3d33935d31a 100644
 --- a/aten/src/ATen/dlpack.h
 +++ b/aten/src/ATen/dlpack.h
 @@ -6,6 +6,9 @@
@@ -345,7 +345,7 @@ index 0ad1e119bc..3d33935d31 100644
    DLDataType dtype;
    /*! \brief The shape of the tensor */
 diff --git a/aten/src/ATen/ops/from_blob.h b/aten/src/ATen/ops/from_blob.h
-index 62f881fdc3..d6dea29a46 100644
+index 62f881fdc38..d6dea29a462 100644
 --- a/aten/src/ATen/ops/from_blob.h
 +++ b/aten/src/ATen/ops/from_blob.h
 @@ -127,10 +127,12 @@ inline Tensor from_blob(
@@ -363,7 +363,7 @@ index 62f881fdc3..d6dea29a46 100644
  }
  
 diff --git a/caffe2/python/dlpack.h b/caffe2/python/dlpack.h
-index 0ad1e119bc..3d33935d31 100644
+index 0ad1e119bcb..3d33935d31a 100644
 --- a/caffe2/python/dlpack.h
 +++ b/caffe2/python/dlpack.h
 @@ -6,6 +6,9 @@
@@ -468,7 +468,7 @@ index 0ad1e119bc..3d33935d31 100644
    DLDataType dtype;
    /*! \brief The shape of the tensor */
 diff --git a/torch/_tensor.py b/torch/_tensor.py
-index fd3f338d51..7ec31661b1 100644
+index fd3f338d514..7ec31661b1e 100644
 --- a/torch/_tensor.py
 +++ b/torch/_tensor.py
 @@ -1347,6 +1347,8 @@ class Tensor(torch._C._TensorBase):
@@ -481,7 +481,7 @@ index fd3f338d51..7ec31661b1 100644
              raise ValueError(
                  "Unknown device type {} for Dlpack".format(self.device.type)
 diff --git a/torch/utils/dlpack.py b/torch/utils/dlpack.py
-index ae0aafceb1..a48abcad76 100644
+index ae0aafceb17..a48abcad764 100644
 --- a/torch/utils/dlpack.py
 +++ b/torch/utils/dlpack.py
 @@ -18,6 +18,7 @@ class DLDeviceType(enum.IntEnum):

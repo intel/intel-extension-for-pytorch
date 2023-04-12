@@ -1,7 +1,7 @@
-From 3274d26b245f2e221acbc64a63909a6d4d22b6b2 Mon Sep 17 00:00:00 2001
+From d7f5dcb360d4174055b9e6c3b8801d175eafbd7c Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Wed, 20 Apr 2022 00:28:18 +0800
-Subject: [PATCH 06/11] Add xpu legacy profiler (#30)
+Subject: [PATCH 14/15] Add xpu legacy profiler (#30)
 
 Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
 ---
@@ -22,7 +22,7 @@ Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
  14 files changed, 491 insertions(+), 181 deletions(-)
 
 diff --git a/torch/_C/_autograd.pyi b/torch/_C/_autograd.pyi
-index bddda0a8c9..9206273838 100644
+index bddda0a8c95..92062738383 100644
 --- a/torch/_C/_autograd.pyi
 +++ b/torch/_C/_autograd.pyi
 @@ -9,6 +9,7 @@ from ._profiler import _ProfilerEvent, ActiveProfilerType, ProfilerActivity, Pro
@@ -34,7 +34,7 @@ index bddda0a8c9..9206273838 100644
      OPENGL = ...
      OPENCL = ...
 diff --git a/torch/autograd/profiler.py b/torch/autograd/profiler.py
-index dd5700f949..24ba73512d 100644
+index dd5700f9492..24ba73512de 100644
 --- a/torch/autograd/profiler.py
 +++ b/torch/autograd/profiler.py
 @@ -67,6 +67,8 @@ class profile(object):
@@ -119,7 +119,7 @@ index dd5700f949..24ba73512d 100644
  
      functions.sort(key=lambda evt: evt.time_range.start)
 diff --git a/torch/autograd/profiler_legacy.py b/torch/autograd/profiler_legacy.py
-index b3e875f252..14bc2a2f70 100644
+index b3e875f252c..14bc2a2f708 100644
 --- a/torch/autograd/profiler_legacy.py
 +++ b/torch/autograd/profiler_legacy.py
 @@ -1,7 +1,7 @@
@@ -364,7 +364,7 @@ index b3e875f252..14bc2a2f70 100644
  
      # Sort functions by start time then by end time ascending.
 diff --git a/torch/autograd/profiler_util.py b/torch/autograd/profiler_util.py
-index 7d0532d611..368f8d3316 100644
+index 7d0532d6119..368f8d33163 100644
 --- a/torch/autograd/profiler_util.py
 +++ b/torch/autograd/profiler_util.py
 @@ -15,13 +15,17 @@ class EventList(list):
@@ -842,7 +842,7 @@ index 7d0532d611..368f8d3316 100644
 +        append("Self XPU time total: {}".format(_format_time(sum_self_xpu_time_total)))
      return ''.join(result)
 diff --git a/torch/csrc/autograd/init.cpp b/torch/csrc/autograd/init.cpp
-index a1d6de21d1..46c2704bc9 100644
+index a1d6de21d18..46c2704bc9b 100644
 --- a/torch/csrc/autograd/init.cpp
 +++ b/torch/csrc/autograd/init.cpp
 @@ -111,10 +111,20 @@ PyObject* THPAutograd_initExtension(PyObject* _unused, PyObject* unused) {
@@ -867,7 +867,7 @@ index a1d6de21d1..46c2704bc9 100644
        .def("node_id", &LegacyEvent::nodeId)
        .def("is_remote", &LegacyEvent::isRemote)
 diff --git a/torch/csrc/autograd/profiler_legacy.cpp b/torch/csrc/autograd/profiler_legacy.cpp
-index f77b4f5928..eb0cd7948e 100644
+index f77b4f5928b..eb0cd7948eb 100644
 --- a/torch/csrc/autograd/profiler_legacy.cpp
 +++ b/torch/csrc/autograd/profiler_legacy.cpp
 @@ -140,6 +140,10 @@ struct ProfilerLegacyThreadLocalState : public ProfilerStateBase {
@@ -1079,7 +1079,7 @@ index f77b4f5928..eb0cd7948e 100644
  
  static const at::jit::CodeTemplate event_template(R"(
 diff --git a/torch/csrc/autograd/profiler_legacy.h b/torch/csrc/autograd/profiler_legacy.h
-index e12beca806..3b12a5c35a 100644
+index e12beca8060..3b12a5c35ac 100644
 --- a/torch/csrc/autograd/profiler_legacy.h
 +++ b/torch/csrc/autograd/profiler_legacy.h
 @@ -35,7 +35,8 @@ struct TORCH_API LegacyEvent {
@@ -1217,7 +1217,7 @@ index e12beca806..3b12a5c35a 100644
  // Usage:
  //   {
 diff --git a/torch/csrc/profiler/api.cpp b/torch/csrc/profiler/api.cpp
-index 61a285919e..d8f62b5c05 100644
+index 61a285919ef..d8f62b5c051 100644
 --- a/torch/csrc/profiler/api.cpp
 +++ b/torch/csrc/profiler/api.cpp
 @@ -1,7 +1,5 @@
@@ -1365,7 +1365,7 @@ index 61a285919e..d8f62b5c05 100644
  } // namespace impl
  } // namespace profiler
 diff --git a/torch/csrc/profiler/api.h b/torch/csrc/profiler/api.h
-index 0414b8c323..5eb5133348 100644
+index 0414b8c3238..5eb51333489 100644
 --- a/torch/csrc/profiler/api.h
 +++ b/torch/csrc/profiler/api.h
 @@ -4,16 +4,19 @@
@@ -1409,7 +1409,7 @@ index 0414b8c323..5eb5133348 100644
  } // namespace impl
  } // namespace profiler
 diff --git a/torch/csrc/profiler/cuda.cpp b/torch/csrc/profiler/cuda.cpp
-index c64eb5e9ca..3c0f2b0f97 100644
+index c64eb5e9caa..3c0f2b0f973 100644
 --- a/torch/csrc/profiler/cuda.cpp
 +++ b/torch/csrc/profiler/cuda.cpp
 @@ -5,6 +5,8 @@
@@ -1483,7 +1483,7 @@ index c64eb5e9ca..3c0f2b0f97 100644
      // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
      ::nvtxMark(name);
 diff --git a/torch/csrc/profiler/itt.cpp b/torch/csrc/profiler/itt.cpp
-index 3269a5784a..54bdf50320 100644
+index 3269a5784ae..54bdf503206 100644
 --- a/torch/csrc/profiler/itt.cpp
 +++ b/torch/csrc/profiler/itt.cpp
 @@ -18,6 +18,11 @@ struct ITTMethods : public ProfilerStubs {
@@ -1499,7 +1499,7 @@ index 3269a5784a..54bdf50320 100644
      // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
      torch::profiler::itt_mark(name);
 diff --git a/torch/csrc/profiler/orchestration/observer.h b/torch/csrc/profiler/orchestration/observer.h
-index 3b75a91804..7d75623363 100644
+index 3b75a91804b..7d75623363f 100644
 --- a/torch/csrc/profiler/orchestration/observer.h
 +++ b/torch/csrc/profiler/orchestration/observer.h
 @@ -20,6 +20,7 @@ enum class C10_API_ENUM ProfilerState {
@@ -1511,7 +1511,7 @@ index 3b75a91804..7d75623363 100644
    ITT, // only emit ITT markers
    KINETO, // use libkineto
 diff --git a/torch/csrc/profiler/python/init.cpp b/torch/csrc/profiler/python/init.cpp
-index 9e1b663d65..813057df40 100644
+index 9e1b663d657..813057df40f 100644
 --- a/torch/csrc/profiler/python/init.cpp
 +++ b/torch/csrc/profiler/python/init.cpp
 @@ -32,6 +32,7 @@ void initPythonBindings(PyObject* module) {
@@ -1523,7 +1523,7 @@ index 9e1b663d65..813057df40 100644
        .value("ITT", ProfilerState::ITT)
        .value("KINETO", ProfilerState::KINETO)
 diff --git a/torch/testing/_internal/distributed/rpc/rpc_test.py b/torch/testing/_internal/distributed/rpc/rpc_test.py
-index ea294b43c3..326b5cc0aa 100644
+index ea294b43c38..326b5cc0aa2 100644
 --- a/torch/testing/_internal/distributed/rpc/rpc_test.py
 +++ b/torch/testing/_internal/distributed/rpc/rpc_test.py
 @@ -4583,9 +4583,9 @@ class CudaRpcTest(RpcAgentTestFixture):
