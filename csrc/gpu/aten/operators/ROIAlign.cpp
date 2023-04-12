@@ -8,6 +8,7 @@
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 
+#include <ATen/autocast_mode.h>
 #include "RandomEngine.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
@@ -495,24 +496,57 @@ at::Tensor roi_align_backward_kernel(
   return grad_input;
 }
 
+at::Tensor roi_align_forward_autocast(
+    const at::Tensor& input,
+    const at::Tensor& rois,
+    double spatial_scale,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t sampling_ratio,
+    bool aligned) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocast(c10::DispatchKey::AutocastXPU);
+  return roi_align_forward_kernel(
+             at::autocast::cached_cast(at::kFloat, input, c10::DeviceType::XPU),
+             at::autocast::cached_cast(at::kFloat, rois, c10::DeviceType::XPU),
+             spatial_scale,
+             pooled_height,
+             pooled_width,
+             sampling_ratio,
+             aligned)
+      .to(input.scalar_type());
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_REGISTER(
-      "roi_align.xpu", at::AtenIpexTypeXPU::roi_align_forward_kernel);
-  IPEX_OP_REGISTER(
+  IPEX_OP_REGISTER_DISPATCH(
+      "roi_align.xpu",
+      at::AtenIpexTypeXPU::roi_align_forward_kernel,
+      c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH(
       "_roi_align_backward.xpu",
-      at::AtenIpexTypeXPU::roi_align_backward_kernel);
+      at::AtenIpexTypeXPU::roi_align_backward_kernel,
+      c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "roi_align.xpu",
+      at::AtenIpexTypeXPU::roi_align_forward_autocast,
+      c10::DispatchKey::AutocastXPU);
 }
 
-IPEX_TORCH_LIBRARY_IMPL(torchvision, XPU, m) {
+TORCH_LIBRARY_FRAGMENT(torchvision, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("torchvision::roi_align"),
+      c10::DispatchKey::XPU,
       TORCH_FN((&at::AtenIpexTypeXPU::roi_align_forward_kernel)));
   m.impl(
       TORCH_SELECTIVE_NAME("torchvision::_roi_align_backward"),
+      c10::DispatchKey::XPU,
       TORCH_FN((&at::AtenIpexTypeXPU::roi_align_backward_kernel)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("torchvision::roi_align"),
+      c10::DispatchKey::AutocastXPU,
+      TORCH_FN((&at::AtenIpexTypeXPU::roi_align_forward_autocast)));
 }
 } // namespace
