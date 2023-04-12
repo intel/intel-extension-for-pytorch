@@ -220,7 +220,12 @@ def check_model_obsever_has_run(
 ) -> None:
     """
     This function is about check whether the module's observer has been run by checking the
-    observer's min_value and max_max_value is the init value or not.
+        observer's min_value and max_max_value is the init value or not.
+    Rules:
+    - If no observer found, return false.
+    - If any observer returns true or false, return that value.
+    - To avoid wrong results in case no observer found at the beginning, only return false
+        if all checks of the module and its children return false.
     """
     if hasattr(module, '_auto_quant_state'):
         qstate: AutoQuantizationState = module._auto_quant_state  # type: ignore[assignment]
@@ -237,9 +242,10 @@ def check_model_obsever_has_run(
                 assert False, "The observer's dtype only can be torch.quint8 or torch.qint8"
 
     for _, child in module.named_children():
-        check_model_obsever_has_run(child)
+        if check_model_obsever_has_run(child):
+            return True
 
-    return True
+    return False
 
 
 def attach_op_convert_info_to_model(
