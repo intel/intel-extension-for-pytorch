@@ -247,7 +247,7 @@ class CPUPoolList():
 
         # Split the aggregated pool into individual pools
         self.pools_ondemand.clear()
-        pool.sort(key=lambda x: (x.node, 1 - int(x.is_physical_core)))
+        pool.sort(key=lambda x: (x.core, 1 - int(x.is_physical_core)))
         for i in range(ninstances):
             # Generate individual raw pool
             pool_local = CPUPool()
