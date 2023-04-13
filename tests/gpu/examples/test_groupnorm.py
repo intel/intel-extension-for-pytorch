@@ -99,3 +99,43 @@ class TestTorchMethod(TestCase):
             grad_dpcpp, = torch.autograd.grad(y_pred_dpcpp, x_dpcpp, grad_out.to("xpu"))
             self.assertEqual(grad_dpcpp.is_contiguous(), True)
             self.assertEqual(grad, grad_dpcpp)
+
+    def test_group_norm(self):
+        shapes = [[1, 256, 513, 513], 
+                [1, 256, 1021, 1023], 
+                [1, 128, 512, 512], 
+                [1, 256, 55, 55], 
+                [1, 128, 7, 7]]
+        groups = [128, 32]
+        formats = [torch.contiguous_format, torch.channels_last]
+        dtypes = [torch.float]
+
+        for shape in shapes:
+            for group in groups:
+                for format in formats:
+                    for dtype in dtypes:
+                        group = min(group, shape[1])
+                        if (shape[1] % group):
+                            continue
+
+                        input = torch.randn(shape)
+                        grad = torch.randn(shape)
+                        input = input.to(memory_format=format)
+                        grad = grad.to(memory_format=format)
+
+                        input_cpu = input.clone()
+                        input_cpu.requires_grad_(True)
+                        grad_cpu = grad.clone()
+                        m = torch.nn.GroupNorm(group, shape[1])
+                        output_cpu = m(input_cpu)
+                        output_cpu.backward(grad_cpu)
+
+                        input_xpu = input.clone().to("xpu").to(dtype)
+                        input_xpu.requires_grad_(True)
+                        grad_xpu = grad.clone().to("xpu")
+                        model_xpu = m.to("xpu").to(dtype)
+                        output_xpu = model_xpu(input_xpu)
+                        output_xpu.backward(grad_xpu)
+
+                        self.assertEqual(output_cpu.float(), output_xpu.cpu().float())
+                        self.assertEqual(input_cpu.grad.float(), input_xpu.grad.cpu().float())
