@@ -186,7 +186,7 @@ class TestNNMethod(TestCase):
             self.assertEqual(input.grad, input_xpu.grad.cpu())
             self.assertEqual(h0.grad, h0_xpu.grad.cpu())
             self.assertEqual(c0.grad, c0_xpu.grad.cpu())
-    
+
     @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
     def test_lstm_bf16(self, dtype=torch.bfloat16):
         rnn = nn.LSTM(320, 320, num_layers=2)

@@ -773,7 +773,7 @@ lstm_backward(
   size_t scratchpad_size = lstm_backward_pd->scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
       {scratchpad_size}, src.options().dtype(at::kByte), c10::nullopt);
-  auto scratchpad_m = dnnl::memory(
+  auto scratchpad_m = dpcpp_onednn_memory(
       lstm_backward_pd->scratchpad_desc(),
       engine,
       scratchpad_tensor.data_ptr());

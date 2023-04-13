@@ -576,7 +576,7 @@ static void convolution_backward_weights(
   size_t scratchpad_size = conv_bwd_w_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
       {scratchpad_size}, src.options().dtype(at::kByte), c10::nullopt);
-  auto scratchpad_m = dnnl::memory(
+  auto scratchpad_m = dpcpp_onednn_memory(
       conv_bwd_w_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
   args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_m});
 #endif

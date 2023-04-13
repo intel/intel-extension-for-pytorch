@@ -623,7 +623,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
   size_t scratchpad_size = gru_backward_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
       {scratchpad_size}, src_layer.options().dtype(at::kByte), c10::nullopt);
-  auto scratchpad_m = dnnl::memory(
+  auto scratchpad_m = dpcpp_onednn_memory(
       gru_backward_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
   args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_m});
 #endif
