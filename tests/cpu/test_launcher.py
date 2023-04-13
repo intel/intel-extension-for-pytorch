@@ -500,7 +500,7 @@ class TestLauncher(TestCase):
                 'num_nodes_sum': 2,
                 'num_cores': [14, 14, 14, 14, 14, 14, 14],
                 'num_nodes': [1, 1, 1, 1, 1, 1, 1],
-                'pools_cores': ['0-13', '14-27', '56-69', '70-83', '28-41', '42-55', '84-97'],
+                'pools_cores': ['0-6,56-62', '7-13,63-69', '14-20,70-76', '21-27,77-83', '28-34,84-90', '35-41,91-97', '42-48,98-104'],
                 'pools_nodes': ['0', '0', '0', '0', '1', '1', '1']}
         self.verify_affinity(cpuinfo.pools_ondemand, ground_truth)
 
@@ -517,7 +517,7 @@ class TestLauncher(TestCase):
                 'num_nodes_sum': 2,
                 'num_cores': [14, 14, 14],
                 'num_nodes': [1, 1, 1],
-                'pools_cores': ['14-27', '70-83', '28-41'],
+                'pools_cores': ['14-20,70-76', '21-27,77-83', '28-34,84-90'],
                 'pools_nodes': ['1', '1', '2']}
         self.verify_affinity(cpuinfo.pools_ondemand, ground_truth)
 
