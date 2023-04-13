@@ -858,7 +858,7 @@ with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 entry_points = {
     'console_scripts': [
-        'ipexrun = {}.cpu.launch:main'.format(PACKAGE_NAME),
+        'ipexrun = {}.cpu.launch.__main__:main'.format(PACKAGE_NAME),
     ]
 }
 
