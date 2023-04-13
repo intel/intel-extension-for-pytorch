@@ -35,25 +35,25 @@ namespace {
 // implementation taken from Caffe2
 template <typename T>
 void pre_calc_for_bilinear_interpolate(
-    int height,
-    int width,
-    int pooled_height,
-    int pooled_width,
+    int64_t height,
+    int64_t width,
+    int64_t pooled_height,
+    int64_t pooled_width,
     T roi_start_h,
     T roi_start_w,
     T bin_size_h,
     T bin_size_w,
-    int roi_bin_grid_h,
-    int roi_bin_grid_w,
+    int64_t roi_bin_grid_h,
+    int64_t roi_bin_grid_w,
     std::vector<PreCalc<T>>& pre_calc) {
-  int pre_calc_index = 0;
-  for (int ph = 0; ph < pooled_height; ph++) {
-    for (int pw = 0; pw < pooled_width; pw++) {
-      for (int iy = 0; iy < roi_bin_grid_h; iy++) {
+  int64_t pre_calc_index = 0;
+  for (int64_t ph = 0; ph < pooled_height; ph++) {
+    for (int64_t pw = 0; pw < pooled_width; pw++) {
+      for (int64_t iy = 0; iy < roi_bin_grid_h; iy++) {
         const T yy = roi_start_h + ph * bin_size_h +
             static_cast<T>(iy + .5f) * bin_size_h /
                 static_cast<T>(roi_bin_grid_h); // e.g., 0.5, 1.5
-        for (int ix = 0; ix < roi_bin_grid_w; ix++) {
+        for (int64_t ix = 0; ix < roi_bin_grid_w; ix++) {
           const T xx = roi_start_w + pw * bin_size_w +
               static_cast<T>(ix + .5f) * bin_size_w /
                   static_cast<T>(roi_bin_grid_w);
@@ -84,10 +84,10 @@ void pre_calc_for_bilinear_interpolate(
             x = 0;
           }
 
-          int y_low = (int)y;
-          int x_low = (int)x;
-          int y_high;
-          int x_high;
+          int64_t y_low = (int64_t)y;
+          int64_t x_low = (int64_t)x;
+          int64_t y_high;
+          int64_t x_high;
 
           if (y_low >= height - 1) {
             y_high = y_low = height - 1;
@@ -131,26 +131,27 @@ template <typename T, typename ACC_T>
 inline void roi_align_single_framework_forward(
     const T* input,
     const ACC_T count,
-    int channels,
-    int height,
-    int width,
-    int pooled_height,
-    int pooled_width,
-    int roi_bin_grid_h,
-    int roi_bin_grid_w,
+    int64_t channels,
+    int64_t height,
+    int64_t width,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t roi_bin_grid_h,
+    int64_t roi_bin_grid_w,
     const std::vector<PreCalc<ACC_T>>& pre_calc,
     T* output) {
-  for (int c = 0; c < channels; c++) {
+  for (int64_t c = 0; c < channels; c++) {
     const T* offset_input = input + c * height * width;
-    int pre_calc_index = 0;
+    int64_t pre_calc_index = 0;
 
-    for (int ph = 0; ph < pooled_height; ph++) {
-      for (int pw = 0; pw < pooled_width; pw++) {
-        int index = c * pooled_height * pooled_width + ph * pooled_width + pw;
+    for (int64_t ph = 0; ph < pooled_height; ph++) {
+      for (int64_t pw = 0; pw < pooled_width; pw++) {
+        int64_t index =
+            c * pooled_height * pooled_width + ph * pooled_width + pw;
 
         ACC_T output_val = 0.;
-        for (int iy = 0; iy < roi_bin_grid_h; iy++) {
-          for (int ix = 0; ix < roi_bin_grid_w; ix++) {
+        for (int64_t iy = 0; iy < roi_bin_grid_h; iy++) {
+          for (int64_t ix = 0; ix < roi_bin_grid_w; ix++) {
             PreCalc<ACC_T> pc = pre_calc[pre_calc_index];
             output_val += pc.w1 * static_cast<ACC_T>(offset_input[pc.pos1]) +
                 pc.w2 * static_cast<ACC_T>(offset_input[pc.pos2]) +
@@ -172,22 +173,22 @@ template <typename T, typename ACC_T>
 inline void roi_align_single_framework_channels_last_forward(
     const T* input,
     const ACC_T count,
-    int channels,
-    int height,
-    int width,
-    int pooled_height,
-    int pooled_width,
-    int roi_bin_grid_h,
-    int roi_bin_grid_w,
+    int64_t channels,
+    int64_t height,
+    int64_t width,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t roi_bin_grid_h,
+    int64_t roi_bin_grid_w,
     const std::vector<PreCalc<ACC_T>>& pre_calc,
     T* output) {
   // for 'normal' size of channels, should be L1 fit;
   // otherwise consider blocking on channels.
   using Vec = at::vec::Vectorized<T>;
 
-  int pre_calc_index = 0;
-  for (int ph = 0; ph < pooled_height; ph++) {
-    for (int pw = 0; pw < pooled_width; pw++) {
+  int64_t pre_calc_index = 0;
+  for (int64_t ph = 0; ph < pooled_height; ph++) {
+    for (int64_t pw = 0; pw < pooled_width; pw++) {
       T* out = output + (ph * pooled_width + pw) * channels;
 
       // pass I: zero the out lane
@@ -202,8 +203,8 @@ inline void roi_align_single_framework_channels_last_forward(
       }
 
       // pass II: do accumulation
-      for (int iy = 0; iy < roi_bin_grid_h; iy++) {
-        for (int ix = 0; ix < roi_bin_grid_w; ix++) {
+      for (int64_t iy = 0; iy < roi_bin_grid_h; iy++) {
+        for (int64_t ix = 0; ix < roi_bin_grid_w; ix++) {
           PreCalc<ACC_T> pc = pre_calc[pre_calc_index];
           const T* in1 = input + pc.pos1 * channels;
           const T* in2 = input + pc.pos2 * channels;
@@ -252,13 +253,13 @@ inline void roi_align_single_framework_channels_last_forward<
     float>(
     const at::BFloat16* input,
     const float count,
-    int channels,
-    int height,
-    int width,
-    int pooled_height,
-    int pooled_width,
-    int roi_bin_grid_h,
-    int roi_bin_grid_w,
+    int64_t channels,
+    int64_t height,
+    int64_t width,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t roi_bin_grid_h,
+    int64_t roi_bin_grid_w,
     const std::vector<PreCalc<float>>& pre_calc,
     at::BFloat16* output) {
   // for 'normal' size of channels, should be L1 fit;
@@ -271,9 +272,9 @@ inline void roi_align_single_framework_channels_last_forward<
   std::unique_ptr<float[]> sum_arr(new float[channels]);
   float* sum = sum_arr.get();
 
-  int pre_calc_index = 0;
-  for (int ph = 0; ph < pooled_height; ph++) {
-    for (int pw = 0; pw < pooled_width; pw++) {
+  int64_t pre_calc_index = 0;
+  for (int64_t ph = 0; ph < pooled_height; ph++) {
+    for (int64_t pw = 0; pw < pooled_width; pw++) {
       at::BFloat16* out = output + (ph * pooled_width + pw) * channels;
 
       // pass I: zero the sum lane
@@ -288,8 +289,8 @@ inline void roi_align_single_framework_channels_last_forward<
       }
 
       // pass II: do accumulation
-      for (int iy = 0; iy < roi_bin_grid_h; iy++) {
-        for (int ix = 0; ix < roi_bin_grid_w; ix++) {
+      for (int64_t iy = 0; iy < roi_bin_grid_h; iy++) {
+        for (int64_t ix = 0; ix < roi_bin_grid_w; ix++) {
           PreCalc<float> pc = pre_calc[pre_calc_index];
           const at::BFloat16* in1 = input + pc.pos1 * channels;
           const at::BFloat16* in2 = input + pc.pos2 * channels;
@@ -353,25 +354,25 @@ inline void roi_align_single_framework_channels_last_forward<
 
 template <typename T, typename ACC_T>
 void roi_align_forward_kernel_body(
-    int n_rois,
+    int64_t n_rois,
     const T* input,
     const ACC_T& spatial_scale,
-    int channels,
-    int height,
-    int width,
-    int pooled_height,
-    int pooled_width,
-    int sampling_ratio,
+    int64_t channels,
+    int64_t height,
+    int64_t width,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t sampling_ratio,
     bool aligned,
     const ACC_T* rois,
     T* output,
     bool is_channels_last) {
   // (n, c, ph, pw) is an element in the pooled output
   // can be parallelized using omp
-  at::parallel_for(0, n_rois, 1, [&](int begin, int end) {
-    for (int n = begin; n < end; n++) {
+  at::parallel_for(0, n_rois, 1, [&](int64_t begin, int64_t end) {
+    for (int64_t n = begin; n < end; n++) {
       const ACC_T* offset_rois = rois + n * 5;
-      int roi_batch_ind = offset_rois[0];
+      int64_t roi_batch_ind = offset_rois[0];
 
       // Do not using rounding; this implementation detail is critical
       ACC_T offset = aligned ? (ACC_T)0.5 : (ACC_T)0.0;
@@ -394,17 +395,17 @@ void roi_align_forward_kernel_body(
           static_cast<ACC_T>(roi_width) / static_cast<ACC_T>(pooled_width);
 
       // We use roi_bin_grid to sample the grid and mimic integral
-      int roi_bin_grid_h = (sampling_ratio > 0)
+      int64_t roi_bin_grid_h = (sampling_ratio > 0)
           ? sampling_ratio
           : ceil(roi_height / pooled_height); // e.g., = 2
-      int roi_bin_grid_w = (sampling_ratio > 0)
+      int64_t roi_bin_grid_w = (sampling_ratio > 0)
           ? sampling_ratio
           : ceil(roi_width / pooled_width);
 
       // We do average (integral) pooling inside a bin
       // When the grid is empty, output zeros.
       const ACC_T count =
-          std::max(roi_bin_grid_h * roi_bin_grid_w, 1); // e.g. = 4
+          std::max(roi_bin_grid_h * roi_bin_grid_w, (int64_t)1); // e.g. = 4
 
       // we want to precalculate indices and weights shared by all channels,
       // this is the key point of optimization
@@ -463,28 +464,28 @@ template <typename T, typename ACC_T>
 inline void roi_align_single_framework_backward(
     const T* grad_output,
     const ACC_T count,
-    int channels,
-    int height,
-    int width,
-    int pooled_height,
-    int pooled_width,
-    int roi_bin_grid_h,
-    int roi_bin_grid_w,
+    int64_t channels,
+    int64_t height,
+    int64_t width,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t roi_bin_grid_h,
+    int64_t roi_bin_grid_w,
     const std::vector<PreCalc<ACC_T>>& pre_calc,
     T* grad_input) {
-  for (int c = 0; c < channels; c++) {
+  for (int64_t c = 0; c < channels; c++) {
     T* offset_grad_input = grad_input + c * height * width;
     const T* offset_grad_output =
         grad_output + c * pooled_height * pooled_width;
-    int pre_calc_index = 0;
+    int64_t pre_calc_index = 0;
 
-    for (int ph = 0; ph < pooled_height; ph++) {
-      for (int pw = 0; pw < pooled_width; pw++) {
+    for (int64_t ph = 0; ph < pooled_height; ph++) {
+      for (int64_t pw = 0; pw < pooled_width; pw++) {
         const ACC_T grad_output_this_bin =
             offset_grad_output[ph * pooled_width + pw];
 
-        for (int iy = 0; iy < roi_bin_grid_h; iy++) {
-          for (int ix = 0; ix < roi_bin_grid_w; ix++) {
+        for (int64_t iy = 0; iy < roi_bin_grid_h; iy++) {
+          for (int64_t ix = 0; ix < roi_bin_grid_w; ix++) {
             PreCalc<ACC_T> pc = pre_calc[pre_calc_index];
             T g1 = grad_output_this_bin * pc.w1 / count;
             T g2 = grad_output_this_bin * pc.w2 / count;
@@ -507,26 +508,26 @@ template <typename T, typename ACC_T>
 inline void roi_align_single_framework_channels_last_backward(
     const T* grad_output,
     const ACC_T count,
-    int channels,
-    int height,
-    int width,
-    int pooled_height,
-    int pooled_width,
-    int roi_bin_grid_h,
-    int roi_bin_grid_w,
+    int64_t channels,
+    int64_t height,
+    int64_t width,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t roi_bin_grid_h,
+    int64_t roi_bin_grid_w,
     const std::vector<PreCalc<ACC_T>>& pre_calc,
     T* grad_input) {
   // for 'normal' size of channels, should be L1 fit;
   // otherwise consider blocking on channels.
   using Vec = at::vec::Vectorized<T>;
 
-  int pre_calc_index = 0;
-  for (int ph = 0; ph < pooled_height; ph++) {
-    for (int pw = 0; pw < pooled_width; pw++) {
+  int64_t pre_calc_index = 0;
+  for (int64_t ph = 0; ph < pooled_height; ph++) {
+    for (int64_t pw = 0; pw < pooled_width; pw++) {
       const T* g_out = grad_output + (ph * pooled_width + pw) * channels;
 
-      for (int iy = 0; iy < roi_bin_grid_h; iy++) {
-        for (int ix = 0; ix < roi_bin_grid_w; ix++) {
+      for (int64_t iy = 0; iy < roi_bin_grid_h; iy++) {
+        for (int64_t ix = 0; ix < roi_bin_grid_w; ix++) {
           PreCalc<ACC_T> pc = pre_calc[pre_calc_index];
           T* g_in1 = grad_input + pc.pos1 * channels;
           T* g_in2 = grad_input + pc.pos2 * channels;
@@ -567,25 +568,25 @@ inline void roi_align_single_framework_channels_last_backward(
 
 template <typename T, typename ACC_T>
 void roi_align_backward_kernel_body(
-    int n_rois,
+    int64_t n_rois,
     const T* grad_output,
     const ACC_T& spatial_scale,
-    int channels,
-    int height,
-    int width,
-    int pooled_height,
-    int pooled_width,
-    int sampling_ratio,
+    int64_t channels,
+    int64_t height,
+    int64_t width,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t sampling_ratio,
     bool aligned,
     T* grad_input,
     const ACC_T* rois,
     bool is_channels_last) {
   // (n, c, ph, pw) is an element in the pooled output
   // can be parallelized using omp
-  // at::parallel_for(0, n_rois, 1, [&](int begin, int end) {
-  for (int n = 0; n < n_rois; n++) {
+  // at::parallel_for(0, n_rois, 1, [&](int64_t begin, int64_t end) {
+  for (int64_t n = 0; n < n_rois; n++) {
     const ACC_T* offset_rois = rois + n * 5;
-    int roi_batch_ind = offset_rois[0];
+    int64_t roi_batch_ind = offset_rois[0];
 
     // Do not using rounding; this implementation detail is critical
     ACC_T offset = aligned ? (ACC_T)0.5 : (ACC_T)0.0;
@@ -608,10 +609,10 @@ void roi_align_backward_kernel_body(
         static_cast<ACC_T>(roi_width) / static_cast<ACC_T>(pooled_width);
 
     // We use roi_bin_grid to sample the grid and mimic integral
-    int roi_bin_grid_h = (sampling_ratio > 0)
+    int64_t roi_bin_grid_h = (sampling_ratio > 0)
         ? sampling_ratio
         : ceil(roi_height / pooled_height); // e.g., = 2
-    int roi_bin_grid_w =
+    int64_t roi_bin_grid_w =
         (sampling_ratio > 0) ? sampling_ratio : ceil(roi_width / pooled_width);
 
     // We do average (integral) pooling inside a bin
