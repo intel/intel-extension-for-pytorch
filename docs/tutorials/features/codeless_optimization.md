@@ -48,19 +48,19 @@ Let's take the [QA case](https://github.com/huggingface/transformers/tree/main/e
 ### The origin command with ipex launch
 Here is the command to run with [`ipexrun`](../performance_tuning/launch_script.md).
 ```
-clear && ipexrun --use_default_allocator --ninstance 2 --ncore_per_instance 28 run_qa.py --model_name_or_path bert-base-uncased --dataset_name squad --do_eval --per_device_train_batch_size 12 --learning_rate 3e-5 --num_train_epochs 2 --max_seq_length 384 --doc_stride 128 --output_dir /tmp/debug_squad/
+clear && ipexrun --memory-allocator default --ninstances 2 --ncores-per-instance 28 run_qa.py --model_name_or_path bert-base-uncased --dataset_name squad --do_eval --per_device_train_batch_size 12 --learning_rate 3e-5 --num_train_epochs 2 --max_seq_length 384 --doc_stride 128 --output_dir /tmp/debug_squad/
 ```
 
 ### Command to apply ipex optimization for FP32
-Added `--auto_ipex`
+Added `--auto-ipex`
 ```
-clear && ipexrun --use_default_allocator --ninstance 2 --ncore_per_instance 28 --auto_ipex run_qa.py --model_name_or_path bert-base-uncased --dataset_name squad --do_eval --per_device_train_batch_size 12 --learning_rate 3e-5 --num_train_epochs 2 --max_seq_length 384 --doc_stride 128 --output_dir /tmp/debug_squad/
+clear && ipexrun --memory-allocator default --ninstances 2 --ncores-per-instance 28 --auto-ipex run_qa.py --model_name_or_path bert-base-uncased --dataset_name squad --do_eval --per_device_train_batch_size 12 --learning_rate 3e-5 --num_train_epochs 2 --max_seq_length 384 --doc_stride 128 --output_dir /tmp/debug_squad/
 ```
 
 ### Command to apply ipex optimization for BF16
-Added `--auto_ipex --dtype bfloat16`
+Added `--auto-ipex --dtype bfloat16`
 ```
-clear && ipexrun --use_default_allocator --ninstance 2 --ncore_per_instance 28 --auto_ipex --dtype bfloat16 run_qa.py --model_name_or_path bert-base-uncased --dataset_name squad --do_eval --per_device_train_batch_size 12 --learning_rate 3e-5 --num_train_epochs 2 --max_seq_length 384 --doc_stride 128 --output_dir /tmp/debug_squad/
+clear && ipexrun --memory-allocator default --ninstances 2 --ncores-per-instance 28 --auto-ipex --dtype bfloat16 run_qa.py --model_name_or_path bert-base-uncased --dataset_name squad --do_eval --per_device_train_batch_size 12 --learning_rate 3e-5 --num_train_epochs 2 --max_seq_length 384 --doc_stride 128 --output_dir /tmp/debug_squad/
 ```
 
 ## Use Case not supported

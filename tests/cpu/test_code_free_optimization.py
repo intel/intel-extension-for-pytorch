@@ -20,12 +20,12 @@ class TestCodeFreeOptimization(TestCase):
             _ipex_optimize_hit_count = 0
             _ipex_convolution = False
             _has_batchnorm = False
-            cmd = 'python -m intel_extension_for_pytorch.cpu.launch --ninstance 1 '
-            cmd += '--auto_ipex '
+            cmd = 'ipexrun --ninstances 1 '
+            cmd += '--auto-ipex '
             cmd += '--dtype {} '.format(dtype)
-            cmd += '--auto_ipex_verbose '
+            cmd += '--auto-ipex-verbose '
             if disable_ipex_graph_mode:
-                cmd += '--disable_ipex_graph_mode '
+                cmd += '--disable-ipex-graph-mode '
             cmd += '{}/code_free_optimization.py --conv_bn'.format(loc)
             with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
                 for line in p.stdout.readlines():
@@ -49,12 +49,12 @@ class TestCodeFreeOptimization(TestCase):
         for disable_ipex_graph_mode, dtype in itertools.product(disable_ipex_graph_modes, dtypes):
             _ipex_optimize_hit_count = 0
             _ipex_convolution = False
-            cmd = 'python -m intel_extension_for_pytorch.cpu.launch --ninstance 1 '
-            cmd += '--auto_ipex '
+            cmd = 'ipexrun --ninstances 1 '
+            cmd += '--auto-ipex '
             cmd += '--dtype {} '.format(dtype)
-            cmd += '--auto_ipex_verbose '
+            cmd += '--auto-ipex-verbose '
             if disable_ipex_graph_mode:
-                cmd += '--disable_ipex_graph_mode '
+                cmd += '--disable-ipex-graph-mode '
             cmd += '{}/code_free_optimization.py --conv_bn_with_module_created_in_forward'.format(loc)
             with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
                 for line in p.stdout.readlines():
@@ -79,9 +79,9 @@ class TestCodeFreeOptimization(TestCase):
             _has_batchnorm = False
             cmd = 'python -m intel_extension_for_pytorch.cpu.auto_ipex '
             cmd += '--dtype {} '.format(dtype)
-            cmd += '--auto_ipex_verbose '
+            cmd += '--auto-ipex-verbose '
             if disable_ipex_graph_mode:
-                cmd += '--disable_ipex_graph_mode '
+                cmd += '--disable-ipex-graph-mode '
             cmd += '{}/code_free_optimization.py --conv_bn'.format(loc)
             with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
                 for line in p.stdout.readlines():
