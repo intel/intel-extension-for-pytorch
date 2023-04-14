@@ -237,17 +237,12 @@ static memory conv_get_expected_src_memory(
     bool need_reorder = true) {
   memory src_m;
   if (src_usr_md != expected_src_md) {
-    // avoid reorder in case of, [n][C][1][1][16c] <==> [n][c][1][1]
-    if (src.sizes().size() == 4 && src.size(2) == 1 && src.size(3) == 1) {
-      src_m = dpcpp_onednn_memory(expected_src_md, engine, src.data_ptr());
-    } else {
-      src_blocked =
-          empty_opaque_tensor(expected_src_md, src.options(), c10::nullopt);
-      src_m =
-          dpcpp_onednn_memory(expected_src_md, engine, src_blocked.data_ptr());
-      if (need_reorder)
-        xpu::oneDNN::reorder(src, src_blocked);
-    }
+    src_blocked =
+        empty_opaque_tensor(expected_src_md, src.options(), c10::nullopt);
+    src_m =
+        dpcpp_onednn_memory(expected_src_md, engine, src_blocked.data_ptr());
+    if (need_reorder)
+      xpu::oneDNN::reorder(src, src_blocked);
   } else {
     src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
     src_blocked = src;
