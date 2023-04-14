@@ -39,8 +39,6 @@ Optimizers are a key part of the training workloads. Intel® Extension for PyTor
 2. SplitSGD for BF16 training, which reduces the memory footprint of the master weights by half. **[CPU]**
 
 
-For more detailed information, check `Optimizer Fusion on CPU <technical_details/optimizer_fusion_cpu.md>`_, `Optimizer Fusion on GPU <technical_details/optimizer_fusion_gpu.md>`_ and `Split SGD <technical_details/split_sgd.html>`_ 
-
 .. toctree::
    :hidden:
    :maxdepth: 1
@@ -48,3 +46,24 @@ For more detailed information, check `Optimizer Fusion on CPU <technical_details
    technical_details/optimizer_fusion_cpu
    technical_details/optimizer_fusion_gpu
    technical_details/split_sgd
+
+
+.. _xpu-memory-management:
+
+Memory Management [GPU]
+---------------------------------
+
+Intel® Extension for PyTorch* uses a caching memory allocator to speed up memory allocations. This allows fast memory deallocation without any overhead.
+Allocations are associated with a sycl device. The allocator attempts to find the smallest cached block that will fit the requested size from the reserved block pool.
+If it unable to find a appropriate memory block inside of already allocated ares, the allocator will delegate to allocate a new block memory.
+
+For more detailed information, check `Memory Management <technical_details/memory_management.html>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   technical_details/memory_management
+
+
+For more detailed information, check `Optimizer Fusion on CPU <technical_details/optimizer_fusion_cpu.md>`_, `Optimizer Fusion on GPU <technical_details/optimizer_fusion_gpu.md>`_, `Split SGD <technical_details/split_sgd.html>`_ and `Memory Management <technical_details/memory_management.html>`_

@@ -30,6 +30,8 @@ namespace dpcpp {
 /// @param strides: strides.
 /// @param device_id: device id.
 /// @returns: Tensor.
+C10_DEPRECATED_MESSAGE(
+    "fromUSM is deprecated. Please use the USM-based DLPack solution instead.")
 IPEX_API at::Tensor fromUSM(
     void* src,
     const at::ScalarType stype,
@@ -40,6 +42,8 @@ IPEX_API at::Tensor fromUSM(
 /// Get a pointer of united shared memory from a tensor.
 /// @param src: Tensor.
 /// @returns: a pointer of united shared memory.
+C10_DEPRECATED_MESSAGE(
+    "toUSM is deprecated. Please use the USM-based DLPack solution instead.")
 IPEX_API void* toUSM(const at::Tensor& src);
 
 } // namespace dpcpp
