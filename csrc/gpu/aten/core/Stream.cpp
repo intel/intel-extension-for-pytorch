@@ -18,9 +18,9 @@ namespace {
 // Global stream state and constants
 static DeviceId num_devices = -1;
 
-// Thread-local current queues, it stores StreamId that can calculate QueueIndex
-// that can retrieve the current queue from queue pool.
-static thread_local std::unique_ptr<StreamId[]> current_queues = nullptr;
+// Thread-local current streams, it stores StreamId that can calculate
+// QueueIndex that can retrieve the current queue from queue pool.
+static thread_local std::unique_ptr<StreamId[]> current_streams = nullptr;
 
 // Note [StreamId assignment]
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -54,11 +54,11 @@ static inline StreamId makeStreamId(QueueType qt, QueueIndex qi) {
       static_cast<StreamId>(qt);
 }
 
-// Init queue pool's state and current queues' state
-static void initDPCPPQueuesOnce() {
+// Init queue pool's state and current streams' state
+static void initDPCPPStreamsOnce() {
   dpcppInitQueueStateOnce();
 
-  if (current_queues) {
+  if (current_streams) {
     return;
   }
 
@@ -66,12 +66,12 @@ static void initDPCPPQueuesOnce() {
   TORCH_CHECK(
       num_devices > 0, "Number of XPU devices should be greater than zero!");
 
-  // Inits current queues (thread local) to the first queue in the queue pool.
+  // Inits current streams (thread local) to the first queue in the queue pool.
   // Note: the queue pools have not been initialized yet. They will be
   // initialized in dpcppInitDeviceQueueOnce for the specified device.
-  current_queues = std::make_unique<StreamId[]>(num_devices);
+  current_streams = std::make_unique<StreamId[]>(num_devices);
   for (auto i = 0; i < num_devices; i++) {
-    current_queues[i] = makeStreamId(QueueType::RESERVED, 0);
+    current_streams[i] = makeStreamId(QueueType::RESERVED, 0);
   }
 }
 
@@ -141,7 +141,7 @@ QueueIndex DPCPPStream::queue_id() const {
 DPCPPStream getStreamFromPool(
     const bool isHighPriority,
     DeviceId device_index) {
-  initDPCPPQueuesOnce();
+  initDPCPPStreamsOnce();
   if (device_index == -1)
     device_index = xpu::dpcpp::current_device();
   check_device_index(device_index);
@@ -154,17 +154,17 @@ DPCPPStream getStreamFromPool(
 // Note: when called the first time on a device, this will create the queue pool
 // for that device.
 DPCPPStream getCurrentDPCPPStream(DeviceId device_index) {
-  initDPCPPQueuesOnce();
+  initDPCPPStreamsOnce();
   if (device_index == -1)
     device_index = xpu::dpcpp::current_device();
   check_device_index(device_index);
   dpcppInitDeviceQueueOnce(device_index);
-  return DPCPPStreamForId(device_index, current_queues[device_index]);
+  return DPCPPStreamForId(device_index, current_streams[device_index]);
 }
 
 void setCurrentDPCPPStream(DPCPPStream stream) {
-  initDPCPPQueuesOnce();
-  current_queues[stream.device_index()] = stream.id();
+  initDPCPPStreamsOnce();
+  current_streams[stream.device_index()] = stream.id();
 }
 
 std::ostream& operator<<(std::ostream& stream, const DPCPPStream& s) {
@@ -172,7 +172,7 @@ std::ostream& operator<<(std::ostream& stream, const DPCPPStream& s) {
 }
 
 void deviceSynchronize(DeviceIndex device_index) {
-  initDPCPPQueuesOnce();
+  initDPCPPStreamsOnce();
   if (device_index == -1)
     device_index = xpu::dpcpp::current_device();
   check_device_index(device_index);

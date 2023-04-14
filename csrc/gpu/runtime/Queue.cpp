@@ -32,10 +32,6 @@ static std::vector<std::array<std::unique_ptr<sycl::queue>, kQueuesPerPool>>
     reserved_queues;
 static std::deque<std::atomic<uint32_t>> reserved_counters;
 
-// Thread-local current queues, it stores StreamId that can calculate QueueIndex
-// that can retrieve the current queue from queue pool.
-static thread_local std::unique_ptr<StreamId[]> current_queues = nullptr;
-
 } // anonymous namespace
 
 // Warning: this function must only be called once!
