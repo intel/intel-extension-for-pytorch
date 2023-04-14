@@ -289,6 +289,27 @@ class TestNNMethod(TestCase):
         self.assertEqual(real.cpu(), ref)
         self.assertEqual(y_dpcpp_gw.cpu(), y_cpu_gw)
 
+    def test_conv2d_blk_with_h1w1(self, dtype=torch.float):
+        x_cpu = torch.randn([128, 256, 1, 1], dtype=dtype, device=cpu_device, requires_grad=True)
+        grad_cpu = torch.full([128, 1, 1, 1], 1e-3, dtype=dtype, device=cpu_device, requires_grad=True)
+        conv_cpu = nn.Conv2d(256, 1, kernel_size=(1, 1), stride=(1, 1))
+        y_cpu = conv_cpu(x_cpu)
+        y_cpu.backward(grad_cpu)
+        y_cpu_gw = conv_cpu.weight.grad.detach().clone()
+
+        conv_cpu.zero_grad()
+
+        with torch.xpu.onednn_layout():
+            x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
+            grad_dpcpp = grad_cpu.to(dpcpp_device)
+            conv_dpcpp = conv_cpu.to(dpcpp_device)
+            y_dpcpp = conv_dpcpp(x_dpcpp)
+            y_dpcpp.backward(grad_dpcpp)
+            y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
+
+            self.assertEqual(y_cpu, y_dpcpp.cpu())
+            self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu())
+
     def test_group_conv_blk(self, dtype=torch.float):
         conv = nn.Conv2d(256, 64, kernel_size=3, stride=1, padding=1, bias=False, groups=2).to(cpu_device)
         x = torch.randn([1, 256, 3, 3], dtype=torch.float, device=cpu_device, requires_grad=True).to(cpu_device)
