@@ -185,9 +185,9 @@ class DistributedTrainingLauncher(Launcher):
         cmd.append(args.program)
         cmd.extend(args.program_args)
         log_name = f'{args.log_file_prefix}.log'
-        log_name = os.path.join(args.log_path, log_name)
+        log_name = os.path.join(args.log_dir, log_name)
         cmd_s = ' '.join(cmd)
-        if args.log_path:
+        if args.log_dir:
             cmd_s = f'{cmd_s} 2>&1 | tee {log_name}'
         self.verbose('info', cmd_s)
         process = subprocess.Popen(cmd_s, env=os.environ, shell=True)

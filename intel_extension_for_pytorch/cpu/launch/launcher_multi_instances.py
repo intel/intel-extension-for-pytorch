@@ -158,11 +158,11 @@ class MultiInstancesLauncher(Launcher):
             cmd.append('-m')
         cmd.append(args.program)
         log_name = f'{args.log_file_prefix}_instance_{index}_cores_{cores_list_local.replace(",", "_")}.log'
-        log_name = os.path.join(args.log_path, log_name)
+        log_name = os.path.join(args.log_dir, log_name)
         cmd.extend(args.program_args)
         os.environ['LAUNCH_CMD'] += '{" ".join(cmd)},#'
         cmd_s = ' '.join(cmd)
-        if args.log_path:
+        if args.log_dir:
             cmd_s = f'{cmd_s} 2>&1 | tee {log_name}'
         self.verbose('info', cmd_s)
         if len(set([c.node for c in pool])) > 1:
