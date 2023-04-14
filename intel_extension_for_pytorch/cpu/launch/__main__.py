@@ -130,6 +130,7 @@ def add_deprecated_params(parser):
     group.add_argument('--disable_numactl', action='store_true', default=False, help='Deprecated by --multi-task-manager.')
     group.add_argument('--disable_taskset', action='store_true', default=False, help='Deprecated by --multi-task-manager.')
     group.add_argument('--disable_iomp', action='store_true', default=False, help='Deprecated by --omp-runtime.')
+    group.add_argument('--log_path', type=str, default='', help='Deprecated by --log-dir.')
     group.add_argument('--multi_instance', action='store_true', default=False, help='Deprecated. Will be removed.')
     group.add_argument('--distributed', action='store_true', default=False, help='Deprecated. Will be removed.')
 
@@ -155,6 +156,9 @@ def process_deprecated_params(args, logger):
     if args.use_logical_core:
         logger.warning('Argument --use_logical_core is deprecated by --use-logical-cores.')
         args.use_logical_cores = args.use_logical_core
+    if args.log_path != '':
+        logger.warning('Argument --log_path is deprecated by --log-dir.')
+        args.log_dir = args.log_path
 
     if args.multi_instance:
         logger.info('Argument --multi_instance is deprecated. Will be removed. If you are using the deprecated argument, please update it to the new one.')
@@ -251,8 +255,8 @@ This is a script for launching PyTorch training and inference on Intel Xeon CPU 
     )
 
     parser.add_argument(
-        '--log-path',
-        '--log_path',
+        '--log-dir',
+        '--log_dir',
         default='',
         type=str,
         help='The log file directory. Setting it to empty disables logging to files.',
@@ -299,14 +303,14 @@ def main():
 
     args = parser.parse_args()
     process_deprecated_params(args, logger)
-    if args.log_path:
-        path = os.path.dirname(args.log_path if args.log_path.endswith('/') else f'{args.log_path}/')
+    if args.log_dir:
+        path = os.path.dirname(args.log_dir if args.log_dir.endswith('/') else f'{args.log_dir}/')
         if not os.path.exists(path):
             os.makedirs(path)
-        args.log_path = path
+        args.log_dir = path
 
         args.log_file_prefix = f'{args.log_file_prefix}_{datetime.now().strftime("%Y%m%d%H%M%S")}'
-        fileHandler = logging.FileHandler(f'{args.log_path}/{args.log_file_prefix}_instances.log')
+        fileHandler = logging.FileHandler(f'{args.log_dir}/{args.log_file_prefix}_instances.log')
         logFormatter = logging.Formatter(format_str)
         fileHandler.setFormatter(logFormatter)
         logger.addHandler(fileHandler)
