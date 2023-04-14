@@ -335,8 +335,10 @@ static void cat(
   int64_t offset;
   bool hasSkippedInput = false;
   Tensor notSkippedTensor; // non-owning reference
+  // empty tensor includes size[0], size[0, 0, ..., 0] (n-dim).
+  // here we only skip size[0], other empty sizes are not skipped.
   auto should_skip = [](const Tensor& t) {
-    return !t.defined() && t.dim() == 1;
+    return t.numel() == 0 && t.dim() == 1;
   };
   int nDims = 0;
 

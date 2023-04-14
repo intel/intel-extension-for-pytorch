@@ -131,3 +131,17 @@ class TestTorchMethod(TestCase):
         x_xpu2 = x_cpu2.clone().to("xpu:1")
         res_xpu = torch.cat((x_xpu1, x_xpu2))
         self.assertEqual(res_cpu, res_xpu.cpu())
+
+    def test_cat_size0_tensor(self):
+        output1_cpu = torch.cat((torch.tensor([],device='cpu'), torch.tensor([1],device='cpu')), dim=0)
+        output2_cpu = torch.cat((torch.tensor([],device='cpu'), torch.tensor([1,2],device='cpu')), dim=0)
+        output3_cpu = torch.cat((torch.tensor([],device='cpu'), torch.tensor([[1,2],[3,4]],device='cpu')), dim=0)
+        output4_cpu = torch.cat((torch.tensor([],device='cpu'), torch.tensor([[[1]],[[2]]],device='cpu')), dim=0)
+        output1_xpu = torch.cat((torch.tensor([],device='xpu'), torch.tensor([1],device='xpu')), dim=0)
+        output2_xpu = torch.cat((torch.tensor([],device='xpu'), torch.tensor([1,2],device='xpu')), dim=0)
+        output3_xpu = torch.cat((torch.tensor([],device='xpu'), torch.tensor([[1,2],[3,4]],device='xpu')), dim=0)
+        output4_xpu = torch.cat((torch.tensor([],device='xpu'), torch.tensor([[[1]],[[2]]],device='xpu')), dim=0)
+        self.assertEqual(output1_cpu, output1_xpu.cpu())
+        self.assertEqual(output2_cpu, output2_xpu.cpu())
+        self.assertEqual(output3_cpu, output3_xpu.cpu())
+        self.assertEqual(output4_cpu, output4_xpu.cpu())
