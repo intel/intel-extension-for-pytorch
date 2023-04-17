@@ -339,6 +339,9 @@ std::tuple<Tensor, Tensor> batch_norm_gather_stats_xpu_template(
   const auto ngroups = (features + wgroup_size - 1) / wgroup_size;
 
   int world_size = mean_.size(0);
+  // Avoid double issues in ATSM
+  float momentum_ = momentum;
+  float epsilon_ = epsilon;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(
@@ -354,24 +357,24 @@ std::tuple<Tensor, Tensor> batch_norm_gather_stats_xpu_template(
             for (int j = 0; j < world_size; j++) {
               scalar_t count = counts[j];
               accscalar_t m = mean[j][tid];
-              accscalar_t v = accscalar_t(1.0) / (invstd[j][tid]);
-              v = (v * v - epsilon) * count;
-              accscalar_t factor = 1.0 / (n + count);
+              accscalar_t v = accscalar_t(1.0f) / (invstd[j][tid]);
+              v = (v * v - epsilon_) * count;
+              accscalar_t factor = 1.0f / (n + count);
               var_n += v + (avg - m) * (avg - m) * n * count * factor;
               avg = n * factor * avg + count * factor * m;
               n += count;
             }
             save_mean[tid] = avg;
             save_invstd[tid] = static_cast<accscalar_t>(1) /
-                Numerics<accscalar_t>::sqrt(var_n / n + epsilon);
+                Numerics<accscalar_t>::sqrt(var_n / n + epsilon_);
             if (running_mean != nullptr) {
               running_mean[tid] = static_cast<scalar_t>(
-                  (1 - momentum) * running_mean[tid] + momentum * avg);
+                  (1 - momentum_) * running_mean[tid] + momentum_ * avg);
             }
             accscalar_t unbiasedVar = var_n / (n - 1);
             if (running_var != nullptr) {
               running_var[tid] = static_cast<scalar_t>(
-                  (1 - momentum) * running_var[tid] + momentum * unbiasedVar);
+                  (1 - momentum_) * running_var[tid] + momentum_ * unbiasedVar);
             }
           }
         });
