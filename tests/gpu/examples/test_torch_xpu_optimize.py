@@ -282,7 +282,7 @@ class TestTorchMethod(TestCase):
         for optimizer_string in SUPPORTED_FUSION_OPTIMIZER:
             print('checking optimizer: ', optimizer_string)
             support_dtype_list = [torch.float32, torch.bfloat16]
-            if optimizer_string.lower() == "adam":
+            if optimizer_string.lower() == "adam" or optimizer_string.lower() == "sgd":
                 support_dtype_list.append(torch.float64)
             for dtype in support_dtype_list:
                 print('checking dtype: ', dtype)
