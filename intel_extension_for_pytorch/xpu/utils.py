@@ -2,6 +2,7 @@
 import torch
 from .. import _C
 from enum import Enum
+import warnings
 from .. import frontend
 import intel_extension_for_pytorch  # noqa
 
@@ -25,12 +26,27 @@ def from_usm(src, dtype, shape, stride = None, device_id: int = -1) -> torch.Ten
             returned tensor is contiguous.
         device_id: the root device id where the USM pointer is allocated. Default: -1,
             if the user is not sure.
+
+    Warning: This is decrepated. Please use torch.from_dlpack instead.
     """
 
+    warnings.warn("from_usm is decrepated. Please use torch.from_dlpack instead.")
     return _C._from_usm(src, dtype, shape, stride, device_id)
 
 
 def to_usm(src: torch.Tensor):
+    """to_usm(src: torch.Tensor): -> PyCapsule
+
+    Converts a torch tensor allocated in USM(United Shared Memory) into a ``PyCapsule``,
+    which encapsules a USM data pointer address.
+
+    Args:
+        src: a torch tensor.
+
+    Warning: This is decrepated. Please use torch.to_dlpack instead.
+    """
+
+    warnings.warn("to_usm is decrepated. Please use torch.to_dlpack instead.")
     return _C._to_usm(src)
 
 
