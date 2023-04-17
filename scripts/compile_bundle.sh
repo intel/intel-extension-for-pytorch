@@ -1,5 +1,6 @@
 #!/bin/bash
 set -x
+set -e
 
 VER_LLVM="llvmorg-13.0.0"
 VER_PYTORCH="v1.13.1"
@@ -13,6 +14,16 @@ if [[ $# -lt 2 ]]; then
     echo "AOT is optional, should be the text string for environment variable USE_AOT_DEVLIST."
     exit 1
 fi
+
+CC="${CC:-/usr/bin/gcc}"
+
+if ${CC} -v 2>&1 | grep "version 11"; then
+    echo "gcc version 11 is installed."
+else
+    echo "gcc version 11 is not installed."
+    exit 2
+fi
+
 DPCPP_ROOT=$1
 ONEMKL_ROOT=$2
 AOT=""
@@ -105,7 +116,7 @@ python -m pip install cmake
 # Compile individual component
 #  LLVM
 cd ../llvm-project
-git config --global --add safe.directory `pwd`
+
 if [ -d build ]; then
     rm -rf build
 fi
@@ -123,10 +134,10 @@ ln -s ${LLVM_ROOT}/bin/llvm-config ${LLVM_ROOT}/bin/llvm-config-13
 export PATH=${LLVM_ROOT}/bin:$PATH
 export LD_LIBRARY_PATH=${LLVM_ROOT}/lib:$LD_LIBRARY_PATH
 cd ..
-git config --global --unset safe.directory
+
 #  PyTorch
 cd ../pytorch
-git config --global --add safe.directory `pwd`
+
 git stash
 git clean -f
 git apply ../intel-extension-for-pytorch/torch_patches/*.patch
@@ -153,28 +164,28 @@ unset LLVM_DIR
 unset USE_LLVM
 python -m pip uninstall -y mkl-static mkl-include
 python -m pip install --force-reinstall dist/*.whl
-git config --global --unset safe.directory
+
 #  TorchVision
 cd ../vision
-git config --global --add safe.directory `pwd`
+
 conda install -y libpng jpeg
 python setup.py clean
 python setup.py bdist_wheel 2>&1 | tee build.log
 python -m pip install --force-reinstall --no-deps dist/*.whl
 python -m pip install Pillow
-git config --global --unset safe.directory
+
 #  TorchAudio
 cd ../audio
-git config --global --add safe.directory `pwd`
+
 conda install -y bzip2
 python -m pip install -r requirements.txt
 python setup.py clean
 python setup.py bdist_wheel 2>&1 | tee build.log
 python -m pip install --force-reinstall --no-deps dist/*.whl
-git config --global --unset safe.directory
+
 #  Intel® Extension for PyTorch*
 cd ../intel-extension-for-pytorch
-git config --global --add safe.directory `pwd`
+
 python -m pip install -r requirements.txt
 source ${DPCPP_ENV}
 source ${ONEMKL_ENV}
@@ -193,7 +204,6 @@ if [[ ! ${AOT} == "" ]]; then
     unset USE_AOT_DEVLIST
 fi
 python -m pip install --force-reinstall dist/*.whl
-git config --global --unset safe.directory
 
 # Sanity Test
 cd ..
