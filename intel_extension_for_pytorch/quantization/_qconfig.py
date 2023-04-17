@@ -6,6 +6,7 @@ from torch.ao.quantization import (
     QConfig,
     QConfigMapping,
 )
+from ._smooth_quant import SmoothQuantActivationObserver, SmoothQuantWeightObserver
 
 
 _default_weight_observer = PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric)
@@ -25,3 +26,41 @@ Default qconfig configuration for dynamic quantization.
 """
 
 default_dynamic_qconfig_mapping = QConfigMapping().set_global(default_dynamic_qconfig)
+
+def get_smooth_quant_qconfig_mapping(
+        alpha=0.5,
+        act_observer=None,
+        act_ic_observer=None,
+        wei_observer=None,
+        wei_ic_observer=None):
+    """
+    Configuration with SmoothQuant for static quantization of large language models (LLM)
+    For SmoothQuant, see https://arxiv.org/pdf/2211.10438.pdf
+    Arguments:
+        alpha:              Hyper-parameter for SmoothQuant.
+        act_observer:       Observer for activation of ops other than nn.Linear. HistogramObserver by default.
+                            For nn.Linear with SmoothQuant enabled, q-param is calculated based on act_ic_observer's
+                            and wei_ic_observer's min/max. It is not affected by this argument.
+        act_ic_observer:    Per-input-channel Observer for activation. For nn.Linear with SmoothQuant enabled only.
+                            PerChannelMinMaxObserver by default.
+        wei_observer:       Observer for weight of all weighted ops. For nn.Linear with SmoothQuant enabled, it
+                            calculates q-params after applying scaling factors. PerChannelMinMaxObserver by default.
+        wei_ic_observer:    Per-input-channel Observer for weight. For nn.Linear with SmoothQuant enabled only.
+                            PerChannelMinMaxObserver by default.
+    """
+    qconfig = QConfig(
+        activation=SmoothQuantActivationObserver.with_args(
+            reduce_range=False,
+            alpha=alpha,
+            act_observer=act_observer,
+            act_ic_observer=act_ic_observer
+        ),
+        weight=SmoothQuantWeightObserver.with_args(
+            dtype=torch.qint8,
+            qscheme=torch.per_channel_symmetric,
+            alpha=alpha,
+            wei_observer=wei_observer,
+            wei_ic_observer=wei_ic_observer
+        )
+    )
+    return QConfigMapping().set_global(qconfig)

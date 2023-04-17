@@ -7,6 +7,7 @@ from ._utils import OpQuantizeabilityType, is_leaf, get_fqn_valid_for_module_dic
 from ._quantization_state_utils import SeenQOpInfo, SeenNonQOpInfo, QTensorInfo, op_needs_quantization, get_input_observed_arg_idxs, \
     get_weight_arg_idx, iterate_and_apply, get_input_args_quant_dequant_info, _raise_obs_not_found_error, get_weight_args_quant_dequant_info, \
     _raise_obs_op_mismatch, ops_are_related, iterate_and_apply_convert
+from ._smooth_quant import SmoothQuantActivationObserver, SmoothQuantWeightObserver
 
 
 OpConvertInfo = Tuple[
@@ -58,6 +59,10 @@ class AutoQuantizationState(torch.nn.Module):
         self.idx_to_op_convert_info: Dict[int, OpConvertInfo] = {}
         self.weight_tensor_id_to_scale_zp: Dict[str, Tuple[torch.Tensor, torch.Tensor]] = {}
         self.idx_to_op_weight_convert_info: Dict[int, OpConvertInfo] = {}
+        self.tensor_id_to_smooth_quant_scaling_factor: Dict[int, torch.Tensor] = {}
+        self.weight_tensor_id_to_smooth_quant_scaling_factor: Dict[int, torch.Tensor] = {}
+        self.idx_to_smooth_quant_scaling_factor: Dict[str, torch.Tensor] = {}
+        self.idx_to_weight_updated_for_smooth_quant: set[str] = set()
 
     def get_extra_state(self):
         return {"tensor_id_to_scale_zp": self.tensor_id_to_scale_zp}
@@ -326,6 +331,15 @@ class AutoQuantizationState(torch.nn.Module):
         # * can quantize args (via arg_quant_infos)
         # * can add scale and zp (via additional kwargs)
         arg_quant_infos, any_arg_quant_or_dequant_needed = self.get_op_convert_info(op)
+        # Insert mul before nn.Linear for SmoothQuant
+        act_key = str(self.idx)
+        if act_key in self.idx_to_smooth_quant_scaling_factor:
+            act_scaling_factors = \
+                self.idx_to_smooth_quant_scaling_factor[act_key]
+            if act_scaling_factors is not None:
+                args = list(args)
+                new_act = torch.mul(args[0], act_scaling_factors)
+                args[0] = new_act
         args = iterate_and_apply_convert(args, arg_quant_infos, any_arg_quant_or_dequant_needed, op)
         return op, args, kwargs
 
@@ -361,6 +375,13 @@ class AutoQuantizationState(torch.nn.Module):
                     arg = arg.dequantize()
                     arg = arg.to(torch.bfloat16)
                 else:
+                    # Update weight of nn.Linear for SmoothQuant
+                    wei_key = str(self.idx) + '_0'
+                    if wei_key in self.idx_to_smooth_quant_scaling_factor:
+                        wei_scaling_factors = \
+                            self.idx_to_smooth_quant_scaling_factor[wei_key]
+                        if wei_scaling_factors is not None:
+                            weight = torch.mul(weight, wei_scaling_factors)
                     if scale.numel() > 1:
                         arg = torch.quantize_per_channel(weight, scale, zp, ch_axis, dtype)
                     else:
@@ -711,6 +732,7 @@ class AutoQuantizationState(torch.nn.Module):
             seen_q_op_info.type, seen_q_op_info.type_is_module)
 
         qconfig = seen_q_op_info.qconfig
+        found_duplicate_input = False
         for idx, tensor_info in enumerate(seen_q_op_info.input_tensor_infos):
             if tensor_info is None:
                 continue
@@ -734,7 +756,10 @@ class AutoQuantizationState(torch.nn.Module):
                         obs = qconfig.weight()
                 else:
                     obs = qconfig.activation()
-                self.tensor_id_to_observer[str(tensor_id)] = obs
+                if str(tensor_id) not in self.tensor_id_to_observer:
+                    self.tensor_id_to_observer[str(tensor_id)] = obs
+                else:
+                    found_duplicate_input = True
         
         # add weight observer if the op is nn.module and has a weight.
         for tensor_info in seen_q_op_info.weight_tensor_infos:
@@ -765,6 +790,36 @@ class AutoQuantizationState(torch.nn.Module):
                     obs = qconfig.weight()
                     self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(tensor_id)] = obs
                     self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(tensor_id + 1)] = obs
+
+        # SmoothQuant: Linear activation observer and weight observer should know each other
+        if seen_q_op_info.type == str(torch.nn.Linear) and \
+                qconfig is not None and \
+                isinstance(qconfig.activation(), SmoothQuantActivationObserver) and \
+                isinstance(qconfig.weight(), SmoothQuantWeightObserver):
+            x_tensor_id = seen_q_op_info.input_tensor_infos[0].id
+            w_tensor_id = seen_q_op_info.weight_tensor_infos[0].id
+            x_obs = self.tensor_id_to_observer[str(x_tensor_id)]
+            w_obs = self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(w_tensor_id)]
+            # Duplicate input:
+            # (1) In modules like MHA, multiple linear layers may share the same activation tensor
+            #   In other words, multiple weight tensors share one activation tensor
+            #   In this case, we regard these weights as a single big tensor (i.e., concat along OC axis).
+            #   When calculating scaling factor, consider per-IC min/max of the big tensor
+            #   So, these weights share the same per-IC observer
+            # (2) It is also possible that linear shares activation with some non-weighted op.
+            #   In that case, x_obs.weight_obs is not set. Also check it here.
+            if not found_duplicate_input or x_obs.weight_obs is None:
+                x_obs.weight_obs = w_obs.ic_obs
+            else:
+                # The input (activation) has been used by other linear ops
+                # Weight should share the same per-IC observer with that linear
+                w_obs.ic_obs = x_obs.weight_obs
+            # In all cases, weight observer holds a reference to activation's per-IC observer
+            w_obs.act_obs = x_obs.ic_obs
+            # For all linear ops, set smooth_quant_enabled to true
+            # Otherwise the observers just act as normal observers
+            x_obs.smooth_quant_enabled = True
+            w_obs.smooth_quant_enabled = True
 
     def _maybe_insert_output_observers(
         self,
