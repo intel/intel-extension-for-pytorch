@@ -83,10 +83,14 @@ class DeepspeedTester(TestCase):
             self.assertTrue(module_found(ds_model, LinearAllreduce))
 
             optimized = ipex.optimize(ds_model.eval(), inplace=True)
+            jit_optimized = torch.jit.trace(optimized, x)
+            jit_optimized = torch.jit.freeze(jit_optimized)
             self.assertTrue(module_found(optimized, _IPEXLinear))
             self.assertTrue(module_found(optimized, _IPEXLinearAllreduce))
 
             optimized = optimized(x)
+            jit_res = jit_optimized(x)
+            self.assertEqual(y, jit_res)
             self.assertEqual(y, optimized)
 
     def test_dynamic_quantization(self):

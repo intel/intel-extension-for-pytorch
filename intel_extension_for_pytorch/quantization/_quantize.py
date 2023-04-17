@@ -194,8 +194,7 @@ class DynamicQuantizedLinearAllreduce(_IPEXDynamicQuantizedLinear):
         output = Y.to(x.dtype)
 
         if self.mp_group is not None:
-            ar = torch.ops.aten.all_reduce(output, 'sum', "", list(torch.arange(int(os.environ['WORLD_SIZE']))), int(os.environ['WORLD_SIZE']))
-            output = torch.ops.aten.wait_tensor(ar)
+            torch.ops.deepspeed_comm.all_reduce(output, 'sum', "", list(torch.arange(int(os.environ['WORLD_SIZE']))), int(os.environ['WORLD_SIZE']))
 
         if self.original_bias is not None:
             output += self.original_bias

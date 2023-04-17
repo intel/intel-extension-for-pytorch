@@ -9,7 +9,6 @@ import os
 from intel_extension_for_pytorch import optim, frontend
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _using_dnnl
 import intel_extension_for_pytorch._C as core
-import torch.distributed._functional_collectives as ft_c
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +21,30 @@ def may_import_deepspeed_modules():
         return LinearAllreduce, LinearLayer
     except ImportError:
         return None
+    
+if may_import_deepspeed_modules() is not None:
+    #register ds comm as the kernel of aten.all_reduce 
+    #to align the _IPEX_LinearAllreduce with LinearAllreduce 
+    import torch.distributed as dist
+    import torch.distributed.distributed_c10d as c10d
+    from deepspeed import comm
+    def _all_reduce(self, reduceOp, tag, ranks, group_size):    
+        prefer_deepspeed_comm = os.environ.get("PREFER_DEEPSPEED_COMM")
+        if prefer_deepspeed_comm:
+            comm.all_reduce(self, async_op=False)
+        else:
+            reduceOp = reduceOp.upper()
+            op = dist.ReduceOp.RedOpType.__members__.get(reduceOp)
+            if op is None:
+                raise ValueError(f"Invalid reduce operation {reduceOp}")
+            group = c10d._find_or_create_pg_by_ranks_and_tag(tag, ranks, group_size)
+            assert group is not None
+            comm.all_reduce(self, group=group, op=op, async_op=False)
+        return self 
+    ds_comm = torch.library.Library("deepspeed_comm", "DEF")
+    ds_comm.define("all_reduce(Tensor self, str reduceOp, str tag, int[] ranks, int group_size) -> Tensor")
+    ds_comm_lib_cpu = torch.library.Library("deepspeed_comm", "IMPL", "CPU") 
+    ds_comm_lib_cpu.impl("all_reduce", _all_reduce) 
 
 def _save_weight_bias_to_state_dict(self, destination, prefix):
     if self.bias is not None:
@@ -263,8 +286,7 @@ class _IPEXLinearAllreduce(_IPEXLinear):
 
     def post_ipex_gemm(self, output):
         if self.mp_group is not None:
-            ar = torch.ops.aten.all_reduce(output, 'sum', "", list(torch.arange(int(os.environ['WORLD_SIZE']))), int(os.environ['WORLD_SIZE']))
-            output = torch.ops.aten.wait_tensor(ar)
+            torch.ops.deepspeed_comm.all_reduce(output, 'sum', "", list(torch.arange(int(os.environ['WORLD_SIZE']))), int(os.environ['WORLD_SIZE']))
 
         if self.module_bias is not None:
             output += self.module_bias
