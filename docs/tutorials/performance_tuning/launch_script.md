@@ -32,6 +32,8 @@ Launcher Common Arguments:
 
 | knob | type | default value | help |
 | :-- | :--: | :--: | :-- |
+| `--ncores-per-instance` | int | 0 | Number of cores per instance |
+| `--nodes-list` | str | '' | Specify nodes list for multiple instances to run on, in format of list of single node ids "node_id,node_id,..." or list of node ranges "node_id-node_id,...". By default all nodes will be used. |
 | `--memory-allocator` | str | 'auto' | Choose which memory allocator to run the workloads with. Supported choices are ['auto', 'default', 'tcmalloc', 'jemalloc']. |
 | `--omp-runtime` | str | 'auto' | Choose which OpenMP runtime to run the workloads with. Supported choices are ['auto', 'default', 'intel']. |
 
@@ -39,7 +41,6 @@ Multi-instance Arguments:
 
 | knob | type | default value | help |
 | :-- | :--: | :--: | :-- |
-| `--ncores-per-instance` | int | 0 | Number of cores per instance |
 | `--ninstances` | int | 0 | Number of instances |
 | `--instance-idx` | int | -1 | Inside the multi instance list, execute a specific instance at index. If it is set to -1, run all of them. |
 | `--use-logical-cores` | - | False | Use logical cores on the workloads or not. By default, only physical cores are used. |
@@ -47,7 +48,6 @@ Multi-instance Arguments:
 | `--multi-task-manager` | str | 'auto' | Choose which multi task manager to run the workloads with. Supported choices are ['auto', 'none', 'numactl', 'taskset']. |
 | `--latency-mode` | - | False | Use 4 cores per instance over all physical cores. |
 | `--throughput-mode` | - | False | Run one instance per node with all physical cores. |
-| `--nodes-list` | str | '' | Specify nodes list for multiple instances to run on, in format of list of single node ids "node_id,node_id,..." or list of node ranges "node_id-node_id,...". By default all nodes will be used. |
 | `--cores-list` | str | '' | Specify cores list for multiple instances to run on, in format of list of single core ids "core_id,core_id,..." or list of core ranges "core_id-core_id,...". By default all cores will be used. |
 | `--benchmark` | - | False | Enable benchmark config. JeMalloc's MALLOC_CONF has been tuned for low latency. Recommend to use this for benchmarking purpose; for other use cases, this MALLOC_CONF may cause Out-of-Memory crash. |
 
@@ -56,7 +56,7 @@ Distributed Training Arguments With oneCCL backend:
 | knob | type | default value | help |
 | :-- | :--: | :--: | :-- |
 | `--nnodes` | int | 0 | Number of machines/devices to use for distributed training |
-| `--nprocs-per-node` | int | 2 | Number of processes run on each machine/device |
+| `--nprocs-per-node` | int | 0 | Number of processes run on each machine/device. It is by default the number of available nodes when set to `0`. Argument `--nodes-list` affects this default value. |
 | `--ccl-worker-count` | int | 4 | Number of cores per rank for ccl communication |
 | `--logical-cores-for-ccl` | - | False | Use logical cores for the ccl worker. |
 | `--master-addr` | str | 127.0.0.1 | Address of master node (rank 0), should be either IP address or hostname of node 0. For single node multi-proc training, the --master-addr can simply be 127.0.0.1. |

@@ -100,30 +100,42 @@ class TestLauncher(TestCase):
     def test_memory_allocator_setup(self):
         launcher = Launcher()
 
-        # tcmalloc
-        launcher.set_memory_allocator(memory_allocator='tcmalloc')
+        # preset ld_preload
+        ld_preload_bk = os.getenv('LD_PRELOAD', 'UNSET')
+        os.environ['LD_PRELOAD'] = 'LD_PRELOAD_TEST'
         find_tcmalloc = self.find_lib('tcmalloc')
-        ld_preload_in_os = 'LD_PRELOAD' in os.environ
-        tcmalloc_enabled = 'libtcmalloc.so' in os.environ['LD_PRELOAD'] if ld_preload_in_os else False
+        launcher.set_memory_allocator(memory_allocator='tcmalloc')
+        tcmalloc_enabled = 'libtcmalloc.so' in launcher.environ_set['LD_PRELOAD']
+        self.assertEqual(find_tcmalloc, tcmalloc_enabled)
+        self.assertEqual('LD_PRELOAD_TEST' in launcher.environ_set['LD_PRELOAD'], True)
+        if ld_preload_bk == 'UNSET':
+            del os.environ['LD_PRELOAD']
+        else:
+            os.environ['LD_PRELOAD'] = ld_preload_bk
+
+        # tcmalloc
+        find_tcmalloc = self.find_lib('tcmalloc')
+        launcher.set_memory_allocator(memory_allocator='tcmalloc')
+        tcmalloc_enabled = 'libtcmalloc.so' in launcher.environ_set['LD_PRELOAD']
         self.assertEqual(find_tcmalloc, tcmalloc_enabled)
 
         # jemalloc
-        launcher.set_memory_allocator(memory_allocator='jemalloc')
         find_jemalloc = self.find_lib('jemalloc')
-        ld_preload_in_os = 'LD_PRELOAD' in os.environ
-        jemalloc_enabled = 'libjemalloc.so' in os.environ['LD_PRELOAD'] if ld_preload_in_os else False
+        launcher.set_memory_allocator(memory_allocator='jemalloc')
+        jemalloc_enabled = 'libjemalloc.so' in launcher.environ_set['LD_PRELOAD']
         self.assertEqual(find_jemalloc, jemalloc_enabled)
         if jemalloc_enabled:
-            self.assertTrue('MALLOC_CONF' in os.environ)
-            self.assertTrue(os.environ['MALLOC_CONF'] == 'oversize_threshold:1,background_thread:true,metadata_thp:auto')
+            self.assertTrue('MALLOC_CONF' in launcher.environ_set)
+            self.assertTrue(launcher.environ_set['MALLOC_CONF'] == 'oversize_threshold:1,background_thread:true,metadata_thp:auto')
 
         self.del_env('MALLOC_CONF')
         launcher.set_memory_allocator(memory_allocator='jemalloc', benchmark=True)
         if jemalloc_enabled:
-            self.assertTrue('MALLOC_CONF' in os.environ)
-            self.assertTrue(os.environ['MALLOC_CONF'] == 'oversize_threshold:1,background_thread:false,metadata_thp:always,dirty_decay_ms:-1,muzzy_decay_ms:-1')
+            self.assertTrue('MALLOC_CONF' in launcher.environ_set)
+            self.assertTrue(launcher.environ_set['MALLOC_CONF'] == 'oversize_threshold:1,background_thread:false,metadata_thp:always,dirty_decay_ms:-1,muzzy_decay_ms:-1')
 
     def test_mpi_pin_domain_and_ccl_worker_affinity(self):
+        # HT ON, use_logical_cores ON
         nprocs_per_node = 2
         ccl_worker_count = 4
         lscpu_txt = self.construct_numa_config(nprocs_per_node, 28, enable_ht=True, numa_mode=1)
@@ -134,6 +146,58 @@ class TestLauncher(TestCase):
         expect_pin_domain = '[0xffffff0,0xffffff00000000]'
         self.assertEqual(pin_domain_affinity['pin_domain'], expect_pin_domain)
         expected_ccl_worker_affinity = '0,1,2,3,28,29,30,31'
+        self.assertEqual(pin_domain_affinity['affinity'], expected_ccl_worker_affinity)
+
+        # HT ON, use_logical_cores OFF
+        nprocs_per_node = 2
+        ccl_worker_count = 4
+        lscpu_txt = self.construct_numa_config(nprocs_per_node, 28, enable_ht=True, numa_mode=1)
+        launcher = DistributedTrainingLauncher(lscpu_txt=lscpu_txt)
+
+        launcher.cpuinfo.gen_pools_ondemand(ninstances=nprocs_per_node, use_logical_cores=True)
+        pin_domain_affinity = launcher.get_pin_domain_affinity(launcher.cpuinfo.pools_ondemand, ccl_worker_count, logical_cores_for_ccl=True)
+        expect_pin_domain = '[0xfffffff,0xfffffff0000000]'
+        self.assertEqual(pin_domain_affinity['pin_domain'], expect_pin_domain)
+        expected_ccl_worker_affinity = '56,57,58,59,84,85,86,87'
+        self.assertEqual(pin_domain_affinity['affinity'], expected_ccl_worker_affinity)
+
+        # HT OFF, use_logical_cores ON
+        nprocs_per_node = 2
+        ccl_worker_count = 4
+        lscpu_txt = self.construct_numa_config(nprocs_per_node, 28, enable_ht=False, numa_mode=1)
+        launcher = DistributedTrainingLauncher(lscpu_txt=lscpu_txt)
+
+        launcher.cpuinfo.gen_pools_ondemand(ninstances=nprocs_per_node, use_logical_cores=True)
+        pin_domain_affinity = launcher.get_pin_domain_affinity(launcher.cpuinfo.pools_ondemand, ccl_worker_count, logical_cores_for_ccl=True)
+        expect_pin_domain = '[0xffffff0,0xffffff00000000]'
+        self.assertEqual(pin_domain_affinity['pin_domain'], expect_pin_domain)
+        expected_ccl_worker_affinity = '0,1,2,3,28,29,30,31'
+        self.assertEqual(pin_domain_affinity['affinity'], expected_ccl_worker_affinity)
+
+        # nodes_list
+        nprocs_per_node = 2
+        ccl_worker_count = 2
+        lscpu_txt = self.construct_numa_config(4, 14, enable_ht=True, numa_mode=1)
+        launcher = DistributedTrainingLauncher(lscpu_txt=lscpu_txt)
+
+        launcher.cpuinfo.gen_pools_ondemand(ninstances=nprocs_per_node, nodes_list=[1,2], use_logical_cores=True)
+        pin_domain_affinity = launcher.get_pin_domain_affinity(launcher.cpuinfo.pools_ondemand, ccl_worker_count)
+        expect_pin_domain = '[0xfff0000,0x3ffc0000000]'
+        self.assertEqual(pin_domain_affinity['pin_domain'], expect_pin_domain)
+        expected_ccl_worker_affinity = '14,15,28,29'
+        self.assertEqual(pin_domain_affinity['affinity'], expected_ccl_worker_affinity)
+
+        # ncores_per_instance
+        nprocs_per_node = 2
+        ccl_worker_count = 4
+        lscpu_txt = self.construct_numa_config(nprocs_per_node, 28, enable_ht=True, numa_mode=1)
+        launcher = DistributedTrainingLauncher(lscpu_txt=lscpu_txt)
+
+        launcher.cpuinfo.gen_pools_ondemand(ninstances=nprocs_per_node, ncores_per_instance=(8+ccl_worker_count)*nprocs_per_node, use_logical_cores=True)
+        pin_domain_affinity = launcher.get_pin_domain_affinity(launcher.cpuinfo.pools_ondemand, ccl_worker_count)
+        expect_pin_domain = '[0xff0,0xff0000]'
+        self.assertEqual(pin_domain_affinity['pin_domain'], expect_pin_domain)
+        expected_ccl_worker_affinity = '0,1,2,3,12,13,14,15'
         self.assertEqual(pin_domain_affinity['affinity'], expected_ccl_worker_affinity)
 
     def test_launcher_scripts(self):

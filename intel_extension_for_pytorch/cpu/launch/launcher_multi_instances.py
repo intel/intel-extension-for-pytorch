@@ -16,13 +16,6 @@ class MultiInstancesLauncher(Launcher):
         group = parser.add_argument_group('Multi-instance Arguments')
         # multi-instance control
         group.add_argument(
-            '--ncores-per-instance',
-            '--ncores_per_instance',
-            default=0,
-            type=int,
-            help='Number of cores per instance',
-        )
-        group.add_argument(
             '--ninstances',
             default=0,
             type=int,
@@ -72,13 +65,6 @@ class MultiInstancesLauncher(Launcher):
             help='Run one instance per node with all physical cores.',
         )
         group.add_argument(
-            '--nodes-list',
-            '--nodes_list',
-            default='',
-            type=str,
-            help='Specify nodes list for multiple instances to run on, in format of list of single node ids "node_id,node_id,..." or list of node ranges "node_id-node_id,...". By default all nodes will be used.',
-        )
-        group.add_argument(
             '--cores-list',
             '--cores_list',
             default='',
@@ -103,7 +89,7 @@ class MultiInstancesLauncher(Launcher):
             pass
         return is_available
 
-    def set_multi_task_manager(self, multi_task_manager='auto', skip_numactl=False):
+    def set_multi_task_manager(self, multi_task_manager='auto', skip_list=[]):
         '''
         Set multi-task manager
         '''
@@ -111,28 +97,8 @@ class MultiInstancesLauncher(Launcher):
                 'numactl': ['numactl', ''],
                 'taskset': ['taskset', ''],
                 }
-        skip_list = []
-        if skip_numactl:
-            skip_list.append('numactl')
         tm_local = self.set_lib_bin_from_list(multi_task_manager, tm_bin_name, 'multi-task manager', self.tm_supported, self.is_command_available, skip_list)
         return tm_local
-
-    def parse_list_argument(self, txt):
-        ret = []
-        txt = txt.strip()
-        if txt != '':
-            for elem in txt.split(","):
-                elem = elem.strip()
-                if elem.isdigit():
-                    ret.append(int(elem))
-                else:
-                    core_range = [int(x.strip()) for x in elem.split("-")]
-                    assert len(core_range) == 2, "Invalid range format detected."
-                    begin, end = core_range
-                    assert begin <= end, "Begining index of a range must be <= ending index."
-                    ret.extend(list(range(begin, end + 1)))
-        ret = list(set(ret))
-        return ret
 
     def execution_command_builder(self, args, task_mgr, cpu_pools, index):
         cmd = []
@@ -164,7 +130,7 @@ class MultiInstancesLauncher(Launcher):
         cmd_s = ' '.join(cmd)
         if args.log_dir:
             cmd_s = f'{cmd_s} 2>&1 | tee {log_name}'
-        self.verbose('info', cmd_s)
+        self.verbose('info', f'cmd: {cmd_s}')
         if len(set([c.node for c in pool])) > 1:
             self.verbose('warning', f'Cross NUMA nodes execution detected: cores [{cores_list_local}] are on different NUMA nodes [{nodes_list_local}]')
         process = subprocess.Popen(cmd_s, env=os.environ, shell=True)
@@ -209,18 +175,19 @@ class MultiInstancesLauncher(Launcher):
             assert not is_kmp_affinity_set, f'Environment variable "KMP_AFFINITY" is detected. Please unset it when using all cores.'
             set_kmp_affinity = False
 
-        self.set_multi_thread_and_allocator(
-                args.ncores_per_instance,
-                args.memory_allocator,
-                args.benchmark,
-                args.omp_runtime,
-                set_kmp_affinity,
-                )
-        self.set_env('OMP_NUM_THREADS', str(args.ncores_per_instance))
-        os.environ["LAUNCH_CMD"] = "#"
+        self.set_memory_allocator(args.memory_allocator, args.benchmark)
+        self.set_omp_runtime(args.omp_runtime, set_kmp_affinity)
+        self.add_env('OMP_NUM_THREADS', str(args.ncores_per_instance))
 
-        skip_numactl = is_iomp_set and is_kmp_affinity_set
-        task_mgr = self.set_multi_task_manager(args.multi_task_manager, skip_numactl=skip_numactl)
+        skip_list = []
+        if is_iomp_set and is_kmp_affinity_set:
+            skip_list.append('numactl')
+        task_mgr = self.set_multi_task_manager(args.multi_task_manager, skip_list=skip_list)
+
+        # Set environment variables for multi-instance execution
+        for k,v in self.environ_set.items():
+            self.verbose('info', f'env: {k}={v}')
+            os.environ[k] = v
 
         if args.auto_ipex:
             args.program = auto_ipex.apply_monkey_patch(args.program, args.dtype, args.auto_ipex_verbose, args.disable_ipex_graph_mode)
@@ -235,6 +202,7 @@ class MultiInstancesLauncher(Launcher):
         instance_idx = list(set(instance_idx))
         assert set(instance_idx).issubset(set(instances_available)), f'Designated nodes list contains invalid nodes.'
         processes = []
+        os.environ["LAUNCH_CMD"] = "#"
         for i in instance_idx:
             process = self.execution_command_builder(
                     args = args,
@@ -242,7 +210,6 @@ class MultiInstancesLauncher(Launcher):
                     cpu_pools = self.cpuinfo.pools_ondemand,
                     index = i)
             processes.append(process)
-
         os.environ["LAUNCH_CMD"] = os.environ["LAUNCH_CMD"][:-2]
         try:
             for process in processes:

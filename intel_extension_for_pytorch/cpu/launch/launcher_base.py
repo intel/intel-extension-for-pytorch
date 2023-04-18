@@ -21,9 +21,24 @@ class Launcher():
                           '/usr/lib/x86_64-linux-gnu/'])
         self.ma_supported = ['auto', 'default', 'tcmalloc', 'jemalloc']
         self.omp_supported = ['auto', 'default', 'intel']
+        self.environ_set = {}
 
     def add_common_params(self, parser):
         group = parser.add_argument_group('Launcher Common Arguments')
+        group.add_argument(
+            '--ncores-per-instance',
+            '--ncores_per_instance',
+            default=0,
+            type=int,
+            help='Number of cores used for computation per instance',
+        )
+        group.add_argument(
+            '--nodes-list',
+            '--nodes_list',
+            default='',
+            type=str,
+            help='Specify nodes list for multiple instances to run on, in format of list of single node ids "node_id,node_id,..." or list of node ranges "node_id-node_id,...". By default all nodes will be used.',
+        )
         group.add_argument(
             '--memory-allocator',
             '--memory_allocator',
@@ -55,13 +70,18 @@ class Launcher():
     def launch(self, args):
         pass
 
-    def add_lib_preload(self, lib_type=None):
+    def add_lib_preload(self, lib_type):
         '''
         Enable TCMalloc/JeMalloc/intel OpenMP
         '''
         lib_found = False
         lib_set = False
-        for item in os.getenv('LD_PRELOAD', '').split(':'):
+        if not 'LD_PRELOAD' in self.environ_set.keys():
+            self.environ_set['LD_PRELOAD'] = ''
+        if self.environ_set['LD_PRELOAD'] == '' and 'LD_PRELOAD' in os.environ:
+            self.environ_set['LD_PRELOAD'] = os.environ['LD_PRELOAD']
+        ld_preload = self.environ_set['LD_PRELOAD']
+        for item in ld_preload.split(':'):
             if item.endswith(f'lib{lib_type}.so'):
                 lib_set = True
                 break
@@ -72,13 +92,24 @@ class Launcher():
                 library_file = f'{lib_path}/lib{lib_type}.so'
                 matches = glob.glob(library_file)
                 if len(matches) > 0:
-                    if 'LD_PRELOAD' in os.environ:
-                        os.environ['LD_PRELOAD'] = f'{matches[0]}:{os.environ["LD_PRELOAD"]}'
+                    if ld_preload == '':
+                        ld_preload = matches[0]
                     else:
-                        os.environ['LD_PRELOAD'] = matches[0]
+                        ld_preload = f'{matches[0]}:{ld_preload}'
+                    self.environ_set['LD_PRELOAD'] = ld_preload
                     lib_found = True
                     break
+        if self.environ_set['LD_PRELOAD'] == '':
+            del self.environ_set['LD_PRELOAD']
         return lib_set or lib_found
+
+    def add_env(self, env_name, env_value):
+        value = os.getenv(env_name, '')
+        if value != '' and value != env_value:
+            self.verbose('warning', f'{env_name} in environment variable is {os.environ[env_name]} while the value you would like to set is {env_value}. Use the exsiting value.')
+            self.environ_set[env_name] = os.environ[env_name]
+        else:
+            self.environ_set[env_name] = env_value
 
     def set_lib_bin_from_list(self, name_input, name_map, category, supported, fn, skip_list=[], extra_warning_msg_with_default_choice=''):
         '''
@@ -138,7 +169,7 @@ class Launcher():
             self.verbose('info', f'Use \'{name_local}\' {category}.')
         return name_local
 
-    def set_memory_allocator(self, memory_allocator='auto', benchmark=False):
+    def set_memory_allocator(self, memory_allocator='auto', benchmark=False, skip_list=[]):
         '''
         Enable TCMalloc/JeMalloc with LD_PRELOAD and set configuration for JeMalloc.
         By default, PTMalloc will be used for PyTorch, but TCMalloc and JeMalloc can get better
@@ -148,47 +179,40 @@ class Launcher():
                 'jemalloc': ['jemalloc', 'conda install -c conda-forge jemalloc'],
                 'tcmalloc': ['tcmalloc', 'conda install -c conda-forge gperftools']
                 }
-        ma_local = self.set_lib_bin_from_list(memory_allocator, ma_lib_name, 'memory allocator', self.ma_supported, self.add_lib_preload, extra_warning_msg_with_default_choice='This may drop the performance.')
+        ma_local = self.set_lib_bin_from_list(memory_allocator, ma_lib_name, 'memory allocator', self.ma_supported, self.add_lib_preload, skip_list=skip_list, extra_warning_msg_with_default_choice='This may drop the performance.')
         if ma_local == 'jemalloc':
             if benchmark:
-                self.set_env('MALLOC_CONF', 'oversize_threshold:1,background_thread:false,metadata_thp:always,dirty_decay_ms:-1,muzzy_decay_ms:-1')
+                self.add_env('MALLOC_CONF', 'oversize_threshold:1,background_thread:false,metadata_thp:always,dirty_decay_ms:-1,muzzy_decay_ms:-1')
             else:
-                self.set_env('MALLOC_CONF', 'oversize_threshold:1,background_thread:true,metadata_thp:auto')
+                self.add_env('MALLOC_CONF', 'oversize_threshold:1,background_thread:true,metadata_thp:auto')
 
     def set_omp_runtime(self, omp_runtime='auto', set_kmp_affinity=True):
         '''
         Set OpenMP runtime
         '''
         omp_lib_name = {'intel': ['iomp5', 'conda install intel-openmp']}
-        omp_local = self.set_lib_bin_from_list(omp_runtime, omp_lib_name, 'OpenMP Runtime', self.omp_supported, self.add_lib_preload)
+        omp_local = self.set_lib_bin_from_list(omp_runtime, omp_lib_name, 'OpenMP runtime', self.omp_supported, self.add_lib_preload)
         if omp_local == 'intel':
             if set_kmp_affinity:
-                self.set_env('KMP_AFFINITY', 'granularity=fine,compact,1,0')
-            self.set_env('KMP_BLOCKTIME', '1')
+                self.add_env('KMP_AFFINITY', 'granularity=fine,compact,1,0')
+            self.add_env('KMP_BLOCKTIME', '1')
 
-    def logger_env(self, env_name=''):
-        if env_name in os.environ:
-            self.verbose('info', f'{env_name}={os.environ[env_name]}')
-
-    def set_env(self, env_name, env_value=None):
-        if not env_value:
-            self.verbose('warning', f'{env_name} is None. Abandon setting environment variable {env_name}.')
-        if env_name not in os.environ:
-            os.environ[env_name] = env_value
-        elif os.environ[env_name] != env_value:
-            self.verbose('warning', f'{env_name} in environment variable is {os.environ[env_name]} while the value you would like to set is {env_value}. Using the exsiting value.')
-        self.logger_env(env_name)
-
-    # set_kmp_affinity is used to control whether to set KMP_AFFINITY or not. In scenario that use all cores on all nodes, including logical cores, setting KMP_AFFINITY disables logical cores. In this case, KMP_AFFINITY should not be set.
-    def set_multi_thread_and_allocator(self, ncores_per_instance, memory_allocator='', benchmark=False, omp_runtime='', set_kmp_affinity=True):
-        '''
-        Set multi-thread configuration and enable Intel openMP and TCMalloc/JeMalloc.
-        By default, GNU openMP and PTMalloc are used in PyTorch. but Intel openMP and TCMalloc/JeMalloc are better alternatives
-        to get performance benifit.
-        '''
-        self.set_memory_allocator(memory_allocator, benchmark)
-        self.set_omp_runtime(omp_runtime, set_kmp_affinity)
-        self.logger_env('LD_PRELOAD')
+    def parse_list_argument(self, txt):
+        ret = []
+        txt = txt.strip()
+        if txt != '':
+            for elem in txt.split(","):
+                elem = elem.strip()
+                if elem.isdigit():
+                    ret.append(int(elem))
+                else:
+                    core_range = [int(x.strip()) for x in elem.split("-")]
+                    assert len(core_range) == 2, "Invalid range format detected."
+                    begin, end = core_range
+                    assert begin <= end, "Begining index of a range must be <= ending index."
+                    ret.extend(list(range(begin, end + 1)))
+        ret = list(set(ret))
+        return ret
 
 if __name__ == '__main__':
     pass
