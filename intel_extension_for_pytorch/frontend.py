@@ -7,6 +7,8 @@ import torch._dynamo
 import torch.fx.experimental.optimization as optimization
 from torch._dynamo.backends.common import fake_tensor_unsupported
 from torch.jit._trace import TracerWarning
+from torch.utils._mode_utils import no_dispatch
+from torch._subclasses import FakeTensor
 import warnings
 
 from .nn import utils
@@ -26,6 +28,8 @@ from typing import List
 import functools
 import logging
 import threading
+from typing import Callable, Dict, Optional, Union
+import builtins
 
 def _copy_model_and_optimizer(model, optimizer):
     new_model = copy.deepcopy(model)
@@ -556,6 +560,52 @@ def optimize(
             optimized_optimizer, opt_properties.split_master_weight_for_bf16)
     return optimized_model, optimized_optimizer
 
+def defake(x):
+    if not isinstance(x, FakeTensor):
+        return x
+    if x._has_symbolic_sizes_strides:
+        size = [
+            s.node.shape_env.size_hint(s.node.expr)
+            if isinstance(s, torch.SymInt)
+            else s
+            for s in x.size()
+        ]
+        stride = [
+            s.node.shape_env.size_hint(s.node.expr)
+            if isinstance(s, torch.SymInt)
+            else s
+            for s in x.stride()
+        ]
+    else:
+        size = x.size()
+        stride = x.stride()
+    y = torch.empty_strided(
+        size,
+        stride,
+        dtype=x.dtype,
+        device=x.device,
+        requires_grad=x.requires_grad,
+    )
+    y.zero_()
+    return y
+
+def compile(
+    model: torch.fx.GraphModule,
+    example_inputs: List[torch.Tensor],
+    mode: Union[str, None] = None,
+    options: Optional[Dict[str, Union[str, builtins.int, builtins.bool]]] = None
+) -> Callable:
+
+    try:
+        with no_dispatch():
+            real_inputs = list(map(defake, example_inputs))
+            with torch.no_grad():
+                traced_model = torch.jit.trace(model.eval(), real_inputs)
+                traced_model = torch.jit.freeze(traced_model)
+            return traced_model
+    except Exception:
+        warnings.warn("JIT trace failed during the IPEX compile process.")
+        return model
 
 def enable_onednn_fusion(enabled):
     r"""
