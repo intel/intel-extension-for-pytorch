@@ -491,7 +491,7 @@ def weight_prepack_with_ipex_xpu(module):
         weight_prepack_with_ipex_xpu(child)
     return module
 
-def weight_prepack_with_ipex(module, optimizer, params_attr, device_type='cpu'):
+def weight_prepack_with_ipex(module, optimizer, params_attr, inplace=False, device_type='cpu'):
     def convert(m, optimizer, params_attr):
         if _should_prepack(m, is_training=(optimizer!=None)) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16 or \
             (m.weight.dtype == torch.half and type(m) not in[torch.nn.ConvTranspose2d, torch.nn.ConvTranspose3d])):
@@ -544,6 +544,8 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, device_type='cpu'):
             # replace optimizer's param with prepacked param, also prepack its state.
             optim._optimizer_utils.pack_optimizer_params_and_states(
                 optimizer, params_pair, params_attr, m.weight.dtype)
+            if inplace:
+                del m.weight
             return new_m
         else:
             return m
