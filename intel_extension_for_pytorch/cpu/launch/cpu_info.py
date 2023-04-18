@@ -136,7 +136,6 @@ class CPUPoolList():
         '''
         phy_cores = [c.core for c in self.pool_all]
         phy_cores_unique = set(phy_cores)
-        assert len(phy_cores) % len(phy_cores_unique) == 0, f'Incorrect CPU configuration detected ({len(phy_cores_unique)} physical cores, {len(phy_cores)} logical cores).'
         if len(phy_cores) // len(phy_cores_unique) > 1:
             core_cur = -1
             self.pool_all.sort(key=lambda x: (x.core, x.cpu))

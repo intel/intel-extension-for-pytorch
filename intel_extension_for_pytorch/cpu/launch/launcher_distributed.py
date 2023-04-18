@@ -1,3 +1,4 @@
+import re
 import sys
 import subprocess
 import os
@@ -20,7 +21,7 @@ class DistributedTrainingLauncher(Launcher):
             '--nprocs-per-node',
             '--nprocs_per_node',
             type=int,
-            default=len(set([c.node for c in self.cpuinfo.pool_all])),
+            default=0,
             help='Number of processes run on each machine/device',
         )
         # ccl control
@@ -94,16 +95,23 @@ class DistributedTrainingLauncher(Launcher):
         domain_binaries = []
         affinity = []
         for pool in cpu_pools:
+            if logical_cores_for_ccl and len([c for c in pool if not c.is_physical_core]) < ccl_worker_count:
+                self.verbose('warning', 'Argument --logical-cores-for-ccl is set but no enough logical cores are available. Disable this argument.')
+                logical_cores_for_ccl = False
+                break
+        for pool in cpu_pools:
             domain_binary = 0
             cores = []
             if logical_cores_for_ccl:
-                cores = [c for c in pool if c.is_physical_core]
                 affinity.extend([str(c.cpu) for c in pool if not c.is_physical_core][:ccl_worker_count])
+                cores = [str(c.cpu) for c in pool if c.is_physical_core]
             else:
-                cores = [c for c in pool if c.is_physical_core][ccl_worker_count:]
-                affinity.extend([str(c.cpu) for c in pool if c.is_physical_core][:ccl_worker_count])
+                physical_cores = [str(c.cpu) for c in pool if c.is_physical_core]
+                assert ccl_worker_count < len(physical_cores), f'ccl_worker_count ({ccl_worker_count}) cannot exceed number of available cores ({len(physical_cores)}).'
+                affinity.extend(physical_cores[:ccl_worker_count])
+                cores = physical_cores[ccl_worker_count:]
             for c in cores:
-                domain_binary |= (1 << c.cpu)
+                domain_binary |= (1 << int(c))
             domain_binaries.append(hex(domain_binary))
         return {'pin_domain': f'[{",".join(domain_binaries)}]', 'affinity': ','.join(affinity)}
 
@@ -143,35 +151,46 @@ class DistributedTrainingLauncher(Launcher):
                 assert completed_process.returncode == 0, f'Passwordless SSH login to {ip} failed, please make sure you have a SSH public key setup correctly.'
                 self.verbose('info', f'Connection from the master node {args.master_addr} to the slave node {ip} succeeded.')
 
-        self.cpuinfo.gen_pools_ondemand(ninstances=args.nprocs_per_node, use_logical_cores=True)
+        nodes_list = self.parse_list_argument(args.nodes_list)
+        args.nprocs_per_node = len(set([c.node for c in self.cpuinfo.pool_all])) if len(nodes_list) == 0 else len(nodes_list)
+        ncores_per_instance = args.ncores_per_instance
+        if ncores_per_instance > 0:
+            if not args.logical_cores_for_ccl or len([c for c in self.cpuinfo.pool_all if not c.is_physical_core]) < args.nprocs_per_node * args.ccl_worker_count:
+                ncores_per_instance += args.ccl_worker_count
+            ncores_per_instance = len([c for c in self.cpuinfo.pool_all if c.core < ncores_per_instance])
+        self.cpuinfo.gen_pools_ondemand(
+                ninstances=args.nprocs_per_node,
+                ncores_per_instance=ncores_per_instance,
+                use_logical_cores=True,
+                nodes_list=nodes_list
+                )
+
+        self.set_memory_allocator(args.memory_allocator, False, ['jemalloc'])
+        self.set_omp_runtime(args.omp_runtime, True)
+        omp_num_threads = len([c for c in self.cpuinfo.pools_ondemand[0] if c.is_physical_core])
+        if not args.logical_cores_for_ccl:
+            omp_num_threads -= args.ccl_worker_count
+        self.add_env('OMP_NUM_THREADS', str(omp_num_threads))
 
         # set distributed related environmental variables
-        self.set_env('MASTER_ADDR', args.master_addr)
-        self.set_env('MASTER_PORT', str(args.master_port))
+        self.add_env('MASTER_ADDR', args.master_addr)
+        self.add_env('MASTER_PORT', str(args.master_port))
         pin_domain_affinity = self.get_pin_domain_affinity(
                 self.cpuinfo.pools_ondemand,
                 args.ccl_worker_count,
                 args.logical_cores_for_ccl,
                 )
-        self.set_env('I_MPI_PIN_DOMAIN', pin_domain_affinity['pin_domain'])
-        self.set_env('CCL_WORKER_COUNT', str(args.ccl_worker_count))
-        self.set_env('CCL_WORKER_AFFINITY', pin_domain_affinity['affinity'])
+        self.add_env('I_MPI_PIN_DOMAIN', pin_domain_affinity['pin_domain'])
+        self.add_env('CCL_WORKER_COUNT', str(args.ccl_worker_count))
+        self.add_env('CCL_WORKER_AFFINITY', pin_domain_affinity['affinity'])
 
-        omp_num_threads = len([c for c in self.cpuinfo.pools_ondemand[0] if c.is_physical_core])
-        if not args.logical_cores_for_ccl:
-            omp_num_threads -= args.ccl_worker_count
-
-        self.set_multi_thread_and_allocator(
-                omp_num_threads,
-                args.memory_allocator,
-                False,
-                args.omp_runtime,
-                True,
-                )
+        for k,v in self.environ_set.items():
+            self.verbose('info', f'env: {k}={v}')
 
         os.environ['LAUNCH_CMD'] = '#'
         cmd = ['mpiexec.hydra']
-        mpi_config = f'-l -np {args.nnodes * args.nprocs_per_node} -ppn {args.nprocs_per_node} -genv I_MPI_PIN_DOMAIN={pin_domain_affinity["pin_domain"]} -genv OMP_NUM_THREADS={omp_num_threads} '
+        genvs = [f'-genv {k}={v}' for k,v in self.environ_set.items()]
+        mpi_config = f"-l -np {args.nnodes * args.nprocs_per_node} -ppn {args.nprocs_per_node} {' '.join(genvs)} "
         mpi_config += args.extra_mpi_params
         if args.nnodes > 1:
             mpi_config += f' -hostfile {args.hostfile}'
@@ -189,9 +208,25 @@ class DistributedTrainingLauncher(Launcher):
         cmd_s = ' '.join(cmd)
         if args.log_dir:
             cmd_s = f'{cmd_s} 2>&1 | tee {log_name}'
-        self.verbose('info', cmd_s)
+        self.verbose('info', f'cmd: {cmd_s}')
         process = subprocess.Popen(cmd_s, env=os.environ, shell=True)
         process.wait()
+        if args.log_dir:
+            log_fns = []
+            for i in range(args.nnodes * args.nprocs_per_node):
+                log_name_rank = f'{args.log_file_prefix}_rank_{i}.log'
+                log_name_rank = os.path.join(args.log_dir, log_name_rank)
+                fn = open(log_name_rank, 'w')
+                log_fns.append(fn)
+            with open(log_name) as fp:
+                for line in fp:
+                    m = re.match('\[(\d+)\] (.*)', line.strip())
+                    if m:
+                        log_fns[int(m.group(1))].write(f'{m.group(2)}\n')
+                    else:
+                        self.verbose('warning', f'Failed to detect rank id from log file {log_name} at line "{line.strip()}".')
+            for fn in log_fns:
+                fn.close()
         os.environ['LAUNCH_CMD'] += f'{" ".join(cmd)},#'
         os.environ['LAUNCH_CMD'] = os.environ['LAUNCH_CMD'][:-2]
 
