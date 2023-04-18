@@ -111,7 +111,7 @@ Please refer to [AOT documentation](./AOT.md) for how to configure `USE_AOT_DEVL
 To ensure a smooth compilation of the bundle, including PyTorch\*, torchvision, torchaudio, Intel® Extension for PyTorch\*, a script is provided in the Github repo. If you would like to compile the binaries from source, it is highly recommended to utilize this script.
 
 ```bash
-$ wget https://github.com/intel/intel-extension-for-pytorch/blob/xpu-master/scripts/compile_bundle.sh
+$ wget https://raw.githubusercontent.com/intel/intel-extension-for-pytorch/xpu-master/scripts/compile_bundle.sh
 $ bash compile_bundle.sh <DPCPPROOT> <MKLROOT> [AOT]
   DPCPPROOT and MKLROOT are mandatory, should be absolute or relative path to the root directory of DPC++ compiler and oneMKL respectively.
   AOT is optional, should be the text string for environment variable USE_AOT_DEVLIST.
