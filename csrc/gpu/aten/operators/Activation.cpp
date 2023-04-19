@@ -942,6 +942,11 @@ Tensor& silu_backward_out(
       /* alpha = */ 1.0f);
 }
 
+Tensor silu_backward(const Tensor& grad_output, const Tensor& output) {
+  Tensor grad_input = at::empty_like(grad_output);
+  return silu_backward_out(grad_output, output, grad_input);
+}
+
 at::Tensor& mish_out(const at::Tensor& self, at::Tensor& out) {
   return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_mish>(
       TensorIterator::unary_op, out, self, [=](TensorIteratorBase& iter) {
@@ -962,6 +967,10 @@ at::Tensor& mish_out(const at::Tensor& self, at::Tensor& out) {
                   });
             });
       });
+}
+
+TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl("silu_backward", TORCH_FN(silu_backward));
 }
 
 } // namespace AtenIpexTypeXPU
