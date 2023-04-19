@@ -34,6 +34,7 @@ Launcher Common Arguments:
 | :-- | :--: | :--: | :-- |
 | `--ncores-per-instance` | int | 0 | Number of cores per instance |
 | `--nodes-list` | str | '' | Specify nodes list for multiple instances to run on, in format of list of single node ids "node_id,node_id,..." or list of node ranges "node_id-node_id,...". By default all nodes will be used. |
+| `--use-e-cores` | - | False | Use Efficient-Cores on the workloads or not. By default, only Performance-Cores are used. |
 | `--memory-allocator` | str | 'auto' | Choose which memory allocator to run the workloads with. Supported choices are ['auto', 'default', 'tcmalloc', 'jemalloc']. |
 | `--omp-runtime` | str | 'auto' | Choose which OpenMP runtime to run the workloads with. Supported choices are ['auto', 'default', 'intel']. |
 

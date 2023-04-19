@@ -1,6 +1,7 @@
 import unittest
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
+from utils.cpuinfo import construct_numa_config
 import time, sys
 from intel_extension_for_pytorch.cpu.launch import *
 import os
@@ -11,69 +12,6 @@ import subprocess
 class TestLauncher(TestCase):
     launch_scripts = [['python', '-m', 'intel_extension_for_pytorch.cpu.launch'],
                       ['ipexrun']]
-
-    # examples
-      # mode 0
-      # 0 p0 0 | 4 p4 1
-      # 1 p1 0 | 5 p5 1
-      # 2 p2 0 | 6 p6 1
-      # 3 p3 0 | 7 p7 1
-
-      # 0 p0 0 | 4 l0 0 |  8 p4 1 | 12 l4 1
-      # 1 p1 0 | 5 l1 0 |  9 p5 1 | 13 l5 1
-      # 2 p2 0 | 6 l2 0 | 10 p6 1 | 14 l6 1
-      # 3 p3 0 | 7 l3 0 | 11 p7 1 | 15 l7 1
-
-      # mode 1
-      # 0 p0 0 | 4 p4 1
-      # 1 p1 0 | 5 p5 1
-      # 2 p2 0 | 6 p6 1
-      # 3 p3 0 | 7 p7 1
-
-      # 0 p0 0 | 4 p4 1 |  8 l0 0 | 12 l4 1
-      # 1 p1 0 | 5 p5 1 |  9 l1 0 | 13 l5 1
-      # 2 p2 0 | 6 p6 1 | 10 l2 0 | 14 l6 1
-      # 3 p3 0 | 7 p7 1 | 11 l3 0 | 15 l7 1
-
-      # mode 2
-      # 0 p0 0 | 4 p4 1
-      # 1 p1 0 | 5 p5 1
-      # 2 p2 0 | 6 p6 1
-      # 3 p3 0 | 7 p7 1
-
-      # 0 p0 0 | 4 p2 0 |  8 p4 1 | 12 p6 1
-      # 1 l0 0 | 5 l2 0 |  9 l4 1 | 13 l6 1
-      # 2 p1 0 | 6 p3 0 | 10 p5 1 | 14 p7 1
-      # 3 l1 0 | 7 l3 0 | 11 l5 1 | 15 l7 1
-    def construct_numa_config(self, num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=0, show_node=True):
-        ret = ''
-        ncores_per_node = n_phycores_per_node
-        factor_ht = 1
-        if enable_ht:
-            factor_ht = 2
-        ncores_per_node *= factor_ht
-        num_cores = num_nodes * ncores_per_node
-        for i in range(num_cores):
-            cpu_idx = i
-            core_idx = cpu_idx
-            if numa_mode == 0:
-                socket_idx = i // ncores_per_node
-                core_idx = cpu_idx % n_phycores_per_node + socket_idx * n_phycores_per_node
-            if numa_mode == 1:
-                if enable_ht:
-                    socket_idx = (i // n_phycores_per_node) % num_nodes
-                    core_idx = cpu_idx % (n_phycores_per_node * num_nodes)
-                else:
-                    socket_idx = i // ncores_per_node
-            if numa_mode == 2:
-                socket_idx = i // ncores_per_node
-                if enable_ht:
-                    core_idx = (cpu_idx // factor_ht) % (n_phycores_per_node * num_nodes)
-            node_idx = ''
-            if show_node:
-                node_idx = str(socket_idx)
-            ret += f'{cpu_idx},{core_idx},{socket_idx},{node_idx}\n'
-        return ret
 
     def find_lib(self, lib_type):
         library_paths = []
@@ -138,7 +76,7 @@ class TestLauncher(TestCase):
         # HT ON, use_logical_cores ON
         nprocs_per_node = 2
         ccl_worker_count = 4
-        lscpu_txt = self.construct_numa_config(nprocs_per_node, 28, enable_ht=True, numa_mode=1)
+        lscpu_txt = construct_numa_config(nprocs_per_node, 28, enable_ht=True, numa_mode=1)
         launcher = DistributedTrainingLauncher(lscpu_txt=lscpu_txt)
 
         launcher.cpuinfo.gen_pools_ondemand(ninstances=nprocs_per_node, use_logical_cores=True)
@@ -151,7 +89,7 @@ class TestLauncher(TestCase):
         # HT ON, use_logical_cores OFF
         nprocs_per_node = 2
         ccl_worker_count = 4
-        lscpu_txt = self.construct_numa_config(nprocs_per_node, 28, enable_ht=True, numa_mode=1)
+        lscpu_txt = construct_numa_config(nprocs_per_node, 28, enable_ht=True, numa_mode=1)
         launcher = DistributedTrainingLauncher(lscpu_txt=lscpu_txt)
 
         launcher.cpuinfo.gen_pools_ondemand(ninstances=nprocs_per_node, use_logical_cores=True)
@@ -164,7 +102,7 @@ class TestLauncher(TestCase):
         # HT OFF, use_logical_cores ON
         nprocs_per_node = 2
         ccl_worker_count = 4
-        lscpu_txt = self.construct_numa_config(nprocs_per_node, 28, enable_ht=False, numa_mode=1)
+        lscpu_txt = construct_numa_config(nprocs_per_node, 28, enable_ht=False, numa_mode=1)
         launcher = DistributedTrainingLauncher(lscpu_txt=lscpu_txt)
 
         launcher.cpuinfo.gen_pools_ondemand(ninstances=nprocs_per_node, use_logical_cores=True)
@@ -177,7 +115,7 @@ class TestLauncher(TestCase):
         # nodes_list
         nprocs_per_node = 2
         ccl_worker_count = 2
-        lscpu_txt = self.construct_numa_config(4, 14, enable_ht=True, numa_mode=1)
+        lscpu_txt = construct_numa_config(4, 14, enable_ht=True, numa_mode=1)
         launcher = DistributedTrainingLauncher(lscpu_txt=lscpu_txt)
 
         launcher.cpuinfo.gen_pools_ondemand(ninstances=nprocs_per_node, nodes_list=[1,2], use_logical_cores=True)
@@ -190,7 +128,7 @@ class TestLauncher(TestCase):
         # ncores_per_instance
         nprocs_per_node = 2
         ccl_worker_count = 4
-        lscpu_txt = self.construct_numa_config(nprocs_per_node, 28, enable_ht=True, numa_mode=1)
+        lscpu_txt = construct_numa_config(nprocs_per_node, 28, enable_ht=True, numa_mode=1)
         launcher = DistributedTrainingLauncher(lscpu_txt=lscpu_txt)
 
         launcher.cpuinfo.gen_pools_ondemand(ninstances=nprocs_per_node, ncores_per_instance=(8+ccl_worker_count)*nprocs_per_node, use_logical_cores=True)
@@ -198,6 +136,19 @@ class TestLauncher(TestCase):
         expect_pin_domain = '[0xff0,0xff0000]'
         self.assertEqual(pin_domain_affinity['pin_domain'], expect_pin_domain)
         expected_ccl_worker_affinity = '0,1,2,3,12,13,14,15'
+        self.assertEqual(pin_domain_affinity['affinity'], expected_ccl_worker_affinity)
+
+        # e-cores
+        nprocs_per_node = 2
+        ccl_worker_count = 4
+        lscpu_txt = construct_numa_config(nprocs_per_node, 28, enable_ht=True, n_e_cores=4, numa_mode=0)
+        launcher = DistributedTrainingLauncher(lscpu_txt=lscpu_txt)
+
+        launcher.cpuinfo.gen_pools_ondemand(ninstances=nprocs_per_node, use_logical_cores=True)
+        pin_domain_affinity = launcher.get_pin_domain_affinity(launcher.cpuinfo.pools_ondemand, ccl_worker_count, logical_cores_for_ccl=True)
+        expect_pin_domain = '[0xfffffff,0xfffffff000000000000000]'
+        self.assertEqual(pin_domain_affinity['pin_domain'], expect_pin_domain)
+        expected_ccl_worker_affinity = '28,29,30,31,88,89,90,91'
         self.assertEqual(pin_domain_affinity['affinity'], expected_ccl_worker_affinity)
 
     def test_launcher_scripts(self):
@@ -222,7 +173,7 @@ class TestLauncher(TestCase):
         # mode 0
         num_nodes = 2
         n_phycores_per_node = 28
-        lscpu_txt = self.construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=0)
+        lscpu_txt = construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=0)
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
         ground_truth = {
                 'ninstances': 1,
@@ -300,7 +251,7 @@ class TestLauncher(TestCase):
 
         num_nodes = 4
         n_phycores_per_node = 14
-        lscpu_txt = self.construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=0)
+        lscpu_txt = construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=0)
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
         ground_truth = {
                 'ninstances': 1,
@@ -325,10 +276,26 @@ class TestLauncher(TestCase):
                 'pools_nodes': ['1,2']}
         self.verify_affinity(cpuinfo.pools_ondemand, ground_truth)
 
+        num_nodes = 2
+        n_phycores_per_node = 28
+        lscpu_txt = construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, n_e_cores=4, numa_mode=0)
+        cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
+        cpuinfo.gen_pools_ondemand(ninstances=2)
+        ground_truth = {
+                'ninstances': 2,
+                'ncores_per_instance': 28,
+                'num_cores_sum': 56,
+                'num_nodes_sum': 2,
+                'num_cores': [28, 28],
+                'num_nodes': [1, 1],
+                'pools_cores': ['0-27', '60-87'],
+                'pools_nodes': ['0', '1']}
+        self.verify_affinity(cpuinfo.pools_ondemand, ground_truth)
+
         # mode 1
         num_nodes = 2
         n_phycores_per_node = 28
-        lscpu_txt = self.construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=1)
+        lscpu_txt = construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=1)
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
         cpuinfo.gen_pools_ondemand(ninstances=1)
         ground_truth = {
@@ -407,7 +374,7 @@ class TestLauncher(TestCase):
 
         num_nodes = 4
         n_phycores_per_node = 14
-        lscpu_txt = self.construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=1)
+        lscpu_txt = construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=1)
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
         cpuinfo.gen_pools_ondemand(ninstances=2, nodes_list=[1, 2])
         ground_truth = {
@@ -421,10 +388,26 @@ class TestLauncher(TestCase):
                 'pools_nodes': ['1', '2']}
         self.verify_affinity(cpuinfo.pools_ondemand, ground_truth)
 
+        num_nodes = 2
+        n_phycores_per_node = 28
+        lscpu_txt = construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, n_e_cores=4, numa_mode=1)
+        cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
+        cpuinfo.gen_pools_ondemand(ninstances=2)
+        ground_truth = {
+                'ninstances': 2,
+                'ncores_per_instance': 28,
+                'num_cores_sum': 56,
+                'num_nodes_sum': 2,
+                'num_cores': [28, 28],
+                'num_nodes': [1, 1],
+                'pools_cores': ['0-27', '28-55'],
+                'pools_nodes': ['0', '1']}
+        self.verify_affinity(cpuinfo.pools_ondemand, ground_truth)
+
         # mode 2
         num_nodes = 2
         n_phycores_per_node = 28
-        lscpu_txt = self.construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=2)
+        lscpu_txt = construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=2)
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
         cpuinfo.gen_pools_ondemand(ninstances=2)
         ground_truth = {
@@ -503,7 +486,7 @@ class TestLauncher(TestCase):
 
         num_nodes = 4
         n_phycores_per_node = 14
-        lscpu_txt = self.construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=2)
+        lscpu_txt = construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=2)
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
         cpuinfo.gen_pools_ondemand(nodes_list=[1, 2])
         ground_truth = {
@@ -517,10 +500,26 @@ class TestLauncher(TestCase):
                 'pools_nodes': ['1,2']}
         self.verify_affinity(cpuinfo.pools_ondemand, ground_truth)
 
+        num_nodes = 2
+        n_phycores_per_node = 28
+        lscpu_txt = construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, n_e_cores=4, numa_mode=2)
+        cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
+        cpuinfo.gen_pools_ondemand(ninstances=2)
+        ground_truth = {
+                'ninstances': 2,
+                'ncores_per_instance': 28,
+                'num_cores_sum': 56,
+                'num_nodes_sum': 2,
+                'num_cores': [28, 28],
+                'num_nodes': [1, 1],
+                'pools_cores': ['0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54', '60,62,64,66,68,70,72,74,76,78,80,82,84,86,88,90,92,94,96,98,100,102,104,106,108,110,112,114'],
+                'pools_nodes': ['0', '1']}
+        self.verify_affinity(cpuinfo.pools_ondemand, ground_truth)
+
     def test_core_affinity_with_logical_cores(self):
         num_nodes = 2
         n_phycores_per_node = 28
-        lscpu_txt = self.construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=1)
+        lscpu_txt = construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=1)
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
         cpuinfo.gen_pools_ondemand(ninstances=2, use_logical_cores=True)
         ground_truth = {
@@ -537,7 +536,7 @@ class TestLauncher(TestCase):
     def test_core_affinity_with_skip_cross_node_cores(self):
         num_nodes = 2
         n_phycores_per_node = 28
-        lscpu_txt = self.construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=1)
+        lscpu_txt = construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=1)
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
         cpuinfo.gen_pools_ondemand(ninstances=3, skip_cross_node_cores=True)
         ground_truth = {
@@ -554,7 +553,7 @@ class TestLauncher(TestCase):
     def test_core_affinity_with_skip_cross_node_cores_and_use_logical_core(self):
         num_nodes = 2
         n_phycores_per_node = 28
-        lscpu_txt = self.construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=1)
+        lscpu_txt = construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=1)
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
         cpuinfo.gen_pools_ondemand(ninstances=7, use_logical_cores=True, skip_cross_node_cores=True)
         ground_truth = {
@@ -571,7 +570,7 @@ class TestLauncher(TestCase):
     def test_core_affinity_with_skip_cross_node_cores_and_node_id_use_logical_core(self):
         num_nodes = 4
         n_phycores_per_node = 14
-        lscpu_txt = self.construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=1)
+        lscpu_txt = construct_numa_config(num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=1)
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
         cpuinfo.gen_pools_ondemand(ninstances=3, nodes_list=[1, 2], use_logical_cores=True, skip_cross_node_cores=True)
         ground_truth = {
