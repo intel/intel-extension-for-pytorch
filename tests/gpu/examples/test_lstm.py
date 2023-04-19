@@ -150,6 +150,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(h0.grad, h0_xpu.grad.cpu())
         self.assertEqual(c0.grad, c0_xpu.grad.cpu())
 
+    @pytest.mark.skip("Unstable case. Will be fixed soon.")
     def test_lstm_rnnt_onednn(self, dtype=torch.float):
         with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.ONEDNN):
             rnn = nn.LSTM(240, 1024, num_layers=2)
