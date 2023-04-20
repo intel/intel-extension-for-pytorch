@@ -33,7 +33,7 @@ Verified Hardware Platforms:
 |OS|Instructions for installing Intel GPU Driver|
 |-|-|
 |Linux\*|Refer to the [Installation Guides](https://dgpu-docs.intel.com/installation-guides/index.html) for the latest driver installation for individual Linux\* distributions. When installing the verified [Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html) driver, use a specific version for component package names, such as `sudo apt-get install intel-opencl-icd=22.43.24595.35`|
-|Windows 11 or Windows 10 21H2 (via WSL2)|Please download drivers for Intel® Arc™ A-Series [for Windows 11 or Windows 10 21H2](https://www.intel.com/content/www/us/en/download/726609/intel-arc-graphics-windows-dch-driver.html). Please note that you would have to follow the rest of the steps in WSL2, but the drivers should be installed on Windows|
+|Windows 11 or Windows 10 21H2 (via WSL2)|Please download drivers for Intel® Arc™ A-Series [for Windows 11 or Windows 10 21H2](https://www.intel.com/content/www/us/en/download/726609/intel-arc-graphics-windows-dch-driver.html). Please note that you would have to follow the rest of the steps in WSL2, but the GPU drivers should be installed on Windows. Besides that, please follow Steps 4 & 5 of the [Installation Guides](https://dgpu-docs.intel.com/installation-guides/ubuntu/ubuntu-jammy-arc.html#step-4-install-run-time-packages) on WSL2 Ubuntu 22.04. |
 
 ### Install oneAPI Base Toolkit
 
