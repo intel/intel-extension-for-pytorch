@@ -32,7 +32,14 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from_original) {
   // dtype in stored context, so the reconstruction is needed for reorder's
   // correctness.
   auto is_equal = check_equality_for_meta_dtype_and_ctx_dtype(from_original);
-  if (!is_equal) {
+  auto is_opaque_u8_qtensor = is_opaque_u8(from_original);
+  // Case 1:
+  //   Tensor ctx has real dtype(like f32,s8) but meta has byte dtype(u8), this
+  //   is for pickling tensor. Run following if statement
+  // Case 2:
+  //  Opaque u8 qtensor has QUInt8 meta but s8 ctx. No need for pickiling it,
+  //  bypass following if statement.
+  if (!is_equal && !is_opaque_u8_qtensor) {
     // Here use opaqueTypeToScalarType to deduce the meta dtype
     // [from] the context dtype, then reconstruct the tensor [from]
     from = at::empty_like(
@@ -59,7 +66,7 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from_original) {
       to, to_meta.sizes_, to_meta.strides_, c10::nullopt);
   xpu::oneDNN::reorder(from, to_);
 
-  if (!is_equal) {
+  if (!is_equal && !is_opaque_u8_qtensor) {
     // reconstruct the [to] tensor with the original tensor meta
     to = at::empty_like(from_original);
 
