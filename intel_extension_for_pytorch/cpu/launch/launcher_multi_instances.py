@@ -159,6 +159,7 @@ class MultiInstancesLauncher(Launcher):
                 ninstances = args.ninstances,
                 ncores_per_instance = args.ncores_per_instance,
                 use_logical_cores = args.use_logical_cores,
+                use_e_cores = args.use_e_cores,
                 skip_cross_node_cores = args.skip_cross_node_cores,
                 nodes_list = nodes_list,
                 cores_list = cores_list

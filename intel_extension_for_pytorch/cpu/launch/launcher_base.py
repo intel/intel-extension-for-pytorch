@@ -40,6 +40,13 @@ class Launcher():
             help='Specify nodes list for multiple instances to run on, in format of list of single node ids "node_id,node_id,..." or list of node ranges "node_id-node_id,...". By default all nodes will be used.',
         )
         group.add_argument(
+            '--use-e-cores',
+            '--use_e_cores',
+            action='store_true',
+            default=False,
+            help='Use Efficient-Cores on the workloads or not. By default, only Performance-Cores are used.',
+        )
+        group.add_argument(
             '--memory-allocator',
             '--memory_allocator',
             default='auto',

@@ -162,6 +162,7 @@ class DistributedTrainingLauncher(Launcher):
                 ninstances=args.nprocs_per_node,
                 ncores_per_instance=ncores_per_instance,
                 use_logical_cores=True,
+                use_e_cores=args.use_e_cores,
                 nodes_list=nodes_list
                 )
 
