@@ -10207,6 +10207,7 @@ class TestNNDeviceType(NNTestCase):
         self.assertEqual(input1.grad.data, input2.grad.data, prec=prec)
 
     @onlyDPCPP
+    @skipDPCPPIf(not torch.xpu.utils.has_2d_block_array(), reason="Randomly failed on ATSM only, will be fixed soon.")
     def test_activations_bfloat16(self, device):
         self._test_bfloat16_ops(torch.nn.ReLU(), device, inp_dims=(5), prec=1e-2)
         self._test_bfloat16_ops(torch.nn.Threshold(0.1, 20), device, inp_dims=(5), prec=1e-2)

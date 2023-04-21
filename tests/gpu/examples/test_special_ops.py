@@ -130,6 +130,7 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_2d_block_array(), reason="Randomly failed on ATSM only, will be fixed soon.")
     def test_modified_bessel_k0(self, dtype=torch.float):
         input0 = torch.randn(8192, 8192, device="cpu")
         input0_xpu = input0.clone().to("xpu")

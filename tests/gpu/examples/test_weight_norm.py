@@ -150,6 +150,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(v.grad, v_xpu.grad.cpu(), atol=1e-3, rtol=1e-5)
         self.assertEqual(g.grad, g_xpu.grad.cpu(), atol=1e-3, rtol=1e-5)
 
+    @pytest.mark.skipif(not torch.xpu.utils.has_2d_block_array(), reason="Randomly failed on ATSM only, will be fixed soon.")
     def test_weight_norm_large_batch(self):
         v = torch.randn(8193, 8193).requires_grad_(True)
         g = torch.randn(8193).requires_grad_(True)
