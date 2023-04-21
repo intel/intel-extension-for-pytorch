@@ -217,25 +217,22 @@ at::ScalarType get_bias_dtype(
 std::vector<float> get_mkldnn_weight_scales_of_lstm(
     const at::Tensor& weight_ih,
     const at::Tensor& weight_hh) {
-  std::vector<float> weight_scales;
-
   at::Tensor weight_ih_scales_tensor =
       int8::utils::get_weight_scale_tensor(weight_ih);
   at::Tensor weight_hh_scales_tensor =
       int8::utils::get_weight_scale_tensor(weight_hh);
   TORCH_CHECK(
-      weight_ih_scales_tensor.sizes() == weight_hh_scales_tensor.sizes(),
-      "scales of weight_ih and weight_hh should be of same size");
+      weight_ih_scales_tensor.sizes() == weight_hh_scales_tensor.sizes() == 1,
+      "Expect scales of LSTM weight_ih and weight_hh to be of size 1");
 
   // PyTorch scale: (max - min) / (qmax - qmin)
   // oneDNN scale: (qmax - qmin) / (max - min)
-  for (size_t i = 0; i < weight_ih_scales_tensor.sizes()[0]; i++) {
-    weight_scales.push_back(
-        1. /
-        std::max(
-            weight_ih_scales_tensor[i].item().toFloat(),
-            weight_hh_scales_tensor[i].item().toFloat()));
-  }
+  auto scale_tensor = 1. /
+      torch::maximum(weight_ih_scales_tensor, weight_hh_scales_tensor)
+          .to(c10::kFloat);
+  scale_tensor = scale_tensor.contiguous();
+  auto s_ptr = scale_tensor.data_ptr<float>();
+  std::vector<float> weight_scales{s_ptr, s_ptr + scale_tensor.size(0)};
   return weight_scales;
 }
 
