@@ -52,6 +52,7 @@ class TestTorchMethod(TestCase):
             self.assertEqual(loss, loss_dpcpp.cpu())
             self.assertEqual(cpu_grad, dpcpp_grad.cpu())
 
+
         log_probs = torch.randn(50, 15, 20).log_softmax(
             2).detach().requires_grad_()
         targets = torch.randint(1, 20, (15, 30), dtype=torch.long)
@@ -76,5 +77,11 @@ class TestTorchMethod(TestCase):
         target_lengths = torch.randint(10, 30, (16,), dtype=torch.long)
 
         _test_loss_ctc(log_probs, targets, input_lengths, target_lengths)
+
+        log_probs = torch.randn(256, 32, 1024).log_softmax(
+            2).detach().requires_grad_()
+        targets = torch.randint(1, 1024, (32, 30), dtype=torch.long)
+        input_lengths = torch.full((32,), 1024, dtype=torch.long)
+        target_lengths = torch.randint(10, 30, (32,), dtype=torch.long)
 
         print("pass")

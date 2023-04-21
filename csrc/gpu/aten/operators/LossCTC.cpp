@@ -42,18 +42,17 @@ std::tuple<sycl::range<2>, sycl::range<2>> get_work_range(
   while (intra_batch_size / 2 >= work_in_batch_size && intra_batch_size > 1) {
     intra_batch_size /= 2;
   }
-
   int inter_batch_size =
       std::min((int)(work_group_size / intra_batch_size), (int)batch_size);
 
   sycl::range<2> global_range(
+      ((batch_size + inter_batch_size - 1) / inter_batch_size) *
+          inter_batch_size, // round up to inter_batch_size
       std::max<int>(
           (work_in_batch_size + intra_batch_size - 1) / intra_batch_size, 1) *
-          intra_batch_size, // round up to intra_batch_size
-      ((batch_size + inter_batch_size - 1) / inter_batch_size) *
-          inter_batch_size // round up to inter_batch_size
+          intra_batch_size // round up to intra_batch_size
   );
-  sycl::range<2> local_range(intra_batch_size, inter_batch_size);
+  sycl::range<2> local_range(inter_batch_size, intra_batch_size);
 
   return std::make_tuple(global_range, local_range);
 }
@@ -83,13 +82,13 @@ void ctc_loss_log_alpha_kernel(
 
   auto& sycl_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto work_group_size = dpcppMaxWorkGroupSize(dev_id);
-
+  auto work_group_size = dpcppMaxWorkItemsPerEU(dev_id);
   sycl::range<2> global_range(1, 1), local_range(1, 1);
-  std::tie(global_range, local_range) =
-      get_work_range(work_group_size, 2 * __max_input_length + 1, __batch_size);
-
+  std::tie(global_range, local_range) = get_work_range(
+      work_group_size, 2 * __max_target_length + 1, __batch_size);
   auto cgf = DPCPP_Q_CGF(cgh) {
+    dpcpp_local_acc_t<scalar_t> shared_local_buff(work_group_size, cgh);
+
     auto log_alpha_data = log_alpha.data_ptr<scalar_t>();
     auto log_probs_data = log_probs.data_ptr<scalar_t>();
     auto input_lengths_data = input_lengths.data_ptr<int64_t>();
@@ -97,9 +96,10 @@ void ctc_loss_log_alpha_kernel(
     auto target_lengths_data = target_lengths.data_ptr<int64_t>();
     auto neg_log_likelihood_data = neg_log_likelihood.data_ptr<scalar_t>();
     auto tg_batch_offsets_data = tg_batch_offsets.data_ptr<int64_t>();
+
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
-      size_t intra_batch_id = item_id.get_local_id(0);
-      size_t intra_batch_size = item_id.get_local_range(0);
+      size_t intra_batch_id = item_id.get_local_id(1);
+      size_t intra_batch_size = item_id.get_local_range(1);
       scalar_t* log_alpha_ptr = log_alpha_data;
       scalar_t* log_probs_ptr = log_probs_data;
       target_t* targets_ptr = targets_data;
@@ -109,8 +109,9 @@ void ctc_loss_log_alpha_kernel(
       int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
 
       // bookkeeping
-      int64_t b = item_id.get_local_id(1) +
-          item_id.get_group(1) * item_id.get_local_range(1);
+      int64_t b = item_id.get_local_id(0) +
+          item_id.get_group(0) * item_id.get_local_range(0);
+      size_t batch_slm_off = item_id.get_local_id(0) * intra_batch_size;
       // This is a workaround for unknown compute cpp issue.
       int64_t max_input_length = __max_input_length;
       int64_t max_target_length = __max_target_length;
@@ -182,31 +183,51 @@ void ctc_loss_log_alpha_kernel(
           have_three = false;
         }
 
+        auto lidx = intra_batch_id;
+        auto slm_lidx = batch_slm_off + lidx;
+        shared_local_buff[slm_lidx] = log_alpha_ptr
+            [la_batch_offset + la_input_stride * (0) +
+             la_target_stride * s]; // t == 0
+
         for (int64_t t = 1; t < max_input_length; t++) {
-          item_id.barrier(sycl::access::fence_space::global_space);
+          item_id.barrier(dpcpp_local_fence);
+          scalar_t result_t_s = neginf;
           if ((b < batch_size) && (t < input_length) &&
               (s < 2 * target_length + 1)) {
             // only for valid t, s. This is equation (6) and (7), la1, la2, la3
             // are the three summands,
             // lamax is the maximum for the logsumexp trick.
-            scalar_t la1 = log_alpha_ptr
-                [la_batch_offset + la_input_stride * (t - 1) +
-                 la_target_stride * s];
+            scalar_t la1 = shared_local_buff[slm_lidx];
             scalar_t lamax = la1;
             scalar_t la2, la3;
-            if (s > 0) {
-              la2 = log_alpha_ptr
-                  [la_batch_offset + la_input_stride * (t - 1) +
-                   la_target_stride * (s - 1)];
+            if (s > 0) { // for sequence idx start from 1
+              if (lidx > 0) {
+                // for sequence segement idx start from block_s + 1
+                la2 = shared_local_buff[slm_lidx - 1];
+              } else {
+                // only for item s =  block_s, and ptr[*, *, s-1] is not changed
+                // during this t loop as it is sloved in previous segement
+                la2 = log_alpha_ptr
+                    [la_batch_offset + la_input_stride * (t - 1) +
+                     la_target_stride * (s - 1)];
+              }
               if (la2 > lamax)
                 lamax = la2;
             } else {
               la2 = neginf;
             }
             if (have_three) {
-              la3 = log_alpha_ptr
-                  [la_batch_offset + la_input_stride * (t - 1) +
-                   la_target_stride * (s - 2)];
+              if (lidx > 1) {
+                // for sequence segement idx start from block_s + 2
+                la3 = shared_local_buff[slm_lidx - 2];
+              } else {
+                // only for item s = block_s or s = block_s + 1, and ptr[*,*,
+                // s-2] is not changed during this t loop as it is sloved in
+                // previous segement
+                la3 = log_alpha_ptr
+                    [la_batch_offset + la_input_stride * (t - 1) +
+                     la_target_stride * (s - 2)];
+              }
               if (la3 > lamax)
                 lamax = la3;
             } else {
@@ -220,13 +241,15 @@ void ctc_loss_log_alpha_kernel(
                 Numerics<scalar_t>::exp(la1 - lamax) +
                 Numerics<scalar_t>::exp(la2 - lamax) +
                 Numerics<scalar_t>::exp(la3 - lamax));
+            result_t_s = tmp + lamax +
+                static_cast<scalar_t>(
+                             log_probs_ptr
+                                 [lp_batch_offset + t * lp_input_stride +
+                                  lp_char_stride * current_char]);
             log_alpha_ptr
                 [la_batch_offset + la_input_stride * t + la_target_stride * s] =
-                    tmp + lamax +
-                static_cast<scalar_t>(
-                        log_probs_ptr
-                            [lp_batch_offset + t * lp_input_stride +
-                             lp_char_stride * current_char]);
+                    result_t_s;
+
           } else {
             // otherwise we just set to neginf
             if (b < batch_size && s < 2 * max_target_length + 1)
@@ -234,21 +257,21 @@ void ctc_loss_log_alpha_kernel(
                   [la_batch_offset + la_input_stride * t +
                    la_target_stride * s] = neginf;
           }
+          item_id.barrier(dpcpp_local_fence);
+          shared_local_buff[slm_lidx] = result_t_s;
         }
+        // sync on batch_s segement
+        item_id.barrier(dpcpp_global_fence);
       }
-      item_id.barrier(sycl::access::fence_space::global_space);
 
       if (b >= batch_size)
         return;
-
       // compute the loss (eq (8))
       if (intra_batch_id == 0) {
         if (target_length == 0) {
           neg_log_likelihood_ptr[b] = -static_cast<scalar_t>(
               log_alpha_ptr
-                  [la_batch_offset +
-                   la_input_stride *
-                       (input_length - 1) /*+ la_target_stride * 0*/]);
+                  [la_batch_offset + la_input_stride * (input_length - 1)]);
         } else {
           scalar_t l1 = log_alpha_ptr
               [la_batch_offset + la_input_stride * (input_length - 1) +
@@ -303,7 +326,7 @@ void ctc_loss_backward_log_beta_kernel(
 
   auto& sycl_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto work_group_size = dpcppMaxWorkGroupSize(dev_id);
+  auto work_group_size = dpcppMaxWorkItemsPerEU(dev_id);
 
   sycl::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
@@ -317,8 +340,8 @@ void ctc_loss_backward_log_beta_kernel(
     auto target_lengths_data = target_lengths.data_ptr<int64_t>();
     auto tg_batch_offsets_data = tg_batch_offsets.data_ptr<int64_t>();
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
-      size_t intra_batch_id = item_id.get_local_id(0);
-      size_t intra_batch_size = item_id.get_local_range(0);
+      size_t intra_batch_id = item_id.get_local_id(1);
+      size_t intra_batch_size = item_id.get_local_range(1);
       scalar_t* log_beta_ptr = log_beta_data;
       scalar_t* log_probs_ptr = log_probs_data;
       target_t* targets_ptr = targets_data;
@@ -327,8 +350,8 @@ void ctc_loss_backward_log_beta_kernel(
       int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
 
       // bookkeeping
-      int64_t b = item_id.get_local_id(1) +
-          item_id.get_group(1) * item_id.get_local_range(1);
+      int64_t b = item_id.get_local_id(0) +
+          item_id.get_group(0) * item_id.get_local_range(0);
       // This is a workaround for unknown compute cpp issue.
       int64_t max_input_length = __max_input_length;
       int64_t max_target_length = __max_target_length;
@@ -404,7 +427,7 @@ void ctc_loss_backward_log_beta_kernel(
         // now go backward in t. Note that we need to skip the last timestep
         // that we did above.
         for (int64_t t = max_input_length - 2; t >= 0; t--) {
-          item_id.barrier(sycl::access::fence_space::global_space);
+          item_id.barrier(dpcpp_global_fence);
           if ((b < batch_size) && (t < input_length - 1) &&
               (s < 2 * target_length + 1)) {
             scalar_t lb1 = log_beta_ptr
@@ -520,7 +543,7 @@ void ctc_loss_backward_collect_nonblank_kernel(
 
   auto& sycl_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto work_group_size = dpcppMaxWorkGroupSize(dev_id);
+  auto work_group_size = dpcppMaxWorkItemsPerEU(dev_id);
 
   sycl::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
@@ -549,10 +572,10 @@ void ctc_loss_backward_collect_nonblank_kernel(
       int64_t* target_lengths_ptr = target_lengths_data;
       int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
 
-      int64_t b = item_id.get_local_id(1) +
-          item_id.get_group(1) * item_id.get_local_range(1);
-      int64_t s = item_id.get_local_id(0) +
+      int64_t b = item_id.get_local_id(0) +
           item_id.get_group(0) * item_id.get_local_range(0);
+      int64_t s = item_id.get_local_id(1) +
+          item_id.get_group(1) * item_id.get_local_range(1);
       // note, this directly indexes into targets, no targets prime!
 
       if (b >= batch_size)
@@ -640,10 +663,9 @@ void ctc_loss_backward_collect_kernel(
   int64_t lb_batch_stride = log_beta.stride(0);
   int64_t lb_input_stride = log_beta.stride(1);
   int64_t lb_target_stride = log_beta.stride(2);
-
   auto& sycl_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto work_group_size = dpcppMaxWorkGroupSize(dev_id);
+  auto work_group_size = dpcppMaxWorkItemsPerEU(dev_id);
 
   sycl::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
@@ -671,10 +693,10 @@ void ctc_loss_backward_collect_kernel(
       int64_t* target_lengths_ptr = target_lengths_data;
       int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
 
-      int64_t b = item_id.get_local_id(1) +
-          item_id.get_group(1) * item_id.get_local_range(1);
-      int64_t t = item_id.get_local_id(0) +
+      int64_t b = item_id.get_local_id(0) +
           item_id.get_group(0) * item_id.get_local_range(0);
+      int64_t t = item_id.get_local_id(1) +
+          item_id.get_group(1) * item_id.get_local_range(1);
 
       if ((t >= max_input_length) || (b >= batch_size))
         return;
@@ -756,7 +778,7 @@ void ctc_loss_zero_padded_gradients(
     int64_t num_labels /* D */) {
   auto& sycl_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto work_group_size = dpcppMaxWorkGroupSize(dev_id);
+  auto work_group_size = dpcppMaxWorkItemsPerEU(dev_id);
 
   sycl::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
@@ -769,10 +791,10 @@ void ctc_loss_zero_padded_gradients(
       scalar_t* gradient_ptr = gradient_data;
       int64_t* input_lengths_ptr = input_lengths_data;
 
-      int64_t b = item_id.get_local_id(1) +
-          item_id.get_group(1) * item_id.get_local_range(1);
-      int64_t t = item_id.get_local_id(0) +
+      int64_t b = item_id.get_local_id(0) +
           item_id.get_group(0) * item_id.get_local_range(0);
+      int64_t t = item_id.get_local_id(1) +
+          item_id.get_group(1) * item_id.get_local_range(1);
 
       if (b >= batch_size || t >= max_input_length) {
         return;
