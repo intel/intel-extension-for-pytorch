@@ -77,7 +77,13 @@ Tensor quantize_tensor_per_channel_affine(
   Tensor dnn_zero_point =
       at::zeros_like(zero_points, dtype(at::kInt).device(at::kXPU));
   xpu::oneDNN::quantized_reorder(
-      rtensor, qtensor, dnn_scale, dnn_zero_point, rattr);
+      rtensor,
+      qtensor,
+      /*src_scale=*/Tensor(),
+      /*src_zero_point=*/Tensor(),
+      dnn_scale,
+      dnn_zero_point,
+      rattr);
 
   return qtensor;
 }
@@ -134,7 +140,13 @@ Tensor quantize_tensor_per_tensor_affine(
         AtenIpexTypeXPU::empty_opaque_qtensor(q_md, c10::nullopt, quantizer);
 
     xpu::oneDNN::quantized_reorder(
-        rtensor, qtensor_opt, dnn_scale, dnn_zero_point, rattr);
+        rtensor,
+        qtensor_opt,
+        /*src_scale=*/Tensor(),
+        /*src_zero_point=*/Tensor(),
+        dnn_scale,
+        dnn_zero_point,
+        rattr);
     auto q_opt_ctx =
         at::AtenIpexTypeXPU::DPCPPTensorContext::release_tensor_ctx(
             qtensor_opt);
@@ -142,7 +154,13 @@ Tensor quantize_tensor_per_tensor_affine(
         qtensor, std::move(q_opt_ctx));
   } else {
     xpu::oneDNN::quantized_reorder(
-        rtensor, qtensor, dnn_scale, dnn_zero_point, rattr);
+        rtensor,
+        qtensor,
+        /*src_scale=*/Tensor(),
+        /*srd_zero_point=*/Tensor(),
+        dnn_scale,
+        dnn_zero_point,
+        rattr);
   }
 
   return qtensor;

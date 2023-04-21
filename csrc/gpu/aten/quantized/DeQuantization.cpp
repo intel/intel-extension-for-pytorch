@@ -14,6 +14,7 @@ using namespace dnnl;
 using namespace at::native;
 using namespace xpu::dpcpp;
 using namespace xpu::oneDNN;
+using namespace at::AtenIpexTypeQuantizedXPU;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -25,25 +26,38 @@ Tensor dequantize_tensor_per_tensor_affine(
     int64_t zero_point) {
   ReorderAttr rattr = ReorderAttr();
   int mask = 0;
-  auto q_ctx = DPCPPTensorContext::get_tensor_ctx(qtensor);
-  // TODO: Remove workaround for dnnl symmetric quantization
-  float true_scale = ((q_ctx.is_plain() ? get_onednn_dtype(qtensor)
-                                        : q_ctx.meta().get_data_type()) ==
-                          memory::data_type::u8 &&
-                      qtensor.q_zero_point() == 128)
-      ? static_cast<float>(scale / 2)
-      : static_cast<float>(scale);
   rattr.set_src_sc_and_zp_mask(mask);
 
-  // See [Note: Scale setting for reorder]
-  Tensor dnn_scale =
-      at::ones(1, at::dtype(at::kFloat).device(at::kXPU)) * true_scale;
-  // TODO: Remove workaround for dnnl symmetric quantization
-  Tensor dnn_zero_point = at::zeros(1, at::dtype(at::kInt).device(at::kXPU));
-
   Tensor rtensor_ = at::empty(qtensor.sizes(), rtensor.options());
-  xpu::oneDNN::quantized_reorder(
-      qtensor, rtensor_, dnn_scale, dnn_zero_point, rattr);
+  if (is_opaque_u8(qtensor)) {
+    Tensor dnn_scale =
+        at::empty({1}, at::dtype(at::kFloat).device(at::kXPU)).fill_(scale);
+    Tensor dnn_zero_point =
+        at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
+
+    // See [Note: Scale setting for reorder]
+    xpu::oneDNN::quantized_reorder(
+        qtensor,
+        rtensor_,
+        dnn_scale,
+        dnn_zero_point,
+        /*dst_scale=*/Tensor(),
+        /*dst_zero_point=*/Tensor(),
+        rattr);
+  } else {
+    // See [Note: Scale setting for reorder]
+    xpu::oneDNN::quantized_reorder(
+        qtensor,
+        rtensor_,
+        q_scale_ptr(qtensor),
+        q_zero_point_ptr(qtensor),
+        /*dst_scale=*/nullptr,
+        /*dst_zero_point=*/nullptr,
+        {1},
+        {1},
+        rattr);
+  }
+
   return rtensor_;
 }
 
@@ -91,7 +105,13 @@ Tensor dequantize_tensor_per_channel_affine(
 
   Tensor rtensor_ = empty_opaque_tensor(r_md, rtensor.options(), c10::nullopt);
   xpu::oneDNN::quantized_reorder(
-      qtensor, rtensor_, dnn_scale, dnn_zero_point, rattr);
+      qtensor,
+      rtensor_,
+      dnn_scale,
+      dnn_zero_point,
+      /*dst_scale=*/Tensor(),
+      /*dst_zero_point=*/Tensor(),
+      rattr);
 
   return rtensor_;
 }

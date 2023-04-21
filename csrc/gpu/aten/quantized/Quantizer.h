@@ -4,12 +4,50 @@
 #include <quantized/DeQuantization.h>
 #include <quantized/QTensor.h>
 #include <quantized/Quantization.h>
+#include <runtime/Utils.h>
 #include <utils/LRUCache.h>
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 
+using namespace xpu::dpcpp;
+
+template <typename scale_t_, typename zp_t_>
+class XPUQuantizerBase {
+ public:
+  using scale_t = scale_t_;
+  using zp_t = zp_t_;
+  using scale_ptr_t = std::shared_ptr<scale_t>;
+  using zp_ptr_t = std::shared_ptr<zp_t>;
+
+ public:
+  XPUQuantizerBase() = default;
+
+  XPUQuantizerBase(size_t size, sycl::queue& q)
+      : scale_ptr_(
+            sycl::malloc_device<scale_t>(size * sizeof(scale_t), q),
+            [=](scale_t* ptr) { sycl::free(ptr, q); }),
+        zp_ptr_(
+            sycl::malloc_device<zp_t>(size * sizeof(zp_t), q),
+            [=](zp_t* ptr) { sycl::free(ptr, q); }) {}
+  scale_t* scale_ptr() {
+    return scale_ptr_.get();
+  }
+
+  zp_t* zero_point_ptr() {
+    return zp_ptr_.get();
+  }
+
+ private:
+  scale_ptr_t scale_ptr_;
+  zp_ptr_t zp_ptr_;
+};
+
 struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
+  using QuantizerBaseType = XPUQuantizerBase<float, int32_t>;
+  using scale_t = QuantizerBaseType::scale_t;
+  using zp_t = QuantizerBaseType::zp_t;
+
   explicit DPCPPPerTensorAffineQuantizer(
       ScalarType scalar_type,
       double scale,
@@ -22,17 +60,21 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
     }
     // TODO: Modify this line after asymmetric enabled
     xpu::dpcpp::create_key(key_sc_zp, dnn_scale, 0);
-    bool key_found = xpu::dpcpp::find_key<std::pair<Tensor, Tensor>>(key_sc_zp);
+    bool key_found = xpu::dpcpp::find_key<QuantizerBaseType>(key_sc_zp);
     if (key_found) {
-      std::tie(scale_tensor_, zero_point_tensor_) =
-          xpu::dpcpp::fetch_m<std::pair<Tensor, Tensor>>(key_sc_zp);
+      base_ = xpu::dpcpp::fetch_m<QuantizerBaseType>(key_sc_zp);
     } else {
-      scale_tensor_ = at::empty({1}, at::dtype(kFloat).device(at::kXPU))
-                          .fill_(static_cast<float>(dnn_scale));
-      // TODO: Modify this line after asymmetric enabled
-      zero_point_tensor_ = at::zeros({1}, at::dtype(kInt).device(at::kXPU));
-      xpu::dpcpp::fetch_or_create_m<std::pair<Tensor, Tensor>>(
-          key_sc_zp, scale_tensor_, zero_point_tensor_);
+      base_ = QuantizerBaseType(1, dpcppGetCurrentQueue());
+
+      scale_t* sc_ptr = base_.scale_ptr();
+      scale_t _scale = (scale_t)dnn_scale;
+      dpcppGetCurrentQueue().single_task([=]() { sc_ptr[0] = _scale; });
+
+      zp_t* zp_ptr = base_.zero_point_ptr();
+      zp_t _zp = (zp_t)0;
+      dpcppGetCurrentQueue().single_task([=]() { zp_ptr[0] = _zp; });
+
+      xpu::dpcpp::fetch_or_create_m<QuantizerBaseType>(key_sc_zp, base_);
     }
   }
 
@@ -80,12 +122,12 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
     return zero_point_;
   }
 
-  Tensor scale_tensor() {
-    return scale_tensor_;
+  scale_t* scale_ptr() {
+    return base_.scale_ptr();
   }
 
-  Tensor zero_point_tensor() {
-    return zero_point_tensor_;
+  zp_t* zero_point_ptr() {
+    return base_.zero_point_ptr();
   }
 
   bool equalTo(QuantizerPtr other) const override {
@@ -107,8 +149,7 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
   const double scale_;
   // We use int64_t for consistency with Python
   const int64_t zero_point_;
-  Tensor scale_tensor_;
-  Tensor zero_point_tensor_;
+  QuantizerBaseType base_;
 };
 
 struct DPCPPPerChannelAffineQuantizer : public AffineQuantizer {

@@ -363,8 +363,7 @@ static inline void matmul(
                   .fill_(m1.q_scale());
       m1_sc_m = dpcpp_onednn_memory(m1_sc_md, engine, m1_sc.data_ptr());
     } else {
-      m1_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(m1);
-      m1_sc_m = dpcpp_onednn_memory(m1_sc_md, engine, m1_sc.data_ptr());
+      m1_sc_m = dpcpp_onednn_memory(m1_sc_md, engine, q_scale_ptr(m1));
     }
     args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, m1_sc_m});
 
@@ -373,8 +372,7 @@ static inline void matmul(
     if (m2.is_quantized()) {
       memory::desc m2_sc_md =
           memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
-      m2_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(m2);
-      m2_sc_m = dpcpp_onednn_memory(m2_sc_md, engine, m2_sc.data_ptr());
+      m2_sc_m = dpcpp_onednn_memory(m2_sc_md, engine, q_scale_ptr(m2));
       args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, m2_sc_m});
     }
 
@@ -383,8 +381,7 @@ static inline void matmul(
     if (dst.is_quantized()) {
       memory::desc dst_sc_md =
           memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
-      dst_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(dst);
-      dst_sc_m = dpcpp_onednn_memory(dst_sc_md, engine, dst_sc.data_ptr());
+      dst_sc_m = dpcpp_onednn_memory(dst_sc_md, engine, q_scale_ptr(dst));
       args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, dst_sc_m});
     }
 
@@ -421,9 +418,7 @@ static inline void matmul(
     if (is_per_tensor_quantized) {
       memory::desc wgh_sc_md =
           memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
-      Tensor wgh_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(m2);
-      memory wgh_sc_m =
-          dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
+      memory wgh_sc_m = dpcpp_onednn_memory(wgh_sc_md, engine, q_scale_ptr(m2));
       args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
 
 #ifdef BUILD_PRIOR_SYMM_QUANT

@@ -36,9 +36,9 @@ Tensor q_per_channel_zero_points(const Tensor& self);
 
 int64_t q_per_channel_axis(const Tensor& self);
 
-Tensor q_scale_tensor(const Tensor& self);
+float* q_scale_ptr(const Tensor& self);
 
-Tensor q_zero_point_tensor(const Tensor& self);
+int32_t* q_zero_point_ptr(const Tensor& self);
 
 Tensor& set_(
     Tensor& self,

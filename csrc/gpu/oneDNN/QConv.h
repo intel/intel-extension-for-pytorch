@@ -485,8 +485,7 @@ static at::Tensor quantized_convolution(
                  .fill_(static_cast<float>(src.q_scale()));
     src_sc_m = dpcpp_onednn_memory(src_sc_md, engine, src_sc.data_ptr());
   } else {
-    src_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(src);
-    src_sc_m = dpcpp_onednn_memory(src_sc_md, engine, src_sc.data_ptr());
+    src_sc_m = dpcpp_onednn_memory(src_sc_md, engine, q_scale_ptr(src));
   }
   args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, src_sc_m});
 
@@ -530,10 +529,9 @@ static at::Tensor quantized_convolution(
 #endif
 
   if (wgh.qscheme() == kPerTensorAffine) {
-    Tensor wgh_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(wgh);
     memory::desc wgh_sc_md =
         memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
-    memory wgh_sc_m = dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
+    memory wgh_sc_m = dpcpp_onednn_memory(wgh_sc_md, engine, q_scale_ptr(wgh));
     args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
 
 #ifdef BUILD_PRIOR_SYMM_QUANT
