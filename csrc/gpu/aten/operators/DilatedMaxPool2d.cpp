@@ -54,6 +54,12 @@ void max_pool2d_with_indices_out_template(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
+  if (ceil_mode) {
+    TORCH_CHECK(
+        (input.ndimension() == 4),
+        "For now, the max pool2d only support 4d input for ceil mode");
+  }
+
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 2,
       "max_pool2d: kernel_size must either be a single int, or a tuple "
