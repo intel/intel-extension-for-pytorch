@@ -82,7 +82,7 @@ static void mean_kernel(TensorIterator& iter) {
 
 Tensor& mean_out(
     const Tensor& self,
-    c10::OptionalArrayRef<long> opt_dim,
+    c10::OptionalArrayRef<int64_t> opt_dim,
     bool keepdim,
     c10::optional<ScalarType> opt_dtype,
     Tensor& result) {
@@ -107,7 +107,7 @@ Tensor& mean_out(
 
 Tensor mean(
     const Tensor& self,
-    c10::OptionalArrayRef<long> opt_dim,
+    c10::OptionalArrayRef<int64_t> opt_dim,
     bool keepdim,
     optional<ScalarType> dtype) {
   Tensor result;

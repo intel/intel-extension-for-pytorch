@@ -7,6 +7,7 @@ set(Options_cmake_included true)
 # The options to build xpu
 include(CMakeDependentOption)
 # General options:
+
 option(BUILD_WITH_CPU "Build CPU backend implementation" ON)
 option(BUILD_WITH_XPU "Build XPU backend implementation" OFF)
 option(BUILD_NO_CLANGFORMAT "Build without force clang-format" OFF)

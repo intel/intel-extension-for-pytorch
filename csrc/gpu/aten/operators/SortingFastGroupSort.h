@@ -43,8 +43,8 @@ inline void fast_group_radix_sort_impl_(
       SortMethod::PROCESSING_LENGTH;
   auto& q = dpcppGetCurrentQueue();
 
-  constexpr uint64_t KEY_TRAITS_TYPE_MASK = 1l
-      << ((sizeof(KeyTraitsT) << 3) - 1);
+  constexpr uint64_t KEY_TRAITS_TYPE_MASK =
+      (1ll << ((sizeof(KeyTraitsT) << 3) - 1));
   KeyTraitsT padding_key;
   if (IS_DESCENDING) {
     padding_key = 0;

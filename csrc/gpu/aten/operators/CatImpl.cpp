@@ -202,7 +202,7 @@ void parallel_cat(
   scalar_out_t* data = static_cast<scalar_out_t*>(out.data_ptr());
 
   // Kernel Parameter
-  long tensorMetadataSize =
+  int64_t tensorMetadataSize =
       sizeof(CatArrInputTensor<scalar_in_t, unsigned int>) *
       CAT_ARRAY_BATCH_SIZE;
   auto d_inputs_storage =

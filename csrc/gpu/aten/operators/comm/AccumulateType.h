@@ -70,7 +70,7 @@ template <typename T>
 using acc_type = typename AccumulateType<T>::type;
 
 // This function always return accumulator type for dpcpp
-TORCH_API static inline c10::ScalarType toAccumulateType(c10::ScalarType type) {
+static inline c10::ScalarType toAccumulateType(c10::ScalarType type) {
   switch (type) {
 #define DEFINE_CASE(scalar_t, TypeNum) \
   case ScalarType::TypeNum:            \

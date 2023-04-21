@@ -24,16 +24,16 @@ namespace xpu {
 
 /// \enum FP32_MATH_MODE
 /// \brief specifies the available DPCCP packet types
-enum IPEX_API FP32_MATH_MODE {
+enum FP32_MATH_MODE {
   FP32 = 0, ///< set floating-point math mode to FP32.
   TF32 = 1, ///< set floating-point math mode to TF32.
   BF32 = 2, ///< set floating-point math mode to BF32.
   FP32_MATH_MODE_MAX = BF32 ///< set floating-point math mode.
 };
-static const char* IPEX_API FP32_MATH_MODE_STR[]{"FP32", "TF32", "BF32"};
+static const char* FP32_MATH_MODE_STR[]{"FP32", "TF32", "BF32"};
 
 /// Get Math Mode Setting Status.
-IPEX_API FP32_MATH_MODE get_fp32_math_mode();
+FP32_MATH_MODE get_fp32_math_mode();
 
 /// Enable or disable implicit data type conversion.
 /// If mode is FP32MathMode.FP32 which means to disable the oneDNN fpmath mode.
@@ -47,6 +47,6 @@ IPEX_API FP32_MATH_MODE get_fp32_math_mode();
 ///     will be enabled if dtype is set to ``FP32MathMode.TF32`. The implicit
 ///     FP32 to BF16 data type conversion will be enabled if dtype is set to
 ///     ``FP32MathMode.BF32`.
-IPEX_API bool set_fp32_math_mode(FP32_MATH_MODE mode);
+bool set_fp32_math_mode(FP32_MATH_MODE mode);
 
 } // namespace xpu

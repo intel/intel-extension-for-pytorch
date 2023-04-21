@@ -380,7 +380,7 @@ Tensor& renorm_out(
 static Tensor& linalg_vector_norm_impl(
     const Tensor& self,
     const Scalar& scalar_ord,
-    c10::OptionalArrayRef<long> opt_dim,
+    c10::OptionalArrayRef<int64_t> opt_dim,
     bool keepdim,
     optional<ScalarType> opt_dtype,
     Tensor& result) {
@@ -465,7 +465,7 @@ static Tensor& linalg_vector_norm_impl(
 Tensor linalg_vector_norm(
     const Tensor& self,
     const Scalar& ord,
-    c10::OptionalArrayRef<long> opt_dim,
+    c10::OptionalArrayRef<int64_t> opt_dim,
     bool keepdim,
     optional<ScalarType> opt_dtype) {
   ScalarType out_dtype =
@@ -478,7 +478,7 @@ Tensor linalg_vector_norm(
 Tensor& linalg_vector_norm_out(
     const Tensor& self,
     const Scalar& ord,
-    c10::OptionalArrayRef<long> opt_dim,
+    c10::OptionalArrayRef<int64_t> opt_dim,
     bool keepdim,
     optional<ScalarType> opt_dtype,
     Tensor& result) {

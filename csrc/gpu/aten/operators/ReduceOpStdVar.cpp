@@ -144,7 +144,7 @@ static void std_var_kernel(
 Tensor& std_var_out(
     Tensor& result,
     const Tensor& self,
-    c10::OptionalArrayRef<long> dim,
+    c10::OptionalArrayRef<int64_t> dim,
     int64_t correction_opt,
     bool keepdim,
     bool take_sqrt) {

@@ -3862,9 +3862,9 @@ static inline DPCPP_BOTH scalar_t calc_erfcx(scalar_t x) {
     if (x < -26.7) {
       return Numerics<scalar_t>::upper_bound();
     } else if (x < -6.1) {
-      return 2 * exp(x * x);
+      return 2 * Numerics<scalar_t>::exp(x * x);
     } else {
-      return 2 * exp(x * x) - erfcx_y100(400 / (4 - x));
+      return 2 * Numerics<scalar_t>::exp(x * x) - erfcx_y100(400 / (4 - x));
     }
   }
 }

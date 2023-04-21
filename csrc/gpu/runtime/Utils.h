@@ -156,7 +156,7 @@ uint32_t dpcppPrefVectorWidth(
   if (std::is_same<T, int>::value) {
     return dev_prop->pref_vec_width_int;
   }
-  if (std::is_same<T, long>::value) {
+  if (std::is_same<T, int64_t>::value) {
     return dev_prop->pref_vec_width_long;
   }
   if (std::is_same<T, float>::value) {
@@ -185,7 +185,7 @@ uint32_t dpcppNativeVectorWidth(
   if (std::is_same<T, int>::value) {
     return dev_prop->native_vec_width_int;
   }
-  if (std::is_same<T, long>::value) {
+  if (std::is_same<T, int64_t>::value) {
     return dev_prop->native_vec_width_long;
   }
   if (std::is_same<T, float>::value) {

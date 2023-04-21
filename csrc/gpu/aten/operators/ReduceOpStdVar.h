@@ -6,7 +6,7 @@ namespace AtenIpexTypeXPU {
 at::Tensor& std_var_out(
     at::Tensor& result,
     const at::Tensor& self,
-    c10::OptionalArrayRef<long> dim,
+    c10::OptionalArrayRef<int64_t> dim,
     int64_t correction_opt,
     bool keepdim,
     bool take_sqrt);

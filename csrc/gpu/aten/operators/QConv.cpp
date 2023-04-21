@@ -10,7 +10,11 @@
 #include <quantized/QUtils.h>
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 #include "comm/RegistrationDeclarations.h"
 #include "utils/CustomOperatorRegistration.h"
 

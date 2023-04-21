@@ -1,6 +1,5 @@
 #include <ATen/ATen.h>
 #include <ATen/NamedTensorUtils.h>
-#include <ATen/native/ComplexHelper.h>
 #include <ATen/native/TensorIterator.h>
 #include <utils/DPCPP.h>
 #include "comm/AccumulateType.h"

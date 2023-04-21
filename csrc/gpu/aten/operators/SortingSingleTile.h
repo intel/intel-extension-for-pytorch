@@ -4,6 +4,12 @@
 #include "SortingRadixProcesser.h"
 #include "comm/TensorOptions.h"
 
+#ifdef _WIN32
+#include <winsock.h>
+#undef max
+#undef min
+#endif
+
 namespace at {
 namespace AtenIpexTypeXPU {
 
@@ -614,8 +620,8 @@ class RadixSortDownsweep {
       if (IS_DESCENDING)
         bin_idx = RADIX_DIGITS - bin_idx - 1;
 
-      u_int32_t counter_lane = (bin_idx & (COUNTER_LANES - 1));
-      u_int32_t sub_counter = bin_idx >> (LOG_COUNTER_LANES);
+      uint32_t counter_lane = (bin_idx & (COUNTER_LANES - 1));
+      uint32_t sub_counter = bin_idx >> (LOG_COUNTER_LANES);
       exclusive_digit_prefix =
           local_storage.rank_storage.buckets[counter_lane][0][sub_counter];
     }

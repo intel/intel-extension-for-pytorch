@@ -23,8 +23,8 @@ template <typename scalar_t, typename item_t>
 inline void renormRowsL1(
     item_t& item,
     scalar_t* dist,
-    long rows,
-    long cols,
+    int64_t rows,
+    int64_t cols,
     unsigned char* my_smem) {
   auto thread_idx = item.get_local_id(0);
   auto thread_range = item.get_local_range(0);

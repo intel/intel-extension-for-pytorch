@@ -42,7 +42,7 @@
       IPEX_PRIVATE_CASE_TYPE(                                                \
           at::ScalarType::BFloat16, at::BFloat16, __VA_ARGS__)               \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)    \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, long, __VA_ARGS__)        \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, int64_t, __VA_ARGS__)     \
       default:                                                               \
         AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \
     }                                                                        \
@@ -65,7 +65,7 @@
       IPEX_PRIVATE_CASE_TYPE(                                                \
           at::ScalarType::BFloat16, at::BFloat16, __VA_ARGS__)               \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)    \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, long, __VA_ARGS__)        \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, int64_t, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(                                                \
           at::ScalarType::ComplexFloat, c10::complex<float>, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(                                                \

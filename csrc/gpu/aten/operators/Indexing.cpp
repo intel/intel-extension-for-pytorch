@@ -665,8 +665,8 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
       getTensorInfo<scalar_t, uint64_t>(self);
   out_info.collapseDims();
 
-  TensorInfo<long, uint64_t> indices_info =
-      getTensorInfo<long, uint64_t>(index);
+  TensorInfo<int64_t, uint64_t> indices_info =
+      getTensorInfo<int64_t, uint64_t>(index);
   indices_info.collapseDims();
 
   TensorInfo<scalar_t, uint64_t> source_info =
@@ -677,7 +677,7 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto out_data = self.data_ptr<scalar_t>();
-    auto indices_data = index.data_ptr<long>();
+    auto indices_data = index.data_ptr<int64_t>();
     auto source_data = source.data_ptr<scalar_t>();
 
     auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
@@ -687,7 +687,7 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
 
       auto linear_idx = item_id.get_id(0);
       auto idx_offset =
-          IndexToOffset<long, uint64_t>::get(linear_idx, indices_info);
+          IndexToOffset<int64_t, uint64_t>::get(linear_idx, indices_info);
 
       auto index = indices_ptr[idx_offset];
       if (index < 0) {

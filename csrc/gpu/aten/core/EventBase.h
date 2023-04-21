@@ -37,7 +37,7 @@ struct DPCPPEventBase {
   virtual void ipc_handle(void* handle) = 0;
 };
 
-std::shared_ptr<DPCPPEventBase> create_dpcpp_event();
+IPEX_API std::shared_ptr<DPCPPEventBase> create_dpcpp_event();
 
 } // namespace dpcpp
 } // namespace xpu

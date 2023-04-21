@@ -16,7 +16,7 @@ namespace AtenIpexTypeXPU {
 
 std::tuple<Tensor&, Tensor&> sort_out(
     const Tensor& input,
-    long dim,
+    int64_t dim,
     bool order,
     Tensor& sorted,
     Tensor& indices) {

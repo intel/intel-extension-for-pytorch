@@ -9,6 +9,7 @@ if(BUILD_SIMPLE_TRACE)
 endif()
 
 set(BUILD_IPEX_GPU_ATEN_GENERATED "${CMAKE_BINARY_DIR}/csrc/aten/generated/ATen")
+file(MAKE_DIRECTORY ${BUILD_IPEX_GPU_ATEN_GENERATED})
 
 Function(GEN_BACKEND file_yaml)
         SET(generated_files "")
@@ -19,8 +20,6 @@ Function(GEN_BACKEND file_yaml)
                 ${PROJECT_SOURCE_DIR}/scripts/tools/torchgen/yaml/${file_yaml})
         add_custom_command(OUTPUT
                 ${generated_files}
-                COMMAND
-                mkdir -p ${BUILD_IPEX_GPU_ATEN_GENERATED}
                 COMMAND
                 "${PYTHON_EXECUTABLE}" -m torchgen.gen_backend_stubs
                 --output_dir ${BUILD_IPEX_GPU_ATEN_GENERATED}

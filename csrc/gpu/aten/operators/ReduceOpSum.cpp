@@ -93,7 +93,7 @@ void nansum_kernel_impl(TensorIterator& iter) {
 
 Tensor& nansum_out(
     const Tensor& self,
-    c10::OptionalArrayRef<long> opt_dim,
+    c10::OptionalArrayRef<int64_t> opt_dim,
     bool keepdim,
     optional<ScalarType> opt_dtype,
     Tensor& result) {
@@ -127,7 +127,7 @@ Tensor& nansum_out(
 
 Tensor nansum(
     const Tensor& self,
-    c10::OptionalArrayRef<long> opt_dim,
+    c10::OptionalArrayRef<int64_t> opt_dim,
     bool keepdim,
     c10::optional<ScalarType> opt_dtype) {
   ScalarType dtype = get_dtype_from_self(self, opt_dtype, true);

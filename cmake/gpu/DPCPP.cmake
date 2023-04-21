@@ -126,15 +126,20 @@ else()
 endif()
 set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-max-parallel-link-jobs=${SYCL_MAX_PARALLEL_LINK_JOBS}")
 
-# If FP64 is unsupported on certain GPU arch, warning all kernels with double
-# data type operations, and finish/return WITHOUT any computations.
-set(IPEX_OFFLINE_COMP_OPTIONS "${IPEX_OFFLINE_COMP_OPTIONS} -cl-poison-unsupported-fp64-kernels")
-# Use IGC auto large GRF option explicitly for current stage. The option is default in previous IGC.
-# Before fully controlling large GRF setting (trade off concurrency and memory spill), we will keep it, let compiler to choose.
-set(IPEX_OFFLINE_COMP_OPTIONS "${IPEX_OFFLINE_COMP_OPTIONS} -cl-intel-enable-auto-large-GRF-mode")
+if (NOT WINDOWS)
+  # If FP64 is unsupported on certain GPU arch, warning all kernels with double
+  # data type operations, and finish/return WITHOUT any computations.
+  set(IPEX_OFFLINE_COMP_OPTIONS "${IPEX_OFFLINE_COMP_OPTIONS} -cl-poison-unsupported-fp64-kernels")
+  # Use IGC auto large GRF option explicitly for current stage. The option is default in previous IGC.
+  # Before fully controlling large GRF setting (trade off concurrency and memory spill), we will keep it, let compiler to choose.
+  set(IPEX_OFFLINE_COMP_OPTIONS "${IPEX_OFFLINE_COMP_OPTIONS} -cl-intel-enable-auto-large-GRF-mode")
 
-# Apply offline compiler options
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -Xs '-options \"${IPEX_OFFLINE_COMP_OPTIONS}\"'")
+  # Apply offline compiler options
+  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -Xs '-options \"${IPEX_OFFLINE_COMP_OPTIONS}\"'")
+else()
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /Xs \"-options -cl-poison-unsupported-fp64-kernels -cl-intel-enable-auto-large-GRF-mode\"")
+endif()
+
 
 if(BUILD_BY_PER_KERNEL)
   set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-device-code-split=per_kernel")

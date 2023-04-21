@@ -422,7 +422,7 @@ std::tuple<Tensor&, Tensor&> mode_out_template(
     auto cgf = DPCPP_Q_CGF(cgh) {
       auto self_data = self_.data_ptr<scalar_t>();
       auto values_data = values.data_ptr<scalar_t>();
-      auto indices_data = indices.data_ptr<long>();
+      auto indices_data = indices.data_ptr<int64_t>();
 
       cgh.parallel_for(sycl::range<1>(total_threads), [=](sycl::item<1> item) {
         auto self_ptr = self_data;
@@ -489,7 +489,7 @@ std::tuple<Tensor&, Tensor&> mode_out_template(
       auto length = self_.size(0);
       auto self_data = self_.data_ptr<scalar_t>();
       auto values_data = values.data_ptr<scalar_t>();
-      auto indices_data = indices.data_ptr<long>();
+      auto indices_data = indices.data_ptr<int64_t>();
 
       cgh.parallel_for(sycl::range<1>(total_threads), [=](sycl::item<1> item) {
         auto self_ptr = self_data;

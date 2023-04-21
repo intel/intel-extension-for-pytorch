@@ -1,14 +1,7 @@
 #ifdef BUILD_SIMPLE_TRACE
 
-#ifndef _MSC_VER
-#include <sys/types.h>
-#include <unistd.h>
-#if __GLIBC__ == 2 && __GLIBC_MINOR__ < 30
-#include <sys/syscall.h>
-#define gettid() syscall(SYS_gettid)
-#endif
-#endif
 #include <utils/SimpleTrace.h>
+#include <utils/SysUtil.h>
 #include <iomanip>
 #include <sstream>
 #include <string>
@@ -26,9 +19,11 @@ SimpleTrace::SimpleTrace(const char* name)
     gindex++;
 
     std::stringstream ps;
+
     ps << "[" << std::setfill(' ') << std::setw(13)
-       << std::to_string(getpid()) + "." + std::to_string(gettid()) << "] "
-       << std::setw(gindent * 2 + 1) << " ";
+       << std::to_string(sys_getpid()) + "." + std::to_string(sys_gettid())
+       << "] " << std::setw(gindent * 2 + 1) << " ";
+
     _pre_str = ps.str();
 
     _index = gindex;

@@ -573,8 +573,8 @@ static inline int preferred_vector_width(DeviceId dev_id, int elem_sz) {
       static_assert(sizeof(int) == 4, "the long size is not 4 bytes");
       break;
     case 8:
-      static_assert(sizeof(long) == 8, "the long size is not 8");
-      ret = xpu::dpcpp::dpcppPrefVectorWidth<long>(dev_id);
+      static_assert(sizeof(int64_t) == 8, "the long size is not 8");
+      ret = xpu::dpcpp::dpcppPrefVectorWidth<int64_t>(dev_id);
       break;
     default:
       // no vectorize

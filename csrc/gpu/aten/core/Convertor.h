@@ -2,6 +2,7 @@
 
 #include <ATen/ATen.h>
 #include <ATen/Tensor.h>
+#include <utils/Macros.h>
 
 using namespace at;
 
@@ -18,13 +19,13 @@ at::Device getATenDeviceFromUSM(void* src, const DeviceIndex device_id);
 // 2) take a tensor object and convert it to a pointer addressed in USM.
 // 3) this convertor doesn't manage USM pointer src's lifetime. please take care
 // it carefully by yourself.
-Tensor fromUSM(
+IPEX_API Tensor fromUSM(
     void* src,
     const ScalarType stype,
     IntArrayRef shape,
     c10::optional<IntArrayRef> strides = c10::nullopt,
     const DeviceIndex device_id = -1);
 
-void* toUSM(const Tensor& src);
+IPEX_API void* toUSM(const Tensor& src);
 } // namespace dpcpp
 } // namespace xpu

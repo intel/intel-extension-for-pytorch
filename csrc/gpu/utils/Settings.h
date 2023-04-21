@@ -31,7 +31,7 @@ static const char* COMPUTE_ENG_STR[]{
 
 namespace dpcpp {
 
-class Settings final {
+class IPEX_API Settings final {
  public:
   Settings();
 

@@ -495,8 +495,8 @@ void spatial_class_nll_criterion_update_output_no_reduce_kernel(
       getTensorInfo<scalar_t, uint64_t>(self);
   int dst_dim = self_info.collapseDims(1);
   self_info.reduceDim(dst_dim);
-  TensorInfo<long, uint64_t> target_info =
-      getTensorInfo<long, uint64_t>(target);
+  TensorInfo<int64_t, uint64_t> target_info =
+      getTensorInfo<int64_t, uint64_t>(target);
   target_info.collapseDims();
   TensorInfo<scalar_t, uint64_t> output_info =
       getTensorInfo<scalar_t, uint64_t>(output);
@@ -510,7 +510,7 @@ void spatial_class_nll_criterion_update_output_no_reduce_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto out_data = output.data_ptr<scalar_t>();
     auto self_data = self.data_ptr<scalar_t>();
-    auto target_data = target.data_ptr<long>();
+    auto target_data = target.data_ptr<int64_t>();
     auto weight_data = weight.data_ptr<scalar_t>();
 
     auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
@@ -521,7 +521,7 @@ void spatial_class_nll_criterion_update_output_no_reduce_kernel(
 
       auto index = item_id.get_linear_id();
       auto target_offset =
-          IndexToOffset<long, uint64_t>::get(index, target_info);
+          IndexToOffset<int64_t, uint64_t>::get(index, target_info);
       auto output_offset =
           IndexToOffset<scalar_t, uint64_t>::get(index, output_info);
 
@@ -569,8 +569,8 @@ void spatial_class_nll_criterion_update_output_kernel(
       getTensorInfo<scalar_t, uint64_t>(self);
   int dst_dim = self_info.collapseDims(1);
   self_info.reduceDim(dst_dim);
-  TensorInfo<long, uint64_t> target_info =
-      getTensorInfo<long, uint64_t>(target);
+  TensorInfo<int64_t, uint64_t> target_info =
+      getTensorInfo<int64_t, uint64_t>(target);
   target_info.collapseDims();
   TensorInfo<scalar_t, uint64_t> weight_info =
       getTensorInfo<scalar_t, uint64_t>(weight);
@@ -580,7 +580,7 @@ void spatial_class_nll_criterion_update_output_kernel(
     auto out_data = output.data_ptr<scalar_t>();
     auto total_weight_data = total_weight.data_ptr<scalar_t>();
     auto self_data = self.data_ptr<scalar_t>();
-    auto target_data = target.data_ptr<long>();
+    auto target_data = target.data_ptr<int64_t>();
     auto weight_data = weight.data_ptr<scalar_t>();
     dpcpp_local_acc_t<accscalar_t, 1> partial_sums(wgroup_size, cgh);
     dpcpp_local_acc_t<accscalar_t, 1> partial_weight(wgroup_size, cgh);
@@ -603,7 +603,7 @@ void spatial_class_nll_criterion_update_output_kernel(
         auto global_shift = global_idx + i * global_range_size;
         if (global_shift < numel) {
           auto target_offset =
-              IndexToOffset<long, uint64_t>::get(global_shift, target_info);
+              IndexToOffset<int64_t, uint64_t>::get(global_shift, target_info);
           int64_t cur_target = target_ptr[target_offset];
 
           if (cur_target != ignore_index) {
@@ -687,8 +687,8 @@ void spatial_class_nll_criterion_update_grad_input_no_reduce_kernel(
       getTensorInfo<scalar_t, uint64_t>(grad_input);
   int dst_dim = grad_input_info.collapseDims(1);
   grad_input_info.reduceDim(dst_dim);
-  TensorInfo<long, uint64_t> target_info =
-      getTensorInfo<long, uint64_t>(target);
+  TensorInfo<int64_t, uint64_t> target_info =
+      getTensorInfo<int64_t, uint64_t>(target);
   target_info.collapseDims();
   TensorInfo<scalar_t, uint64_t> grad_output_info =
       getTensorInfo<scalar_t, uint64_t>(grad_output);
@@ -702,7 +702,7 @@ void spatial_class_nll_criterion_update_grad_input_no_reduce_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto grad_input_data = grad_input.data_ptr<scalar_t>();
     auto grad_output_data = grad_output.data_ptr<scalar_t>();
-    auto target_data = target.data_ptr<long>();
+    auto target_data = target.data_ptr<int64_t>();
     auto weight_data = weight.data_ptr<scalar_t>();
 
     auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
@@ -713,7 +713,7 @@ void spatial_class_nll_criterion_update_grad_input_no_reduce_kernel(
 
       auto index = item_id.get_linear_id();
       auto target_offset =
-          IndexToOffset<long, uint64_t>::get(index, target_info);
+          IndexToOffset<int64_t, uint64_t>::get(index, target_info);
 
       int64_t cur_target = target_ptr[target_offset];
       if (cur_target != ignore_index) {
@@ -758,8 +758,8 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
       getTensorInfo<scalar_t, uint64_t>(grad_input);
   int dst_dim = grad_input_info.collapseDims(1);
   grad_input_info.reduceDim(dst_dim);
-  TensorInfo<long, uint64_t> target_info =
-      getTensorInfo<long, uint64_t>(target);
+  TensorInfo<int64_t, uint64_t> target_info =
+      getTensorInfo<int64_t, uint64_t>(target);
   target_info.collapseDims();
   TensorInfo<scalar_t, uint64_t> weight_info =
       getTensorInfo<scalar_t, uint64_t>(weight);
@@ -770,7 +770,7 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto grad_input_data = grad_input.data_ptr<scalar_t>();
     auto grad_output_data = grad_output.data_ptr<scalar_t>();
-    auto target_data = target.data_ptr<long>();
+    auto target_data = target.data_ptr<int64_t>();
     auto weight_data = weight.data_ptr<scalar_t>();
     auto total_weight_data = total_weight.data_ptr<scalar_t>();
 
@@ -784,7 +784,7 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
 
       auto index = item_id.get_linear_id();
       auto target_offset =
-          IndexToOffset<long, uint64_t>::get(index, target_info);
+          IndexToOffset<int64_t, uint64_t>::get(index, target_info);
 
       int64_t cur_target = target_ptr[target_offset];
       if (cur_target != ignore_index) {

@@ -6,6 +6,7 @@
 #include <c10/core/DeviceGuard.h>
 #include <c10/core/Stream.h>
 #include <runtime/Queue.h>
+#include <utils/Macros.h>
 
 /*
  * A DPCPPStream is an abstraction of an actual sycl queue on the XPU.
@@ -20,7 +21,7 @@ namespace dpcpp {
 
 // This is a wrapper around c10::Stream. And use DPCPPStream.id() to unpack a
 // QueueIndex to retrieve sycl queue from the pool.
-class DPCPPStream {
+class IPEX_API DPCPPStream {
  public:
   enum Unchecked { UNCHECKED };
 
@@ -101,15 +102,14 @@ class DPCPPStream {
  * Currently, priority queue property is not supported yet. You can request a
  * stream for a specific device by setting device.
  */
-DPCPPStream getStreamFromPool(
-    const bool isHighPriority = false,
-    DeviceIndex device = -1);
+IPEX_API DPCPPStream
+getStreamFromPool(const bool isHighPriority = false, DeviceIndex device = -1);
 
 /**
  * Get the current XPU stream, for the passed XPU device, or for the
  * current device if no device index is passed.
  */
-DPCPPStream getCurrentDPCPPStream(DeviceIndex device_index = -1);
+IPEX_API DPCPPStream getCurrentDPCPPStream(DeviceIndex device_index = -1);
 
 /**
  * Set the current stream on the device of the passed in stream to be the passed
@@ -119,7 +119,7 @@ DPCPPStream getCurrentDPCPPStream(DeviceIndex device_index = -1);
  * will switch both your current device and current stream in the way you
  * expect, and reset it back to its original state afterwards).
  */
-void setCurrentDPCPPStream(DPCPPStream stream);
+IPEX_API void setCurrentDPCPPStream(DPCPPStream stream);
 
 /**
  * Block all queues on the device, and wait their synchronizations. We emulate
@@ -128,7 +128,7 @@ void setCurrentDPCPPStream(DPCPPStream stream);
  * depends on the most time-consuming queue as each of the queue is executed
  * asynchronously.
  */
-void deviceSynchronize(DeviceIndex device_index = -1);
+IPEX_API void deviceSynchronize(DeviceIndex device_index = -1);
 
 } // namespace dpcpp
 } // namespace xpu

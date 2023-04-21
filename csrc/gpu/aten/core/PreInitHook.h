@@ -1,4 +1,5 @@
 #pragma once
+#include <utils/Macros.h>
 
 namespace xpu {
 namespace dpcpp {
@@ -13,7 +14,7 @@ using InitFnPtr = void (*)();
 
 void do_pre_init_hook();
 
-void set_pre_init_hook_fn(InitFnPtr fn);
+IPEX_API void set_pre_init_hook_fn(InitFnPtr fn);
 
 struct PreInitHookRegister {
   explicit PreInitHookRegister(InitFnPtr fn) {

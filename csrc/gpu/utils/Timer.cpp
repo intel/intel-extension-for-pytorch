@@ -1,13 +1,6 @@
+#include <utils/SysUtil.h>
 #include <utils/Timer.h>
 
-#ifndef _MSC_VER
-#include <sys/types.h>
-#include <unistd.h>
-#if __GLIBC__ == 2 && __GLIBC_MINOR__ < 30
-#include <sys/syscall.h>
-#define gettid() syscall(SYS_gettid)
-#endif
-#endif
 #include <iomanip>
 #include <sstream>
 #include <string>
@@ -42,8 +35,9 @@ ipex_timer::~ipex_timer() {
     std::stringstream ps;
 
     ps << "[" << std::setfill(' ') << std::setw(13)
-       << std::to_string(getpid()) + "." + std::to_string(gettid()) << "]  "
-       << tag_ << ":";
+       << std::to_string(sys_getpid()) + "." + std::to_string(sys_gettid())
+       << "]  " << tag_ << ":";
+
     for (int i = 0; i < stamp_.size(); i++) {
       auto stamp = stamp_.at(i);
       auto sstamp = sstamp_.at(i);

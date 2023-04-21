@@ -122,7 +122,7 @@ void construct_function_schema_and_register(
       std::move(op_name.name), std::move(op_name.overload_name));
   s.setAliasAnalysis(c10::AliasAnalysisKind::CONSERVATIVE);
   c10::OperatorName find_name = s.operator_name();
-  const auto found = c10::Dispatcher::singleton().findOp(find_name);
+  const auto found = c10::Dispatcher::realSingleton().findOp(find_name);
   if (found == c10::nullopt) {
     m.def(std::move(s));
   }
