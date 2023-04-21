@@ -36,6 +36,7 @@ find_file(INTEL_SYCL_VERSION
         ${SYCL_INCLUDE_DIR}
     PATH_SUFFIXES
         sycl
+        sycl/CL
         sycl/CL/sycl
     NO_DEFAULT_PATH)
 

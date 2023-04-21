@@ -29,6 +29,11 @@ add_subdirectory(${IPEX_GPU_ROOT_DIR}/utils)
 set(IPEX_DISTRIBUTED_SRCS)
 add_subdirectory(${IPEX_GPU_ROOT_DIR}/distributed)
 
+if(USE_XETLA)
+  set(IPEX_GPU_XETLA_DIR "${IPEX_GPU_ROOT_DIR}/xetla")
+  add_subdirectory(${IPEX_GPU_XETLA_DIR})
+endif()
+
 if(NOT DEFINED SYCL_INCLUDE_DIR)
     message(FATAL_ERROR, "Cannot find SYCL include directory")
 endif()
@@ -62,6 +67,7 @@ if(BUILD_SEPARATE_OPS)
       target_link_libraries(${op_lib} PUBLIC ${GPU_TORCH_LIBS})
       list(APPEND IPEX_GPU_OP_LIBRARIES ${op_lib})
   endforeach()
+
 else()
   list(APPEND IPEX_GPU_CORE_SRC ${IPEX_ATEN_OPS_SRCS})
 endif()
@@ -82,6 +88,10 @@ if(BUILD_SEPARATE_OPS)
   target_link_libraries(intel-ext-pt-gpu PUBLIC ${GPU_TORCH_LIBS} ${IPEX_GPU_OP_LIBRARIES})
 else()
   target_link_libraries(intel-ext-pt-gpu PUBLIC ${GPU_TORCH_LIBS})
+endif()
+
+if(USE_XETLA)
+  target_link_libraries(intel-ext-pt-gpu PUBLIC xetla_kernels)
 endif()
 
 set(IPEX_COMPILE_DEFINITIONS)
@@ -109,6 +119,10 @@ endif()
 if (USE_SCRATCHPAD_MODE)
   # Enable oneDNN scratchpad user mode
   list(APPEND IPEX_COMPILE_DEFINITIONS "USE_SCRATCHPAD_MODE")
+endif()
+
+if(USE_XETLA)
+  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_XETLA")
 endif()
 
 if (USE_CHANNELS_LAST_1D)
@@ -204,6 +218,14 @@ if(BUILD_SEPARATE_OPS)
       RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
   endforeach()
 endif()
+
+if(USE_XETLA)
+  install(TARGETS xetla_kernels
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
 install(TARGETS intel-ext-pt-gpu
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

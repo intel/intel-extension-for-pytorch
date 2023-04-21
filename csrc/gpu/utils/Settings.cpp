@@ -298,6 +298,14 @@ bool Settings::is_jit_quantization_save_enabled() const {
 #endif
 }
 
+bool Settings::is_xetla_enabled() const {
+#if defined(USE_XETLA)
+  return true;
+#else
+  return false;
+#endif
+}
+
 bool Settings::is_simple_trace_enabled() const {
 #ifdef BUILD_SIMPLE_TRACE
   std::lock_guard<std::mutex> lock(s_mutex);

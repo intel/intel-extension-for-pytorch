@@ -634,6 +634,8 @@ void init_xpu_module(pybind11::module& m) {
     return Settings::I().is_onednn_layout_enabled();
   });
 
+  m.def("_is_xetla_enabled", []() { return Settings::I().is_xetla_enabled(); });
+
   m.def(
       "_enable_onednn_layout", []() { Settings::I().enable_onednn_layout(); });
 

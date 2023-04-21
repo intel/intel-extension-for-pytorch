@@ -7,3 +7,6 @@
 [submodule "third_party/ideep"]
 	path = third_party/ideep
 	url = https://github.com/intel/ideep.git
+[submodule "third_party/xetla"]
+	path = third_party/xetla
+	url = https://github.com/intel-innersource/libraries.gpu.xetla.git
