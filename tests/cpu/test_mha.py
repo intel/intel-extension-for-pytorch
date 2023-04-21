@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import intel_extension_for_pytorch as ipex
 import math
+import copy
 from common_utils import TestCase
 
 #(from Diffusers 0.12.1)
@@ -336,111 +337,58 @@ num_heads = [12, 16, 29]
 head_dims = [64, 96, 17]
 
 class TransFreeMHATester(TestCase):
+    def sd_mha_bf16_common(self, model, mat1, mat2=None):
+        for neg_FLT_MIN in [True, False]:
+            sd_mha_model = copy.deepcopy(model)
+            if mat2 is not None:
+                inputs = (mat1.to(torch.bfloat16), mat2.to(torch.bfloat16)) if not neg_FLT_MIN else ((mat1 + 15).to(torch.bfloat16), (mat2 + 15).to(torch.bfloat16))
+            else:
+                inputs = (mat1.to(torch.bfloat16), ) if not neg_FLT_MIN else ((mat1 + 15).to(torch.bfloat16), )
+            mha_ipex = ipex.optimize(sd_mha_model, dtype=torch.bfloat16, level="O1")
+            with torch.cpu.amp.autocast(), torch.no_grad():
+                mha_ipex = torch.jit.trace(mha_ipex, inputs)
+                mha_ipex = torch.jit.freeze(mha_ipex)
+
+                for _ in range(2):
+                    mha_jit = mha_ipex(*inputs)
+                mha_ref = sd_mha_model(*inputs)
+                self.assertEqual(mha_ref, mha_jit, prec=1.5e-0 if neg_FLT_MIN else 1e-2)
+
+                mha_graph = mha_ipex.graph_for(*inputs)
+                self.assertTrue(any(n.kind() == "ipex::sd_flash_mha" for n in mha_graph.nodes()))
 
     def test_sd_mha_bf16_v1(self):
-        mat = (torch.randn(2, 4096, 320) + 15).to(torch.bfloat16)
+        mat = torch.randn(2, 4096, 320)
         sd_mha_model = SD_MHA_Model_v1(0.3, 8, 320, 320).eval()
-        mha_ipex = ipex.optimize(sd_mha_model, dtype=torch.bfloat16, level="O1")
-
-        with torch.cpu.amp.autocast(), torch.no_grad():
-            mha_ipex = torch.jit.trace(mha_ipex, (mat, ))
-            mha_ipex = torch.jit.freeze(mha_ipex)
-
-            for _ in range(2):
-                mha_jit = mha_ipex(mat)
-            mha_ref = sd_mha_model(mat)
-            self.assertEqual(mha_ref, mha_jit, prec=1e-0)
-
-            mha_graph = mha_ipex.graph_for(mat)
-            self.assertTrue(any(n.kind() == "ipex::sd_flash_mha" for n in mha_graph.nodes()))
+        self.sd_mha_bf16_common(sd_mha_model, mat)
 
     def test_sd_mha_bf16_v2(self):
-        mat1 = (torch.randn(2, 4096, 320) + 15).to(torch.bfloat16)
-        mat2 = (torch.randn(2, 77, 320) + 15).to(torch.bfloat16)
+        mat1 = torch.randn(2, 4096, 320)
+        mat2 = torch.randn(2, 77, 320)
         sd_mha_model = SD_MHA_Model_v2(0.3, 8, 320, 320).eval()
-        mha_ipex = ipex.optimize(sd_mha_model, dtype=torch.bfloat16, level="O1")
-
-        with torch.cpu.amp.autocast(), torch.no_grad():
-            mha_ipex = torch.jit.trace(mha_ipex, (mat1, mat2,))
-            mha_ipex = torch.jit.freeze(mha_ipex)
-
-            for _ in range(2):
-                mha_jit = mha_ipex(mat1, mat2)
-            mha_ref = sd_mha_model(mat1, mat2)
-            self.assertEqual(mha_ref, mha_jit, prec=1e-0)
-
-            mha_graph = mha_ipex.graph_for(mat1, mat2)
-            self.assertTrue(any(n.kind() == "ipex::sd_flash_mha" for n in mha_graph.nodes()))
+        self.sd_mha_bf16_common(sd_mha_model, mat1, mat2)
 
     def test_sd_mha_bf16_v3(self):
-        mat = (torch.randn(2, 4096, 320) + 15).to(torch.bfloat16)
+        mat = torch.randn(2, 4096, 320)
         sd_mha_model = SD_MHA_Model_v3(8, 320, 320).eval()
-        mha_ipex = ipex.optimize(sd_mha_model, dtype=torch.bfloat16, level="O1")
-
-        with torch.cpu.amp.autocast(), torch.no_grad():
-            mha_ipex = torch.jit.trace(mha_ipex, (mat, ))
-            mha_ipex = torch.jit.freeze(mha_ipex)
-
-            for _ in range(2):
-                mha_jit = mha_ipex(mat)
-            mha_ref = sd_mha_model(mat)
-            self.assertEqual(mha_ref, mha_jit, prec=1e-0)
-
-            mha_graph = mha_ipex.graph_for(mat)
-            self.assertTrue(any(n.kind() == "ipex::sd_flash_mha" for n in mha_graph.nodes()))
+        self.sd_mha_bf16_common(sd_mha_model, mat)
 
     def test_sd_mha_bf16_scale_v3(self):
-        mat = (torch.randn(2, 4096, 320) + 15).to(torch.bfloat16)
+        mat = torch.randn(2, 4096, 320)
         sd_mha_model = SD_MHA_Model_scale_v3(8, 320, 320, 0.3).eval()
-        mha_ipex = ipex.optimize(sd_mha_model, dtype=torch.bfloat16, level="O1")
-
-        with torch.cpu.amp.autocast(), torch.no_grad():
-            mha_ipex = torch.jit.trace(mha_ipex, (mat, ))
-            mha_ipex = torch.jit.freeze(mha_ipex)
-
-            for _ in range(2):
-                mha_jit = mha_ipex(mat)
-            mha_ref = sd_mha_model(mat)
-            self.assertEqual(mha_ref, mha_jit, prec=1e-0)
-
-            mha_graph = mha_ipex.graph_for(mat)
-            self.assertTrue(any(n.kind() == "ipex::sd_flash_mha" for n in mha_graph.nodes()))
+        self.sd_mha_bf16_common(sd_mha_model, mat)
 
     def test_sd_mha_bf16_v4(self):
-        mat1 = (torch.randn(2, 4096, 320) + 15).to(torch.bfloat16)
-        mat2 = (torch.randn(2, 77, 320) + 15).to(torch.bfloat16)
+        mat1 = torch.randn(2, 4096, 320)
+        mat2 = torch.randn(2, 77, 320)
         sd_mha_model = SD_MHA_Model_v4(8, 320, 320).eval()
-        mha_ipex = ipex.optimize(sd_mha_model, dtype=torch.bfloat16, level="O1")
-
-        with torch.cpu.amp.autocast(), torch.no_grad():
-            mha_ipex = torch.jit.trace(mha_ipex, (mat1, mat2,))
-            mha_ipex = torch.jit.freeze(mha_ipex)
-
-            for _ in range(2):
-                mha_jit = mha_ipex(mat1, mat2)
-            mha_ref = sd_mha_model(mat1, mat2)
-            self.assertEqual(mha_ref, mha_jit, prec=1e-0)
-
-            mha_graph = mha_ipex.graph_for(mat1, mat2)
-            self.assertTrue(any(n.kind() == "ipex::sd_flash_mha" for n in mha_graph.nodes()))
+        self.sd_mha_bf16_common(sd_mha_model, mat1, mat2)
 
     def test_sd_mha_bf16_scale_v4(self):
-        mat1 = (torch.randn(2, 4096, 320) + 15).to(torch.bfloat16)
-        mat2 = (torch.randn(2, 77, 320) + 15).to(torch.bfloat16)
+        mat1 = torch.randn(2, 4096, 320)
+        mat2 = torch.randn(2, 77, 320)
         sd_mha_model = SD_MHA_Model_scale_v4(8, 320, 320, 0.11).eval()
-        mha_ipex = ipex.optimize(sd_mha_model, dtype=torch.bfloat16, level="O1")
-
-        with torch.cpu.amp.autocast(), torch.no_grad():
-            mha_ipex = torch.jit.trace(mha_ipex, (mat1, mat2,))
-            mha_ipex = torch.jit.freeze(mha_ipex)
-
-            for _ in range(2):
-                mha_jit = mha_ipex(mat1, mat2)
-            mha_ref = sd_mha_model(mat1, mat2)
-            self.assertEqual(mha_ref, mha_jit, prec=1e-0)
-
-            mha_graph = mha_ipex.graph_for(mat1, mat2)
-            self.assertTrue(any(n.kind() == "ipex::sd_flash_mha" for n in mha_graph.nodes()))
+        self.sd_mha_bf16_common(sd_mha_model, mat1, mat2)
 
     def test_fake_sd_mha_bf16(self):
         mat1 = (torch.randn(1, 2, 64, 64) + 20).to(torch.bfloat16)
