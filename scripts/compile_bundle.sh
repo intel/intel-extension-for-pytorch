@@ -1,5 +1,6 @@
-#!/bin/bash
-set -x
+#!/usr/bin/env bash
+set -veo pipefail
+# can not use -u, because external env/vars.sh source'ing
 
 VER_LLVM="llvmorg-13.0.0"
 VER_PYTORCH="v1.13.1"
@@ -26,35 +27,42 @@ if [ ! -f ${DPCPP_ENV} ]; then
     echo "DPC++ compiler environment ${DPCPP_ENV} doesn't seem to exist."
     exit 2
 fi
+source ${DPCPP_ENV}
+
 ONEMKL_ENV=${ONEMKL_ROOT}/env/vars.sh
 if [ ! -f ${ONEMKL_ENV} ]; then
     echo "oneMKL environment ${ONEMKL_ENV} doesn't seem to exist."
     exit 3
 fi
+source ${ONEMKL_ENV}
 
 # Check existance of required Linux commands
-which python > /dev/null 2>&1
-if [[ $? -ne 0 ]]; then
-    echo "Error: linux command \"python\" not found."
-    exit 4
+for APP in python git patch pkg-config nproc bzip2; do
+    command -v $APP || (echo "Error: Command \"${APP}\" not found." ; exit 4)
+done
+
+# Check existance of required libs
+for LIB_NAME in libpng libjpeg; do
+    pkg-config --exists $LIB_NAME || (echo "Error: \"${LIB_NAME}\" not found in pkg-config." ; exit 5)
+done
+
+# set CC if not already defined
+if [ -z "${CC-}" ]; then
+    export CC="$(command -v gcc)" || (echo "Error: gcc not found" ; exit 6)
 fi
-which git > /dev/null 2>&1
-if [[ $? -ne 0 ]]; then
-    echo "Error: linux command \"git\" not found."
-    exit 5
-fi
-which patch > /dev/null 2>&1
-if [[ $? -ne 0 ]]; then
-    echo "Error: linux command \"patch\" not found."
-    exit 6
-fi
-which pkg-config > /dev/null 2>&1
-if [[ $? -ne 0 ]]; then
-    echo "Error: linux command \"pkg-config\" not found."
+
+if [ $($CC -dumpversion) -ne 11 ]; then
+    echo "Error: GCC version 11 required"
     exit 7
 fi
-env | grep CONDA_PREFIX > /dev/null 2>&1
-CONDA=$?
+
+# Install python dependency
+python -m pip install cmake astunparse numpy ninja pyyaml mkl-static mkl-include setuptools cffi typing_extensions future six requests dataclasses Pillow
+
+# set number of compile processes, if not already defined
+if [ -z "${MAX_JOBS-}" ]; then
+    export MAX_JOBS=$(nproc)
+fi
 
 # Save current directory path
 BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
@@ -99,44 +107,39 @@ git checkout ${VER_IPEX}
 git submodule sync
 git submodule update --init --recursive
 
-# Install the basic dependency cmake
-python -m pip install cmake
-
 # Compile individual component
 #  LLVM
 cd ../llvm-project
-git config --global --add safe.directory `pwd`
 if [ -d build ]; then
     rm -rf build
 fi
 mkdir build
 cd build
 cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=1" -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF ../llvm/
-cmake --build . -j $(nproc)
-LLVM_ROOT=`pwd`/../release
+cmake --build . -j $MAX_JOBS
+LLVM_ROOT="$(pwd)/../release"
 if [ -d ${LLVM_ROOT} ]; then
 	rm -rf ${LLVM_ROOT}
 fi
 cmake -DCMAKE_INSTALL_PREFIX=${LLVM_ROOT}/../release/ -P cmake_install.cmake
-#xargs rm -rf < install_manifest.txt
 ln -s ${LLVM_ROOT}/bin/llvm-config ${LLVM_ROOT}/bin/llvm-config-13
 export PATH=${LLVM_ROOT}/bin:$PATH
 export LD_LIBRARY_PATH=${LLVM_ROOT}/lib:$LD_LIBRARY_PATH
 cd ..
-git config --global --unset safe.directory
 #  PyTorch
 cd ../pytorch
-git config --global --add safe.directory `pwd`
 git stash
 git clean -f
 git apply ../intel-extension-for-pytorch/torch_patches/*.patch
-python -m pip install astunparse numpy ninja pyyaml mkl-static mkl-include setuptools cmake cffi typing_extensions future six requests dataclasses
 export USE_LLVM=${LLVM_ROOT}
 export LLVM_DIR=${USE_LLVM}/lib/cmake/llvm
-if [[ ${CONDA} -eq 0 ]]; then
-    export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
+if [ -n "${CONDA_PREFIX-}" ]; then
+    export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(command -v conda))/../"}
+elif [ -n "${VIRTUAL_ENV-}" ]; then
+    export CMAKE_PREFIX_PATH=${VIRTUAL_ENV:-"$(dirname $(command -v python))/../"}
 else
-    export CMAKE_PREFIX_PATH=${VIRTUAL_ENV:-"$(dirname $(which python))/../"}
+    # TODO not building with conda or virtualenv, what should be set?
+    continue
 fi
 export USE_STATIC_MKL=1
 export _GLIBCXX_USE_CXX11_ABI=1
@@ -153,31 +156,20 @@ unset LLVM_DIR
 unset USE_LLVM
 python -m pip uninstall -y mkl-static mkl-include
 python -m pip install --force-reinstall dist/*.whl
-git config --global --unset safe.directory
 #  TorchVision
 cd ../vision
-git config --global --add safe.directory `pwd`
-conda install -y libpng jpeg
 python setup.py clean
 python setup.py bdist_wheel 2>&1 | tee build.log
 python -m pip install --force-reinstall --no-deps dist/*.whl
-python -m pip install Pillow
-git config --global --unset safe.directory
 #  TorchAudio
 cd ../audio
-git config --global --add safe.directory `pwd`
-conda install -y bzip2
 python -m pip install -r requirements.txt
 python setup.py clean
 python setup.py bdist_wheel 2>&1 | tee build.log
 python -m pip install --force-reinstall --no-deps dist/*.whl
-git config --global --unset safe.directory
 #  Intel® Extension for PyTorch*
 cd ../intel-extension-for-pytorch
-git config --global --add safe.directory `pwd`
 python -m pip install -r requirements.txt
-source ${DPCPP_ENV}
-source ${ONEMKL_ENV}
 if [[ ! ${AOT} == "" ]]; then
     export USE_AOT_DEVLIST=${AOT}
 fi
@@ -193,7 +185,6 @@ if [[ ! ${AOT} == "" ]]; then
     unset USE_AOT_DEVLIST
 fi
 python -m pip install --force-reinstall dist/*.whl
-git config --global --unset safe.directory
 
 # Sanity Test
 cd ..
