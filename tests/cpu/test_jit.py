@@ -2688,11 +2688,11 @@ class Tester(TestCase):
             kind_not_in_graph="ipex_prepack::convolution_add_run")
 
     def test_output_conv_sum(self):
-        batch_size = 8
-        out_channels = 32
+        batch_size = 2
+        out_channels = 16
         in_channels = 3
         kernel_size = 3
-        image_size = 64
+        image_size = 28
         for dim in [1, 2, 3]:
             if dim == 1:
                 input_size = [batch_size, in_channels, image_size]
