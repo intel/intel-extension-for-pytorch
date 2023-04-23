@@ -9,6 +9,14 @@ import intel_extension_for_pytorch as ipex
 ipex_emb_fn = ipex.nn.functional._embeddingbag._embeddingbag
 aten_emb_fn = ipex.nn.functional._embeddingbag.torch_embedding_bag
 
+class Embeddingbag(torch.nn.Module):
+    def __init__(self):
+        super(Embeddingbag, self).__init__()
+        self.embeddingbag = nn.EmbeddingBag(10, 3, mode='sum', sparse=True)
+
+    def forward(self, input, offsets):
+        return self.embeddingbag(input, offsets)
+
 class TestEMB(TestCase):
 
     def _test_emb(
@@ -95,6 +103,20 @@ class TestEMB(TestCase):
         script_emb = torch.jit.script(emb)
         out = script_emb(input, offsets)
         self.assertEqual(out, ref_out)
+
+    def test_emb_torch_compile(self):
+        emb = Embeddingbag().eval()
+        input = torch.LongTensor([1,2,4,5,4,3,2,9])
+        offsets = torch.LongTensor([0,1,2,3,4,5,6,7])
+        # TODO: add dynamic tests when 'ipex' backend supports it.
+        for dtype, backend, dynamic in itertools.product([torch.float32, torch.bfloat16], ['ipex', 'inductor'], [False]):
+            torch._dynamo.reset()
+            emb_torchcompile = torch.compile(emb, backend=backend, dynamic=dynamic)
+            with torch.cpu.amp.autocast(enabled=(dtype==torch.bfloat16)), torch.no_grad():
+                y0 = emb(input, offsets)
+                y1 = emb_torchcompile(input, offsets)
+            self.assertEqual(y0, y1)
+            self.assertEqual(y1.dtype, dtype)
 
 if __name__ == '__main__':
     test = unittest.main()
