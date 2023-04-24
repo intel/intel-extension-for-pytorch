@@ -25,7 +25,7 @@ Available option settings (knobs) are listed below:
 | `-h`, `--help` | - | - | show this help message and exit |
 | `-m`, `--module` | - | False | Changes each process to interpret the launch script  as a python module, executing with the same behavior as 'python -m'. |
 | `--no-python` | - | False | Avoid applying `python` to execute `program`. |
-| `--log-path` | str | '' | The log file directory. Setting it to empty ('') disables logging to files. |
+| `--log-dir` | str | '' | The log file directory. Setting it to empty ('') disables logging to files. |
 | `--log-file-prefix` | str | 'run' | log file name prefix |
 
 Launcher Common Arguments:
@@ -78,7 +78,7 @@ Distributed Training Arguments With oneCCL backend:
 
 The *launch* script respects existing environment variables when it get launched, except for *LD_PRELOAD*. If you have your favorite values for certain environment variables, you can set them before running the *launch* script. Intel OpenMP library uses an environment variable *KMP_AFFINITY* to control its behavior. Different settings result in different performance numbers. By default, if you enable Intel OpenMP library, the *launch* script will set *KMP_AFFINITY* to `granularity=fine,compact,1,0`. If you want to try with other values, you can use `export` command on Linux to set *KMP_AFFINITY* before you run the *launch* script. In this case, the script will not set the default value but take the existing value of *KMP_AFFINITY*, and print a message to stdout.
 
-Execution via the *launch* script can dump logs into files under a designated log directory so you can do some investigations afterward. By default, it is disabled to avoid undesired log files. You can enable logging by setting knob `--log-path` to be:
+Execution via the *launch* script can dump logs into files under a designated log directory so you can do some investigations afterward. By default, it is disabled to avoid undesired log files. You can enable logging by setting knob `--log-dir` to be:
 
 - directory to store log files. It can be an absolute path or relative path.
 - types of log files to generate. One file (`<prefix>_timestamp_instances.log`) contains command and information when the script was launched. Another type of file (`<prefix>_timestamp_instance_#_core#-core#....log`) contain stdout print of each instance.
@@ -119,7 +119,7 @@ __Note:__ GIF files below illustrate CPU usage ONLY. Do NOT infer performance nu
 #### I. Use all physical cores
 
 ```
-ipexrun --log-path ./logs resnet50.py
+ipexrun --log-dir ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched physical core number of threads on all physical cores.
@@ -153,7 +153,7 @@ $ cat logs/run_20210712212258_instances.log
 #### II. Use all cores including logical cores
 
 ```
-ipexrun --use-logical-core --log-path ./logs resnet50.py
+ipexrun --use-logical-core --log-dir ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on all cores, including logical cores.
@@ -187,7 +187,7 @@ $ cat logs/run_20210712223308_instances.log
 #### III. Use physical cores on designated nodes
 
 ```
-ipexrun --nodes-list 1 --log-path ./logs resnet50.py
+ipexrun --nodes-list 1 --log-dir ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on all other cores on the same numa node.
@@ -221,7 +221,7 @@ $ cat logs/run_20210712214504_instances.log
 #### IV. Use your designated number of cores
 
 ```
-ipexrun --ninstances 1 --ncores-per-instance 10 --log-path ./logs resnet50.py
+ipexrun --ninstances 1 --ncores-per-instance 10 --log-dir ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on other 9 physical cores.
@@ -254,7 +254,7 @@ $ cat logs/run_20210712220928_instances.log
 You can also specify the cores to be utilized using `--cores-list` argument. For example, if core id 11-20 are desired instead of the first 10 cores, the launch command would be as below.
 
 ```
-ipexrun --ncores-per-instance 10 --cores-list "11-20" --log-path ./logs resnet50.py
+ipexrun --ncores-per-instance 10 --cores-list "11-20" --log-dir ./logs resnet50.py
 ```
 
 Please notice that when specifying `--cores-list`, a correspondant `--ncores-per-instance` argument is required for instance number deduction.
@@ -286,7 +286,7 @@ $ cat logs/run_20210712221615_instances.log
 #### V. Throughput mode
 
 ```
-ipexrun --throughput-mode --log-path ./logs resnet50.py
+ipexrun --throughput-mode --log-dir ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 2 main worker threads were launched on 2 numa nodes respectively, then they launched threads on other physical cores.
@@ -321,7 +321,7 @@ $ cat logs/run_20210712221150_instances.log
 #### VI. Latency mode
 
 ```
-ipexrun --latency-mode --log-path ./logs resnet50.py
+ipexrun --latency-mode --log-dir ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 4 cores are used for each instance.
@@ -375,7 +375,7 @@ $ cat logs/run_20210712221415_instances.log
 #### VII. Your designated number of instances
 
 ```
-ipexrun --ninstances 4 --log-path ./logs resnet50.py
+ipexrun --ninstances 4 --log-dir ./logs resnet50.py
 ```
 
 CPU usage is shown as below. 4 main worker thread were launched, then they launched threads on all other physical cores.
@@ -416,7 +416,7 @@ $ cat logs/run_20210712221305_instances.log
 Launcher by default runs all `ninstances` for multi-instance inference/training as shown above. You can specify `instance_idx` to independently run that instance only among `ninstances`
 
 ```
-ipexrun --ninstances 4 --instance-idx 0 --log-path ./logs resnet50.py
+ipexrun --ninstances 4 --instance-idx 0 --log-dir ./logs resnet50.py
 ```
 
 you can confirm usage in log file:
@@ -431,7 +431,7 @@ you can confirm usage in log file:
 ```
 
 ```
-ipexrun --ninstances 4 --instance-idx 1 --log-path ./logs resnet50.py
+ipexrun --ninstances 4 --instance-idx 1 --log-dir ./logs resnet50.py
 ```
 
 you can confirm usage in log file:
@@ -454,7 +454,7 @@ Memory allocator influences performance sometime. If users do not designate desi
 __Note:__ You can set your favorite value to *MALLOC_CONF* before running the *launch* script if you do not want to use its default setting.
 
 ```
-ipexrun --memory-allocator jemalloc --log-path ./logs resnet50.py
+ipexrun --memory-allocator jemalloc --log-dir ./logs resnet50.py
 ```
 
 you can confirm usage in log file:
@@ -474,7 +474,7 @@ you can confirm usage in log file:
 #### TCMalloc
 
 ```
-ipexrun --memory-allocator tcmalloc --log-path ./logs resnet50.py
+ipexrun --memory-allocator tcmalloc --log-dir ./logs resnet50.py
 ```
 
 you can confirm usage in log file:
@@ -493,7 +493,7 @@ you can confirm usage in log file:
 #### Default memory allocator
 
 ```
-ipexrun --memory-allocator default --log-path ./logs resnet50.py
+ipexrun --memory-allocator default --log-dir ./logs resnet50.py
 ```
 
 you can confirm usage in log file:
@@ -516,16 +516,18 @@ Generally, Intel OpenMP library brings better performance. Thus, in the *launch*
 
 #### GNU OpenMP Library
 
-It is, however, not always that Intel OpenMP library brings better performance comparing to GNU OpenMP library. In this case, you can use knob `--disable_iomp` to switch active OpenMP library to the GNU one.
+It is, however, not always that Intel OpenMP library brings better performance comparing to GNU OpenMP library. In this case, you can use knob `--omp-runtime default` to switch active OpenMP library to the GNU one. GNU OpenMP specific environment variables, *OMP_SCHEDULE* and *OMP_PROC_BIND*, for setting CPU affinity are set automatically.
 
 ```
-ipexrun --omp-runtime default --log-path ./logs resnet50.py
+ipexrun --omp-runtime default --log-dir ./logs resnet50.py
 ```
 
 you can confirm usage in log file:
 
 ```
 2021-07-13 15:25:00,760 - __main__ - WARNING - Both TCMalloc and JeMalloc are not found in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or /home/<user>/.local/lib/ so the LD_PRELOAD environment variable will not be set. This may drop the performance
+2021-07-13 15:25:00,761 - __main__ - INFO - OMP_SCHEDULE=STATIC
+2021-07-13 15:25:00,761 - __main__ - INFO - OMP_PROC_BIND=CLOSE
 2021-07-13 15:25:00,761 - __main__ - INFO - OMP_NUM_THREADS=44
 2021-07-13 15:25:00,761 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] on different NUMA nodes
 2021-07-13 15:25:00,761 - __main__ - INFO - numactl -C 0-43 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210713152500_instance_0_cores_0-43.log

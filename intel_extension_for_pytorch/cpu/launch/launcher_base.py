@@ -192,6 +192,7 @@ class Launcher():
                 self.add_env('MALLOC_CONF', 'oversize_threshold:1,background_thread:false,metadata_thp:always,dirty_decay_ms:-1,muzzy_decay_ms:-1')
             else:
                 self.add_env('MALLOC_CONF', 'oversize_threshold:1,background_thread:true,metadata_thp:auto')
+        return ma_local
 
     def set_omp_runtime(self, omp_runtime='auto', set_kmp_affinity=True):
         '''
@@ -203,6 +204,10 @@ class Launcher():
             if set_kmp_affinity:
                 self.add_env('KMP_AFFINITY', 'granularity=fine,compact,1,0')
             self.add_env('KMP_BLOCKTIME', '1')
+        elif omp_local == 'default':
+            self.add_env('OMP_SCHEDULE', 'STATIC')
+            self.add_env('OMP_PROC_BIND', 'CLOSE')
+        return omp_local
 
     def parse_list_argument(self, txt):
         ret = []
