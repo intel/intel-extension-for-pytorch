@@ -188,7 +188,6 @@ class DistributedTrainingLauncher(Launcher):
         for k,v in self.environ_set.items():
             self.verbose('info', f'env: {k}={v}')
 
-        os.environ['LAUNCH_CMD'] = '#'
         cmd = ['mpiexec.hydra']
         genvs = [f'-genv {k}={v}' for k,v in self.environ_set.items()]
         mpi_config = f"-l -np {args.nnodes * args.nprocs_per_node} -ppn {args.nprocs_per_node} {' '.join(genvs)} "
@@ -228,8 +227,6 @@ class DistributedTrainingLauncher(Launcher):
                         self.verbose('warning', f'Failed to detect rank id from log file {log_name} at line "{line.strip()}".')
             for fn in log_fns:
                 fn.close()
-        os.environ['LAUNCH_CMD'] += f'{" ".join(cmd)},#'
-        os.environ['LAUNCH_CMD'] = os.environ['LAUNCH_CMD'][:-2]
 
 if __name__ == '__main__':
     pass

@@ -100,9 +100,10 @@ class MultiInstancesLauncher(Launcher):
         tm_local = self.set_lib_bin_from_list(multi_task_manager, tm_bin_name, 'multi-task manager', self.tm_supported, self.is_command_available, skip_list)
         return tm_local
 
-    def execution_command_builder(self, args, task_mgr, cpu_pools, index):
-        cmd = []
+    def execution_command_builder(self, args, omp_runtime, task_mgr, environ, cpu_pools, index):
         assert index > -1 and index <= len(cpu_pools), 'Designated instance index for constructing execution commands is out of range.'
+        cmd = []
+        environ_local = environ
         pool = cpu_pools[index]
         pool_txt = pool.get_pool_txt()
         cores_list_local = pool_txt['cores']
@@ -116,6 +117,19 @@ class MultiInstancesLauncher(Launcher):
                 params = f'-c {cores_list_local}'
             cmd.append(task_mgr)
             cmd.extend(params.split())
+        else:
+            k = ''
+            v = ''
+            if omp_runtime == 'default':
+                k = 'GOMP_CPU_AFFINITY'
+                v = cores_list_local
+            elif omp_runtime == 'intel':
+                k = 'KMP_AFFINITY'
+                v = f'granularity=fine,proclist=[{cores_list_local}],explicit'
+            if k != '':
+                self.verbose('info', '==========')
+                self.verbose('info', f'env: {k}={v}')
+                environ_local[k] = v
 
         if not args.no_python:
             cmd.append(sys.executable)
@@ -126,14 +140,13 @@ class MultiInstancesLauncher(Launcher):
         log_name = f'{args.log_file_prefix}_instance_{index}_cores_{cores_list_local.replace(",", "_")}.log'
         log_name = os.path.join(args.log_dir, log_name)
         cmd.extend(args.program_args)
-        os.environ['LAUNCH_CMD'] += '{" ".join(cmd)},#'
         cmd_s = ' '.join(cmd)
         if args.log_dir:
             cmd_s = f'{cmd_s} 2>&1 | tee {log_name}'
         self.verbose('info', f'cmd: {cmd_s}')
         if len(set([c.node for c in pool])) > 1:
             self.verbose('warning', f'Cross NUMA nodes execution detected: cores [{cores_list_local}] are on different NUMA nodes [{nodes_list_local}]')
-        process = subprocess.Popen(cmd_s, env=os.environ, shell=True)
+        process = subprocess.Popen(cmd_s, env=environ_local, shell=True)
         return {'process': process, 'cmd': cmd_s}
 
     def launch(self, args):
@@ -177,7 +190,7 @@ class MultiInstancesLauncher(Launcher):
             set_kmp_affinity = False
 
         self.set_memory_allocator(args.memory_allocator, args.benchmark)
-        self.set_omp_runtime(args.omp_runtime, set_kmp_affinity)
+        omp_runtime = self.set_omp_runtime(args.omp_runtime, set_kmp_affinity)
         self.add_env('OMP_NUM_THREADS', str(args.ncores_per_instance))
 
         skip_list = []
@@ -187,8 +200,12 @@ class MultiInstancesLauncher(Launcher):
 
         # Set environment variables for multi-instance execution
         for k,v in self.environ_set.items():
+            if task_mgr == self.tm_supported[1]:
+                if omp_runtime == 'default' and k == 'GOMP_CPU_AFFINITY':
+                    continue
+                if omp_runtime == 'intel' and k == 'KMP_AFFINITY':
+                    continue
             self.verbose('info', f'env: {k}={v}')
-            os.environ[k] = v
 
         if args.auto_ipex:
             args.program = auto_ipex.apply_monkey_patch(args.program, args.dtype, args.auto_ipex_verbose, args.disable_ipex_graph_mode)
@@ -203,15 +220,15 @@ class MultiInstancesLauncher(Launcher):
         instance_idx = list(set(instance_idx))
         assert set(instance_idx).issubset(set(instances_available)), f'Designated nodes list contains invalid nodes.'
         processes = []
-        os.environ["LAUNCH_CMD"] = "#"
         for i in instance_idx:
             process = self.execution_command_builder(
                     args = args,
+                    omp_runtime = omp_runtime,
                     task_mgr = task_mgr,
+                    environ = self.environ_set,
                     cpu_pools = self.cpuinfo.pools_ondemand,
                     index = i)
             processes.append(process)
-        os.environ["LAUNCH_CMD"] = os.environ["LAUNCH_CMD"][:-2]
         try:
             for process in processes:
                 p = process['process']
