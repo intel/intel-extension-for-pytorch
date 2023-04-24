@@ -30,7 +30,10 @@ class TestCompile(TestCase):
             with torch.cpu.amp.autocast(enabled=(dtype == torch.bfloat16), dtype=torch.bfloat16), torch.no_grad():
                 y1 = model(x)
                 fx_model = torch.fx.symbolic_trace(model)
-                compiled_model = ipex.compile(fx_model, x)
+                compiled_model = ipex.compile(fx_model, [x])
+                # warm up
+                for _ in range(2):
+                    compiled_model(x)
                 y2 = compiled_model(x)
             self.assertEqual(y1, y2)
             self.assertTrue(y2.dtype == dtype)
