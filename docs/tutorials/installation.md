@@ -88,7 +88,7 @@ python -m pip install <package_name>==<version_name> -f https://developer.intel.
 To ensure a smooth compilation, a script is provided in the Github repo. If you would like to compile the binaries from source, it is highly recommended to utilize this script.
 
 ```bash
-$ wget https://github.com/intel/intel-extension-for-pytorch/blob/v2.0.0+cpu/scripts/compile_bundle.sh
+$ wget https://raw.githubusercontent.com/intel/intel-extension-for-pytorch/v2.0.0+cpu/scripts/compile_bundle.sh
 $ bash compile_bundle.sh
 ```
 
