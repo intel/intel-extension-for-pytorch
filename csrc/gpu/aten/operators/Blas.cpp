@@ -67,6 +67,7 @@ Tensor& addmm_out(
   }
 
   // general case
+  Tensor bias = at::Tensor();
   Attr attr;
   float beta_ = beta.to<float>();
   if (beta_ == 0.f) {
@@ -75,20 +76,24 @@ Tensor& addmm_out(
           1.f, alpha.to<float>(), 0.f, attr.kind_with_linear);
     }
   } else {
-    Tensor binary = self.dim() == 1 ? self.unsqueeze(0) : self;
-    // Tensor binary = self.expand_as(result);
-    // For post-binary-add, onednn needs binary scale=1.f
-    // Thus we need the following transformation
-    // alpha * matmul(mat1, mat2) + beta * binary
-    // beta * (alpha/beta * matmul(src, wei) + binary)
-    float alpha_ = alpha.to<float>() / beta_;
-    if (alpha_ != 1.f)
-      attr.append_post_eltwise(1.f, alpha_, 0.f, attr.kind_with_linear);
-    attr.append_post_binary(attr.kind_with_binary_add, binary);
-    if (beta_ != 1.f)
-      attr.append_post_eltwise(1.f, beta_, 0.f, attr.kind_with_linear);
+    if (alpha.to<float>() == 1.f && beta_ == 1.f) {
+      bias = self;
+    } else {
+      Tensor binary = self.dim() == 1 ? self.unsqueeze(0) : self;
+      // Tensor binary = self.expand_as(result);
+      // For post-binary-add, onednn needs binary scale=1.f
+      // Thus we need the following transformation
+      // alpha * matmul(mat1, mat2) + beta * binary
+      // beta * (alpha/beta * matmul(src, wei) + binary)
+      float alpha_ = alpha.to<float>() / beta_;
+      if (alpha_ != 1.f)
+        attr.append_post_eltwise(1.f, alpha_, 0.f, attr.kind_with_linear);
+      attr.append_post_binary(attr.kind_with_binary_add, binary);
+      if (beta_ != 1.f)
+        attr.append_post_eltwise(1.f, beta_, 0.f, attr.kind_with_linear);
+    }
   }
-  xpu::oneDNN::matmul(result, mat1, mat2, at::Tensor(), true, attr);
+  xpu::oneDNN::matmul(result, mat1, mat2, bias, true, attr);
   return result;
 }
 
