@@ -5,7 +5,6 @@
 
 #include <c10/core/DeviceGuard.h>
 #include <c10/core/Stream.h>
-#include <runtime/Queue.h>
 #include <utils/Macros.h>
 
 /*
@@ -18,6 +17,9 @@ using namespace at;
 
 namespace xpu {
 namespace dpcpp {
+
+// Please keep synchronized with QueueIndex in runtime/Queue.h
+using QueueIndex = uint8_t;
 
 // This is a wrapper around c10::Stream. And use DPCPPStream.id() to unpack a
 // QueueIndex to retrieve sycl queue from the pool.
@@ -68,11 +70,11 @@ class IPEX_API DPCPPStream {
 
   void synchronize_and_throw() const;
 
-  /// Explicit conversion to sycl queue.
-  sycl::queue& queue() const;
+  /// Explicit conversion to sycl queue opaque pointer.
+  void* queue() const;
 
   /// Return the sycl queue index in the queue pool.
-  QueueIndex queue_id() const;
+  QueueIndex queue_index() const;
 
   /// Explicit conversion to Stream.
   Stream unwrap() const {

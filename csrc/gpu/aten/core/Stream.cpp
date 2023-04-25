@@ -2,6 +2,7 @@
 #include <core/Device.h>
 #include <core/Stream.h>
 #include <runtime/Device.h>
+#include <runtime/Queue.h>
 
 #include <atomic>
 #include <cstdint>
@@ -93,16 +94,16 @@ DPCPPStream DPCPPStreamForId(DeviceId device_index, StreamId stream_id) {
 
 void DPCPPStream::synchronize() const {
   DeviceGuard guard{stream_.device()};
-  queue().wait();
+  dpcppGetRawQueue(device_index(), queue_index()).wait();
 }
 
 void DPCPPStream::synchronize_and_throw() const {
   DeviceGuard guard{stream_.device()};
-  queue().wait_and_throw();
+  dpcppGetRawQueue(device_index(), queue_index()).wait_and_throw();
 }
 
 // See Note [StreamId assignment]
-sycl::queue& DPCPPStream::queue() const {
+void* DPCPPStream::queue() const {
   DeviceId device_index = stream_.device_index();
   StreamId stream_id = stream_.id();
   QueueType qt = queueType(stream_id);
@@ -118,7 +119,7 @@ sycl::queue& DPCPPStream::queue() const {
           ").",
           " Did you manufacture the StreamId yourself?  Don't do that;");
     case QueueType::RESERVED:
-      return dpcppGetRawQueue(device_index, qi);
+      return reinterpret_cast<void*>(&dpcppGetRawQueue(device_index, qi));
     default:
       TORCH_INTERNAL_ASSERT(
           0,
@@ -131,7 +132,7 @@ sycl::queue& DPCPPStream::queue() const {
 }
 
 // Returns a sycl queue index in queue pool.
-QueueIndex DPCPPStream::queue_id() const {
+QueueIndex DPCPPStream::queue_index() const {
   return queueIndex(stream_.id());
 }
 
@@ -177,6 +178,7 @@ void deviceSynchronize(DeviceIndex device_index) {
     device_index = xpu::dpcpp::current_device();
   check_device_index(device_index);
   dpcppInitDeviceQueueOnce(device_index);
+  auto stream = getCurrentDPCPPStream();
 
   // For each device, we have 32 (kQueuesPerPool) reserved queues.
   std::array<sycl::event, kQueuesPerPool> events;
@@ -198,7 +200,8 @@ void deviceSynchronize(DeviceIndex device_index) {
 
 sycl::queue& get_queue_from_stream(c10::Stream stream) {
   dpcpp::DPCPPStream dpcpp_stream(stream);
-  return dpcpp_stream.queue();
+  return dpcppGetRawQueue(
+      dpcpp_stream.device_index(), dpcpp_stream.queue_index());
 }
 
 } // namespace xpu

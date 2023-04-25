@@ -79,12 +79,12 @@ struct GpuStreamManager {
   dnnl::stream& get_stream() {
     int device_index = current_device();
     TORCH_INTERNAL_ASSERT(device_index < xpu::dpcpp::device_count());
-    int queue_id = getCurrentDPCPPStream(device_index).queue_id();
+    int queue_id = getCurrentDPCPPStream(device_index).queue_index();
     if (stream_pool[device_index][queue_id] == nullptr) {
       stream_pool[device_index][queue_id] =
           std::make_shared<dnnl::stream>(dnnl::sycl_interop::make_stream(
               GpuEngineManager::Instance().get_engine({kXPU, device_index}),
-              getCurrentDPCPPStream(device_index).queue()));
+              dpcppGetRawQueue(device_index, queue_id)));
     }
     return *(stream_pool[device_index][queue_id].get());
   }
@@ -94,7 +94,7 @@ struct GpuStreamManager {
     TORCH_INTERNAL_ASSERT(device_index < xpu::dpcpp::device_count());
     return dnnl::sycl_interop::make_stream(
         GpuEngineManager::Instance().get_engine({kXPU, device_index}),
-        getCurrentDPCPPStream(device_index).queue());
+        dpcppGetQueueFromStream(getCurrentDPCPPStream(device_index)));
   }
 #endif
 

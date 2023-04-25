@@ -59,8 +59,7 @@ static PyObject* THDPStream_get_device(THDPStream* self, void* unused) {
 
 static PyObject* THDPStream_get_sycl_queue(THDPStream* self, void* unused) {
   HANDLE_TH_ERRORS
-  return PyLong_FromVoidPtr(
-      reinterpret_cast<void*>(&self->dpcpp_stream.queue()));
+  return PyLong_FromVoidPtr(self->dpcpp_stream.queue());
   END_HANDLE_TH_ERRORS
 }
 

@@ -1,6 +1,8 @@
 #include <core/Event.h>
 #include <core/Stream.h>
 
+#include <runtime/Utils.h>
+
 #include <cstdint>
 #include <memory>
 #include <utility>
@@ -93,7 +95,7 @@ void DPCPPEvent::record(const DPCPPStream& stream) {
         ".");
   }
 
-  events_.push_back(xpu::dpcpp::queue_barrier(stream.queue()));
+  events_.push_back(xpu::dpcpp::queue_barrier(dpcppGetQueueFromStream(stream)));
 }
 
 void DPCPPEvent::recordOnce(const DPCPPStream& stream) {
@@ -103,7 +105,7 @@ void DPCPPEvent::recordOnce(const DPCPPStream& stream) {
 
 void DPCPPEvent::block(const DPCPPStream& stream) {
   if (!events_.empty()) {
-    xpu::dpcpp::queue_barrier(stream.queue(), events_);
+    xpu::dpcpp::queue_barrier(dpcppGetQueueFromStream(stream), events_);
   }
 }
 

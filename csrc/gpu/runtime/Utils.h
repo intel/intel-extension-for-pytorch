@@ -3,7 +3,7 @@
 #include <core/Stream.h>
 #include <runtime/Device.h>
 #include <runtime/Exception.h>
-#include <utils/DPCPP.h>
+#include <runtime/Queue.h>
 #include <stdexcept>
 #include <type_traits>
 
@@ -32,12 +32,16 @@ static inline bool dpcppIsDeviceAvailable(
   return dev_prop->is_available;
 }
 
+static inline sycl::queue& dpcppGetQueueFromStream(DPCPPStream stream) {
+  return dpcppGetRawQueue(stream.device_index(), stream.queue_index());
+}
+
 static inline sycl::queue& dpcppGetCurrentQueue() {
-  return getCurrentDPCPPStream().queue();
+  return dpcppGetQueueFromStream(getCurrentDPCPPStream());
 }
 
 static inline QueueIndex dpcppGetCurrentQueueId() {
-  return getCurrentDPCPPStream().queue_id();
+  return getCurrentDPCPPStream().queue_index();
 }
 
 static inline int64_t dpcppMaxWorkGroupSize(

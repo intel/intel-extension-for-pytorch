@@ -1,6 +1,7 @@
 #pragma once
 
 #include <c10/core/Device.h>
+#include <utils/DPCPP.h>
 
 #include <cstdint>
 #include <utility>
@@ -26,13 +27,6 @@
  * threads as the SYCL specification described.
  */
 
-// Here we use forward declaration to avoid #include <sycl/sycl.hpp>.
-namespace sycl {
-inline namespace _V1 {
-class queue;
-}
-} // namespace sycl
-
 using namespace at;
 
 namespace xpu {
@@ -43,6 +37,7 @@ static constexpr int kQueuesPerPoolBits = 5;
 static constexpr int kQueuesPerPool = 1 << kQueuesPerPoolBits;
 static constexpr int kQueueTypeBits = 3;
 
+// Please keep synchronized with QueueIndex in aten/core/Stream.h
 using QueueIndex = uint8_t;
 
 enum class QueueType : uint8_t {

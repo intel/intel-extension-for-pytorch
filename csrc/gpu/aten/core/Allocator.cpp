@@ -3,6 +3,7 @@
 #include <runtime/CachingDeviceAllocator.h>
 #include <runtime/CachingHostAllocator.h>
 #include <runtime/Exception.h>
+#include <runtime/Utils.h>
 #include <tensor/Context.h>
 
 namespace xpu {
@@ -29,7 +30,7 @@ class DeviceAllocator final : public at::Allocator {
     void* r = nullptr;
     if (size != 0) {
       auto stream = getCurrentDPCPPStream(curDevID);
-      Instance()->alloc()->malloc(&r, size, &stream.queue());
+      Instance()->alloc()->malloc(&r, size, &dpcppGetQueueFromStream(stream));
     }
     auto ctx = new at::AtenIpexTypeXPU::DPCPPTensorContext(r);
     return {r, ctx, &deleter, Device(DeviceType::XPU, curDevID)};
@@ -63,7 +64,7 @@ class DeviceAllocator final : public at::Allocator {
       return;
     }
 
-    alloc()->recordQueue(ptr.get(), &stream.queue());
+    alloc()->recordQueue(ptr.get(), &dpcppGetQueueFromStream(stream));
   }
 
   std::mutex* getFreeMutex() {
