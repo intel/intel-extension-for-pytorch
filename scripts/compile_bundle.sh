@@ -1,5 +1,6 @@
 #!/bin/bash
 set -x
+set -e
 
 VER_LLVM="llvmorg-13.0.0"
 VER_PYTORCH=""
@@ -8,18 +9,10 @@ VER_TORCHAUDIO=""
 VER_IPEX="v2.0.0+cpu"
 
 # Check existance of required Linux commands
-which python > /dev/null 2>&1
-if [[ $? -ne 0 ]]; then
-    echo "Error: linux command \"python\" not found."
-    exit 4
-fi
-which git > /dev/null 2>&1
-if [[ $? -ne 0 ]]; then
-    echo "Error: linux command \"git\" not found."
-    exit 5
-fi
-env | grep CONDA_PREFIX > /dev/null 2>&1
-CONDA=$?
+for CMD in gcc g++ python git; do
+    command -v ${CMD} || (echo "Error: Command \"${CMD}\" not found." ; exit 4)
+done
+echo "You are using GCC: $(gcc --version | grep gcc)"
 
 # Save current directory path
 BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
@@ -34,11 +27,15 @@ fi
 
 # Checkout required branch/commit and update submodules
 cd llvm-project
-git checkout ${VER_LLVM}
+if [ ! -z ${VER_LLVM} ]; then
+    git checkout ${VER_LLVM}
+fi
 git submodule sync
 git submodule update --init --recursive
 cd ../intel-extension-for-pytorch
-git checkout ${VER_IPEX}
+if [ ! -z ${VER_IPEX} ]; then
+    git checkout ${VER_IPEX}
+fi
 git submodule sync
 git submodule update --init --recursive
 
@@ -50,7 +47,9 @@ ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
 # Compile individual component
 #  LLVM
 cd ../llvm-project
-git config --global --add safe.directory `pwd`
+if [ ${UID} -eq 0 ]; then
+    git config --global --add safe.directory `pwd`
+fi
 if [ -d build ]; then
     rm -rf build
 fi
@@ -60,7 +59,7 @@ cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-D_GLIBC
 cmake --build . -j $(nproc)
 LLVM_ROOT=`pwd`/../release
 if [ -d ${LLVM_ROOT} ]; then
-	rm -rf ${LLVM_ROOT}
+    rm -rf ${LLVM_ROOT}
 fi
 cmake -DCMAKE_INSTALL_PREFIX=${LLVM_ROOT}/../release/ -P cmake_install.cmake
 #xargs rm -rf < install_manifest.txt
@@ -68,10 +67,14 @@ ln -s ${LLVM_ROOT}/bin/llvm-config ${LLVM_ROOT}/bin/llvm-config-13
 export PATH=${LLVM_ROOT}/bin:$PATH
 export LD_LIBRARY_PATH=${LLVM_ROOT}/lib:$LD_LIBRARY_PATH
 cd ..
-git config --global --unset safe.directory
+if [ ${UID} -eq 0 ]; then
+    git config --global --unset safe.directory
+fi
 #  Intel® Extension for PyTorch*
 cd ../intel-extension-for-pytorch
-git config --global --add safe.directory `pwd`
+if [ ${UID} -eq 0 ]; then
+    git config --global --add safe.directory `pwd`
+fi
 python -m pip install -r requirements.txt
 export USE_LLVM=${LLVM_ROOT}
 export LLVM_DIR=${USE_LLVM}/lib/cmake/llvm
@@ -82,7 +85,9 @@ unset DNNL_GRAPH_BUILD_COMPILER_BACKEND
 unset LLVM_DIR
 unset USE_LLVM
 python -m pip install --force-reinstall dist/*.whl
-git config --global --unset safe.directory
+if [ ${UID} -eq 0 ]; then
+    git config --global --unset safe.directory
+fi
 
 # Sanity Test
 cd ..
