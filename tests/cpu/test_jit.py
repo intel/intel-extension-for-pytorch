@@ -663,6 +663,15 @@ class Linear_Reshape_Bn(nn.Module):
     def forward(self, x):
         return self.bn(torch.reshape(self.linear(x),self.dest_shape))
 
+class Linear_With_Transposed_Weight(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(Linear_With_Transposed_Weight, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels)
+        self.linear.weight = nn.Parameter(self.linear.weight.transpose(0,1).reshape(out_channels, in_channels))
+
+    def forward(self, x):
+        return self.linear(x)
+    
 class ConvSumInDiffBlock(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(ConvSumInDiffBlock, self).__init__()
@@ -3396,6 +3405,12 @@ class Tester(TestCase):
             torch.rand(1, 1, 32, 32),
             kind_in_graph="aten::linear")
 
+    def test_output_linear_with_transposed_weight(self):
+        self._test_mkl_fp32(
+            Linear_With_Transposed_Weight(133, 133),
+            torch.randn(2, 133),
+            kind_in_graph="ipex_prepack::mkl_sgemm_run")
+        
     def test_output_linear_swish(self):
         self._test_mkl_fp32(
             LinearSigmoidMul(3, 32, bias=True),

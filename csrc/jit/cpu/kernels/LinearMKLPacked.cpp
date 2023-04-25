@@ -34,6 +34,7 @@ ContextLinearMKL create(
     at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
     const c10::optional<int64_t> batch_size) {
+  weight = weight.contiguous();
   auto out_features = weight.size(0);
   auto in_features = weight.size(1);
   auto batch = batch_size.has_value() ? batch_size.value() : 128;
