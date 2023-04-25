@@ -9,10 +9,15 @@ VER_TORCHAUDIO=""
 VER_IPEX="master"
 
 # Check existance of required Linux commands
-for CMD in gcc g++ python git; do
+for CMD in gcc g++ python git nproc; do
     command -v ${CMD} || (echo "Error: Command \"${CMD}\" not found." ; exit 4)
 done
 echo "You are using GCC: $(gcc --version | grep gcc)"
+
+MAX_JOBS_VAR=$(nproc)
+if [ ! -z "${MAX_JOBS}" ]; then
+    MAX_JOBS_VAR=${MAX_JOBS}
+fi
 
 # Save current directory path
 BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
@@ -56,8 +61,8 @@ fi
 mkdir build
 cd build
 cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${ABI}" -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF ../llvm/
-cmake --build . -j $(nproc)
-LLVM_ROOT=`pwd`/../release
+cmake --build . -j ${MAX_JOBS_VAR}
+LLVM_ROOT="$(pwd)/../release"
 if [ -d ${LLVM_ROOT} ]; then
     rm -rf ${LLVM_ROOT}
 fi
