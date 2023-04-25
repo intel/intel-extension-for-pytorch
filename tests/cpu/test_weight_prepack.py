@@ -37,23 +37,33 @@ def get_rand_seed():
 class TestPrepackCases(TestCase):
     def _test_convolution_inference_base(self, dim):
         class ConvNd(torch.nn.Module):
-            def __init__(self, dim, in_channels, out_channels, kernel_size, stride, padding, dilation, bias, groups):
+            def __init__(self, dim, in_channels, out_channels, kernel_size, stride, padding, dilation, bias, groups, padding_mode):
                 super(ConvNd, self).__init__()
-                self.conv = conv_module[dim](in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, bias=bias, groups=groups)
+                self.conv = conv_module[dim](
+                    in_channels,
+                    out_channels,
+                    kernel_size=kernel_size,
+                    stride=stride,
+                    padding=padding,
+                    dilation=dilation,
+                    bias=bias,
+                    groups=groups,
+                    padding_mode=padding_mode)
 
             def forward(self, x):
                 return self.conv(x)
         input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
+        padding_modes = ['zeros', 'reflect']
         if dim == 2:
             channels_last = torch.channels_last
         elif dim == 3:
             channels_last = torch.channels_last_3d
         if dim == 1:
-            options = itertools.product([True, False], [1, 2], [1, 4], [True, False], [torch.contiguous_format])
+            options = itertools.product([True, False], [1, 2], [1, 4], [True, False], [torch.contiguous_format], padding_modes)
         else:
-            options = itertools.product([True, False], [1, 2], [1, 4], [True, False], [torch.contiguous_format, channels_last])
+            options = itertools.product([True, False], [1, 2], [1, 4], [True, False], [torch.contiguous_format, channels_last], padding_modes)
 
-        for bias, dilation, groups, feed_sample_input, memory_format in options:
+        for bias, dilation, groups, feed_sample_input, memory_format, padding_mode in options:
             N = torch.randint(1, 10, (1,)).item()
             M = torch.randint(1, 3, (1,)).item() * groups
             C = torch.randint(1, 3, (1,)).item() * groups
@@ -68,7 +78,8 @@ class TestPrepackCases(TestCase):
                 padding=1,
                 dilation=dilation,
                 bias=bias,
-                groups=groups).float().eval()
+                groups=groups,
+                padding_mode=padding_mode).float().eval()
             model = model.to(memory_format=memory_format)
             x = x.to(memory_format=memory_format)
             if dim == 1:

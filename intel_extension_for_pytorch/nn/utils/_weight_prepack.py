@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import copy
 import logging
 
@@ -72,10 +73,13 @@ class _IPEXConvNd(nn.Module):
         self.padding = dense_module.padding
         self.dilation = dense_module.dilation
         self.groups = dense_module.groups
+        self.padding_mode = dense_module.padding_mode
+        self._reversed_padding_repeated_twice = dense_module._reversed_padding_repeated_twice
         self.prepack_input_shape = dense_module.input_shape if hasattr(dense_module, "input_shape") else []
         self.weight_channels_last = dense_module.weight.is_contiguous(memory_format=torch.channels_last) \
             or dense_module.weight.is_contiguous(memory_format=torch.channels_last_3d)
         self.weight_size = dense_module.weight.size()
+        self._real_padding = self.padding if self.padding_mode == 'zeros' else tuple([0] * (len(self.weight_size) - 2 ))
 
         # TODO: ".clone()" will make weight shared by multiple module not shared anymore
         # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
@@ -91,7 +95,7 @@ class _IPEXConvNd(nn.Module):
             self.register_parameter('bias', None)
         # create conv op context
         self.ctx = torch.ops.ipex_prepack.convolution_prepack(
-            dense_module.weight, self.bias, self.stride, self.padding,
+            dense_module.weight, self.bias, self.stride, self._real_padding,
             self.dilation, self.groups,
             self.weight_channels_last, self.prepack_input_shape
         )
@@ -117,14 +121,32 @@ class _IPEXConvNd(nn.Module):
         with torch.no_grad():
             loaded_weight, loaded_bias, fp32_loaded_weight, weight_trail = _load_from_state_dict_pre_hook(self, state_dict, prefix)
             loaded_ctx = torch.ops.ipex_prepack.convolution_prepack(
-                loaded_weight, loaded_bias, self.stride, self.padding,
+                loaded_weight, loaded_bias, self.stride, self._real_padding,
                 self.dilation, self.groups,
                 self.weight_channels_last, self.prepack_input_shape
             )
             _load_from_state_dict_post_hook(self, loaded_ctx, fp32_loaded_weight, weight_trail)
 
     def forward(self, x):
-        return torch.ops.torch_ipex.convolution_forward(x, self.weight, self.bias, self.ctx.get_data_handle(), self.weight_size, self.padding, self.stride, self.dilation)
+        if self.padding_mode != 'zeros':
+            return torch.ops.torch_ipex.convolution_forward(
+                F.pad(x, self._reversed_padding_repeated_twice, mode=self.padding_mode),
+                self.weight,
+                self.bias,
+                self.ctx.get_data_handle(),
+                self.weight_size,
+                self._real_padding,
+                self.stride,
+                self.dilation)
+        return torch.ops.torch_ipex.convolution_forward(
+            x,
+            self.weight,
+            self.bias,
+            self.ctx.get_data_handle(),
+            self.weight_size,
+            self._real_padding,
+            self.stride,
+            self.dilation)
 
 class _IPEXConv1d(_IPEXConvNd):
     def __init__(self, dense_module):
@@ -457,10 +479,13 @@ def record_input_shape_for_prepack(module, sample_input):
 
     def hook_function(self, input):
         # input for linear/conv/transpose conv received here will be Tuple[Tensor]
-        self.input_shape = input[0].shape
+        if self in [torch.nn.Conv1d, torch.nn.Conv2d, torch.nn.Conv3d] and self.padding_mode != 'zeros':
+            self.input_shape = F.pad(input[0], self._reversed_padding_repeated_twice, mode=self.padding_mode).shape
+        else:
+            self.input_shape = input[0].shape
 
     def register_hook_function(module):
-        if type(module) in [torch.nn.Linear, torch.nn.Conv1d, torch.nn.Conv2d, torch.nn.ConvTranspose2d]:
+        if type(module) in [torch.nn.Linear, torch.nn.Conv1d, torch.nn.Conv2d, torch.nn.Conv3d, torch.nn.ConvTranspose2d]:
             module.register_forward_pre_hook(hook_function)
 
     def register_hook_function_rec(module):
