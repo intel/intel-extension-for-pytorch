@@ -1,4 +1,5 @@
 import unittest, copy
+import itertools
 import torch
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
@@ -219,6 +220,54 @@ class RoIAlignTester(TestCase):
             self.assertTrue(x4.grad.dtype == torch.bfloat16)
             self.assertTrue(torch.allclose(gt_x.grad.to(x4.dtype), x4.grad, rtol=1e-5, atol=1e-5))
 
+    @skipIfNoTorchVision
+    def test_torchvision_roialign_torchcompile(self):
+        pool_size = 5
+        n_channels = 2 * (pool_size ** 2)
+        x = torch.rand(2, n_channels, 10, 10)
+        rois = torch.tensor([[0, 0, 0, 9, 9],  # format is (xyxy)
+                             [0, 0, 5, 4, 9],
+                             [0, 5, 5, 9, 9],
+                             [1, 0, 0, 9, 9]])
+        pool_h, pool_w = pool_size, pool_size
+
+        # TODO: add dynamic tests when 'ipex' backend supports it.
+        for dtype, backend, dynamic in itertools.product([torch.float32, torch.bfloat16], ['ipex', 'inductor'], [False]):
+            torch._dynamo.reset()
+            torchcompile_torchvision_fn = torch.compile(torchvision_fn, backend=backend, dynamic=dynamic)
+            x = x.to(dtype=dtype)
+            rois = rois.to(dtype=dtype)
+            # forward
+            with torch.cpu.amp.autocast(enabled=(dtype==torch.bfloat16)), torch.no_grad():
+                y0 = torchvision_fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+                y1 = torchcompile_torchvision_fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+                self.assertEqual(y0, y1)
+                self.assertTrue(y1.dtype == dtype)
+
+    @skipIfNoTorchVision
+    def test_roialign_torchcompile(self):
+        pool_size = 5
+        n_channels = 2 * (pool_size ** 2)
+        x = torch.rand(2, n_channels, 10, 10)
+        rois = torch.tensor([[0, 0, 0, 9, 9],  # format is (xyxy)
+                             [0, 0, 5, 4, 9],
+                             [0, 5, 5, 9, 9],
+                             [1, 0, 0, 9, 9]])
+        pool_h, pool_w = pool_size, pool_size
+        torch._dynamo.allow_in_graph(ipex.nn.modules._roi_align.RoIAlign)
+
+        # TODO: add dynamic tests when 'ipex' backend supports it.
+        for dtype, backend, dynamic in itertools.product([torch.float32, torch.bfloat16], ['ipex', 'inductor'], [False]):
+            torch._dynamo.reset()
+            torchcompile_fn = torch.compile(fn, backend=backend, dynamic=dynamic)
+            x = x.to(dtype=dtype)
+            rois = rois.to(dtype=dtype)
+            # forward
+            with torch.cpu.amp.autocast(enabled=(dtype==torch.bfloat16)), torch.no_grad():
+                y0 = fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+                y1 = torchcompile_fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+                self.assertEqual(y0, y1)
+                self.assertTrue(y1.dtype == dtype)
 
 if __name__ == '__main__':
     test = unittest.main()

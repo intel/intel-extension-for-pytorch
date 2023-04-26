@@ -7,6 +7,29 @@
 namespace torch_ipex {
 namespace cpu {
 
+at::Tensor ROIAlign_forward_impl(
+    const at::Tensor& input,
+    const at::Tensor& rois,
+    double spatial_scale,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t sampling_ratio,
+    bool aligned);
+
+at::Tensor ROIAlign_backward(
+    const at::Tensor& grad,
+    const at::Tensor& rois,
+    double spatial_scale,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t batch_size,
+    int64_t channels,
+    int64_t height,
+    int64_t width,
+    int64_t sampling_ratio,
+    bool aligned,
+    bool is_channels_last);
+
 class IPEXROIAlignOp : public torch::autograd::Function<IPEXROIAlignOp> {
  public:
   // forward function without autograd overhead, will go this way when only do
@@ -36,6 +59,15 @@ class IPEXROIAlignOp : public torch::autograd::Function<IPEXROIAlignOp> {
 };
 
 at::Tensor ROIAlign_forward(
+    const at::Tensor& input,
+    const at::Tensor& rois,
+    double spatial_scale,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t sampling_ratio,
+    bool aligned);
+
+at::Tensor ROIAlign_forward_meta(
     const at::Tensor& input,
     const at::Tensor& rois,
     double spatial_scale,

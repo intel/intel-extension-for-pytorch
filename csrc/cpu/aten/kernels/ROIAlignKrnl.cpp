@@ -673,12 +673,6 @@ at::Tensor roi_align_forward_kernel_impl(
     int64_t pooled_width,
     int64_t sampling_ratio,
     bool aligned) {
-#if defined(IPEX_DISP_OP)
-  printf("torch_ipex::ROIAlign_forward\n");
-#endif
-  RECORD_FUNCTION(
-      "torch_ipex::ROIAlign_forward", c10::ArrayRef<c10::IValue>({}));
-
   TORCH_CHECK(input.device().is_cpu(), "input must be a CPU tensor");
   TORCH_CHECK(rois.device().is_cpu(), "rois must be a CPU tensor");
   TORCH_CHECK(rois.size(1) == 5, "rois must have shape as Tensor[K, 5]");
@@ -741,12 +735,6 @@ at::Tensor roi_align_backward_kernel_impl(
     int64_t sampling_ratio,
     bool aligned,
     bool is_channels_last) {
-#if defined(IPEX_DISP_OP)
-  printf("torch_ipex::ROIAlign_backward\n");
-#endif
-  RECORD_FUNCTION(
-      "torch_ipex::ROIAlign_backward", c10::ArrayRef<c10::IValue>({}));
-
   TORCH_CHECK(grad.device().is_cpu(), "grad must be a CPU tensor");
   TORCH_CHECK(rois.device().is_cpu(), "rois must be a CPU tensor");
 
