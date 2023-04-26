@@ -42,9 +42,10 @@ calibration_data_loader = torch.utils.data.DataLoader(
   batch_size=128
 )
 
-for batch_idx, (d, target) in enumerate(calibration_data_loader):
-  print(f'calibrated on batch {batch_idx} out of {len(calibration_data_loader)}')
-  prepared_model(d)
+with torch.no_grad():
+  for batch_idx, (d, target) in enumerate(calibration_data_loader):
+    print(f'calibrated on batch {batch_idx} out of {len(calibration_data_loader)}')
+    prepared_model(d)
 ##############################
 
 converted_model = convert(prepared_model)

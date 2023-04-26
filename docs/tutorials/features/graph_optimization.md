@@ -12,63 +12,16 @@ ipex.enable_onednn_fusion(False)
 ```
 
 ### FP32 and BF16 models
-```
-import torch
-import torchvision.models as models
 
-# Import the Intel Extension for PyTorch
-import intel_extension_for_pytorch as ipex
+[//]: # (marker_feature_graph_optimization_fp32_bf16)
+[//]: # (marker_feature_graph_optimization_fp32_bf16)
 
-model = models.__dict__["resnet50 "](pretrained=True)
-model.eval()
-
-# Apply some fusions at the front end
-model = ipex.optimize(model, dtype=torch.float32)
-
-x = torch.randn(args.batch_size, 3, 224, 224)
-with torch.no_grad():
-    model = torch.jit.trace(model, x, check_trace=False).eval()
-    # Fold the BatchNormalization and propagate constant
-    torch.jit.freeze(model)
-    # Print the graph
-    print(model.graph_for(x))
-```
 Compared to the original code, the model launcher needs to add a few lines of code and the extension will automatically accelerate the model. Regarding the RN50, the extension will automatically fuse the Conv + ReLU and Conv + Sum + ReLU as ConvReLU and ConvSumReLU. If you check the output of `graph_for`, you will observe the fused operators.
 
 ### INT8 models
-```
-import torch
-import intel_extension_for_pytorch as ipex
 
-
-# First-time quantization flow
-# define the model
-def MyModel(torch.nn.Module):
- ...
-
-# construct the model
-model = MyModel(...)
-qconfig = ipex.quantization.default_static_qconfig
-model.eval()
-example_inputs = ..
-prepared_model = prepare(user_model, qconfig, example_inputs=example_inputs, inplace=False)
-with torch.no_grad():
-    for images in calibration_data_loader():
-        prepared_model(images)
-
-convert_model = convert(prepared_model)
-with torch.no_grad():
-    traced_model = torch.jit.trace(convert_model, example_input)
-    traced_model = torch.jit.freeze(traced_model)
-
-traced_model.save("quantized_model.pt")
-# Deployment
-import intel_extension_for_pytorch as ipex
-quantized_model = torch.jit.load("quantized_model.pt")
-quantized_model = torch.jit.freeze(quantized_model.eval())
-with torch.no_grad():
-    output = quantized_model(images)
-```
+[//]: # (marker_feature_graph_optimization_int8)
+[//]: # (marker_feature_graph_optimization_int8)
 
 ## Methodology
 ### Fusion
@@ -175,17 +128,8 @@ Here listed all the currently supported int8 patterns in Intel® Extension for P
 
 ### Folding
 Stock PyTorch provids constant propagation and BatchNormalization folding. These optimizations are automatically applied to the jit model by invoking `torch.jit.freeze`. Take the Resnet50 as an example:
-```
-import torch
-import torchvision.models as models
-model = models.__dict__["resnet50 "](pretrained=True)
-model.eval()
-x = torch.randn(args.batch_size, 3, 224, 224)
-with torch.no_grad():
-    model = torch.jit.trace(model, x, check_trace=False).eval()
-    # Fold the BatchNormalization and propagate constant
-    torch.jit.freeze(model)
-    # Print the graph
-    print(model.graph_for(x))
-```
+
+[//]: # (marker_feature_graph_optimization_folding)
+[//]: # (marker_feature_graph_optimization_folding)
+
 If the model owner does not invoke the `torch.jit.freeze`, the `BatchNormalization` still exists on the graph. Otheriwse, the `BatchNormalization` will be folded on the graph to save the compuation and then improve the performance. Refer to the [Constant Folding Wikipedia page](https://en.wikipedia.org/wiki/Constant_folding) for more details.
