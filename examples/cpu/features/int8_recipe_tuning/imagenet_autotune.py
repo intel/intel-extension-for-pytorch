@@ -126,6 +126,8 @@ def validate(val_loader, model, criterion, args):
       images = images.contiguous(memory_format=torch.channels_last)
       traced_model = torch.jit.trace(converted_model, images)
       traced_model = torch.jit.freeze(traced_model)
+      traced_model(images)
+      traced_model(images)
       break
 
   eval_func(traced_model)
@@ -166,7 +168,7 @@ if __name__ == '__main__':
                  ' (default: resnet18)')
   parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
             help='number of data loading workers (default: 4)')
-  parser.add_argument('-b', '--batch-size', default=56, type=int,
+  parser.add_argument('-b', '--batch-size', default=256, type=int,
             metavar='N',
             help='mini-batch size (default: 256), this is the total '
                  'batch size of all GPUs on the current node when '

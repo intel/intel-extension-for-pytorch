@@ -24,11 +24,14 @@ def autotune(prepared_model, calib_dataloader, eval_func, sampling_sizes=[100], 
     Returns:
         FP32 tuned model (torch.nn.Module)
     """
+    neural_compressor_version = '1.14.1'
     try:
         import neural_compressor
+        if neural_compressor.__version__ != neural_compressor_version:
+            raise RuntimeError("Please install Intel® Neural Compressor with version {} while the current version of Intel® Neural Compressor is {}.".format(neural_compressor_version, neural_compressor.__version__))
     except ImportError:
         try:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'neural_compressor==1.14.1'])
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'neural_compressor=={}'.format(neural_compressor_version)])
             import neural_compressor
         except:
             assert False, "Unable to import neural_compressor from the local environment."
