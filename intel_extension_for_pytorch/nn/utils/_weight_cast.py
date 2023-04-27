@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import sys
 from intel_extension_for_pytorch.optim import _optimizer_utils, _lamb
 import types
 from ._model_convert import _LSTM
@@ -124,10 +125,15 @@ def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight
                             cast_attr(sub_m, name, master_weight_split, params_attr, optimizer)
         return m
 
+    def isCLIPTextEmbeddings(m):
+        mod = 'transformers.models.clip.modeling_clip'
+        return mod in sys.modules and hasattr(sys.modules[mod], 'CLIPTextEmbeddings') and isinstance(m, sys.modules[mod].CLIPTextEmbeddings)
+
     def convert_rec(m):
         new_m = convert(m)
         for name, sub_m in m.named_children():
-            setattr(new_m, name, convert_rec(sub_m))
+            if not isCLIPTextEmbeddings(sub_m):
+                setattr(new_m, name, convert_rec(sub_m))
         return new_m
 
     casted_model, casted_optimizer, params_attr = convert_rec(module), optimizer, params_attr
