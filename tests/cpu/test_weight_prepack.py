@@ -1295,6 +1295,35 @@ class TestPrepackCases(TestCase):
             os.remove('origin_checkpoint.pth')
             os.remove('ipex_checkpoint.pth')
 
+    def test_lstm_weight_reorder(self):
+        class Lstm(torch.nn.Module):
+            def __init__(self, input_size, hidden_size, num_layers, bidirectional, bias, dropout, batch_first):
+                super(Lstm, self).__init__()
+                self.lstm = torch.nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
+
+            def forward(self, x, h=None):
+                x, h = self.lstm(x, h)
+                return x, h
+
+        test_dtypes = []
+        if core.onednn_has_bf16_support():
+            test_dtypes.append(torch.bfloat16)
+        for dtype in test_dtypes:
+            m = Lstm(2, 3, 1, False, False, 0, False)
+            x = torch.randn(2, 1, 2)
+            x_var = torch.randn(5, 1, 2)
+
+            origin_model = copy.deepcopy(m).eval()
+            ipex_model = ipex.optimize(origin_model, dtype=dtype)
+
+            with torch.cpu.amp.autocast(enabled=True, dtype=dtype):            
+                # run with 2 different shapes to verify weight prepack works when weight format changes
+                y = ipex_model(x)
+                y_var = ipex_model(x_var)
+
+                y_ref = origin_model(x_var)
+                self.assertEqual(y_var, y_ref)     
+
 if __name__ == '__main__':
     torch.manual_seed(2020)
     test = unittest.main()
