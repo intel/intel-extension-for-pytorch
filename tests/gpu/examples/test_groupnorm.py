@@ -101,10 +101,29 @@ class TestTorchMethod(TestCase):
             self.assertEqual(grad, grad_dpcpp)
 
     def test_group_norm(self):
-        shapes = [[1, 256, 513, 513], 
-                [1, 256, 1021, 1023], 
-                [1, 128, 512, 512], 
-                [1, 256, 55, 55], 
+        shapes = [[2, 2560, 32, 32],
+                [2, 2560, 16, 16],
+                [2, 2560, 8, 8],
+                [2, 1920, 32, 32],
+                [2, 1920, 16, 16],
+                [2, 1920, 8, 8],
+                [2, 1280, 32, 32],
+                [2, 1280, 16, 16],
+                [2, 1280, 8, 8],
+                [2, 960, 64, 64],
+                [2, 960, 32, 32],
+                [2, 960, 16, 16],
+                [2, 640, 64, 64],
+                [2, 640, 32, 32],
+                [2, 640, 16, 16],
+                [2, 320, 64, 64],
+                [1, 512, 128, 128],
+                [1, 512, 64, 64],
+                [1, 256, 256, 256],
+                [1, 128, 512, 512],
+                [1, 256, 513, 513],
+                [1, 128, 512, 512],
+                [1, 256, 55, 55],
                 [1, 128, 7, 7]]
         groups = [128, 32]
         formats = [torch.contiguous_format, torch.channels_last]
@@ -129,13 +148,17 @@ class TestTorchMethod(TestCase):
                         m = torch.nn.GroupNorm(group, shape[1])
                         output_cpu = m(input_cpu)
                         output_cpu.backward(grad_cpu)
+                        grad_wei = m.weight.grad.clone()
 
                         input_xpu = input.clone().to("xpu").to(dtype)
                         input_xpu.requires_grad_(True)
                         grad_xpu = grad.clone().to("xpu")
                         model_xpu = m.to("xpu").to(dtype)
+                        model_xpu.zero_grad()
                         output_xpu = model_xpu(input_xpu)
                         output_xpu.backward(grad_xpu)
+                        grad_wei_xpu = model_xpu.weight.grad.clone()
 
                         self.assertEqual(output_cpu.float(), output_xpu.cpu().float())
                         self.assertEqual(input_cpu.grad.float(), input_xpu.grad.cpu().float())
+                        self.assertEqual(grad_wei, grad_wei_xpu, atol=7e-3, rtol=7e-3)

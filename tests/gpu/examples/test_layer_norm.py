@@ -160,3 +160,101 @@ class TestNNMethod(TestCase):
         layernorm.to(dpcpp_device).to(dtype)
         y_dpcpp = layernorm(x_dpcpp_i)
         self.assertEqual(y_cpu, y_dpcpp.float(), atol=1e-1, rtol=0)
+
+    def test_layer_norm_fwd_bwd(self, dtype=torch.float):
+        formats = [torch.contiguous_format, torch.channels_last]    
+        input_shapes = [
+            [257, 1024], 
+            [1, 1024], 
+            [2, 4096, 320], 
+            [2, 1024, 640], 
+            [2, 256, 1280], 
+            [2, 64, 1280], 
+            [8192, 1024], 
+            [196, 512], 
+            [49, 1024], 
+            [49, 2048], 
+            [784, 256], 
+            [784, 512], 
+            [3136, 128], 
+            [16384, 1024], 
+            [2432, 1024], 
+            [128, 4096],
+            [4, 4096], 
+            [24576, 1024], 
+            [16384, 768], 
+            [16384, 3072],
+            [257, 1023], 
+            [257, 1025], 
+            [257, 7], 
+            [1024, 512],
+            [1024, 255],
+            [32, 2048*16*15 +1],
+            [32, 2048*16*16 +1],
+            [1024, 384, 385],
+            [1024, 384, 385],
+            [20, 5, 10, 10],
+            [20, 5, 10, 10]]
+        norm_shapes = [
+            [1024],
+            [1024],
+            [320],
+            [640],
+            [1280],
+            [1280],
+            [1024],
+            [512],
+            [1024],
+            [2048],
+            [256],
+            [512],
+            [128],
+            [1024],
+            [1024],
+            [4096],
+            [4096],
+            [1024],
+            [768],
+            [3072],
+            [1023],
+            [1025],
+            [7],
+            [512],
+            [255],
+            [2048*16*15 +1],
+            [2048*16*16 +1],
+            [384, 385],
+            [385],
+            [5, 10, 10],
+            [10, 10]]
+
+        for idx, input_shape in enumerate(input_shapes):
+            for format in formats:
+                norm_shape = norm_shapes[idx]
+                input = torch.randn(input_shape)
+                grad = torch.randn(input_shape)
+                if (input.dim() == 4): 
+                    input = input.to(memory_format=format)
+                    grad = grad.to(memory_format=format)
+
+                input_cpu = input.clone()
+                input_cpu.requires_grad_(True)
+                grad_cpu = grad.clone()
+                m = torch.nn.LayerNorm(norm_shape)
+                output_cpu = m(input_cpu)
+                output_cpu.backward(grad_cpu)
+                grad_wei = m.weight.grad.clone()
+
+                m.zero_grad()
+                input_xpu = input.clone().to("xpu").to(dtype)
+                input_xpu.requires_grad_(True)
+                grad_xpu = grad.clone().to("xpu")
+                model_xpu = m.to("xpu").to(dtype)
+                model_xpu.zero_grad()
+                output_xpu = model_xpu(input_xpu)
+                output_xpu.backward(grad_xpu)
+                grad_wei_xpu = model_xpu.weight.grad.clone()
+
+                self.assertEqual(output_cpu, output_xpu.cpu())
+                self.assertEqual(input_cpu.grad, input_xpu.grad.cpu())
+                self.assertEqual(grad_wei, grad_wei_xpu.cpu(), rtol=10e-4, atol=10e-4)

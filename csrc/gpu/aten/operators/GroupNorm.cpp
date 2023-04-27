@@ -5,204 +5,234 @@ using namespace at::AtenIpexTypeXPU::normalization;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-template <
-    typename scalar_t,
-    typename accscalar_t,
-    typename IndexType,
-    int vec_size,
-    int SIMD>
-void RowwiseMomentsDPCPPKernel(
-    int64_t Batch,
-    int64_t Plane,
-    int64_t WGPlane,
-    int workgroup_num,
-    int workgroup_num_foreach,
-    int local_size,
-    int sub_group_num,
-    scalar_t eps,
-    const Tensor& X,
-    scalar_t* mean_data,
-    scalar_t* rstd_data) {
-  // X: [N * Group][C/Group * HxW]
-  // workitem: [workgroup_num][workgroup_num_foreach][local_size]
-  scalar_t* X_data = X.data_ptr<scalar_t>();
+template <typename scalar_t, typename accscalar_t, typename weight_t>
+class GroupNormForward : public NormForward<scalar_t, accscalar_t, weight_t> {
+ public:
+  GroupNormForward() = delete;
+  GroupNormForward(
+      scalar_t* X_data,
+      scalar_t* mean_data,
+      scalar_t* var_data,
+      weight_t* gamma_data,
+      weight_t* beta_data,
+      accscalar_t eps,
+      int64_t N,
+      int64_t C,
+      int64_t group,
+      int64_t HxW)
+      : NormForward<scalar_t, accscalar_t, weight_t>(
+            X_data,
+            nullptr,
+            mean_data,
+            var_data,
+            gamma_data,
+            beta_data,
+            eps),
+        N(N),
+        C(C),
+        group(group),
+        HxW(HxW) {
+    numel = N * C * HxW;
+    D = C / group;
+  }
+  typedef NormForward<scalar_t, accscalar_t, weight_t> NF;
 
-  using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
-  sycl::range<3> local_range{1, 1, local_size};
-  sycl::range<3> global_range{workgroup_num, workgroup_num_foreach, local_size};
-  IndexType loops_end = WGPlane / vec_size;
-
-  int sub_group_num_global = 1;
-  Tensor semaphores, scratchpad;
-  int* semaphores_ptr;
-  accscalar_t* scratchpad_ptr;
-  if (workgroup_num_foreach) {
-    int scratchpad_size = 2 * Batch * workgroup_num_foreach;
-    init_scratchpad<accscalar_t, SIMD>(
-        X,
-        semaphores,
-        scratchpad,
-        sub_group_num_global,
-        workgroup_num,
-        scratchpad_size,
-        workgroup_num_foreach);
-    semaphores_ptr = semaphores.data_ptr<int>();
-    scratchpad_ptr = scratchpad.data_ptr<accscalar_t>();
+  void set_eltwise_update_parameter(
+      scalar_t* X_ptr,
+      scalar_t* Y_ptr,
+      accscalar_t* a_ptr,
+      accscalar_t* b_ptr,
+      bool is_channels_last) {
+    NF::X_data = X_ptr;
+    NF::Y_data = Y_ptr;
+    a_data = a_ptr;
+    b_data = b_ptr;
+    channels_last = is_channels_last;
   }
 
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    dpcpp_local_acc_t<accscalar_t> local_sum1(sub_group_num, cgh);
-    dpcpp_local_acc_t<accscalar_t> local_sum2(sub_group_num, cgh);
-    dpcpp_local_acc_t<bool> last_workgroup(1, cgh);
-    cgh.parallel_for(
-        sycl::nd_range<3>(global_range, local_range),
-        [=](sycl::nd_item<3> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
-          IndexType local_id = item_id.get_local_id(2);
-          IndexType group_id = item_id.get_group(0);
-          IndexType group_id_foreach = item_id.get_group(1);
-          IndexType group_offset = group_id * Plane;
+  template <int vec_size, typename index_t, typename vec_t>
+  void eltwise_update(index_t i) const {
+    index_t remaining = numel - i * vec_size;
+    if (remaining < vec_size) {
+      for (int j = 0; j < remaining; ++j) {
+        index_t offset = i * vec_size + j;
 
-          accscalar_t sum1 = accscalar_t(0);
-          accscalar_t sum2 = accscalar_t(0);
-          for (IndexType j = local_id; j < loops_end; j += local_size) {
-            IndexType plane_offset = group_id_foreach * WGPlane + j * vec_size;
-            if (plane_offset < Plane) {
-              vec_t value = *(reinterpret_cast<vec_t*>(
-                  X_data + group_offset + plane_offset));
+        index_t nc;
+        if (channels_last) {
+          nc = offset / (C * HxW) * C + offset % C;
+        } else {
+          nc = offset / HxW;
+        }
+        NF::Y_data[offset] = static_cast<scalar_t>(
+            a_data[nc] * static_cast<accscalar_t>(NF::X_data[offset]) +
+            b_data[nc]);
+      }
+    } else {
+      index_t offset = i * vec_size;
+
+      vec_t in_val = *(reinterpret_cast<vec_t*>(NF::X_data + offset));
+      vec_t out_val;
 #pragma unroll(vec_size)
-              for (int v = 0; v < vec_size; ++v) {
-                sum1 += static_cast<accscalar_t>(value[v]);
-                sum2 += static_cast<accscalar_t>(value[v]) *
-                    static_cast<accscalar_t>(value[v]);
-              }
-            }
-          }
-
-          norm_group_reduce<SIMD, accscalar_t>(
-              item_id,
-              sub_group_num,
-              sum1,
-              sum2,
-              local_sum1,
-              local_sum2,
-              [](accscalar_t a, accscalar_t b) { return a + b; });
-
-          if (workgroup_num_foreach > 1) {
-            norm_global_reduce<SIMD, accscalar_t, IndexType>(
-                item_id,
-                workgroup_num_foreach,
-                local_size,
-                sub_group_num_global,
-                sum1,
-                sum2,
-                scratchpad_ptr,
-                semaphores_ptr,
-                local_sum1,
-                local_sum2,
-                last_workgroup,
-                [](accscalar_t a, accscalar_t b) { return a + b; });
-
-            if (last_workgroup[0] && local_id == 0) {
-              project_and_store<scalar_t, accscalar_t>(
-                  group_id, sum1, sum2, Plane, mean_data, rstd_data, eps);
-            }
-          } else {
-            if (local_id == 0) {
-              project_and_store<scalar_t, accscalar_t>(
-                  group_id, sum1, sum2, Plane, mean_data, rstd_data, eps);
-            }
-          }
-        });
+      for (int v = 0; v < vec_size; ++v) {
+        index_t nc;
+        if (channels_last) {
+          nc = (offset + v) / (C * HxW) * C + (offset + v) % C;
+        } else {
+          nc = (offset + v) / HxW;
+        }
+        out_val[v] = static_cast<scalar_t>(
+            a_data[nc] * static_cast<accscalar_t>(in_val[v]) + b_data[nc]);
+      }
+      *(reinterpret_cast<vec_t*>(NF::Y_data + offset)) = out_val;
+    }
   };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-}
 
-template <typename scalar_t, typename accscalar_t, int SIMD>
-void RowwiseMomentsDPCPPKernelImpl(
-    int64_t Batch,
-    int64_t Plane,
-    int vec_size,
-    scalar_t eps,
-    const Tensor& X,
-    scalar_t* mean_data,
-    scalar_t* rstd_data) {
-  int workgroup_num, workgroup_num_foreach, local_size, sub_group_num;
-  get_workgroup_size<SIMD>(
-      Batch,
-      Plane,
-      vec_size,
-      workgroup_num,
-      workgroup_num_foreach,
-      local_size,
-      sub_group_num);
-  int WGPlane = (Plane + workgroup_num_foreach - 1) / workgroup_num_foreach;
+  int N;
+  int C;
+  int group;
+  int HxW;
+  int D;
+  int numel;
+  accscalar_t* a_data;
+  accscalar_t* b_data;
+  bool channels_last;
+};
 
-  // decide indexing range: uint32_t (4GB) or uint64_t (>4GB)
-  bool can_use_32bit_index = canUse32BitIndexMath(X);
-
-#define VecRowwiseMomentsDPCPPKernel(vec_size)                                 \
-  {                                                                            \
-    using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>; \
-    constexpr int align_bytes = alignof(vec_t);                                \
-    int X_start = ((uint64_t)X.data_ptr()) % align_bytes / sizeof(scalar_t);   \
-    if (X_start == 0 && WGPlane % vec_size == 0) {                             \
-      if (can_use_32bit_index) {                                               \
-        RowwiseMomentsDPCPPKernel<                                             \
-            scalar_t,                                                          \
-            accscalar_t,                                                       \
-            uint32_t,                                                          \
-            vec_size,                                                          \
-            SIMD>(                                                             \
-            Batch,                                                             \
-            Plane,                                                             \
-            WGPlane,                                                           \
-            workgroup_num,                                                     \
-            workgroup_num_foreach,                                             \
-            local_size,                                                        \
-            sub_group_num,                                                     \
-            eps,                                                               \
-            X,                                                                 \
-            mean_data,                                                         \
-            rstd_data);                                                        \
-      } else {                                                                 \
-        RowwiseMomentsDPCPPKernel<                                             \
-            scalar_t,                                                          \
-            accscalar_t,                                                       \
-            uint64_t,                                                          \
-            vec_size,                                                          \
-            SIMD>(                                                             \
-            Batch,                                                             \
-            Plane,                                                             \
-            WGPlane,                                                           \
-            workgroup_num,                                                     \
-            workgroup_num_foreach,                                             \
-            local_size,                                                        \
-            sub_group_num,                                                     \
-            eps,                                                               \
-            X,                                                                 \
-            mean_data,                                                         \
-            rstd_data);                                                        \
-      }                                                                        \
-      break;                                                                   \
-    }                                                                          \
+template <typename scalar_t, typename accscalar_t, typename weight_t>
+class GroupNormBackward : public NormBackward<scalar_t, accscalar_t, weight_t> {
+ public:
+  GroupNormBackward() = delete;
+  GroupNormBackward(
+      scalar_t* X_data,
+      scalar_t* dY_data,
+      accscalar_t* a_data,
+      accscalar_t* b_data,
+      int64_t N,
+      int64_t C,
+      int64_t group,
+      int64_t HxW)
+      : NormBackward<scalar_t, accscalar_t, weight_t>(
+            X_data,
+            dY_data,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            a_data,
+            b_data),
+        N(N),
+        C(C),
+        group(group),
+        HxW(HxW) {
+    numel = N * C * HxW;
+    D = C / group;
   }
 
-  switch (vec_size) {
-    case 8: {
-      VecRowwiseMomentsDPCPPKernel(8);
-    }
-    case 4: {
-      VecRowwiseMomentsDPCPPKernel(4);
-    }
-    case 2: {
-      VecRowwiseMomentsDPCPPKernel(2);
-    }
-    default: {
-      VecRowwiseMomentsDPCPPKernel(1);
+  typedef NormBackward<scalar_t, accscalar_t, weight_t> NB;
+
+  template <
+      int vec_size,
+      typename vec_t,
+      typename weight_vec_t,
+      typename index_t,
+      typename nd_item_id>
+  void reduce_combine(
+      nd_item_id item_id,
+      const NormConfig& cfg,
+      accscalar_t& sum1,
+      accscalar_t& sum2) const {
+    auto group_id = item_id.get_group(0);
+    auto group_id_foreach = item_id.get_group(1);
+    auto local_id = item_id.get_local_id(2);
+    index_t group_offset = group_id * cfg.Plane;
+
+    for (int64_t j = local_id * vec_size; j < cfg.WGPlane;
+         j += cfg.workgroup_size * vec_size) {
+      index_t plane_offset = group_id_foreach * cfg.WGPlane + j;
+      if (plane_offset < cfg.Plane) {
+        vec_t dY_val = *(reinterpret_cast<vec_t*>(
+            NB::dY_data + group_offset + plane_offset));
+        vec_t X_val = *(
+            reinterpret_cast<vec_t*>(NB::X_data + group_offset + plane_offset));
+        for (int v = 0; v < vec_size; ++v) {
+          sum1 += static_cast<accscalar_t>(dY_val[v]) *
+              static_cast<accscalar_t>(X_val[v]);
+          sum2 += static_cast<accscalar_t>(dY_val[v]);
+        }
+      }
     }
   }
-}
+
+  void set_eltwise_update_parameter(
+      accscalar_t* c1_ptr,
+      accscalar_t* c2_ptr,
+      accscalar_t* c3_ptr,
+      scalar_t* X_ptr,
+      scalar_t* dY_ptr,
+      scalar_t* dX_ptr,
+      bool is_channels_last) {
+    c1_data = c1_ptr;
+    c2_data = c2_ptr;
+    c3_data = c3_ptr;
+    NB::X_data = X_ptr;
+    NB::dY_data = dY_ptr;
+    NB::dX_data = dX_ptr;
+    channels_last = is_channels_last;
+  }
+
+  template <int vec_size, typename index_t, typename vec_t>
+  void eltwise_update(index_t i) const {
+    index_t remaining = numel - i * vec_size;
+    if (remaining < vec_size) {
+      for (int j = 0; j < remaining; ++j) {
+        index_t offset = i * vec_size + j;
+
+        index_t nc, ng;
+        if (channels_last) {
+          nc = offset / (C * HxW) * C + offset % C;
+          ng = nc / D;
+        } else {
+          nc = offset / HxW;
+          ng = nc / D;
+        }
+        NB::dX_data[offset] =
+            c1_data[nc] * static_cast<accscalar_t>(NB::dY_data[offset]) +
+            c2_data[ng] * static_cast<accscalar_t>(NB::X_data[offset]) +
+            c3_data[ng];
+      }
+    } else {
+      index_t offset = i * vec_size;
+      vec_t X_val = *(reinterpret_cast<vec_t*>(NB::X_data + offset));
+      vec_t dY_val = *(reinterpret_cast<vec_t*>(NB::dY_data + offset));
+      vec_t dX_val;
+#pragma unroll(vec_size)
+      for (int v = 0; v < vec_size; ++v) {
+        index_t nc, ng;
+        if (channels_last) {
+          nc = (offset + v) / (C * HxW) * C + (offset + v) % C;
+          ng = nc / D;
+        } else {
+          nc = (offset + v) / HxW;
+          ng = nc / D;
+        }
+        dX_val[v] = c1_data[nc] * static_cast<accscalar_t>(dY_val[v]) +
+            c2_data[ng] * static_cast<accscalar_t>(X_val[v]) + c3_data[ng];
+      }
+      *(reinterpret_cast<vec_t*>(NB::dX_data + offset)) = dX_val;
+    }
+  }
+
+  int N;
+  int C;
+  int group;
+  int HxW;
+  int D;
+  int numel;
+  accscalar_t* c1_data;
+  accscalar_t* c2_data;
+  accscalar_t* c3_data;
+  bool channels_last;
+};
 
 template <typename scalar_t, typename accscalar_t, typename weight_t>
 void ComputeFusedParamsDPCPPKernel(
@@ -236,129 +266,6 @@ void ComputeFusedParamsDPCPPKernel(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <
-    typename scalar_t,
-    typename accscalar_t,
-    typename IndexType,
-    int vec_size>
-void GroupNormForwardDPCPPKernel(
-    int64_t N,
-    int64_t C,
-    int64_t HxW,
-    const Tensor& X,
-    const accscalar_t* a_data,
-    const accscalar_t* b_data,
-    Tensor& Y) {
-  // input: [NxC][HxW]
-  // a,b: [NxC]
-  scalar_t* X_data = X.data_ptr<scalar_t>();
-  scalar_t* Y_data = Y.data_ptr<scalar_t>();
-
-  IndexType Plane = C * HxW;
-  IndexType loops_end = (N * C * HxW + vec_size - 1) / vec_size;
-  bool channels_last = is_smf_channels_last(X);
-
-  using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  int total_threads = dpcppMaxWorkItemsPerTile(dev_id);
-  auto local_size = dpcppMaxWorkGroupSize(dev_id);
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(
-        sycl::nd_range<1>(
-            sycl::range<1>(total_threads), sycl::range<1>(local_size)),
-        [=](sycl::nd_item<1> item_id) {
-          IndexType local_id = item_id.get_global_linear_id();
-          for (IndexType i = local_id; i < loops_end; i += total_threads) {
-            IndexType remaining = N * C * HxW - i * vec_size;
-            if (remaining < vec_size) {
-              for (int j = 0; j < remaining; ++j) {
-                IndexType offset = i * vec_size + j;
-
-                IndexType nc;
-                if (channels_last) {
-                  nc = offset / Plane * C + offset % C;
-                } else {
-                  nc = offset / HxW;
-                }
-                Y_data[offset] = static_cast<scalar_t>(
-                    a_data[nc] * static_cast<accscalar_t>(X_data[offset]) +
-                    b_data[nc]);
-              }
-            } else {
-              IndexType offset = i * vec_size;
-
-              vec_t in_val = *(reinterpret_cast<vec_t*>(X_data + offset));
-              vec_t out_val;
-#pragma unroll(vec_size)
-              for (int v = 0; v < vec_size; ++v) {
-                IndexType nc;
-                if (channels_last) {
-                  nc = (offset + v) / Plane * C + (offset + v) % C;
-                } else {
-                  nc = (offset + v) / HxW;
-                }
-                out_val[v] = static_cast<scalar_t>(
-                    a_data[nc] * static_cast<accscalar_t>(in_val[v]) +
-                    b_data[nc]);
-              }
-              *(reinterpret_cast<vec_t*>(Y_data + offset)) = out_val;
-            }
-          }
-        });
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-}
-
-template <typename scalar_t, typename accscalar_t>
-void GroupNormForwardDPCPPKernelImpl(
-    int64_t N,
-    int64_t C,
-    int64_t HxW,
-    int vec_size,
-    const Tensor& X,
-    const accscalar_t* a_data,
-    const accscalar_t* b_data,
-    Tensor& Y) {
-  auto X_vec_size = at::native::Memory::can_vectorize_up_to<scalar_t>(
-      dpcppGetDeviceIdOfCurrentQueue(), reinterpret_cast<char*>(X.data_ptr()));
-  auto Y_vec_size = at::native::Memory::can_vectorize_up_to<scalar_t>(
-      dpcppGetDeviceIdOfCurrentQueue(), reinterpret_cast<char*>(Y.data_ptr()));
-  vec_size = std::min(vec_size, X_vec_size);
-  vec_size = std::min(vec_size, Y_vec_size);
-
-  // decide indexing range: uint32_t (4GB) or uint64_t (>4GB)
-  bool can_use_32bit_index = canUse32BitIndexMath(X);
-
-#define VecGroupNormForwardDPCPPKernel(vec_size)                              \
-  {                                                                           \
-    if (can_use_32bit_index) {                                                \
-      GroupNormForwardDPCPPKernel<scalar_t, accscalar_t, uint32_t, vec_size>( \
-          N, C, HxW, X, a_data, b_data, Y);                                   \
-    } else {                                                                  \
-      GroupNormForwardDPCPPKernel<scalar_t, accscalar_t, uint64_t, vec_size>( \
-          N, C, HxW, X, a_data, b_data, Y);                                   \
-    }                                                                         \
-    break;                                                                    \
-  }
-
-  switch (vec_size) {
-    case 8: {
-      VecGroupNormForwardDPCPPKernel(8);
-    }
-    case 4: {
-      VecGroupNormForwardDPCPPKernel(4);
-    }
-    case 2: {
-      VecGroupNormForwardDPCPPKernel(2);
-    }
-    case 1: {
-      VecGroupNormForwardDPCPPKernel(1);
-    }
-  }
-}
-
 template <typename scalar_t, typename weight_t>
 void GroupNormKernelImplInternal(
     const Tensor& X,
@@ -379,23 +286,37 @@ void GroupNormKernelImplInternal(
   if (N == 0) {
     return;
   }
-  const int64_t G = group;
-  const int64_t D = C / G;
-  int vec_size = get_vec_size<scalar_t>(N * C * HxW);
   Tensor X_cont = X.contiguous();
+  scalar_t* X_data = X_cont.data_ptr<scalar_t>();
 
   mean = at::empty({N, group}, X.options());
   rstd = at::empty({N, group}, X.options());
   scalar_t* mean_data = mean.data_ptr<scalar_t>();
   scalar_t* rstd_data = rstd.data_ptr<scalar_t>();
-  constexpr int SIMD16 = 16;
-  RowwiseMomentsDPCPPKernelImpl<scalar_t, accscalar_t, SIMD16>(
-      N * G, D * HxW, vec_size, eps, X_cont, mean_data, rstd_data);
+  weight_t* gamma_data = gamma.defined() ? gamma.data_ptr<weight_t>() : nullptr;
+  weight_t* beta_data = beta.defined() ? beta.data_ptr<weight_t>() : nullptr;
 
-  const weight_t* gamma_data =
-      gamma.defined() ? gamma.data_ptr<weight_t>() : nullptr;
-  const weight_t* beta_data =
-      beta.defined() ? beta.data_ptr<weight_t>() : nullptr;
+  auto config = NormConfig(N * group, C / group * HxW, 1, sizeof(scalar_t));
+  GroupNormForward<scalar_t, accscalar_t, weight_t> group_norm_forward(
+      X_data,
+      mean_data,
+      rstd_data,
+      gamma_data,
+      beta_data,
+      eps,
+      N,
+      C,
+      group,
+      HxW);
+  bool can_use_32bit_index = canUse32BitIndexMath(X);
+  Tensor semaphores, scratchpad;
+  config.template init_global_reduce<accscalar_t>(X, semaphores, scratchpad);
+  RowwiseMomentsDPCPPKernelImpl<
+      scalar_t,
+      accscalar_t,
+      weight_t,
+      GroupNormForward>(group_norm_forward, config, can_use_32bit_index);
+
   const auto kAccType =
       (X.scalar_type() == kHalf || X.scalar_type() == kBFloat16)
       ? kFloat
@@ -405,221 +326,28 @@ void GroupNormKernelImplInternal(
   accscalar_t* a_data = a.data_ptr<accscalar_t>();
   accscalar_t* b_data = b.data_ptr<accscalar_t>();
   ComputeFusedParamsDPCPPKernel<scalar_t, accscalar_t, weight_t>(
-      N, C, G, mean_data, rstd_data, gamma_data, beta_data, a_data, b_data);
+      N, C, group, mean_data, rstd_data, gamma_data, beta_data, a_data, b_data);
 
   // propagate channels_last format from X to Y
-  if (is_smf_channels_last(X)) {
+  bool is_channels_last = is_smf_channels_last(X);
+  if (is_channels_last) {
     X_cont = X;
     auto smf = X.suggest_memory_format();
     Y = at::empty_like(X, smf);
   } else {
     Y = at::empty_like(X_cont);
   }
-  GroupNormForwardDPCPPKernelImpl<scalar_t, accscalar_t>(
-      N, C, HxW, vec_size, X_cont, a_data, b_data, Y);
-}
-
-template <
-    typename scalar_t,
-    typename accscalar_t,
-    typename IndexType,
-    int vec_size,
-    int SIMD>
-void ComputeInternalGradientsDPCPPKernel(
-    int64_t Batch,
-    int64_t Plane,
-    const Tensor& dY,
-    const Tensor& X,
-    accscalar_t* ds_data,
-    accscalar_t* db_data,
-    int workgroup_num,
-    int workgroup_num_foreach,
-    int local_size,
-    int sub_group_num) {
-  scalar_t* dY_data = dY.data_ptr<scalar_t>();
-  scalar_t* X_data = X.data_ptr<scalar_t>();
-
-  using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
-  sycl::range<3> local_range{1, 1, local_size};
-  sycl::range<3> global_range{workgroup_num, workgroup_num_foreach, local_size};
-  auto WGPlane = Plane / workgroup_num_foreach;
-  IndexType loops_end = WGPlane / vec_size;
-
-  int sub_group_num_foreach = 1;
-  Tensor semaphores, scratchpad;
-  int* semaphores_ptr;
-  accscalar_t* scratchpad_ptr;
-  if (workgroup_num_foreach) {
-    int scratchpad_size = 2 * Batch * workgroup_num_foreach;
-    init_scratchpad<accscalar_t, SIMD>(
-        X,
-        semaphores,
-        scratchpad,
-        sub_group_num_foreach,
-        workgroup_num,
-        scratchpad_size,
-        workgroup_num_foreach);
-    semaphores_ptr = semaphores.data_ptr<int>();
-    scratchpad_ptr = scratchpad.data_ptr<accscalar_t>();
-  }
-
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    dpcpp_local_acc_t<accscalar_t> local_sum1(sub_group_num, cgh);
-    dpcpp_local_acc_t<accscalar_t> local_sum2(sub_group_num, cgh);
-    dpcpp_local_acc_t<bool> last_workgroup(1, cgh);
-    cgh.parallel_for(
-        sycl::nd_range<3>(
-            sycl::range<3>(global_range), sycl::range<3>(local_range)),
-        [=](sycl::nd_item<3> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
-          auto local_id = item_id.get_local_id(2);
-          auto group_id = item_id.get_group(0);
-          IndexType group_id_foreach = item_id.get_group(1);
-          IndexType group_offset = group_id * Plane;
-
-          accscalar_t sum1 = 0;
-          accscalar_t sum2 = 0;
-          for (int64_t j = local_id; j < loops_end; j += local_size) {
-            IndexType plane_offset = group_id_foreach * WGPlane + j * vec_size;
-            if (plane_offset < Plane) {
-              vec_t dY_val = *(reinterpret_cast<vec_t*>(
-                  dY_data + group_offset + plane_offset));
-              vec_t X_val = *(reinterpret_cast<vec_t*>(
-                  X_data + group_offset + plane_offset));
-#pragma unroll(vec_size)
-              for (int v = 0; v < vec_size; ++v) {
-                sum1 += static_cast<accscalar_t>(dY_val[v]) *
-                    static_cast<accscalar_t>(X_val[v]);
-                sum2 += static_cast<accscalar_t>(dY_val[v]);
-              }
-            }
-          }
-
-          norm_group_reduce<SIMD, accscalar_t>(
-              item_id,
-              sub_group_num,
-              sum1,
-              sum2,
-              local_sum1,
-              local_sum2,
-              [](accscalar_t a, accscalar_t b) { return a + b; });
-
-          if (workgroup_num_foreach > 1) {
-            norm_global_reduce<SIMD, accscalar_t, IndexType>(
-                item_id,
-                workgroup_num_foreach,
-                local_size,
-                sub_group_num,
-                sum1,
-                sum2,
-                scratchpad_ptr,
-                semaphores_ptr,
-                local_sum1,
-                local_sum2,
-                last_workgroup,
-                [](accscalar_t a, accscalar_t b) { return a + b; });
-
-            if (last_workgroup[0] && local_id == 0) {
-              ds_data[group_id] = sum1;
-              db_data[group_id] = sum2;
-            }
-          } else {
-            if (local_id == 0) {
-              ds_data[group_id] = sum1;
-              db_data[group_id] = sum2;
-            }
-          }
-        });
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-}
-
-template <typename scalar_t, typename accscalar_t, int SIMD>
-void ComputeInternalGradientsDPCPPKernelImpl(
-    int64_t total_size,
-    int64_t HxW,
-    int vec_size,
-    const Tensor& dY,
-    const Tensor& X,
-    accscalar_t* ds_data,
-    accscalar_t* db_data) {
-  int Batch = total_size;
-  int Plane = HxW;
-
-  int workgroup_num, workgroup_num_foreach, local_size, sub_group_num;
-  get_workgroup_size<SIMD>(
-      Batch,
-      Plane,
-      vec_size,
-      workgroup_num,
-      workgroup_num_foreach,
-      local_size,
-      sub_group_num);
-  int WGPlane = (Plane + workgroup_num_foreach - 1) / workgroup_num_foreach;
-
-  // decide indexing range: uint32_t (4GB) or uint64_t (>4GB)
-  bool can_use_32bit_index =
-      canUse32BitIndexMath(X) && canUse32BitIndexMath(dY);
-#define VecComputeInternalGradientsDPCPPKernel(vec_size)                       \
-  {                                                                            \
-    using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>; \
-    constexpr int align_bytes = alignof(vec_t);                                \
-    int X_start = ((uint64_t)X.data_ptr()) % align_bytes / sizeof(scalar_t);   \
-    int dY_start = ((uint64_t)dY.data_ptr()) % align_bytes / sizeof(scalar_t); \
-    if (X_start == 0 && dY_start == 0 && WGPlane % vec_size == 0) {            \
-      if (can_use_32bit_index) {                                               \
-        ComputeInternalGradientsDPCPPKernel<                                   \
-            scalar_t,                                                          \
-            accscalar_t,                                                       \
-            uint32_t,                                                          \
-            vec_size,                                                          \
-            SIMD>(                                                             \
-            Batch,                                                             \
-            Plane,                                                             \
-            dY,                                                                \
-            X,                                                                 \
-            ds_data,                                                           \
-            db_data,                                                           \
-            workgroup_num,                                                     \
-            workgroup_num_foreach,                                             \
-            local_size,                                                        \
-            sub_group_num);                                                    \
-      } else {                                                                 \
-        ComputeInternalGradientsDPCPPKernel<                                   \
-            scalar_t,                                                          \
-            accscalar_t,                                                       \
-            uint64_t,                                                          \
-            vec_size,                                                          \
-            SIMD>(                                                             \
-            Batch,                                                             \
-            Plane,                                                             \
-            dY,                                                                \
-            X,                                                                 \
-            ds_data,                                                           \
-            db_data,                                                           \
-            workgroup_num,                                                     \
-            workgroup_num_foreach,                                             \
-            local_size,                                                        \
-            sub_group_num);                                                    \
-      }                                                                        \
-      break;                                                                   \
-    }                                                                          \
-  }
-
-  switch (vec_size) {
-    case 8: {
-      VecComputeInternalGradientsDPCPPKernel(8);
-    }
-    case 4: {
-      VecComputeInternalGradientsDPCPPKernel(4);
-    }
-    case 2: {
-      VecComputeInternalGradientsDPCPPKernel(2);
-    }
-    default: {
-      VecComputeInternalGradientsDPCPPKernel(1);
-    }
-  }
+  group_norm_forward.set_eltwise_update_parameter(
+      X_cont.data_ptr<scalar_t>(),
+      Y.data_ptr<scalar_t>(),
+      a_data,
+      b_data,
+      is_channels_last);
+  NormEltwiseUpdateKernelImpl<
+      scalar_t,
+      accscalar_t,
+      weight_t,
+      GroupNormForward>(group_norm_forward, config, can_use_32bit_index);
 }
 
 template <typename T, typename weight_t>
@@ -647,14 +375,14 @@ void ComputeGradOutputCoeffientDPCPPKernel(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename T, typename accscalar_t, typename weight_t, int SIMD>
+template <typename scalar_t, typename accscalar_t, typename weight_t>
 void ComputeBackwardFusedParamsDPCPPKernel(
     int64_t N,
     int64_t C,
     int64_t HxW,
     int64_t group,
-    const T* mean,
-    const T* rstd,
+    const scalar_t* mean,
+    const scalar_t* rstd,
     const weight_t* gamma,
     const accscalar_t* ds,
     const accscalar_t* db,
@@ -668,25 +396,25 @@ void ComputeBackwardFusedParamsDPCPPKernel(
   auto D = C / G;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto local_size = dpcppMaxWorkGroupSize(dev_id);
-  local_size = std::min(local_size, D);
-  int sub_group_num = (local_size + SIMD - 1) / SIMD;
-  local_size = sub_group_num * SIMD;
-  auto cgf = DPCPP_Q_CGF(cgh) [[intel::reqd_sub_group_size(SIMD)]] {
+  auto workgroup_size = dpcppMaxWorkGroupSize(dev_id);
+  workgroup_size = std::min(workgroup_size, D);
+  int sub_group_num = (workgroup_size + SIMD - 1) / SIMD;
+  workgroup_size = sub_group_num * SIMD;
+  auto cgf = DPCPP_Q_CGF(cgh) {
     dpcpp_local_acc_t<accscalar_t> local_sum1(sub_group_num, cgh);
     dpcpp_local_acc_t<accscalar_t> local_sum2(sub_group_num, cgh);
     cgh.parallel_for(
         sycl::nd_range<2>(
-            sycl::range<2>(N, group * local_size),
-            sycl::range<2>(1, local_size)),
-        [=](sycl::nd_item<2> item_id) {
+            sycl::range<2>(N, group * workgroup_size),
+            sycl::range<2>(1, workgroup_size)),
+        [=](sycl::nd_item<2> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
           auto local_id = item_id.get_local_id(1);
           auto n = item_id.get_group(0);
           auto g = item_id.get_group(1);
           auto ng = n * G + g;
           accscalar_t sum1 = 0;
           accscalar_t sum2 = 0;
-          for (int64_t i = local_id; i < D; i += local_size) {
+          for (int64_t i = local_id; i < D; i += workgroup_size) {
             auto nc = ng * D + i;
             auto c = g * D + i;
             const accscalar_t gamma_v = gamma == nullptr
@@ -696,7 +424,7 @@ void ComputeBackwardFusedParamsDPCPPKernel(
             sum2 += db[nc] * gamma_v;
           }
 
-          norm_group_reduce<SIMD, accscalar_t>(
+          norm_group_reduce<accscalar_t>(
               item_id,
               sub_group_num,
               sum1,
@@ -733,14 +461,18 @@ void GammaBetaBackwardDPCPPKernel(
     const accscalar_t* db,
     weight_t* dgamma,
     weight_t* dbeta) {
+  // mean, rstd: {N, group}
+  // ds, db: {N, C}  {N, group, D}
+  // dgamma, dbeta: {C}  {group, D}
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto local_size = dpcppMaxWorkGroupSize(dev_id);
-  auto total_threads = ((C + local_size - 1) / local_size) * local_size;
+  auto workgroup_size = dpcppMaxWorkGroupSize(dev_id);
+  auto total_threads =
+      ((C + workgroup_size - 1) / workgroup_size) * workgroup_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(
         sycl::nd_range<1>(
-            sycl::range<1>(total_threads), sycl::range<1>(local_size)),
+            sycl::range<1>(total_threads), sycl::range<1>(workgroup_size)),
         [=](sycl::nd_item<1> item_id) {
           auto index = item_id.get_global_linear_id();
           if (index < C) {
@@ -769,144 +501,6 @@ void GammaBetaBackwardDPCPPKernel(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <
-    typename scalar_t,
-    typename accscalar_t,
-    typename IndexType,
-    int vec_size>
-void GroupNormBackwardDPCPPKernel(
-    int64_t N,
-    int64_t C,
-    int64_t HxW,
-    int64_t group,
-    const Tensor& dY,
-    const Tensor& X,
-    const accscalar_t* c1_data,
-    const accscalar_t* c2_data,
-    const accscalar_t* c3_data,
-    Tensor& dX) {
-  int64_t D = C / group;
-  int64_t Plane = C * HxW;
-  int64_t Numel = N * Plane;
-  scalar_t* dY_ptr = dY.data_ptr<scalar_t>();
-  scalar_t* X_ptr = X.data_ptr<scalar_t>();
-  scalar_t* dX_ptr = dX.data_ptr<scalar_t>();
-
-  using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  int total_threads = dpcppMaxWorkItemsPerTile(dev_id);
-  auto local_size = dpcppMaxWorkGroupSize(dev_id);
-
-  IndexType loops_end = (Numel + vec_size - 1) / vec_size;
-  bool channels_last = is_smf_channels_last(X);
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(
-        sycl::nd_range<1>(
-            sycl::range<1>(total_threads), sycl::range<1>(local_size)),
-        [=](sycl::nd_item<1> item_id) {
-          IndexType local_id = item_id.get_global_linear_id();
-          for (IndexType i = local_id; i < loops_end; i += total_threads) {
-            IndexType remaining = Numel - i * vec_size;
-            if (remaining < vec_size) {
-              for (int j = 0; j < remaining; ++j) {
-                IndexType offset = i * vec_size + j;
-
-                IndexType nc, ng;
-                if (channels_last) {
-                  nc = offset / Plane * C + offset % C;
-                  ng = nc / D;
-                } else {
-                  nc = offset / HxW;
-                  ng = nc / D;
-                }
-                dX_ptr[offset] =
-                    c1_data[nc] * static_cast<accscalar_t>(dY_ptr[offset]) +
-                    c2_data[ng] * static_cast<accscalar_t>(X_ptr[offset]) +
-                    c3_data[ng];
-              }
-            } else {
-              IndexType offset = i * vec_size;
-
-              vec_t X_val = *(reinterpret_cast<vec_t*>(X_ptr + offset));
-              vec_t dY_val = *(reinterpret_cast<vec_t*>(dY_ptr + offset));
-              vec_t dX_val;
-#pragma unroll(vec_size)
-              for (int v = 0; v < vec_size; ++v) {
-                IndexType nc, ng;
-                if (channels_last) {
-                  nc = (offset + v) / Plane * C + (offset + v) % C;
-                  ng = nc / D;
-                } else {
-                  nc = (offset + v) / HxW;
-                  ng = nc / D;
-                }
-                dX_val[v] = c1_data[nc] * static_cast<accscalar_t>(dY_val[v]) +
-                    c2_data[ng] * static_cast<accscalar_t>(X_val[v]) +
-                    c3_data[ng];
-              }
-              *(reinterpret_cast<vec_t*>(dX_ptr + offset)) = dX_val;
-            }
-          }
-        });
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-}
-
-template <typename scalar_t, typename accscalar_t>
-void GroupNormBackwardDPCPPKernelImpl(
-    int64_t N,
-    int64_t C,
-    int64_t HxW,
-    int64_t group,
-    int vec_size,
-    const Tensor& dY,
-    const Tensor& X,
-    const accscalar_t* c1_data,
-    const accscalar_t* c2_data,
-    const accscalar_t* c3_data,
-    Tensor& dX) {
-  auto dY_vec_size = at::native::Memory::can_vectorize_up_to<scalar_t>(
-      dpcppGetDeviceIdOfCurrentQueue(), reinterpret_cast<char*>(dY.data_ptr()));
-  auto X_vec_size = at::native::Memory::can_vectorize_up_to<scalar_t>(
-      dpcppGetDeviceIdOfCurrentQueue(), reinterpret_cast<char*>(X.data_ptr()));
-  auto dX_vec_size = at::native::Memory::can_vectorize_up_to<scalar_t>(
-      dpcppGetDeviceIdOfCurrentQueue(), reinterpret_cast<char*>(dX.data_ptr()));
-  vec_size = std::min(vec_size, dY_vec_size);
-  vec_size = std::min(vec_size, X_vec_size);
-  vec_size = std::min(vec_size, dX_vec_size);
-
-  bool can_use_32bit_index =
-      canUse32BitIndexMath(X) && canUse32BitIndexMath(dY);
-#define VecGroupNormBackwardDPCPPKernel(vec_size)                              \
-  {                                                                            \
-    if (can_use_32bit_index) {                                                 \
-      GroupNormBackwardDPCPPKernel<scalar_t, accscalar_t, uint32_t, vec_size>( \
-          N, C, HxW, group, dY, X, c1_data, c2_data, c3_data, dX);             \
-    } else {                                                                   \
-      GroupNormBackwardDPCPPKernel<scalar_t, accscalar_t, uint64_t, vec_size>( \
-          N, C, HxW, group, dY, X, c1_data, c2_data, c3_data, dX);             \
-    }                                                                          \
-    break;                                                                     \
-  }
-
-  switch (vec_size) {
-    case 8: {
-      VecGroupNormBackwardDPCPPKernel(8);
-    }
-    case 4: {
-      VecGroupNormBackwardDPCPPKernel(4);
-    }
-    case 2: {
-      VecGroupNormBackwardDPCPPKernel(2);
-    }
-    case 1: {
-      VecGroupNormBackwardDPCPPKernel(1);
-    }
-  }
-}
-
 template <typename scalar_t, typename weight_t>
 void GroupNormBackwardKernelImplInternal(
     const Tensor& dY,
@@ -923,19 +517,16 @@ void GroupNormBackwardKernelImplInternal(
     Tensor& dbeta,
     std::array<bool, 3> grad_input_mask) {
   using accscalar_t = acc_type<scalar_t>;
-  const int64_t G = group;
   TORCH_CHECK(dY.numel() == N * C * HxW);
   TORCH_CHECK(X.numel() == N * C * HxW);
-  TORCH_CHECK(mean.numel() == N * G);
-  TORCH_CHECK(rstd.numel() == N * G);
+  TORCH_CHECK(mean.numel() == N * group);
+  TORCH_CHECK(rstd.numel() == N * group);
   TORCH_CHECK(!gamma.defined() || gamma.numel() == C);
 
   if (N == 0) {
     return;
   }
 
-  constexpr int SIMD16 = 16;
-  int vec_size = get_vec_size<scalar_t>(N * C * HxW);
   Tensor X_cont = X.contiguous();
   Tensor dY_cont = dY.contiguous();
   const scalar_t* mean_data = mean.data_ptr<scalar_t>();
@@ -951,29 +542,43 @@ void GroupNormBackwardKernelImplInternal(
   Tensor db = at::empty({N, C}, X.options().dtype(kAccType));
   accscalar_t* ds_data = ds.data_ptr<accscalar_t>();
   accscalar_t* db_data = db.data_ptr<accscalar_t>();
-  ComputeInternalGradientsDPCPPKernelImpl<scalar_t, accscalar_t, SIMD16>(
-      N * C, HxW, vec_size, dY_cont, X_cont, ds_data, db_data);
+
+  bool can_use_32bit_index =
+      canUse32BitIndexMath(X_cont) && canUse32BitIndexMath(dY_cont);
+  auto config = NormConfig(N * C, HxW, 1, sizeof(scalar_t));
+  GroupNormBackward<scalar_t, accscalar_t, weight_t> group_norm_backward(
+      X_cont.data_ptr<scalar_t>(),
+      dY_cont.data_ptr<scalar_t>(),
+      ds_data,
+      db_data,
+      N,
+      C,
+      group,
+      HxW);
+  Tensor semaphores, scratchpad;
+  config.template init_global_reduce<accscalar_t>(X, semaphores, scratchpad);
+  RowwiseMomentsDPCPPKernelImpl<
+      scalar_t,
+      accscalar_t,
+      weight_t,
+      GroupNormBackward>(group_norm_backward, config, can_use_32bit_index);
 
   // compute gradient input (dX)
   if (grad_input_mask[0]) {
     Tensor c1 = at::empty({N, C}, X.options().dtype(kAccType));
     accscalar_t* c1_data = c1.data_ptr<accscalar_t>();
     ComputeGradOutputCoeffientDPCPPKernel<scalar_t, weight_t>(
-        N, C, G, rstd_data, gamma_data, c1_data);
+        N, C, group, rstd_data, gamma_data, c1_data);
 
-    Tensor c2 = at::empty({N, G}, X.options().dtype(kAccType));
-    Tensor c3 = at::empty({N, G}, X.options().dtype(kAccType));
+    Tensor c2 = at::empty({N, group}, X.options().dtype(kAccType));
+    Tensor c3 = at::empty({N, group}, X.options().dtype(kAccType));
     accscalar_t* c2_data = c2.data_ptr<accscalar_t>();
     accscalar_t* c3_data = c3.data_ptr<accscalar_t>();
-    ComputeBackwardFusedParamsDPCPPKernel<
-        scalar_t,
-        accscalar_t,
-        weight_t,
-        SIMD16>(
+    ComputeBackwardFusedParamsDPCPPKernel<scalar_t, accscalar_t, weight_t>(
         N,
         C,
         HxW,
-        G,
+        group,
         mean_data,
         rstd_data,
         gamma_data,
@@ -982,7 +587,8 @@ void GroupNormBackwardKernelImplInternal(
         c2_data,
         c3_data);
 
-    if (is_smf_channels_last(X)) {
+    bool is_channels_last = is_smf_channels_last(X);
+    if (is_channels_last) {
       auto smf = X.suggest_memory_format();
       dX = at::empty_like(X, smf);
       X_cont = X;
@@ -990,8 +596,19 @@ void GroupNormBackwardKernelImplInternal(
     } else {
       dX = at::empty_like(X_cont);
     }
-    GroupNormBackwardDPCPPKernelImpl<scalar_t>(
-        N, C, HxW, G, vec_size, dY_cont, X_cont, c1_data, c2_data, c3_data, dX);
+    group_norm_backward.set_eltwise_update_parameter(
+        c1_data,
+        c2_data,
+        c3_data,
+        X_cont.data_ptr<scalar_t>(),
+        dY_cont.data_ptr<scalar_t>(),
+        dX.data_ptr<scalar_t>(),
+        is_channels_last);
+    NormEltwiseUpdateKernelImpl<
+        scalar_t,
+        accscalar_t,
+        weight_t,
+        GroupNormBackward>(group_norm_backward, config, can_use_32bit_index);
   }
 
   // compute gradient weight (dgamma and dbeta)
@@ -1009,7 +626,7 @@ void GroupNormBackwardKernelImplInternal(
     GammaBetaBackwardDPCPPKernel<scalar_t, accscalar_t, weight_t>(
         N,
         C,
-        G,
+        group,
         mean_data,
         rstd_data,
         ds_data,
@@ -1037,7 +654,7 @@ void GroupNormKernelImpl(
       X.scalar_type(),
       "GroupNormKernelImpl",
       [&]() {
-        if (gamma.scalar_type() == kFloat) {
+        if (gamma.defined() && gamma.scalar_type() == kFloat) {
           GroupNormKernelImplInternal<scalar_t, float>(
               X,
               gamma,
@@ -1087,7 +704,7 @@ void GroupNormBackwardKernelImpl(
       X.scalar_type(),
       "GroupNormBackwardKernelImpl",
       [&]() {
-        if (gamma.scalar_type() == kFloat) {
+        if (gamma.defined() && gamma.scalar_type() == kFloat) {
           GroupNormBackwardKernelImplInternal<scalar_t, float>(
               dY,
               X,
