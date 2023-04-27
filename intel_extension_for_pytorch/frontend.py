@@ -30,6 +30,7 @@ import logging
 import threading
 from typing import Callable, Dict, Optional, Union
 import builtins
+import traceback
 
 def _copy_model_and_optimizer(model, optimizer):
     new_model = copy.deepcopy(model)
@@ -474,8 +475,8 @@ def optimize(
         if opt_properties.conv_bn_folding:
             try:
                 optimized_model = optimization.fuse(optimized_model, inplace=inplace)
-            except:  # noqa E722
-                warnings.warn("Conv BatchNorm folding failed during the optimize process.")
+            except Exception as e:
+                traceback.print_exc()
         if opt_properties.linear_bn_folding:
             try:
                 optimized_model = linear_bn_fuse(optimized_model, inplace=inplace)
