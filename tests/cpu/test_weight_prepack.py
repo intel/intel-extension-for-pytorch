@@ -610,7 +610,7 @@ class TestPrepackCases(TestCase):
         # Example taken from GPT-J. The weight loaded from the state_dict is non-contiguous with the below size and stride:
         m.linear.weight = torch.nn.Parameter(copy.deepcopy(m.linear.weight).as_strided([oc, ic], [1, oc]))
         
-        optimized_m = ipex.optimize(m, dtype=dtype, inplace=True)
+        optimized_m = ipex.optimize(m, dtype=dtype, inplace=False)
         with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
             jit_m = torch.jit.trace(optimized_m, x)
             jit_m = torch.jit.freeze(jit_m)

@@ -531,7 +531,7 @@ def optimize(
                         "FP16 weight prepack needs the cpu support avx512_core_fp16, " + \
                         "please set dtype to torch.float or set weights_prepack to False."
             optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
-                optimized_model, optimized_optimizer, params_attr, 'cpu')
+                optimized_model, optimized_optimizer, params_attr, inplace,  'cpu')
             torch._dynamo.allow_in_graph(utils._weight_prepack._IPEXConv2d)
             torch._dynamo.allow_in_graph(utils._weight_prepack._IPEXConvTranspose2d)
             torch._dynamo.allow_in_graph(utils._weight_prepack._IPEXLinear)
@@ -539,7 +539,7 @@ def optimize(
         else:
             assert device_type == 'xpu', "Unknown device type, only support device CPU and XPU"
             optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
-                optimized_model, optimized_optimizer, params_attr, 'xpu')
+                optimized_model, optimized_optimizer, params_attr, inplace,  'xpu')
 
     if opt_properties.graph_mode:
         _old_forward = optimized_model.forward

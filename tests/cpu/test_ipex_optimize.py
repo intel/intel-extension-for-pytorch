@@ -224,11 +224,10 @@ class TestOptimizeCases(TestCase):
             opt_M = ipex.optimize(M, dtype=dtype, level=level, inplace=True)
             # After ConvBN folding,  opt_M will be Graph Module while the M is original nn.Module which they
             # share parameters. But the changes on Graph Module cannot be reflected on original module. So
-            # only the un-opitimized  weight will use same mem buffer with original module.
-            # While dtype = float, ipex.optimize will choose mkl backend and does not prepack weight
+            # only the un-opitimized weight will use same mem buffer with original module.
             if level == "O1":
                 self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
-                self.assertTrue(dtype is torch.float or M.linear.weight.data_ptr() != opt_M.linear.weight.data_ptr())
+                self.assertFalse(hasattr(M.linear, 'weight'))
             # un-optimized part should be inplaced
             self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
 
