@@ -116,7 +116,8 @@ at::Tensor convolution_kernel(
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     int64_t groups,
-    const ideep::attr_t& attr) {
+    const ideep::attr_t& attr,
+    at::MemoryFormat memory_format) {
   // Base convolution kernel, this base kernel will not change input's format,
   // so make sure you has make process the input's format before call this
   // function, the output wil has same format with input.
@@ -132,9 +133,8 @@ at::Tensor convolution_kernel(
 
   at::Tensor output;
   if (input.dim() != 3) {
-    output = at::empty(
-        output_sizes,
-        input.options().memory_format(input.suggest_memory_format()));
+    output =
+        at::empty(output_sizes, input.options().memory_format(memory_format));
   } else {
     // This a temporary workaround before channels last 1D is formally supported
     // in PyTorch. We will force to return nwc output.
@@ -164,7 +164,8 @@ at::Tensor convolution_forward_impl(
     c10::optional<at::IntArrayRef> kernel_size,
     c10::optional<at::IntArrayRef> padding,
     c10::optional<at::IntArrayRef> stride,
-    c10::optional<at::IntArrayRef> dilation) {
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<bool> weight_channels_last) {
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::convolution_forward_impl\n");
 #endif
@@ -385,7 +386,8 @@ at::Tensor IPEXConvolutionOp::_forward(
     c10::optional<at::IntArrayRef> kernel_size,
     c10::optional<at::IntArrayRef> padding,
     c10::optional<at::IntArrayRef> stride,
-    c10::optional<at::IntArrayRef> dilation) {
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<bool> weight_channels_last) {
   at::AutoDispatchBelowADInplaceOrView g;
   RECORD_FUNCTION(
       "IPEXConvolutionOp::_forward", c10::ArrayRef<c10::IValue>({}));
@@ -401,7 +403,8 @@ at::Tensor IPEXConvolutionOp::_forward(
       kernel_size,
       padding,
       stride,
-      dilation);
+      dilation,
+      weight_channels_last);
 }
 
 at::Tensor IPEXConvolutionOp::forward(
@@ -413,7 +416,8 @@ at::Tensor IPEXConvolutionOp::forward(
     c10::optional<at::IntArrayRef> kernel_size,
     c10::optional<at::IntArrayRef> padding,
     c10::optional<at::IntArrayRef> stride,
-    c10::optional<at::IntArrayRef> dilation) {
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<bool> weight_channels_last) {
   RECORD_FUNCTION("IPEXConvolutionOp::forward", c10::ArrayRef<c10::IValue>({}));
 
   at::AutoDispatchBelowADInplaceOrView g;
@@ -432,7 +436,8 @@ at::Tensor IPEXConvolutionOp::forward(
       kernel_size,
       padding,
       stride,
-      dilation);
+      dilation,
+      weight_channels_last);
 }
 
 torch::autograd::variable_list IPEXConvolutionOp::backward(
@@ -463,6 +468,7 @@ torch::autograd::variable_list IPEXConvolutionOp::backward(
       at::Tensor(),
       at::Tensor(),
       at::Tensor(),
+      at::Tensor(),
       at::Tensor()};
 }
 
@@ -474,7 +480,8 @@ at::Tensor convolution_forward(
     c10::optional<at::IntArrayRef> kernel_size,
     c10::optional<at::IntArrayRef> padding,
     c10::optional<at::IntArrayRef> stride,
-    c10::optional<at::IntArrayRef> dilation) {
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<bool> weight_channels_last) {
   if (at::GradMode::is_enabled()) {
     return IPEXConvolutionOp::apply(
         input,
@@ -484,7 +491,8 @@ at::Tensor convolution_forward(
         kernel_size,
         padding,
         stride,
-        dilation);
+        dilation,
+        weight_channels_last);
   }
   return IPEXConvolutionOp::_forward(
       input,
@@ -494,7 +502,8 @@ at::Tensor convolution_forward(
       kernel_size,
       padding,
       stride,
-      dilation);
+      dilation,
+      weight_channels_last);
 }
 
 at::Tensor convolution_forward_meta(
@@ -505,11 +514,12 @@ at::Tensor convolution_forward_meta(
     c10::optional<at::IntArrayRef> kernel_size,
     c10::optional<at::IntArrayRef> padding,
     c10::optional<at::IntArrayRef> stride,
-    c10::optional<at::IntArrayRef> dilation) {
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<bool> weight_channels_last) {
   TORCH_CHECK(
       kernel_size.has_value() && padding.has_value() && stride.has_value() &&
-          dilation.has_value(),
-      "kernel_size, padding, stride and dilation must have value for convolution_forward_meta");
+          dilation.has_value() && weight_channels_last.has_value(),
+      "kernel_size, padding, stride, dilation and weight_channels_last must have value for convolution_forward_meta");
   auto input_size = input.sym_sizes();
   c10::SymDimVector output_sizes = calc_conv_output_size(
       input_size,
@@ -518,6 +528,28 @@ at::Tensor convolution_forward_meta(
       stride.value(),
       dilation.value());
   auto output = at::empty_symint(output_sizes, input.options());
+
+  bool use_channels_last =
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d ||
+      weight_channels_last.value();
+
+  auto memory_format = at::MemoryFormat::Contiguous;
+  if (use_channels_last) {
+    if (input.dim() == 4) {
+      memory_format = at::MemoryFormat::ChannelsLast;
+    } else if (input.dim() == 5) {
+      memory_format = at::MemoryFormat::ChannelsLast3d;
+    }
+  }
+
+  if (!is_channels_last_1d(output)) {
+    output = output.contiguous(memory_format);
+    if (input.dim() == 3) {
+      output = to_channels_last_1d(output);
+    }
+  }
+
   return output;
 }
 
@@ -535,7 +567,8 @@ at::Tensor convolution_forward(
     c10::optional<at::IntArrayRef> kernel_size,
     c10::optional<at::IntArrayRef> padding,
     c10::optional<at::IntArrayRef> stride,
-    c10::optional<at::IntArrayRef> dilation) {
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<bool> weight_channels_last) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::convolution_forward", "")
@@ -551,7 +584,8 @@ at::Tensor convolution_forward(
       kernel_size,
       padding,
       stride,
-      dilation);
+      dilation,
+      weight_channels_last);
 }
 
 } // namespace autocast
@@ -562,7 +596,7 @@ namespace {
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "convolution_forward(Tensor input, Tensor weight, Tensor? bias, "
-      "Tensor W_prepack, int[]? kernel_size, int[]? padding, int[]? stride, int[]? dilation) -> Tensor");
+      "Tensor W_prepack, int[]? kernel_size, int[]? padding, int[]? stride, int[]? dilation, bool? weight_channels_last) -> Tensor");
   m.impl(
       "convolution_forward",
       c10::DispatchKey::Autograd,

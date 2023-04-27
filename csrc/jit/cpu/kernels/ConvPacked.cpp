@@ -695,7 +695,8 @@ at::Tensor run(
       context.padding_,
       context.dilation_,
       context.groups_,
-      attr);
+      attr,
+      memory_format);
 }
 
 at::Tensor& run(

@@ -44,7 +44,8 @@ at::Tensor conv_transpose(
     c10::optional<at::IntArrayRef> output_padding,
     c10::optional<at::IntArrayRef> stride,
     c10::optional<at::IntArrayRef> dilation,
-    c10::optional<int64_t> groups);
+    c10::optional<int64_t> groups,
+    c10::optional<bool> weight_channels_last);
 
 at::Tensor conv_transpose_forward_meta(
     const at::Tensor& input,
@@ -56,7 +57,8 @@ at::Tensor conv_transpose_forward_meta(
     c10::optional<at::IntArrayRef> output_padding,
     c10::optional<at::IntArrayRef> stride,
     c10::optional<at::IntArrayRef> dilation,
-    c10::optional<int64_t> groups);
+    c10::optional<int64_t> groups,
+    c10::optional<bool> weight_channels_last);
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor>
 conv_transpose_backward_kernel_impl(
@@ -87,7 +89,8 @@ class IPEXConvTransposeOp
       c10::optional<at::IntArrayRef> output_padding,
       c10::optional<at::IntArrayRef> stride,
       c10::optional<at::IntArrayRef> dilation,
-      c10::optional<int64_t> groups);
+      c10::optional<int64_t> groups,
+      c10::optional<bool> weight_channels_last);
 
   static at::Tensor forward(
       torch::autograd::AutogradContext* ctx,
@@ -100,7 +103,8 @@ class IPEXConvTransposeOp
       c10::optional<at::IntArrayRef> output_padding,
       c10::optional<at::IntArrayRef> stride,
       c10::optional<at::IntArrayRef> dilation,
-      c10::optional<int64_t> groups);
+      c10::optional<int64_t> groups,
+      c10::optional<bool> weight_channels_last);
 
   static torch::autograd::variable_list backward(
       torch::autograd::AutogradContext* ctx,

@@ -137,7 +137,8 @@ class _IPEXConvNd(nn.Module):
                 self.weight_size,
                 self._real_padding,
                 self.stride,
-                self.dilation)
+                self.dilation,
+                self.weight_channels_last)
         return torch.ops.torch_ipex.convolution_forward(
             x,
             self.weight,
@@ -146,7 +147,8 @@ class _IPEXConvNd(nn.Module):
             self.weight_size,
             self._real_padding,
             self.stride,
-            self.dilation)
+            self.dilation,
+            self.weight_channels_last)
 
 class _IPEXConv1d(_IPEXConvNd):
     def __init__(self, dense_module):
@@ -301,7 +303,8 @@ class _IPEXConvTransposeNd(nn.Module):
             self.output_padding,
             self.stride,
             self.dilation,
-            self.groups)
+            self.groups,
+            self.weight_channels_last)
 
 class _IPEXConvTranspose2d(_IPEXConvTransposeNd):
     def __init__(self, dense_module):
