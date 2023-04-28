@@ -1108,7 +1108,11 @@ class TestFusionPattern(JitLlgaTestCase):
         ]
         graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, int8_bf16=True)
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 4)
-        self.assertFused(graph, ['aten::linear', 'aten::add', 'aten::dequantize'])
+        # TODO: oneDNN primitive raised more limitations to sum post-ops, it forced fusion changes on oneDNN graph side.
+        # The dequant node connected to aten::add can't be fused into the INT8 linear-add partition any more.
+        # oneDNN graph expects no end to end model performance impact.
+        # Revisit this change if validation has found model level regression.
+        self.assertFused(graph, ['aten::linear', 'aten::add'])
         self.checkPatterns(graph, patterns)
 
     def test_linear_gelu_bf16(self):
@@ -1283,7 +1287,11 @@ class TestFusionPattern(JitLlgaTestCase):
 
         graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1)
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
-        self.assertFused(graph, ['aten::_convolution', 'aten::dequantize'])
+        # TODO: oneDNN primitive raised more limitations to sum post-ops, it forced fusion changes on oneDNN graph side.
+        # The dequant node connected to aten::add can't be fused into the INT8 conv-add partition any more.
+        # oneDNN graph expects no end to end model performance impact.
+        # Revisit this change if validation has found model level regression.        
+        self.assertFused(graph, ['aten::_convolution'])
         self.checkPatterns(graph, patterns)        
 
     def test_wildcard(self):
