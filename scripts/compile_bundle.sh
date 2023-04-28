@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
-set -veo pipefail
-# can not use -u, because external env/vars.sh source'ing
+#
+# Please review the system requirements before running this script
+# https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html
+#
+set -ueo pipefail
 
 VER_LLVM="llvmorg-13.0.0"
 VER_PYTORCH="v1.13.1"
 VER_TORCHVISION="v0.14.1"
 VER_TORCHAUDIO="v0.13.1"
 VER_IPEX="xpu-master"
+VER_GCC=11
 
 if [[ $# -lt 2 ]]; then
     echo "Usage: bash $0 <DPCPPROOT> <MKLROOT> [AOT]"
@@ -27,17 +31,15 @@ if [ ! -f ${DPCPP_ENV} ]; then
     echo "DPC++ compiler environment ${DPCPP_ENV} doesn't seem to exist."
     exit 2
 fi
-source ${DPCPP_ENV}
 
 ONEMKL_ENV=${ONEMKL_ROOT}/env/vars.sh
 if [ ! -f ${ONEMKL_ENV} ]; then
     echo "oneMKL environment ${ONEMKL_ENV} doesn't seem to exist."
     exit 3
 fi
-source ${ONEMKL_ENV}
 
 # Check existance of required Linux commands
-for APP in python git patch pkg-config nproc bzip2; do
+for APP in python git patch pkg-config nproc bzip2 gcc g++; do
     command -v $APP || (echo "Error: Command \"${APP}\" not found." ; exit 4)
 done
 
@@ -46,18 +48,12 @@ for LIB_NAME in libpng libjpeg; do
     pkg-config --exists $LIB_NAME || (echo "Error: \"${LIB_NAME}\" not found in pkg-config." ; exit 5)
 done
 
-# set CC if not already defined
-if [ -z "${CC-}" ]; then
-    export CC="$(command -v gcc)" || (echo "Error: gcc not found" ; exit 6)
+if [ $(gcc -dumpversion) -ne $VER_GCC ]; then
+    echo -e '\a'
+    echo "Warning: GCC version ${VER_GCC} is recommended"
+    echo "Found GCC version $(gcc -dumpfullversion)"
+    sleep 5
 fi
-
-if [ $($CC -dumpversion) -ne 11 ]; then
-    echo "Error: GCC version 11 required"
-    exit 7
-fi
-
-# Install python dependency
-python -m pip install cmake astunparse numpy ninja pyyaml mkl-static mkl-include setuptools cffi typing_extensions future six requests dataclasses Pillow
 
 # set number of compile processes, if not already defined
 if [ -z "${MAX_JOBS-}" ]; then
@@ -67,6 +63,12 @@ fi
 # Save current directory path
 BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd ${BASEFOLDER}
+
+# Be verbose now
+set -x
+
+# Install python dependency
+python -m pip install cmake astunparse numpy ninja pyyaml mkl-static mkl-include setuptools cffi typing_extensions future six requests dataclasses Pillow
 
 # Checkout individual components
 if [ ! -d llvm-project ]; then
@@ -133,13 +135,11 @@ git clean -f
 git apply ../intel-extension-for-pytorch/torch_patches/*.patch
 export USE_LLVM=${LLVM_ROOT}
 export LLVM_DIR=${USE_LLVM}/lib/cmake/llvm
+# Ensure cmake can find python packages when using conda or virtualenv
 if [ -n "${CONDA_PREFIX-}" ]; then
     export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(command -v conda))/../"}
 elif [ -n "${VIRTUAL_ENV-}" ]; then
     export CMAKE_PREFIX_PATH=${VIRTUAL_ENV:-"$(dirname $(command -v python))/../"}
-else
-    # TODO not building with conda or virtualenv, what should be set?
-    continue
 fi
 export USE_STATIC_MKL=1
 export _GLIBCXX_USE_CXX11_ABI=1
@@ -161,6 +161,11 @@ cd ../vision
 python setup.py clean
 python setup.py bdist_wheel 2>&1 | tee build.log
 python -m pip install --force-reinstall --no-deps dist/*.whl
+# don't fail on external scripts
+set +uex
+source ${DPCPP_ENV}
+source ${ONEMKL_ENV}
+set -uex
 #  TorchAudio
 cd ../audio
 python -m pip install -r requirements.txt
