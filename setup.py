@@ -103,6 +103,7 @@ import errno
 #FIXME: always set BUILD_WITH_XPU = ON in XPU repo
 os.environ['BUILD_WITH_XPU'] = 'ON'
 
+PACKAGE_NAME = "intel_extension_for_pytorch"
 
 # Define env values
 ON_ENV_VAL = ['ON', 'YES', '1', 'Y']
@@ -173,10 +174,6 @@ def get_version_num():
             sys.exit(1)
     version = versions['VERSION_MAJOR'] + '.' + versions['VERSION_MINOR'] + '.' + versions['VERSION_PATCH']
     return version
-
-
-PACKAGE_NAME = "intel_extension_for_pytorch"
-PYTHON_VERSION = sys.version_info
 
 
 def get_pytorch_install_dir():
@@ -549,8 +546,10 @@ class IPEXCPPLibBuild(build_clib, object):
             'IPEX_INSTALL_LIBDIR'      : os.path.abspath(output_lib_path),
             'CMAKE_PROJECT_VERSION'    : get_version_num(),
             'PYTHON_PLATFORM_INFO'     : platform.platform(),
-            'PYTHON_INCLUDE_DIR'       : sysconfig.get_paths()['include'],
+            'PYTHON_INCLUDE_DIR'       : sysconfig.get_path('include'),
             'PYTHON_EXECUTABLE'        : sys.executable,
+            'PYTHON_BUILD_VERSION'     : sys.version.replace('\n', ''),
+            'PYTHON_VERSION'           : platform.python_version(),
             'IPEX_PROJ_NAME'           : PACKAGE_NAME,
             'LIBIPEX_GITREV'           : ipex_git_sha,
             'LIBIPEX_VERSION'          : ipex_build_version,
@@ -563,6 +562,7 @@ class IPEXCPPLibBuild(build_clib, object):
         # Windows uses Ninja as default generator
         if IS_WINDOWS:
             use_ninja = True
+            build_option_common['PYTHON_LIBRARIES'] = os.path.join(sys.prefix, 'libs', f'python{sysconfig.get_python_version()}.lib')
         sequential_build = False
 
         cmake_common_args = []

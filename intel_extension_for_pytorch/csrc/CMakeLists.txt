@@ -17,24 +17,8 @@ else()
 endif()
 
 if (WINDOWS)
-  # handling python linking
-  # TODO: precise python finding for conda env
-  find_package(Python COMPONENTS Interpreter Development)
-
-  if(NOT DEFINED ${TORCH_PATH})
-    # query torch path from python
-    execute_process(COMMAND python -c "import sys; import torch.utils.cpp_extension; print(torch.utils.cpp_extension.include_paths()[0], file=sys.stderr)" ERROR_VARIABLE TORCH_FIRST_INCLUDE_DIR)
-    get_filename_component(TORCH_ROOT ${TORCH_FIRST_INCLUDE_DIR}/../ ABSOLUTE)
-    set(TORCH_PATH "${TORCH_ROOT}" CACHE FILEPATH "path to pytorch in the python installation")
-    if(NOT (EXISTS ${TORCH_PATH}))
-      message( FATAL_ERROR "Pytorch not found, is it not installed in the python distribution ${PYTHON_DIRECTORY}?")
-    else()
-      message(STATUS "Torch found at ${TORCH_PATH}")
-    endif()
-  endif(NOT DEFINED ${TORCH_PATH})
-  message(STATUS "TORCH PATH: ${TORCH_PATH} ${TORCH_ROOT}")
   # add missing torch_python.lib
-  set(TORCH_LIBRARIES ${TORCH_LIBRARIES} "${TORCH_ROOT}/lib/torch_python.lib")
+  set(TORCH_PYTHON_LIBRARIES ${TORCH_LIBRARIES} "${TORCH_INSTALL_PREFIX}/lib/torch_python.lib")
 endif(WINDOWS)
 
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PYBIND11_CL_FLAGS}")
@@ -77,8 +61,8 @@ if(BUILD_WITH_XPU)
   target_compile_definitions(intel-ext-pt-python PUBLIC "BUILD_WITH_XPU")
   target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-gpu)
   if(WINDOWS)
-    target_link_libraries(intel-ext-pt-python PUBLIC ${Python_LIBRARIES})
-    target_link_libraries(intel-ext-pt-python PUBLIC ${TORCH_LIBRARIES})
+    target_link_libraries(intel-ext-pt-python PUBLIC ${PYTHON_LIBRARIES})
+    target_link_libraries(intel-ext-pt-python PUBLIC ${TORCH_PYTHON_LIBRARIES})
   endif()
 endif()
 
@@ -101,13 +85,16 @@ function (print_python_config_summary)
 
   message(STATUS "  Torch version         : ${Torch_VERSION}")
   message(STATUS "  Torch include         : ${TORCH_INCLUDE_DIRS}")
+if(WINDOWS)
+  message(STATUS "  Torch Python libs     : ${TORCH_PYTHON_LIBRARIES}")
+endif()
 
-  message(STATUS "  Python                : ${Python_FOUND}")
-  message(STATUS "  Python version        : ${Python_VERSION}")
-  message(STATUS "  Python development    : ${Python_Development_FOUND}")
-  message(STATUS "  Python libraries      : ${Python_LIBRARIES}")
+  message(STATUS "  Python version        : ${PYTHON_BUILD_VERSION}")
   message(STATUS "  Python include        : ${PYTHON_INCLUDE_DIR}")
   message(STATUS "  pybind11 include      : ${pybind11_INCLUDE_DIRS}")
+if(WINDOWS)
+  message(STATUS "  Python libraries      : ${PYTHON_LIBRARIES}")
+endif()
 
   message(STATUS "")
   message(STATUS "***********************************")
