@@ -47,6 +47,7 @@ Optimizers are a key part of the training workloads. Intel® Extension for PyTor
    technical_details/optimizer_fusion_gpu
    technical_details/split_sgd
 
+For more detailed information, check `Optimizer Fusion on CPU <technical_details/optimizer_fusion_cpu.md>`_, `Optimizer Fusion on GPU <technical_details/optimizer_fusion_gpu.md>`_ and `Split SGD <technical_details/split_sgd.html>`_.
 
 .. _xpu-memory-management:
 
@@ -65,5 +66,3 @@ For more detailed information, check `Memory Management <technical_details/memor
 
    technical_details/memory_management
 
-
-For more detailed information, check `Optimizer Fusion on CPU <technical_details/optimizer_fusion_cpu.md>`_, `Optimizer Fusion on GPU <technical_details/optimizer_fusion_gpu.md>`_, `Split SGD <technical_details/split_sgd.html>`_ and `Memory Management <technical_details/memory_management.html>`_

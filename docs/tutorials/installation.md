@@ -16,13 +16,14 @@ Verified Hardware Platforms:
 
 |Hardware|OS|Driver|
 |-|-|-|
-|Intel® Data Center GPU Flex Series|Ubuntu 22.04 (Validated), Red Hat 8.6|[Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)|
-|Intel® Data Center GPU Max Series|Red Hat 8.6, Sles 15sp3/sp4 (Validated)|[Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)|
-|Intel® Arc™ A-Series Graphics|Ubuntu 22.04|[Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html)|
-|Intel® Arc™ A-Series Graphics|Windows 11 or Windows 10 21H2 (via WSL2)|[for Windows 11 or Windows 10 21H2](https://www.intel.com/content/www/us/en/download/726609/intel-arc-graphics-windows-dch-driver.html)|
-|CPU (3<sup>rd</sup> and 4<sup>th</sup> Gen of Intel® Xeon® Scalable Processors)|Linux\* distributions with glibc>=2.17. Validated on Ubuntu 18.04.|N/A|
+|Intel® Data Center GPU Flex Series|Ubuntu 22.04 (Validated), Red Hat 8.6|[Stable 602](https://dgpu-docs.intel.com/releases/stable_602_20230323.html)|
+|Intel® Data Center GPU Max Series|Ubuntu 22.04, Red Hat 8.6, Sles 15sp3/sp4 (Validated)|[Stable 602](https://dgpu-docs.intel.com/releases/stable_602_20230323.html)|
+|Intel® Arc™ A-Series Graphics|Ubuntu 22.04|[Stable 602](https://dgpu-docs.intel.com/releases/stable_602_20230323.html)|
+|Intel® Arc™ A-Series Graphics|Windows 11 or Windows 10 21H2 (via WSL2)|[for Windows 11 or Windows 10 21H2](https://www.intel.com/content/www/us/en/download/726609/intel-arc-iris-xe-graphics-whql-windows.html)|
+|CPU (3<sup>rd</sup> and 4<sup>th</sup> Gen of Intel® Xeon® Scalable Processors)|Linux\* distributions with glibc>=2.17. Validated on RHEL 8.|N/A|
 
-- Intel® oneAPI Base Toolkit 2023.0
+- Intel® oneAPI Base Toolkit 2023.1
+- [DPC++ Compiler hotfix](https://registrationcenter-download.intel.com/akdlm/IRC_NAS/89283df8-c667-47b0-b7e1-c4573e37bd3e/2023.1-linux-hotfix.zip)
 - Python 3.7-3.10
 - Verified with GNU GCC 11
 
@@ -32,12 +33,12 @@ Verified Hardware Platforms:
 
 |OS|Instructions for installing Intel GPU Driver|
 |-|-|
-|Linux\*|Refer to the [Installation Guides](https://dgpu-docs.intel.com/installation-guides/index.html) for the latest driver installation for individual Linux\* distributions. When installing the verified [Stable 540](https://dgpu-docs.intel.com/releases/stable_540_20221205.html) driver, use a specific version for component package names, such as `sudo apt-get install intel-opencl-icd=22.43.24595.35`|
-|Windows 11 or Windows 10 21H2 (via WSL2)|Please download drivers for Intel® Arc™ A-Series [for Windows 11 or Windows 10 21H2](https://www.intel.com/content/www/us/en/download/726609/intel-arc-graphics-windows-dch-driver.html). Please note that you would have to follow the rest of the steps in WSL2, but the GPU drivers should be installed on Windows. Besides that, please follow Steps 4 & 5 of the [Installation Guides](https://dgpu-docs.intel.com/installation-guides/ubuntu/ubuntu-jammy-arc.html#step-4-install-run-time-packages) on WSL2 Ubuntu 22.04. |
+|Linux\*|Refer to the [Installation Guides](https://dgpu-docs.intel.com/installation-guides/index.html) for the driver installation on individual Linux\* distributions. When installing the verified driver mentioned in the table above, use the specific version of each component packages mentioned in the installation guide page, such as `sudo apt-get install intel-opencl-icd=<version>`|
+|Windows 11 or Windows 10 21H2 (via WSL2)|Please download drivers for Intel® Arc™ A-Series from the web page mentioned in the table above. Please note that you would have to follow the rest of the steps in WSL2, but the drivers should be installed on Windows. Besides that, please follow Steps 4 & 5 of the [Installation Guides](https://dgpu-docs.intel.com/installation-guides/ubuntu/ubuntu-jammy-arc.html#step-4-install-run-time-packages) on WSL2 Ubuntu 22.04.|
 
 ### Install oneAPI Base Toolkit
 
-Please refer to [Install oneAPI Base Toolkit Packages](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit).
+Please refer to [Install oneAPI Base Toolkit Packages](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html).
 
 Need to install components of Intel® oneAPI Base Toolkit:
  - Intel® oneAPI DPC++ Compiler (`DPCPPROOT` as its installation path)
@@ -45,13 +46,22 @@ Need to install components of Intel® oneAPI Base Toolkit:
 
 Default installation location *{ONEAPI_ROOT}* is `/opt/intel/oneapi` for root account, `${HOME}/intel/oneapi` for other accounts. Generally, `DPCPPROOT` is `{ONEAPI_ROOT}/compiler/latest`, `MKLROOT` is `{ONEAPI_ROOT}/mkl/latest`.
 
-**_NOTE:_** You need to activate oneAPI environment when using Intel® Extension for PyTorch\* on Intel GPU.
+A DPC++ compiler patch is required to use with oneAPI Basekit 2023.1.0. Use the command below to download the patch package.
 
 ```bash
-source {ONEAPI_ROOT}/setvars.sh
+wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/89283df8-c667-47b0-b7e1-c4573e37bd3e/2023.1-linux-hotfix.zip
 ```
 
-**_NOTE:_** You need to activate ONLY DPC++ compiler and oneMKL environment when compiling Intel® Extension for PyTorch\* from source on Intel GPU.
+You can either follow instructions in the `README.txt` of the patch package, or use the commands below to install the patch.
+
+```bash
+unzip 2023.1-linux-hotfix.zip
+cd 2023.1-linux-hotfix
+source {ONEAPI_ROOT}/setvars.sh
+bash installpatch.sh
+```
+
+If later on you are not using the environment of the patch installation, you need to activate ONLY DPC++ compiler and oneMKL environment later on when no matter **_compiling_** or **_using_** Intel® Extension for PyTorch\* on Intel GPUs.
 
 ```bash
 source {DPCPPROOT}/env/vars.sh
@@ -64,7 +74,7 @@ Intel® Extension for PyTorch\* has to work with a corresponding version of PyTo
 
 |PyTorch Version|Extension Version|
 |--|--|
-|[v1.13.\*](https://github.com/pytorch/pytorch/tree/v1.13.0) (patches needed)|[v1.13.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.13.10+xpu)|
+|[v1.13.\*](https://github.com/pytorch/pytorch/tree/v1.13.1) (patches needed)|[v1.13.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.13.120+xpu)|
 |[v1.10.\*](https://github.com/pytorch/pytorch/tree/v1.10.0) (patches needed)|[v1.10.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.10.200+gpu)|
 
 ## Install via wheel files
@@ -73,6 +83,7 @@ Prebuilt wheel files availability matrix for Python versions:
 
 | Extension Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 | Python 3.10 |
 | :--: | :--: | :--: | :--: | :--: | :--: |
+| 1.13.120+xpu |  | ✔️ | ✔️ | ✔️ | ✔️ |
 | 1.13.10+xpu |  | ✔️ | ✔️ | ✔️ | ✔️ |
 | 1.10.200+gpu | ✔️ | ✔️ | ✔️ | ✔️ |  |
 
@@ -82,15 +93,13 @@ Prebuilt wheel files for generic Python\* and Intel® Distribution for Python\* 
 
 ```bash
 # General Python*
-python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 intel_extension_for_pytorch==1.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
+python -m pip install torch==1.13.0a0+git6c9b55e torchvision==0.14.1a0 intel_extension_for_pytorch==1.13.120+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
 
 # Intel® Distribution for Python*
-python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 intel_extension_for_pytorch==1.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu-idp
+python -m pip install torch==1.13.0a0+git6c9b55e torchvision==0.14.1a0 intel_extension_for_pytorch==1.13.120+xpu -f https://developer.intel.com/ipex-whl-stable-xpu-idp
 ```
 
 **Note:** Wheel files for Intel® Distribution for Python\* only supports Python 3.9. The support starts from 1.13.10+xpu.
-
-**Note:** Please install Numpy 1.22.3 under Intel® Distribution for Python\*.
 
 **Note:** Installation of TorchVision is optional.
 
@@ -111,7 +120,7 @@ Please refer to [AOT documentation](./AOT.md) for how to configure `USE_AOT_DEVL
 To ensure a smooth compilation of the bundle, including PyTorch\*, torchvision, torchaudio, Intel® Extension for PyTorch\*, a script is provided in the Github repo. If you would like to compile the binaries from source, it is highly recommended to utilize this script.
 
 ```bash
-$ wget https://github.com/intel/intel-extension-for-pytorch/blob/xpu-master/scripts/compile_bundle.sh
+$ wget https://raw.githubusercontent.com/intel/intel-extension-for-pytorch/xpu-master/scripts/compile_bundle.sh
 $ bash compile_bundle.sh <DPCPPROOT> <MKLROOT> [AOT]
   DPCPPROOT and MKLROOT are mandatory, should be absolute or relative path to the root directory of DPC++ compiler and oneMKL respectively.
   AOT is optional, should be the text string for environment variable USE_AOT_DEVLIST.

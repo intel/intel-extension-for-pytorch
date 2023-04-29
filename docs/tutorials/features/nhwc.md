@@ -162,7 +162,7 @@ The general guideline has been listed under reference [Writing-memory-format-awa
 
 ### b. Register oneDNN Kernel on Channels Last
 
-Registering a oneDNN kernel under Channels Last memory format on CPU is no different from [cuDNN](https://github.com/pytorch/pytorch/pull/23861): Only very few upper level changes are needed, such as accommodate 'contiguous()' to 'contiguous(suggested_memory_format)'. The automatic reorder of oneDNN weight shall been hidden in ideep.
+Registering a oneDNN kernel under Channels Last memory format on CPU is no different from [cuDNN](https://github.com/pytorch/pytorch/pull/23861): Only very few upper level changes are needed, such as accommodate 'contiguous()' to 'contiguous(suggested_memory_format)'. The automatic reorder of oneDNN weight shall have been hidden in ideep.
 
 ## oneDNN NHWC APIs
 
