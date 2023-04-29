@@ -91,7 +91,7 @@ Use cases that had already been optimized by Intel engineers are available at [M
 
 ## License
 
-_Apache License_, Version _2.0_. As found in [LICENSE](https://github.com/intel/intel-extension-for-pytorch/blob/master/LICENSE.txt) file.
+_Apache License_, Version _2.0_. As found in [LICENSE](https://github.com/intel/intel-extension-for-pytorch/blob/master/LICENSE) file.
 
 ## Security
 
