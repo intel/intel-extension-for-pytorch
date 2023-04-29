@@ -32,12 +32,28 @@ python setup.py install
 
 Installation for GPU:
 
+- Clone the `oneccl_bindings_for_pytorch`
+
 ```bash
-git clone https://github.com/intel/torch-ccl.git -b v1.13.100+gpu
+git clone https://github.com/intel/torch-ccl.git -b v1.13.200+gpu
 cd torch-ccl
 git submodule sync 
 git submodule update --init --recursive
-BUILD_NO_ONECCL_PACKAGE=ON COMPUTE_BACKEND=dpcpp python setup.py install
+```
+
+- Install `oneccl_bindings_for_pytorch`
+
+Option 1: build with oneCCL from third party (recommended)
+
+```bash
+COMPUTE_BACKEND=dpcpp python setup.py install
+```
+
+Option 2: build without oneCCL and use oneCCL in system
+
+```bash
+export INTELONEAPIROOT=${HOME}/intel/oneapi
+USE_SYSTEM_ONECCL=ON COMPUTE_BACKEND=dpcpp python setup.py install
 ```
 
 #### Install from prebuilt wheel:
