@@ -16,15 +16,6 @@
 using namespace dnnl;
 using namespace xpu::dpcpp;
 
-#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                           \
-  {                                                                    \
-    auto q = dnnl::sycl_interop::get_queue((stream));                  \
-    DPCPP_EXT_SUBMIT(                                                  \
-        (q),                                                           \
-        "onednn_kernel",                                               \
-        dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__)); \
-  }
-
 namespace xpu {
 namespace oneDNN {
 

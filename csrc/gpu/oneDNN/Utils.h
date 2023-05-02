@@ -10,12 +10,21 @@
 #include <tensor/Context.h>
 #include <utils/Macros.h>
 #include <utils/Settings.h>
+
 using namespace dnnl;
+
+#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                           \
+  {                                                                    \
+    auto q = dnnl::sycl_interop::get_queue((stream));                  \
+    DPCPP_EXT_SUBMIT(                                                  \
+        (q),                                                           \
+        "onednn_kernel",                                               \
+        dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__)); \
+  }
 
 // FIXME: In some cases, for example, concat, reorder, and etc.
 // oneDNN only supports dims <= 6 for now.
 #define MAX_ONEDNN_SUPPORTED_DIMS 6
-#define ONEDNN_SCALES_MASK_BY_CHANNEL(x) (1 << x)
 
 namespace xpu {
 namespace oneDNN {
