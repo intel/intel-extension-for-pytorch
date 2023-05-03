@@ -882,4 +882,8 @@ setup(
     ext_modules=ext_modules,
     cmdclass=cmdclass,
     entry_points=entry_points,
+    license='https://www.apache.org/licenses/LICENSE-2.0',
+    classifiers=[
+        'License :: OSI Approved :: Apache Software License',
+    ],
     )
