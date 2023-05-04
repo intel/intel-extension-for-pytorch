@@ -175,8 +175,19 @@ PyObject* THPModule_getCurrentStream_wrap(
   THPUtils_assert(
       THPUtils_checkLong(device_index), "invalid argument to getCurrentStream");
   int64_t device = THPUtils_unpackLong(device_index);
-  return PyLong_FromUnsignedLongLong(
-      xpu::dpcpp::getCurrentDPCPPStream(device).pack());
+  auto stream = xpu::dpcpp::getCurrentDPCPPStream(device);
+  PyObject* output_tuple = PyTuple_New(3);
+  PyTuple_SetItem(
+      output_tuple, 0, THPUtils_packInt64(static_cast<int64_t>(stream.id())));
+  PyTuple_SetItem(
+      output_tuple,
+      1,
+      THPUtils_packInt64(static_cast<int64_t>(stream.device_index())));
+  PyTuple_SetItem(
+      output_tuple,
+      2,
+      THPUtils_packInt64(static_cast<int64_t>(stream.device_type())));
+  return output_tuple;
   END_HANDLE_TH_ERRORS
 }
 

@@ -304,7 +304,8 @@ def set_stream(stream: Stream):
     """
     if stream is None:
         return
-    intel_extension_for_pytorch._C._setCurrentStream(stream._cdata)
+    intel_extension_for_pytorch._C._setCurrentStream(
+        stream_id=stream.stream_id, device_index=stream.device_index, device_type=stream.device_type)
 
 
 def current_stream(device: Optional[_device_t] = None) -> Stream:

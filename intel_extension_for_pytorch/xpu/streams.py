@@ -4,8 +4,12 @@ import intel_extension_for_pytorch
 
 class Stream(intel_extension_for_pytorch._C._XPUStreamBase):
     def __new__(cls, device=None, priority=0, **kwargs):
-        with intel_extension_for_pytorch.xpu.device(device):
+        # setting device manager is expensive, so we avoid it unless necessary
+        if device is None or ("stream_id" in kwargs and "device_index" in kwargs):
             return super(Stream, cls).__new__(cls, priority=priority, **kwargs)
+        else:
+            with intel_extension_for_pytorch.xpu.device(device):
+                return super(Stream, cls).__new__(cls, priority=priority, **kwargs)
 
     @property
     def _as_parameter_(self):
