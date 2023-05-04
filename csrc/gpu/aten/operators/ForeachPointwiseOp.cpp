@@ -91,8 +91,8 @@ namespace AtenIpexTypeXPU {
         });                                                                \
   }
 
-FOREACH_MAXIMUM_MINIMUM_OP(maximum, >);
-FOREACH_MAXIMUM_MINIMUM_OP(minimum, <);
+// FOREACH_MAXIMUM_MINIMUM_OP(maximum, >);
+// FOREACH_MAXIMUM_MINIMUM_OP(minimum, <);
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

@@ -64,7 +64,7 @@ supported:
   - _reshape_alias  # newly added
   - _segment_reduce_backward
   - _sample_dirichlet
-  - _scaled_dot_product_attention_forward
+  # - _scaled_dot_product_attention_forward
   - _softmax.out
   - _softmax_backward_data.out
   - _linalg_svd.U
@@ -424,7 +424,7 @@ supported:
   - nan_to_num.out
   - nanmedian
   - nanmedian.dim_values
-  - narrow_copy
+  # - narrow_copy
   - native_batch_norm
   - native_batch_norm.out
   - native_batch_norm_backward
@@ -761,10 +761,10 @@ supported:
   - _foreach_neg
   - _foreach_neg_
   - _foreach_zero_
-  - _foreach_maximum.List
-  - _foreach_maximum_.List
-  - _foreach_minimum.List
-  - _foreach_minimum_.List
+  # - _foreach_maximum.List
+  # - _foreach_maximum_.List
+  # - _foreach_minimum.List
+  # - _foreach_minimum_.List
   - _foreach_addcdiv.Scalar
   - _foreach_addcdiv_.Scalar
   - _foreach_addcmul.Scalar

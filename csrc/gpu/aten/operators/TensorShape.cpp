@@ -20,13 +20,13 @@ Tensor view(const Tensor& self, IntArrayRef size) {
   return at::native::view(self, size);
 }
 
-Tensor narrow_copy(
-    const Tensor& self,
-    int64_t dim,
-    int64_t start,
-    int64_t length) {
-  return at::native::narrow_copy_dense(self, dim, start, length);
-}
+// Tensor narrow_copy(
+//     const Tensor& self,
+//     int64_t dim,
+//     int64_t start,
+//     int64_t length) {
+//   return at::native::narrow_copy_dense(self, dim, start, length);
+// }
 
 Tensor unfold(
     const Tensor& self,
@@ -66,13 +66,13 @@ Tensor as_strided(
   return at::native::as_strided_qtensorimpl(self, size, stride, storage_offset);
 }
 
-const Tensor& as_strided_(
-    const Tensor& self,
-    IntArrayRef size,
-    IntArrayRef stride,
-    optional<int64_t> storage_offset_) {
-  return at::native::as_strided_(self, size, stride, storage_offset_);
-}
+// const Tensor& as_strided_(
+//     const Tensor& self,
+//     IntArrayRef size,
+//     IntArrayRef stride,
+//     optional<int64_t> storage_offset_) {
+//   return at::native::as_strided_(self, size, stride, storage_offset_);
+// }
 
 Tensor& transpose_(Tensor& self, int64_t dim0, int64_t dim1) {
   return at::native::transpose_(self, dim0, dim1);

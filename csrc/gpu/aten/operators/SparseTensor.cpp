@@ -161,30 +161,30 @@ void coalesce_values_kernel(
 }
 } // namespace impl
 
-Tensor _sparse_coo_tensor_with_dims_and_tensors(
-    int64_t sparse_dim,
-    int64_t dense_dim,
-    IntArrayRef size,
-    const Tensor& indices,
-    const Tensor& values,
-    c10::optional<at::ScalarType> dtype,
-    c10::optional<at::Layout> layout,
-    c10::optional<at::Device> device,
-    c10::optional<bool> pin_memory) {
-  TensorOptions options =
-      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
-          pin_memory);
-  return at::native::new_with_dims_and_tensor_sparse(
-      sparse_dim,
-      dense_dim,
-      size,
-      indices,
-      values,
-      options.dtype().toScalarType(),
-      options.layout(),
-      options.device(),
-      options.pinned_memory());
-}
+// Tensor _sparse_coo_tensor_with_dims_and_tensors(
+//     int64_t sparse_dim,
+//     int64_t dense_dim,
+//     IntArrayRef size,
+//     const Tensor& indices,
+//     const Tensor& values,
+//     c10::optional<at::ScalarType> dtype,
+//     c10::optional<at::Layout> layout,
+//     c10::optional<at::Device> device,
+//     c10::optional<bool> pin_memory) {
+//   TensorOptions options =
+//       TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
+//           pin_memory);
+//   return at::native::new_with_dims_and_tensor_sparse(
+//       sparse_dim,
+//       dense_dim,
+//       size,
+//       indices,
+//       values,
+//       options.dtype().toScalarType(),
+//       options.layout(),
+//       options.device(),
+//       options.pinned_memory());
+// }
 
 Tensor empty(
     IntArrayRef size,
