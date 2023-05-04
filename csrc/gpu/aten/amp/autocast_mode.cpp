@@ -565,8 +565,6 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
   KERNEL_XPU(
       ADD_NS(pow), "pow.Scalar", Tensor(const Scalar&, const Tensor&), fp32)
   KERNEL_XPU(
-      ADD_NS(frobenius_norm), "frobenius_norm", Tensor(const Tensor&), fp32)
-  KERNEL_XPU(
       ADD_NS(frobenius_norm),
       "frobenius_norm.dim",
       Tensor(const Tensor&, IntArrayRef, bool),
