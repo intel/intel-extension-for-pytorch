@@ -562,7 +562,7 @@ class IPEXCPPLibBuild(build_clib, object):
         # Windows uses Ninja as default generator
         if IS_WINDOWS:
             use_ninja = True
-            build_option_common['PYTHON_LIBRARIES'] = os.path.join(sys.prefix, 'libs', f'python{sysconfig.get_python_version()}.lib')
+            build_option_common['PYTHON_LIBRARIES'] = os.path.join(sys.prefix, 'libs', f'python{sys.version_info.major}{sys.version_info.minor}.lib')
         sequential_build = False
 
         cmake_common_args = []
