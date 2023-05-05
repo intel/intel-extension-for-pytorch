@@ -49,24 +49,13 @@ void linear_kernel_output(
   if (bias.defined()) {
     auto bias_ = self.is_contiguous() ? bias : bias.contiguous();
     const ideep::tensor mkldnn_bias = itensor_view_from_dense(bias_);
-    ideep::inner_product_forward::compute(
-        mkldnn_input,
-        mkldnn_weight,
-        mkldnn_bias,
-        mkldnn_output,
-        ideep::scale_t(),
-        ideep::scale_t(),
-        ideep::scale_t(),
-        attr);
+    ideep::inner_product_forward::
+        compute</*reorder_src=*/false, /*reorder_weight=*/false>(
+            mkldnn_input, mkldnn_weight, mkldnn_bias, mkldnn_output, attr);
   } else {
-    ideep::inner_product_forward::compute(
-        mkldnn_input,
-        mkldnn_weight,
-        mkldnn_output,
-        ideep::scale_t(),
-        ideep::scale_t(),
-        ideep::scale_t(),
-        attr);
+    ideep::inner_product_forward::
+        compute</*reorder_src=*/false, /*reorder_weight=*/false>(
+            mkldnn_input, mkldnn_weight, mkldnn_output, attr);
   }
   if (self.dim() != 2) {
     output = output.reshape(output_size);
