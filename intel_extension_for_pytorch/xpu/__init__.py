@@ -24,11 +24,8 @@ from .random import *
 from .memory import *
 
 from .overrides import (
-    set_default_tensor_type as set_default_tensor_type,
-    enable_cl_to as enable_cl_to,
     override_tensor_totype,
-    override_assert_equal,
-    WrapAPI
+    override_assert_equal
     )
 
 from .generator import Generator
