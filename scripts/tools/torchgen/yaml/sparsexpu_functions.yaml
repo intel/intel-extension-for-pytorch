@@ -21,3 +21,4 @@ supported:
   - add.Tensor
   - add_.Tensor
   - add.out
+  - _to_dense

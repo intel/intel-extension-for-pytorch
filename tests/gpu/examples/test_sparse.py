@@ -52,3 +52,12 @@ class TestTorchMethod(TestCase):
             self.assertEqual(x_cpu, x_xpu.cpu())
             self.assertEqual(x_cpu.dim(), x_xpu.dim())
 
+    def test_sparse_dense_convert(self):
+        i = torch.LongTensor([[2,4]])
+        v = torch.FloatTensor([[1,3], [5,7]])
+        x = torch.sparse.FloatTensor(i, v).to_dense()
+        i_xpu = i.to("xpu")
+        v_xpu = v.to("xpu")
+        x_xpu = torch.sparse.FloatTensor(i_xpu, v_xpu).to_dense()
+        self.assertEqual(x, x_xpu.cpu())
+
