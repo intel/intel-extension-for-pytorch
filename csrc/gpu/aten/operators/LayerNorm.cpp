@@ -110,7 +110,7 @@ class LayerNormForward : public NormForward<scalar_t, accscalar_t, weight_t> {
       if (local_id == 0) {
         NF::reduce_project(item_id, sum1, sum2, cfg);
       }
-      item_id.barrier(dpcpp_local_fence);
+      item_id.barrier(dpcpp_global_fence);
     }
 
     scalar_t mean_val = NF::mean_data[group_id];

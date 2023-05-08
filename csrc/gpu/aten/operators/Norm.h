@@ -121,9 +121,12 @@ static void norm_global_reduce(
     auto idx = group_id * workgroup_num_foreach * 2 + group_id_foreach;
     scratchpad_ptr[idx] = sum1;
     scratchpad_ptr[workgroup_num_foreach + idx] = sum2;
+  }
+  item_id.barrier(dpcpp_global_fence);
 
+  if (local_id == 0) {
     dpcpp_atomic_ref_rlx_dev_global_t<int> count(semaphores_ptr[group_id]);
-    int prev_groups_finished = count.fetch_add(1, dpcpp_mem_odr_acq_rel);
+    int prev_groups_finished = count.fetch_add(1);
     last_workgroup[0] = (prev_groups_finished == workgroup_num_foreach - 1);
   }
   item_id.barrier(dpcpp_local_fence);
