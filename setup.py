@@ -75,12 +75,14 @@ from __future__ import print_function
 from distutils.command.build_py import build_py
 from distutils.command.install import install
 from distutils.cmd import Command
+from distutils.version import LooseVersion
 from functools import lru_cache
 from subprocess import check_call, check_output
 from setuptools.command.build_clib import build_clib
 from setuptools.command.egg_info import egg_info
 from setuptools import setup, distutils
 from pathlib import Path
+from typing import Any, Optional
 
 import sysconfig
 import distutils.ccompiler
@@ -196,16 +198,54 @@ def _build_installation_dependency():
     return install_requires
 
 
+def which(thefile: str) -> Optional[str]:
+    path = os.environ.get("PATH", os.defpath).split(os.pathsep)
+    for d in path:
+        fname = os.path.join(d, thefile)
+        fnames = [fname]
+        if sys.platform == "win32":
+            exts = os.environ.get("PATHEXT", "").split(os.pathsep)
+            fnames += [fname + ext for ext in exts]
+        for name in fnames:
+            if os.access(name, os.F_OK | os.X_OK) and not os.path.isdir(name):
+                return name
+    return None
+
+
 def get_cmake_command():
     if platform.system() == 'Windows':
         return 'cmake'
-    if shutil.which('cmake3') is not None:
-        return 'cmake3'
-    if shutil.which('cmake') is not None:
-        return 'cmake'
-    else:
-        raise RuntimeError('no cmake or cmake3 found')
+    def _get_version(cmd: Optional[str]) -> Any:
+        "Returns cmake version."
+        if cmd is None:
+            return None
+        for line in check_output([cmd, "--version"]).decode("utf-8").split("\n"):
+            if "version" in line:
+                 return LooseVersion(line.strip().split(" ")[2])
+        raise RuntimeError("no version found")
 
+    cmake3_version = _get_version(which("cmake3"))
+    cmake_version = _get_version(which("cmake"))
+
+    _cmake_min_version = LooseVersion("3.13.0")
+    if all(
+        (
+            ver is None or ver < _cmake_min_version
+            for ver in [cmake_version, cmake3_version]
+        )
+    ):
+        raise RuntimeError("Require cmake or cmake3 3.13.0 or higher but not found")
+
+    if cmake3_version is None:
+        cmake_command = "cmake"
+    elif cmake_version is None:
+        cmake_command = "cmake3"
+    else:
+        if cmake3_version >= cmake_version:
+            cmake_command = "cmake3"
+        else:
+            cmake_command = "cmake"
+    return cmake_command
 
 def get_cpack_command():
     if platform.system() == 'Windows':
