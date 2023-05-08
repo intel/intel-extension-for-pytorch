@@ -25,7 +25,8 @@ class TestEMB(TestCase):
         per_sample_weights=None,
         padding_idx=None,
         include_last_offset=False,
-        sparse=True
+        sparse=True,
+        test_int32=False
     ):
         aten_emb = nn.EmbeddingBag(
             10, 33, mode=mode, sparse=sparse,
@@ -36,13 +37,15 @@ class TestEMB(TestCase):
         ipex_emb = copy.deepcopy(aten_emb)
         bf16_emb = copy.deepcopy(aten_emb).bfloat16()
         # a batch of 2 samples of 4 indices each
-        input = torch.LongTensor([1,2,4,5,4,3,2,9])
+
+        tensor_create_fn = torch.IntTensor if test_int32 else torch.LongTensor
+        input = tensor_create_fn([1,2,4,5,4,3,2,9])
         if per_sample_weights is not None:
             per_sample_weights = torch.rand_like(input.float())
         if include_last_offset:
-            offsets = torch.LongTensor([0, 4, 8])
+            offsets = tensor_create_fn([0, 4, 8])
         else:
-            offsets = torch.LongTensor([0, 4])
+            offsets = tensor_create_fn([0, 4])
         # aten path
         torch.embedding_bag = aten_emb_fn
         aten_out = aten_emb(input, offsets, per_sample_weights)
@@ -77,17 +80,15 @@ class TestEMB(TestCase):
 
     def test_emb_fallback_path(self):
         self._test_emb(mode='mean')
-        for options in itertools.product([2, None], [True, None], [True, False], [True, False]):
-            padding_idx, per_sample_weights, include_last_offset, sparse = options
-            if per_sample_weights == None and padding_idx == None:
-                # covered by test_emb_fast_path
-                continue
+        for options in itertools.product([2, None], [True, None], [True, False], [True, False], [True, False]):
+            padding_idx, per_sample_weights, include_last_offset, sparse, test_int32 = options
             self._test_emb(
                 mode='sum',
                 per_sample_weights=per_sample_weights,
                 padding_idx=padding_idx,
                 include_last_offset=include_last_offset,
-                sparse=sparse
+                sparse=sparse,
+                test_int32=test_int32
             )
 
     def test_emb_fast_path(self):
