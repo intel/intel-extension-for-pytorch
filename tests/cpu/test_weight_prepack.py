@@ -40,70 +40,6 @@ def get_rand_seed():
     return int(time.time() * 1000000000)
 
 class TestPrepackCases(TestCase):
-    def _test_convolution_inference_base(self, dim):
-        class ConvNd(torch.nn.Module):
-            def __init__(self, dim, in_channels, out_channels, kernel_size, stride, padding, dilation, bias, groups, padding_mode):
-                super(ConvNd, self).__init__()
-                self.conv = conv_module[dim](in_channels, out_channels, kernel_size=kernel_size, stride=stride,
-                        padding=padding, dilation=dilation, bias=bias, groups=groups, padding_mode=padding_mode)
-
-            def forward(self, x):
-                return self.conv(x)
-        input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
-        padding_modes = ['zeros', 'reflect']
-        if dim == 2:
-            channels_last = torch.channels_last
-        elif dim == 3:
-            channels_last = torch.channels_last_3d
-        if dim == 1:
-            options = itertools.product([True, False], [1, 2], [1, 4], [True, False], [torch.contiguous_format], padding_modes)
-        else:
-            options = itertools.product([True, False], [1, 2], [1, 4], [True, False], [torch.contiguous_format, channels_last], padding_modes)
-
-        for bias, dilation, groups, feed_sample_input, memory_format, padding_mode in options:
-            N = torch.randint(1, 10, (1,)).item()
-            M = torch.randint(1, 3, (1,)).item() * groups
-            C = torch.randint(1, 3, (1,)).item() * groups
-            x_shape = (N, C) + input_shapes[dim]
-            x = torch.randn(x_shape, dtype=torch.float32)
-            model = ConvNd(
-                dim=dim,
-                in_channels=C,
-                out_channels=M,
-                kernel_size=3,
-                stride=2,
-                padding=1,
-                dilation=dilation,
-                bias=bias,
-                groups=groups,
-                padding_mode=padding_mode).float().eval()
-            model = model.to(memory_format=memory_format)
-            x = x.to(memory_format=memory_format)
-            if dim == 1:
-                x_nwc = to_channels_last_1d(copy.deepcopy(x))
-                model = to_channels_last_1d(model)
-            if feed_sample_input:
-                ipex_model = ipex.optimize(model, dtype=torch.float32, level='O1', sample_input=x)
-            else:
-                ipex_model = ipex.optimize(model, dtype=torch.float32, level='O1')
-            y_ipex = ipex_model(x)
-            y = model(x)
-            self.assertEqual(y, y_ipex)
-            if dim == 1:
-                y_ipex_nwc = ipex_model(x_nwc)
-                self.assertEqual(y_ipex, y_ipex_nwc)
-                self.assertTrue(is_contiguous_channels_last_1d(y_ipex))
-                self.assertTrue(is_contiguous_channels_last_1d(y_ipex_nwc))
-
-    def test_conv1d_inference(self):
-        self._test_convolution_inference_base(dim=1)
-
-    def test_conv2d_inference(self):
-        self._test_convolution_inference_base(dim=2)
-
-    def test_conv3d_inference(self):
-        self._test_convolution_inference_base(dim=3)
-
     def test_channels_last_1d_forward(self):
         class Conv1d(torch.nn.Module):
             def __init__(self, in_channels, out_channels, kernel_size, stride, padding, bias):
@@ -142,6 +78,14 @@ class TestPrepackCases(TestCase):
             self.assertTrue(is_contiguous_channels_last_1d(y_ipex_nwc))
 
     def _test_convolution_base(self, dim, dtype, is_train, rtol=None, atol=None):
+        class ConvNd(torch.nn.Module):
+            def __init__(self, dim, in_channels, out_channels, kernel_size, stride, padding, dilation, bias, groups, padding_mode):
+                super(ConvNd, self).__init__()
+                self.conv = conv_module[dim](in_channels, out_channels, kernel_size=kernel_size, stride=stride,
+                        padding=padding, dilation=dilation, bias=bias, groups=groups, padding_mode=padding_mode)
+
+            def forward(self, x):
+                return self.conv(x)
         input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
         channels_last = torch.channels_last if dim ==2 else torch.channels_last_3d
         padding_modes = ['zeros', 'reflect']
@@ -160,7 +104,8 @@ class TestPrepackCases(TestCase):
             x_shape = (N, C) + input_shapes[dim]
             x = torch.randn(x_shape, dtype=torch.float32).to(dtype=dtype).float()
 
-            model = conv_module[dim](
+            model = ConvNd(
+                dim=dim,
                 in_channels=C,
                 out_channels=M,
                 kernel_size=3,
@@ -215,8 +160,8 @@ class TestPrepackCases(TestCase):
                         ipex_model1 = ipex.optimize(origin_model1, dtype=dtype, level='O1')
                         ipex_model2 = ipex.optimize(origin_model2, dtype=dtype, level='O1', inplace=True)
             if is_train or dtype == torch.float16:
-                self.assertTrue(ipex_model1.weight.dtype == dtype)
-                self.assertTrue(ipex_model2.weight.dtype == dtype)
+                self.assertTrue(ipex_model1.conv.weight.dtype == dtype)
+                self.assertTrue(ipex_model2.conv.weight.dtype == dtype)
 
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                 # original fp32 path
@@ -225,6 +170,13 @@ class TestPrepackCases(TestCase):
                 y2 = ipex_model1(x2)
                 # ipex path with inplace=True
                 y3 = ipex_model2(x3)
+                if dim == 1:
+                    x4 = to_channels_last_1d(copy.deepcopy(x2))
+                    y4 = ipex_model1(x4)
+                    self.assertEqual(y1, y4, rtol=rtol, atol=atol)
+                    self.assertTrue(is_contiguous_channels_last_1d(y2))
+                    self.assertTrue(is_contiguous_channels_last_1d(y3))
+                    self.assertTrue(is_contiguous_channels_last_1d(y4))
 
             if is_train:
                 grad_x = torch.randn(y1.shape, dtype=torch.float32).to(dtype=dtype).float()
@@ -251,8 +203,8 @@ class TestPrepackCases(TestCase):
                 self.assertEqual(x1.grad, x2.grad, rtol=rtol, atol=atol)
                 self.assertEqual(x1.grad, x3.grad, rtol=rtol, atol=atol)
             if bias and is_train:
-                self.assertEqual(origin_model1.bias.grad.float(), ipex_model1.bias.grad.float(), rtol=rtol, atol=atol)
-                self.assertEqual(origin_model1.bias.grad.float(), ipex_model2.bias.grad.float(), rtol=rtol, atol=atol)
+                self.assertEqual(origin_model1.conv.bias.grad.float(), ipex_model1.conv.bias.grad.float(), rtol=rtol, atol=atol)
+                self.assertEqual(origin_model1.conv.bias.grad.float(), ipex_model2.conv.bias.grad.float(), rtol=rtol, atol=atol)
 
             # compare origin_model parameters with origin_model parameters after grad updata
             origin_model_state = origin_model1.state_dict()
