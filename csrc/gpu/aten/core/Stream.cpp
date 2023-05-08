@@ -178,21 +178,14 @@ void deviceSynchronize(DeviceIndex device_index) {
     device_index = xpu::dpcpp::current_device();
   check_device_index(device_index);
   dpcppInitDeviceQueueOnce(device_index);
-  auto stream = getCurrentDPCPPStream();
 
   // For each device, we have 32 (kQueuesPerPool) reserved queues.
-  std::array<sycl::event, kQueuesPerPool> events;
   for (auto i = 0; i < kQueuesPerPool; i++) {
     /**
-     * Why need a barrier here? The deviceSynchronize's behavior should wait
-     * until all preceding commands in all queues of all host threads have
-     * completed. It avoids another thread submitting a kernel while
-     * deviceSynchronize() is running.
+     * Why we don NOT need a barrier for synchronization snapshot here? Because
+     * xpu::dpcpp::queue_barrier is so much time-consuming.
      */
-    events[i] = xpu::dpcpp::queue_barrier(dpcppGetRawQueue(device_index, i));
-  }
-  for (auto i = 0; i < kQueuesPerPool; i++) {
-    events[i].wait();
+    dpcppGetRawQueue(device_index, i).wait();
   }
 }
 
