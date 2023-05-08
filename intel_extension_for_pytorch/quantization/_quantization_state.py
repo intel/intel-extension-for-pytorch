@@ -365,15 +365,14 @@ class AutoQuantizationState(torch.nn.Module):
                 if type(op) in [torch.nn.ConvTranspose2d, torch.nn.ConvTranspose3d]:
                     ch_axis = 1
                 if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
-                    if weight.dtype == torch.float32:
-                        weight = weight.to(torch.bfloat16)
-                    weight  = weight.to(torch.float32)
+                    if weight.dtype == torch.bfloat16:
+                        weight = weight.to(dtype=torch.float32)
                     if scale.numel() > 1:
                         arg = torch.quantize_per_channel(weight, scale, zp, ch_axis, dtype)
                     else:
                         arg = torch.quantize_per_tensor(weight, scale.item(), zp.item(), dtype)
                     arg = arg.dequantize()
-                    arg = arg.to(torch.bfloat16)
+                    arg = arg.to(dtype=torch.bfloat16)
                 else:
                     # Update weight of nn.Linear for SmoothQuant
                     wei_key = str(self.idx) + '_0'
@@ -397,12 +396,11 @@ class AutoQuantizationState(torch.nn.Module):
                 scale, zp, dtype = quant_info
                 weight = op.weight
                 if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
-                    if weight.dtype == torch.float32:
-                        weight = weight.to(torch.bfloat16)
-                    weight  = weight.to(torch.float32)
+                    if weight.dtype == torch.bfloat16:
+                        weight = weight.to(dtype=torch.float32)
                     arg = torch.quantize_per_tensor(weight, scale.item(), zp.item(), dtype)
                     arg = arg.dequantize()
-                    arg = arg.to(torch.bfloat16)
+                    arg = arg.to(dtype=torch.bfloat16)
                 else:
                     arg = torch.quantize_per_tensor(op.weight, scale.item(), zp.item(), dtype)
                     arg = arg.dequantize()
@@ -415,15 +413,15 @@ class AutoQuantizationState(torch.nn.Module):
             for tensor_arg_idx in range(0, len(arg_quant_infos), step):
                 quant_info = arg_quant_infos[tensor_arg_idx]
                 if quant_info is not None and any_arg_quant_or_dequant_needed[tensor_arg_idx]:
-                    w_ih =  weights[tensor_arg_idx]
-                    w_hh =  weights[tensor_arg_idx + 1]
+                    w_ih = weights[tensor_arg_idx]
+                    w_hh = weights[tensor_arg_idx + 1]
                     w_ih_scale, w_ih_zp, w_ih_dtype = quant_info
                     w_hh_scale, w_hh_zp, w_hh_dtype = arg_quant_infos[tensor_arg_idx + 1]
                     if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
                         weight_if_bf16 = w_ih.dtype == torch.bfloat16
                         if weight_if_bf16:
-                            w_ih  = w_ih.to(torch.float32)
-                            w_hh  = w_hh.to(torch.float32)
+                            w_ih = w_ih.to(dtype=torch.float32)
+                            w_hh = w_hh.to(dtype=torch.float32)
                         if w_ih_scale.numel() > 1:
                             w_ih = torch.quantize_per_channel(w_ih, w_ih_scale, w_ih_zp, 0, w_ih_dtype)
                             w_hh = torch.quantize_per_channel(w_hh, w_hh_scale, w_hh_zp, 0, w_hh_dtype)
@@ -433,8 +431,8 @@ class AutoQuantizationState(torch.nn.Module):
                         w_ih = w_ih.dequantize()
                         w_hh = w_hh.dequantize()
                         if weight_if_bf16:
-                            w_ih  = w_ih.to(torch.bfloat16)
-                            w_hh  = w_hh.to(torch.bfloat16)
+                            w_ih = w_ih.to(dtype=torch.bfloat16)
+                            w_hh = w_hh.to(dtype=torch.bfloat16)
                     else:
                         if w_ih_scale.numel() > 1:
                             w_ih = torch.quantize_per_channel(w_ih, w_ih_scale, w_ih_zp, 0, w_ih_dtype)

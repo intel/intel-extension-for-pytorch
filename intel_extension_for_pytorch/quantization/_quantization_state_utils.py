@@ -341,11 +341,10 @@ def iterate_and_apply_convert(
                 if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
                     # do autocast in Python side
                     if args.dtype == torch.float32:
-                        args = args.to(torch.bfloat16)
-                    args = args.to(torch.float32)
+                        args = args.to(dtype=torch.float32)
                     args = torch.quantize_per_channel(args, scale, zp, ch_axis, dtype)
                     args = args.dequantize()
-                    args = args.to(torch.bfloat16)
+                    args = args.to(dtype=torch.bfloat16)
                 else:
                     args = torch.quantize_per_channel(args, scale, zp, ch_axis, dtype)
                     args = args.dequantize()
@@ -353,12 +352,11 @@ def iterate_and_apply_convert(
                 # white list, conv, linear, matmul, we always convert it's input to bflat16 firstly, and then inser q+dq
                 if str(op) in conv_linear_ops + [str(torch.matmul), str(torch.Tensor.matmul), str(torch.bmm), str(torch.Tensor.bmm)] + embedding_op or str(type(op)) in conv_linear_modules:
                     if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
-                        if args.dtype == torch.float32:
-                            args = args.to(torch.bfloat16)
-                        args = args.to(torch.float32)
+                        if args.dtype == torch.bfloat16:
+                            args = args.to(dtype=torch.float32)
                         args = torch.quantize_per_tensor(args, scale.item(), zp.item(), dtype)
                         args = args.dequantize()
-                        args = args.to(torch.bfloat16)
+                        args = args.to(dtype=torch.bfloat16)
                     else:
                         args = torch.quantize_per_tensor(args, scale.item(), zp.item(), dtype)
                         args = args.dequantize()
@@ -367,11 +365,11 @@ def iterate_and_apply_convert(
                     args_is_bfloat16 = False
                     if args.dtype == torch.bfloat16:
                         args_is_bfloat16 = True
-                        args = args.to(torch.float32)
+                        args = args.to(dtype=torch.float32)
                     args = torch.quantize_per_tensor(args, scale.item(), zp.item(), dtype)
                     args = args.dequantize()
                     if args_is_bfloat16:
-                        args = args.to(torch.bfloat16)
+                        args = args.to(dtype=torch.bfloat16)
         flattened_tensor_infos_idx[0] += 1
         return args
 
