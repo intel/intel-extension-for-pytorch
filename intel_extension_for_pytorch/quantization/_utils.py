@@ -519,6 +519,16 @@ def _create_observer(setting):
     elif setting["name"] in IPEX_OBSERVERS:
         observer = IPEX_OBSERVERS[setting["name"]]
         setting.pop("name", None)
+        # SmoothQuant observers contain sub-observers
+        smooth_quant_sub_obs_keys = [
+            'act_observer',
+            'act_ic_observer',
+            'wei_observer',
+            'wei_ic_observer'
+        ]
+        for key in smooth_quant_sub_obs_keys:
+            if key in setting:
+                setting[key] = _create_observer(setting[key])()
         return observer.with_args(**setting)
     else:
         raise NameError('torch.quantization.observer %s not found' % setting["name"])
@@ -593,9 +603,13 @@ def save_quant_state(quant_state_map, configure_file):
                 info["activation_observer"] = _get_observer_setting(op_info.qconfig.activation())
                 if isinstance(op_info.qconfig.activation(), SmoothQuantActivationObserver):
                     info["activation_observer"]["smooth_quant_enabled"] = smooth_quant_enabled
+                    info["activation_observer"]["act_observer"] = _get_observer_setting(op_info.qconfig.activation().act_obs)
+                    info["activation_observer"]["act_ic_observer"] = _get_observer_setting(op_info.qconfig.activation().ic_obs)
                 info["weight_observer"] = _get_observer_setting(op_info.qconfig.weight())
                 if isinstance(op_info.qconfig.weight(), SmoothQuantWeightObserver):
                     info["weight_observer"]["smooth_quant_enabled"] = smooth_quant_enabled
+                    info["weight_observer"]["wei_observer"] = _get_observer_setting(op_info.qconfig.weight().oc_obs)
+                    info["weight_observer"]["wei_ic_observer"] = _get_observer_setting(op_info.qconfig.weight().ic_obs)
                 q_op_infos[q_k] = info
             layer_infos["q_op_infos"] = q_op_infos
         if len(v.seen_nonq_op_infos) == 0:

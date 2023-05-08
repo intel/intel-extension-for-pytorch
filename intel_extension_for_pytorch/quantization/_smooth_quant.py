@@ -58,7 +58,11 @@ class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
                 eps=eps,
             )
         else:
-            assert isinstance(act_ic_observer, UniformQuantizationObserverBase)
+            assert isinstance(act_ic_observer, UniformQuantizationObserverBase), \
+                f'act_ic_observer should be an instance of UniformQuantizationObserverBase ' \
+                f'or its subclass but got {type(act_ic_observer)}'
+            assert hasattr(act_ic_observer, 'ch_axis'), \
+                f'act_ic_observer should be a per-channel observer and observe input channel axis'
             self.ic_obs = act_ic_observer
         if act_observer is None:
             self.act_obs = HistogramObserver(
@@ -144,7 +148,7 @@ class SmoothQuantWeightObserver(UniformQuantizationObserverBase):
         wei_ic_observer=None,
         smooth_quant_enabled=False,  # if false, act as a normal observer
         dtype=torch.qint8,
-        qscheme=torch.per_channel_affine,
+        qscheme=torch.per_channel_symmetric,
         reduce_range=False,
         quant_min=None,
         quant_max=None,
@@ -188,7 +192,11 @@ class SmoothQuantWeightObserver(UniformQuantizationObserverBase):
                 eps=eps,
             )
         else:
-            assert isinstance(wei_ic_observer, UniformQuantizationObserverBase)
+            assert isinstance(wei_ic_observer, UniformQuantizationObserverBase), \
+                f'wei_ic_observer should be an instance of UniformQuantizationObserverBase ' \
+                f'or its subclass but got {type(wei_ic_observer)}'
+            assert hasattr(wei_ic_observer, 'ch_axis'), \
+                f'wei_ic_observer should be a per-channel observer and observe input channel axis'
             self.ic_obs = wei_ic_observer
         # if smooth_quant_enabled is false, this observer acts as
         # a normal observer

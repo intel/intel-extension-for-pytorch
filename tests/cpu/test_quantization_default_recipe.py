@@ -175,16 +175,17 @@ class TestDefaultRecipe(JitLlgaTestCase):
         for _ in range(5):
             prepared_model(torch.rand(4, 4))
         assert check_model_obsever_has_run(prepared_model)
-        qconf_filename = '_test_check_model_obsever_has_run.json'
-        prepared_model.save_qconf_summary(qconf_filename)
-        # Observers are removed after save_qconf_summary
-        assert not check_model_obsever_has_run(prepared_model)
-        prepared_model.load_qconf_summary(qconf_filename)
-        # Observers are added but not run yet after load_qconf_summary
-        assert not check_model_obsever_has_run(prepared_model)
-        for _ in range(5):
-            prepared_model(torch.rand(4, 4))
-        assert check_model_obsever_has_run(prepared_model)
+        with tempfile.NamedTemporaryFile() as fp:
+            qconf_filename = fp.name
+            prepared_model.save_qconf_summary(qconf_filename)
+            # Observers are removed after save_qconf_summary
+            assert not check_model_obsever_has_run(prepared_model)
+            prepared_model.load_qconf_summary(qconf_filename)
+            # Observers are added but not run yet after load_qconf_summary
+            assert not check_model_obsever_has_run(prepared_model)
+            for _ in range(5):
+                prepared_model(torch.rand(4, 4))
+            assert check_model_obsever_has_run(prepared_model)
 
     def test_smooth_quant(self):
         N, IC, OC = 4, 4, 4
@@ -264,37 +265,80 @@ class TestDefaultRecipe(JitLlgaTestCase):
 
         m = Mod().eval()
         x = torch.rand(1, 4)
+        calib_dataset = [torch.rand(1, 4) for _ in range(5)]
+        per_channel_observer = torch.ao.quantization.MovingAveragePerChannelMinMaxObserver
+        custom_config = {
+            'alpha' : 0.75,
+            'act_observer' : torch.ao.quantization.MinMaxObserver(),
+            'act_ic_observer' : per_channel_observer(ch_axis=-1),
+            'wei_observer' : per_channel_observer(dtype=torch.qint8, qscheme=torch.per_channel_symmetric),
+            'wei_ic_observer' : per_channel_observer(ch_axis=1),
+        }
+        for use_custom_config in [False, True]:
+            kwargs = custom_config if use_custom_config else {}
+            qconfig_mapping = ipex.quantization.get_smooth_quant_qconfig_mapping(**kwargs)
+            prepared_model = ipex.quantization.prepare(
+                m, qconfig_mapping, example_inputs=x, inplace=False)
 
-        qconfig_mapping = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=0.5)
-        prepared_model = ipex.quantization.prepare(
-            m, qconfig_mapping, example_inputs=x, inplace=False)
+            # Save observer info for comparison
+            if use_custom_config:
+                observer_info = {
+                    **prepared_model._fqn_to_auto_quant_state_map[' '].tensor_id_to_observer,
+                    **prepared_model._fqn_to_auto_quant_state_map[' '].weight_tensor_id_to_observer
+                }
+                observer_info_dict = {}
+                for key, obs in observer_info.items():
+                    observer_info_dict[key] = {
+                        'smooth_quant_enabled' : obs.smooth_quant_enabled,
+                        'alpha' : obs.alpha,
+                        'ic_obs' : type(obs.ic_obs),
+                        'act_obs' : type(obs.act_obs)
+                    }
 
-        for _ in range(5):
-            x = torch.rand(1, 4)
-            prepared_model(x)
+            for data in calib_dataset:
+                prepared_model(data)
 
-        qconf_filename = "_test_smooth_quant_save_load_qconf_summary.json"
-        prepared_model.save_qconf_summary(qconf_summary=qconf_filename)
-        q_model = ipex.quantization.convert(prepared_model)
+            with tempfile.NamedTemporaryFile() as fp:
+                qconf_filename = fp.name
+                prepared_model.save_qconf_summary(qconf_summary=qconf_filename)
+                q_model = ipex.quantization.convert(prepared_model)
 
-        with torch.no_grad():
-            q_model = torch.jit.trace(q_model, x)
-            q_model = torch.jit.freeze(q_model)
-        x = torch.rand(1, 4)
-        out_ref = q_model(x)
+                with torch.no_grad():
+                    q_model = torch.jit.trace(q_model, x)
+                    q_model = torch.jit.freeze(q_model)
+                out_ref = q_model(x)
 
-        prepared_model_2 = ipex.quantization.prepare(m, qconfig_mapping, example_inputs=x, inplace=False)
-        prepared_model_2.load_qconf_summary(qconf_summary=qconf_filename)
-        q_model_2 = ipex.quantization.convert(prepared_model_2)
+                prepared_model_2 = ipex.quantization.prepare(m, qconfig_mapping, example_inputs=x, inplace=False)
+                prepared_model_2.load_qconf_summary(qconf_summary=qconf_filename)
 
-        with torch.no_grad():
-            q_model_2 = torch.jit.trace(q_model_2, x)
-            q_model_2 = torch.jit.freeze(q_model_2)
-        out = q_model_2(x)
+                # Save observer info for comparison
+                if use_custom_config:
+                    observer_info_2 = {
+                        **prepared_model_2._fqn_to_auto_quant_state_map[' '].tensor_id_to_observer,
+                        **prepared_model_2._fqn_to_auto_quant_state_map[' '].weight_tensor_id_to_observer
+                    }
+                    observer_info_dict_2 = {}
+                    for key, obs in observer_info_2.items():
+                        observer_info_dict_2[key] = {
+                            'smooth_quant_enabled' : obs.smooth_quant_enabled,
+                            'alpha' : obs.alpha,
+                            'ic_obs' : type(obs.ic_obs),
+                            'act_obs' : type(obs.act_obs)
+                        }
 
-        assert torch.allclose(out_ref, out)
-        assert os.path.isfile(qconf_filename)
-        os.remove(qconf_filename)
+                q_model_2 = ipex.quantization.convert(prepared_model_2)
+
+                with torch.no_grad():
+                    q_model_2 = torch.jit.trace(q_model_2, x)
+                    q_model_2 = torch.jit.freeze(q_model_2)
+                out_2 = q_model_2(x)
+
+                assert torch.allclose(out_ref, out_2)
+
+            # Check observers
+            if use_custom_config:
+                assert observer_info_dict == observer_info_dict_2, \
+                    "Error: SmoothQuant observer info lost after saving/loading qconf JSON"
 
 if __name__ == '__main__':
     run_tests() 
