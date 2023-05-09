@@ -191,18 +191,33 @@ PyObject* THPModule_getCurrentStream_wrap(
   END_HANDLE_TH_ERRORS
 }
 
-PyObject* THPModule_setCurrentStream_wrap(PyObject* self, PyObject* obj) {
+PyObject* THPModule_setCurrentStream_wrap(
+    PyObject* self,
+    PyObject* args,
+    PyObject* kwargs) {
   HANDLE_TH_ERRORS
-  THPUtils_assert(PyLong_Check(obj), "invalid stream");
-  uint64_t bits = PyLong_AsUnsignedLongLong(obj);
-  if (bits == static_cast<uint64_t>(-1) && PyErr_Occurred()) {
-    throw python_error();
+  int64_t stream_id = 0;
+  int64_t device_index = 0;
+  int64_t device_type = 0;
+
+  constexpr char* kwlist[] = {
+      "stream_id", "device_index", "device_type", nullptr};
+  if (!PyArg_ParseTupleAndKeywords(
+          args,
+          kwargs,
+          "|LLL",
+          const_cast<char**>(kwlist),
+          &stream_id,
+          &device_index,
+          &device_type)) {
   }
-  auto stream = xpu::dpcpp::DPCPPStream::unpack(bits);
-  auto device = static_cast<int>(xpu::dpcpp::current_device());
+
+  auto stream = at::cuda::DPCPPStream::unpack3(
+      stream_id, device_index, static_cast<c10::DeviceType>(device_type));
+
+  auto device = xpu::dpcpp::current_device();
   if (device != stream.device_index()) {
-    xpu::dpcpp::set_device(
-        static_cast<c10::DeviceIndex>(stream.device_index()));
+    xpu::dpcpp::set_device(stream.device_index());
   }
   xpu::dpcpp::setCurrentDPCPPStream(stream);
   Py_RETURN_NONE;
@@ -457,7 +472,7 @@ static struct PyMethodDef _THPModule_methods[] = {
      nullptr},
     {"_setCurrentStream",
      (PyCFunction)THPModule_setCurrentStream_wrap,
-     METH_O,
+     METH_VARARGS | METH_KEYWORDS,
      nullptr},
     {"_emptyCache", (PyCFunction)THPModule_emptyCache, METH_NOARGS, nullptr},
     {"_memoryStats", (PyCFunction)THPModule_memoryStats, METH_O, nullptr},
