@@ -36,6 +36,18 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
+    def test_multinomial_align_to_cuda(self):
+        torch.xpu.manual_seed(1234)
+        a = torch.rand(20, device='xpu')
+        outl = []
+        for i in range (20):
+            out = torch.multinomial(a, 1)
+            outl.append(out.item())
+        ref = [8, 15, 2, 5, 15, 11, 12, 11, 4, 8, 1, 19, 7, 10, 9, 7, 10, 8, 16, 1]
+        for c, r in zip(outl, ref):
+            if c != r:
+                raise RuntimeError('test_multinomial_align_to_cuda error')
+
     def test_multinomial(self, dtype=torch.float):
         #  create a tensor of weights
         w = torch.tensor([1, 10, 3, 2], dtype=torch.float)

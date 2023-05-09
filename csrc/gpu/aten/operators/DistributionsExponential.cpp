@@ -37,11 +37,12 @@ Tensor& exponential_(
       [&]() {
         using accscalar_t = acc_type<scalar_t>;
         auto lambd = static_cast<accscalar_t>(lambda);
-        auto exponential_func = [lambd](accscalar_t rand) {
-          auto sample =
-              Numerics<accscalar_t>::log(static_cast<accscalar_t>(1.0) - rand);
-          return static_cast<scalar_t>(
-              static_cast<accscalar_t>(-1.0) / lambd * sample);
+        auto exponential_func = [lambd](accscalar_t val) {
+          auto log = val >= static_cast<accscalar_t>(1.) -
+                      std::numeric_limits<accscalar_t>::epsilon() / 2
+              ? -std::numeric_limits<accscalar_t>::epsilon() / 2
+              : Numerics<accscalar_t>::log(val);
+          return static_cast<accscalar_t>(-1.0) / lambd * log;
         };
         uniform_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
             iter, gen, exponential_func);
