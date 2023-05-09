@@ -212,7 +212,7 @@ PyObject* THPModule_setCurrentStream_wrap(
           &device_type)) {
   }
 
-  auto stream = at::cuda::DPCPPStream::unpack3(
+  auto stream = xpu::dpcpp::DPCPPStream::unpack3(
       stream_id, device_index, static_cast<c10::DeviceType>(device_type));
 
   auto device = xpu::dpcpp::current_device();
@@ -471,7 +471,7 @@ static struct PyMethodDef _THPModule_methods[] = {
      METH_O,
      nullptr},
     {"_setCurrentStream",
-     (PyCFunction)THPModule_setCurrentStream_wrap,
+     castPyCFunctionWithKeywords(THPModule_setCurrentStream_wrap),
      METH_VARARGS | METH_KEYWORDS,
      nullptr},
     {"_emptyCache", (PyCFunction)THPModule_emptyCache, METH_NOARGS, nullptr},

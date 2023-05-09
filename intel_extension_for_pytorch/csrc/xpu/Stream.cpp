@@ -25,11 +25,7 @@ static PyObject* THDPStream_pynew(
   int64_t device_type = 0;
 
   constexpr char* kwlist[] = {
-      "priority",
-      "stream_id",
-      "device_index",
-      "device_type",
-      nullptr};
+      "priority", "stream_id", "device_index", "device_type", nullptr};
   if (!PyArg_ParseTupleAndKeywords(
           args,
           kwargs,
