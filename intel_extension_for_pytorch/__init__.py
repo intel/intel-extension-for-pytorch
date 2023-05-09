@@ -1,3 +1,5 @@
+import re
+
 import torch
 try:
     import torchvision
@@ -11,11 +13,10 @@ _cpu_isa.check_minimal_isa_support()
 
 torch_version = ''
 ipex_version = ''
-import re
-matches = re.match('(\d+\.\d+).*', torch.__version__)
+matches = re.match(r'(\d+\.\d+).*', torch.__version__)
 if matches and len(matches.groups()) == 1:
   torch_version = matches.group(1)
-matches = re.match('(\d+\.\d+).*', __version__)
+matches = re.match(r'(\d+\.\d+).*', __version__)
 if matches and len(matches.groups()) == 1:
   ipex_version = matches.group(1)
 if torch_version == '' or ipex_version == '' or torch_version != ipex_version:
