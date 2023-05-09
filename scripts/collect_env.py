@@ -313,17 +313,20 @@ def get_env_info():
         ipex_version_str = ipex.__version__
         try:
             import intel_extension_for_pytorch._version as ver
-        except:
+        except ImportError:
             import intel_extension_for_pytorch.version as ver
         try:
             ipex_gitrev_str = ver.__ipex_gitrev__
-        except:
+        except AttributeError:
             ipex_gitrev_str = ver.__gitrev__
         try:
             build_type_str = str(ver.__build_type__)
-        except:
+        except AttributeError:
             build_type_str = str(ver.__mode__)
-        xpu_available_str = str(torch.xpu.is_available())
+        try:
+            xpu_available_str = str(torch.xpu.is_available())
+        except AttributeError:
+            xpu_available_str = False
     else:
         ipex_version_str = ipex_gitrev_str = 'N/A'
         build_type_str = xpu_available_str = 'N/A'
