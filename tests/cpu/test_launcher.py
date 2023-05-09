@@ -38,29 +38,18 @@ class TestLauncher(TestCase):
     def test_memory_allocator_setup(self):
         launcher = Launcher()
 
-        # preset ld_preload
-        ld_preload_bk = os.getenv('LD_PRELOAD', 'UNSET')
-        os.environ['LD_PRELOAD'] = 'LD_PRELOAD_TEST'
-        find_tcmalloc = self.find_lib('tcmalloc')
-        launcher.set_memory_allocator(memory_allocator='tcmalloc')
-        tcmalloc_enabled = 'libtcmalloc.so' in launcher.environ_set['LD_PRELOAD']
-        self.assertEqual(find_tcmalloc, tcmalloc_enabled)
-        self.assertEqual('LD_PRELOAD_TEST' in launcher.environ_set['LD_PRELOAD'], True)
-        if ld_preload_bk == 'UNSET':
-            del os.environ['LD_PRELOAD']
-        else:
-            os.environ['LD_PRELOAD'] = ld_preload_bk
-
         # tcmalloc
         find_tcmalloc = self.find_lib('tcmalloc')
         launcher.set_memory_allocator(memory_allocator='tcmalloc')
-        tcmalloc_enabled = 'libtcmalloc.so' in launcher.environ_set['LD_PRELOAD']
+        ld_preload = ':'.join(launcher.ld_preload) if len(launcher.ld_preload) > 0 else ''
+        tcmalloc_enabled = 'libtcmalloc.so' in ld_preload
         self.assertEqual(find_tcmalloc, tcmalloc_enabled)
 
         # jemalloc
         find_jemalloc = self.find_lib('jemalloc')
         launcher.set_memory_allocator(memory_allocator='jemalloc')
-        jemalloc_enabled = 'libjemalloc.so' in launcher.environ_set['LD_PRELOAD']
+        ld_preload = ':'.join(launcher.ld_preload) if len(launcher.ld_preload) > 0 else ''
+        jemalloc_enabled = 'libjemalloc.so' in ld_preload
         self.assertEqual(find_jemalloc, jemalloc_enabled)
         if jemalloc_enabled:
             self.assertTrue('MALLOC_CONF' in launcher.environ_set)

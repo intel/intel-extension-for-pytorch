@@ -185,6 +185,14 @@ class DistributedTrainingLauncher(Launcher):
         self.add_env('CCL_WORKER_COUNT', str(args.ccl_worker_count))
         self.add_env('CCL_WORKER_AFFINITY', pin_domain_affinity['affinity'])
 
+        ld_preload_marker = 'LD_PRELOAD_UNSET'
+        ld_preload_bk = os.environ['LD_PRELOAD'] if 'LD_PRELOAD' in os.environ else ld_preload_marker
+        if len(self.ld_preload) > 0:
+            os.environ['LD_PRELOAD'] = ':'.join(self.ld_preload)
+            self.verbose('info', f'LD_PRELOAD={os.environ["LD_PRELOAD"]}')
+        else:
+            if 'LD_PRELOAD' in os.environ:
+                del os.environ['LD_PRELOAD']
         for k,v in self.environ_set.items():
             self.verbose('info', f'env: {k}={v}')
 
@@ -211,6 +219,11 @@ class DistributedTrainingLauncher(Launcher):
         self.verbose('info', f'cmd: {cmd_s}')
         process = subprocess.Popen(cmd_s, env=os.environ, shell=True)
         process.wait()
+        if ld_preload_bk == ld_preload_marker:
+            if 'LD_PRELOAD' in os.environ:
+                del os.environ['LD_PRELOAD']
+        else:
+            os.environ['LD_PRELOAD'] = ld_preload_bk
         if args.log_dir:
             log_fns = []
             for i in range(args.nnodes * args.nprocs_per_node):

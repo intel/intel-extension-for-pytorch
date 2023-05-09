@@ -22,6 +22,7 @@ class Launcher():
         self.ma_supported = ['auto', 'default', 'tcmalloc', 'jemalloc']
         self.omp_supported = ['auto', 'default', 'intel']
         self.environ_set = {}
+        self.ld_preload = os.environ['LD_PRELOAD'].split(':') if 'LD_PRELOAD' in os.environ else []
 
     def add_common_params(self, parser):
         group = parser.add_argument_group('Launcher Common Arguments')
@@ -83,12 +84,7 @@ class Launcher():
         '''
         lib_found = False
         lib_set = False
-        if not 'LD_PRELOAD' in self.environ_set.keys():
-            self.environ_set['LD_PRELOAD'] = ''
-        if self.environ_set['LD_PRELOAD'] == '' and 'LD_PRELOAD' in os.environ:
-            self.environ_set['LD_PRELOAD'] = os.environ['LD_PRELOAD']
-        ld_preload = self.environ_set['LD_PRELOAD']
-        for item in ld_preload.split(':'):
+        for item in self.ld_preload:
             if item.endswith(f'lib{lib_type}.so'):
                 lib_set = True
                 break
@@ -99,15 +95,9 @@ class Launcher():
                 library_file = f'{lib_path}/lib{lib_type}.so'
                 matches = glob.glob(library_file)
                 if len(matches) > 0:
-                    if ld_preload == '':
-                        ld_preload = matches[0]
-                    else:
-                        ld_preload = f'{matches[0]}:{ld_preload}'
-                    self.environ_set['LD_PRELOAD'] = ld_preload
+                    self.ld_preload.append(matches[0])
                     lib_found = True
                     break
-        if self.environ_set['LD_PRELOAD'] == '':
-            del self.environ_set['LD_PRELOAD']
         return lib_set or lib_found
 
     def add_env(self, env_name, env_value):
@@ -174,6 +164,13 @@ class Launcher():
                 self.verbose('info', f'Use \'{name_local}\' {category}.')
         else:
             self.verbose('info', f'Use \'{name_local}\' {category}.')
+        if fn == self.add_lib_preload:
+            for k,v in name_map.items():
+                if k == name_local:
+                    continue
+                for item in self.ld_preload:
+                    if item.endswith(f'lib{v[0]}.so'):
+                        self.ld_preload.remove(item)
         return name_local
 
     def set_memory_allocator(self, memory_allocator='auto', benchmark=False, skip_list=[]):
