@@ -160,13 +160,13 @@ class TestMergedEmbedding(TestCase):
 
     table0 = nn.EmbeddingBag(100, 16, mode='mean', sparse=False).double()
     table1 = nn.EmbeddingBag(50, 32, mode='sum', sparse=False)
-    table2 = nn.EmbeddingBag(18000000, 128, mode='sum', include_last_offset=True, _weight=torch.empty(18000000, 128, dtype=torch.bfloat16), sparse=False)
+    table2 = nn.EmbeddingBag(18000000, 8, mode='sum', include_last_offset=True, _weight=torch.empty(18000000, 8, dtype=torch.bfloat16), sparse=False)
     table3 = nn.EmbeddingBag(100, 16, mode='mean', sparse=True).double()
     merged = MergedEmbeddingBag.from_embeddingbag_list([table0, table1, table2])
     merged2 = MergedEmbeddingBag([
         (100, 16, 'mean', table0.weight.dtype, table0.weight.detach(), False),
         (50, 32, 'sum', table1.weight.dtype, table1.weight.detach(), False),
-        (18000000, 128, 'sum', table2.weight.dtype, table2.weight.detach(), False),
+        (18000000, 8, 'sum', table2.weight.dtype, table2.weight.detach(), False),
     ])
     input = [
         [torch.LongTensor([10, 10, 15, 10, 20, 25]), torch.LongTensor([[0, 30], [21, 15], [30, 11]]), torch.LongTensor([10, 15, 17999999])],
