@@ -529,6 +529,7 @@ TORCH_API void Register${backend_name}${dispatch_key}NativeFunctions() {
                                 selector,
                                 rocm=False,
                                 symint=True,
+                                simple_trace=simple_trace,
                                 class_method_name=f"{class_name}",
                                 skip_dispatcher_op_registration=False,
                             ),
