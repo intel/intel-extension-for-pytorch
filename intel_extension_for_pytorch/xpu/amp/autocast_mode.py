@@ -1,7 +1,5 @@
 import torch
 
-
-# TODO: XPU: 1.13 torch uses torch.amp.autocast_mode.autocast, previous is torch.autocast_mode.autocast
 class autocast(torch.amp.autocast_mode.autocast):
     r"""
     See :class:`torch.autocast`.

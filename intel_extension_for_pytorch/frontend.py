@@ -10,12 +10,13 @@ from torch.jit._trace import TracerWarning
 from torch.utils._mode_utils import no_dispatch
 from torch._subclasses import FakeTensor
 import warnings
+from enum import IntFlag
 
 from .nn import utils
 from .optim._optimizer_utils import optimizer_fusion, IPEX_FUSED_OPTIMIZER_LIST_CPU, IPEX_FUSED_OPTIMIZER_LIST_XPU
 import intel_extension_for_pytorch._C as core
-from intel_extension_for_pytorch.utils.channels_last_1d import to_channels_last_1d
-from intel_extension_for_pytorch.utils.linear_bn_folding import linear_bn_fuse
+from .utils.channels_last_1d import to_channels_last_1d
+from .cpu.utils.linear_bn_folding import linear_bn_fuse
 from enum import IntEnum
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl
 import intel_extension_for_pytorch._C as torch_ipex_cpp
@@ -89,15 +90,26 @@ def _copy_model_and_optimizer(model, optimizer):
 
         return new_model, new_optimizer
 
-auto_channels_last = True
+
+# TODO: need discussion design here with CPU
+class auto_channels_last_flag(IntFlag):
+    AUTO = -1
+    DISABLE = 0
+    ENABLE = 1
+
+
+auto_channels_last = auto_channels_last_flag.AUTO
+
 
 def enable_auto_channels_last():
     global auto_channels_last
-    auto_channels_last = True
+    auto_channels_last = auto_channels_last_flag.ENABLE
+
 
 def disable_auto_channels_last():
     global auto_channels_last
-    auto_channels_last = False
+    auto_channels_last = auto_channels_last_flag.DISABLE
+
 
 class _Properties(object):
     r"""
@@ -146,8 +158,10 @@ class _O1:
         properties.graph_mode = False
         return properties
 
+
 opt_levels = {"O0": _O0(),
               "O1": _O1()}
+
 
 class RunMethods(IntEnum):
     JIT = 1
@@ -218,7 +232,7 @@ class GraphCapture(object):
                                     self.method = RunMethods.JIT
                                     logging.debug("generate graph by JIT trace.")
                                     return output
-                            except:
+                            except BaseException:
                                 try:
                                     # JIT trace failed, try torchdynamo with JIT trace backend.
                                     torch._dynamo.reset()
@@ -228,13 +242,14 @@ class GraphCapture(object):
                                     self.method = RunMethods.TorchDynamo
                                     logging.debug("generate graph by TorchDynamo.")
                                     return output
-                                except:
+                                except BaseException:
                                     warnings.warn("Both JIT and TorchDynamo failed, fallback to original model.")
                                     self.method = RunMethods.EagerInfer
                                     torch._dynamo.reset()
                                     return self.model(*input, **kwargs)
 
         return forward
+
 
 def optimize(
     model,
@@ -267,7 +282,8 @@ def optimize(
     perspective it has drawbacks. Running with the ``blocked layout``, oneDNN
     splits one or several dimensions of data into blocks with fixed size each
     time the operator is executed. More details information about oneDNN data
-    mermory format is available at `oneDNN manual <https://oneapi-src.github.io/oneDNN/dev_guide_understanding_memory_formats.html>`_.
+    mermory format is available at `oneDNN manual
+    <https://oneapi-src.github.io/oneDNN/dev_guide_understanding_memory_formats.html>`_.
     To reduce this overhead, data will be converted to predefined block shapes
     prior to the execution of oneDNN operator execution. In runtime, if the data
     shape matches oneDNN operator execution requirements, oneDNN won't perform
@@ -304,7 +320,7 @@ def optimize(
         weights_prepack (bool): Whether to perform weight prepack for convolution
             and linear to avoid oneDNN weights reorder. The default value is
             ``None``. Explicitly setting this knob overwrites the configuration
-            set by ``level`` knob.
+            set by ``level`` knob. For now, XPU doesn't support weights prepack.
         replace_dropout_with_identity (bool): Whether to replace ``nn.Dropout``
             with ``nn.Identity``. If replaced, the ``aten::dropout`` won't be
             included in the JIT graph. This may provide more fusion opportunites
@@ -351,11 +367,6 @@ def optimize(
 
     .. warning::
 
-        Please invoke ``optimize`` function AFTER loading weights to model via
-        ``model.load_state_dict(torch.load(PATH))``.
-
-    .. warning::
-
         Please invoke ``optimize`` function BEFORE invoking DDP in distributed
         training scenario.
 
@@ -379,6 +390,24 @@ def optimize(
         >>> optimized_model, optimized_optimizer = ipex.optimize(model, dtype=torch.bfloat16, optimizer=optimizer)
         >>> # running training step.
 
+    `torch.xpu.optimize()` is an alternative of optimize API in Intel® Extension for PyTorch*,
+    to provide identical usage for XPU device only. The motivation of adding this alias is
+    to unify the coding style in user scripts base on torch.xpu modular.
+
+    Examples:
+
+        >>> # bfloat16 inference case.
+        >>> model = ...
+        >>> model.load_state_dict(torch.load(PATH))
+        >>> model.eval()
+        >>> optimized_model = torch.xpu.optimize(model, dtype=torch.bfloat16)
+        >>> # running evaluation step.
+        >>> # bfloat16 training case.
+        >>> optimizer = ...
+        >>> model.train()
+        >>> optimized_model, optimized_optimizer = torch.xpu.optimize(model, dtype=torch.bfloat16, optimizer=optimizer)
+        >>> # running training step.
+
     """
     if isinstance(model, torch.jit.ScriptModule):
         if optimizer is None:
@@ -398,16 +427,28 @@ def optimize(
         opt_properties = opt_levels[level](opt_properties)
 
     device_type = 'cpu'
-    if len(list(model.parameters())) and list(model.parameters())[0].device.type == 'xpu':
-        if not all([param.device.type == 'xpu' for param in list(model.parameters())]):
-            raise RuntimeError("The model is mixed with different device type.")
+    model_parameters_list = list(model.parameters())
+    if len(model_parameters_list) and model_parameters_list[0].device.type == 'xpu':
+        if not all([param.device.type == 'xpu' for param in model_parameters_list]):
+            raise RuntimeError("The model is mixed with different device type")
         else:
             device_type = 'xpu'
 
-    # auto model channels_last memory format conversion
-    # TODO: for xpu, the auto channels last is temp disabled
-    if auto_channels_last and device_type == 'cpu':
-        _convert_convNd_weight_memory_format(model)
+    global auto_channels_last
+
+    def xpu_check_channel_last():
+        global auto_channels_last
+        if auto_channels_last.value == auto_channels_last_flag.ENABLE:
+            return True
+        elif auto_channels_last.value == auto_channels_last_flag.AUTO and torch.xpu.has_2d_block_array():
+            return True
+        else:
+            return False
+
+    if device_type == 'cpu' and (auto_channels_last.value != auto_channels_last_flag.DISABLE):
+        _convert_convNd_deconvNd_weight_memory_format(model)
+    elif device_type == 'xpu' and xpu_check_channel_last():
+        _convert_convNd_deconvNd_weight_memory_format(model)
 
     if level is not None:
         opt_properties.opt_level = level
@@ -444,20 +485,28 @@ def optimize(
             # TODO: for xpu, the split master weight will be supported soon
             opt_properties.split_master_weight_for_bf16 = False
         if opt_properties.graph_mode:
-            warnings.warn("For XPU, the Out-of-Box (OOB) solution for inference is to trace model outside of the " +
-                "ipex.optimize, so temp to disable the graph mode.")
-            # TODO: for xpu now, the oob solution for inference is to trace model outside of the ipex.optimize.
+            warnings.warn(
+                "For XPU, the oob solution for inference is to trace model outside of the torch.xpu.optimize,"
+                + " so temp to disable the graph mode")
+            # TODO: for xpu now, the oob solution for inference is to trace model outside of the torch.xpu.optimize.
             opt_properties.graph_mode = False
         if not inplace:
-            warnings.warn("For XPU device to save valuable device memory, temp to do optimization on inplaced model, " +
-                "so make inplace to be true")
+            warnings.warn(
+                "For XPU device to save valuable device memory, temp to do optimization on inplaced model,"
+                + " so make inplace to be true")
             # TODO: for xpu, inplace is true will add device memory pressure, so set inplace to be true
             inplace = True
+        # for XPU, weight prepack is unsupported, so sample input is useless
         if opt_properties.weights_prepack:
-            warnings.warn("For XPU, the weight prepack and sample input are disabled. For onednn layout, " +
-                "IPEX_XPU_ONEDNN_LAYOUT is recommended to use")
+            warnings.warn(
+                "For XPU, the weight prepack and sample input are disabled. The onednn layout"
+                + " is automatically chosen to use")
             opt_properties.weights_prepack = False
             sample_input = None
+        if opt_properties.optimize_lstm is not None:
+            warnings.warn(
+                "For XPU, the optimize_lstm(replace lstm with ipex_lstm) is unsupported, so disable it")
+            opt_properties.optimize_lstm = False
 
     if inplace:
         optimized_model = model
@@ -517,7 +566,8 @@ def optimize(
         params_attr = optimized_optimizer.params_attr
     if dtype == torch.bfloat16 and model.training:
         optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
-            optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16, convert_dtype=torch.bfloat16)
+            optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16,
+            convert_dtype=torch.bfloat16)
     if dtype == torch.half and model.training:
         assert device_type != 'xpu', "For now, XPU device does not support model training with half precision."
         optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
@@ -557,7 +607,7 @@ def optimize(
     # with an optimizer
     if opt_properties.fuse_update_step:
         optimized_optimizer = optimizer_fusion(
-            optimized_optimizer, opt_properties.split_master_weight_for_bf16)
+            optimized_optimizer, opt_properties.split_master_weight_for_bf16, device_type)
     return optimized_model, optimized_optimizer
 
 def defake(x):
@@ -631,46 +681,59 @@ def enable_onednn_fusion(enabled):
     else:
         core.disable_jit_opt()
 
-def _convert_convNd_weight_memory_format(module):
+
+def _convert_convNd_deconvNd_weight_memory_format(module):
     # inspired from https://github.com/pytorch/pytorch/blob/master/torch/nn/utils/memory_format.py
-    if isinstance(module, torch.nn.Conv1d) or isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Conv3d):
-        if isinstance(module, torch.nn.Conv1d):
-            weight_data = to_channels_last_1d(module.weight.detach().clone())
-            module.weight.data = weight_data.resize_(weight_data.size())
-        elif isinstance(module, torch.nn.Conv2d):
-            weight_data = module.weight.detach().clone().contiguous(memory_format=torch.channels_last)
-            module.weight.data = weight_data.resize_(weight_data.size(), memory_format=torch.channels_last)
-        elif isinstance(module, torch.nn.Conv3d):
-            weight_data = module.weight.detach().clone().contiguous(memory_format=torch.channels_last_3d)
-            module.weight.data = weight_data.resize_(weight_data.size(), memory_format=torch.channels_last_3d)
+    if isinstance(module, (torch.nn.Conv1d, torch.nn.ConvTranspose1d)):
+        weight_data = to_channels_last_1d(module.weight.detach().clone())
+        module.weight.data = weight_data.resize_(weight_data.size())
+    elif isinstance(module, (torch.nn.Conv2d, torch.nn.ConvTranspose2d)):
+        weight_data = module.weight.detach().clone().contiguous(memory_format=torch.channels_last)
+        module.weight.data = weight_data.resize_(weight_data.size(), memory_format=torch.channels_last)
+    elif isinstance(module, (torch.nn.Conv3d, torch.nn.ConvTranspose3d)):
+        weight_data = module.weight.detach().clone().contiguous(memory_format=torch.channels_last_3d)
+        module.weight.data = weight_data.resize_(weight_data.size(), memory_format=torch.channels_last_3d)
 
     for child in module.children():
-        _convert_convNd_weight_memory_format(child)
+        _convert_convNd_deconvNd_weight_memory_format(child)
 
 class FP32MathMode(IntEnum):
     FP32 = int(core.FP32MathMode.FP32)
     TF32 = int(core.FP32MathMode.TF32)
     BF32 = int(core.FP32MathMode.BF32)
 
+
 def set_fp32_math_mode(mode=FP32MathMode.FP32, device="cpu"):
     r"""
     Enable or disable implicit data type conversion.
-    If mode is FP32MathMode.FP32 which means to disable the oneDNN fpmath mode.
-    If mode is FP32MathMode.BF32 which means to enable the oneDNN fpmath mode by down convert to bfloat16 implicitly.
 
     Args:
-        mode (FP32MathMode): Only works for ``FP32MathMode.FP32`` and ``FP32MathMode.BF32``.
-            oneDNN fpmath mode will be disabled by default if dtype is set to ``FP32MathMode.FP32``.
-            The implicit FP32 to BF16 data type conversion will be enabled if dtype is set to ``FP32MathMode.BF32`.
-        device (string): Only "cpu" is supported right now.
+        mode (FP32MathMode): ``FP32MathMode.FP32``, ``FP32MathMode.BF32`` or
+            ``FP32MathMode.TF32`` (GPU ONLY). oneDNN fpmath mode will be disabled by default if dtype
+            is set to ``FP32MathMode.FP32``. The implicit ``FP32`` to ``TF32`` data type conversion
+            will be enabled if dtype is set to ``FP32MathMode.TF32``. The implicit ``FP32``
+            to ``BF16`` data type conversion will be enabled if dtype is set to ``FP32MathMode.BF32``.
+        device (string): ``cpu``, ``xpu``
 
     Examples:
 
         >>> import intel_extension_for_pytorch as ipex
         >>> # to enable the implicit data type conversion
-        >>> ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.BF32)
+        >>> ipex.set_fp32_math_mode(device="xpu", mode=ipex.FP32MathMode.BF32)
         >>> # to disable the implicit data type conversion
-        >>> ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.FP32)
+        >>> ipex.set_fp32_math_mode(device="xpu", mode=ipex.FP32MathMode.FP32)
+
+    ``torch.xpu.set_fp32_math_mode()`` is an alternative function in Intel® Extension for PyTorch*,
+    to provide identical usage for XPU device only. The motivation of adding this alias is
+    to unify the coding style in user scripts base on ``torch.xpu`` modular.
+
+    Examples:
+
+        >>> import intel_extension_for_pytorch as ipex
+        >>> # to enable the implicit data type conversion
+        >>> torch.xpu.set_fp32_math_mode(device="xpu", mode=ipex.FP32MathMode.BF32)
+        >>> # to disable the implicit data type conversion
+        >>> torch.xpu.set_fp32_math_mode(device="xpu", mode=ipex.FP32MathMode.FP32)
     """
 
     if device == "cpu":
@@ -679,7 +742,9 @@ def set_fp32_math_mode(mode=FP32MathMode.FP32, device="cpu"):
         elif mode == FP32MathMode.FP32:
             core.set_fp32_math_mode(core.FP32MathMode.FP32)
         else:
-            warnings.warn("For CPU device, IPEX does not support mode except FP32MathMode.FP32 and FP32MathMode.BF32 for fpmath_mode right now.")
+            warnings.warn(
+                "For CPU device, IPEX does not support mode except \
+                    FP32MathMode.FP32 and FP32MathMode.BF32 for fpmath_mode right now.")
     elif device == "xpu":
         if mode == FP32MathMode.BF32:
             torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.BF32)
@@ -688,7 +753,9 @@ def set_fp32_math_mode(mode=FP32MathMode.FP32, device="cpu"):
         elif mode == FP32MathMode.TF32:
             torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.TF32)
         else:
-            warnings.warn("For XPU device, IPEX does not support mode except FP32MathMode.FP32, FP32MathMode.BF32 and FP32MathMode.TF32 for fpmath_mode right now.")
+            warnings.warn(
+                "For XPU device, IPEX does not support mode except \
+                    FP32MathMode.FP32, FP32MathMode.BF32 and FP32MathMode.TF32 for fpmath_mode right now.")
     else:
         raise RuntimeError("Unexpected device type {}. ".format(device) + "Supported are 'cpu', 'xpu'.")
 
@@ -698,19 +765,31 @@ def get_fp32_math_mode(device="cpu"):
     Get the current fpmath_mode setting.
 
     Args:
-        device (string): Only "cpu" is supported right now
+        device (string): ``cpu``, ``xpu``
 
     Returns:
         Fpmath mode
-        The value will be ``FP32MathMode.FP32`` or ``FP32MathMode.BF32``.
-        ``FP32MathMode.FP32`` means implicit down-conversion is disabled,
-        while ``FP32MathMode.BF32`` means implicit down-conversions from f32 to bf16/f16 or compatible FP type is allowed.
+        The value will be ``FP32MathMode.FP32``, ``FP32MathMode.BF32`` or ``FP32MathMode.TF32`` (GPU ONLY).
+        oneDNN fpmath mode will be disabled by default if dtype is set to ``FP32MathMode.FP32``.
+        The implicit ``FP32`` to ``TF32`` data type conversion will be enabled if dtype is set
+        to ``FP32MathMode.TF32``. The implicit ``FP32`` to ``BF16`` data type conversion will be
+        enabled if dtype is set to ``FP32MathMode.BF32``.
 
     Examples:
 
         >>> import intel_extension_for_pytorch as ipex
         >>> # to get the current fpmath mode
-        >>> ipex.get_fp32_math_mode(device="cpu")
+        >>> ipex.get_fp32_math_mode(device="xpu")
+
+    ``torch.xpu.get_fp32_math_mode()`` is an alternative function in Intel® Extension for PyTorch*,
+    to provide identical usage for XPU device only. The motivation of adding this alias is
+    to unify the coding style in user scripts base on ``torch.xpu`` modular.
+
+    Examples:
+
+        >>> import intel_extension_for_pytorch as ipex
+        >>> # to get the current fpmath mode
+        >>> torch.xpu.get_fp32_math_mode(device="xpu")
     """
 
     if device == "cpu":

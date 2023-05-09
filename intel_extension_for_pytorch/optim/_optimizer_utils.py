@@ -141,7 +141,7 @@ def patch_load_state_dict(optimizer):
     def repack(self):
         for group in self.param_groups:
             for i, p in enumerate(group['params']):
-                if p in self.params_attr:
+                if p in self.params_attr and p.device.type == 'cpu':
                     attr = self.params_attr[p]
                     if 'op' in attr:
                         # weight attr need "op" info to pack state while bias attr not
@@ -329,7 +329,7 @@ def patch_state_dict(optimizer):
         setattr(optimizer, '_original_state_dict', optimizer.state_dict)
         setattr(optimizer, 'state_dict', types.MethodType(get_optimizer_unpacked_state_dict, optimizer))
 
-def optimizer_fusion(optimizer, master_weight_split, is_xpu=False):
+def optimizer_fusion(optimizer, master_weight_split, device_type):
     r"""
     Patch "step" method to choose IPEX optimized fused update kernel.
     """
@@ -337,10 +337,15 @@ def optimizer_fusion(optimizer, master_weight_split, is_xpu=False):
     if not hasattr(optimizer, 'params_attr'):
         setattr(optimizer, 'params_attr', {})
     try:
-        if not is_xpu:
+        if device_type == 'cpu':
             step = OPTIMIZER_FUSED_STEP_MAPPING_CPU[type(optimizer)]
-        else:
+        elif device_type == 'xpu':
             step = OPTIMIZER_FUSED_STEP_MAPPING_XPU[type(optimizer)]
+        else:
+            warnings.warn(
+                "IPEX does not support device type " + str(device_type)
+                + ". For now, only support CPU, XPU.")
+            return optimizer
         if not hasattr(optimizer, '_original_step'):
             setattr(optimizer, '_original_step', optimizer.step)
         setattr(optimizer, 'step', types.MethodType(step, optimizer))

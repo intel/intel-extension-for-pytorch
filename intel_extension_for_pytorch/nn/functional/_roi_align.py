@@ -101,4 +101,3 @@ def roi_align(
     return torch.ops.torch_ipex.ROIAlign_forward(input, rois, spatial_scale,
                                            output_size[0], output_size[1],
                                            sampling_ratio, aligned)
-

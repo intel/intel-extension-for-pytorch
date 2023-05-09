@@ -13,7 +13,7 @@ from torch.ao.quantization.quantize import propagate_qconfig_
 from torch.ao.quantization.quantization_mappings import get_default_dynamic_quant_module_mappings
 
 import intel_extension_for_pytorch._C as core
-from intel_extension_for_pytorch.utils.linear_bn_folding import linear_bn_fuse
+from intel_extension_for_pytorch.cpu.utils.linear_bn_folding import linear_bn_fuse
 from intel_extension_for_pytorch.nn.utils._weight_prepack import may_import_deepspeed_modules
 from ._quantize_utils import auto_prepare, auto_convert, copy_prepared_model
 from .. import nn
@@ -50,9 +50,9 @@ def prepare(
     if isinstance(configure, QConfigMapping):
         configure = configure.global_qconfig
     # auto model channels_last memory format conversion
-    from ..frontend import auto_channels_last, _convert_convNd_weight_memory_format
+    from ..frontend import auto_channels_last, _convert_convNd_deconvNd_weight_memory_format
     if auto_channels_last:
-        _convert_convNd_weight_memory_format(model)
+        _convert_convNd_deconvNd_weight_memory_format(model)
     if inplace:
         prepare_model = model
     else:

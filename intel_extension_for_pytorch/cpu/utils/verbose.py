@@ -25,7 +25,7 @@ class verbose(object):
 
         import intel_extension_for_pytorch as ipex
         model(data)
-        with ipex.verbose(ipex.utils.VERBOSE_ON):
+        with ipex.verbose(ipex.verbose.VERBOSE_ON):
             model(data)
 
     Args:

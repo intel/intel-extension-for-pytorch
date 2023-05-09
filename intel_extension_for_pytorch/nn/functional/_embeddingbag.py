@@ -25,6 +25,43 @@ def _embedding_bag_fast_path_sum(
 
 torch_embedding_bag = torch.embedding_bag
 
+def patch_emb_bag_cpu_only(func):
+    def wrapper(weights: Tensor,
+                indices: Tensor,
+                offsets: Tensor,
+                scale_grad_by_freq: bool = False,
+                mode: int = 0,
+                sparse: bool = False,
+                per_sample_weights: Optional[Tensor] = None,
+                include_last_offset: bool = False,
+                padding_idx: Optional[int] = None):
+        all_cpu = weights.device.type == 'cpu' \
+            and indices.device.type == 'cpu' \
+                and offsets.device.type == 'cpu'\
+                    and (True if per_sample_weights is None else per_sample_weights.device.type == 'cpu')
+        if all_cpu:
+            return func(weights,
+                        indices,
+                        offsets,
+                        scale_grad_by_freq,
+                        mode,
+                        sparse,
+                        per_sample_weights,
+                        include_last_offset,
+                        padding_idx)
+        else:
+            return torch_embedding_bag(weights,
+                                        indices,
+                                        offsets,
+                                        scale_grad_by_freq,
+                                        mode,
+                                        sparse,
+                                        per_sample_weights,
+                                        include_last_offset,
+                                        padding_idx)
+    return wrapper
+
+@patch_emb_bag_cpu_only
 def _embeddingbag(
     weights: Tensor,
     indices: Tensor,

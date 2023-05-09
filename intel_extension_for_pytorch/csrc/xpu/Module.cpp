@@ -190,7 +190,8 @@ PyObject* THPModule_setCurrentStream_wrap(PyObject* self, PyObject* obj) {
   auto stream = xpu::dpcpp::DPCPPStream::unpack(bits);
   auto device = static_cast<int>(xpu::dpcpp::current_device());
   if (device != stream.device_index()) {
-    xpu::dpcpp::set_device(static_cast<c10::DeviceIndex>(device));
+    xpu::dpcpp::set_device(
+        static_cast<c10::DeviceIndex>(stream.device_index()));
   }
   xpu::dpcpp::setCurrentDPCPPStream(stream);
   Py_RETURN_NONE;
@@ -364,7 +365,9 @@ static PyObject* set_autocast_xpu_dtype(PyObject* _unused, PyObject* arg) {
 static PyObject* get_autocast_xpu_dtype(PyObject* _unused, PyObject* arg) {
   HANDLE_TH_ERRORS
   at::ScalarType current_dtype = at::autocast::get_autocast_xpu_dtype();
-  return THPDtype_New(current_dtype, scalarTypeName(current_dtype));
+  auto dtype = (PyObject*)torch::getTHPDtype(current_dtype);
+  Py_INCREF(dtype);
+  return dtype;
   END_HANDLE_TH_ERRORS
 }
 
@@ -505,6 +508,10 @@ static void register_xpu_device_info(PyObject* module) {
       .def_readonly("platform_name", &DeviceInfo::platform_name)
       .def_readonly("total_memory", &DeviceInfo::global_mem_size)
       .def_readonly("max_compute_units", &DeviceInfo::max_compute_units)
+      .def_readonly("gpu_eu_count", &DeviceInfo::gpu_eu_count)
+      .def_readonly("max_work_group_size", &DeviceInfo::max_work_group_size)
+      .def_readonly("max_num_sub_groups", &DeviceInfo::max_num_sub_groups)
+      .def_readonly("sub_group_sizes", &DeviceInfo::sub_group_sizes)
       .def_readonly("support_fp64", &DeviceInfo::support_fp64)
       .def_property_readonly(
           "dev_type", [](const DeviceInfo& info) { return get_dev_type(info); })
@@ -514,7 +521,8 @@ static void register_xpu_device_info(PyObject* module) {
                << "', platform_name='" << info.platform_name << "', dev_type='"
                << get_dev_type(info) << ", support_fp64=" << info.support_fp64
                << ", total_memory=" << info.global_mem_size / (1024 * 1024)
-               << "MB, max_compute_units=" << info.max_compute_units << ")";
+               << "MB, max_compute_units=" << info.max_compute_units
+               << ", gpu_eu_count=" << info.gpu_eu_count << ")";
         return stream.str();
       });
 }
@@ -554,7 +562,7 @@ at::Scalar scalar_slow(PyObject* object) {
 void init_xpu_module(pybind11::module& m) {
   // For Runtime API, still use pybind
   m.def("_synchronize", [](const int& device_index) {
-    getCurrentDPCPPStream(device_index).synchronize();
+    xpu::dpcpp::deviceSynchronize(device_index);
   });
 
   m.def("dump_memory_stat", [](const int& device_index) {
@@ -633,16 +641,19 @@ void init_xpu_module(pybind11::module& m) {
     Settings::I().disable_onednn_layout();
   });
 
-  m.def("_is_force_onednn_primitive_enabled", []() {
-    return Settings::I().is_force_onednn_primitive_enabled();
-  });
+  py::enum_<xpu::COMPUTE_ENG>(m, "XPUComputeEng")
+      .value("RECOMMEND", xpu::COMPUTE_ENG::RECOMMEND)
+      .value("BASIC", xpu::COMPUTE_ENG::BASIC)
+      .value("ONEDNN", xpu::COMPUTE_ENG::ONEDNN)
+      .value("ONEMKL", xpu::COMPUTE_ENG::ONEMKL)
+      .value("XETLA", xpu::COMPUTE_ENG::XETLA)
+      .export_values();
 
-  m.def("_enable_force_onednn_primitive", []() {
-    Settings::I().enable_force_onednn_primitive();
+  m.def("_get_compute_eng", []() {
+    return static_cast<int>(Settings::I().get_compute_eng());
   });
-
-  m.def("_disable_force_onednn_primitive", []() {
-    Settings::I().disable_force_onednn_primitive();
+  m.def("_set_compute_eng", [](const int eng) {
+    return Settings::I().set_compute_eng(static_cast<xpu::COMPUTE_ENG>(eng));
   });
 
   m.def("_set_onednn_verbose", [](const int level) {

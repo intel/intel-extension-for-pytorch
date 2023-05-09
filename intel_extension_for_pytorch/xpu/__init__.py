@@ -2,13 +2,15 @@ r"""
 This package is lazily initialized, so you can always import it.
 """
 
-import contextlib
+from torch import serialization
+from torch.storage import _StorageBase
 import sys
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Dict
 import torch
 import intel_extension_for_pytorch
 from .lazy_init import _lazy_init, _lazy_call
 from torch import device as _device
+from torch._utils import classproperty
 
 from .streams import Stream, Event
 from .intrinsic import *
@@ -17,38 +19,17 @@ from .amp import *
 from .utils import *
 from .random import *
 from .memory import *
+from .overrides import set_default_tensor_type as set_default_tensor_type
+from .overrides import enable_cl_to as enable_cl_to
+from .overrides import override_tensor_totype, override_assert_equal
+from .generator import Generator
 
 from torch._utils import _get_device_index
 import intel_extension_for_pytorch.optim as optim
-
+from intel_extension_for_pytorch._version import (__version__, __ipex_gitrev__, __torch_gitrev__, __gpu_onednn_gitrev__, __build_type__) # noqa B950
 
 default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
-
-from ._utils import _dummy_type
-
-if not hasattr(intel_extension_for_pytorch._C, 'ShortStorageBase'):
-    intel_extension_for_pytorch._C.__dict__['ShortStorageBase'] = _dummy_type('ShortStorageBase')
-if not hasattr(intel_extension_for_pytorch._C, 'CharStorageBase'):
-    intel_extension_for_pytorch._C.__dict__['CharStorageBase'] = _dummy_type('CharStorageBase')
-if not hasattr(intel_extension_for_pytorch._C, 'IntStorageBase'):
-    intel_extension_for_pytorch._C.__dict__['IntStorageBase'] = _dummy_type('IntStorageBase')
-if not hasattr(intel_extension_for_pytorch._C, 'LongStorageBase'):
-    intel_extension_for_pytorch._C.__dict__['LongStorageBase'] = _dummy_type('LongStorageBase')
-if not hasattr(intel_extension_for_pytorch._C, 'BoolStorageBase'):
-    intel_extension_for_pytorch._C.__dict__['BoolStorageBase'] = _dummy_type('BoolStorageBase')
-if not hasattr(intel_extension_for_pytorch._C, 'HalfStorageBase'):
-    intel_extension_for_pytorch._C.__dict__['HalfStorageBase'] = _dummy_type('HalfStorageBase')
-if not hasattr(intel_extension_for_pytorch._C, 'DoubleStorageBase'):
-    intel_extension_for_pytorch._C.__dict__['DoubleStorageBase'] = _dummy_type('DoubleStorageBase')
-if not hasattr(intel_extension_for_pytorch._C, 'FloatStorageBase'):
-    intel_extension_for_pytorch._C.__dict__['FloatStorageBase'] = _dummy_type('FloatStorageBase')
-if not hasattr(intel_extension_for_pytorch._C, 'BFloat16StorageBase'):
-    intel_extension_for_pytorch._C.__dict__['BFloat16StorageBase'] = _dummy_type('BFloat16StorageBase')
-if not hasattr(intel_extension_for_pytorch._C, 'QUInt8StorageBase'):
-    intel_extension_for_pytorch._C.__dict__['QUInt8StorageBase'] = _dummy_type('QUInt8StorageBase')
-if not hasattr(intel_extension_for_pytorch._C, 'QInt8StorageBase'):
-    intel_extension_for_pytorch._C.__dict__['QInt8StorageBase'] = _dummy_type('QInt8StorageBase')
 
 
 def is_initialized():
@@ -171,6 +152,24 @@ def get_device_name(device: Optional[_device_t] = None) -> str:
     return get_device_properties(device).name
 
 
+def get_device_capability(device: Optional[_device_t] = None) -> Dict[str, Any]:
+    r"""Gets the xpu capability of a device.
+
+    Args:
+        device (torch.device or int, optional): device for which to return the
+            device capability. It uses the current device, given by
+            :func:`~torch.xpu.current_device`, if :attr:`device` is ``None``
+            (default).
+
+    Returns:
+        Dict[str, Any]: the xpu capability dictionary of the device
+    """
+    prop = get_device_properties(device)
+    return {"max_work_group_size": prop.max_work_group_size,
+            "max_num_sub_groups": prop.max_num_sub_groups,
+            "sub_group_sizes": prop.sub_group_sizes}
+
+
 def get_device_properties(device: _device_t):
     r"""Gets the xpu properties of a device.
 
@@ -209,6 +208,87 @@ def synchronize(device: _device_t = None) -> None:
     return intel_extension_for_pytorch._C._synchronize(idx)
 
 
+class StreamContext(object):
+    r"""Context-manager that selects a given stream.
+
+    All XPU kernels queued within its context will be enqueued on a selected
+    stream.
+
+    Args:
+        Stream (Stream): selected stream. This manager is a no-op if it's
+            ``None``.
+    .. note:: Streams are per-device.
+    """
+    cur_stream: Optional['Stream']
+
+    def __init__(self, stream: Optional['Stream']):
+        self.stream = stream
+        self.idx = _get_device_index(None, True)
+        if not torch.jit.is_scripting():
+            if self.idx is None:
+                self.idx = -1
+
+        self.src_prev_stream = None
+        self.dst_prev_stream = None
+
+    def __enter__(self):
+        # Local cur_stream variable for type refinement
+        cur_stream = self.stream
+        # Return if stream is None or XPU device not available
+        if cur_stream is None or self.idx == -1:
+            return
+        self.src_prev_stream = current_stream(None)
+
+        # If the stream is not on the current device, then
+        # set the current stream on the device
+        if self.src_prev_stream.device != cur_stream.device:
+            with device(cur_stream.device):
+                self.dst_prev_stream = current_stream(cur_stream.device)
+        set_stream(cur_stream)
+
+    def __exit__(self, type: Any, value: Any, traceback: Any):
+        # Local cur_stream variable for type refinement
+        cur_stream = self.stream
+        # If stream is None or no XPU device available, return
+        if cur_stream is None or self.idx == -1:
+            return
+
+        # Reset the stream on the original device
+        # and destination device
+        if self.src_prev_stream.device != cur_stream.device:
+            set_stream(self.dst_prev_stream)
+        set_stream(self.src_prev_stream)
+
+
+def stream(stream: Optional['Stream']) -> StreamContext:
+    r"""Wrapper around the Context-manager StreamContext that
+    selects a given stream.
+
+    Arguments:
+        stream (Stream): selected stream. This manager is a no-op if it's
+            ``None``.
+
+    .. note:: Streams are per-device. If the selected stream is not on the
+        current device, this function will also change the current device to
+        match the stream.
+    """
+    return StreamContext(stream)
+
+
+def set_stream(stream: Stream):
+    r"""Sets the current stream.This is a wrapper API to set the stream.
+        Usage of this function is discouraged in favor of the ``stream``
+        context manager.
+
+    Args:
+        stream (Stream): selected stream. This function is a no-op
+            if this argument is ``None``.
+    """
+    if stream is None:
+        return
+    intel_extension_for_pytorch._C._setCurrentStream(stream._cdata)
+
+
 def current_stream(device: Optional[_device_t] = None) -> Stream:
     r"""Returns the currently selected :class:`Stream` for a given device.
 
@@ -223,39 +303,7 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
         _get_device_index(device, optional=True)))
 
 
-@contextlib.contextmanager
-def stream(stream):
-    r"""Context-manager that selects a given stream.
-
-    Arguments:
-        stream (Stream): selected stream. This manager is a no-op if it's
-            ``None``.
-
-    .. note:: Streams are per-device. If the selected stream is not on the
-        current device, this function will also change the current device to
-        match the stream.
-    """
-    if stream is None:
-        yield
-        return
-    src_prev_stream = current_stream()
-
-    if src_prev_stream.device != stream.device:
-        # The given stream is on a different device; have to restore the
-        # current_stream on that device on exit as well
-        with device(stream.device):
-            dst_prev_stream = current_stream()
-
-    intel_extension_for_pytorch._C._setCurrentStream(stream._cdata)
-    try:
-        yield
-    finally:
-        if src_prev_stream.device != stream.device:
-            intel_extension_for_pytorch._C._setCurrentStream(dst_prev_stream._cdata)
-        intel_extension_for_pytorch._C._setCurrentStream(src_prev_stream._cdata)
-
-
-from torch.storage import _StorageBase
+from torch.storage import _LegacyStorage
 
 @staticmethod  # type: ignore[misc]
 def _lazy_new(cls, *args, **kwargs):
@@ -278,66 +326,99 @@ class _XPUBase(object):
     __new__ = _lazy_new
 
 
-class ShortStorage(_XPUBase, intel_extension_for_pytorch._C.ShortStorageBase, _StorageBase):
-    pass
+class _XPULegacyStorage(_LegacyStorage):
+    @classmethod
+    def from_buffer(cls, *args, **kwargs):
+        raise RuntimeError('from_buffer: Not available for XPU storage')
 
+    @classmethod
+    def _new_with_weak_ptr(cls, *args, **kwargs):
+        raise RuntimeError('_new_with_weak_ptr: Not available for XPU storage')
 
-class CharStorage(_XPUBase, intel_extension_for_pytorch._C.CharStorageBase, _StorageBase):
-    pass
+    @classmethod
+    def _new_shared_filename(cls, manager, obj, size, *, device=None, dtype=None):
+        raise RuntimeError('_new_shared_filename: Not available for XPU storage')
 
+class ByteStorage(_XPULegacyStorage):
+    @classproperty
+    def dtype(self):
+        return torch.uint8
 
-class IntStorage(_XPUBase, intel_extension_for_pytorch._C.IntStorageBase, _StorageBase):
-    pass
+class DoubleStorage(_XPULegacyStorage):
+    @classproperty
+    def dtype(self):
+        return torch.double
 
+class FloatStorage(_XPULegacyStorage):
+    @classproperty
+    def dtype(self):
+        return torch.float
 
-class LongStorage(_XPUBase, intel_extension_for_pytorch._C.LongStorageBase, _StorageBase):
-    pass
+class HalfStorage(_XPULegacyStorage):
+    @classproperty
+    def dtype(self):
+        return torch.half
 
+class LongStorage(_XPULegacyStorage):
+    @classproperty
+    def dtype(self):
+        return torch.long
 
-class BoolStorage(_XPUBase, intel_extension_for_pytorch._C.BoolStorageBase, _StorageBase):
-    pass
+class IntStorage(_XPULegacyStorage):
+    @classproperty
+    def dtype(self):
+        return torch.int
 
+class ShortStorage(_XPULegacyStorage):
+    @classproperty
+    def dtype(self):
+        return torch.short
 
-class HalfStorage(_XPUBase, intel_extension_for_pytorch._C.HalfStorageBase, _StorageBase):
-    pass
+class CharStorage(_XPULegacyStorage):
+    @classproperty
+    def dtype(self):
+        return torch.int8
 
+class BoolStorage(_XPULegacyStorage):
+    @classproperty
+    def dtype(self):
+        return torch.bool
 
-class DoubleStorage(_XPUBase, intel_extension_for_pytorch._C.DoubleStorageBase, _StorageBase):
-    pass
+class BFloat16Storage(_XPULegacyStorage):
+    @classproperty
+    def dtype(self):
+        return torch.bfloat16
 
+class ComplexDoubleStorage(_XPULegacyStorage):
+    @classproperty
+    def dtype(self):
+        return torch.cdouble
 
-class FloatStorage(_XPUBase, intel_extension_for_pytorch._C.FloatStorageBase, _StorageBase):
-    pass
+class ComplexFloatStorage(_XPULegacyStorage):
+    @classproperty
+    def dtype(self):
+        return torch.cfloat
 
+del _LegacyStorage
+del _XPULegacyStorage
 
-class BFloat16Storage(_XPUBase, intel_extension_for_pytorch._C.BFloat16StorageBase, _StorageBase):
-    pass
-
-
-class QUInt8Storage(_XPUBase, intel_extension_for_pytorch._C.QUInt8StorageBase, _StorageBase):
-    pass
-
-
-class QInt8Storage(_XPUBase, intel_extension_for_pytorch._C.QInt8StorageBase, _StorageBase):
-    pass
-
-
-torch._storage_classes.add(ShortStorage)
-torch._storage_classes.add(CharStorage)
-torch._storage_classes.add(IntStorage)
-torch._storage_classes.add(LongStorage)
-torch._storage_classes.add(BoolStorage)
-torch._storage_classes.add(HalfStorage)
 torch._storage_classes.add(DoubleStorage)
 torch._storage_classes.add(FloatStorage)
+torch._storage_classes.add(LongStorage)
+torch._storage_classes.add(IntStorage)
+torch._storage_classes.add(ShortStorage)
+torch._storage_classes.add(CharStorage)
+torch._storage_classes.add(ByteStorage)
+torch._storage_classes.add(HalfStorage)
+torch._storage_classes.add(BoolStorage)
 torch._storage_classes.add(BFloat16Storage)
-torch._storage_classes.add(QUInt8Storage)
-torch._storage_classes.add(QInt8Storage)
+torch._storage_classes.add(ComplexDoubleStorage)
+torch._storage_classes.add(ComplexFloatStorage)
 
 
 def _xpu_tag(obj):
-    if type(obj).__module__ == 'intel_extension_for_pytorch.xpu':
-        return 'xpu:' + str(obj.get_device())
+    if obj.device.type == 'xpu':
+        return 'xpu:' + str(obj.device.index)
 
 
 def validate_xpu_device(location):
@@ -391,17 +472,19 @@ def _xpu(self, device=None, non_blocking=False, **kwargs):
             # return new_type(indices, values, self.size())
             pass
         else:
-            new_type = getattr(current_module, self.__class__.__name__)
-            return new_type(self.size()).copy_(self, non_blocking)
+            untyped_storage = torch.UntypedStorage(
+                self.size(), device=torch.device("xpu")
+            )
+            untyped_storage.copy_(self, non_blocking)
+            return untyped_storage
 
 
 def _xpu_deserialize(obj, location):
     if location.startswith('xpu'):
         device_id = validate_xpu_device(location)
         if getattr(obj, "_torch_load_uninitialized", False):
-            storage_type = getattr(current_module, type(obj).__name__)
-            with device(device_id):
-                return storage_type(obj.size())
+            with torch.xpu.device(device):
+                return torch.UntypedStorage(obj.nbytes(), device=torch.device(location))
         else:
             return _xpu(obj, device=device_id)
 
@@ -409,14 +492,29 @@ def _xpu_deserialize(obj, location):
 def get_device_type() -> str:
     return 'xpu'
 
-
-from torch import serialization
+_StorageBase.xpu = _xpu
 
 serialization.register_package(30, _xpu_tag, _xpu_deserialize)
 
 torch._register_device_module('xpu', current_module)
 
 # post initial
-# add dummy function for xpu
 if hasattr(intel_extension_for_pytorch._C, '_postInitExtension'):
     intel_extension_for_pytorch._C._postInitExtension()
+
+# class FloatTensor:
+#     def __new__(cls, e):
+#         return torch.tensor(e, device='xpu', dtype=torch.float)
+
+
+# class DoubleTensor:
+#     def __new__(cls, e):
+#         return torch.tensor(e, device='xpu', dtype=torch.float64)
+
+if intel_extension_for_pytorch._C._has_xpu():
+    if is_available() and not has_fp64_dtype():
+        override_tensor_totype()
+
+        exec_path = sys.argv[0].split("/")
+        if (len(exec_path) > 0 and "pytest" in exec_path):
+            override_assert_equal()

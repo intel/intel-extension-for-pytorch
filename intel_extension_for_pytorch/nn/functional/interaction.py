@@ -40,4 +40,3 @@ class InteractionFunc(Function):
         args = ctx.saved_tensors
         grad_in = torch.ops.torch_ipex.interaction_backward(grad_out.contiguous(), args)
         return tuple(grad_in)
-

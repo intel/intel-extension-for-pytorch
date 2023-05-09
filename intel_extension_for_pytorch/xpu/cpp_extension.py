@@ -8,6 +8,7 @@ import re
 import shlex
 import sys
 import sysconfig
+import errno
 
 import warnings
 
@@ -81,7 +82,7 @@ def _get_exec_path(module_name, path):
 
 def get_dpcpp_complier():
     # build cxx via dpcpp
-    dpcpp_cmp = shutil.which('dpcpp')
+    dpcpp_cmp = shutil.which('icpx')
     if dpcpp_cmp is None:
         raise RuntimeError("Failed to find compiler path from OS PATH")
     _cxxbin = os.getenv("CXX")
@@ -219,6 +220,9 @@ class DpcppBuildExtension(build_ext, object):
             original_spawn = self.compiler.spawn
         else:
             original_compile = self.compiler._compile
+            # save origin function for passthough
+            original_link_shared_object = self.compiler.link_shared_object
+            original_spawn = self.compiler.spawn
 
         def append_std17_if_no_std_present(cflags) -> None:
             cpp_format_prefix = '/{}:' if self.compiler.compiler_type == 'msvc' else '-{}='
@@ -265,6 +269,74 @@ class DpcppBuildExtension(build_ext, object):
             finally:
                 # Put the original compiler back in place.
                 self.compiler.set_executable('compiler_so', original_compiler)
+
+        def _gen_link_lib_cmd_line(
+                linker,
+                objects,
+                target_name,
+                library_dirs,
+                runtime_library_dirs,
+                libraries,
+                extra_postargs):
+            cmd_line = []
+
+            library_dirs_args = []
+            library_dirs_args += [f'-L{x}' for x in library_dirs]
+
+            runtime_library_dirs_args = []
+            runtime_library_dirs_args += [f'-L{x}' for x in runtime_library_dirs]
+
+            libraries_args = []
+            libraries_args += [f'-l{x}' for x in libraries]
+
+            common_args = ['-shared']
+
+            '''
+            link command formats:
+            cmd = [LD common_args objects library_dirs_args runtime_library_dirs_args libraries_args
+                    -o target_name extra_postargs]
+            '''
+
+            cmd_line += [linker]
+            cmd_line += common_args
+            cmd_line += objects
+            cmd_line += library_dirs_args
+            cmd_line += runtime_library_dirs_args
+            cmd_line += libraries_args
+            cmd_line += ['-o']
+            cmd_line += [target_name]
+            cmd_line += extra_postargs
+
+            return cmd_line
+
+        def create_parent_dirs_by_path(filename):
+            if not os.path.exists(os.path.dirname(filename)):
+                try:
+                    os.makedirs(os.path.dirname(filename))
+                except OSError as exc:  # Guard against race condition
+                    if exc.errno != errno.EEXIST:
+                        raise
+
+        def unix_wrap_single_link_shared_object(objects,
+                                                output_libname,
+                                                output_dir=None,
+                                                libraries=None,
+                                                library_dirs=None,
+                                                runtime_library_dirs=None,
+                                                export_symbols=None,
+                                                debug=0,
+                                                extra_preargs=None,
+                                                extra_postargs=None,
+                                                build_temp=None,
+                                                target_lang=None):
+            # create output directories avoid linker error.
+            create_parent_dirs_by_path(output_libname)
+
+            _cxxbin = get_dpcpp_complier()
+            cmd = _gen_link_lib_cmd_line(_cxxbin, objects, output_libname, library_dirs,
+                                         runtime_library_dirs, libraries, extra_postargs)
+
+            return original_spawn(cmd)
 
         def unix_wrap_ninja_compile(sources,
                                     output_dir=None,
@@ -325,6 +397,7 @@ class DpcppBuildExtension(build_ext, object):
                 self.compiler.compile = unix_wrap_ninja_compile
             else:
                 self.compiler._compile = unix_wrap_single_compile
+                self.compiler.link_shared_object = unix_wrap_single_link_shared_object
 
         build_ext.build_extensions(self)
 
@@ -382,10 +455,9 @@ BUILT_FROM_SOURCE_VERSION_PATTERN = re.compile(r'\d+\.\d+\.\d+\w+\+\w+')
 def _is_binary_build() -> bool:
     return not BUILT_FROM_SOURCE_VERSION_PATTERN.match(torch.version.__version__)
 
-
 def _accepted_compilers_for_platform() -> List[str]:
     # gnu-c++ and gnu-cc are the conda gcc compilers
-    return ['clang++', 'clang'] if IS_MACOS else ['dpcpp', 'icx']
+    return ['clang++', 'clang'] if IS_MACOS else ['icpx', 'icx']
 
 def check_compiler_ok_for_platform(compiler: str) -> bool:
     r'''
@@ -579,6 +651,9 @@ def _write_ninja_file_and_build_library(
         extra_ldflags or [],
         verbose,
         is_standalone)
+
+    extra_cflags = _prepare_compile_flags(extra_cflags)
+
     build_file_path = os.path.join(build_directory, 'build.ninja')
     if verbose:
         print(f'Emitting ninja build file {build_file_path}...')
@@ -626,6 +701,16 @@ def library_paths() -> List[str]:
     paths += get_one_api_help().get_library_dirs()
 
     return paths
+
+def _prepare_compile_flags(extra_compile_args):
+    if(isinstance(extra_compile_args, List)):
+        extra_compile_args.append('-fsycl')
+    elif(isinstance(extra_compile_args, dict)):
+        cl_flags = extra_compile_args.get('cxx', [])
+        cl_flags.append('-fsycl')
+        extra_compile_args['cxx'] = cl_flags
+
+    return extra_compile_args
 
 def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
     if IS_WINDOWS:
@@ -895,7 +980,7 @@ def _jit_compile(name,
     if version > 0:
         if version != old_version and verbose:
             print(f'The input conditions for extension module {name} have changed. ' +
-                  f'Bumping to version {version} and re-building as {name}_v{version}...')
+            f'Bumping to version {version} and re-building as {name}_v{version}...')
         name = f'{name}_v{version}'
 
     if version != old_version:
@@ -939,7 +1024,7 @@ def load(name,
          is_standalone=False,
          keep_intermediates=True):
     r'''
-    Loads a PyTorch C++ extension just-in-time (JIT).
+    Loads a intel_extension_for_pytorch DPC++ extension just-in-time (JIT).
 
     To load an extension, a Ninja build file is emitted, which is used to
     compile the given sources into a dynamic library. This library is
@@ -1228,7 +1313,6 @@ def get_pytorch_include_dir():
 def get_pytorch_lib_dir():
     return [os.path.join(_TORCH_PATH, 'lib')]
 
-
 def DPCPPExtension(name, sources, *args, **kwargs):
     r'''
     Creates a :class:`setuptools.Extension` for DPCPP/C++.
@@ -1276,6 +1360,7 @@ def DPCPPExtension(name, sources, *args, **kwargs):
     extra_link_args = kwargs.get('extra_link_args', [])
     # add oneapi link parameters
     extra_link_args = _prepare_ldflags(extra_link_args, False, False)
+    extra_compile_args = _prepare_compile_flags(extra_compile_args)
 
     # todo: add dpcpp parameter support.
     kwargs['extra_link_args'] = extra_link_args

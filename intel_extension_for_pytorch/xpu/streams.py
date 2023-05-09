@@ -1,16 +1,15 @@
 import ctypes
 import intel_extension_for_pytorch
-from ._utils import _dummy_type
 
-if not hasattr(intel_extension_for_pytorch._C, '_XPUStreamBase'):
-    # Define dummy base classes
-    intel_extension_for_pytorch._C.__dict__['_XPUStreamBase'] = _dummy_type('_XPUStreamBase')
-    intel_extension_for_pytorch._C.__dict__['_XPUEventBase'] = _dummy_type('_XPUEventBase')
 
 class Stream(intel_extension_for_pytorch._C._XPUStreamBase):
     def __new__(cls, device=None, priority=0, **kwargs):
         with intel_extension_for_pytorch.xpu.device(device):
             return super(Stream, cls).__new__(cls, priority=priority, **kwargs)
+
+    @property
+    def _as_parameter_(self):
+        return ctypes.c_void_p(self.sycl_queue)
 
     def __eq__(self, o):
         if isinstance(o, Stream):
@@ -18,11 +17,11 @@ class Stream(intel_extension_for_pytorch._C._XPUStreamBase):
         return False
 
     def __hash__(self):
-        return hash((self._cdata, self.device))
+        return hash((self.sycl_queue, self.device))
 
     def __repr__(self):
-        return ('<intel_extension_for_pytorch.Stream device={0} xpu_stream={1}>'
-                .format(self.device, self.xpu_stream))
+        return ('<intel_extension_for_pytorch.Stream device={0} sycl_queue={1:#x}>'
+                .format(self.device, self.sycl_queue))
 
     def wait_event(self, event):
         r"""Makes all future work submitted to the stream wait for an event.
