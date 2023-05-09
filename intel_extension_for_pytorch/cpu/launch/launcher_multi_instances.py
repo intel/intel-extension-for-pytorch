@@ -180,8 +180,11 @@ class MultiInstancesLauncher(Launcher):
         args.ninstances = len(self.cpuinfo.pools_ondemand)
         args.ncores_per_instance = len(self.cpuinfo.pools_ondemand[0])
 
-        preset_ld_preload = os.environ.get('LD_PRELOAD', '')
-        is_iomp_set = 'libiomp5.so' in preset_ld_preload
+        is_iomp_set = False
+        for item in self.ld_preload:
+            if item.endswith('libiomp5.so'):
+                is_iomp_set = True
+                break
         is_kmp_affinity_set = True if 'KMP_AFFINITY' in os.environ else False
         set_kmp_affinity = True
         # When using all cores on all nodes, including logical cores, setting KMP_AFFINITY disables logical cores. Thus, KMP_AFFINITY should not be set.
@@ -199,6 +202,15 @@ class MultiInstancesLauncher(Launcher):
         task_mgr = self.set_multi_task_manager(args.multi_task_manager, skip_list=skip_list)
 
         # Set environment variables for multi-instance execution
+        self.verbose('info', 'env: Untouched preset environment variables are not displayed.')
+        environ_local = {}
+        for k,v in os.environ.items():
+            if k == 'LD_PRELOAD':
+                continue
+            environ_local[k] = v
+        if len(self.ld_preload) > 0:
+            environ_local['LD_PRELOAD'] = ':'.join(self.ld_preload)
+            self.verbose('info', f'env: LD_PRELOAD={environ_local["LD_PRELOAD"]}')
         for k,v in self.environ_set.items():
             if task_mgr == self.tm_supported[1]:
                 if omp_runtime == 'default' and k == 'GOMP_CPU_AFFINITY':
@@ -206,6 +218,7 @@ class MultiInstancesLauncher(Launcher):
                 if omp_runtime == 'intel' and k == 'KMP_AFFINITY':
                     continue
             self.verbose('info', f'env: {k}={v}')
+            environ_local[k] = v
 
         if args.auto_ipex:
             args.program = auto_ipex.apply_monkey_patch(args.program, args.dtype, args.auto_ipex_verbose, args.disable_ipex_graph_mode)
@@ -225,7 +238,7 @@ class MultiInstancesLauncher(Launcher):
                     args = args,
                     omp_runtime = omp_runtime,
                     task_mgr = task_mgr,
-                    environ = self.environ_set,
+                    environ = environ_local,
                     cpu_pools = self.cpuinfo.pools_ondemand,
                     index = i)
             processes.append(process)
