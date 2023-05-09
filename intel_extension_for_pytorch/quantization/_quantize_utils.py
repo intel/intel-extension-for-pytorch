@@ -28,15 +28,6 @@ def _nn_sequential_patched_forward(cls, input):
             input = module(input)
     return input
 
-def _check_add_has_scalar_input(args):
-    r"""
-    This function is about check add whether has scalar input.
-    """
-    for arg in args:
-        if not isinstance(arg, torch.Tensor):
-            return True
-    return False
-
 def _convert_PackedSequence_to_tuple_lstm(args):
      if isinstance(args, tuple) and len(args) == 2:   # (PackedSequence, hx)
         input, batch_sizes, sorted_indices, unsorted_indices = args[0]
@@ -54,7 +45,7 @@ def _convert_tuple_to_PackedSequence_lstm(args):
         return (PackedSequence(*args),)
     else:
         return (PackedSequence(*args[:-1]), args[-1])
-    
+
 
 def auto_prepare(
     model : torch.nn.Module,
@@ -84,6 +75,21 @@ def auto_prepare(
     global_op_idx = [0]
 
     global_disable_torch_function_override = False
+
+    def check_add_has_scalar_tensor_input(args):
+        r"""
+        This function is about check add whether has scalar(tensor) input.
+        """
+        nonlocal global_disable_torch_function_override
+        old_global_disable_torch_function_override = \
+            global_disable_torch_function_override
+        global_disable_torch_function_override = True
+        for arg in args:
+            if not isinstance(arg, torch.Tensor) or arg.dim() == 0:
+                global_disable_torch_function_override = old_global_disable_torch_function_override
+                return True
+        global_disable_torch_function_override = old_global_disable_torch_function_override
+        return False
 
     class QuantizationPrepareTensorProxy(torch.Tensor):
         """
@@ -124,7 +130,8 @@ def auto_prepare(
             # case, scalar+scalar, pytorch trace will convert the first input as a tensor at convert step,
             # but we didn't collect the quant info at calibration step, which can't get
             # quant info here(asster KeyError), so we disable torch.add(tensor, scaler) quantizaiton.
-            if hook_type is HookType.OP_HOOKS and func in [torch.add, torch.Tensor.add] and _check_add_has_scalar_input(args):
+            if hook_type is HookType.OP_HOOKS and func in [torch.add, torch.Tensor.add] \
+                    and check_add_has_scalar_tensor_input(args):
                 hook_type = None
 
             if hook_type is HookType.OP_HOOKS:
@@ -266,7 +273,7 @@ def auto_prepare(
                         else:
                             output = parent_qstate.op_prepare_after_hook(
                                 cur_module, output, args, global_op_idx)
-                        
+
                         if is_lstm_packed_input:
                             output = _convert_tuple_to_PackedSequence_lstm(output)
 
@@ -324,7 +331,7 @@ def auto_prepare(
             try:
                 if first_call:
                     init_model_quant_state(self, module_id_to_fqn, configure)
-               
+
                 global_op_idx[0] = 0
                 output = super().__call__(*new_args, **new_kwargs)
 
@@ -363,7 +370,7 @@ def auto_prepare(
             # Setting model qconf_summary attr which can be easily to check the whether the scale/zp has been computed.
             self._qconf_summary = qconf_summary
             save_quant_state(quant_state_map, qconf_summary)
-        
+
         def load_qconf_summary(self, qconf_summary):
             r"""
             This function is about load the user qconf_summary, which will overwrite the model's quant_state_map.
@@ -376,7 +383,7 @@ def auto_prepare(
 
     model.q_config = configure
     # For Dynamic quantization, most user model has a dynamic control flow, the DBR
-    # doesn't support it now, so there skip DRB when user want to run dynamic quantization. 
+    # doesn't support it now, so there skip DRB when user want to run dynamic quantization.
     if not isinstance(configure.activation(), PlaceholderObserver):
         model.__class__ = QuantizationInterceptionModule
         # init model quantization state using example_inputs
@@ -410,6 +417,21 @@ def auto_convert(
             return x
 
     global_disable_torch_function_override = False
+
+    def check_add_has_scalar_tensor_input(args):
+        r"""
+        This function is about check add whether has scalar(tensor) input.
+        """
+        nonlocal global_disable_torch_function_override
+        old_global_disable_torch_function_override = \
+            global_disable_torch_function_override
+        global_disable_torch_function_override = True
+        for arg in args:
+            if not isinstance(arg, torch.Tensor) or arg.dim() == 0:
+                global_disable_torch_function_override = old_global_disable_torch_function_override
+                return True
+        global_disable_torch_function_override = old_global_disable_torch_function_override
+        return False
 
     class QuantizationConvertTensorProxy(torch.Tensor):
         """
@@ -449,7 +471,8 @@ def auto_convert(
             # case, scalar+scalar, pytorch trace will convert the first input as a tensor,
             # but we didn't collect the quant info at calibration step, which can't get
             # quant info here(asster KeyError), so we disable torch.add(tensor, scaler) quantizaiton.
-            if hook_type is HookType.OP_HOOKS and func in [torch.add, torch.Tensor.add] and _check_add_has_scalar_input(args):
+            if hook_type is HookType.OP_HOOKS and func in [torch.add, torch.Tensor.add] \
+                    and check_add_has_scalar_tensor_input(args):
                 hook_type = None
 
             if hook_type is HookType.OP_HOOKS:
@@ -567,7 +590,7 @@ def auto_convert(
                         old_global_disable_torch_function_override = \
                             global_disable_torch_function_override
                         global_disable_torch_function_override = True
-                        
+
                         output = cur_qstate.outputs_convert_hook(output)
                         global_disable_torch_function_override = \
                             old_global_disable_torch_function_override
@@ -595,7 +618,7 @@ def auto_convert(
             finally:
                 torch.nn.Module.__call__ = orig_module_call
                 torch.nn.Sequential.forward = orig_nn_sequential_forward  # type: ignore[assignment]
- 
+
     # If module doesn't have a configure_file attr, we can say that user didn't run save_qconf_summary method which have
     # computed the scales and zp, or didn't use the user's setting from a given json file(load_qconf_summary), we need to compute
     # the scale and zp here.
