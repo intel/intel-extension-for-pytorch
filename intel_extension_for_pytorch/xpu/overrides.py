@@ -1,6 +1,7 @@
 import torch
 import intel_extension_for_pytorch  # noqa
 from functools import wraps
+from torch.nn.parallel.scatter_gather import _is_namedtuple
 
 
 def override_tensor_totype():
@@ -58,6 +59,80 @@ def override_assert_equal():
     torch.backends.disable_global_flags = _disable_global_flags
     from torch.testing._internal.common_utils import TestCase
     TestCase.assertEqual = fp64_assert_equal_wrapper(TestCase.assertEqual)
+
+
+# background streams used for copying
+_streams = None
+
+def override_get_stream():
+    r"""
+    This function overrides `_get_stream` in PyTorch to provide XPU support.
+    """
+    def _get_stream(device: int):
+        r"""
+        Gets a background stream for copying between CPU and XPU.
+        """
+        global _streams
+        if device == -1:
+            return None
+        if _streams is None:
+            _streams = [None] * torch.xpu.device_count()
+        if _streams[device] is None:
+            _streams[device] = torch.xpu.Stream(device)
+        return _streams[device]
+
+    torch.nn.parallel._functions._get_stream = _get_stream
+    return _get_stream
+
+
+def override_recursive_to():
+    r"""
+    This function overrides `_recursive_to` in PyTorch to provide XPU support for data movement.
+    """
+    def _recursive_to(inputs, target_gpu, use_side_stream_for_tensor_copies):
+        r"""
+        Recursively moves input to the target_gpu, used in XPU distributed training.
+        """
+        def to_map(obj):
+            if isinstance(obj, torch.Tensor):
+                if obj.device == torch.device('xpu', target_gpu):
+                    return (obj,)
+                if not use_side_stream_for_tensor_copies:
+                    return (obj.to(target_gpu),)
+                else:
+                    # Perform CPU -> GPU copies in a background stream. This code is
+                    # motivated from similar logic in torch/nn/parallel/_functions.py
+                    _get_stream = override_get_stream()
+                    stream = _get_stream(target_gpu)
+                    with torch.xpu.stream(stream):
+                        output = obj.to(target_gpu)
+                    # synchronize with the copy stream
+                    with torch.xpu.device(target_gpu):
+                        current_stream = torch.xpu.current_stream()
+                        # Sync the current stream with the copy stream
+                        current_stream.wait_stream(stream)
+                        # nsure tensor memory is not reused until work on
+                        # main stream is complete
+                        output.record_stream(current_stream)
+                    return (output,)
+            if _is_namedtuple(obj):
+                return [type(obj)(*args) for args in zip(*map(to_map, obj))]
+            if isinstance(obj, tuple) and len(obj) > 0:
+                return list(zip(*map(to_map, obj)))
+            if isinstance(obj, list) and len(obj) > 0:
+                return [list(i) for i in zip(*map(to_map, obj))]
+            if isinstance(obj, dict) and len(obj) > 0:
+                return [type(obj)(i) for i in zip(*map(to_map, obj.items()))]
+            return [obj]
+
+        # Avoid reference cycle
+        try:
+            res = to_map(inputs)
+        finally:
+            to_map = None  # type: ignore[assignment]
+        return res
+
+    torch.distributed.utils._recursive_to = _recursive_to
 
 
 class WrapAPI:

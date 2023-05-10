@@ -25,7 +25,9 @@ from .memory import *
 
 from .overrides import (
     override_tensor_totype,
-    override_assert_equal
+    override_assert_equal,
+    override_get_stream,
+    override_recursive_to,
     )
 
 from .generator import Generator
@@ -522,9 +524,12 @@ if hasattr(intel_extension_for_pytorch._C, '_postInitExtension'):
 #         return torch.tensor(e, device='xpu', dtype=torch.float64)
 
 if intel_extension_for_pytorch._C._has_xpu():
-    if is_available() and not has_fp64_dtype():
-        override_tensor_totype()
+    if is_available():
+        override_get_stream()
+        override_recursive_to()
+        if not has_fp64_dtype():
+            override_tensor_totype()
 
-        exec_path = sys.argv[0].split("/")
-        if (len(exec_path) > 0 and "pytest" in exec_path):
-            override_assert_equal()
+            exec_path = sys.argv[0].split("/")
+            if (len(exec_path) > 0 and "pytest" in exec_path):
+                override_assert_equal()
