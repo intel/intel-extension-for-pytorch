@@ -21,7 +21,7 @@ from .. import nn
 def prepare(
     model,
     configure,
-    example_inputs,
+    example_inputs=None,
     inplace=False,
     bn_folding=True):
     r"""
@@ -46,9 +46,12 @@ def prepare(
         warnings.warn("\nIPEX quantization: QConfig are deprecated. Please use QConfigMapping instead.\nUsage:"
                       "\n    qconfig_mapping = ipex.quantization.default_static_qconfig_mapping # for static quantization"
                       "\n    qconfig_mapping = ipex.quantization.default_dynamic_qconfig_mapping # for dynamic quantization"
-                      "\n    prepared_model = ipex.quantization.prepare(model_fp32, qconfig_mapping)")
+                      "\n    prepared_model = ipex.quantization.prepare(model_fp32, qconfig_mapping, ...)")
     if isinstance(configure, QConfigMapping):
         configure = configure.global_qconfig
+    if not isinstance(configure.activation(), PlaceholderObserver):
+        assert example_inputs is not None, \
+            "IPEX quantization.prepare: example inputs cannot be None for static quantization"
     # auto model channels_last memory format conversion
     from ..frontend import auto_channels_last, _convert_convNd_deconvNd_weight_memory_format
     if auto_channels_last:
@@ -72,7 +75,7 @@ def prepare(
     # Special case for common case of passing a single Tensor
     if isinstance(example_inputs, (torch.Tensor, dict)):
         example_inputs = (example_inputs,)
-    elif not isinstance(example_inputs, tuple):
+    elif not isinstance(example_inputs, tuple) and example_inputs is not None:
         example_inputs = tuple(example_inputs)
     return auto_prepare(prepare_model, configure, example_inputs)
 

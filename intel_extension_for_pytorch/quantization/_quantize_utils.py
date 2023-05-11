@@ -50,7 +50,7 @@ def _convert_tuple_to_PackedSequence_lstm(args):
 def auto_prepare(
     model : torch.nn.Module,
     configure: QConfig,
-    example_inputs: Tuple[Any],
+    example_inputs: Optional[Tuple[Any]],
 ) -> torch.nn.Module:
 
     def convert_to_interception_proxy(x):
@@ -387,6 +387,8 @@ def auto_prepare(
     if not isinstance(configure.activation(), PlaceholderObserver):
         model.__class__ = QuantizationInterceptionModule
         # init model quantization state using example_inputs
+        assert example_inputs is not None, \
+            "IPEX: example inputs cannot be None for static quantization"
         model(*example_inputs)
     return model
 

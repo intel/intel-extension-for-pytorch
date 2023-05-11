@@ -340,5 +340,31 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 assert observer_info_dict == observer_info_dict_2, \
                     "Error: SmoothQuant observer info lost after saving/loading qconf JSON"
 
+    def test_none_example_input_for_quantization(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = nn.Linear(2, 2)
+                self.relu = nn.ReLU()
+
+            def forward(self, x):
+                x = self.linear(x)
+                x = self.relu(x)
+                return x
+
+        m = M()
+
+        # Dynamic quant
+        qconfig_mapping = ipex.quantization.default_dynamic_qconfig_mapping
+        prepared_model = ipex.quantization.prepare(m, qconfig_mapping)
+        converted_model = ipex.quantization.convert(prepared_model)
+        assert hasattr(converted_model, 'linear')
+        assert isinstance(converted_model.linear, nn.quantized.dynamic.Linear)
+
+        # Static quant
+        qconfig_mapping = ipex.quantization.default_static_qconfig_mapping
+        with self.assertRaises(AssertionError):
+            prepared_model = ipex.quantization.prepare(m, qconfig_mapping)
+
 if __name__ == '__main__':
     run_tests() 
