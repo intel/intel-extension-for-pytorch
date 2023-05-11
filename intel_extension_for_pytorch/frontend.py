@@ -610,34 +610,18 @@ def optimize(
             optimized_optimizer, opt_properties.split_master_weight_for_bf16, device_type)
     return optimized_model, optimized_optimizer
 
-def defake(x):
-    if not isinstance(x, FakeTensor):
-        return x
-    if x._has_symbolic_sizes_strides:
-        size = [
-            s.node.shape_env.size_hint(s.node.expr)
-            if isinstance(s, torch.SymInt)
-            else s
-            for s in x.size()
-        ]
-        stride = [
-            s.node.shape_env.size_hint(s.node.expr)
-            if isinstance(s, torch.SymInt)
-            else s
-            for s in x.stride()
-        ]
-    else:
-        size = x.size()
-        stride = x.stride()
-    y = torch.empty_strided(
-        size,
-        stride,
-        dtype=x.dtype,
-        device=x.device,
-        requires_grad=x.requires_grad,
-    )
-    y.zero_()
-    return y
+
+_compiler_backend = "torchscript"
+
+
+def _get_compiler_backend():
+    return _compiler_backend
+
+
+def _set_compiler_backend(backend="torchscript"):
+    global _compiler_backend
+    _compiler_backend = backend
+
 
 def compile(
     model: torch.fx.GraphModule,
@@ -645,6 +629,39 @@ def compile(
     mode: Union[str, None] = None,
     options: Optional[Dict[str, Union[str, builtins.int, builtins.bool]]] = None
 ) -> Callable:
+
+    def defake(x):
+        if not isinstance(x, FakeTensor):
+            return x
+        if x._has_symbolic_sizes_strides:
+            size = [
+                s.node.shape_env.size_hint(s.node.expr)
+                if isinstance(s, torch.SymInt)
+                else s
+                for s in x.size()
+            ]
+            stride = [
+                s.node.shape_env.size_hint(s.node.expr)
+                if isinstance(s, torch.SymInt)
+                else s
+                for s in x.stride()
+            ]
+        else:
+            size = x.size()
+            stride = x.stride()
+        y = torch.empty_strided(
+            size,
+            stride,
+            dtype=x.dtype,
+            device=x.device,
+            requires_grad=x.requires_grad,
+        )
+        y.zero_()
+        return y
+
+    if _get_compiler_backend() == "inductor":
+        from ._inductor.compile_fx import compile_fx
+        return compile_fx(model, example_inputs, mode, options)
 
     try:
         with no_dispatch():

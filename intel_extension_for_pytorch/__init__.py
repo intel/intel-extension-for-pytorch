@@ -23,6 +23,7 @@ from . import optim
 from .frontend import optimize, compile, enable_onednn_fusion
 from .frontend import enable_auto_channels_last, disable_auto_channels_last
 from .frontend import set_fp32_math_mode, get_fp32_math_mode, FP32MathMode, fast_bert
+from .frontend import _set_compiler_backend, _get_compiler_backend
 from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl
 from .cpu.utils.verbose import verbose
 
