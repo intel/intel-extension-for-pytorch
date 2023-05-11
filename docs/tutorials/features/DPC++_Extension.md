@@ -102,9 +102,19 @@ target_include_directories(lltm_xpu PUBLIC "${TORCH_IPEX_INCLUDE_DIRS}")
 set_property(TARGET lltm_xpu PROPERTY CXX_STANDARD 17)
 #DPCPP need 17
 ```
+Find cmake_prefix_path of torch and ipex
+```
+$ python
+>>> import torch
+>>> import intel_extension_for_pytorch
+>>> torch.utils.cmake_prefix_path
+'<cmake_prefix_path for torch>'
+>>> intel_extension_for_pytorch.cmake_prefix_path
+'<cmake_prefix_path for ipex>'
+```
 Commands for compilation:
 ```
-$ cmake -DCMAKE_PREFIX_PATH=<torch/ipex cmake path in your env> -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=dpcpp ..
+$ cmake -DCMAKE_PREFIX_PATH=<torch & ipex cmake_prefix_path> -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=<icpx|icx> ..
 $ make
 ```
 After build the python module with CMake, the `lltm_xpu` is also avalible for importing as a extension plug-in like setuptools method.
@@ -127,7 +137,7 @@ c10_stream.synchronize();
 
 ### Fetching the corresponding sycl::queue
 
-We provide some APIs to fetch the corresponding `sycl::queue` associated with the 
+We provide some APIs to fetch the corresponding `sycl::queue` associated with the
 current `c10::Stream`.
 In C++ code, you can fetch a `sycl::queue` reference as below.
 ```cpp
@@ -175,7 +185,7 @@ std::vector<torch::Tensor> lltm_xpu_backward(
     torch::Tensor X,
     torch::Tensor gate_weights,
     torch::Tensor weights);
-    
+
 // C++ interface
 
 #define CHECK_XPU(x) TORCH_CHECK(x.device().is_xpu(), #x " must be a XPU tensor")
@@ -279,8 +289,8 @@ scalar_t d_elu(scalar_t z, scalar_t alpha = 1.0) {
 }
 ```
 
-Now we can implement the actual code for our extension with two functions in DPC++: 
-* a function that performs operations we don’t wish to explicitly write by hand and calls into the function to submit the SYCL kernel, 
+Now we can implement the actual code for our extension with two functions in DPC++:
+* a function that performs operations we don’t wish to explicitly write by hand and calls into the function to submit the SYCL kernel,
 * a function that actual submits the SYCL kernel to the XPU device for the parts we want to speed up. 
 
 For the forward pass, the first function looks like this:
