@@ -207,9 +207,9 @@ void adaptive_avg_pool2d_out_template(
         0,
         outputHeight,
         outputWidth,
-        dilation_vec,
-        kernel_size_vec,
         stride_vec,
+        kernel_size_vec,
+        dilation_vec,
         padding_vec,
         padding_vec);
   } else {
@@ -504,16 +504,20 @@ void adaptive_avg_pool2d_backward_out_template(
       std::floor((float)inputHeight / outputHeight);
   int dW = std::floor((float)2 * inputWidth / outputWidth) -
       std::floor((float)inputWidth / outputWidth);
+  std::vector<int64_t> stride_vec = {dH, dW};
 
   int kH = std::ceil((float)2 * inputHeight / outputHeight) -
       std::floor((float)inputHeight / outputHeight);
   int kW = std::ceil((float)2 * inputWidth / outputWidth) -
       std::floor((float)inputWidth / outputWidth);
+  std::vector<int64_t> kernel_size_vec = {kH, kW};
 
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
+  std::vector<int64_t> padding_vec = {padH, padW};
 
   // per oneDNN definition, no dilation means dilation ratio is 0
+  std::vector<int64_t> dilation_vec = {0, 0};
   if (xpu::oneDNN::is_valid_pooling(
           {inputHeight, inputWidth},
           {outputHeight, inputHeight},
@@ -533,18 +537,11 @@ void adaptive_avg_pool2d_backward_out_template(
         0,
         outputHeight,
         outputWidth,
-        0,
-        kH,
-        kW,
-        0,
-        dH,
-        dW,
-        0,
-        0,
-        0,
-        0,
-        padH,
-        padW);
+        stride_vec,
+        kernel_size_vec,
+        dilation_vec,
+        padding_vec,
+        padding_vec);
   } else {
     auto gradOutput_ = to_plain_if_needed(gradOutput);
 

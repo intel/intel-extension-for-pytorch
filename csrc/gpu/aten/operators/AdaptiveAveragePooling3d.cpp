@@ -109,9 +109,9 @@ void adaptive_avg_pool3d_out_template(
       outputDepth,
       outputHeight,
       outputWidth,
-      dilation_vec,
-      kernel_size_vec,
       stride_vec,
+      kernel_size_vec,
+      dilation_vec,
       padding_vec,
       padding_vec);
 }
@@ -137,20 +137,24 @@ Tensor& adaptive_avg_pool3d_backward_out_template(
   int dW = std::floor((float)2 * gradInputWidth / gradOutputWidth) -
       std::floor((float)gradInputWidth / gradOutputWidth);
 
+  std::vector<int64_t> stride_vec = {dD, dH, dW};
+
   int kD = std::ceil((float)2 * gradInputDepth / gradOutputDepth) -
       std::floor((float)gradInputDepth / gradOutputDepth);
   int kH = std::ceil((float)2 * gradInputHeight / gradOutputHeight) -
       std::floor((float)gradInputHeight / gradOutputHeight);
   int kW = std::ceil((float)2 * gradInputWidth / gradOutputWidth) -
       std::floor((float)gradInputWidth / gradOutputWidth);
+  std::vector<int64_t> kernel_vec = {kD, kH, kW};
 
   int padD = (dD * (gradOutputDepth - 1) + kD - gradInputDepth) / 2;
   int padH = (dH * (gradOutputHeight - 1) + kH - gradInputHeight) / 2;
   int padW = (dW * (gradOutputWidth - 1) + kW - gradInputWidth) / 2;
+  std::vector<int64_t> padding_vec = {padD, padH, padW};
 
+  std::vector<int64_t> dilation_vec = {0, 0, 0};
   // per oneDNN definition, no dilation means dilation ratio is 0
   xpu::oneDNN::pooling_backward<alg::pooling_avg_exclude_padding>(
-
       gradInput,
       gradOutput,
       input,
@@ -162,18 +166,11 @@ Tensor& adaptive_avg_pool3d_backward_out_template(
       gradOutputDepth,
       gradOutputHeight,
       gradOutputWidth,
-      kD,
-      kH,
-      kW,
-      dD,
-      dH,
-      dW,
-      0,
-      0,
-      0,
-      padD,
-      padH,
-      padW);
+      stride_vec,
+      kernel_vec,
+      dilation_vec,
+      padding_vec,
+      padding_vec);
 
   return gradInput;
 }

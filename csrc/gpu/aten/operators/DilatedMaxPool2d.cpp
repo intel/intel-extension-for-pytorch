@@ -54,12 +54,6 @@ void max_pool2d_with_indices_out_template(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-  if (ceil_mode) {
-    TORCH_CHECK(
-        (input.ndimension() == 4),
-        "For now, the max pool2d only support 4d input for ceil mode");
-  }
-
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 2,
       "max_pool2d: kernel_size must either be a single int, or a tuple "
@@ -118,9 +112,19 @@ void max_pool2d_with_indices_out_template(
   std::vector<int64_t> output_sizes;
   int64_t outputHeight, outputWidth;
 
+  /*
+    For the pooling output shap with ceil_mode, oneDNN computes as (src -
+    ker_range + pad_l + pad_r) / str + 1 and PyTorch ceil_mode comptues as (src
+    - ker_range + pl + pr + stride -1) /stride +1. The code following here is to
+    adjust right padding of pooling to satisfy oneDNN fromula according to
+    https://jira.devtools.intel.com/browse/MFDNN-6759. The code is based on
+    https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/mkldnn/Pooling.cpp#L222.
+  */
   if (ceil_mode) {
+    // Unsqueeze 3D input(C, H, W) -> 4D input(1, C, H, W)
+    auto input_4d = (input.ndimension() == 3) ? (input.unsqueeze(0)) : (input);
     const std::vector<int64_t> output_sizes_ceil = pool_output_sizes(
-        input.sizes(),
+        input_4d.sizes(),
         kernel_size_vec,
         stride_vec,
         padding_vec_l,
@@ -131,7 +135,7 @@ void max_pool2d_with_indices_out_template(
     bool all_equal = false;
     while (!all_equal) {
       output_sizes = pool_output_sizes(
-          input.sizes(),
+          input_4d.sizes(),
           kernel_size_vec,
           stride_vec,
           padding_vec_l,
@@ -140,7 +144,7 @@ void max_pool2d_with_indices_out_template(
           false);
 
       all_equal = true;
-      for (size_t i = 2; i < input.sizes().size(); ++i) {
+      for (size_t i = 2; i < input_4d.sizes().size(); ++i) {
         if (output_sizes[i] < output_sizes_ceil[i]) {
           padding_vec_r[i - 2]++;
           all_equal = false;
@@ -215,9 +219,9 @@ void max_pool2d_with_indices_out_template(
       0,
       outputHeight,
       outputWidth,
-      dilation_vec,
-      kernel_size_vec,
       stride_vec,
+      kernel_size_vec,
+      dilation_vec,
       padding_vec_l,
       padding_vec_r);
 }
@@ -290,9 +294,19 @@ Tensor& max_pool2d_with_indices_backward_out_template(
   std::vector<int64_t> output_sizes;
   int64_t outputHeight, outputWidth;
 
+  // Unsqueeze 3D input(C, H, W) -> 4D input(1, C, H, W)
+  auto input_4d = (input.ndimension() == 3) ? (input.unsqueeze(0)) : (input);
+  /*
+    For the pooling output shap with ceil_mode, oneDNN computes as (src -
+    ker_range + pad_l + pad_r) / str + 1 and PyTorch ceil_mode comptues as (src
+    - ker_range + pl + pr + stride -1) /stride +1. The code following here is to
+    adjust right padding of pooling to satisfy oneDNN fromula according to
+    https://jira.devtools.intel.com/browse/MFDNN-6759. The code is based on
+    https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/mkldnn/Pooling.cpp#L222.
+  */
   if (ceil_mode) {
     const std::vector<int64_t> output_sizes_ceil = pool_output_sizes(
-        input.sizes(),
+        input_4d.sizes(),
         kernel_size_vec,
         stride_vec,
         padding_vec_l,
@@ -303,7 +317,7 @@ Tensor& max_pool2d_with_indices_backward_out_template(
     bool all_equal = false;
     while (!all_equal) {
       output_sizes = pool_output_sizes(
-          input.sizes(),
+          input_4d.sizes(),
           kernel_size_vec,
           stride_vec,
           padding_vec_l,
@@ -312,9 +326,9 @@ Tensor& max_pool2d_with_indices_backward_out_template(
           false);
 
       all_equal = true;
-      for (size_t i = 2; i < input.sizes().size(); ++i) {
+      for (size_t i = 2; i < input_4d.sizes().size(); ++i) {
         if (output_sizes[i] < output_sizes_ceil[i]) {
-          padding_vec_l[i - 2]++;
+          padding_vec_r[i - 2]++;
           all_equal = false;
         }
       }
@@ -351,6 +365,7 @@ Tensor& max_pool2d_with_indices_backward_out_template(
   // per oneDNN definition, no dilation means dilation ratio is 0.
   // Since dilation is already designed in the output size, no dilation
   // is used in ::xpu::oneDNN::pooling
+  dilation_vec = {0, 0};
   ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
       gradOutput,
@@ -364,18 +379,11 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       0,
       outputHeight,
       outputWidth,
-      0,
-      kH,
-      kW,
-      0,
-      dH,
-      dW,
-      0,
-      0,
-      0,
-      0,
-      padding_vec_l[0],
-      padding_vec_l[1]);
+      stride_vec,
+      kernel_size_vec,
+      dilation_vec,
+      padding_vec_l,
+      padding_vec_r);
 
   return gradInput;
 }

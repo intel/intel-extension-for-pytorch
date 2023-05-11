@@ -140,9 +140,9 @@ void avg_pool3d_out_template(
         outputDepth,
         outputHeight,
         outputWidth,
-        dilation_vec,
-        kernel_size_vec,
         stride_vec,
+        kernel_size_vec,
+        dilation_vec,
         padding_vec,
         padding_vec);
   } else {
@@ -157,9 +157,9 @@ void avg_pool3d_out_template(
         outputDepth,
         outputHeight,
         outputWidth,
-        dilation_vec,
-        kernel_size_vec,
         stride_vec,
+        kernel_size_vec,
+        dilation_vec,
         padding_vec,
         padding_vec);
   }
@@ -185,6 +185,7 @@ Tensor& avg_pool3d_backward_out_template(
   const int kW = kernel_size.size() == 1
       ? kD
       : safe_downcast<int, int64_t>(kernel_size[2]);
+  std::vector<int64_t> kernel_vec = {kD, kH, kW};
 
   TORCH_CHECK(
       stride.empty() || stride.size() == 1 || stride.size() == 3,
@@ -197,6 +198,7 @@ Tensor& avg_pool3d_backward_out_template(
   const int dW = stride.empty() ? kW
       : stride.size() == 1      ? dD
                                 : safe_downcast<int, int64_t>(stride[2]);
+  std::vector<int64_t> stride_vec = {dD, dH, dW};
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 3,
@@ -207,6 +209,7 @@ Tensor& avg_pool3d_backward_out_template(
       padding.size() == 1 ? padD : safe_downcast<int, int64_t>(padding[1]);
   const int padW =
       padding.size() == 1 ? padD : safe_downcast<int, int64_t>(padding[2]);
+  std::vector<int64_t> padding_vec = {padD, padH, padW};
 
   TORCH_CHECK(
       (input.ndimension() == 4 || input.ndimension() == 5),
@@ -256,6 +259,7 @@ Tensor& avg_pool3d_backward_out_template(
       "avg_pool3d_backward_out_template()");
 
   // per oneDNN definition, no dilation means dilation ratio is 0
+  std::vector<int64_t> dilation_vec = {0, 0, 0};
   if (count_include_pad) {
     ::xpu::oneDNN::pooling_backward<
         ::xpu::oneDNN::alg::pooling_avg_include_padding>(
@@ -270,18 +274,11 @@ Tensor& avg_pool3d_backward_out_template(
         odepth,
         oheight,
         owidth,
-        kD,
-        kH,
-        kW,
-        dD,
-        dH,
-        dW,
-        0,
-        0,
-        0,
-        padD,
-        padH,
-        padW);
+        stride_vec,
+        kernel_vec,
+        dilation_vec,
+        padding_vec,
+        padding_vec);
   } else {
     ::xpu::oneDNN::pooling_backward<
         ::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
@@ -296,18 +293,11 @@ Tensor& avg_pool3d_backward_out_template(
         odepth,
         oheight,
         owidth,
-        kD,
-        kH,
-        kW,
-        dD,
-        dH,
-        dW,
-        0,
-        0,
-        0,
-        padD,
-        padH,
-        padW);
+        stride_vec,
+        kernel_vec,
+        dilation_vec,
+        padding_vec,
+        padding_vec);
   }
   return gradInput;
 }

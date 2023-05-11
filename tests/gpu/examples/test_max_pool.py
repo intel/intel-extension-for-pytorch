@@ -281,3 +281,18 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(output_cpu, output_xpu.to(cpu_device))
         self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
+
+    def test_max_pool2d_ceil_mode_3d_input(self):
+        pool2d = nn.MaxPool2d((3, 3), stride=(2, 2), padding=0, dilation=1, ceil_mode=True)
+        input_cpu = torch.randn((2, 3, 6), dtype=torch.float32).requires_grad_(True)
+        output_cpu = pool2d(input_cpu)
+        pool2d = pool2d.to(dpcpp_device)
+        input_xpu = input_cpu.detach().clone().to(dpcpp_device).requires_grad_(True)
+        output_xpu = pool2d(input_xpu)
+        self.assertEqual(output_cpu, output_xpu.to(cpu_device))
+
+        grad_cpu = torch.randn((2, 1, 3))
+        output_cpu.backward(grad_cpu)
+        grad_xpu = grad_cpu.detach().clone().to(dpcpp_device)
+        output_xpu.backward(grad_xpu)
+        self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))

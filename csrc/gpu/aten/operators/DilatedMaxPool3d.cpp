@@ -153,9 +153,9 @@ void max_pool3d_with_indices_out_template(
       outputDepth,
       outputHeight,
       outputWidth,
-      dilation_vec,
-      kernel_size_vec,
       stride_vec,
+      kernel_size_vec,
+      dilation_vec,
       padding_vec,
       padding_vec);
 }
@@ -181,6 +181,7 @@ Tensor& max_pool3d_with_indices_backward_out_template(
   const int kW = kernel_size.size() == 1
       ? kD
       : safe_downcast<int, int64_t>(kernel_size[2]);
+  std::vector<int64_t> kernel_vec = {kD, kH, kW};
 
   TORCH_CHECK(
       stride.empty() || stride.size() == 1 || stride.size() == 3,
@@ -203,6 +204,7 @@ Tensor& max_pool3d_with_indices_backward_out_template(
       padding.size() == 1 ? padD : safe_downcast<int, int64_t>(padding[1]);
   const int padW =
       padding.size() == 1 ? padD : safe_downcast<int, int64_t>(padding[2]);
+  std::vector<int64_t> padding_vec = {padD, padH, padW};
 
   TORCH_CHECK(
       dilation.size() == 1 || dilation.size() == 3,
@@ -215,6 +217,7 @@ Tensor& max_pool3d_with_indices_backward_out_template(
   const int dilationW = dilation.size() == 1
       ? dilationD
       : safe_downcast<int, int64_t>(dilation[2]);
+  std::vector<int64_t> stride_vec = {dD, dH, dW};
 
   TORCH_CHECK(
       (input.ndimension() == 4 || input.ndimension() == 5),
@@ -263,6 +266,7 @@ Tensor& max_pool3d_with_indices_backward_out_template(
   // per oneDNN definition, no dilation means dilation ratio is 0.
   // Since dilation is already designed in the output size, no dilation
   // is used in ::xpu::oneDNN::pooling
+  std::vector<int64_t> dilation_vec = {0, 0, 0};
   ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
       gradOutput,
@@ -276,18 +280,11 @@ Tensor& max_pool3d_with_indices_backward_out_template(
       gradOutputDepth,
       gradOutputHeight,
       gradOutputWidth,
-      kD,
-      kH,
-      kW,
-      dD,
-      dH,
-      dW,
-      0,
-      0,
-      0,
-      padD,
-      padH,
-      padW);
+      stride_vec,
+      kernel_vec,
+      dilation_vec,
+      padding_vec,
+      padding_vec);
 
   return gradInput;
 }

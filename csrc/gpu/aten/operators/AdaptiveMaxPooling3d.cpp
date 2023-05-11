@@ -64,6 +64,7 @@ void adaptive_max_pool3d_out_template(
       std::floor((float)inputHeight / outputHeight);
   int dW = std::floor((float)2 * inputWidth / outputWidth) -
       std::floor((float)inputWidth / outputWidth);
+  std::vector<int64_t> stride_vec = {dD, dH, dW};
 
   int kD = std::ceil((float)2 * inputDepth / outputDepth) -
       std::floor((float)inputDepth / outputDepth);
@@ -71,12 +72,15 @@ void adaptive_max_pool3d_out_template(
       std::floor((float)inputHeight / outputHeight);
   int kW = std::ceil((float)2 * inputWidth / outputWidth) -
       std::floor((float)inputWidth / outputWidth);
+  std::vector<int64_t> kernel_vec = {kD, kH, kW};
 
   int padD = (dD * (outputDepth - 1) + kD - inputDepth) / 2;
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
+  std::vector<int64_t> padding_vec = {padD, padH, padW};
 
   Tensor input_;
+
   if (input.ndimension() == 4) {
     // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
     // cannot give channels last for 4D tensor from frontend user perspective
@@ -95,9 +99,6 @@ void adaptive_max_pool3d_out_template(
         {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
   }
 
-  std::vector<int64_t> kernel_size_vec = {kD, kH, kW};
-  std::vector<int64_t> stride_vec = {dD, dH, dW};
-  std::vector<int64_t> padding_vec = {padD, padH, padW};
   // per oneDNN definition, no dilation means dilation ratio is 0
   std::vector<int64_t> dilation_vec = {0, 0, 0};
   ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
@@ -112,9 +113,9 @@ void adaptive_max_pool3d_out_template(
       outputDepth,
       outputHeight,
       outputWidth,
-      dilation_vec,
-      kernel_size_vec,
       stride_vec,
+      kernel_vec,
+      dilation_vec,
       padding_vec,
       padding_vec);
 }
@@ -140,6 +141,7 @@ Tensor& adaptive_max_pool3d_backward_out_template(
       std::floor((float)gradInputHeight / gradOutputHeight);
   int dW = std::floor((float)2 * gradInputWidth / gradOutputWidth) -
       std::floor((float)gradInputWidth / gradOutputWidth);
+  std::vector<int64_t> stride_vec = {dD, dH, dW};
 
   int kD = std::ceil((float)2 * gradInputDepth / gradOutputDepth) -
       std::floor((float)gradInputDepth / gradOutputDepth);
@@ -147,12 +149,15 @@ Tensor& adaptive_max_pool3d_backward_out_template(
       std::floor((float)gradInputHeight / gradOutputHeight);
   int kW = std::ceil((float)2 * gradInputWidth / gradOutputWidth) -
       std::floor((float)gradInputWidth / gradOutputWidth);
+  std::vector<int64_t> kernel_vec = {kD, kH, kW};
 
   int padD = (dD * (gradOutputDepth - 1) + kD - gradInputDepth) / 2;
   int padH = (dH * (gradOutputHeight - 1) + kH - gradInputHeight) / 2;
   int padW = (dW * (gradOutputWidth - 1) + kW - gradInputWidth) / 2;
+  std::vector<int64_t> padding_vec = {padD, padH, padW};
 
   // per oneDNN definition, no dilation means dilation ratio is 0
+  std::vector<int64_t> dilation_vec = {0, 0, 0};
   ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
       gradOutput,
@@ -166,18 +171,11 @@ Tensor& adaptive_max_pool3d_backward_out_template(
       gradOutputDepth,
       gradOutputHeight,
       gradOutputWidth,
-      kD,
-      kH,
-      kW,
-      dD,
-      dH,
-      dW,
-      0,
-      0,
-      0,
-      padD,
-      padH,
-      padW);
+      stride_vec,
+      kernel_vec,
+      dilation_vec,
+      padding_vec,
+      padding_vec);
   return gradInput;
 }
 

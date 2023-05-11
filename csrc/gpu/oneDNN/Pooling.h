@@ -52,9 +52,9 @@ static at::Tensor pooling(
     int64_t dstDepth,
     int64_t dstHeight,
     int64_t dstWidth,
-    std::vector<int64_t>& dilation_vec,
-    std::vector<int64_t>& kernel_vec,
     std::vector<int64_t>& stride_vec,
+    std::vector<int64_t>& kernel_vec,
+    std::vector<int64_t>& dilation_vec,
     std::vector<int64_t>& padding_l_vec,
     std::vector<int64_t>& padding_r_vec) {
   at::Device curDevice = at::Device(at::kXPU, current_device());
@@ -72,11 +72,6 @@ static at::Tensor pooling(
 
   memory::dims src_tz;
   memory::dims dst_tz;
-  memory::dims kernel;
-  memory::dims dilation;
-  memory::dims stride;
-  memory::dims padding_l;
-  memory::dims padding_r;
 
   auto ndim = src.ndimension();
   // FIXME:
@@ -131,11 +126,6 @@ static at::Tensor pooling(
     src_tz = {nbatch, nInputPlane, srcDepth, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstDepth, dstHeight, dstWidth};
   }
-  stride = {stride_vec.cbegin(), stride_vec.cend()};
-  kernel = {kernel_vec.cbegin(), kernel_vec.cend()};
-  dilation = {dilation_vec.cbegin(), dilation_vec.cend()};
-  padding_l = {padding_l_vec.cbegin(), padding_l_vec.cend()};
-  padding_r = {padding_r_vec.cbegin(), padding_r_vec.cend()};
 
   auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
   // propagate blocked format from src to dst
@@ -154,11 +144,11 @@ static at::Tensor pooling(
       alg_kind,
       src_usr_md,
       dst_md,
-      stride,
-      kernel,
-      dilation,
-      padding_l,
-      padding_r);
+      stride_vec,
+      kernel_vec,
+      dilation_vec,
+      padding_l_vec,
+      padding_r_vec);
 
   memory src_m, dst_m;
   if (!is_onednn_layout_suggested) {
@@ -205,11 +195,11 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
     int64_t dstDepth,
     int64_t dstHeight,
     int64_t dstWidth,
-    std::vector<int64_t> dilation_vec,
-    std::vector<int64_t> kernel_vec,
-    std::vector<int64_t> stride_vec,
-    std::vector<int64_t> padding_l_vec,
-    std::vector<int64_t> padding_r_vec) {
+    std::vector<int64_t>& stride_vec,
+    std::vector<int64_t>& kernel_vec,
+    std::vector<int64_t>& dilation_vec,
+    std::vector<int64_t>& padding_l_vec,
+    std::vector<int64_t>& padding_r_vec) {
   at::Device curDevice = at::Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -224,11 +214,6 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   memory::format_tag format;
   memory::dims src_tz;
   memory::dims dst_tz;
-  memory::dims kernel;
-  memory::dims stride;
-  memory::dims dilation;
-  memory::dims padding_l;
-  memory::dims padding_r;
 
   auto ndim = src.ndimension();
   // FIXME:
@@ -283,11 +268,6 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
     src_tz = {nbatch, nInputPlane, srcDepth, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstDepth, dstHeight, dstWidth};
   }
-  kernel = {kernel_vec.cbegin(), kernel_vec.cend()};
-  stride = {stride_vec.cbegin(), stride_vec.cend()};
-  dilation = {dilation_vec.cbegin(), dilation_vec.cend()};
-  padding_l = {padding_l_vec.cbegin(), padding_l_vec.cend()};
-  padding_r = {padding_r_vec.cbegin(), padding_r_vec.cend()};
 
   auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
   // propagate blocked format from src to dst
@@ -307,11 +287,11 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
       alg_kind,
       src_usr_md,
       dst_md,
-      stride,
-      kernel,
-      dilation,
-      padding_l,
-      padding_r);
+      stride_vec,
+      kernel_vec,
+      dilation_vec,
+      padding_l_vec,
+      padding_r_vec);
 
   auto expected_dst_md = pooling_fwd_pd.dst_desc();
 
@@ -396,18 +376,11 @@ static at::Tensor pooling_backward(
     int64_t diff_dst_depth,
     int64_t diff_dst_height,
     int64_t diff_dst_width,
-    int kD,
-    int kH,
-    int kW,
-    int dD,
-    int dH,
-    int dW,
-    int dlD,
-    int dlH,
-    int dlW,
-    int padD,
-    int padH,
-    int padW) {
+    std::vector<int64_t>& stride_vec,
+    std::vector<int64_t>& kernel_vec,
+    std::vector<int64_t>& dilation_vec,
+    std::vector<int64_t>& padding_l_vec,
+    std::vector<int64_t>& padding_r_vec) {
   at::Device curDevice = at::Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -457,10 +430,6 @@ static at::Tensor pooling_backward(
                                        : memory::format_tag::nchw;
     diff_src_tz = {nbatch, nInputPlane, diff_src_height, diff_src_width};
     diff_dst_tz = {nbatch, nInputPlane, diff_dst_height, diff_dst_width};
-    kernel = {kH, kW};
-    stride = {dH, dW};
-    dilation = {dlH, dlW};
-    padding = {padH, padW};
   } else if (ndim == 5 || (ndim == 4 && diff_src_depth != 0)) {
     /*
       This path is used for AvgPool3d/AdaptiveAvgPool3d.
@@ -485,10 +454,6 @@ static at::Tensor pooling_backward(
         nbatch, nInputPlane, diff_src_depth, diff_src_height, diff_src_width};
     diff_dst_tz = {
         nbatch, nInputPlane, diff_dst_depth, diff_dst_height, diff_dst_width};
-    kernel = {kD, kH, kW};
-    stride = {dD, dH, dW};
-    dilation = {dlD, dlH, dlW};
-    padding = {padD, padH, padW};
   }
 
   auto diff_src_usr_md = memory::desc({diff_src_tz}, data_t, format);
@@ -512,22 +477,22 @@ static at::Tensor pooling_backward(
       alg_kind,
       src_usr_md,
       diff_dst_usr_md,
-      stride,
-      kernel,
-      dilation,
-      padding,
-      padding);
+      stride_vec,
+      kernel_vec,
+      dilation_vec,
+      padding_l_vec,
+      padding_r_vec);
 
   auto pooling_bwd_pd = dnnl::pooling_backward::primitive_desc(
       engine,
       alg_kind,
       diff_src_md,
       diff_dst_usr_md,
-      stride,
-      kernel,
-      dilation,
-      padding,
-      padding,
+      stride_vec,
+      kernel_vec,
+      dilation_vec,
+      padding_l_vec,
+      padding_r_vec,
       pooling_fwd_pd);
 
   auto pooling_bwd = dnnl::pooling_backward(pooling_bwd_pd);
@@ -577,18 +542,11 @@ static at::Tensor pooling_backward(
     int64_t diff_dst_depth,
     int64_t diff_dst_height,
     int64_t diff_dst_width,
-    int kD,
-    int kH,
-    int kW,
-    int dD,
-    int dH,
-    int dW,
-    int dlD,
-    int dlH,
-    int dlW,
-    int padD,
-    int padH,
-    int padW) {
+    std::vector<int64_t>& stride_vec,
+    std::vector<int64_t>& kernel_vec,
+    std::vector<int64_t>& dilation_vec,
+    std::vector<int64_t>& padding_l_vec,
+    std::vector<int64_t>& padding_r_vec) {
   at::Device curDevice = at::Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -602,10 +560,6 @@ static at::Tensor pooling_backward(
   memory::format_tag format;
   memory::dims diff_src_tz;
   memory::dims diff_dst_tz;
-  memory::dims kernel;
-  memory::dims stride;
-  memory::dims dilation;
-  memory::dims padding;
 
   auto ndim = src.ndimension();
   // FIXME:
@@ -637,10 +591,6 @@ static at::Tensor pooling_backward(
                                        : memory::format_tag::nchw;
     diff_src_tz = {nbatch, nInputPlane, diff_src_height, diff_src_width};
     diff_dst_tz = {nbatch, nInputPlane, diff_dst_height, diff_dst_width};
-    kernel = {kH, kW};
-    stride = {dH, dW};
-    dilation = {dlH, dlW};
-    padding = {padH, padW};
   } else if (ndim == 5 || (ndim == 4 && diff_src_depth != 0)) {
     /*
       This path is used for MaxPool3d/AdaptiveMaxPool3d.
@@ -665,10 +615,6 @@ static at::Tensor pooling_backward(
         nbatch, nInputPlane, diff_src_depth, diff_src_height, diff_src_width};
     diff_dst_tz = {
         nbatch, nInputPlane, diff_dst_depth, diff_dst_height, diff_dst_width};
-    kernel = {kD, kH, kW};
-    stride = {dD, dH, dW};
-    dilation = {dlD, dlH, dlW};
-    padding = {padD, padH, padW};
   }
 
   auto diff_src_usr_md = memory::desc({diff_src_tz}, data_t, format);
@@ -693,22 +639,22 @@ static at::Tensor pooling_backward(
       alg_kind,
       src_usr_md,
       diff_dst_usr_md,
-      stride,
-      kernel,
-      dilation,
-      padding,
-      padding);
+      stride_vec,
+      kernel_vec,
+      dilation_vec,
+      padding_l_vec,
+      padding_r_vec);
 
   auto pooling_bwd_pd = dnnl::pooling_backward::primitive_desc(
       engine,
       alg_kind,
       diff_src_md,
       diff_dst_usr_md,
-      stride,
-      kernel,
-      dilation,
-      padding,
-      padding,
+      stride_vec,
+      kernel_vec,
+      dilation_vec,
+      padding_l_vec,
+      padding_r_vec,
       pooling_fwd_pd);
 
   auto expected_diff_src_md = pooling_bwd_pd.diff_src_desc();
