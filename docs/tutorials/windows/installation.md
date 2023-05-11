@@ -1,4 +1,4 @@
-# Building IPEX on Native Windows
+# Building Intel® Extension for PyTorch* on Native Windows
 
 ## 1. Install Microsoft Visual Studio 2022
 Follow this [link](https://visualstudio.microsoft.com/vs/) to download and install Microsoft Visual Studio 2022. In order to link oneAPI to VS environment in the next step, select **Desktop development with C++** workload.
@@ -28,7 +28,7 @@ Get the PyTorch repo:
 ```
 git clone https://github.com/pytorch/pytorch -b v1.13.1
 ```
-Get the IPEX repo to apply PyTorch patch needed:
+Get the Intel® Extension for PyTorch* repo to apply PyTorch patch needed:
 ```
 git clone https://github.com/intel/intel-extension-for-pytorch.git -b xpu-master
 cd pytorch
@@ -44,8 +44,8 @@ Install PyTorch:
 python setup.py install
 ```
 
-## 5. Install IPEX
-Get the IPEX repo:
+## 5. Install Intel® Extension for PyTorch*
+Get the Intel® Extension for PyTorch* repo:
 
 Skip if already done in previous step.
 ```
@@ -56,7 +56,7 @@ Install the required packages:
 ```
 pip install -r requirements.txt
 ```
-Install IPEX:
+Install Intel® Extension for PyTorch*:
 
 **Note**: Windows compiler check needs to be **comment out** at **third_party/oneDNN/cmake/dpcpp_driver_check.cmake#L36**
     
