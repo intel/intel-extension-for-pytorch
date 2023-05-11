@@ -100,7 +100,7 @@ from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl
 from .cpu.utils.verbose import verbose
 
 from . import _C
-from ._version import (__version__, __ipex_gitrev__, __torch_gitrev__, 
+from ._version import (__version__, __ipex_gitrev__, __torch_gitrev__,
             __gpu_onednn_gitrev__, __cpu_ideep_gitrev__, __build_type__)
 
 from .cpu.utils import _cpu_isa, _custom_fx_tracer
@@ -165,10 +165,10 @@ cmake_prefix_path = os.path.join(os.path.dirname(__file__), 'share', 'cmake')
 torch_version = ''
 ipex_version = ''
 import re
-matches = re.match('(\d+\.\d+).*', torch.__version__) # noqa W605
+matches = re.match(r'(\d+\.\d+).*', torch.__version__) # noqa W605
 if matches and len(matches.groups()) == 1:
     torch_version = matches.group(1)
-matches = re.match('(\d+\.\d+).*', __version__) # noqa W605
+matches = re.match(r'(\d+\.\d+).*', __version__) # noqa W605
 if matches and len(matches.groups()) == 1:
     ipex_version = matches.group(1)
 if torch_version == '' or ipex_version == '' or torch_version != ipex_version:
