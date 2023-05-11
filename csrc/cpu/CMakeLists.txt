@@ -17,8 +17,9 @@ set(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 set(DNNL_GRAPH_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 if(DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
-  set(DNNL_GRAPH_BUILD_COMPILER_BACKEND ON CACHE BOOL "" FORCE)
-  set(DNNL_GRAPH_LLVM_CONFIG "llvm-config-13" CACHE STRING "" FORCE)
+  set(ONEDNN_EXPERIMENTAL_GRAPH_COMPILER_BACKEND ON CACHE BOOL "" FORCE)
+  set(ONEDNN_EXPERIMENTAL_GRAPH_COMPILER_CPU_JIT "llvm;builtin" CACHE STRING "" FORCE)
+  set(ONEDNN_EXPERIMENTAL_GRAPH_COMPILER_CPU_LLVM_CONFIG "llvm-config-13" CACHE STRING "" FORCE)
 endif()
 add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn cpu_third_party/ideep/mkl-dnn EXCLUDE_FROM_ALL)
 # add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/mkl-dnn cpu_third_party/mkl-dnn)
@@ -92,10 +93,6 @@ target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_UTLIS_CPP_ROOT})
 
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/include)
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include)
-target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/third_party/oneDNN/include)
-# TODO: once llga is merged into oneDNN, use oneDNN directly as the third_party instead of using that inside llga
-# target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
-# target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
 
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/include)
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${PYTHON_INCLUDE_DIR})
@@ -119,18 +116,19 @@ ExternalProject_Add(libxsmm
   INSTALL_COMMAND ""
   )
 target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/lib/libxsmm.a)
-add_dependencies(${PLUGIN_NAME_CPU} dnnl_graph)
+add_dependencies(${PLUGIN_NAME_CPU} dnnl)
 # If Graph Compiler is built, then it should link to its LLVM dependencies,
 # and not the LLVM symbols exposed by PyTorch.
-target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC dnnl_graph)
 if (DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
   get_target_property(DNNL_GRAPHCOMPILER_LLVM_LIB dnnl_graphcompiler_llvm_lib INTERFACE_LINK_LIBRARIES)
-  target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC graphcompiler ${DNNL_GRAPHCOMPILER_LLVM_LIB})
+  target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC dnnl ${DNNL_GRAPHCOMPILER_LLVM_LIB})
   # BUILD_SHARED_LIBS is not used to control ipex library type, it is always shared
   if (NOT MSVC)
     get_target_property(DNNL_GRAPHCOMPILER_LLVM_LIB_EXCLUDE dnnl_graphcompiler_llvm_lib_exclude_string INTERFACE_LINK_LIBRARIES)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--exclude-libs=${DNNL_GRAPHCOMPILER_LLVM_LIB_EXCLUDE}")
   endif()
+else()
+  target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC dnnl)
 endif()
 find_package(oneMKL QUIET)
 if (ONEMKL_FOUND)
