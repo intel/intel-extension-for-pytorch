@@ -1,4 +1,4 @@
-From bcd8cddd204db21474ce35d2ccce8fb04db6b119 Mon Sep 17 00:00:00 2001
+From eebfd5ef313d94af99ce7d79050b030be121cc4a Mon Sep 17 00:00:00 2001
 From: KevinYuk <kevin.yu@intel.com>
 Date: Mon, 31 Oct 2022 19:46:01 +0000
 Subject: [PATCH 01/15] enable xpu group norm channels last support (#87680)
@@ -12,7 +12,7 @@ Approved by: https://github.com/albanD
  2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/aten/src/ATen/native/group_norm.cpp b/aten/src/ATen/native/group_norm.cpp
-index db1d82f84fe..527e04c5827 100644
+index db1d82f84f..527e04c582 100644
 --- a/aten/src/ATen/native/group_norm.cpp
 +++ b/aten/src/ATen/native/group_norm.cpp
 @@ -172,7 +172,7 @@ Tensor group_norm(
@@ -25,7 +25,7 @@ index db1d82f84fe..527e04c5827 100644
    const auto& gamma = weight.defined() ? weight.contiguous() : kEmpty;
    const auto& beta = bias.defined() ? bias.contiguous() : kEmpty;
 diff --git a/tools/autograd/derivatives.yaml b/tools/autograd/derivatives.yaml
-index 3fb18bd206d..18236ea244e 100644
+index 3fb18bd206..18236ea244 100644
 --- a/tools/autograd/derivatives.yaml
 +++ b/tools/autograd/derivatives.yaml
 @@ -1164,7 +1164,7 @@

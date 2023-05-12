@@ -1,4 +1,4 @@
-From 29a49409cb2a2f02889e988d62f961e2b1535257 Mon Sep 17 00:00:00 2001
+From da935a4cfc83541e3583d5b6ac06f0f591718c9e Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Thu, 30 Mar 2023 13:26:44 +0800
 Subject: [PATCH 05/15] remove dlpack dependency (#106)
@@ -12,7 +12,7 @@ Subject: [PATCH 05/15] remove dlpack dependency (#106)
  3 files changed, 13 insertions(+), 5 deletions(-)
 
 diff --git a/aten/src/ATen/DLConvertor.cpp b/aten/src/ATen/DLConvertor.cpp
-index 817f9839137..c10b25a2298 100644
+index 817f983913..c10b25a229 100644
 --- a/aten/src/ATen/DLConvertor.cpp
 +++ b/aten/src/ATen/DLConvertor.cpp
 @@ -92,7 +92,7 @@ DLDevice getDLDevice(const Tensor& tensor, const int64_t& device_id) {
@@ -25,7 +25,7 @@ index 817f9839137..c10b25a2298 100644
      default:
        TORCH_CHECK(false, "Cannot pack tensors on " + tensor.device().str());
 diff --git a/aten/src/ATen/detail/XPUHooksInterface.h b/aten/src/ATen/detail/XPUHooksInterface.h
-index ff42ca60d49..584ccf8d8c4 100644
+index ff42ca60d4..584ccf8d8c 100644
 --- a/aten/src/ATen/detail/XPUHooksInterface.h
 +++ b/aten/src/ATen/detail/XPUHooksInterface.h
 @@ -1,6 +1,5 @@
@@ -67,7 +67,7 @@ index ff42ca60d49..584ccf8d8c4 100644
        void* data) const {
      TORCH_CHECK(
 diff --git a/aten/src/ATen/dlpack.h b/aten/src/ATen/dlpack.h
-index 3d33935d31a..ef6960b23a1 100644
+index 3d33935d31..ef6960b23a 100644
 --- a/aten/src/ATen/dlpack.h
 +++ b/aten/src/ATen/dlpack.h
 @@ -94,7 +94,10 @@ typedef enum {

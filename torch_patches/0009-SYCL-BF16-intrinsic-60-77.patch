@@ -1,4 +1,4 @@
-From 8ce87341c84a88036b2418ee6c4936d0a3a4bb95 Mon Sep 17 00:00:00 2001
+From 633cd96baaed41b7783ba2e356efc8a4ad625734 Mon Sep 17 00:00:00 2001
 From: "Gu, Jinghui" <jinghui.gu@intel.com>
 Date: Wed, 16 Nov 2022 13:11:37 +0000
 Subject: [PATCH 09/15] SYCL BF16 intrinsic (#60) (#77)
@@ -12,7 +12,7 @@ Subject: [PATCH 09/15] SYCL BF16 intrinsic (#60) (#77)
  4 files changed, 48 insertions(+), 9 deletions(-)
 
 diff --git a/c10/util/BFloat16-inl.h b/c10/util/BFloat16-inl.h
-index 29fda9c3880..95c39966309 100644
+index 29fda9c388..95c3996630 100644
 --- a/c10/util/BFloat16-inl.h
 +++ b/c10/util/BFloat16-inl.h
 @@ -3,6 +3,15 @@
@@ -69,7 +69,7 @@ index 29fda9c3880..95c39966309 100644
  
  #if defined(__CUDACC__) || defined(__HIPCC__)
 diff --git a/c10/util/BFloat16.h b/c10/util/BFloat16.h
-index 1ada02bba1c..83c820de3fe 100644
+index 1ada02bba1..83c820de3f 100644
 --- a/c10/util/BFloat16.h
 +++ b/c10/util/BFloat16.h
 @@ -11,6 +11,15 @@
@@ -102,7 +102,7 @@ index 1ada02bba1c..83c820de3fe 100644
  
  } // namespace c10
 diff --git a/c10/util/Half-inl.h b/c10/util/Half-inl.h
-index 3ed8cf80d11..9d296f0be17 100644
+index 3ed8cf80d1..9d296f0be1 100644
 --- a/c10/util/Half-inl.h
 +++ b/c10/util/Half-inl.h
 @@ -12,10 +12,10 @@
@@ -129,7 +129,7 @@ index 3ed8cf80d11..9d296f0be17 100644
    x = *reinterpret_cast<const unsigned short*>(&value);
  }
 diff --git a/c10/util/Half.h b/c10/util/Half.h
-index a786db956cd..4b6d4a59c8f 100644
+index a786db956c..4b6d4a59c8 100644
 --- a/c10/util/Half.h
 +++ b/c10/util/Half.h
 @@ -45,10 +45,10 @@

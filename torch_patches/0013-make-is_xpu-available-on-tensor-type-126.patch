@@ -1,0 +1,80 @@
+From 45654892dda6359488a90084ed49c6f018c71074 Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
+Date: Fri, 12 May 2023 20:47:16 +0800
+Subject: [PATCH 13/15] make is_xpu available on tensor type (#126)
+
+* make is_xpu available on tensor type
+---
+ test/test_torch.py                  | 11 +++++++++++
+ torch/csrc/tensor/python_tensor.cpp | 12 ++++++++++++
+ 2 files changed, 23 insertions(+)
+
+diff --git a/test/test_torch.py b/test/test_torch.py
+index cadbcf4bcd..ab8b3c150e 100644
+--- a/test/test_torch.py
++++ b/test/test_torch.py
+@@ -4305,6 +4305,17 @@ else:
+         self.assertEqual(torch.FloatTensor(5).to(device).is_signed(), True)
+         self.assertEqual(torch.HalfTensor(10).to(device).is_signed(), True)
+ 
++    def test_tensor_type(self):
++        for t in torch._tensor_classes:
++            if 'cuda' in t.__module__:
++                self.assertEqual(t.is_cuda, True)
++            else:
++                self.assertEqual(t.is_cuda, False)
++            if 'xpu' in t.__module__:
++                self.assertEqual(t.is_xpu, True)
++            else:
++                self.assertEqual(t.is_xpu, False)
++
+     # Note - reports a leak of 512 bytes on CUDA device 1
+     @deviceCountAtLeast(2)
+     @skipCUDAMemoryLeakCheckIf(True)
+diff --git a/torch/csrc/tensor/python_tensor.cpp b/torch/csrc/tensor/python_tensor.cpp
+index 4d6778a7b0..7cbb581ef5 100644
+--- a/torch/csrc/tensor/python_tensor.cpp
++++ b/torch/csrc/tensor/python_tensor.cpp
+@@ -36,6 +36,7 @@ struct PyTensorType {
+   THPDtype* dtype;
+   THPLayout* layout;
+   bool is_cuda;
++  bool is_xpu;
+   // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,cppcoreguidelines-avoid-magic-numbers,modernize-avoid-c-arrays)
+   char name[64];
+   int backend;
+@@ -127,6 +128,14 @@ PyObject* Tensor_is_cuda(PyTensorType* self, void* unused) {
+     Py_RETURN_FALSE;
+   }
+ }
++ 
++PyObject* Tensor_is_xpu(PyTensorType* self, void* unused) {
++  if (self->is_xpu) {
++    Py_RETURN_TRUE;
++  } else {
++    Py_RETURN_FALSE;
++  }
++}
+ 
+ PyObject* Tensor_is_sparse(PyTensorType* self, void* unused) {
+   if (self->layout->layout == at::Layout::Strided) {
+@@ -156,6 +165,7 @@ static struct PyGetSetDef metaclass_properties[] = {
+     {"dtype", (getter)Tensor_dtype, nullptr, nullptr, nullptr},
+     {"layout", (getter)Tensor_layout, nullptr, nullptr, nullptr},
+     {"is_cuda", (getter)Tensor_is_cuda, nullptr, nullptr, nullptr},
++    {"is_xpu", (getter)Tensor_is_xpu, nullptr, nullptr, nullptr},
+     {"is_sparse", (getter)Tensor_is_sparse, nullptr, nullptr, nullptr},
+     {"is_sparse_csr", (getter)Tensor_is_sparse_csr, nullptr, nullptr, nullptr},
+     {nullptr}};
+@@ -263,6 +273,8 @@ static void set_type(
+   type_obj.dtype = torch::getTHPDtype(scalarType);
+   type_obj.is_cuda =
+       (backend == at::Backend::CUDA || backend == at::Backend::SparseCUDA);
++  type_obj.is_xpu =
++      (backend == at::Backend::XPU || backend == at::Backend::SparseXPU);
+ }
+ 
+ static void set_name(PyTensorType& type_obj, const std::string& name) {
+-- 
+2.25.1
+

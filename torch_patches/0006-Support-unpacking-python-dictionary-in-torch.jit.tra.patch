@@ -1,4 +1,4 @@
-From 05a2efae11f38aa519739c800b5e2cd4d6b8defc Mon Sep 17 00:00:00 2001
+From 8c4c12dc185a743a1b5d7e3301db7b6bdcd742ba Mon Sep 17 00:00:00 2001
 From: Stonepia <tong.su@intel.com>
 Date: Tue, 14 Feb 2023 12:55:42 +0800
 Subject: [PATCH 06/15] Support unpacking python dictionary in
@@ -71,7 +71,7 @@ Co-authored-by: tangleintel <lei1.tang@intel.com>
  7 files changed, 321 insertions(+), 38 deletions(-)
 
 diff --git a/test/test_jit.py b/test/test_jit.py
-index 055c990f859..ee168a1b339 100644
+index 055c990f85..ee168a1b33 100644
 --- a/test/test_jit.py
 +++ b/test/test_jit.py
 @@ -3027,6 +3027,46 @@ class TestFrontend(JitTestCase):
@@ -122,7 +122,7 @@ index 055c990f859..ee168a1b339 100644
  class TestScript(JitTestCase):
  
 diff --git a/torch/_C/__init__.pyi.in b/torch/_C/__init__.pyi.in
-index 9ed156886f3..793edbc674f 100644
+index 9ed156886f..793edbc674 100644
 --- a/torch/_C/__init__.pyi.in
 +++ b/torch/_C/__init__.pyi.in
 @@ -332,6 +332,15 @@ def _create_function_from_trace(
@@ -142,7 +142,7 @@ index 9ed156886f3..793edbc674f 100644
  def _last_executed_optimized_graph() -> Graph: ...
  def parse_type_comment(comment: str) -> Decl: ...
 diff --git a/torch/csrc/jit/python/pybind_utils.h b/torch/csrc/jit/python/pybind_utils.h
-index 694d2b8ee48..835c7d0dc70 100644
+index 694d2b8ee4..835c7d0dc7 100644
 --- a/torch/csrc/jit/python/pybind_utils.h
 +++ b/torch/csrc/jit/python/pybind_utils.h
 @@ -565,6 +565,17 @@ inline Stack toTraceableStack(const py::tuple& inputs) {
@@ -164,7 +164,7 @@ index 694d2b8ee48..835c7d0dc70 100644
    auto elems = c10::impl::GenericList(elem_type);
    for (auto elem : obj) {
 diff --git a/torch/csrc/jit/python/python_tracer.cpp b/torch/csrc/jit/python/python_tracer.cpp
-index 78676e2ed77..c89d54872a0 100644
+index 78676e2ed7..c89d54872a 100644
 --- a/torch/csrc/jit/python/python_tracer.cpp
 +++ b/torch/csrc/jit/python/python_tracer.cpp
 @@ -73,6 +73,69 @@ SourceRange getPythonInterpreterSourceRange() {
@@ -238,7 +238,7 @@ index 78676e2ed77..c89d54872a0 100644
      const py::function& func,
      Stack trace_inputs,
 diff --git a/torch/csrc/jit/python/python_tracer.h b/torch/csrc/jit/python/python_tracer.h
-index 3f1fca20bfe..6ec9dc388c3 100644
+index 3f1fca20bf..6ec9dc388c 100644
 --- a/torch/csrc/jit/python/python_tracer.h
 +++ b/torch/csrc/jit/python/python_tracer.h
 @@ -24,6 +24,16 @@ Node* preRecordPythonTrace(
@@ -259,7 +259,7 @@ index 3f1fca20bfe..6ec9dc388c3 100644
      const py::function& func,
      Stack inputs,
 diff --git a/torch/csrc/jit/python/script_init.cpp b/torch/csrc/jit/python/script_init.cpp
-index 110c2f4a70c..ee950958893 100644
+index 110c2f4a70..ee95095889 100644
 --- a/torch/csrc/jit/python/script_init.cpp
 +++ b/torch/csrc/jit/python/script_init.cpp
 @@ -1218,6 +1218,43 @@ void initJitScriptBindings(PyObject* module) {
@@ -351,7 +351,7 @@ index 110c2f4a70c..ee950958893 100644
        "_jit_script_class_compile",
        [](const std::string& qualifiedName,
 diff --git a/torch/jit/_trace.py b/torch/jit/_trace.py
-index fe0091f63bb..b4352648df9 100644
+index fe0091f63b..b4352648df 100644
 --- a/torch/jit/_trace.py
 +++ b/torch/jit/_trace.py
 @@ -316,6 +316,7 @@ def _check_trace(
