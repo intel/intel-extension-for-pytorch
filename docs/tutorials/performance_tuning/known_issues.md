@@ -54,13 +54,13 @@ Known Issues
 - When working with an NLP model inference with dynamic input data length appling with TorchScript (either `torch.jit.trace` or `torch.jit.script`), performance with Intel® Extension for PyTorch\* is possible to be less than that without Intel® Extension for PyTorch\*. In this case, adding the workarounds below would help solve this issue.
   - Python interface
     ```python
-	torch._C._jit_set_texpr_fuser_enabled(False)
-	```
+    torch._C._jit_set_texpr_fuser_enabled(False)
+    ```
   - C++ interface
     ```c++
     #include <torch/csrc/jit/passes/tensorexpr_fuser.h>
-	torch::jit::setTensorExprFuserEnabled(false);
-	```
+    torch::jit::setTensorExprFuserEnabled(false);
+    ```
 
 ## INT8
 
