@@ -36,7 +36,7 @@ std::tuple<Tensor, Tensor> sort(
 namespace impl {
 
 static void mul_add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
@@ -140,7 +140,7 @@ Tensor mul_scalar_add_scalar(
                     .add_output(result)
                     .add_input(self)
                     .build();
-    IPEX_DISPATCH_ALL_TYPES_AND2(
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         iter.dtype(),
@@ -176,9 +176,12 @@ Tensor mul_add_scalar(
     result = AtenIpexTypeXPU::mul(self, other);
     return AtenIpexTypeXPU::add(result, accumu, alpha);
   }
-  result = at::empty_like(self);
   auto iter = TensorIteratorConfig()
                   .set_check_mem_overlap(true)
+                  .promote_inputs_to_common_dtype(true)
+                  .cast_common_dtype_to_outputs(true)
+                  .enforce_safe_casting_to_output(true)
+                  .promote_integer_inputs_to_float(true)
                   .add_output(result)
                   .add_input(self)
                   .add_input(other)
@@ -187,7 +190,7 @@ Tensor mul_add_scalar(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
-      "mul_scalar_add_scalar",
+      "mul_add_scalar",
       [&]() {
         using accscalar_t = acc_type<scalar_t>;
         auto add_scalar = alpha.to<accscalar_t>() * accumu.to<accscalar_t>();
@@ -196,7 +199,7 @@ Tensor mul_add_scalar(
               return a * b + add_scalar;
             });
       });
-
+  result = iter.output();
   return result;
 }
 
@@ -228,18 +231,21 @@ Tensor mul_scalar_add(
     result = AtenIpexTypeXPU::mul(self, other);
     result = AtenIpexTypeXPU::add(result, accumu, alpha);
   } else {
-    result = at::empty_like(self);
     auto iter = TensorIteratorConfig()
                     .set_check_mem_overlap(true)
+                    .promote_inputs_to_common_dtype(true)
+                    .cast_common_dtype_to_outputs(true)
+                    .enforce_safe_casting_to_output(true)
+                    .promote_integer_inputs_to_float(true)
                     .add_output(result)
                     .add_input(self)
                     .add_input(accumu)
                     .build();
-    IPEX_DISPATCH_ALL_TYPES_AND2(
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         iter.dtype(),
-        "mul_scalar_add_scalar",
+        "mul_scalar_add",
         [&]() {
           using accscalar_t = acc_type<scalar_t>;
           auto alpha_scalar = alpha.to<accscalar_t>();
@@ -249,6 +255,7 @@ Tensor mul_scalar_add(
                 return a * other_scalar + b * alpha_scalar;
               });
         });
+    result = iter.output();
   }
   return result;
 }
@@ -281,16 +288,19 @@ Tensor mul_add(
     result = AtenIpexTypeXPU::mul(self, other);
     result = AtenIpexTypeXPU::add(result, accumu, alpha);
   } else {
-    result = at::empty_like(self);
     auto iter = TensorIteratorConfig()
                     .set_check_mem_overlap(true)
+                    .promote_inputs_to_common_dtype(true)
+                    .cast_common_dtype_to_outputs(true)
+                    .enforce_safe_casting_to_output(true)
+                    .promote_integer_inputs_to_float(true)
                     .add_output(result)
                     .add_input(self)
                     .add_input(other)
                     .add_input(accumu)
                     .build();
     impl::mul_add_kernel_dpcpp(iter, alpha);
-    TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
+    result = iter.output();
   }
   return result;
 }
