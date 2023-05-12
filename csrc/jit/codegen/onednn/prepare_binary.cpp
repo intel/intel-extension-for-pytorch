@@ -26,17 +26,15 @@ void mayConvertScalarInputToTensor(Node* node) {
     WithInsertPoint guard(node);
     auto g = node->owningGraph();
     // 42 : Scalar  -->  tensor(42.0) : Float([])
-    auto t = g->insert(
+    auto scalar_tensor = g->insert(
         aten::as_tensor, {scalar}, {{"dtype", at::ScalarType::Float}});
     // tensor(42.0) : Float([])  -->  tensor([42.0]) : Float([1])
-    c10::optional<size_t> t_dim = 1;
     auto target_type = TensorTypePtr(
-        TensorType::create(at::ScalarType::Float, at::kCPU, t_dim, false));
-    target_type = target_type->withSizes({1});
-    t->setType(target_type);
-    auto unsqueezed = g->insert(aten::unsqueeze, {t, 0});
-    unsqueezed->setType(target_type);
-    node->replaceInput(1, unsqueezed);
+        TensorType::create(at::ScalarType::Float, at::kCPU, {}, false));
+    target_type = target_type->withSizes({});
+    TORCH_CHECK(target_type->numel() == 1, "scalar tensor must have 1 element");
+    scalar_tensor->setType(target_type);
+    node->replaceInput(1, scalar_tensor);
     // Add a mark here and convert tensor back to scalar later on for unfused
     // add/div
     node->i_(Symbol::attr("scalar"), true);
@@ -51,8 +49,7 @@ void mayConvertTensorToScalarInput(Node* node) {
       node->hasAttributeS("scalar"),
       "add or div node with numAttributes != 0 must have attr: scalar");
 
-  auto unsqueeze_node = node->input(1)->node();
-  auto as_tensor_node = unsqueeze_node->input(0)->node();
+  auto as_tensor_node = node->input(1)->node();
   auto scalar_value = as_tensor_node->input(0);
   node->replaceInput(1, scalar_value);
 

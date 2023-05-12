@@ -19,14 +19,16 @@ struct LlgaTensorDesc {
       std::vector<int64_t> sizes,
       std::vector<int64_t> strides,
       desc::data_type dtype,
-      desc::property_type property_type)
+      desc::property_type property_type,
+      bool is_scalar_tensor)
       : tid_(tid),
         sizes_(sizes),
         strides_(strides),
         dtype_(dtype),
         property_type_(property_type),
         layout_type_(desc::layout_type::strided),
-        layout_id_(-1) {}
+        layout_id_(-1),
+        is_scalar_tensor_(is_scalar_tensor) {}
 
   LlgaTensorDesc(const desc& t)
       : tid_(t.get_id()),
@@ -48,22 +50,38 @@ struct LlgaTensorDesc {
             {},
             {},
             desc::data_type::f32,
-            get_property_type(v)) {
+            get_property_type(v),
+            /* is_scalar_tensor = */ false) {
     if (v->type()->isSubtypeOf(torch::jit::TensorType::get())) {
       auto tt = v->type()->cast<torch::jit::TensorType>();
 
       if (tt->scalarType())
         dtype_ = getLlgaDataType(tt->scalarType().value());
 
-      auto sizes = tt->sizes();
-      if (sizes.sizes())
-        for (auto d : *sizes.sizes())
-          sizes_.push_back(d.value_or(DNNL_GRAPH_UNKNOWN_DIM));
+      // The profiling info of some graph inputs is missing, so we cannnot use
+      // numel() to check if a tensor is a scalar tensor.
+      auto user_nodes = v->uses();
+      if (user_nodes.size() == 1) {
+        if (user_nodes[0].user->hasAttributeS("scalar") &&
+            (user_nodes[0].offset == 1)) {
+          is_scalar_tensor_ = true;
+        }
+      }
 
-      auto strides = tt->strides();
-      if (strides.sizes())
-        for (auto d : *strides.sizes())
-          strides_.push_back(d.value_or(DNNL_GRAPH_UNKNOWN_DIM));
+      if (!is_scalar_tensor_) {
+        auto sizes = tt->sizes();
+        if (sizes.sizes()) {
+          for (auto d : *sizes.sizes()) {
+            sizes_.push_back(d.value_or(DNNL_GRAPH_UNKNOWN_DIM));
+          }
+        }
+        auto strides = tt->strides();
+        if (strides.sizes()) {
+          for (auto d : *strides.sizes()) {
+            strides_.push_back(d.value_or(DNNL_GRAPH_UNKNOWN_DIM));
+          }
+        }
+      }
     }
   }
 
@@ -98,7 +116,8 @@ struct LlgaTensorDesc {
   }
 
   LlgaTensorDesc dtype(desc::data_type new_dtype) const {
-    return LlgaTensorDesc(tid_, sizes_, strides_, new_dtype, property_type_);
+    return LlgaTensorDesc(
+        tid_, sizes_, strides_, new_dtype, property_type_, is_scalar_tensor_);
   }
 
   desc::layout_type layout_type() const {
@@ -143,7 +162,13 @@ struct LlgaTensorDesc {
   }
 
   desc logical_tensor() const {
-    if (is_dimensionality_unknown()) {
+    if (is_scalar_tensor_) {
+      return desc(
+          tid_,
+          dtype_,
+          dnnl::graph::logical_tensor::dims{},
+          dnnl::graph::logical_tensor::dims{});
+    } else if (is_dimensionality_unknown()) {
       return desc(
           tid_, dtype_, DNNL_GRAPH_UNKNOWN_NDIMS, layout_type_, property_type_);
     } else if (is_opaque()) {
@@ -195,7 +220,6 @@ struct LlgaTensorDesc {
   bool is_dimensionality_unknown() const {
     return sizes_.size() == 0;
   }
-
   size_t tid_;
   std::vector<int64_t> sizes_;
   std::vector<int64_t> strides_;
@@ -203,6 +227,7 @@ struct LlgaTensorDesc {
   desc::property_type property_type_;
   desc::layout_type layout_type_;
   size_t layout_id_;
+  bool is_scalar_tensor_ = false;
   at::QuantizerPtr quantizer_;
 };
 
