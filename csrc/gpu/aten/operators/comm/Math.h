@@ -13,7 +13,7 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 template <typename scalar_t>
-DPCPP_BOTH static inline scalar_t zeta(scalar_t _x, scalar_t _q) {
+static inline scalar_t zeta(scalar_t _x, scalar_t _q) {
   using acc_t = acc_type<scalar_t>;
   const acc_t MACHEP = acc_t{1.11022302462515654042E-16};
   constexpr acc_t zero = acc_t{0.0};
@@ -92,7 +92,7 @@ DPCPP_BOTH static inline scalar_t zeta(scalar_t _x, scalar_t _q) {
 }
 
 template <typename scalar_t>
-DPCPP_BOTH static scalar_t ratevl(
+static scalar_t ratevl(
     scalar_t x,
     const scalar_t num[],
     int64_t M,
@@ -197,7 +197,7 @@ static scalar_t lanczos_sum_expg_scaled(scalar_t x) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t bessel_j0_forward(scalar_t x) {
+static inline scalar_t bessel_j0_forward(scalar_t x) {
   const scalar_t PP[] = {
       +7.96936729297347051624e-04,
       +8.28352392107440799803e-02,
@@ -317,7 +317,7 @@ static inline DPCPP_BOTH scalar_t bessel_j0_forward(scalar_t x) {
 } // bessel_j0_forward(scalar_t x)
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t bessel_j1_forward(scalar_t x) {
+static inline scalar_t bessel_j1_forward(scalar_t x) {
   const scalar_t PP[] = {
       +7.62125616208173112003e-04,
       +7.31397056940917570436e-02,
@@ -677,7 +677,7 @@ static inline scalar_t bessel_y1_forward(scalar_t x) {
 } // bessel_y1_forward(scalar_t x)
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t spherical_bessel_j0_forward(scalar_t x) {
+static inline scalar_t spherical_bessel_j0_forward(scalar_t x) {
   if (Numerics<scalar_t>::isinf(x)) {
     return scalar_t(0.0);
   }
@@ -702,8 +702,7 @@ static inline DPCPP_BOTH scalar_t spherical_bessel_j0_forward(scalar_t x) {
 } // spherical_bessel_j0_forward(T x)
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t
-hermite_polynomial_he_forward(scalar_t x, scalar_t _n) {
+static inline scalar_t hermite_polynomial_he_forward(scalar_t x, scalar_t _n) {
   int n = static_cast<int64_t>(_n);
   if (n < 0) {
     return scalar_t(0.0);
@@ -731,8 +730,7 @@ hermite_polynomial_he_forward(scalar_t x, scalar_t _n) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t
-hermite_polynomial_h_forward(scalar_t x, scalar_t _n) {
+static inline scalar_t hermite_polynomial_h_forward(scalar_t x, scalar_t _n) {
   int n = static_cast<int64_t>(_n);
   if (n < 0) {
     return scalar_t(0.0);
@@ -760,8 +758,7 @@ hermite_polynomial_h_forward(scalar_t x, scalar_t _n) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t
-laguerre_polynomial_l_forward(scalar_t x, scalar_t _n) {
+static inline scalar_t laguerre_polynomial_l_forward(scalar_t x, scalar_t _n) {
   int n = static_cast<int64_t>(_n);
   if (n < 0) {
     return scalar_t(0.0);
@@ -793,8 +790,7 @@ laguerre_polynomial_l_forward(scalar_t x, scalar_t _n) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t
-legendre_polynomial_p_forward(scalar_t x, scalar_t _n) {
+static inline scalar_t legendre_polynomial_p_forward(scalar_t x, scalar_t _n) {
   int n = static_cast<int64_t>(_n);
   if (n < 0) {
     return scalar_t(0.0);
@@ -830,7 +826,7 @@ legendre_polynomial_p_forward(scalar_t x, scalar_t _n) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t modified_bessel_i0_forward(scalar_t x) {
+static inline scalar_t modified_bessel_i0_forward(scalar_t x) {
   const scalar_t A[] = {
       -4.41534164647933937950e-18, +3.33079451882223809783e-17,
       -2.43127984654795469359e-16, +1.71539128555513303061e-15,
@@ -897,7 +893,7 @@ static inline DPCPP_BOTH scalar_t modified_bessel_i0_forward(scalar_t x) {
 } // modified_bessel_i0_forward(T x)
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t modified_bessel_i1_forward(scalar_t x) {
+static inline scalar_t modified_bessel_i1_forward(scalar_t x) {
   const scalar_t A[] = {
       +2.77791411276104639959e-18, -2.11142121435816608115e-17,
       +1.55363195773620046921e-16, -1.10559694773538630805e-15,
@@ -977,7 +973,7 @@ static inline DPCPP_BOTH scalar_t modified_bessel_i1_forward(scalar_t x) {
 } // modified_bessel_i1_forward(T x)
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t modified_bessel_k0_forward(scalar_t x) {
+static inline scalar_t modified_bessel_k0_forward(scalar_t x) {
   const scalar_t A[] = {
       +1.37446543561352307156e-16,
       +4.25981614279661018399e-14,
@@ -1044,7 +1040,7 @@ static inline DPCPP_BOTH scalar_t modified_bessel_k0_forward(scalar_t x) {
 } // modified_bessel_k0_forward(T x)
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t modified_bessel_k1_forward(scalar_t x) {
+static inline scalar_t modified_bessel_k1_forward(scalar_t x) {
   const scalar_t A[] = {
       -7.02386347938628759343e-18,
       -2.42744985051936593393e-15,
@@ -1113,8 +1109,7 @@ static inline DPCPP_BOTH scalar_t modified_bessel_k1_forward(scalar_t x) {
 } // modified_bessel_k1_forward(T x)
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t
-scaled_modified_bessel_k0_forward(scalar_t x) {
+static inline scalar_t scaled_modified_bessel_k0_forward(scalar_t x) {
   const scalar_t A[] = {
       +1.37446543561352307156e-16,
       +4.25981614279661018399e-14,
@@ -1182,8 +1177,7 @@ scaled_modified_bessel_k0_forward(scalar_t x) {
 } // T scaled_modified_bessel_k0_forward(T x)
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t
-scaled_modified_bessel_k1_forward(scalar_t x) {
+static inline scalar_t scaled_modified_bessel_k1_forward(scalar_t x) {
   const scalar_t A[] = {
       -7.02386347938628759343e-18,
       -2.42744985051936593393e-15,
@@ -1291,7 +1285,7 @@ static scalar_t _igam_helper_fac(scalar_t a, scalar_t x) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t _igam_helper_series(scalar_t a, scalar_t x) {
+static inline scalar_t _igam_helper_series(scalar_t a, scalar_t x) {
   // Compute igam using DLMF 8.11.4. [igam1]
 
   using accscalar_t = acc_type<scalar_t>;
@@ -1325,7 +1319,7 @@ static inline DPCPP_BOTH scalar_t _igam_helper_series(scalar_t a, scalar_t x) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t _igamc_helper_series(scalar_t a, scalar_t x) {
+static inline scalar_t _igamc_helper_series(scalar_t a, scalar_t x) {
   // Compute igamc using DLMF 8.7.3 [igam1]. This is related to the series in
   // _igam_helper_series but extra care is taken to avoid cancellation.
 
@@ -1356,8 +1350,10 @@ static inline DPCPP_BOTH scalar_t _igamc_helper_series(scalar_t a, scalar_t x) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t
-_igam_helper_asymptotic_series(scalar_t a, scalar_t x, bool igam) {
+static inline scalar_t _igam_helper_asymptotic_series(
+    scalar_t a,
+    scalar_t x,
+    bool igam) {
   // Compute igam/igamc using DLMF 8.12.3/8.12.4 [igam1]
 
   using accscalar_t = acc_type<scalar_t>;
@@ -1670,8 +1666,9 @@ _igam_helper_asymptotic_series(scalar_t a, scalar_t x, bool igam) {
   return res;
 }
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t
-_igamc_helper_continued_fraction(scalar_t a, scalar_t x) {
+static inline scalar_t _igamc_helper_continued_fraction(
+    scalar_t a,
+    scalar_t x) {
   // Compute igamc using DLMF 8.9.2. [igam1]
 
   using accscalar_t = acc_type<scalar_t>;
@@ -1736,7 +1733,7 @@ _igamc_helper_continued_fraction(scalar_t a, scalar_t x) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t calc_igammac(scalar_t a, scalar_t x) {
+static inline scalar_t calc_igammac(scalar_t a, scalar_t x) {
   /* the calculation of the regularized upper incomplete gamma function
    * is done differently based on the values of a and x:
    * - if x and/or a is at the boundary of defined region, then assign the
@@ -1805,7 +1802,7 @@ static inline DPCPP_BOTH scalar_t calc_igammac(scalar_t a, scalar_t x) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t calc_igamma(scalar_t a, scalar_t x) {
+static inline scalar_t calc_igamma(scalar_t a, scalar_t x) {
   /* the calculation of the regularized lower incomplete gamma function
    * is done differently based on the values of a and x:
    * - if x and/or a is at the boundary of defined region, then assign the
@@ -1861,7 +1858,7 @@ static inline DPCPP_BOTH scalar_t calc_igamma(scalar_t a, scalar_t x) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t calc_digamma(scalar_t in) {
+static inline scalar_t calc_digamma(scalar_t in) {
   // [C++ Standard Reference: Gamma Function]
   // https://en.cppreference.com/w/cpp/numeric/math/tgamma
   using accscalar_t = acc_type<scalar_t>;
@@ -1927,7 +1924,7 @@ static inline DPCPP_BOTH scalar_t calc_digamma(scalar_t in) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t calc_trigamma(scalar_t in) {
+static inline scalar_t calc_trigamma(scalar_t in) {
   using accscalar_t = acc_type<scalar_t>;
   const accscalar_t PI = 3.14159265358979323846;
   accscalar_t x = static_cast<accscalar_t>(in);
@@ -1952,7 +1949,7 @@ static inline DPCPP_BOTH scalar_t calc_trigamma(scalar_t in) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t calc_gcd(scalar_t a_in, scalar_t b_in) {
+static inline scalar_t calc_gcd(scalar_t a_in, scalar_t b_in) {
   scalar_t a = Numerics<scalar_t>::abs(a_in);
   scalar_t b = Numerics<scalar_t>::abs(b_in);
   while (a != 0) {
@@ -1968,8 +1965,7 @@ static inline DPCPP_BOTH scalar_t calc_gcd(scalar_t a_in, scalar_t b_in) {
  * implementation located in "ATen/native/Math.h".
  */
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t
-chbevl(scalar_t _x, const scalar_t array[], size_t len) {
+static inline scalar_t chbevl(scalar_t _x, const scalar_t array[], size_t len) {
   static_assert(
       !std::is_same<scalar_t, Half>() && !std::is_same<scalar_t, BFloat16>(),
       "don't instantiate with low precision type");
@@ -1995,7 +1991,7 @@ chbevl(scalar_t _x, const scalar_t array[], size_t len) {
  * implementation located in "ATen/native/Math.h".
  */
 template <typename T>
-DPCPP_BOTH inline std::tuple<const T*, size_t> chebyshev_coefficients_i0e_A() {
+inline std::tuple<const T*, size_t> chebyshev_coefficients_i0e_A() {
   /* Chebyshev coefficients for exp(-x) I0(x)
    * in the interval [0,8].
    *
@@ -2022,7 +2018,7 @@ DPCPP_BOTH inline std::tuple<const T*, size_t> chebyshev_coefficients_i0e_A() {
 }
 
 template <typename T>
-DPCPP_BOTH inline std::tuple<const T*, size_t> chebyshev_coefficients_i0e_B() {
+inline std::tuple<const T*, size_t> chebyshev_coefficients_i0e_B() {
   /* Chebyshev coefficients for exp(-x) sqrt(x) I0(x)
    * in the inverted interval [8,infinity].
    *
@@ -2047,7 +2043,7 @@ DPCPP_BOTH inline std::tuple<const T*, size_t> chebyshev_coefficients_i0e_B() {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t calc_i0(scalar_t _x) {
+static inline scalar_t calc_i0(scalar_t _x) {
   static_assert(
       !std::is_same<scalar_t, Half>() && !std::is_same<scalar_t, BFloat16>(),
       "don't instantiate with low precision type");
@@ -2084,7 +2080,7 @@ static inline DPCPP_BOTH scalar_t calc_i0(scalar_t _x) {
  * domain of the approximation.
  */
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t calc_i0e(scalar_t _x) {
+static inline scalar_t calc_i0e(scalar_t _x) {
   scalar_t x = Numerics<scalar_t>::abs(_x);
 
   if (x <= scalar_t{8.0}) {
@@ -2117,7 +2113,7 @@ static inline c10::BFloat16 calc_i0e(c10::BFloat16 a) {
 }
 
 template <typename T>
-DPCPP_BOTH inline typename std::enable_if<
+inline typename std::enable_if<
     std::is_same<double, T>::value,
     std::tuple<const T*, size_t>>::type
 chebyshev_coefficients_i1e_A() {
@@ -2147,7 +2143,7 @@ chebyshev_coefficients_i1e_A() {
 }
 
 template <typename T>
-DPCPP_BOTH inline typename std::
+inline typename std::
     enable_if<std::is_same<float, T>::value, std::tuple<const T*, size_t>>::type
     chebyshev_coefficients_i1e_A() {
   /* Chebyshev coefficients for exp(-x) I1(x)
@@ -2177,7 +2173,7 @@ DPCPP_BOTH inline typename std::
 };
 
 template <typename T>
-DPCPP_BOTH inline typename std::enable_if<
+inline typename std::enable_if<
     std::is_same<double, T>::value,
     std::tuple<const T*, size_t>>::type
 chebyshev_coefficients_i1e_B() {
@@ -2205,7 +2201,7 @@ chebyshev_coefficients_i1e_B() {
 }
 
 template <typename T>
-DPCPP_BOTH inline typename std::
+inline typename std::
     enable_if<std::is_same<float, T>::value, std::tuple<const T*, size_t>>::type
     chebyshev_coefficients_i1e_B() {
   /* Chebyshev coefficients for exp(-x) sqrt(x) I1(x)
@@ -2226,7 +2222,7 @@ DPCPP_BOTH inline typename std::
 };
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t calc_i1(scalar_t _x) {
+static inline scalar_t calc_i1(scalar_t _x) {
   const auto x = Numerics<scalar_t>::abs(_x);
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i1e_A<scalar_t>();
@@ -2247,7 +2243,7 @@ static inline DPCPP_BOTH scalar_t calc_i1(scalar_t _x) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t calc_i1e(scalar_t _x) {
+static inline scalar_t calc_i1e(scalar_t _x) {
   const auto x = Numerics<scalar_t>::abs(_x);
   if (x <= scalar_t{8.0}) {
     auto coeff_pair = chebyshev_coefficients_i1e_A<scalar_t>();
@@ -2267,7 +2263,7 @@ static inline DPCPP_BOTH scalar_t calc_i1e(scalar_t _x) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t calc_polygamma(scalar_t x, int n) {
+static inline scalar_t calc_polygamma(scalar_t x, int n) {
   // already blocked if n <= 1
   const auto one = scalar_t{1};
   return ((n % 2) ? one : -one) *
@@ -2291,7 +2287,7 @@ static inline DPCPP_BOTH scalar_t calc_polygamma(scalar_t x, int n) {
  *            N                   0
  */
 template <typename T>
-static inline DPCPP_BOTH T polevl(const T x, const T A[], size_t len) {
+static inline T polevl(const T x, const T A[], size_t len) {
   T result = 0;
   for (size_t i = 0; i <= len; i++) {
     result = result * x + A[i];
@@ -2308,7 +2304,7 @@ static inline DPCPP_BOTH T polevl(const T x, const T A[], size_t len) {
  * density function (integrated from minus infinity to x) is equal to y.
  */
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t calc_ndtri(scalar_t y0) {
+static inline scalar_t calc_ndtri(scalar_t y0) {
   /* sqrt(2pi) */
   constexpr scalar_t s2pi = 2.50662827463100050242E0;
   constexpr scalar_t one = 1;
@@ -2432,7 +2428,7 @@ static inline c10::BFloat16 calc_ndtri(c10::BFloat16 a) {
 }
 
 template <typename T>
-static inline DPCPP_BOTH T erfcx_y100(T y100) {
+static inline T erfcx_y100(T y100) {
   switch (static_cast<int>(y100)) {
     case 0: {
       T t = 2 * y100 - 1;
@@ -3841,7 +3837,7 @@ static inline DPCPP_BOTH T erfcx_y100(T y100) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t calc_erfcx(scalar_t x) {
+static inline scalar_t calc_erfcx(scalar_t x) {
   if (at::_isnan(x)) {
     return x;
   }
@@ -3870,7 +3866,7 @@ static inline DPCPP_BOTH scalar_t calc_erfcx(scalar_t x) {
 }
 
 template <typename scalar_t>
-static inline DPCPP_BOTH scalar_t calc_log_ndtr(scalar_t x) {
+static inline scalar_t calc_log_ndtr(scalar_t x) {
   scalar_t t = x * static_cast<scalar_t>(0.707106781186547524400844362104849);
   if (x < scalar_t{-1.0}) {
     return Numerics<scalar_t>::log(calc_erfcx(-t) / 2) - t * t;
@@ -4096,8 +4092,7 @@ scalar_t chebyshev_polynomial_w_forward(scalar_t x, scalar_t n) {
 } // chebyshev_polynomial_w_forward(scalar_t x, scalar_t n)
 
 template <typename T>
-static inline DPCPP_BOTH T
-shifted_chebyshev_polynomial_t_forward(T x, int64_t n) {
+static inline T shifted_chebyshev_polynomial_t_forward(T x, int64_t n) {
   if (n < 0) {
     return T(0.0);
   }
@@ -4140,7 +4135,7 @@ shifted_chebyshev_polynomial_t_forward(T x, int64_t n) {
 } // shifted_chebyshev_polynomial_t_forward(T x, int64_t n)
 
 template <typename T>
-static inline DPCPP_BOTH T shifted_chebyshev_polynomial_t_forward(T x, T n) {
+static inline T shifted_chebyshev_polynomial_t_forward(T x, T n) {
   return shifted_chebyshev_polynomial_t_forward(x, static_cast<int64_t>(n));
 } // shifted_chebyshev_polynomial_t_forward(T x, T n)
 

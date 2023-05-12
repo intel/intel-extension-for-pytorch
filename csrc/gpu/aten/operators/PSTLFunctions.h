@@ -14,7 +14,7 @@ using namespace at::AtenIpexTypeXPU;
 namespace xpu {
 namespace pstl {
 template <int scan_type, class InputIt, class OutputIt, class T>
-DPCPP_DEVICE static inline OutputIt _scan_kernel(
+static inline OutputIt _scan_kernel(
     InputIt first,
     InputIt last,
     OutputIt d_first,
@@ -152,7 +152,7 @@ DPCPP_DEVICE static inline OutputIt _scan_kernel(
 }
 
 template <typename T, class InputIt, class OutputIt>
-DPCPP_DEVICE static inline OutputIt exclusive_scan(
+static inline OutputIt exclusive_scan(
     InputIt first,
     InputIt last,
     OutputIt d_first,
@@ -162,7 +162,7 @@ DPCPP_DEVICE static inline OutputIt exclusive_scan(
 }
 
 template <typename T, class InputIt, class OutputIt>
-DPCPP_DEVICE static inline OutputIt inclusive_scan(
+static inline OutputIt inclusive_scan(
     InputIt first,
     InputIt last,
     OutputIt d_first,
@@ -172,7 +172,7 @@ DPCPP_DEVICE static inline OutputIt inclusive_scan(
 }
 
 template <typename index_t, class InputIt, class OutputIt, class UnaryPredicate>
-DPCPP_DEVICE static inline OutputIt copy_if(
+static inline OutputIt copy_if(
     InputIt first,
     InputIt last,
     OutputIt d_first,
@@ -232,7 +232,7 @@ template <
     class InputIt,
     class OutputIt,
     class UnaryOperation>
-DPCPP_DEVICE static inline OutputIt transform(
+static inline OutputIt transform(
     InputIt first1,
     InputIt last1,
     OutputIt d_first,
@@ -259,7 +259,7 @@ template <
     class InputIt2,
     class OutputIt,
     class BinaryOperation>
-DPCPP_DEVICE static inline OutputIt transform(
+static inline OutputIt transform(
     InputIt1 first1,
     InputIt1 last1,
     InputIt2 first2,
@@ -288,7 +288,7 @@ template <
     class InputIt2,
     class OutputIt,
     class BinaryOperation>
-DPCPP_DEVICE static inline OutputIt transform_first_true(
+static inline OutputIt transform_first_true(
     InputIt1 first1,
     InputIt1 last1,
     InputIt2 first2,
@@ -313,7 +313,7 @@ DPCPP_DEVICE static inline OutputIt transform_first_true(
 }
 
 template <class T, class ForwardIt>
-DPCPP_DEVICE static inline void iota(ForwardIt first, ForwardIt last, T value) {
+static inline void iota(ForwardIt first, ForwardIt last, T value) {
   RECORD_FUNCTION("iota_xpu", {});
   const auto N = std::distance(first, last);
   auto& dpcpp_queue = dpcppGetCurrentQueue();

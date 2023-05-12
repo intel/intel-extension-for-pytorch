@@ -42,7 +42,7 @@ class EmbBwdOperator {
   EmbBwdOperator(IdxType* indices_cnt, IdxType padding_idx)
       : indices_cnt_(indices_cnt), padding_idx_(padding_idx) {}
 
-  DPCPP_DEVICE void operator()(
+  void operator()(
       ValType* dst,
       ValType* src,
       int64_t dst_off,

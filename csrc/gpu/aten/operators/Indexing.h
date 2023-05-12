@@ -174,7 +174,7 @@ class IndexKernel {
   IndexKernel() = delete;
   IndexKernel(IdxConfig& cfg) : cfg_(cfg) {}
 
-  DPCPP_DEVICE void init_global_batch_info(
+  void init_global_batch_info(
       BatchKernelConfig::ItemDesc& id,
       int64_t& idx_logical_off,
       int64_t& glb_batch_group,
@@ -191,7 +191,7 @@ class IndexKernel {
         : cfg_.indexing_dimension_size_ + glb_batch_group_loc_off;
   }
 
-  DPCPP_DEVICE int64_t indexing_logical_off(
+  int64_t indexing_logical_off(
       BatchKernelConfig::ItemDesc& id,
       int64_t glb_batch_group,
       int64_t glb_batch_group_loc_off) const {
@@ -211,7 +211,7 @@ class IndexKernel {
     return si + pi * cfg_.stride_ + bi * cfg_.problem_ * cfg_.stride_;
   }
 
-  DPCPP_DEVICE int64_t fixing_logical_off(
+  int64_t fixing_logical_off(
       BatchKernelConfig::ItemDesc& id,
       int64_t glb_batch_group,
       int64_t idx_logical_off) const {
@@ -232,7 +232,7 @@ class IndexKernel {
     return si + pi * stride + bi * stride * cfg_.problem_;
   }
 
-  DPCPP_DEVICE void operator()(sycl::nd_item<2> item) const {
+  void operator()(sycl::nd_item<2> item) const {
     auto id = cfg_.get_item_desc(item);
 
     if (id.glb_problem >= cfg_.problem_ ||
@@ -325,7 +325,7 @@ static inline void launch_index_kernel(IdxConfig& cfg) {
 template <typename ValType>
 class IndexFillOperator {
  public:
-  DPCPP_DEVICE void operator()(
+  void operator()(
       ValType* dst,
       ValType* src,
       int64_t dst_off,
@@ -365,7 +365,7 @@ static inline void _index_fill_kernel(
 template <typename ValType>
 class IndexCopyOperator {
  public:
-  DPCPP_DEVICE void operator()(
+  void operator()(
       ValType* dst,
       ValType* src,
       int64_t dst_off,
@@ -402,7 +402,7 @@ static inline void _index_copy_kernel(
 template <typename ValType>
 class IndexAddOperator {
  public:
-  DPCPP_DEVICE void operator()(
+  void operator()(
       ValType* dst,
       ValType* src,
       int64_t dst_off,
@@ -438,7 +438,7 @@ static inline void _index_add_kernel(
 template <typename ValType>
 class IndexSelectOperator {
  public:
-  DPCPP_DEVICE void operator()(
+  void operator()(
       ValType* dst,
       ValType* src,
       int64_t dst_off,

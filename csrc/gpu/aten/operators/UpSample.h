@@ -14,12 +14,12 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 template <typename scalar_t>
-DPCPP_DEVICE inline scalar_t min(scalar_t a, scalar_t b) {
+inline scalar_t min(scalar_t a, scalar_t b) {
   return a < b ? a : b;
 }
 
 template <typename scalar_t>
-DPCPP_DEVICE inline scalar_t max(scalar_t a, scalar_t b) {
+inline scalar_t max(scalar_t a, scalar_t b) {
   return a > b ? a : b;
 }
 

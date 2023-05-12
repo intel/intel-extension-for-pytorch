@@ -8,14 +8,14 @@ namespace AtenIpexTypeXPU {
 
 template <typename T>
 struct LoadImpl {
-  DPCPP_BOTH static T apply(const void* src) {
+  static T apply(const void* src) {
     return *reinterpret_cast<const T*>(src);
   }
 };
 
 template <>
 struct LoadImpl<bool> {
-  DPCPP_BOTH static bool apply(const void* src) {
+  static bool apply(const void* src) {
     static_assert(sizeof(bool) == sizeof(char), "");
     // NOTE: [Loading boolean values]
     // Protect against invalid boolean values by loading as a byte
@@ -25,12 +25,12 @@ struct LoadImpl<bool> {
 };
 
 template <typename T>
-DPCPP_BOTH T load(const void* src) {
+T load(const void* src) {
   return LoadImpl<T>::apply(src);
 }
 
 template <typename scalar_t>
-DPCPP_BOTH scalar_t load(const scalar_t* src) {
+scalar_t load(const scalar_t* src) {
   return LoadImpl<scalar_t>::apply(src);
 }
 

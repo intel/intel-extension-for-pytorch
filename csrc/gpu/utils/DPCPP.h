@@ -149,13 +149,6 @@ inline constexpr std::string_view FP64_ERROR_FROM_MKL(
     DPCPP_FP64_EXCEP_CATCH                                                     \
   }
 
-// the descriptor as entity attribute
-#define DPCPP_HOST // for host only
-#define DPCPP_DEVICE // for device only
-#define DPCPP_BOTH // for both host and device
-
-#define THREAD_WORK_SIZE 16
-
 #if !defined(__INTEL_LLVM_COMPILER) || \
     (defined(__INTEL_LLVM_COMPILER) && __INTEL_LLVM_COMPILER < 20230000)
 
@@ -527,119 +520,103 @@ static constexpr auto dpcpp_mem_scp_sys = sycl::memory_scope::system;
 
 // dpcpp ptr type
 template <typename T>
-DPCPP_DEVICE using dpcpp_local_ptr = typename sycl::local_ptr<T>;
+using dpcpp_local_ptr = typename sycl::local_ptr<T>;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_priv_ptr = typename sycl::private_ptr<T>;
+using dpcpp_priv_ptr = typename sycl::private_ptr<T>;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_global_ptr = typename sycl::global_ptr<T>;
+using dpcpp_global_ptr = typename sycl::global_ptr<T>;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_const_ptr = typename sycl::constant_ptr<T>;
+using dpcpp_const_ptr = typename sycl::constant_ptr<T>;
 
 template <typename T, sycl::access::address_space Space = dpcpp_global_space>
-DPCPP_DEVICE using dpcpp_multi_ptr = typename sycl::multi_ptr<T, Space>;
+using dpcpp_multi_ptr = typename sycl::multi_ptr<T, Space>;
 
 // dpcpp pointer type
 template <typename T>
-DPCPP_DEVICE using dpcpp_local_ptr_pt = typename dpcpp_local_ptr<T>::pointer_t;
+using dpcpp_local_ptr_pt = typename dpcpp_local_ptr<T>::pointer_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_priv_ptr_pt = typename dpcpp_priv_ptr<T>::pointer_t;
+using dpcpp_priv_ptr_pt = typename dpcpp_priv_ptr<T>::pointer_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_global_ptr_pt =
-    typename dpcpp_global_ptr<T>::pointer_t;
+using dpcpp_global_ptr_pt = typename dpcpp_global_ptr<T>::pointer_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_const_ptr_pt = typename dpcpp_const_ptr<T>::pointer_t;
+using dpcpp_const_ptr_pt = typename dpcpp_const_ptr<T>::pointer_t;
 
 template <typename T, sycl::access::address_space Space = dpcpp_global_space>
-DPCPP_DEVICE using dpcpp_multi_ptr_pt =
-    typename dpcpp_multi_ptr<T, Space>::pointer_t;
+using dpcpp_multi_ptr_pt = typename dpcpp_multi_ptr<T, Space>::pointer_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_local_ptr_cpt =
-    typename dpcpp_local_ptr<T>::const_pointer_t;
+using dpcpp_local_ptr_cpt = typename dpcpp_local_ptr<T>::const_pointer_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_priv_ptr_cpt =
-    typename dpcpp_priv_ptr<T>::const_pointer_t;
+using dpcpp_priv_ptr_cpt = typename dpcpp_priv_ptr<T>::const_pointer_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_global_ptr_cpt =
-    typename dpcpp_global_ptr<T>::const_pointer_t;
+using dpcpp_global_ptr_cpt = typename dpcpp_global_ptr<T>::const_pointer_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_const_ptr_cpt =
-    typename dpcpp_const_ptr<T>::const_pointer_t;
+using dpcpp_const_ptr_cpt = typename dpcpp_const_ptr<T>::const_pointer_t;
 
 template <typename T, sycl::access::address_space Space = dpcpp_global_space>
-DPCPP_DEVICE using dpcpp_multi_ptr_cpt =
-    typename dpcpp_multi_ptr<T, Space>::const_pointer_t;
+using dpcpp_multi_ptr_cpt = typename dpcpp_multi_ptr<T, Space>::const_pointer_t;
 
 // dpcpp reference type
 template <typename T>
-DPCPP_DEVICE using dpcpp_local_ptr_rt =
-    typename dpcpp_local_ptr<T>::reference_t;
+using dpcpp_local_ptr_rt = typename dpcpp_local_ptr<T>::reference_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_priv_ptr_rt = typename dpcpp_priv_ptr<T>::reference_t;
+using dpcpp_priv_ptr_rt = typename dpcpp_priv_ptr<T>::reference_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_global_ptr_rt =
-    typename dpcpp_global_ptr<T>::reference_t;
+using dpcpp_global_ptr_rt = typename dpcpp_global_ptr<T>::reference_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_const_ptr_rt =
-    typename dpcpp_const_ptr<T>::reference_t;
+using dpcpp_const_ptr_rt = typename dpcpp_const_ptr<T>::reference_t;
 
 template <typename T, sycl::access::address_space Space = dpcpp_global_space>
-DPCPP_DEVICE using dpcpp_multi_ptr_rt =
-    typename dpcpp_multi_ptr<T, Space>::reference_t;
+using dpcpp_multi_ptr_rt = typename dpcpp_multi_ptr<T, Space>::reference_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_local_ptr_crt =
-    typename dpcpp_local_ptr<T>::const_reference_t;
+using dpcpp_local_ptr_crt = typename dpcpp_local_ptr<T>::const_reference_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_priv_ptr_crt =
-    typename dpcpp_priv_ptr<T>::const_reference_t;
+using dpcpp_priv_ptr_crt = typename dpcpp_priv_ptr<T>::const_reference_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_global_ptr_crt =
-    typename dpcpp_global_ptr<T>::const_reference_t;
+using dpcpp_global_ptr_crt = typename dpcpp_global_ptr<T>::const_reference_t;
 
 template <typename T>
-DPCPP_DEVICE using dpcpp_const_ptr_crt =
-    typename dpcpp_const_ptr<T>::const_reference_t;
+using dpcpp_const_ptr_crt = typename dpcpp_const_ptr<T>::const_reference_t;
 
 template <typename T, sycl::access::address_space Space = dpcpp_global_space>
-DPCPP_DEVICE using dpcpp_multi_ptr_crt =
+using dpcpp_multi_ptr_crt =
     typename dpcpp_multi_ptr<T, Space>::const_reference_t;
 
 // dpcpp accessor type
 template <typename ScalarType, int Dims = 1>
-DPCPP_DEVICE using dpcpp_local_acc_t = sycl::local_accessor<ScalarType, Dims>;
+using dpcpp_local_acc_t = sycl::local_accessor<ScalarType, Dims>;
 
 template <
     typename ScalarType,
     sycl::access::mode Mode = dpcpp_rw_mode,
     int Dims = 1>
-DPCPP_DEVICE using dpcpp_global_acc_t =
+using dpcpp_global_acc_t =
     sycl::accessor<ScalarType, Dims, Mode, dpcpp_device_buf>;
 
 template <typename ScalarType, int Dims = 1>
-DPCPP_DEVICE using dpcpp_const_acc_t =
+using dpcpp_const_acc_t =
     sycl::accessor<ScalarType, Dims, dpcpp_r_mode, dpcpp_const_buf>;
 
 template <
     typename ScalarType,
     sycl::access::mode Mode = dpcpp_rw_mode,
     int Dims = 1>
-DPCPP_HOST using dpcpp_host_acc_t =
-    sycl::accessor<ScalarType, Dims, Mode, dpcpp_host_buf>;
+using dpcpp_host_acc_t = sycl::accessor<ScalarType, Dims, Mode, dpcpp_host_buf>;
 
 // dpcpp atomic
 template <typename T>

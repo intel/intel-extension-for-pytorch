@@ -85,7 +85,7 @@ static inline c10::BFloat16 nextafteri(c10::BFloat16 from, c10::BFloat16 to) {
 }
 
 template <typename T>
-DPCPP_BOTH inline constexpr T pi_i() {
+inline constexpr T pi_i() {
   return static_cast<T>(3.14159265358979323846L);
 }
 
@@ -1627,17 +1627,17 @@ T scalar_cast(U u) {
 }
 
 template <typename T>
-DPCPP_BOTH inline T Min(T a, T b) {
+inline T Min(T a, T b) {
   return (a < b) ? a : b;
 }
 
 template <typename T>
-DPCPP_BOTH inline T Max(T a, T b) {
+inline T Max(T a, T b) {
   return (a > b) ? a : b;
 }
 
 template <typename T>
-DPCPP_BOTH inline T CeilDiv(T a, T b) {
+inline T CeilDiv(T a, T b) {
   return (a + b - 1) / b;
 }
 
@@ -1647,6 +1647,6 @@ DPCPP_BOTH inline T CeilDiv(T a, T b) {
  *       */
 
 template <typename T>
-DPCPP_BOTH inline T RoundUp(T a, T b) {
+inline T RoundUp(T a, T b) {
   return CeilDiv(a, b) * b;
 }

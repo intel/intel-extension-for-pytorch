@@ -182,7 +182,6 @@ namespace triangle_dpcpp {
 //
 // The following solution uses sqrt directly for most cases, and would only
 // special handle it if there is indeed precision loss.
-DPCPP_DEVICE
 inline int64_t resolve_root_int(
     int64_t b,
     int64_t cX4,
@@ -210,7 +209,6 @@ inline int64_t resolve_root_int(
   return res;
 }
 
-DPCPP_DEVICE
 inline void get_coordinate_in_triu_trapezoid(
     int64_t f,
     int64_t x,
@@ -223,7 +221,6 @@ inline void get_coordinate_in_triu_trapezoid(
   col = x - ((f - row + 1) * row >> 1) + row;
 }
 
-DPCPP_DEVICE
 inline void get_coordinate_in_tril_trapezoid(
     int64_t f,
     int64_t x,

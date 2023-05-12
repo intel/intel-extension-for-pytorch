@@ -162,7 +162,7 @@ class dists {
 };
 
 template <int SG_SIZE, typename scalar_t, typename F, typename nd_item>
-DPCPP_DEVICE scalar_t subgroup_reduce_agg_impl(nd_item item, scalar_t value) {
+scalar_t subgroup_reduce_agg_impl(nd_item item, scalar_t value) {
   const auto sg = item.get_sub_group();
 
 #pragma unroll
@@ -173,8 +173,7 @@ DPCPP_DEVICE scalar_t subgroup_reduce_agg_impl(nd_item item, scalar_t value) {
 }
 
 template <typename scalar_t, typename F, typename nd_item>
-DPCPP_DEVICE scalar_t
-subgroup_reduce_agg(nd_item item, scalar_t value, const int sg_size) {
+scalar_t subgroup_reduce_agg(nd_item item, scalar_t value, const int sg_size) {
   scalar_t ret;
   switch (sg_size) {
     case 8:

@@ -33,7 +33,7 @@ static inline bool is_opaque_u8(const Tensor& qx) {
 }
 
 template <typename T>
-DPCPP_DEVICE inline T Round(const T x) {
+inline T Round(const T x) {
   return std::nearbyint(x);
 }
 
@@ -65,7 +65,7 @@ static inline at::Tensor u8tos8(const at::Tensor& u8) {
 }
 
 template <typename T>
-DPCPP_DEVICE T quantize_val(double scale, int64_t zero_point, float value) {
+T quantize_val(double scale, int64_t zero_point, float value) {
   int64_t qvalue;
   constexpr int64_t qmin = std::numeric_limits<typename T::underlying>::min();
   constexpr int64_t qmax = std::numeric_limits<typename T::underlying>::max();
@@ -77,7 +77,7 @@ DPCPP_DEVICE T quantize_val(double scale, int64_t zero_point, float value) {
 }
 
 template <typename T>
-DPCPP_DEVICE T quantize_val(float scale, int64_t zero_point, float value) {
+T quantize_val(float scale, int64_t zero_point, float value) {
   float qvalue;
   constexpr float qmin = (float)std::numeric_limits<T>::min();
   constexpr float qmax = (float)std::numeric_limits<T>::max();

@@ -17,14 +17,14 @@ namespace impl {
 
 template <typename scalar_t>
 struct BitwiseAndFunctor {
-  DPCPP_DEVICE inline scalar_t operator()(scalar_t a, scalar_t b) const {
+  inline scalar_t operator()(scalar_t a, scalar_t b) const {
     return a & b;
   }
 };
 
 template <>
 struct BitwiseAndFunctor<bool> {
-  DPCPP_DEVICE inline bool operator()(bool a, bool b) const {
+  inline bool operator()(bool a, bool b) const {
     return a && b;
   }
 };
@@ -39,14 +39,14 @@ void and_kernel_dpcpp(TensorIterator& iter) {
 
 template <typename scalar_t>
 struct BitwiseOrFunctor {
-  DPCPP_DEVICE inline scalar_t operator()(scalar_t a, scalar_t b) const {
+  inline scalar_t operator()(scalar_t a, scalar_t b) const {
     return a | b;
   }
 };
 
 template <>
 struct BitwiseOrFunctor<bool> {
-  DPCPP_DEVICE inline bool operator()(bool a, bool b) const {
+  inline bool operator()(bool a, bool b) const {
     return a || b;
   }
 };
@@ -61,14 +61,14 @@ void or_kernel_dpcpp(TensorIterator& iter) {
 
 template <typename scalar_t>
 struct BitwiseXorFunctor {
-  DPCPP_DEVICE inline scalar_t operator()(scalar_t a, scalar_t b) const {
+  inline scalar_t operator()(scalar_t a, scalar_t b) const {
     return a ^ b;
   }
 };
 
 template <>
 struct BitwiseXorFunctor<bool> {
-  DPCPP_DEVICE inline bool operator()(bool a, bool b) const {
+  inline bool operator()(bool a, bool b) const {
     return a != b;
   }
 };

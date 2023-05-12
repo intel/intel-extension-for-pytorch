@@ -20,7 +20,7 @@ template <
     class T,
     class BinaryFunction,
     bool TrivialOffCal = false>
-DPCPP_DEVICE T inline group_x_scan_by_uds_for_loop_scan(
+T inline group_x_scan_by_uds_for_loop_scan(
     sycl::nd_item<2> item,
     const T pre_max_carr,
     int64_t base_off_batch,
@@ -145,8 +145,7 @@ DPCPP_DEVICE T inline group_x_scan_by_uds_for_loop_scan(
 }
 
 template <class T, class BinaryFunction>
-DPCPP_DEVICE T
-subgroup_scan(sycl::nd_item<2> item, T value, BinaryFunction func) {
+T subgroup_scan(sycl::nd_item<2> item, T value, BinaryFunction func) {
   const auto sg = item.get_sub_group();
   const auto lane = sg.get_local_linear_id();
   const auto sg_size = sg.get_local_range()[0];
@@ -162,7 +161,7 @@ subgroup_scan(sycl::nd_item<2> item, T value, BinaryFunction func) {
 }
 
 template <class T, class BinaryFunction>
-DPCPP_DEVICE T group_x_scan(
+T group_x_scan(
     sycl::nd_item<2> item,
     T value,
 #ifndef SG_SCAN
@@ -214,7 +213,7 @@ DPCPP_DEVICE T group_x_scan(
 }
 
 template <class T, class BinaryFunction>
-DPCPP_DEVICE T group_y_scan(
+T group_y_scan(
     sycl::nd_item<2> item,
     T value,
     dpcpp_local_ptr<T> temp,
@@ -352,7 +351,7 @@ class loop_scan_kernel {
  public:
   loop_scan_kernel(const LSConfig& cfg) : cfg(cfg) {}
 
-  DPCPP_DEVICE void lrun(
+  void lrun(
       sycl::nd_item<2> item,
       dpcpp_local_acc_t<T> slm,
       dpcpp_local_acc_t<T> max_carr) const {
@@ -515,8 +514,7 @@ class segment_scan_kernel {
   segment_scan_kernel(const SSConfig& cfg) : cfg(cfg) {}
 
  public:
-  DPCPP_DEVICE void srun(sycl::nd_item<2> item, dpcpp_local_acc_t<T> slm)
-      const {
+  void srun(sycl::nd_item<2> item, dpcpp_local_acc_t<T> slm) const {
     auto id = cfg.get_item_desc(item);
     int64_t si, pi, bi, glb_ldr_off, glb_str_off, glb_str_off_0,
         glb_ldr_logical_off, glb_str_logical_off, crr_off;
@@ -680,7 +678,7 @@ static inline void accumulate_carrier(const SSConfig& cfg) {
 }
 
 template <typename T, class BinaryOp, int Power2ScanSize>
-DPCPP_DEVICE void inclusivePrefixScan(
+void inclusivePrefixScan(
     T* smem,
     BinaryOp binop,
     const sycl::nd_item<1>& item_id) {
@@ -706,7 +704,7 @@ DPCPP_DEVICE void inclusivePrefixScan(
 
 // Inclusive prefix sum using shared Memory
 template <typename T, class BinaryFunction>
-DPCPP_DEVICE void inclusivePrefixScan(
+void inclusivePrefixScan(
     const dpcpp_local_acc_t<T>& smem,
     T in,
     T* out,
@@ -737,7 +735,7 @@ DPCPP_DEVICE void inclusivePrefixScan(
 
 // Exclusive prefix sum using shared memory
 template <typename T, class BinaryFunction>
-DPCPP_DEVICE void exclusivePrefixScan(
+void exclusivePrefixScan(
     const dpcpp_local_acc_t<T>& smem,
     T in,
     T* out,

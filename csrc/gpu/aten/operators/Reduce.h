@@ -26,7 +26,7 @@ namespace xpu {
 namespace dpcpp {
 namespace detail {
 template <class arg_t, class item_t, class CombineFunc, int out_vec_sz = 1>
-DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_reduce(
+inline at::detail::Array<arg_t, out_vec_sz> group_reduce(
     item_t item,
     int wg_size,
     dpcpp_local_ptr<void> shared,
@@ -93,7 +93,7 @@ DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_reduce(
 }
 
 template <class arg_t, class item_t, class CombineFunc, int out_vec_sz = 1>
-DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_x_reduce(
+inline at::detail::Array<arg_t, out_vec_sz> group_x_reduce(
     item_t item,
     dpcpp_local_ptr<void> shared,
     at::detail::Array<arg_t, out_vec_sz> value,
@@ -135,7 +135,7 @@ DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_x_reduce(
 }
 
 template <class arg_t, class item_t, class CombineFunc, int out_vec_sz = 1>
-DPCPP_DEVICE inline at::detail::Array<arg_t, out_vec_sz> group_y_reduce(
+inline at::detail::Array<arg_t, out_vec_sz> group_y_reduce(
     item_t item,
     dpcpp_local_ptr<void> shared,
     at::detail::Array<arg_t, out_vec_sz> value,

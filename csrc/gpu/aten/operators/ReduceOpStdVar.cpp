@@ -29,8 +29,8 @@ struct WelfordData {
   scalar_t m2;
   index_t n;
   combine_t nf;
-  DPCPP_BOTH WelfordData() : mean(0), m2(0), n(0), nf(0) {}
-  DPCPP_DEVICE WelfordData(scalar_t mean, scalar_t m2, index_t n, combine_t nf)
+  WelfordData() : mean(0), m2(0), n(0), nf(0) {}
+  WelfordData(scalar_t mean, scalar_t m2, index_t n, combine_t nf)
       : mean(mean), m2(m2), n(n), nf(nf) {}
 };
 
@@ -47,8 +47,7 @@ struct WelfordOps {
 
  public:
   using acc_t = WelfordData<acc_scalar_t, index_t, combine_t>;
-  inline DPCPP_DEVICE acc_t
-  reduce(acc_t acc, scalar_t data, int64_t idx) const {
+  inline acc_t reduce(acc_t acc, scalar_t data, int64_t idx) const {
     acc_scalar_t delta = data - acc.mean;
     acc_scalar_t new_mean = acc.mean + delta / (acc.nf + 1);
     acc_scalar_t new_delta = data - new_mean;
@@ -59,7 +58,7 @@ struct WelfordOps {
         combine_t(acc.n + 1),
     };
   }
-  inline DPCPP_DEVICE acc_t combine(acc_t a, acc_t b) const {
+  inline acc_t combine(acc_t a, acc_t b) const {
     if (a.nf == 0) {
       return b;
     }
@@ -75,7 +74,7 @@ struct WelfordOps {
         -1,
         new_count};
   }
-  inline DPCPP_DEVICE res_t project(acc_t acc) const {
+  inline res_t project(acc_t acc) const {
     auto mean = acc.mean;
     combine_t divisor = acc.nf > correction ? acc.nf - correction : 0;
     const auto var = acc.m2 / divisor;
@@ -84,7 +83,7 @@ struct WelfordOps {
     std::pair<scalar_t, scalar_t> results{(scalar_t)ret, (scalar_t)mean};
     return results;
   }
-  inline DPCPP_DEVICE acc_t sg_shfl_down(acc_t arg, int offset) const {
+  inline acc_t sg_shfl_down(acc_t arg, int offset) const {
     // FIXME:
     return arg;
   }

@@ -183,7 +183,7 @@ class BatchKernelConfig {
     /* global problem id */ int64_t glb_problem;
   };
 
-  DPCPP_DEVICE ItemDesc get_item_desc(sycl::nd_item<2> item) const {
+  ItemDesc get_item_desc(sycl::nd_item<2> item) const {
     auto lix = item.get_local_id(1);
     auto liy = item.get_local_id(0);
     auto lrx = item.get_local_range(1);
@@ -206,7 +206,7 @@ class BatchKernelConfig {
   // iterate over problems and batchs for `pAdaptive` policy
   // # update workload status inplace in `desc`.
   // # prioritize problem iteration.
-  DPCPP_DEVICE bool next(sycl::nd_item<2> item, ItemDesc& desc) const {
+  bool next(sycl::nd_item<2> item, ItemDesc& desc) const {
     auto next_problem = desc.glb_problem + problem_glb_range_;
     auto next_batch = desc.glb_batch + batch_glb_range_;
     auto cur_chunk = desc.chunk;

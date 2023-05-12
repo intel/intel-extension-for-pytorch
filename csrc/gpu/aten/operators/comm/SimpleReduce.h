@@ -6,7 +6,7 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 template <typename reduce_op, typename nd_item_id, typename local_shared>
-DPCPP_DEVICE static inline void simple_reduce(
+static inline void simple_reduce(
     nd_item_id item_id,
     const local_shared& local_shared_mem,
     reduce_op bin_op) {
@@ -26,7 +26,7 @@ DPCPP_DEVICE static inline void simple_reduce(
 }
 
 template <typename nd_item_id, typename local_shared>
-DPCPP_DEVICE static inline void up_sweep(
+static inline void up_sweep(
     nd_item_id item_id,
     const local_shared& local_shared_mem) {
   auto local_idx = item_id.get_local_id(0);
@@ -45,7 +45,7 @@ DPCPP_DEVICE static inline void up_sweep(
 }
 
 template <typename nd_item_id, typename local_shared, typename T>
-DPCPP_DEVICE static inline void down_sweep(
+static inline void down_sweep(
     nd_item_id item_id,
     const local_shared& local_shared_mem,
     T init) {

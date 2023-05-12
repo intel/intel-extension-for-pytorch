@@ -17,7 +17,7 @@ struct AtomicIntegerImpl;
 template <typename T>
 struct AtomicIntegerImpl<T, 1> {
   template <typename func_t>
-  inline DPCPP_DEVICE void operator()(T* address, T val, const func_t& func) {
+  inline void operator()(T* address, T val, const func_t& func) {
     size_t offset = (size_t)address & 3;
     uint32_t* address_as_ui = (uint32_t*)((char*)address - offset);
     uint32_t assumed = *address_as_ui;
@@ -40,7 +40,7 @@ struct AtomicIntegerImpl<T, 1> {
 template <typename T>
 struct AtomicIntegerImpl<T, 2> {
   template <typename func_t>
-  inline DPCPP_DEVICE void operator()(T* address, T val, const func_t& func) {
+  inline void operator()(T* address, T val, const func_t& func) {
     size_t offset = (size_t)address & 2;
     uint32_t* address_as_ui = (uint32_t*)((char*)address - offset);
     bool is_32_align = offset;
@@ -64,7 +64,7 @@ struct AtomicIntegerImpl<T, 2> {
 template <typename T>
 struct AtomicIntegerImpl<T, 4> {
   template <typename func_t>
-  inline DPCPP_DEVICE void operator()(T* address, T val, const func_t& func) {
+  inline void operator()(T* address, T val, const func_t& func) {
     uint32_t* address_as_ui = (uint32_t*)(address);
     uint32_t assumed = *address_as_ui;
     uint32_t newval;
@@ -79,7 +79,7 @@ struct AtomicIntegerImpl<T, 4> {
 template <typename T>
 struct AtomicIntegerImpl<T, 8> {
   template <typename func_t>
-  inline DPCPP_DEVICE void operator()(T* address, T val, const func_t& func) {
+  inline void operator()(T* address, T val, const func_t& func) {
     unsigned long long* address_as_ull = (unsigned long long*)(address);
     unsigned long long assumed = *address_as_ull;
     unsigned long long newval;
@@ -93,7 +93,7 @@ struct AtomicIntegerImpl<T, 8> {
 };
 
 #define SYCL_ATOMIC_INTEGER(NAME, OP, DTYPE)                  \
-  static inline DPCPP_DEVICE void atomic##NAME(               \
+  static inline void atomic##NAME(                            \
       const dpcpp_global_ptr_pt<DTYPE>& address, DTYPE val) { \
     AtomicIntegerImpl<DTYPE, sizeof(DTYPE)>()(                \
         address, val, [](DTYPE a, DTYPE b) { return OP; });   \
@@ -105,10 +105,7 @@ struct AtomicFPImpl;
 template <>
 struct AtomicFPImpl<at::Half> {
   template <typename func_t>
-  inline DPCPP_DEVICE void operator()(
-      at::Half* address,
-      at::Half val,
-      const func_t& func) {
+  inline void operator()(at::Half* address, at::Half val, const func_t& func) {
     unsigned int* address_as_ui =
         (unsigned int*)((char*)address - ((size_t)address & 2));
     unsigned int assumed = *address_as_ui;
@@ -129,7 +126,7 @@ struct AtomicFPImpl<at::Half> {
 template <>
 struct AtomicFPImpl<at::BFloat16> {
   template <typename func_t>
-  inline DPCPP_DEVICE void operator()(
+  inline void operator()(
       at::BFloat16* address,
       at::BFloat16 val,
       const func_t& func) {
@@ -153,10 +150,7 @@ struct AtomicFPImpl<at::BFloat16> {
 template <>
 struct AtomicFPImpl<float> {
   template <typename func_t>
-  inline DPCPP_DEVICE void operator()(
-      float* address,
-      float val,
-      const func_t& func) {
+  inline void operator()(float* address, float val, const func_t& func) {
     unsigned int* address_as_ui = (unsigned int*)address;
     unsigned int assumed = *address_as_ui;
     unsigned int newval;
@@ -171,10 +165,7 @@ struct AtomicFPImpl<float> {
 template <>
 struct AtomicFPImpl<double> {
   template <typename func_t>
-  inline DPCPP_DEVICE void operator()(
-      double* address,
-      double val,
-      const func_t& func) {
+  inline void operator()(double* address, double val, const func_t& func) {
     unsigned long long* address_as_ull = (unsigned long long*)address;
     unsigned long long assumed = *address_as_ull;
     unsigned long long newval;
@@ -188,21 +179,21 @@ struct AtomicFPImpl<double> {
 };
 
 #define SYCL_ATOMIC_FP(NAME, OP, DTYPE)                                       \
-  static inline DPCPP_DEVICE void atomic##NAME(                               \
+  static inline void atomic##NAME(                                            \
       const dpcpp_global_ptr_pt<DTYPE>& address, DTYPE val) {                 \
     AtomicFPImpl<DTYPE>()(address, val, [](DTYPE a, DTYPE b) { return OP; }); \
   }
 
 // Atomic addition implementation.
 
-static inline DPCPP_DEVICE void atomicAdd(
+static inline void atomicAdd(
     const dpcpp_global_ptr_pt<float>& address,
     float val) {
   dpcpp_atomic_ref_rlx_dev_global_t<float> target(*address);
   target.fetch_add(val);
 }
 
-static inline DPCPP_DEVICE void atomicAdd(
+static inline void atomicAdd(
     const dpcpp_global_ptr_pt<double>& address,
     double val) {
   dpcpp_atomic_ref_rlx_dev_global_t<double> target(*address);
@@ -212,14 +203,12 @@ static inline DPCPP_DEVICE void atomicAdd(
 SYCL_ATOMIC_FP(Add, Numerics<at::Half>::add(a, b), at::Half)
 SYCL_ATOMIC_FP(Add, Numerics<at::BFloat16>::add(a, b), at::BFloat16)
 
-static inline DPCPP_DEVICE void atomicAdd(
-    const dpcpp_global_ptr_pt<int>& address,
-    int val) {
+static inline void atomicAdd(const dpcpp_global_ptr_pt<int>& address, int val) {
   dpcpp_atomic_ref_rlx_dev_global_t<int> target(*address);
   target.fetch_add(val);
 }
 
-static inline DPCPP_DEVICE void atomicAdd(
+static inline void atomicAdd(
     const dpcpp_global_ptr_pt<int64_t>& address,
     int64_t val) {
   dpcpp_atomic_ref_rlx_dev_global_t<int64_t> target(*address);
@@ -230,20 +219,20 @@ SYCL_ATOMIC_INTEGER(Add, Numerics<uint8_t>::add(a, b), uint8_t)
 SYCL_ATOMIC_INTEGER(Add, Numerics<int8_t>::add(a, b), int8_t)
 SYCL_ATOMIC_INTEGER(Add, Numerics<int16_t>::add(a, b), int16_t)
 
-static inline DPCPP_DEVICE void atomicAdd(
+static inline void atomicAdd(
     const dpcpp_global_ptr_pt<bool>& address,
     bool val) {
   *address = address && val;
 }
 
-static inline DPCPP_DEVICE void atomicAdd(
+static inline void atomicAdd(
     const dpcpp_local_ptr_pt<uint32_t>& address,
     uint32_t val) {
   dpcpp_atomic_ref_rlx_wg_local_t<uint32_t> target(*address);
   target.fetch_add(val);
 }
 
-static inline DPCPP_DEVICE void atomicAdd(
+static inline void atomicAdd(
     const dpcpp_local_ptr_pt<uint64_t>& address,
     uint64_t val) {
   dpcpp_atomic_ref_rlx_wg_local_t<uint64_t> target(*address);
@@ -251,7 +240,7 @@ static inline DPCPP_DEVICE void atomicAdd(
 }
 
 template <typename T>
-static inline DPCPP_DEVICE void atomicAdd(
+static inline void atomicAdd(
     const dpcpp_global_ptr_pt<c10::complex<T>>& address,
     c10::complex<T> val) {
   atomicAdd(&address->real_, val.real_);
