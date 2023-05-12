@@ -4,10 +4,12 @@ from torch import nn, Tensor
 from torch.jit.annotations import BroadcastingList2
 from typing import List, Union
 from .modules import Interaction
+from .modules import TransducerLoss
 import intel_extension_for_pytorch
 
 __all__ = [
     'Interaction',
+    'TransducerLoss',
     'nms',
     'locations_to_boxes',
     'roi_align',
