@@ -6,7 +6,7 @@ VER_LLVM="llvmorg-13.0.0"
 VER_PYTORCH=""
 VER_TORCHVISION=""
 VER_TORCHAUDIO=""
-VER_IPEX="v2.0.0+cpu"
+VER_IPEX="v2.0.100+cpu"
 
 # Check existance of required Linux commands
 for CMD in gcc g++ python git nproc; do
@@ -52,9 +52,6 @@ ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
 # Compile individual component
 #  LLVM
 cd ../llvm-project
-if [ ${UID} -eq 0 ]; then
-    git config --global --add safe.directory `pwd`
-fi
 if [ -d build ]; then
     rm -rf build
 fi
@@ -72,14 +69,8 @@ ln -s ${LLVM_ROOT}/bin/llvm-config ${LLVM_ROOT}/bin/llvm-config-13
 export PATH=${LLVM_ROOT}/bin:$PATH
 export LD_LIBRARY_PATH=${LLVM_ROOT}/lib:$LD_LIBRARY_PATH
 cd ..
-if [ ${UID} -eq 0 ]; then
-    git config --global --unset safe.directory
-fi
 #  Intel® Extension for PyTorch*
 cd ../intel-extension-for-pytorch
-if [ ${UID} -eq 0 ]; then
-    git config --global --add safe.directory `pwd`
-fi
 python -m pip install -r requirements.txt
 export USE_LLVM=${LLVM_ROOT}
 export LLVM_DIR=${USE_LLVM}/lib/cmake/llvm
@@ -90,9 +81,6 @@ unset DNNL_GRAPH_BUILD_COMPILER_BACKEND
 unset LLVM_DIR
 unset USE_LLVM
 python -m pip install --force-reinstall dist/*.whl
-if [ ${UID} -eq 0 ]; then
-    git config --global --unset safe.directory
-fi
 
 # Sanity Test
 cd ..
