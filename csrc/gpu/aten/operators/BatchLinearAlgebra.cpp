@@ -2992,6 +2992,9 @@ void linalg_eigh_impl(
     Tensor& infos,
     bool upper,
     bool compute_eigenvectors) {
+  if (eigenvectors.numel() == 0) {
+    return;
+  }
   std::vector<int32_t> infos_vec(at::native::batchCount(eigenvectors), 0);
 
   auto self_sizes = eigenvectors.sizes().vec();
