@@ -223,7 +223,7 @@ class NormConfig {
   void* scratchpad_ptr;
   int sub_group_num_global;
 
-  template <typename accscalar_t>
+  template <typename scalar_t>
   void init_global_reduce(
       const Tensor& X,
       Tensor& semaphores,
@@ -236,7 +236,7 @@ class NormConfig {
           ? kFloat
           : X.scalar_type();
       int scratchpad_size =
-          2 * Batch * workgroup_num_foreach * sizeof(accscalar_t);
+          2 * Batch * workgroup_num_foreach * sizeof(acc_type<scalar_t>);
       scratchpad = at::zeros(scratchpad_size, X.options().dtype(kAccType));
       semaphores_ptr = semaphores.data_ptr<int>();
       scratchpad_ptr = scratchpad.data_ptr();
@@ -330,15 +330,16 @@ class NormConfig {
   }
 };
 
-template <typename scalar_t, typename accscalar_t, typename weight_t>
+template <typename scalar_t, typename mean_t, typename weight_t>
 class NormForward {
  public:
+  using accscalar_t = acc_type<scalar_t>;
   NormForward() = delete;
   NormForward(
       scalar_t* X_data,
       scalar_t* Y_data,
-      scalar_t* mean_data,
-      scalar_t* var_data,
+      mean_t* mean_data,
+      mean_t* var_data,
       weight_t* gamma_data,
       weight_t* beta_data,
       accscalar_t eps)
@@ -442,33 +443,34 @@ class NormForward {
       accscalar_t sum2,
       const NormConfig& cfg) const {
     auto group_id = item_id.get_group(0);
-    accscalar_t scale = 1 / static_cast<accscalar_t>(cfg.Plane);
-    sum1 *= scale;
-    sum2 = sum2 * scale - sum1 * sum1;
-    mean_data[group_id] = static_cast<scalar_t>(sum1);
-    var_data[group_id] = static_cast<scalar_t>(Numerics<accscalar_t>::rsqrt(
+    accscalar_t scale = static_cast<accscalar_t>(cfg.Plane);
+    sum2 = (sum2 - sum1 * sum1 / scale) / scale;
+    sum1 = sum1 / scale;
+    mean_data[group_id] = static_cast<mean_t>(sum1);
+    var_data[group_id] = static_cast<mean_t>(Numerics<accscalar_t>::rsqrt(
         sum2 < 0 ? 0 : sum2 + static_cast<accscalar_t>(eps)));
   }
 
  public:
   scalar_t* X_data;
   scalar_t* Y_data;
-  scalar_t* mean_data;
-  scalar_t* var_data;
+  mean_t* mean_data;
+  mean_t* var_data;
   weight_t* gamma_data;
   weight_t* beta_data;
   accscalar_t eps;
 };
 
-template <typename scalar_t, typename accscalar_t, typename weight_t>
+template <typename scalar_t, typename mean_t, typename weight_t>
 class NormBackward {
  public:
+  using accscalar_t = acc_type<scalar_t>;
   NormBackward(
       scalar_t* X_data,
       scalar_t* dY_data,
       scalar_t* dX_data,
-      scalar_t* mean_data,
-      scalar_t* var_data,
+      mean_t* mean_data,
+      mean_t* var_data,
       weight_t* gamma_data,
       accscalar_t* a_data,
       accscalar_t* b_data)
@@ -484,8 +486,8 @@ class NormBackward {
   scalar_t* X_data;
   scalar_t* dY_data;
   scalar_t* dX_data;
-  scalar_t* mean_data;
-  scalar_t* var_data;
+  mean_t* mean_data;
+  mean_t* var_data;
   weight_t* gamma_data;
   accscalar_t* a_data;
   accscalar_t* b_data;
@@ -575,15 +577,16 @@ class NormBackward {
 
 template <
     typename scalar_t,
-    typename accscalar_t,
+    typename mean_t,
     typename weight_t,
     typename index_t,
     int vec_size,
     template <typename, typename, typename>
     class Norm>
 void fused_norm_kernel(
-    Norm<scalar_t, accscalar_t, weight_t>& norm,
+    Norm<scalar_t, mean_t, weight_t>& norm,
     const NormConfig& cfg) {
+  using accscalar_t = acc_type<scalar_t>;
   using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
   using weight_vec_t =
       at::native::Memory::aligned_vector_loop<weight_t, vec_size>;
@@ -622,35 +625,25 @@ void fused_norm_kernel(
 
 template <
     typename scalar_t,
-    typename accscalar_t,
+    typename mean_t,
     typename weight_t,
     template <typename, typename, typename>
     class Norm>
 void launch_vectorized_fused_norm_kernel(
-    Norm<scalar_t, accscalar_t, weight_t>& norm,
+    Norm<scalar_t, mean_t, weight_t>& norm,
     const NormConfig& config,
     bool can_use_32bit_index) {
   int vec_size = norm.get_update_vec_size(config.WGPlane, config.max_vec_size);
-#define vectorized_fused_norm_kernel(vec_size) \
-  {                                            \
-    if (can_use_32bit_index) {                 \
-      fused_norm_kernel<                       \
-          scalar_t,                            \
-          accscalar_t,                         \
-          weight_t,                            \
-          uint32_t,                            \
-          vec_size,                            \
-          Norm>(norm, config);                 \
-    } else {                                   \
-      fused_norm_kernel<                       \
-          scalar_t,                            \
-          accscalar_t,                         \
-          weight_t,                            \
-          uint64_t,                            \
-          vec_size,                            \
-          Norm>(norm, config);                 \
-    }                                          \
-    break;                                     \
+#define vectorized_fused_norm_kernel(vec_size)                                 \
+  {                                                                            \
+    if (can_use_32bit_index) {                                                 \
+      fused_norm_kernel<scalar_t, mean_t, weight_t, uint32_t, vec_size, Norm>( \
+          norm, config);                                                       \
+    } else {                                                                   \
+      fused_norm_kernel<scalar_t, mean_t, weight_t, uint64_t, vec_size, Norm>( \
+          norm, config);                                                       \
+    }                                                                          \
+    break;                                                                     \
   }
 
   switch (vec_size) {
@@ -671,15 +664,16 @@ void launch_vectorized_fused_norm_kernel(
 
 template <
     typename scalar_t,
-    typename accscalar_t,
+    typename mean_t,
     typename weight_t,
     typename index_t,
     int vec_size,
     template <typename, typename, typename>
     class Norm>
 void RowwiseMomentsDPCPPKernel(
-    Norm<scalar_t, accscalar_t, weight_t>& norm,
+    Norm<scalar_t, mean_t, weight_t>& norm,
     NormConfig& cfg) {
+  using accscalar_t = acc_type<scalar_t>;
   using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
   using weight_vec_t =
       at::native::Memory::aligned_vector_loop<weight_t, vec_size>;
@@ -741,12 +735,12 @@ void RowwiseMomentsDPCPPKernel(
 
 template <
     typename scalar_t,
-    typename accscalar_t,
+    typename mean_t,
     typename weight_t,
     template <typename, typename, typename>
     class Norm>
 void RowwiseMomentsDPCPPKernelImpl(
-    Norm<scalar_t, accscalar_t, weight_t>& norm,
+    Norm<scalar_t, mean_t, weight_t>& norm,
     NormConfig& config,
     bool can_use_32bit_index) {
   int vec_size =
@@ -756,7 +750,7 @@ void RowwiseMomentsDPCPPKernelImpl(
     if (can_use_32bit_index) {                 \
       RowwiseMomentsDPCPPKernel<               \
           scalar_t,                            \
-          accscalar_t,                         \
+          mean_t,                              \
           weight_t,                            \
           uint32_t,                            \
           vec_size,                            \
@@ -764,7 +758,7 @@ void RowwiseMomentsDPCPPKernelImpl(
     } else {                                   \
       RowwiseMomentsDPCPPKernel<               \
           scalar_t,                            \
-          accscalar_t,                         \
+          mean_t,                              \
           weight_t,                            \
           uint64_t,                            \
           vec_size,                            \
@@ -790,14 +784,14 @@ void RowwiseMomentsDPCPPKernelImpl(
 
 template <
     typename scalar_t,
-    typename accscalar_t,
+    typename mean_t,
     typename weight_t,
     typename index_t,
     int vec_size,
     template <typename, typename, typename>
     class Norm>
 void NormUpdateKernel(
-    Norm<scalar_t, accscalar_t, weight_t>& norm,
+    Norm<scalar_t, mean_t, weight_t>& norm,
     const NormConfig& cfg) {
   // input: [M][N]
   // gamma, beta: [M]
@@ -824,36 +818,26 @@ void NormUpdateKernel(
 
 template <
     typename scalar_t,
-    typename accscalar_t,
+    typename mean_t,
     typename weight_t,
     template <typename, typename, typename>
     class Norm>
 void NormUpdateKernelImpl(
-    Norm<scalar_t, accscalar_t, weight_t>& norm,
+    Norm<scalar_t, mean_t, weight_t>& norm,
     const NormConfig& config,
     bool can_use_32bit_index) {
   int vec_size = norm.get_update_vec_size(config.WGPlane, config.max_vec_size);
 
-#define VecNormUpdateKernel(vec_size) \
-  {                                   \
-    if (can_use_32bit_index) {        \
-      NormUpdateKernel<               \
-          scalar_t,                   \
-          accscalar_t,                \
-          weight_t,                   \
-          uint32_t,                   \
-          vec_size,                   \
-          Norm>(norm, config);        \
-    } else {                          \
-      NormUpdateKernel<               \
-          scalar_t,                   \
-          accscalar_t,                \
-          weight_t,                   \
-          uint64_t,                   \
-          vec_size,                   \
-          Norm>(norm, config);        \
-    }                                 \
-    break;                            \
+#define VecNormUpdateKernel(vec_size)                                         \
+  {                                                                           \
+    if (can_use_32bit_index) {                                                \
+      NormUpdateKernel<scalar_t, mean_t, weight_t, uint32_t, vec_size, Norm>( \
+          norm, config);                                                      \
+    } else {                                                                  \
+      NormUpdateKernel<scalar_t, mean_t, weight_t, uint64_t, vec_size, Norm>( \
+          norm, config);                                                      \
+    }                                                                         \
+    break;                                                                    \
   }
 
   switch (vec_size) {
@@ -874,13 +858,13 @@ void NormUpdateKernelImpl(
 
 template <
     typename scalar_t,
-    typename accscalar_t,
+    typename mean_t,
     typename weight_t,
     typename index_t,
     int vec_size,
     template <typename, typename, typename>
     class Norm>
-void NormEltwiseUpdateKernel(Norm<scalar_t, accscalar_t, weight_t>& norm) {
+void NormEltwiseUpdateKernel(Norm<scalar_t, mean_t, weight_t>& norm) {
   using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
@@ -904,12 +888,12 @@ void NormEltwiseUpdateKernel(Norm<scalar_t, accscalar_t, weight_t>& norm) {
 
 template <
     typename scalar_t,
-    typename accscalar_t,
+    typename mean_t,
     typename weight_t,
     template <typename, typename, typename>
     class Norm>
 void NormEltwiseUpdateKernelImpl(
-    Norm<scalar_t, accscalar_t, weight_t>& norm,
+    Norm<scalar_t, mean_t, weight_t>& norm,
     const NormConfig& cfg,
     bool can_use_32bit_index) {
   int vec_size = norm.get_eltwise_update_vec_size(cfg.max_vec_size);
@@ -918,7 +902,7 @@ void NormEltwiseUpdateKernelImpl(
     if (can_use_32bit_index) {               \
       NormEltwiseUpdateKernel<               \
           scalar_t,                          \
-          accscalar_t,                       \
+          mean_t,                            \
           weight_t,                          \
           uint32_t,                          \
           vec_size,                          \
@@ -926,7 +910,7 @@ void NormEltwiseUpdateKernelImpl(
     } else {                                 \
       NormEltwiseUpdateKernel<               \
           scalar_t,                          \
-          accscalar_t,                       \
+          mean_t,                            \
           weight_t,                          \
           uint64_t,                          \
           vec_size,                          \

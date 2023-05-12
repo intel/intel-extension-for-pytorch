@@ -62,22 +62,23 @@ inline std::pair<int64_t, int64_t> _check_layer_norm_inputs(
   return std::make_pair(M, N);
 }
 
-template <typename scalar_t, typename accscalar_t, typename weight_t>
-class LayerNormForward : public NormForward<scalar_t, accscalar_t, weight_t> {
+template <typename scalar_t, typename mean_t, typename weight_t>
+class LayerNormForward : public NormForward<scalar_t, mean_t, weight_t> {
  public:
-  typedef NormForward<scalar_t, accscalar_t, weight_t> NF;
+  using accscalar_t = acc_type<scalar_t>;
+  typedef NormForward<scalar_t, mean_t, weight_t> NF;
   LayerNormForward() = delete;
   LayerNormForward(
       scalar_t* X_data,
       scalar_t* Y_data,
-      scalar_t* mean_data,
-      scalar_t* var_data,
+      mean_t* mean_data,
+      mean_t* var_data,
       weight_t* gamma_data,
       weight_t* beta_data,
       accscalar_t eps,
       int64_t M,
       int64_t N)
-      : NormForward<scalar_t, accscalar_t, weight_t>(
+      : NormForward<scalar_t, mean_t, weight_t>(
             X_data,
             Y_data,
             mean_data,
@@ -113,8 +114,8 @@ class LayerNormForward : public NormForward<scalar_t, accscalar_t, weight_t> {
       item_id.barrier(dpcpp_global_fence);
     }
 
-    scalar_t mean_val = NF::mean_data[group_id];
-    scalar_t var_val = NF::var_data[group_id];
+    mean_t mean_val = NF::mean_data[group_id];
+    mean_t var_val = NF::var_data[group_id];
     for (index_t j = local_id * vec_size; j < cfg.WGPlane;
          j += cfg.workgroup_size * vec_size) {
       index_t plane_offset = group_id_foreach * cfg.WGPlane + j;
@@ -160,20 +161,21 @@ class LayerNormForward : public NormForward<scalar_t, accscalar_t, weight_t> {
   int64_t numel;
 };
 
-template <typename scalar_t, typename accscalar_t, typename weight_t>
-class LayerNormBackward : public NormBackward<scalar_t, accscalar_t, weight_t> {
+template <typename scalar_t, typename mean_t, typename weight_t>
+class LayerNormBackward : public NormBackward<scalar_t, weight_t, weight_t> {
  public:
+  using accscalar_t = acc_type<scalar_t>;
   LayerNormBackward() = delete;
   LayerNormBackward(
       scalar_t* X_data,
       scalar_t* dY_data,
       scalar_t* dX_data,
-      scalar_t* mean_data,
-      scalar_t* var_data,
+      mean_t* mean_data,
+      mean_t* var_data,
       weight_t* gamma_data,
       int64_t M,
       int64_t N)
-      : NormBackward<scalar_t, accscalar_t, weight_t>(
+      : NormBackward<scalar_t, mean_t, weight_t>(
             X_data,
             dY_data,
             dX_data,
@@ -191,14 +193,14 @@ class LayerNormBackward : public NormBackward<scalar_t, accscalar_t, weight_t> {
       scalar_t* X_data,
       scalar_t* dY_data,
       scalar_t* dX_data,
-      scalar_t* mean_data,
-      scalar_t* var_data,
+      mean_t* mean_data,
+      mean_t* var_data,
       weight_t* gamma_data,
       accscalar_t* a_data,
       accscalar_t* b_data,
       int64_t M,
       int64_t N)
-      : NormBackward<scalar_t, accscalar_t, weight_t>(
+      : NormBackward<scalar_t, mean_t, weight_t>(
             X_data,
             dY_data,
             dX_data,
@@ -209,7 +211,7 @@ class LayerNormBackward : public NormBackward<scalar_t, accscalar_t, weight_t> {
             b_data),
         M(M),
         N(N) {}
-  typedef NormBackward<scalar_t, accscalar_t, weight_t> NB;
+  typedef NormBackward<scalar_t, mean_t, weight_t> NB;
 
   template <
       int vec_size,
@@ -227,8 +229,8 @@ class LayerNormBackward : public NormBackward<scalar_t, accscalar_t, weight_t> {
     auto local_id = item_id.get_local_id(2);
     index_t group_offset = group_id * cfg.Plane;
 
-    accscalar_t mean_val = NB::mean_data[group_id];
-    accscalar_t rstd_val = NB::var_data[group_id];
+    mean_t mean_val = NB::mean_data[group_id];
+    mean_t rstd_val = NB::var_data[group_id];
     for (index_t j = local_id * vec_size; j < cfg.WGPlane;
          j += cfg.workgroup_size * vec_size) {
       index_t plane_offset = group_id_foreach * cfg.WGPlane + j;
@@ -275,8 +277,8 @@ class LayerNormBackward : public NormBackward<scalar_t, accscalar_t, weight_t> {
     }
 
     index_t group_offset = group_id * cfg.Plane;
-    accscalar_t mean_val = NB::mean_data[group_id];
-    accscalar_t var_val = NB::var_data[group_id];
+    mean_t mean_val = NB::mean_data[group_id];
+    mean_t var_val = NB::var_data[group_id];
 
     int fH = cfg.Plane;
     accscalar_t term1 = (accscalar_t(1) / fH) * var_val;
@@ -313,14 +315,14 @@ class LayerNormBackward : public NormBackward<scalar_t, accscalar_t, weight_t> {
   int64_t numel;
 };
 
-template <typename scalar_t, typename accscalar_t, typename weight_t>
+template <typename scalar_t, typename mean_t, typename weight_t>
 void LayerNormKernelImplInternal(
     const Tensor& X,
     const Tensor& gamma,
     const Tensor& beta,
     int64_t M,
     int64_t N,
-    accscalar_t eps,
+    acc_type<scalar_t> eps,
     Tensor& Y,
     Tensor& mean,
     Tensor& rstd) {
@@ -330,30 +332,27 @@ void LayerNormKernelImplInternal(
 
   scalar_t* X_data = X.data_ptr<scalar_t>();
   scalar_t* Y_data = Y.data_ptr<scalar_t>();
-  scalar_t* mean_data = mean.data_ptr<scalar_t>();
-  scalar_t* var_data = rstd.data_ptr<scalar_t>();
+  mean_t* mean_data = mean.data_ptr<mean_t>();
+  mean_t* var_data = rstd.data_ptr<mean_t>();
   weight_t* gamma_data = gamma.defined() ? gamma.data_ptr<weight_t>() : nullptr;
   weight_t* beta_data = beta.defined() ? beta.data_ptr<weight_t>() : nullptr;
 
   auto config = NormConfig(M, N, 1, sizeof(scalar_t));
   bool can_use_32bit_index = canUse32BitIndexMath(X);
-  LayerNormForward<scalar_t, accscalar_t, weight_t> layer_norm_forward(
+  LayerNormForward<scalar_t, mean_t, weight_t> layer_norm_forward(
       X_data, Y_data, mean_data, var_data, gamma_data, beta_data, eps, M, N);
   if (config.workgroup_num_foreach == 1) {
     launch_vectorized_fused_norm_kernel<
         scalar_t,
-        accscalar_t,
+        mean_t,
         weight_t,
         LayerNormForward>(layer_norm_forward, config, can_use_32bit_index);
   } else {
     Tensor semaphores, scratchpad;
-    config.template init_global_reduce<accscalar_t>(X, semaphores, scratchpad);
-    RowwiseMomentsDPCPPKernelImpl<
-        scalar_t,
-        accscalar_t,
-        weight_t,
-        LayerNormForward>(layer_norm_forward, config, can_use_32bit_index);
-    NormUpdateKernelImpl<scalar_t, accscalar_t, weight_t, LayerNormForward>(
+    config.template init_global_reduce<scalar_t>(X, semaphores, scratchpad);
+    RowwiseMomentsDPCPPKernelImpl<scalar_t, mean_t, weight_t, LayerNormForward>(
+        layer_norm_forward, config, can_use_32bit_index);
+    NormUpdateKernelImpl<scalar_t, mean_t, weight_t, LayerNormForward>(
         layer_norm_forward, config, can_use_32bit_index);
   }
 }
@@ -374,26 +373,29 @@ void LayerNormKernelImpl(
       X.scalar_type(),
       "LayerNormKernelImpl",
       [&]() {
-        using accscalar_t = acc_type<scalar_t>;
         if (gamma.scalar_type() == kFloat) {
-          LayerNormKernelImplInternal<scalar_t, accscalar_t, float>(
+          mean = at::empty({M}, X.options().dtype(kFloat));
+          rstd = at::empty({M}, X.options().dtype(kFloat));
+          LayerNormKernelImplInternal<scalar_t, float, float>(
               X,
               gamma,
               beta,
               M,
               N,
-              static_cast<accscalar_t>(eps),
+              static_cast<acc_type<scalar_t>>(eps),
               Y,
               mean,
               rstd);
         } else {
-          LayerNormKernelImplInternal<scalar_t, accscalar_t, scalar_t>(
+          mean = at::empty({M}, X.options());
+          rstd = at::empty({M}, X.options());
+          LayerNormKernelImplInternal<scalar_t, scalar_t, scalar_t>(
               X,
               gamma,
               beta,
               M,
               N,
-              static_cast<accscalar_t>(eps),
+              static_cast<acc_type<scalar_t>>(eps),
               Y,
               mean,
               rstd);
@@ -404,13 +406,14 @@ void LayerNormKernelImpl(
 template <
     typename scalar_t,
     typename accscalar_t,
+    typename mean_t,
     typename weight_t,
     int vec_size>
 void GammaBetaBackwardSimpleDPCPPKernel(
     const Tensor& dY,
     const Tensor& X,
-    const scalar_t* mean_data,
-    const scalar_t* var_data,
+    const mean_t* mean_data,
+    const mean_t* var_data,
     Tensor& dgamma,
     Tensor& dbeta,
     NormConfig& cfg) {
@@ -450,8 +453,8 @@ void GammaBetaBackwardSimpleDPCPPKernel(
 
           for (int row_id = local_row_id; row_id < cfg.Batch;
                row_id += cfg.block_row) {
-            scalar_t mean_val = mean_data[row_id];
-            scalar_t rstd_val = var_data[row_id];
+            accscalar_t mean_val = mean_data[row_id];
+            accscalar_t rstd_val = var_data[row_id];
             auto plane_offset =
                 (group_id * cfg.workgroup_size + local_col_id) * vec_size;
             if (plane_offset < cfg.Plane) {
@@ -463,9 +466,8 @@ void GammaBetaBackwardSimpleDPCPPKernel(
                 dg_sum1[v] += (dg_data == nullptr)
                     ? accscalar_t(0)
                     : static_cast<accscalar_t>(dY_val[v]) *
-                        (static_cast<accscalar_t>(X_val[v]) -
-                         static_cast<accscalar_t>(mean_val)) *
-                        static_cast<accscalar_t>(rstd_val);
+                        (static_cast<accscalar_t>(X_val[v]) - mean_val) *
+                        rstd_val;
                 db_sum1[v] += (db_data == nullptr)
                     ? accscalar_t(0)
                     : static_cast<accscalar_t>(dY_val[v]);
@@ -515,12 +517,16 @@ void GammaBetaBackwardSimpleDPCPPKernel(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename scalar_t, typename accscalar_t, typename weight_t>
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename mean_t,
+    typename weight_t>
 void GammaBetaBackwardSimpleDPCPPKernelImpl(
     const Tensor& dY,
     const Tensor& X,
-    const scalar_t* mean_data,
-    const scalar_t* var_data,
+    const mean_t* mean_data,
+    const mean_t* var_data,
     Tensor& dgamma,
     Tensor& dbeta,
     NormConfig& config) {
@@ -530,6 +536,7 @@ void GammaBetaBackwardSimpleDPCPPKernelImpl(
   GammaBetaBackwardSimpleDPCPPKernel<                               \
       scalar_t,                                                     \
       accscalar_t,                                                  \
+      mean_t,                                                       \
       weight_t,                                                     \
       vec_size>(dY, X, mean_data, var_data, dgamma, dbeta, config); \
   break;
@@ -550,7 +557,7 @@ void GammaBetaBackwardSimpleDPCPPKernelImpl(
   }
 }
 
-template <typename scalar_t, typename accscalar_t, typename weight_t>
+template <typename scalar_t, typename mean_t, typename weight_t>
 void LayerNormBackwardKernelImplInternal(
     const Tensor& dY,
     const Tensor& X,
@@ -567,8 +574,9 @@ void LayerNormBackwardKernelImplInternal(
   TORCH_CHECK(mean.numel() == M);
   TORCH_CHECK(rstd.numel() == M);
 
-  scalar_t* mean_data = mean.data_ptr<scalar_t>();
-  scalar_t* var_data = rstd.data_ptr<scalar_t>();
+  using accscalar_t = acc_type<scalar_t>;
+  mean_t* mean_data = mean.data_ptr<mean_t>();
+  mean_t* var_data = rstd.data_ptr<mean_t>();
   weight_t* gamma_data = gamma.defined() ? gamma.data_ptr<weight_t>() : nullptr;
 
   if (grad_input_mask[0]) {
@@ -581,11 +589,11 @@ void LayerNormBackwardKernelImplInternal(
     bool can_use_32bit_index = canUse32BitIndexMath(X) &&
         canUse32BitIndexMath(dY) && canUse32BitIndexMath(dX);
     if (config.workgroup_num_foreach == 1) {
-      LayerNormBackward<scalar_t, accscalar_t, weight_t> layer_norm_backward(
+      LayerNormBackward<scalar_t, mean_t, weight_t> layer_norm_backward(
           X_data, dY_data, dX_data, mean_data, var_data, gamma_data, M, N);
       launch_vectorized_fused_norm_kernel<
           scalar_t,
-          accscalar_t,
+          mean_t,
           weight_t,
           LayerNormBackward>(layer_norm_backward, config, can_use_32bit_index);
     } else {
@@ -598,7 +606,7 @@ void LayerNormBackwardKernelImplInternal(
       accscalar_t* a_data = a.data_ptr<accscalar_t>();
       accscalar_t* b_data = b.data_ptr<accscalar_t>();
 
-      LayerNormBackward<scalar_t, accscalar_t, weight_t> layer_norm_backward(
+      LayerNormBackward<scalar_t, mean_t, weight_t> layer_norm_backward(
           X_data,
           dY_data,
           dX_data,
@@ -614,10 +622,10 @@ void LayerNormBackwardKernelImplInternal(
           X, semaphores, scratchpad);
       RowwiseMomentsDPCPPKernelImpl<
           scalar_t,
-          accscalar_t,
+          mean_t,
           weight_t,
           LayerNormBackward>(layer_norm_backward, config, can_use_32bit_index);
-      NormUpdateKernelImpl<scalar_t, accscalar_t, weight_t, LayerNormBackward>(
+      NormUpdateKernelImpl<scalar_t, mean_t, weight_t, LayerNormBackward>(
           layer_norm_backward, config, can_use_32bit_index);
     }
   }
@@ -625,8 +633,11 @@ void LayerNormBackwardKernelImplInternal(
   if (grad_input_mask[1]) {
     // backward weight
     auto config = NormConfig(M, N, 0, sizeof(scalar_t));
-    GammaBetaBackwardSimpleDPCPPKernelImpl<scalar_t, accscalar_t, weight_t>(
-        dY, X, mean_data, var_data, dgamma, dbeta, config);
+    GammaBetaBackwardSimpleDPCPPKernelImpl<
+        scalar_t,
+        accscalar_t,
+        mean_t,
+        weight_t>(dY, X, mean_data, var_data, dgamma, dbeta, config);
   }
 }
 
@@ -650,7 +661,7 @@ void LayerNormBackwardKernelImpl(
       [&]() {
         using accscalar_t = acc_type<scalar_t>;
         if (gamma.scalar_type() == kFloat) {
-          LayerNormBackwardKernelImplInternal<scalar_t, accscalar_t, float>(
+          LayerNormBackwardKernelImplInternal<scalar_t, float, float>(
               dY,
               X,
               mean,
@@ -663,7 +674,7 @@ void LayerNormBackwardKernelImpl(
               dbeta,
               grad_input_mask);
         } else {
-          LayerNormBackwardKernelImplInternal<scalar_t, accscalar_t, scalar_t>(
+          LayerNormBackwardKernelImplInternal<scalar_t, scalar_t, scalar_t>(
               dY,
               X,
               mean,
@@ -697,8 +708,7 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
   auto N = M_N.second;
 
   Tensor output = at::empty(input.sizes(), input.options());
-  Tensor mean = at::empty({M}, input.options());
-  Tensor rstd = at::empty({M}, input.options());
+  Tensor mean, rstd;
   if (input.numel() != 0) {
     auto ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
     bool apply_onednn = (!ctx.is_plain() && input.dim() > 1);

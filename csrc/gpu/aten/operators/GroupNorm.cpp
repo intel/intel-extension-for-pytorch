@@ -5,14 +5,15 @@ using namespace at::AtenIpexTypeXPU::normalization;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-template <typename scalar_t, typename accscalar_t, typename weight_t>
-class GroupNormForward : public NormForward<scalar_t, accscalar_t, weight_t> {
+template <typename scalar_t, typename mean_t, typename weight_t>
+class GroupNormForward : public NormForward<scalar_t, mean_t, weight_t> {
  public:
+  using accscalar_t = acc_type<scalar_t>;
   GroupNormForward() = delete;
   GroupNormForward(
       scalar_t* X_data,
-      scalar_t* mean_data,
-      scalar_t* var_data,
+      mean_t* mean_data,
+      mean_t* var_data,
       weight_t* gamma_data,
       weight_t* beta_data,
       accscalar_t eps,
@@ -20,7 +21,7 @@ class GroupNormForward : public NormForward<scalar_t, accscalar_t, weight_t> {
       int64_t C,
       int64_t group,
       int64_t HxW)
-      : NormForward<scalar_t, accscalar_t, weight_t>(
+      : NormForward<scalar_t, mean_t, weight_t>(
             X_data,
             nullptr,
             mean_data,
@@ -35,7 +36,7 @@ class GroupNormForward : public NormForward<scalar_t, accscalar_t, weight_t> {
     numel = N * C * HxW;
     D = C / group;
   }
-  typedef NormForward<scalar_t, accscalar_t, weight_t> NF;
+  typedef NormForward<scalar_t, mean_t, weight_t> NF;
 
   void set_eltwise_update_parameter(
       scalar_t* X_ptr,
@@ -98,9 +99,10 @@ class GroupNormForward : public NormForward<scalar_t, accscalar_t, weight_t> {
   bool channels_last;
 };
 
-template <typename scalar_t, typename accscalar_t, typename weight_t>
-class GroupNormBackward : public NormBackward<scalar_t, accscalar_t, weight_t> {
+template <typename scalar_t, typename mean_t, typename weight_t>
+class GroupNormBackward : public NormBackward<scalar_t, mean_t, weight_t> {
  public:
+  using accscalar_t = acc_type<scalar_t>;
   GroupNormBackward() = delete;
   GroupNormBackward(
       scalar_t* X_data,
@@ -111,7 +113,7 @@ class GroupNormBackward : public NormBackward<scalar_t, accscalar_t, weight_t> {
       int64_t C,
       int64_t group,
       int64_t HxW)
-      : NormBackward<scalar_t, accscalar_t, weight_t>(
+      : NormBackward<scalar_t, mean_t, weight_t>(
             X_data,
             dY_data,
             nullptr,
@@ -128,7 +130,7 @@ class GroupNormBackward : public NormBackward<scalar_t, accscalar_t, weight_t> {
     D = C / group;
   }
 
-  typedef NormBackward<scalar_t, accscalar_t, weight_t> NB;
+  typedef NormBackward<scalar_t, mean_t, weight_t> NB;
 
   template <
       int vec_size,
@@ -234,17 +236,18 @@ class GroupNormBackward : public NormBackward<scalar_t, accscalar_t, weight_t> {
   bool channels_last;
 };
 
-template <typename scalar_t, typename accscalar_t, typename weight_t>
+template <typename scalar_t, typename mean_t, typename weight_t>
 void ComputeFusedParamsDPCPPKernel(
     int64_t N,
     int64_t C,
     int64_t group,
-    const scalar_t* mean_data,
-    const scalar_t* rstd_data,
+    const mean_t* mean_data,
+    const mean_t* rstd_data,
     const weight_t* gamma_data,
     const weight_t* beta_data,
-    accscalar_t* a_data,
-    accscalar_t* b_data) {
+    acc_type<scalar_t>* a_data,
+    acc_type<scalar_t>* b_data) {
+  using accscalar_t = acc_type<scalar_t>;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto global_range = N * C;
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -266,7 +269,7 @@ void ComputeFusedParamsDPCPPKernel(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename scalar_t, typename weight_t>
+template <typename scalar_t, typename mean_t, typename weight_t>
 void GroupNormKernelImplInternal(
     const Tensor& X,
     const Tensor& gamma,
@@ -289,15 +292,13 @@ void GroupNormKernelImplInternal(
   Tensor X_cont = X.contiguous();
   scalar_t* X_data = X_cont.data_ptr<scalar_t>();
 
-  mean = at::empty({N, group}, X.options());
-  rstd = at::empty({N, group}, X.options());
-  scalar_t* mean_data = mean.data_ptr<scalar_t>();
-  scalar_t* rstd_data = rstd.data_ptr<scalar_t>();
+  mean_t* mean_data = mean.data_ptr<mean_t>();
+  mean_t* rstd_data = rstd.data_ptr<mean_t>();
   weight_t* gamma_data = gamma.defined() ? gamma.data_ptr<weight_t>() : nullptr;
   weight_t* beta_data = beta.defined() ? beta.data_ptr<weight_t>() : nullptr;
 
   auto config = NormConfig(N * group, C / group * HxW, 1, sizeof(scalar_t));
-  GroupNormForward<scalar_t, accscalar_t, weight_t> group_norm_forward(
+  GroupNormForward<scalar_t, mean_t, weight_t> group_norm_forward(
       X_data,
       mean_data,
       rstd_data,
@@ -310,12 +311,9 @@ void GroupNormKernelImplInternal(
       HxW);
   bool can_use_32bit_index = canUse32BitIndexMath(X);
   Tensor semaphores, scratchpad;
-  config.template init_global_reduce<accscalar_t>(X, semaphores, scratchpad);
-  RowwiseMomentsDPCPPKernelImpl<
-      scalar_t,
-      accscalar_t,
-      weight_t,
-      GroupNormForward>(group_norm_forward, config, can_use_32bit_index);
+  config.template init_global_reduce<scalar_t>(X, semaphores, scratchpad);
+  RowwiseMomentsDPCPPKernelImpl<scalar_t, mean_t, weight_t, GroupNormForward>(
+      group_norm_forward, config, can_use_32bit_index);
 
   const auto kAccType =
       (X.scalar_type() == kHalf || X.scalar_type() == kBFloat16)
@@ -325,7 +323,7 @@ void GroupNormKernelImplInternal(
   Tensor b = at::empty({N, C}, X.options().dtype(kAccType));
   accscalar_t* a_data = a.data_ptr<accscalar_t>();
   accscalar_t* b_data = b.data_ptr<accscalar_t>();
-  ComputeFusedParamsDPCPPKernel<scalar_t, accscalar_t, weight_t>(
+  ComputeFusedParamsDPCPPKernel<scalar_t, mean_t, weight_t>(
       N, C, group, mean_data, rstd_data, gamma_data, beta_data, a_data, b_data);
 
   // propagate channels_last format from X to Y
@@ -343,22 +341,18 @@ void GroupNormKernelImplInternal(
       a_data,
       b_data,
       is_channels_last);
-  NormEltwiseUpdateKernelImpl<
-      scalar_t,
-      accscalar_t,
-      weight_t,
-      GroupNormForward>(group_norm_forward, config, can_use_32bit_index);
+  NormEltwiseUpdateKernelImpl<scalar_t, mean_t, weight_t, GroupNormForward>(
+      group_norm_forward, config, can_use_32bit_index);
 }
 
-template <typename T, typename weight_t>
+template <typename accscalar_t, typename mean_t, typename weight_t>
 void ComputeGradOutputCoeffientDPCPPKernel(
     int64_t N,
     int64_t C,
     int64_t group,
-    const T* rstd,
+    const mean_t* rstd,
     const weight_t* gamma,
-    acc_type<T>* c1) {
-  using accscalar_t = acc_type<T>;
+    accscalar_t* c1) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = N * C;
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -375,14 +369,14 @@ void ComputeGradOutputCoeffientDPCPPKernel(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename scalar_t, typename accscalar_t, typename weight_t>
+template <typename accscalar_t, typename mean_t, typename weight_t>
 void ComputeBackwardFusedParamsDPCPPKernel(
     int64_t N,
     int64_t C,
     int64_t HxW,
     int64_t group,
-    const scalar_t* mean,
-    const scalar_t* rstd,
+    const mean_t* mean,
+    const mean_t* rstd,
     const weight_t* gamma,
     const accscalar_t* ds,
     const accscalar_t* db,
@@ -450,20 +444,21 @@ void ComputeBackwardFusedParamsDPCPPKernel(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename scalar_t, typename accscalar_t, typename weight_t>
+template <typename scalar_t, typename mean_t, typename weight_t>
 void GammaBetaBackwardDPCPPKernel(
     int64_t N,
     int64_t C,
     int64_t group,
-    const scalar_t* mean,
-    const scalar_t* rstd,
-    const accscalar_t* ds,
-    const accscalar_t* db,
+    const mean_t* mean,
+    const mean_t* rstd,
+    const acc_type<scalar_t>* ds,
+    const acc_type<scalar_t>* db,
     weight_t* dgamma,
     weight_t* dbeta) {
   // mean, rstd: {N, group}
   // ds, db: {N, C}  {N, group, D}
   // dgamma, dbeta: {C}  {group, D}
+  using accscalar_t = acc_type<scalar_t>;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   auto workgroup_size = dpcppMaxWorkGroupSize(dev_id);
@@ -501,7 +496,7 @@ void GammaBetaBackwardDPCPPKernel(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename scalar_t, typename weight_t>
+template <typename scalar_t, typename mean_t, typename weight_t>
 void GroupNormBackwardKernelImplInternal(
     const Tensor& dY,
     const Tensor& X,
@@ -529,8 +524,8 @@ void GroupNormBackwardKernelImplInternal(
 
   Tensor X_cont = X.contiguous();
   Tensor dY_cont = dY.contiguous();
-  const scalar_t* mean_data = mean.data_ptr<scalar_t>();
-  const scalar_t* rstd_data = rstd.data_ptr<scalar_t>();
+  const mean_t* mean_data = mean.data_ptr<mean_t>();
+  const mean_t* rstd_data = rstd.data_ptr<mean_t>();
   const weight_t* gamma_data =
       gamma.defined() ? gamma.data_ptr<weight_t>() : nullptr;
 
@@ -546,7 +541,7 @@ void GroupNormBackwardKernelImplInternal(
   bool can_use_32bit_index =
       canUse32BitIndexMath(X_cont) && canUse32BitIndexMath(dY_cont);
   auto config = NormConfig(N * C, HxW, 1, sizeof(scalar_t));
-  GroupNormBackward<scalar_t, accscalar_t, weight_t> group_norm_backward(
+  GroupNormBackward<scalar_t, mean_t, weight_t> group_norm_backward(
       X_cont.data_ptr<scalar_t>(),
       dY_cont.data_ptr<scalar_t>(),
       ds_data,
@@ -557,24 +552,21 @@ void GroupNormBackwardKernelImplInternal(
       HxW);
   Tensor semaphores, scratchpad;
   config.template init_global_reduce<accscalar_t>(X, semaphores, scratchpad);
-  RowwiseMomentsDPCPPKernelImpl<
-      scalar_t,
-      accscalar_t,
-      weight_t,
-      GroupNormBackward>(group_norm_backward, config, can_use_32bit_index);
+  RowwiseMomentsDPCPPKernelImpl<scalar_t, mean_t, weight_t, GroupNormBackward>(
+      group_norm_backward, config, can_use_32bit_index);
 
   // compute gradient input (dX)
   if (grad_input_mask[0]) {
     Tensor c1 = at::empty({N, C}, X.options().dtype(kAccType));
     accscalar_t* c1_data = c1.data_ptr<accscalar_t>();
-    ComputeGradOutputCoeffientDPCPPKernel<scalar_t, weight_t>(
+    ComputeGradOutputCoeffientDPCPPKernel<accscalar_t, mean_t, weight_t>(
         N, C, group, rstd_data, gamma_data, c1_data);
 
     Tensor c2 = at::empty({N, group}, X.options().dtype(kAccType));
     Tensor c3 = at::empty({N, group}, X.options().dtype(kAccType));
     accscalar_t* c2_data = c2.data_ptr<accscalar_t>();
     accscalar_t* c3_data = c3.data_ptr<accscalar_t>();
-    ComputeBackwardFusedParamsDPCPPKernel<scalar_t, accscalar_t, weight_t>(
+    ComputeBackwardFusedParamsDPCPPKernel<accscalar_t, mean_t, weight_t>(
         N,
         C,
         HxW,
@@ -604,11 +596,8 @@ void GroupNormBackwardKernelImplInternal(
         dY_cont.data_ptr<scalar_t>(),
         dX.data_ptr<scalar_t>(),
         is_channels_last);
-    NormEltwiseUpdateKernelImpl<
-        scalar_t,
-        accscalar_t,
-        weight_t,
-        GroupNormBackward>(group_norm_backward, config, can_use_32bit_index);
+    NormEltwiseUpdateKernelImpl<scalar_t, mean_t, weight_t, GroupNormBackward>(
+        group_norm_backward, config, can_use_32bit_index);
   }
 
   // compute gradient weight (dgamma and dbeta)
@@ -623,7 +612,7 @@ void GroupNormBackwardKernelImplInternal(
       dbeta = at::empty_like(gamma);
       dbeta_data = dbeta.data_ptr<weight_t>();
     }
-    GammaBetaBackwardDPCPPKernel<scalar_t, accscalar_t, weight_t>(
+    GammaBetaBackwardDPCPPKernel<scalar_t, mean_t, weight_t>(
         N,
         C,
         group,
@@ -655,7 +644,9 @@ void GroupNormKernelImpl(
       "GroupNormKernelImpl",
       [&]() {
         if (gamma.defined() && gamma.scalar_type() == kFloat) {
-          GroupNormKernelImplInternal<scalar_t, float>(
+          mean = at::empty({N, group}, X.options().dtype(kFloat));
+          rstd = at::empty({N, group}, X.options().dtype(kFloat));
+          GroupNormKernelImplInternal<scalar_t, float, float>(
               X,
               gamma,
               beta,
@@ -668,7 +659,9 @@ void GroupNormKernelImpl(
               mean,
               rstd);
         } else {
-          GroupNormKernelImplInternal<scalar_t, scalar_t>(
+          mean = at::empty({N, group}, X.options());
+          rstd = at::empty({N, group}, X.options());
+          GroupNormKernelImplInternal<scalar_t, scalar_t, scalar_t>(
               X,
               gamma,
               beta,
@@ -705,7 +698,7 @@ void GroupNormBackwardKernelImpl(
       "GroupNormBackwardKernelImpl",
       [&]() {
         if (gamma.defined() && gamma.scalar_type() == kFloat) {
-          GroupNormBackwardKernelImplInternal<scalar_t, float>(
+          GroupNormBackwardKernelImplInternal<scalar_t, float, float>(
               dY,
               X,
               mean,
@@ -720,7 +713,7 @@ void GroupNormBackwardKernelImpl(
               dbeta,
               grad_input_mask);
         } else {
-          GroupNormBackwardKernelImplInternal<scalar_t, scalar_t>(
+          GroupNormBackwardKernelImplInternal<scalar_t, scalar_t, scalar_t>(
               dY,
               X,
               mean,
