@@ -8,15 +8,16 @@ import torch.nn.quantized.dynamic as nnqd
 from torch.quantization.qconfig import QConfig
 
 # Default map for swapping dynamic modules
-DEFAULT_DYNAMIC_QUANT_MODULE_MAPPINGS : Dict[Callable, Any] = {
+DEFAULT_DYNAMIC_QUANT_MODULE_MAPPINGS: Dict[Callable, Any] = {
     nn.Linear: nnqd.Linear,
     nn.LSTM: nnqd.LSTM,
     # TODO: support more RNN module
-    #nn.GRUCell: nnqd.GRUCell,
-    #nn.GRU: nnqd.GRU,
-    #nn.LSTMCell: nnqd.LSTMCell,
-    #nn.RNNCell: nnqd.RNNCell,
+    # nn.GRUCell: nnqd.GRUCell,
+    # nn.GRU: nnqd.GRU,
+    # nn.LSTMCell: nnqd.LSTMCell,
+    # nn.RNNCell: nnqd.RNNCell,
 }
+
 
 def _get_qconfig_dtypes(qconfig):
     r"""
@@ -26,22 +27,28 @@ def _get_qconfig_dtypes(qconfig):
     assert qconfig is not None
     activation = qconfig.activation()
     weight = qconfig.weight()
-    compute_dtype = activation.compute_dtype if hasattr(activation, 'compute_dtype') else None
+    compute_dtype = (
+        activation.compute_dtype if hasattr(activation, "compute_dtype") else None
+    )
     return (activation.dtype, weight.dtype, compute_dtype)
 
+
 def _op_is_int8_dynamically_quantized(qconfig) -> bool:
-    r""" 
+    r"""
     Given a qconfig, returns True if this op is using int8 dynamic
     quantization
     """
-    activation_dtype, weight_dtype, activation_compute_dtype = \
-        _get_qconfig_dtypes(qconfig)
-    return (
-        activation_dtype is torch.float and
-        # for now, the lines below assume fbgemm or qnnpack
-        weight_dtype is torch.qint8 and
-        activation_compute_dtype is torch.quint8
+    activation_dtype, weight_dtype, activation_compute_dtype = _get_qconfig_dtypes(
+        qconfig
     )
+    return (
+        activation_dtype is torch.float
+        and
+        # for now, the lines below assume fbgemm or qnnpack
+        weight_dtype is torch.qint8
+        and activation_compute_dtype is torch.quint8
+    )
+
 
 def _swap_child_modules(
     module: torch.nn.Module,
@@ -71,7 +78,7 @@ def _swap_child_modules(
             op_int8_dynamically_quantized = _op_is_int8_dynamically_quantized(qconfig)
             if op_int8_dynamically_quantized:
                 if not type(mod) in dynamic_mappings:
-                    continue 
+                    continue
                 reassign[local_fqn] = swap_module(mod, dynamic_mappings, {})
 
     for key, value in reassign.items():

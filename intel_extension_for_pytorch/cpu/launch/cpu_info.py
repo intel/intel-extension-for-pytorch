@@ -52,8 +52,9 @@ import subprocess
 #  10    0      0    6 0:0:0:0          yes 3800.0000 800.0000 2400.000
 #  11    0      0    7 0:0:0:0          yes 3800.0000 800.0000 2400.000
 
-class CoreInfo():
-    '''
+
+class CoreInfo:
+    """
     Class to store core-specific information, including:
     - [int] CPU index
     - [int] Core index
@@ -62,8 +63,9 @@ class CoreInfo():
     - [bool] is a physical core or not
     - [float] maxmhz
     - [bool] is a performance core
-    '''
-    def __init__(self, lscpu_txt='', headers={}):
+    """
+
+    def __init__(self, lscpu_txt="", headers={}):
         self.cpu = -1
         self.core = -1
         self.socket = -1
@@ -71,28 +73,30 @@ class CoreInfo():
         self.is_physical_core = True
         self.maxmhz = 0
         self.is_p_core = True
-        if lscpu_txt != '' and len(headers) > 0:
+        if lscpu_txt != "" and len(headers) > 0:
             self.parse_raw(lscpu_txt, headers)
 
     def parse_raw(self, cols, headers):
-        self.cpu = int(cols[headers['cpu']])
-        self.core = int(cols[headers['core']])
-        if 'node' in headers:
-            self.node = int(cols[headers['node']])
-            self.socket = int(cols[headers['socket']])
+        self.cpu = int(cols[headers["cpu"]])
+        self.core = int(cols[headers["core"]])
+        if "node" in headers:
+            self.node = int(cols[headers["node"]])
+            self.socket = int(cols[headers["socket"]])
         else:
-            self.node = int(cols[headers['socket']])
-            self.socket = int(cols[headers['socket']])
-        if 'maxmhz' in headers:
-            self.maxmhz = float(cols[headers['maxmhz']])
+            self.node = int(cols[headers["socket"]])
+            self.socket = int(cols[headers["socket"]])
+        if "maxmhz" in headers:
+            self.maxmhz = float(cols[headers["maxmhz"]])
 
     def __str__(self):
-        return f'{self.cpu}\t{self.core}\t{self.socket}\t{self.node}\t{self.is_physical_core}\t{self.maxmhz}\t{self.is_p_core}'
+        return f"{self.cpu}\t{self.core}\t{self.socket}\t{self.node}\t{self.is_physical_core}\t{self.maxmhz}\t{self.is_p_core}"
+
 
 class CPUPool(list):
-    '''
+    """
     List of CoreInfo objects
-    '''
+    """
+
     def __init__(self):
         super(CPUPool, self).__init__()
 
@@ -101,70 +105,81 @@ class CPUPool(list):
             b = list(b)
             yield b[0][1], b[-1][1]
 
-    def get_pool_txt(self, return_mode='auto'):
+    def get_pool_txt(self, return_mode="auto"):
         cpu_ids = [c.cpu for c in self]
         cpu_ranges = list(self.get_ranges(cpu_ids))
-        cpu_ids_txt = ','.join([str(c) for c in cpu_ids])
-        cpu_ranges_txt = ','.join([f'{r[0]}-{r[1]}' for r in cpu_ranges])
-        node_ids_txt = ','.join([str(n) for n in sorted(list(set([c.node for c in self])))])
-        ret = {'cores': '', 'nodes': node_ids_txt}
-        if return_mode.lower() == 'list':
-            ret['cores'] = cpu_ids_txt
-        elif return_mode.lower() == 'range':
-            ret['cores'] = cpu_ranges_txt
+        cpu_ids_txt = ",".join([str(c) for c in cpu_ids])
+        cpu_ranges_txt = ",".join([f"{r[0]}-{r[1]}" for r in cpu_ranges])
+        node_ids_txt = ",".join(
+            [str(n) for n in sorted(list(set([c.node for c in self])))]
+        )
+        ret = {"cores": "", "nodes": node_ids_txt}
+        if return_mode.lower() == "list":
+            ret["cores"] = cpu_ids_txt
+        elif return_mode.lower() == "range":
+            ret["cores"] = cpu_ranges_txt
         else:
             if len(cpu_ids) <= len(cpu_ranges):
-                ret['cores'] = cpu_ids_txt
+                ret["cores"] = cpu_ids_txt
             else:
-                ret['cores'] = cpu_ranges_txt
+                ret["cores"] = cpu_ranges_txt
         return ret
 
-class CPUPoolList():
-    '''
+
+class CPUPoolList:
+    """
     Get a CPU pool with all available CPUs and CPU pools filtered with designated criterias.
-    '''
-    def __init__(self, logger=None, lscpu_txt=''):
+    """
+
+    def __init__(self, logger=None, lscpu_txt=""):
         self.pool_all = CPUPool()
         self.pools_ondemand = []
 
         self.logger = logger
-        if platform.system() == 'Windows':
-            raise RuntimeError('Windows platform is not supported!!!')
-        elif platform.system() == 'Linux':
-            '''
+        if platform.system() == "Windows":
+            raise RuntimeError("Windows platform is not supported!!!")
+        elif platform.system() == "Linux":
+            """
             Retrieve CPU information from lscpu.
-            '''
-            if lscpu_txt.strip() == '':
-                args = ['lscpu', '--all', '--extended']
-                env_lang = os.getenv('LANG', 'UNSET')
-                os.environ['LANG'] = 'C'
-                lscpu_info = subprocess.check_output(args, env=os.environ, universal_newlines=True)
-                if env_lang == 'UNSET':
-                    del os.environ['LANG']
+            """
+            if lscpu_txt.strip() == "":
+                args = ["lscpu", "--all", "--extended"]
+                env_lang = os.getenv("LANG", "UNSET")
+                os.environ["LANG"] = "C"
+                lscpu_info = subprocess.check_output(
+                    args, env=os.environ, universal_newlines=True
+                )
+                if env_lang == "UNSET":
+                    del os.environ["LANG"]
                 else:
-                    os.environ['LANG'] = env_lang
+                    os.environ["LANG"] = env_lang
             else:
                 lscpu_info = lscpu_txt
 
-            '''
+            """
             Filter out lines that are really useful.
-            '''
-            lscpu_info = lscpu_info.strip().split('\n')
+            """
+            lscpu_info = lscpu_info.strip().split("\n")
             headers = {}
             num_cols = 0
             for line in lscpu_info:
-                line = re.sub(' +', ' ', line.lower().strip())
-                if 'cpu' in line and 'socket' in line and 'core' in line:
-                    t = line.split(' ')
+                line = re.sub(" +", " ", line.lower().strip())
+                if "cpu" in line and "socket" in line and "core" in line:
+                    t = line.split(" ")
                     num_cols = len(t)
                     for i in range(num_cols):
-                        if t[i] in ['cpu', 'core', 'socket', 'node', 'maxmhz']:
+                        if t[i] in ["cpu", "core", "socket", "node", "maxmhz"]:
                             headers[t[i]] = i
                 else:
-                    t = line.split(' ')
-                    if len(t) == num_cols and t[headers['cpu']].isdigit() and t[headers['core']].isdigit() and t[headers['socket']].isdigit():
+                    t = line.split(" ")
+                    if (
+                        len(t) == num_cols
+                        and t[headers["cpu"]].isdigit()
+                        and t[headers["core"]].isdigit()
+                        and t[headers["socket"]].isdigit()
+                    ):
                         self.pool_all.append(CoreInfo(t, headers))
-            assert len(self.pool_all) > 0, 'cpuinfo is empty'
+            assert len(self.pool_all) > 0, "cpuinfo is empty"
 
         # Determine logical cores
         core_cur = -1
@@ -181,10 +196,10 @@ class CPUPoolList():
         maxmhzs.sort()
         mmaxmhzs = max(maxmhzs)
         if mmaxmhzs > 0:
-            maxmhzs_norm = [f/mmaxmhzs for f in maxmhzs]
+            maxmhzs_norm = [f / mmaxmhzs for f in maxmhzs]
             separator_idx = -1
             for i in range(1, len(maxmhzs_norm)):
-                if maxmhzs_norm[i] - maxmhzs_norm[i-1] >= 0.15:
+                if maxmhzs_norm[i] - maxmhzs_norm[i - 1] >= 0.15:
                     separator_idx = i
                     break
             if separator_idx > -1:
@@ -196,43 +211,63 @@ class CPUPoolList():
     def verbose(self, level, msg):
         if self.logger:
             logging_fn = {
-                    'warning': self.logger.warning,
-                    'info': self.logger.info,
-                    }
-            assert level in logging_fn.keys(), f'Unrecognized logging level {level} is detected. Available levels are {logging_fn.keys()}.'
+                "warning": self.logger.warning,
+                "info": self.logger.info,
+            }
+            assert (
+                level in logging_fn.keys()
+            ), f"Unrecognized logging level {level} is detected. Available levels are {logging_fn.keys()}."
             logging_fn[level](msg)
         else:
             print(msg)
 
-    '''
+    """
     Get CPU pools from all available CPU cores with designated criterias.
-    - ninstances [int]: Number of instances. Should be a non negative integer, 0 by default. When it is 0, it will be set according to usage scenarios automatically in the function.
-    - ncores_per_instance [int]: Number of cores per instance. Should be a non negative integer, 0 by default. When it is 0, it will be set according to usage scenarios automatically in the function.
-    - use_logical_cores [bool]: Use logical cores on the workloads or not, False by default. When set to False, only physical cores are used.
+    - ninstances [int]: Number of instances. Should be a non negative integer, 0 by default. \
+        When it is 0, it will be set according to usage scenarios automatically in the function.
+    - ncores_per_instance [int]: Number of cores per instance. Should be a non negative integer, 0 by default. \
+        When it is 0, it will be set according to usage scenarios automatically in the function.
+    - use_logical_cores [bool]: Use logical cores on the workloads or not, False by default. When set to False, \
+        only physical cores are used.
     - use_e_cores [bool]: Use Efficient-Cores, False by default. When set to False, only Performance-Cores are used.
     - skip_cross_node_cores [bool]: Allow instances to be executed on cores across NUMA nodes, False by default.
     - nodes_list [list]: A list containing all node ids that the execution is expected to be running on.
     - cores_list [list]: A list containing all cpu ids that the execution is expected to be running on.
-    - return_mode [str]: A string that defines how result values are formed, could be either of 'auto', 'list' and 'range'. When set to 'list', a string with comma-separated cpu ids, '0,1,2,3,...', is returned. When set to 'range', a string with comma-separated cpu id ranges, '0-2,6-8,...', is returned. When set to 'auto', a 'list' or a 'range' whoever has less number of elements that are separated by comma is returned. I.e. for a list '0,1,2,6,7,8' and a range '0-2,6-8', both reflect the same cpu configuration, the range '0-2,6-8' is returned.
-    '''
+    - return_mode [str]: A string that defines how result values are formed, could be either of 'auto', \
+        'list' and 'range'. When set to 'list', a string with comma-separated cpu ids, '0,1,2,3,...', is returned. \
+        When set to 'range', a string with comma-separated cpu id ranges, '0-2,6-8,...', is returned. \
+        When set to 'auto', a 'list' or a 'range' whoever has less number of elements that are separated by \
+        comma is returned. I.e. for a list '0,1,2,6,7,8' and a range '0-2,6-8', both reflect the same cpu \
+        configuration, the range '0-2,6-8' is returned.
+    """
+
     def gen_pools_ondemand(
-            self,
-            ninstances=0,
-            ncores_per_instance=0,
-            use_logical_cores=False,
-            use_e_cores=False,
-            skip_cross_node_cores=False,
-            nodes_list=[],
-            cores_list=[],
-            return_mode='auto'):
+        self,
+        ninstances=0,
+        ncores_per_instance=0,
+        use_logical_cores=False,
+        use_e_cores=False,
+        skip_cross_node_cores=False,
+        nodes_list=[],
+        cores_list=[],
+        return_mode="auto",
+    ):
         # Generate an aggregated CPU pool
         if len(cores_list) > 0:
             cores_available = [c.cpu for c in self.pool_all]
-            assert set(cores_list).issubset(set(cores_available)), f'Designated cores list {cores_list} contains invalid cores.'
+            assert set(cores_list).issubset(
+                set(cores_available)
+            ), f"Designated cores list {cores_list} contains invalid cores."
             if use_logical_cores:
-                self.verbose('warning', 'Argument --use-logical-cores won\'t take effect when --cores-list is set.')
+                self.verbose(
+                    "warning",
+                    "Argument --use-logical-cores won't take effect when --cores-list is set.",
+                )
             if use_e_cores:
-                self.verbose('warning', 'Argument --use-e-cores won\'t take effect when --cores-list is set.')
+                self.verbose(
+                    "warning",
+                    "Argument --use-e-cores won't take effect when --cores-list is set.",
+                )
             pool = [c for c in self.pool_all if c.cpu in cores_list]
             nodes = list(set([c.node for c in pool]))
             ncores_per_node = -1
@@ -243,12 +278,17 @@ class CPUPoolList():
                 else:
                     if ncores_per_node != ncores_local and skip_cross_node_cores:
                         skip_cross_node_cores = False
-                        self.verbose('warning', 'Argument --skip-cross-node-cores cannot take effect on the designated cores. Disabled.')
+                        self.verbose(
+                            "warning",
+                            "Argument --skip-cross-node-cores cannot take effect on the designated cores. Disabled.",
+                        )
                         break
         else:
             if len(nodes_list) > 0:
                 nodes_available = set([c.node for c in self.pool_all])
-                assert set(nodes_list).issubset(nodes_available), f'Designated nodes list {nodes_list} contains invalid nodes out from {nodes_available}.'
+                assert set(nodes_list).issubset(
+                    nodes_available
+                ), f"Designated nodes list {nodes_list} contains invalid nodes out from {nodes_available}."
                 pool = [c for c in self.pool_all if c.node in nodes_list]
             else:
                 pool = self.pool_all
@@ -258,11 +298,17 @@ class CPUPoolList():
                 pool = [c for c in pool if c.is_p_core]
                 e_cores = [c.cpu for c in pool if not c.is_p_core]
                 if len(e_cores) > 0:
-                    self.verbose('warning', f'Efficient-Cores are detected ({e_cores}). Disabled for performance consideration. You can enable them with argument --use-e-cores.')
+                    self.verbose(
+                        "warning",
+                        f"Efficient-Cores are detected ({e_cores}). Disabled for performance consideration. \
+                            You can enable them with argument --use-e-cores.",
+                    )
 
         # Determine ninstances and ncores_per_instance for grouping
-        assert ncores_per_instance >= 0, 'Argument --ncores-per-instance cannot be a negative value.'
-        assert ninstances >= 0, 'Argument --ninstances cannot be a negative value.'
+        assert (
+            ncores_per_instance >= 0
+        ), "Argument --ncores-per-instance cannot be a negative value."
+        assert ninstances >= 0, "Argument --ninstances cannot be a negative value."
         nodes = set([c.node for c in pool])
         if ncores_per_instance + ninstances == 0:
             # Both ncores_per_instance and ninstances are 0
@@ -297,8 +343,15 @@ class CPUPoolList():
         else:
             # Neither ncores_per_instance nor ninstances is 0
             if skip_cross_node_cores:
-                self.verbose('warning', 'Argument --skip-cross-node-cores won\'t take effect when both --ninstances and --ncores-per-instance are explicitly set.')
-        assert ninstances * ncores_per_instance > 0 and ninstances * ncores_per_instance <= len(pool), 'Requested number of cores exceeds what is available.'
+                self.verbose(
+                    "warning",
+                    "Argument --skip-cross-node-cores won't take effect when both --ninstances and \
+                        --ncores-per-instance are explicitly set.",
+                )
+        assert (
+            ninstances * ncores_per_instance > 0
+            and ninstances * ncores_per_instance <= len(pool)
+        ), "Requested number of cores exceeds what is available."
 
         # Split the aggregated pool into individual pools
         self.pools_ondemand.clear()
@@ -311,15 +364,23 @@ class CPUPoolList():
             pool_local.sort(key=lambda x: x.cpu)
             self.pools_ondemand.append(pool_local)
 
+
 if __name__ == "__main__":
-    lscpu_txt = '''
-'''
-    pools = CPUPoolList(lscpu_txt = lscpu_txt)
-    pools.gen_pools_ondemand(use_logical_cores=False, return_mode='auto', ninstances=3, ncores_per_instance=0, use_e_cores=True, skip_cross_node_cores=False)
+    lscpu_txt = """
+"""
+    pools = CPUPoolList(lscpu_txt=lscpu_txt)
+    pools.gen_pools_ondemand(
+        use_logical_cores=False,
+        return_mode="auto",
+        ninstances=3,
+        ncores_per_instance=0,
+        use_e_cores=True,
+        skip_cross_node_cores=False,
+    )
     print(f'capacity pool_auto:  {pools.pool_all.get_pool_txt(return_mode="auto")}')
     print(f'capacity pool_list:  {pools.pool_all.get_pool_txt(return_mode="list")}')
     print(f'capacity pool_range: {pools.pool_all.get_pool_txt(return_mode="range")}')
-    print('')
+    print("")
     for i in range(len(pools.pools_ondemand)):
         p = pools.pools_ondemand[i]
         print(f'ondemand pool_auto:  {i} {p.get_pool_txt(return_mode="auto")}')

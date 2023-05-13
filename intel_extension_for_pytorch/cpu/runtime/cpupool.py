@@ -1,9 +1,8 @@
-import torch
 import functools
 import warnings
-import numpy as np
 import intel_extension_for_pytorch as ipex
 from .runtime_utils import get_core_list_of_node_id
+
 
 class CPUPool(object):
     r"""
@@ -24,10 +23,14 @@ class CPUPool(object):
             return
         if core_ids is not None:
             if node_id is not None:
-                warnings.warn("Both of core_ids and node_id are inputed. core_ids will be used with priority.")
+                warnings.warn(
+                    "Both of core_ids and node_id are inputed. core_ids will be used with priority."
+                )
             if type(core_ids) is range:
                 core_ids = list(core_ids)
-            assert type(core_ids) is list, "Input of core_ids must be the type of list[Int]"
+            assert (
+                type(core_ids) is list
+            ), "Input of core_ids must be the type of list[Int]"
             self.core_ids = core_ids
         elif node_id is not None:
             self.core_ids = get_core_list_of_node_id(node_id)
@@ -43,6 +46,7 @@ class CPUPool(object):
         # The actual core ids inside CPUPool may be updated in creation of ipex._C.CPUPool.
         # Since ipex._C.CPUPool will filter out core ids which not available for current process.
         self.core_ids = self.cpu_pool.get_core_list()
+
 
 class pin(object):
     r"""
@@ -78,7 +82,9 @@ class pin(object):
         def decorate_pin(*args, **kwargs):
             with self:
                 return func(*args, **kwargs)
+
         return decorate_pin
+
 
 def is_runtime_ext_enabled():
     r"""

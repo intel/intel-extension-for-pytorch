@@ -1,3 +1,5 @@
+# This Python file uses the following encoding: utf-8
+
 import copy
 import sys
 import pkg_resources
@@ -13,17 +15,27 @@ import warnings
 from enum import IntFlag
 
 from .nn import utils
-from .optim._optimizer_utils import optimizer_fusion, IPEX_FUSED_OPTIMIZER_LIST_CPU, IPEX_FUSED_OPTIMIZER_LIST_XPU
+from .optim._optimizer_utils import (
+    optimizer_fusion,
+    IPEX_FUSED_OPTIMIZER_LIST_CPU,
+    IPEX_FUSED_OPTIMIZER_LIST_XPU,
+)
 import intel_extension_for_pytorch._C as core
 from .utils.channels_last_1d import to_channels_last_1d
 from .cpu.utils.linear_bn_folding import linear_bn_fuse
 from enum import IntEnum
-from intel_extension_for_pytorch.cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
+    _enable_dnnl,
+    _disable_dnnl,
+)
 import intel_extension_for_pytorch._C as torch_ipex_cpp
+
 try:
     from . import tpp
 except:
-    warnings.warn("Please install transformers repo when you want to use fast_bert API.")
+    warnings.warn(
+        "Please install transformers repo when you want to use fast_bert API."
+    )
 
 from typing import List
 import functools
@@ -31,6 +43,7 @@ import logging
 import threading
 from typing import Callable, Dict, Optional, Union
 import builtins
+
 
 def _copy_model_and_optimizer(model, optimizer):
     new_model = copy.deepcopy(model)
@@ -45,47 +58,71 @@ def _copy_model_and_optimizer(model, optimizer):
 
         # deep copy param_groups
         for group1, group2 in zip(optimizer.param_groups, new_optimizer.param_groups):
-            for i, p in enumerate(group1['params']):
+            for i, p in enumerate(group1["params"]):
                 # for the p not in the dic_param case, the new optimizer state will be updated
                 # in _deep_copy_params_attr because the param here in optimizer state is the master
                 # parameter of the model, which has ever optimized by ipex.optimize
                 if p in dic_param:
                     new_model_param = dic_param[p]
-                    group2['params'][i] = new_model_param
-                    new_optimizer.state[new_model_param] = copy.deepcopy(optimizer.state[p])
+                    group2["params"][i] = new_model_param
+                    new_optimizer.state[new_model_param] = copy.deepcopy(
+                        optimizer.state[p]
+                    )
 
         # deep copy params_attr for reentrancy of ipex.optimize
         def _deep_copy_params_attr(old_module, new_module):
-            if hasattr(old_module, 'master_weight_split'):
-                setattr(new_module, 'master_weight_split', old_module.master_weight_split)
-                master_weight_split = getattr(new_module, 'master_weight_split')
+            if hasattr(old_module, "master_weight_split"):
+                setattr(
+                    new_module, "master_weight_split", old_module.master_weight_split
+                )
+                master_weight_split = getattr(new_module, "master_weight_split")
 
                 for name, param in old_module.named_parameters():
                     if master_weight_split:
-                        attr_name = name + '_trail'
+                        attr_name = name + "_trail"
                         if param in optimizer.params_attr:
-                            new_optimizer.params_attr[getattr(new_module, name)] = optimizer.params_attr[param]
-                            new_optimizer.params_attr[getattr(new_module, name)]['trail'] = getattr(new_module, attr_name)
+                            new_optimizer.params_attr[
+                                getattr(new_module, name)
+                            ] = optimizer.params_attr[param]
+                            new_optimizer.params_attr[getattr(new_module, name)][
+                                "trail"
+                            ] = getattr(new_module, attr_name)
                     else:
-                        attr_name = 'master_' + name
+                        attr_name = "master_" + name
                         old_master_param = getattr(old_module, attr_name)
                         new_master_param = getattr(new_module, attr_name)
                         if old_master_param in optimizer.params_attr:
-                            new_optimizer.params_attr[new_master_param] = optimizer.params_attr[old_master_param]
-                            if 'bf16_param' in new_optimizer.params_attr[new_master_param]:
-                                new_optimizer.params_attr[new_master_param]['bf16_param'] = getattr(new_module, name)
-                            if 'fp16_param' in new_optimizer.params_attr[new_master_param]:
-                                new_optimizer.params_attr[new_master_param]['fp16_param'] = getattr(new_module, name)
+                            new_optimizer.params_attr[
+                                new_master_param
+                            ] = optimizer.params_attr[old_master_param]
+                            if (
+                                "bf16_param"
+                                in new_optimizer.params_attr[new_master_param]
+                            ):
+                                new_optimizer.params_attr[new_master_param][
+                                    "bf16_param"
+                                ] = getattr(new_module, name)
+                            if (
+                                "fp16_param"
+                                in new_optimizer.params_attr[new_master_param]
+                            ):
+                                new_optimizer.params_attr[new_master_param][
+                                    "fp16_param"
+                                ] = getattr(new_module, name)
 
                         # deep copy new optimizer state for master parameter
-                        new_optimizer.state[new_master_param] = copy.deepcopy(optimizer.state[old_master_param])
+                        new_optimizer.state[new_master_param] = copy.deepcopy(
+                            optimizer.state[old_master_param]
+                        )
 
-            for (_, old_child), (_, new_child) in zip(old_module.named_children(), new_module.named_children()):
+            for (_, old_child), (_, new_child) in zip(
+                old_module.named_children(), new_module.named_children()
+            ):
                 _deep_copy_params_attr(old_child, new_child)
 
-        if hasattr(optimizer, 'params_attr'):
+        if hasattr(optimizer, "params_attr"):
             params_attr = {}
-            setattr(new_optimizer, 'params_attr', params_attr)
+            setattr(new_optimizer, "params_attr", params_attr)
             _deep_copy_params_attr(model, new_model)
 
         return new_model, new_optimizer
@@ -116,6 +153,7 @@ class _Properties(object):
     This class is to establish a set of default properties.
 
     """
+
     def __init__(self):
         self.opt_level = None
         self.conv_bn_folding = None
@@ -126,6 +164,7 @@ class _Properties(object):
         self.fuse_update_step = None
         self.auto_kernel_selection = None
         self.graph_mode = None
+
 
 # O0 properties
 class _O0:
@@ -159,8 +198,7 @@ class _O1:
         return properties
 
 
-opt_levels = {"O0": _O0(),
-              "O1": _O1()}
+opt_levels = {"O0": _O0(), "O1": _O1()}
 
 
 class RunMethods(IntEnum):
@@ -169,8 +207,8 @@ class RunMethods(IntEnum):
     EagerInfer = 3
     EagerTrain = 4
 
-class GraphCapture(object):
 
+class GraphCapture(object):
     def __init__(self, model, train, dtype, weights_prepack):
         self.model = copy.deepcopy(model)
         self.train = train
@@ -180,7 +218,6 @@ class GraphCapture(object):
         self.lock = threading.Lock()
 
     def __call__(self, func):
-
         @fake_tensor_unsupported
         def compiler(gm: torch.fx.GraphModule, example_inputs: List[torch.Tensor]):
             try:
@@ -196,7 +233,10 @@ class GraphCapture(object):
         def forward(*input, **kwargs):
             if torch.jit.is_tracing():
                 return func(*input, **kwargs)
-            with torch.cpu.amp.autocast(enabled=(self.dtype == torch.bfloat16 or self.dtype == torch.half), dtype=self.dtype):
+            with torch.cpu.amp.autocast(
+                enabled=(self.dtype == torch.bfloat16 or self.dtype == torch.half),
+                dtype=self.dtype,
+            ):
                 if self.method:
                     if self.train:
                         return func(*input, **kwargs)
@@ -211,7 +251,9 @@ class GraphCapture(object):
                             else:
                                 return self.model(*input, **kwargs)
                         if self.train:
-                            warnings.warn("graph capture does not support training yet.")
+                            warnings.warn(
+                                "graph capture does not support training yet."
+                            )
                             self.method = RunMethods.EagerTrain
                             return func(*input, **kwargs)
                         else:
@@ -224,8 +266,12 @@ class GraphCapture(object):
                                 # and the tracer will try to emit warnings when doing something that may cause an incorrect trace to be produced.
                                 # Therefore, we catch these warnings and treat them as errors, and let TorchDynamo handle such models appropriately.
                                 with warnings.catch_warnings():
-                                    warnings.filterwarnings('error', category=TracerWarning)
-                                    traced_model = torch.jit.trace(self.model.eval(), input).eval()
+                                    warnings.filterwarnings(
+                                        "error", category=TracerWarning
+                                    )
+                                    traced_model = torch.jit.trace(
+                                        self.model.eval(), input
+                                    ).eval()
                                     traced_model = torch.jit.freeze(traced_model)
                                     output = traced_model(*input, **kwargs)
                                     self.model = traced_model
@@ -236,14 +282,18 @@ class GraphCapture(object):
                                 try:
                                     # JIT trace failed, try torchdynamo with JIT trace backend.
                                     torch._dynamo.reset()
-                                    dynamo_model = torch._dynamo.optimize(compiler, dynamic=True)(self.model)
+                                    dynamo_model = torch._dynamo.optimize(
+                                        compiler, dynamic=True
+                                    )(self.model)
                                     output = dynamo_model(*input, **kwargs)
                                     self.model = dynamo_model
                                     self.method = RunMethods.TorchDynamo
                                     logging.debug("generate graph by TorchDynamo.")
                                     return output
                                 except BaseException:
-                                    warnings.warn("Both JIT and TorchDynamo failed, fallback to original model.")
+                                    warnings.warn(
+                                        "Both JIT and TorchDynamo failed, fallback to original model."
+                                    )
                                     self.method = RunMethods.EagerInfer
                                     torch._dynamo.reset()
                                     return self.model(*input, **kwargs)
@@ -266,7 +316,7 @@ def optimize(
     fuse_update_step=None,
     auto_kernel_selection=None,
     sample_input=None,
-    graph_mode=None
+    graph_mode=None,
 ):
     r"""
     Apply optimizations at Python frontend to the given model (nn.Module), as
@@ -422,17 +472,18 @@ def optimize(
     opt_properties = _Properties()
     if level not in opt_levels:
         raise RuntimeError(
-            f"Unexpected optimization level {level}. Options are 'O0', 'O1'.")
+            f"Unexpected optimization level {level}. Options are 'O0', 'O1'."
+        )
     else:
         opt_properties = opt_levels[level](opt_properties)
 
-    device_type = 'cpu'
+    device_type = "cpu"
     model_parameters_list = list(model.parameters())
-    if len(model_parameters_list) and model_parameters_list[0].device.type == 'xpu':
-        if not all([param.device.type == 'xpu' for param in model_parameters_list]):
+    if len(model_parameters_list) and model_parameters_list[0].device.type == "xpu":
+        if not all([param.device.type == "xpu" for param in model_parameters_list]):
             raise RuntimeError("The model is mixed with different device type")
         else:
-            device_type = 'xpu'
+            device_type = "xpu"
 
     global auto_channels_last
 
@@ -440,14 +491,19 @@ def optimize(
         global auto_channels_last
         if auto_channels_last.value == auto_channels_last_flag.ENABLE:
             return True
-        elif auto_channels_last.value == auto_channels_last_flag.AUTO and torch.xpu.has_2d_block_array():
+        elif (
+            auto_channels_last.value == auto_channels_last_flag.AUTO
+            and torch.xpu.has_2d_block_array()
+        ):
             return True
         else:
             return False
 
-    if device_type == 'cpu' and (auto_channels_last.value != auto_channels_last_flag.DISABLE):
+    if device_type == "cpu" and (
+        auto_channels_last.value != auto_channels_last_flag.DISABLE
+    ):
         _convert_convNd_deconvNd_weight_memory_format(model)
-    elif device_type == 'xpu' and xpu_check_channel_last():
+    elif device_type == "xpu" and xpu_check_channel_last():
         _convert_convNd_deconvNd_weight_memory_format(model)
 
     if level is not None:
@@ -476,128 +532,203 @@ def optimize(
         _enable_dnnl()
 
     # when on xpu, some features are not supported
-    if device_type == 'xpu':
+    if device_type == "xpu":
         if opt_properties.auto_kernel_selection:
-            warnings.warn("For XPU device, the auto kernel selection is unsupported, so disable it.")
+            warnings.warn(
+                "For XPU device, the auto kernel selection is unsupported, so disable it."
+            )
             opt_properties.auto_kernel_selection = False
         if opt_properties.split_master_weight_for_bf16:
-            warnings.warn("For XPU device, the split master weight is unsupported for now, so temp to disable it.")
+            warnings.warn(
+                "For XPU device, the split master weight is unsupported for now, so temp to disable it."
+            )
             # TODO: for xpu, the split master weight will be supported soon
             opt_properties.split_master_weight_for_bf16 = False
         if opt_properties.graph_mode:
             warnings.warn(
                 "For XPU, the oob solution for inference is to trace model outside of the torch.xpu.optimize,"
-                + " so temp to disable the graph mode")
+                + " so temp to disable the graph mode"
+            )
             # TODO: for xpu now, the oob solution for inference is to trace model outside of the torch.xpu.optimize.
             opt_properties.graph_mode = False
         if not inplace:
             warnings.warn(
                 "For XPU device to save valuable device memory, temp to do optimization on inplaced model,"
-                + " so make inplace to be true")
+                + " so make inplace to be true"
+            )
             # TODO: for xpu, inplace is true will add device memory pressure, so set inplace to be true
             inplace = True
         # for XPU, weight prepack is unsupported, so sample input is useless
         if opt_properties.weights_prepack:
             warnings.warn(
                 "For XPU, the weight prepack and sample input are disabled. The onednn layout"
-                + " is automatically chosen to use")
+                + " is automatically chosen to use"
+            )
             opt_properties.weights_prepack = False
             sample_input = None
         if opt_properties.optimize_lstm is not None:
             warnings.warn(
-                "For XPU, the optimize_lstm(replace lstm with ipex_lstm) is unsupported, so disable it")
+                "For XPU, the optimize_lstm(replace lstm with ipex_lstm) is unsupported, so disable it"
+            )
             opt_properties.optimize_lstm = False
 
     if inplace:
         optimized_model = model
         optimized_optimizer = optimizer
     else:
-        optimized_model, optimized_optimizer = _copy_model_and_optimizer(model, optimizer)
+        optimized_model, optimized_optimizer = _copy_model_and_optimizer(
+            model, optimizer
+        )
 
     if sample_input is not None:
         if isinstance(sample_input, torch.Tensor):
             sample_input = (sample_input,)
-        utils._weight_prepack.record_input_shape_for_prepack(optimized_model, sample_input)
+        utils._weight_prepack.record_input_shape_for_prepack(
+            optimized_model, sample_input
+        )
 
     if not model.training:
         if opt_properties.conv_bn_folding:
             try:
                 optimized_model = optimization.fuse(optimized_model, inplace=inplace)
             except:  # noqa E722
-                warnings.warn("Conv BatchNorm folding failed during the optimize process.")
+                warnings.warn(
+                    "Conv BatchNorm folding failed during the optimize process."
+                )
         if opt_properties.linear_bn_folding:
             try:
                 optimized_model = linear_bn_fuse(optimized_model, inplace=inplace)
             except:
-                warnings.warn("Linear BatchNorm folding failed during the optimize process.")
+                warnings.warn(
+                    "Linear BatchNorm folding failed during the optimize process."
+                )
         if opt_properties.replace_dropout_with_identity:
             utils._model_convert.replace_dropout_with_identity(optimized_model)
         if dtype == torch.bfloat16:
-            optimized_model = utils._model_convert.convert_module_data_type(optimized_model, torch.bfloat16)
+            optimized_model = utils._model_convert.convert_module_data_type(
+                optimized_model, torch.bfloat16
+            )
         if dtype == torch.half:
-            optimized_model = utils._model_convert.convert_module_data_type(optimized_model, torch.half)
+            optimized_model = utils._model_convert.convert_module_data_type(
+                optimized_model, torch.half
+            )
 
     if opt_properties.optimize_lstm:
-        utils._model_convert.replace_lstm_with_ipex_lstm(optimized_model, optimized_optimizer)
-    if model.training and opt_properties.split_master_weight_for_bf16 and dtype is torch.bfloat16:
+        utils._model_convert.replace_lstm_with_ipex_lstm(
+            optimized_model, optimized_optimizer
+        )
+    if (
+        model.training
+        and opt_properties.split_master_weight_for_bf16
+        and dtype is torch.bfloat16
+    ):
         if not opt_properties.fuse_update_step:
             opt_properties.split_master_weight_for_bf16 = False
             warnings.warn(
-                "IPEX does not non-fused split master weight for bf16 training, " +
-                "have reset split_master_weight_for_bf16 flag to False. " +
-                "If you want to use split_master_weight_for_bf16. " +
-                "Please set both split_master_weight_for_bf16 and fuse_update_step to True.")
-        elif type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST_CPU and device_type == 'cpu':
+                "IPEX does not non-fused split master weight for bf16 training, "
+                + "have reset split_master_weight_for_bf16 flag to False. "
+                + "If you want to use split_master_weight_for_bf16. "
+                + "Please set both split_master_weight_for_bf16 and fuse_update_step to True."
+            )
+        elif (
+            type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST_CPU
+            and device_type == "cpu"
+        ):
             opt_properties.split_master_weight_for_bf16 = False
             opt_properties.fuse_update_step = False
             warnings.warn(
-                "IPEX CPU does not support fused/fused split update for " + str(type(optimizer)) +
-                " will use non-fused master weight update for bf16 training on CPU.")
-        elif type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST_XPU and device_type == 'xpu':
+                "IPEX CPU does not support fused/fused split update for "
+                + str(type(optimizer))
+                + " will use non-fused master weight update for bf16 training on CPU."
+            )
+        elif (
+            type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST_XPU
+            and device_type == "xpu"
+        ):
             opt_properties.split_master_weight_for_bf16 = False
             opt_properties.fuse_update_step = False
             warnings.warn(
-                "IPEX XPU does not support fused/fused split update for " + str(type(optimizer)) +
-                " will use non-fused master weight update for bf16 training on XPU.")
+                "IPEX XPU does not support fused/fused split update for "
+                + str(type(optimizer))
+                + " will use non-fused master weight update for bf16 training on XPU."
+            )
 
     # convert optimizer for training case.
     params_attr = {}
-    if hasattr(optimized_optimizer, 'params_attr'):
+    if hasattr(optimized_optimizer, "params_attr"):
         params_attr = optimized_optimizer.params_attr
     if dtype == torch.bfloat16 and model.training:
-        optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
-            optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16,
-            convert_dtype=torch.bfloat16)
+        (
+            optimized_model,
+            optimized_optimizer,
+            params_attr,
+        ) = utils._weight_cast.weight_dtype_convert_with_ipex(
+            optimized_model,
+            optimized_optimizer,
+            params_attr,
+            opt_properties.split_master_weight_for_bf16,
+            convert_dtype=torch.bfloat16,
+        )
     if dtype == torch.half and model.training:
-        assert device_type != 'xpu', "For now, XPU device does not support model training with half precision."
-        optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
-            optimized_model, optimized_optimizer, params_attr, False, convert_dtype=torch.half)
+        assert (
+            device_type != "xpu"
+        ), "For now, XPU device does not support model training with half precision."
+        (
+            optimized_model,
+            optimized_optimizer,
+            params_attr,
+        ) = utils._weight_cast.weight_dtype_convert_with_ipex(
+            optimized_model,
+            optimized_optimizer,
+            params_attr,
+            False,
+            convert_dtype=torch.half,
+        )
     # Since TorchDynamo cannot handle custom operations yet, for the case of inference graph mode,
     # the weights prepacking here is temporarily cancelled, and it will be completed on the graph.
     if opt_properties.weights_prepack:
-        if device_type == 'cpu':
+        if device_type == "cpu":
             if dtype == torch.bfloat16:
-                assert core.onednn_has_bf16_support(), \
-                        "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, " + \
-                        "please set dtype to torch.float or set weights_prepack to False."
+                assert core.onednn_has_bf16_support(), (
+                    "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, "
+                    + "please set dtype to torch.float or set weights_prepack to False."
+                )
             if dtype == torch.half:
-                assert core.onednn_has_fp16_support(), \
-                        "FP16 weight prepack needs the cpu support avx512_core_fp16, " + \
-                        "please set dtype to torch.float or set weights_prepack to False."
-            optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
-                optimized_model, optimized_optimizer, params_attr, inplace,  'cpu')
+                assert core.onednn_has_fp16_support(), (
+                    "FP16 weight prepack needs the cpu support avx512_core_fp16, "
+                    + "please set dtype to torch.float or set weights_prepack to False."
+                )
+            (
+                optimized_model,
+                optimized_optimizer,
+                params_attr,
+            ) = utils._weight_prepack.weight_prepack_with_ipex(
+                optimized_model, optimized_optimizer, params_attr, inplace, "cpu"
+            )
             torch._dynamo.allow_in_graph(utils._weight_prepack._IPEXConv2d)
             torch._dynamo.allow_in_graph(utils._weight_prepack._IPEXConvTranspose2d)
             torch._dynamo.allow_in_graph(utils._weight_prepack._IPEXLinear)
             torch._dynamo.allow_in_graph(utils._model_convert._LSTM)
         else:
-            assert device_type == 'xpu', "Unknown device type, only support device CPU and XPU"
-            optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
-                optimized_model, optimized_optimizer, params_attr, inplace,  'xpu')
+            assert (
+                device_type == "xpu"
+            ), "Unknown device type, only support device CPU and XPU"
+            (
+                optimized_model,
+                optimized_optimizer,
+                params_attr,
+            ) = utils._weight_prepack.weight_prepack_with_ipex(
+                optimized_model, optimized_optimizer, params_attr, inplace, "xpu"
+            )
 
     if opt_properties.graph_mode:
         _old_forward = optimized_model.forward
-        wrapper = GraphCapture(optimized_model, optimizer is not None, dtype, opt_properties.weights_prepack)
+        wrapper = GraphCapture(
+            optimized_model,
+            optimizer is not None,
+            dtype,
+            opt_properties.weights_prepack,
+        )
         optimized_model.forward = wrapper(_old_forward)
 
     # TODO: model list, optimizer list.
@@ -607,7 +738,10 @@ def optimize(
     # with an optimizer
     if opt_properties.fuse_update_step:
         optimized_optimizer = optimizer_fusion(
-            optimized_optimizer, opt_properties.split_master_weight_for_bf16, device_type)
+            optimized_optimizer,
+            opt_properties.split_master_weight_for_bf16,
+            device_type,
+        )
     return optimized_model, optimized_optimizer
 
 
@@ -627,9 +761,8 @@ def compile(
     model: torch.fx.GraphModule,
     example_inputs: List[torch.Tensor],
     mode: Union[str, None] = None,
-    options: Optional[Dict[str, Union[str, builtins.int, builtins.bool]]] = None
+    options: Optional[Dict[str, Union[str, builtins.int, builtins.bool]]] = None,
 ) -> Callable:
-
     def defake(x):
         if not isinstance(x, FakeTensor):
             return x
@@ -661,6 +794,7 @@ def compile(
 
     if _get_compiler_backend() == "inductor":
         from ._inductor.compile_fx import compile_fx
+
         return compile_fx(model, example_inputs, mode, options)
 
     try:
@@ -673,6 +807,7 @@ def compile(
     except Exception:
         warnings.warn("JIT trace failed during the IPEX compile process.")
         return model
+
 
 def enable_onednn_fusion(enabled):
     r"""
@@ -705,14 +840,25 @@ def _convert_convNd_deconvNd_weight_memory_format(module):
         weight_data = to_channels_last_1d(module.weight.detach().clone())
         module.weight.data = weight_data.resize_(weight_data.size())
     elif isinstance(module, (torch.nn.Conv2d, torch.nn.ConvTranspose2d)):
-        weight_data = module.weight.detach().clone().contiguous(memory_format=torch.channels_last)
-        module.weight.data = weight_data.resize_(weight_data.size(), memory_format=torch.channels_last)
+        weight_data = (
+            module.weight.detach().clone().contiguous(memory_format=torch.channels_last)
+        )
+        module.weight.data = weight_data.resize_(
+            weight_data.size(), memory_format=torch.channels_last
+        )
     elif isinstance(module, (torch.nn.Conv3d, torch.nn.ConvTranspose3d)):
-        weight_data = module.weight.detach().clone().contiguous(memory_format=torch.channels_last_3d)
-        module.weight.data = weight_data.resize_(weight_data.size(), memory_format=torch.channels_last_3d)
+        weight_data = (
+            module.weight.detach()
+            .clone()
+            .contiguous(memory_format=torch.channels_last_3d)
+        )
+        module.weight.data = weight_data.resize_(
+            weight_data.size(), memory_format=torch.channels_last_3d
+        )
 
     for child in module.children():
         _convert_convNd_deconvNd_weight_memory_format(child)
+
 
 class FP32MathMode(IntEnum):
     FP32 = int(core.FP32MathMode.FP32)
@@ -761,7 +907,8 @@ def set_fp32_math_mode(mode=FP32MathMode.FP32, device="cpu"):
         else:
             warnings.warn(
                 "For CPU device, IPEX does not support mode except \
-                    FP32MathMode.FP32 and FP32MathMode.BF32 for fpmath_mode right now.")
+                    FP32MathMode.FP32 and FP32MathMode.BF32 for fpmath_mode right now."
+            )
     elif device == "xpu":
         if mode == FP32MathMode.BF32:
             torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.BF32)
@@ -772,9 +919,12 @@ def set_fp32_math_mode(mode=FP32MathMode.FP32, device="cpu"):
         else:
             warnings.warn(
                 "For XPU device, IPEX does not support mode except \
-                    FP32MathMode.FP32, FP32MathMode.BF32 and FP32MathMode.TF32 for fpmath_mode right now.")
+                    FP32MathMode.FP32, FP32MathMode.BF32 and FP32MathMode.TF32 for fpmath_mode right now."
+            )
     else:
-        raise RuntimeError("Unexpected device type {}. ".format(device) + "Supported are 'cpu', 'xpu'.")
+        raise RuntimeError(
+            "Unexpected device type {}. ".format(device) + "Supported are 'cpu', 'xpu'."
+        )
 
 
 def get_fp32_math_mode(device="cpu"):
@@ -814,7 +964,10 @@ def get_fp32_math_mode(device="cpu"):
     elif device == "xpu":
         return torch.xpu.get_fp32_math_mode()
     else:
-        raise RuntimeError("Unexpected device type {}. ".format(device) + "Supported are 'cpu', 'xpu'.")
+        raise RuntimeError(
+            "Unexpected device type {}. ".format(device) + "Supported are 'cpu', 'xpu'."
+        )
+
 
 def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     r"""
@@ -860,30 +1013,50 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         >>> # running training step.
 
     """
-    #tpp bert optimization depends on the transformers repo to implementate the related module
+    # tpp bert optimization depends on the transformers repo to implementate the related module
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
-    min_version = '4.6.0'
-    max_version = '4.20.0'
-    if 'transformers' not in installed_pkg:
-        raise RuntimeError("Please installed the transformers with version: between {} and {}".format(min_version, max_version))
+    min_version = "4.6.0"
+    max_version = "4.20.0"
+    if "transformers" not in installed_pkg:
+        raise RuntimeError(
+            "Please installed the transformers with version: between {} and {}".format(
+                min_version, max_version
+            )
+        )
 
     import transformers
     from packaging import version
-    trans_version = transformers.__version__
-    if version.parse(trans_version) < version.parse(min_version) or version.parse(trans_version) > version.parse(max_version):
-        raise RuntimeError("Please installed the transformers with version: between {} and {} while now transformers== {}".format(min_version, max_version, trans_version))
-    PT_OPTIMIZER_TO_TPP_OPTIMIZER = {torch.optim.AdamW : tpp.optim.AdamW,
-                                      transformers.optimization.AdamW : tpp.optim.AdamW,
-                                      torch.optim.SGD : tpp.optim.SGD}
-    assert(dtype == torch.float or dtype == torch.bfloat16, "TPP only supports torch.float and torch.bfloat16.")
 
-    #setup the seed for libxsmm (can be only positive int value) which will imapct some ops using seed. e.g., dropout
+    trans_version = transformers.__version__
+    if version.parse(trans_version) < version.parse(min_version) or version.parse(
+        trans_version
+    ) > version.parse(max_version):
+        raise RuntimeError(
+            "Please installed the transformers with version: between {} and {} while now transformers== {}".format(
+                min_version, max_version, trans_version
+            )
+        )
+    PT_OPTIMIZER_TO_TPP_OPTIMIZER = {
+        torch.optim.AdamW: tpp.optim.AdamW,
+        transformers.optimization.AdamW: tpp.optim.AdamW,
+        torch.optim.SGD: tpp.optim.SGD,
+    }
+    assert (
+        dtype == torch.float or dtype == torch.bfloat16,
+        "TPP only supports torch.float and torch.bfloat16.",
+    )
+
+    # setup the seed for libxsmm (can be only positive int value) which will imapct some ops using seed. e.g., dropout
     try:
-        torch_ipex_cpp.xsmm_manual_seed(torch.tensor(torch.initial_seed()).to(torch.int32).abs().item())
+        torch_ipex_cpp.xsmm_manual_seed(
+            torch.tensor(torch.initial_seed()).to(torch.int32).abs().item()
+        )
     except:
-        warnings.warn("Set seed failed for libxsmm which may impact the training loss, you can call torch.manual_seed(N) before invoking fast_bert.")
-    #replace the original transfomers module object with tpp module which has the same functionality but with more
-    #operator fusion optimization
+        warnings.warn(
+            "Set seed failed for libxsmm which may impact the training loss, you can call torch.manual_seed(N) before invoking fast_bert."
+        )
+    # replace the original transfomers module object with tpp module which has the same functionality but with more
+    # operator fusion optimization
     new_model = copy.deepcopy(model)
     tpp.fused_bert.layer_use_bf16 = True if dtype == torch.bfloat16 else False
     if unpad:
@@ -891,38 +1064,55 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     else:
         tpp.fused_bert.unpad = False
     if isinstance(model, transformers.models.bert.modeling_bert.BertModel):
-        assert(isinstance(new_model.embeddings, transformers.models.bert.modeling_bert.BertEmbeddings))
+        assert isinstance(
+            new_model.embeddings, transformers.models.bert.modeling_bert.BertEmbeddings
+        )
         new_model.embeddings = tpp.fused_bert.BertEmbeddings(model.config)
-        assert(isinstance(new_model.encoder, transformers.models.bert.modeling_bert.BertEncoder))
-        new_model.encoder =  tpp.fused_bert.BertEncoder(model.config)
-    elif hasattr(model, "bert") and isinstance(model.bert, transformers.models.bert.modeling_bert.BertModel):
-        assert(isinstance(new_model.bert.embeddings, transformers.models.bert.modeling_bert.BertEmbeddings))
+        assert isinstance(
+            new_model.encoder, transformers.models.bert.modeling_bert.BertEncoder
+        )
+        new_model.encoder = tpp.fused_bert.BertEncoder(model.config)
+    elif hasattr(model, "bert") and isinstance(
+        model.bert, transformers.models.bert.modeling_bert.BertModel
+    ):
+        assert isinstance(
+            new_model.bert.embeddings,
+            transformers.models.bert.modeling_bert.BertEmbeddings,
+        )
         new_model.bert.embeddings = tpp.fused_bert.BertEmbeddings(model.bert.config)
-        assert(isinstance(new_model.bert.encoder, transformers.models.bert.modeling_bert.BertEncoder))
-        new_model.bert.encoder =  tpp.fused_bert.BertEncoder(model.bert.config)
+        assert isinstance(
+            new_model.bert.encoder, transformers.models.bert.modeling_bert.BertEncoder
+        )
+        new_model.bert.encoder = tpp.fused_bert.BertEncoder(model.bert.config)
     else:
-        warnings.warn("fast_bert only supports instance of transformers.models.bert.modeling_bert.BertModel")
+        warnings.warn(
+            "fast_bert only supports instance of transformers.models.bert.modeling_bert.BertModel"
+        )
         return model, optimizer
-    new_model.load_state_dict(model.state_dict())#copy the original params into the tpp module
-    tpp.block(new_model)#get block format weights/bias
+    new_model.load_state_dict(
+        model.state_dict()
+    )  # copy the original params into the tpp module
+    tpp.block(new_model)  # get block format weights/bias
     if optimizer is None:
         return new_model
-    #replace the original pytorch/transformer optimizer with tpp optimizer for SGD/AdamW
-    #keep the original optimizer state and replace the params with the blocked tpp params
+    # replace the original pytorch/transformer optimizer with tpp optimizer for SGD/AdamW
+    # keep the original optimizer state and replace the params with the blocked tpp params
     param_pair = {}
     for param_ori, param_tpp in zip(model.parameters(), new_model.parameters()):
         param_pair[param_ori] = param_tpp
     if type(optimizer) not in PT_OPTIMIZER_TO_TPP_OPTIMIZER:
-        warnings.warn("Still return the origin optimize, the fast_bert can only replace the SGD, AdamW optimizer")
+        warnings.warn(
+            "Still return the origin optimize, the fast_bert can only replace the SGD, AdamW optimizer"
+        )
         new_optimizer = optimizer
     else:
-        new_optimizer = PT_OPTIMIZER_TO_TPP_OPTIMIZER[type(optimizer)]([{'params':[]}])
+        new_optimizer = PT_OPTIMIZER_TO_TPP_OPTIMIZER[type(optimizer)]([{"params": []}])
     new_optimizer.state = optimizer.state
     new_optimizer.param_groups = optimizer.param_groups
     for group in new_optimizer.param_groups:
-        for i, p in enumerate(group['params']):
+        for i, p in enumerate(group["params"]):
             if p in param_pair:
                 new_param = param_pair[p]
-                group['params'][i] = new_param
+                group["params"][i] = new_param
 
     return new_model, new_optimizer

@@ -1,5 +1,6 @@
 import torch
 
+
 # This is a work-around to convert 3d tensor to channels last format.
 # Theoretically, transpose(permute/view)-contiguous(to)-transpose(permute/view)
 # can convert 3d tensor to channels last. However, this formula cannot convert all
@@ -19,15 +20,20 @@ def tensor_to_channels_last_1d(t):
         t = t.view(t.size(0), t.size(1), t.size(3))
     return t
 
+
 # Port from https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/blob/920c7163c81d6c5098ba79ed482d57b1ded8521d/intel_extension_for_pytorch/xpu/utils.py#L6 and
 def to_channels_last_1d(t):
-    cpu_scope = (torch.nn.Conv1d)
+    cpu_scope = torch.nn.Conv1d
     xpu_scope = (torch.nn.Conv1d, torch.nn.BatchNorm1d, torch.nn.MaxPool1d)
     if isinstance(t, torch.nn.Module):
         for m in t.modules():
             for param in m.parameters():
-                if param.device.type == 'cpu' and isinstance(m, cpu_scope) or \
-                    param.device.type == 'xpu' and isinstance(m, xpu_scope):
+                if (
+                    param.device.type == "cpu"
+                    and isinstance(m, cpu_scope)
+                    or param.device.type == "xpu"
+                    and isinstance(m, xpu_scope)
+                ):
                     if 3 == param.data.dim():
                         param.data = tensor_to_channels_last_1d(param.data)
         return t
@@ -35,6 +41,7 @@ def to_channels_last_1d(t):
     if 3 == t.dim():
         t = tensor_to_channels_last_1d(t)
     return t
+
 
 # Port from https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/blob/920c7163c81d6c5098ba79ed482d57b1ded8521d/intel_extension_for_pytorch/xpu/utils.py#L38
 def is_contiguous_channels_last_1d(input):

@@ -9,7 +9,7 @@ import intel_extension_for_pytorch.cpu.auto_ipex as auto_ipex
 from .launcher_distributed import DistributedTrainingLauncher
 from .launcher_multi_instances import MultiInstancesLauncher
 
-'''
+"""
 This is a script for launching PyTorch training and inference on Intel Xeon CPU with optimal configurations.
 Now, single instance inference/training, multi-instance inference/training and distributed training
 with oneCCL backend is enabled.
@@ -113,81 +113,193 @@ TCMalloc can be used as substitution of the default memory allocator. It is as e
 `--memory-allocator` argument to either of `auto`, `default`, `jemalloc` and `tcmalloc`. Setting it to `auto` tries
 searching availability of the memory allocator in order of `tcmalloc`, 'jemalloc` and 'default`.
 
-'''
+"""
+
 
 def add_deprecated_params(parser):
-    group = parser.add_argument_group('Deprecated Arguments')
-    group.add_argument('--nproc_per_node', metavar='\b', type=int, default=-1, help='Deprecated by --nprocs-per-node.')
-    group.add_argument('--more_mpi_params', metavar='\b', type=str, default='', help='Deprecated by --extra-mpi-params.')
-    group.add_argument('--ncore_per_instance', metavar='\b', type=int, default=-1, help='Deprecated by --ncores-per-instance.')
-    group.add_argument('--node_id', metavar='\b', type=int, default=-1, help='Deprecated by --nodes-list.')
-    group.add_argument('--core_list', metavar='\b', type=str, default='', help='Deprecated by --cores-list.')
-    group.add_argument('--logical_core_for_ccl', action='store_true', default=False, help='Deprecated by --logical-cores-for-ccl.')
-    group.add_argument('--enable_tcmalloc', action='store_true', default=False, help='Deprecated by --memory-allocator.')
-    group.add_argument('--enable_jemalloc', action='store_true', default=False, help='Deprecated by --memory-allocator.')
-    group.add_argument('--use_default_allocator', action='store_true', default=False, help='Deprecated by --memory-allocator.')
-    group.add_argument('--use_logical_core', action='store_true', default=False, help='Deprecated by --use-logical-cores.')
-    group.add_argument('--disable_numactl', action='store_true', default=False, help='Deprecated by --multi-task-manager.')
-    group.add_argument('--disable_taskset', action='store_true', default=False, help='Deprecated by --multi-task-manager.')
-    group.add_argument('--disable_iomp', action='store_true', default=False, help='Deprecated by --omp-runtime.')
-    group.add_argument('--log_path', type=str, default='', help='Deprecated by --log-dir.')
-    group.add_argument('--multi_instance', action='store_true', default=False, help='Deprecated. Will be removed.')
-    group.add_argument('--distributed', action='store_true', default=False, help='Deprecated. Will be removed.')
+    group = parser.add_argument_group("Deprecated Arguments")
+    group.add_argument(
+        "--nproc_per_node",
+        metavar="\b",
+        type=int,
+        default=-1,
+        help="Deprecated by --nprocs-per-node.",
+    )
+    group.add_argument(
+        "--more_mpi_params",
+        metavar="\b",
+        type=str,
+        default="",
+        help="Deprecated by --extra-mpi-params.",
+    )
+    group.add_argument(
+        "--ncore_per_instance",
+        metavar="\b",
+        type=int,
+        default=-1,
+        help="Deprecated by --ncores-per-instance.",
+    )
+    group.add_argument(
+        "--node_id",
+        metavar="\b",
+        type=int,
+        default=-1,
+        help="Deprecated by --nodes-list.",
+    )
+    group.add_argument(
+        "--core_list",
+        metavar="\b",
+        type=str,
+        default="",
+        help="Deprecated by --cores-list.",
+    )
+    group.add_argument(
+        "--logical_core_for_ccl",
+        action="store_true",
+        default=False,
+        help="Deprecated by --logical-cores-for-ccl.",
+    )
+    group.add_argument(
+        "--enable_tcmalloc",
+        action="store_true",
+        default=False,
+        help="Deprecated by --memory-allocator.",
+    )
+    group.add_argument(
+        "--enable_jemalloc",
+        action="store_true",
+        default=False,
+        help="Deprecated by --memory-allocator.",
+    )
+    group.add_argument(
+        "--use_default_allocator",
+        action="store_true",
+        default=False,
+        help="Deprecated by --memory-allocator.",
+    )
+    group.add_argument(
+        "--use_logical_core",
+        action="store_true",
+        default=False,
+        help="Deprecated by --use-logical-cores.",
+    )
+    group.add_argument(
+        "--disable_numactl",
+        action="store_true",
+        default=False,
+        help="Deprecated by --multi-task-manager.",
+    )
+    group.add_argument(
+        "--disable_taskset",
+        action="store_true",
+        default=False,
+        help="Deprecated by --multi-task-manager.",
+    )
+    group.add_argument(
+        "--disable_iomp",
+        action="store_true",
+        default=False,
+        help="Deprecated by --omp-runtime.",
+    )
+    group.add_argument(
+        "--log_path", type=str, default="", help="Deprecated by --log-dir."
+    )
+    group.add_argument(
+        "--multi_instance",
+        action="store_true",
+        default=False,
+        help="Deprecated. Will be removed.",
+    )
+    group.add_argument(
+        "--distributed",
+        action="store_true",
+        default=False,
+        help="Deprecated. Will be removed.",
+    )
+
 
 def process_deprecated_params(args, logger):
     if args.nproc_per_node != -1:
-        logger.warning('Argument --nproc_per_node is deprecated by --nprocs-per-node.')
+        logger.warning("Argument --nproc_per_node is deprecated by --nprocs-per-node.")
         args.nprocs_per_node = args.nproc_per_node
-    if args.more_mpi_params != '':
-        logger.warning('Argument --more_mpi_params is deprecated by --extra-mpi-params.')
+    if args.more_mpi_params != "":
+        logger.warning(
+            "Argument --more_mpi_params is deprecated by --extra-mpi-params."
+        )
         args.extra_mpi_params = args.more_mpi_params
     if args.ncore_per_instance != -1:
-        logger.warning('Argument --ncore_per_instance is deprecated by --ncores-per-instance.')
+        logger.warning(
+            "Argument --ncore_per_instance is deprecated by --ncores-per-instance."
+        )
         args.ncores_per_instance = args.ncore_per_instance
     if args.node_id != -1:
-        logger.warning('Argument --node_id is deprecated by --nodes-list.')
+        logger.warning("Argument --node_id is deprecated by --nodes-list.")
         args.nodes_list = str(args.node_id)
-    if args.core_list != '':
-        logger.warning('Argument --core_list is deprecated by --cores-list.')
+    if args.core_list != "":
+        logger.warning("Argument --core_list is deprecated by --cores-list.")
         args.cores_list = args.core_list
     if args.logical_core_for_ccl:
-        logger.warning('Argument --logical_core_for_ccl is deprecated by --logical-cores-for-ccl.')
+        logger.warning(
+            "Argument --logical_core_for_ccl is deprecated by --logical-cores-for-ccl."
+        )
         args.logical_cores_for_ccl = args.logical_core_for_ccl
     if args.use_logical_core:
-        logger.warning('Argument --use_logical_core is deprecated by --use-logical-cores.')
+        logger.warning(
+            "Argument --use_logical_core is deprecated by --use-logical-cores."
+        )
         args.use_logical_cores = args.use_logical_core
-    if args.log_path != '':
-        logger.warning('Argument --log_path is deprecated by --log-dir.')
+    if args.log_path != "":
+        logger.warning("Argument --log_path is deprecated by --log-dir.")
         args.log_dir = args.log_path
 
     if args.multi_instance:
-        logger.info('Argument --multi_instance is deprecated. Will be removed. If you are using the deprecated argument, please update it to the new one.')
+        logger.info(
+            "Argument --multi_instance is deprecated. Will be removed. \
+                If you are using the deprecated argument, please update it to the new one."
+        )
     if args.distributed:
-        logger.info('Argument --distributed is deprecated. Will be removed. If you are using the deprecated argument, please update it to the new one.')
+        logger.info(
+            "Argument --distributed is deprecated. Will be removed. \
+                If you are using the deprecated argument, please update it to the new one."
+        )
 
     if args.enable_tcmalloc or args.enable_jemalloc or args.use_default_allocator:
-        logger.warning('Arguments --enable_tcmalloc, --enable_jemalloc and --use_default_allocator are deprecated by --memory-allocator.')
-        if (args.enable_tcmalloc and args.enable_jemalloc) or \
-           (args.enable_tcmalloc and args.use_default_allocator) or \
-           (args.enable_jemalloc and args.use_default_allocator) or \
-           (args.enable_tcmalloc and args.enable_jemalloc and args.use_default_allocator):
-            args.memory_allocator = 'auto'
+        logger.warning(
+            "Arguments --enable_tcmalloc, --enable_jemalloc and --use_default_allocator \
+                are deprecated by --memory-allocator."
+        )
+        if (
+            (args.enable_tcmalloc and args.enable_jemalloc)
+            or (args.enable_tcmalloc and args.use_default_allocator)
+            or (args.enable_jemalloc and args.use_default_allocator)
+            or (
+                args.enable_tcmalloc
+                and args.enable_jemalloc
+                and args.use_default_allocator
+            )
+        ):
+            args.memory_allocator = "auto"
         else:
             if args.enable_tcmalloc:
-                args.memory_allocator = 'tcmalloc'
+                args.memory_allocator = "tcmalloc"
             if args.enable_jemalloc:
-                args.memory_allocator = 'jemalloc'
+                args.memory_allocator = "jemalloc"
             if args.use_default_allocator:
-                args.memory_allocator = 'default'
+                args.memory_allocator = "default"
     if args.disable_numactl:
-        logger.warning('Argument --disable_numactl is deprecated by --multi-task-manager.')
-        args.multi_task_manager = 'taskset'
+        logger.warning(
+            "Argument --disable_numactl is deprecated by --multi-task-manager."
+        )
+        args.multi_task_manager = "taskset"
     if args.disable_taskset:
-        logger.warning('Argument --disable_taskset is deprecated by --multi-task-manager.')
-        args.multi_task_manager = 'numactl'
+        logger.warning(
+            "Argument --disable_taskset is deprecated by --multi-task-manager."
+        )
+        args.multi_task_manager = "numactl"
     if args.disable_iomp:
-        logger.warning('Argument --disable_iomp is deprecated by --omp-runtime.')
-        args.omp_runtime = 'default'
+        logger.warning("Argument --disable_iomp is deprecated by --omp-runtime.")
+        args.omp_runtime = "default"
+
 
 class ArgumentTypesDefaultsHelpFormatter(argparse.HelpFormatter):
     """Help message formatter which adds default values to argument help.
@@ -197,32 +309,38 @@ class ArgumentTypesDefaultsHelpFormatter(argparse.HelpFormatter):
     """
 
     def _fill_text(self, text, width, indent):
-        return ''.join(indent + line for line in text.splitlines(keepends=True))
+        return "".join(indent + line for line in text.splitlines(keepends=True))
 
     def _split_lines(self, text, width):
         return text.splitlines()
 
     def _get_help_string(self, action):
         help = action.help
-        if '%(type)' not in action.help:
+        if "%(type)" not in action.help:
             if action.type is not SUPPRESS:
                 typeing_nargs = [OPTIONAL, ZERO_OR_MORE]
                 if action.option_strings or action.nargs in typeing_nargs:
-                    help += ' (type: %(type)s)'
-        if '%(default)' not in action.help:
+                    help += " (type: %(type)s)"
+        if "%(default)" not in action.help:
             if action.default is not SUPPRESS:
                 defaulting_nargs = [OPTIONAL, ZERO_OR_MORE]
                 if action.option_strings or action.nargs in defaulting_nargs:
-                    help += ' (default: %(default)s)'
+                    help += " (default: %(default)s)"
         return help
 
+
 def parse_args():
-    '''
+    """
     Helper function parsing the command line options
     @retval ArgumentParser
-    '''
-    description = '''
-This is a script for launching PyTorch training and inference on Intel Xeon CPU with optimal configurations. Now, single instance inference/training, multi-instance inference/training and distributed training with oneCCL backend is enabled.  To get the peak performance on Intel Xeon CPU, the script optimizes the configuration of thread and memory management. For thread management, the script configures thread affinity and the preload of Intel OMP library. For memory management, it configures NUMA binding and preload optimized memory allocation library (e.g. tcmalloc, jemalloc)
+    """
+    description = """
+This is a script for launching PyTorch training and inference on Intel Xeon CPU with optimal configurations. \
+    Now, single instance inference/training, multi-instance inference/training and distributed training with \
+    oneCCL backend is enabled.  To get the peak performance on Intel Xeon CPU, the script optimizes the \
+    configuration of thread and memory management. For thread management, the script configures thread affinity \
+    and the preload of Intel OMP library. For memory management, it configures NUMA binding and preload optimized \
+    memory allocation library (e.g. tcmalloc, jemalloc)
 ################################# Basic usage #############################
 1. single instance
    >>> ipexrun python_script args
@@ -235,60 +353,63 @@ This is a script for launching PyTorch training and inference on Intel Xeon CPU 
    >>> ipexrun --nnodes 2 --nproc-per-node 2
        --hostfile hostfile python_script args
 ###########################################################################
-'''
-    parser = argparse.ArgumentParser(description=description, formatter_class=ArgumentTypesDefaultsHelpFormatter)
+"""
+    parser = argparse.ArgumentParser(
+        description=description, formatter_class=ArgumentTypesDefaultsHelpFormatter
+    )
 
     parser.add_argument(
-        '-m',
-        '--module',
+        "-m",
+        "--module",
         default=False,
-        action='store_true',
-        help='Changes each process to interpret the launch script '
+        action="store_true",
+        help="Changes each process to interpret the launch script "
         'as a python module, executing with the same behavior as "python -m".',
     )
     parser.add_argument(
-        '--no-python',
-        '--no_python',
+        "--no-python",
+        "--no_python",
         default=False,
-        action='store_true',
-        help='Avoid applying python to execute program.',
+        action="store_true",
+        help="Avoid applying python to execute program.",
     )
 
     parser.add_argument(
-        '--log-dir',
-        '--log_dir',
-        default='',
+        "--log-dir",
+        "--log_dir",
+        default="",
         type=str,
-        help='The log file directory. Setting it to empty disables logging to files.',
+        help="The log file directory. Setting it to empty disables logging to files.",
     )
     parser.add_argument(
-        '--log-file-prefix',
-        '--log_file_prefix',
-        default='run',
+        "--log-file-prefix",
+        "--log_file_prefix",
+        default="run",
         type=str,
-        help='log file name prefix',
+        help="log file name prefix",
     )
 
     # positional
     parser.add_argument(
-        'program',
+        "program",
         type=str,
-        help='Full path to the proram/script to be launched. '
-        'followed by all the arguments for the script',
+        help="Full path to the proram/script to be launched. "
+        "followed by all the arguments for the script",
     )
 
     # rest from the training program
     parser.add_argument(
-        'program_args',
+        "program_args",
         nargs=argparse.REMAINDER,
     )
     return parser
 
-def main():
-    if platform.system() == 'Windows':
-        raise RuntimeError('Windows platform is not supported!!!')
 
-    format_str = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+def main():
+    if platform.system() == "Windows":
+        raise RuntimeError("Windows platform is not supported!!!")
+
+    format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     logging.basicConfig(level=logging.INFO, format=format_str)
     logger = logging.getLogger(__name__)
 
@@ -304,35 +425,45 @@ def main():
     args = parser.parse_args()
     process_deprecated_params(args, logger)
     if args.log_dir:
-        path = os.path.dirname(args.log_dir if args.log_dir.endswith('/') else f'{args.log_dir}/')
+        path = os.path.dirname(
+            args.log_dir if args.log_dir.endswith("/") else f"{args.log_dir}/"
+        )
         if not os.path.exists(path):
             os.makedirs(path)
         args.log_dir = path
 
-        args.log_file_prefix = f'{args.log_file_prefix}_{datetime.now().strftime("%Y%m%d%H%M%S")}'
-        fileHandler = logging.FileHandler(f'{args.log_dir}/{args.log_file_prefix}_instances.log')
+        args.log_file_prefix = (
+            f'{args.log_file_prefix}_{datetime.now().strftime("%Y%m%d%H%M%S")}'
+        )
+        fileHandler = logging.FileHandler(
+            f"{args.log_dir}/{args.log_file_prefix}_instances.log"
+        )
         logFormatter = logging.Formatter(format_str)
         fileHandler.setFormatter(logFormatter)
         logger.addHandler(fileHandler)
 
-    assert args.no_python or args.program.endswith('.py'), 'For non Python script, you should use "--no-python" parameter.'
+    assert args.no_python or args.program.endswith(
+        ".py"
+    ), 'For non Python script, you should use "--no-python" parameter.'
 
     env_before = set(os.environ.keys())
     # Verify LD_PRELOAD
-    if 'LD_PRELOAD' in os.environ:
+    if "LD_PRELOAD" in os.environ:
         lst_valid = []
-        tmp_ldpreload = os.environ['LD_PRELOAD']
-        for item in tmp_ldpreload.split(':'):
-            if item != '':
+        tmp_ldpreload = os.environ["LD_PRELOAD"]
+        for item in tmp_ldpreload.split(":"):
+            if item != "":
                 matches = glob.glob(item)
                 if len(matches) > 0:
                     lst_valid.append(item)
                 else:
-                    logger.warning(f'{item} doesn\'t exist. Removing it from LD_PRELOAD.')
+                    logger.warning(
+                        f"{item} doesn't exist. Removing it from LD_PRELOAD."
+                    )
         if len(lst_valid) > 0:
-            os.environ['LD_PRELOAD'] = ':'.join(lst_valid)
+            os.environ["LD_PRELOAD"] = ":".join(lst_valid)
         else:
-            os.environ['LD_PRELOAD'] = ''
+            os.environ["LD_PRELOAD"] = ""
 
     launcher = None
     if args.nnodes > 0:
@@ -342,7 +473,8 @@ def main():
 
     launcher.launch(args)
     for x in sorted(set(os.environ.keys()) - env_before):
-        logger.debug(f'{x}={os.environ[x]}')
+        logger.debug(f"{x}={os.environ[x]}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

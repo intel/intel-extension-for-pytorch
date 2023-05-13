@@ -595,7 +595,7 @@ class DistLamb(Optimizer):
                     p.grad = self._flat_g[s:e].view_as(p.data).copy_(p.grad.data)
 
     def _one_time_setup(self):
-        if self._one_time_setup_done == True:
+        if self._one_time_setup_done is True:
             return
         from collections import defaultdict
 
@@ -661,7 +661,7 @@ class DistLamb(Optimizer):
                 fp._flat_g.zero_()
             self._acc_steps += 1
         else:
-            raise NotImplemented
+            raise NotImplementedError
 
     def merge_acc_grad(self, avg=True):
         if self._acc_steps == 0:
@@ -676,7 +676,7 @@ class DistLamb(Optimizer):
             self._acc_steps = 0
             return 1 if avg else total_acc_steps
         else:
-            raise NotImplemented
+            raise NotImplementedError
 
     def zero_grad(self):
         if hasattr(self, "flat_params"):
@@ -730,7 +730,10 @@ class DistLamb(Optimizer):
                 self._step,
                 self.fused_param_norm,
             )
-            # if weight_decay > 0.0 and torch.distributed.get_rank() < 2: print(f"wn: {fp._weight_norms[:5].sqrt()}  un: {fp._update_norms[:5].sqrt()}")
-            # if weight_decay > 0.0: print(f"XXX {self._step:3d} NORM {ii}: wn: {fp._weight_norms[0].sqrt().item():.10f}  un: {fp._update_norms[0].sqrt().item():.10f}")
+            # if weight_decay > 0.0 and torch.distributed.get_rank() < 2:
+            #   print(f"wn: {fp._weight_norms[:5].sqrt()}  un: {fp._update_norms[:5].sqrt()}")
+            # if weight_decay > 0.0:
+            #   print(f"XXX {self._step:3d} NORM {ii}: wn: \
+            #   {fp._weight_norms[0].sqrt().item():.10f}  un: {fp._update_norms[0].sqrt().item():.10f}")
 
         return loss

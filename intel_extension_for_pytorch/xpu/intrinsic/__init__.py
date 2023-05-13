@@ -7,10 +7,10 @@ from .modules import Interaction
 import intel_extension_for_pytorch
 
 __all__ = [
-    'Interaction',
-    'nms',
-    'locations_to_boxes',
-    'roi_align',
+    "Interaction",
+    "nms",
+    "locations_to_boxes",
+    "roi_align",
 ]
 
 
@@ -23,19 +23,26 @@ def nms(dets, scores, iou_threshold):
 
 
 def locations_to_boxes(locations, priors, center_variance, size_variance):
-    return torch.ops.torch_ipex.locations_to_boxes(locations, priors, center_variance, size_variance)
+    return torch.ops.torch_ipex.locations_to_boxes(
+        locations, priors, center_variance, size_variance
+    )
 
 
 def check_roi_boxes_shape(boxes: Union[Tensor, List[Tensor]]):
     if isinstance(boxes, (list, tuple)):
         for _tensor in boxes:
             torch._assert(
-                _tensor.size(1) == 4, "The shape of the tensor in the boxes list is not correct as List[Tensor[L, 4]]"
+                _tensor.size(1) == 4,
+                "The shape of the tensor in the boxes list is not correct as List[Tensor[L, 4]]",
             )
     elif isinstance(boxes, torch.Tensor):
-        torch._assert(boxes.size(1) == 5, "The boxes tensor shape is not correct as Tensor[K, 5]")
+        torch._assert(
+            boxes.size(1) == 5, "The boxes tensor shape is not correct as Tensor[K, 5]"
+        )
     else:
-        torch._assert(False, "boxes is expected to be a Tensor[L, 5] or a List[Tensor[K, 4]]")
+        torch._assert(
+            False, "boxes is expected to be a Tensor[L, 5] or a List[Tensor[K, 4]]"
+        )
     return
 
 
@@ -63,5 +70,11 @@ def roi_align(
     if not isinstance(rois, torch.Tensor):
         rois = convert_boxes_to_roi_format(rois)
     return torch.ops.torch_ipex.roi_align(
-        input, rois, spatial_scale, output_size[0], output_size[1], sampling_ratio, aligned
+        input,
+        rois,
+        spatial_scale,
+        output_size[0],
+        output_size[1],
+        sampling_ratio,
+        aligned,
     )

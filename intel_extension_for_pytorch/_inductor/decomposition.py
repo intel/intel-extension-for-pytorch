@@ -17,4 +17,5 @@ def register_decomposition(ops):
 
 def get_decompositions():
     from torch._inductor.decomposition import select_decomp_table
+
     return {**select_decomp_table(), **decomposition_overrides}

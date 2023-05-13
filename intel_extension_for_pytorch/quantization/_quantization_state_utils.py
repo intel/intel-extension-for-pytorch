@@ -7,74 +7,82 @@ from intel_extension_for_pytorch.nn.functional import interaction
 import intel_extension_for_pytorch._C as core
 
 
-functions_supported_by_quantization =set([
-    torch.Tensor.add,
-    torch.add,
-    torch.Tensor.relu,
-    #torch.Tensor.sigmoid,  # TODO
-    torch.flatten,
-    torch.Tensor.flatten,
-    F.adaptive_avg_pool2d,
-    F.adaptive_avg_pool3d,
-    F.avg_pool2d,
-    F.avg_pool3d,
-    F.max_pool2d,
-    F.max_pool3d,
-    F.conv2d,
-    F.conv3d,
-    torch.conv2d,
-    torch.conv3d,
-    F.conv_transpose2d,
-    F.conv_transpose3d,
-    torch.conv_transpose2d,
-    torch.conv_transpose3d,
-    torch.relu,
-    F.relu,
-    #torch.sigmoid,  # TODO
-    #F.sigmoid,  # TODO
-    #F.gelu, # TODO
-    F.linear,
-    torch._C._nn.linear,
-    torch.matmul,
-    torch.bmm,
-    torch.Tensor.matmul,
-    torch.Tensor.bmm,
-    F.embedding_bag,
-    torch.embedding_bag,
-    ])
+functions_supported_by_quantization = set(
+    [
+        torch.Tensor.add,
+        torch.add,
+        torch.Tensor.relu,
+        # torch.Tensor.sigmoid,  # TODO
+        torch.flatten,
+        torch.Tensor.flatten,
+        F.adaptive_avg_pool2d,
+        F.adaptive_avg_pool3d,
+        F.avg_pool2d,
+        F.avg_pool3d,
+        F.max_pool2d,
+        F.max_pool3d,
+        F.conv2d,
+        F.conv3d,
+        torch.conv2d,
+        torch.conv3d,
+        F.conv_transpose2d,
+        F.conv_transpose3d,
+        torch.conv_transpose2d,
+        torch.conv_transpose3d,
+        torch.relu,
+        F.relu,
+        # torch.sigmoid,  # TODO
+        # F.sigmoid,  # TODO
+        # F.gelu, # TODO
+        F.linear,
+        torch._C._nn.linear,
+        torch.matmul,
+        torch.bmm,
+        torch.Tensor.matmul,
+        torch.Tensor.bmm,
+        F.embedding_bag,
+        torch.embedding_bag,
+    ]
+)
 
 # ipex customer function
-functions_supported_by_quantization_ipex = set([
-    interaction,
-    torch.ops.torch_ipex.interaction_forward,
-    ])
+functions_supported_by_quantization_ipex = set(
+    [
+        interaction,
+        torch.ops.torch_ipex.interaction_forward,
+    ]
+)
 
-module_types_supported_by_quantization = set([
-    torch.nn.Conv2d,
-    torch.nn.Conv3d,
-    torch.nn.ConvTranspose2d,
-    torch.nn.ConvTranspose3d,
-    torch.nn.Linear,
-    torch.nn.MaxPool2d,
-    torch.nn.MaxPool3d,
-    torch.nn.AvgPool2d,
-    torch.nn.AvgPool3d,
-    torch.nn.AdaptiveAvgPool2d,
-    torch.nn.AdaptiveAvgPool3d,
-    torch.nn.ReLU,
-    #torch.nn.Sigmoid,  # TODO
-    #torch.nn.GELU,     # TODO
-    torch.nn.EmbeddingBag,
-    torch.nn.Flatten,
-    torch.nn.LSTM,
-    # dynamic quantization module
-    nnqd.Linear,
-    nnqd.LSTM,
-    ])
+module_types_supported_by_quantization = set(
+    [
+        torch.nn.Conv2d,
+        torch.nn.Conv3d,
+        torch.nn.ConvTranspose2d,
+        torch.nn.ConvTranspose3d,
+        torch.nn.Linear,
+        torch.nn.MaxPool2d,
+        torch.nn.MaxPool3d,
+        torch.nn.AvgPool2d,
+        torch.nn.AvgPool3d,
+        torch.nn.AdaptiveAvgPool2d,
+        torch.nn.AdaptiveAvgPool3d,
+        torch.nn.ReLU,
+        # torch.nn.Sigmoid,  # TODO
+        # torch.nn.GELU,     # TODO
+        torch.nn.EmbeddingBag,
+        torch.nn.Flatten,
+        torch.nn.LSTM,
+        # dynamic quantization module
+        nnqd.Linear,
+        nnqd.LSTM,
+    ]
+)
 
-may_inplace_module = set([
-    torch.nn.ReLU,
-    ])
+may_inplace_module = set(
+    [
+        torch.nn.ReLU,
+    ]
+)
 
 
 a_related_to_b = (
@@ -87,7 +95,7 @@ a_related_to_b = (
 )
 
 conv_linear_ops = [
-    #F.conv1d, # it will be enabled at next step.
+    # F.conv1d, # it will be enabled at next step.
     str(F.conv2d),
     str(F.conv3d),
     str(torch.conv2d),
@@ -98,24 +106,28 @@ conv_linear_ops = [
     str(torch.conv_transpose3d),
     str(F.linear),
     str(torch._C._nn.linear),
-    ]
+]
 
 conv_linear_modules = [
-    #str(torch.nn.Conv1d) # it will be enabled at next step.
+    # str(torch.nn.Conv1d) # it will be enabled at next step.
     str(torch.nn.Conv2d),
     str(torch.nn.Conv3d),
     str(torch.nn.ConvTranspose2d),
     str(torch.nn.ConvTranspose3d),
     str(torch.nn.Linear),
-    ]
+]
 
 embedding_op = [
     str(F.embedding_bag),
     str(torch.embedding_bag),
-    ]
+]
+
 
 def op_needs_quantization(op: Callable) -> bool:
-    if op in functions_supported_by_quantization or op in functions_supported_by_quantization_ipex:
+    if (
+        op in functions_supported_by_quantization
+        or op in functions_supported_by_quantization_ipex
+    ):
         return True
     elif type(op) in module_types_supported_by_quantization:
         if op in may_inplace_module and op.inplace:
@@ -123,6 +135,7 @@ def op_needs_quantization(op: Callable) -> bool:
         return True
     else:
         return False
+
 
 def ops_are_related(
     cur_op: Callable,
@@ -135,28 +148,36 @@ def ops_are_related(
     """
     if type_is_module:
         cur_op = type(cur_op)
-    return str(cur_op) == expected_op_type or \
-        (str(cur_op), expected_op_type) in a_related_to_b
+    return (
+        str(cur_op) == expected_op_type
+        or (str(cur_op), expected_op_type) in a_related_to_b
+    )
+
 
 def _raise_obs_not_found_error(func):
     raise RuntimeError(
-        f'Encountered arithmetic operation {torch.typename(func)} but we have '
-        f'encountered fewer arithmetic operations in previous calibration runs. '
-        f'This likely indicates that the program contains dynamic control flow. '
-        f' Quantization is not defined over dynamic control flow!')
+        f"Encountered arithmetic operation {torch.typename(func)} but we have "
+        f"encountered fewer arithmetic operations in previous calibration runs. "
+        f"This likely indicates that the program contains dynamic control flow. "
+        f" Quantization is not defined over dynamic control flow!"
+    )
+
 
 def _raise_obs_op_mismatch(func, prev_op):
     raise RuntimeError(
-        f'Encountered arithmetic operation {torch.typename(func)} but previously '
-        f'recorded operation was {prev_op}!. This likely indicates '
-        f'that the program contains dynamic control flow. Quantization is not '
-        f'defined over dynamic control flow!')
+        f"Encountered arithmetic operation {torch.typename(func)} but previously "
+        f"recorded operation was {prev_op}!. This likely indicates "
+        f"that the program contains dynamic control flow. Quantization is not "
+        f"defined over dynamic control flow!"
+    )
+
 
 @dataclasses.dataclass
 class QTensorInfo:
     id: int  # tensor ID
     orig_dtype: torch.dtype  # dtype seen while tracing with example input
     inf_dtype: torch.dtype  # dtype at inference
+
 
 @dataclasses.dataclass
 class SeenQOpInfo:
@@ -173,7 +194,7 @@ class SeenQOpInfo:
     # Non-tensor inputs are represented with None.
     input_tensor_infos: List[Optional[QTensorInfo]]
     # We use input_tensor_infos's inf_dtype to check whether we need add fake quant
-    # at convert step, but sometimes, the QTensorInfo's infor may used by many 
+    # at convert step, but sometimes, the QTensorInfo's infor may used by many
     # operators, and one operator may set QTensorInfo' inf dtype to fp32, which hope
     # use fp32 kernel, but the cur op hope use low-precison op, so we introduce this flag
     # to fix the multi-use case: if input_tensor_force_inf_dtype has low-precison, we will
@@ -197,7 +218,7 @@ class SeenQOpInfo:
     # 2. Bind output tensor if any of downstream ops is not quantized.
     insert_fake_quant_after_outputs: List[Optional[bool]]
     weight_tensor_infos: List[Optional[QTensorInfo]]
-    qconfig:  torch.ao.quantization.QConfig
+    qconfig: torch.ao.quantization.QConfig
 
     def __repr__(self) -> str:
         s = f"(type): {self.type}\n"
@@ -209,6 +230,7 @@ class SeenQOpInfo:
         s += f"     (weight_tensor_infos): {self.weight_tensor_infos}\n"
         s += f"     (qconfig): {self.qconfig}"
         return s
+
 
 @dataclasses.dataclass
 class SeenNonQOpInfo:
@@ -225,6 +247,7 @@ class SeenNonQOpInfo:
     # Non-tensor outputs are represented with None.
     output_tensor_infos: List[QTensorInfo]
 
+
 def get_input_observed_arg_idxs(
     op_type: str,
     op_type_is_module: bool,
@@ -239,16 +262,18 @@ def get_input_observed_arg_idxs(
     # None means "observe all Tensor args"
     return None
 
+
 def get_weight_arg_idx(op: str) -> Optional[int]:
     if op in conv_linear_ops:
         return 1
     return None
 
+
 def iterate_and_apply(
     args: Any,
     flattened_tensor_infos: List[Optional[QTensorInfo]],
     func: Callable,
-    flattened_tensor_infos_idx=None
+    flattened_tensor_infos_idx=None,
 ) -> Any:
     """
     Inputs:
@@ -267,19 +292,22 @@ def iterate_and_apply(
         new_args = []
         for arg in args:
             new_arg = iterate_and_apply(
-                arg, flattened_tensor_infos, func, flattened_tensor_infos_idx)
+                arg, flattened_tensor_infos, func, flattened_tensor_infos_idx
+            )
             new_args.append(new_arg)
         return tuple(new_args)
     elif isinstance(args, list):
         for idx in range(len(args)):
             new_arg = iterate_and_apply(
-                args[idx], flattened_tensor_infos, func, flattened_tensor_infos_idx)
+                args[idx], flattened_tensor_infos, func, flattened_tensor_infos_idx
+            )
             args[idx] = new_arg
         return args
     else:
         # individual element
-        cur_flattened_tensor_info = \
-            flattened_tensor_infos[flattened_tensor_infos_idx[0]]
+        cur_flattened_tensor_info = flattened_tensor_infos[
+            flattened_tensor_infos_idx[0]
+        ]
         flattened_tensor_infos_idx[0] += 1
 
         if cur_flattened_tensor_info is not None:
@@ -287,12 +315,13 @@ def iterate_and_apply(
         else:
             return args
 
+
 def iterate_and_apply_convert(
     args: Any,
     quant_infos: List[Optional[Tuple[float, int, torch.dtype]]],
     quant_or_dequant_needed: List[bool],
     op: Callable,
-    flattened_tensor_infos_idx=None
+    flattened_tensor_infos_idx=None,
 ) -> Any:
     """
     Inputs:
@@ -306,39 +335,66 @@ def iterate_and_apply_convert(
       `op`: cur quantizable op
     Returns `new_args`, where each tensor has been transformed by `func`.
     """
-    
+
     if flattened_tensor_infos_idx is None:
         flattened_tensor_infos_idx = [0]
     if isinstance(args, tuple):
         new_args = []
         for arg in args:
             new_arg = iterate_and_apply_convert(
-                arg, quant_infos, quant_or_dequant_needed, op, flattened_tensor_infos_idx)
+                arg,
+                quant_infos,
+                quant_or_dequant_needed,
+                op,
+                flattened_tensor_infos_idx,
+            )
             new_args.append(new_arg)
         return tuple(new_args)
     elif isinstance(args, list):
         new_args = []
         for arg in args:
             new_arg = iterate_and_apply_convert(
-                arg, quant_infos, quant_or_dequant_needed, op, flattened_tensor_infos_idx)
+                arg,
+                quant_infos,
+                quant_or_dequant_needed,
+                op,
+                flattened_tensor_infos_idx,
+            )
             new_args.append(new_arg)
         return new_args
     else:
         # individual element
-        cur_quant_infos = \
-            quant_infos[flattened_tensor_infos_idx[0]]
-        cur_quant_or_dequant_needed = \
-            quant_or_dequant_needed[flattened_tensor_infos_idx[0]]
-        if cur_quant_infos is not None and cur_quant_or_dequant_needed and isinstance(args, torch.Tensor):
+        cur_quant_infos = quant_infos[flattened_tensor_infos_idx[0]]
+        cur_quant_or_dequant_needed = quant_or_dequant_needed[
+            flattened_tensor_infos_idx[0]
+        ]
+        if (
+            cur_quant_infos is not None
+            and cur_quant_or_dequant_needed
+            and isinstance(args, torch.Tensor)
+        ):
             scale, zp, dtype = cur_quant_infos
             # For F.Linear, F.conv, the weight's may use per_channel.
-            if str(op) in conv_linear_ops and get_weight_arg_idx(str(op)) == flattened_tensor_infos_idx[0] and isinstance(scale, torch.Tensor) and scale.numel() > 1:
+            if (
+                str(op) in conv_linear_ops
+                and get_weight_arg_idx(str(op)) == flattened_tensor_infos_idx[0]
+                and isinstance(scale, torch.Tensor)
+                and scale.numel() > 1
+            ):
                 ch_axis = 0
                 # conv_transpose's weight is iohw or iodhw
-                if str(op) in [str(F.conv_transpose2d), str(torch.conv_transpose2d), str(F.conv_transpose3d), str(torch.conv_transpose3d)]:
+                if str(op) in [
+                    str(F.conv_transpose2d),
+                    str(torch.conv_transpose2d),
+                    str(F.conv_transpose3d),
+                    str(torch.conv_transpose3d),
+                ]:
                     ch_axis = 1
                 # core.get_autocast_dtype() will be removed after fully use pytorch autocast
-                if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
+                if (
+                    torch.is_autocast_cpu_enabled()
+                    and core.get_autocast_dtype() == torch.bfloat16
+                ):
                     # do autocast in Python side
                     if args.dtype == torch.float32:
                         args = args.to(dtype=torch.float32)
@@ -350,15 +406,33 @@ def iterate_and_apply_convert(
                     args = args.dequantize()
             else:
                 # white list, conv, linear, matmul, we always convert it's input to bflat16 firstly, and then inser q+dq
-                if str(op) in conv_linear_ops + [str(torch.matmul), str(torch.Tensor.matmul), str(torch.bmm), str(torch.Tensor.bmm)] + embedding_op or str(type(op)) in conv_linear_modules:
-                    if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
+                if (
+                    str(op)
+                    in conv_linear_ops
+                    + [
+                        str(torch.matmul),
+                        str(torch.Tensor.matmul),
+                        str(torch.bmm),
+                        str(torch.Tensor.bmm),
+                    ]
+                    + embedding_op
+                    or str(type(op)) in conv_linear_modules
+                ):
+                    if (
+                        torch.is_autocast_cpu_enabled()
+                        and core.get_autocast_dtype() == torch.bfloat16
+                    ):
                         if args.dtype == torch.bfloat16:
                             args = args.to(dtype=torch.float32)
-                        args = torch.quantize_per_tensor(args, scale.item(), zp.item(), dtype)
+                        args = torch.quantize_per_tensor(
+                            args, scale.item(), zp.item(), dtype
+                        )
                         args = args.dequantize()
                         args = args.to(dtype=torch.bfloat16)
                     else:
-                        args = torch.quantize_per_tensor(args, scale.item(), zp.item(), dtype)
+                        args = torch.quantize_per_tensor(
+                            args, scale.item(), zp.item(), dtype
+                        )
                         args = args.dequantize()
                 else:
                     # fall through
@@ -366,12 +440,15 @@ def iterate_and_apply_convert(
                     if args.dtype == torch.bfloat16:
                         args_is_bfloat16 = True
                         args = args.to(dtype=torch.float32)
-                    args = torch.quantize_per_tensor(args, scale.item(), zp.item(), dtype)
+                    args = torch.quantize_per_tensor(
+                        args, scale.item(), zp.item(), dtype
+                    )
                     args = args.dequantize()
                     if args_is_bfloat16:
                         args = args.to(dtype=torch.bfloat16)
         flattened_tensor_infos_idx[0] += 1
         return args
+
 
 def get_input_args_quant_dequant_info(
     seen_q_op_info: SeenQOpInfo,
@@ -400,23 +477,30 @@ def get_input_args_quant_dequant_info(
                     # is same as the origin force_inf_dtype, if not same use force_inf_dtype as new
                     # inf dtype, if same, we can say the input_arg.inf_dtype is not changed or the cur op
                     # changed input_arg.inf_dtype and force_inf_dtype at get default recipe step.
-                    if seen_q_op_info.input_tensor_force_inf_dtype[i] != input_arg.inf_dtype:
+                    if (
+                        seen_q_op_info.input_tensor_force_inf_dtype[i]
+                        != input_arg.inf_dtype
+                    ):
                         inf_dtype = seen_q_op_info.input_tensor_force_inf_dtype[i]
-                
+
                     scale, zp = tensor_id_to_scale_zp[tensor_id]
                     quant_infos.append((scale, zp, inf_dtype))  # type: ignore[arg-type]
                     # only support float to int8.
-                    if input_arg.orig_dtype == torch.float32 and inf_dtype in quantized_dtype:
+                    if (
+                        input_arg.orig_dtype == torch.float32
+                        and inf_dtype in quantized_dtype
+                    ):
                         any_arg_quant_or_dequant_needed.append(True)
                     else:
                         any_arg_quant_or_dequant_needed.append(False)
                 else:
-                     quant_infos.append(None)
-                     any_arg_quant_or_dequant_needed.append(False)
+                    quant_infos.append(None)
+                    any_arg_quant_or_dequant_needed.append(False)
             else:
                 quant_infos.append(None)
                 any_arg_quant_or_dequant_needed.append(None)
     return quant_infos, any_arg_quant_or_dequant_needed
+
 
 def get_weight_args_quant_dequant_info(
     seen_q_op_info: SeenQOpInfo,
@@ -434,7 +518,10 @@ def get_weight_args_quant_dequant_info(
                 scale, zp = weight_tensor_id_to_scale_zp[tensor_id]
                 output_dtype = input_arg.inf_dtype
                 quant_infos.append((scale, zp, output_dtype))  # type: ignore[arg-type]
-                if input_arg.orig_dtype == torch.float32 and input_arg.inf_dtype in [torch.quint8,  torch.qint8]:
+                if input_arg.orig_dtype == torch.float32 and input_arg.inf_dtype in [
+                    torch.quint8,
+                    torch.qint8,
+                ]:
                     any_arg_quant_or_dequant_needed.append(True)
                 else:
                     any_arg_quant_or_dequant_needed.append(False)

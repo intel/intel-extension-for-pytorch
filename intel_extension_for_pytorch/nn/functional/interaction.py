@@ -1,6 +1,7 @@
 import torch
 from torch.autograd import Function
 
+
 def interaction(*args):
     r"""
     Get the interaction feature beyond different kinds of features (like gender
@@ -27,6 +28,7 @@ def interaction(*args):
     if torch.is_grad_enabled():
         return InteractionFunc.apply(*args)
     return torch.ops.torch_ipex.interaction_forward(args)
+
 
 class InteractionFunc(Function):
     @staticmethod

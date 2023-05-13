@@ -130,7 +130,7 @@ class BlockedTensor(object):
         )
 
     def get_plain_shape(self, dim=None):
-        if dim == None:
+        if dim is None:
             if self.plain_shape:
                 return self.plain_shape
             self.plain_shape = torch.Size(
@@ -172,10 +172,7 @@ class BlockedTensor(object):
         plain_dtype = self.get_plain_dtype()
         # print("BlockedTensor returning unblocked tensor with shape %s" % (plain_shape,))
         return (
-            self._t.permute(permute_list)
-            .contiguous()
-            .view(plain_shape)
-            .to(plain_dtype)
+            self._t.permute(permute_list).contiguous().view(plain_shape).to(plain_dtype)
         )
 
     def get_signature(self):
@@ -260,9 +257,7 @@ class BlockedParameter(torch.nn.Parameter):
         if not self.blocked:
             return
         assert self.blocking_manager is not None
-        self.data = self.blocking_manager.unblock(self.data).to(
-            self.unblocked_dtype
-        )
+        self.data = self.blocking_manager.unblock(self.data).to(self.unblocked_dtype)
         if self.grad is not None:
             self.grad.data = self.blocking_manager.unblock(self.grad.data).to(
                 self.unblocked_dtype

@@ -1,11 +1,12 @@
 import torch
 import torch.nn as nn
-from typing import Union, Optional
+from typing import Union
 import intel_extension_for_pytorch._C as core
 from .cpupool import CPUPool
 from .task import Task
 import copy
 import warnings
+
 
 class MultiStreamModuleHint(object):
     r"""
@@ -32,13 +33,16 @@ class MultiStreamModuleHint(object):
         self.args_len = args.__len__()
         self.kwargs_len = kwargs.__len__()
 
+
 default_multi_stream_module_split_hint = MultiStreamModuleHint(0)
 default_multi_stream_module_concat_hint = MultiStreamModuleHint(0)
+
 
 def get_default_num_streams(cpu_pool):
     # One core per stream usually brings better overall throughput than other configurations.
     # Therefore, we heuristically make one core per stream the default here.
     return cpu_pool.core_ids.__len__()
+
 
 class MultiStreamModule(nn.Module):
     r"""
@@ -84,40 +88,59 @@ class MultiStreamModule(nn.Module):
 
     :meta public:
     """
-    def __init__(self,
-                model,
-                num_streams: Union[int, str] = "AUTO",
-                cpu_pool: CPUPool = CPUPool(),
-                concat_output: bool = True,
-                input_split_hint: MultiStreamModuleHint = default_multi_stream_module_split_hint,
-                output_concat_hint: MultiStreamModuleHint = default_multi_stream_module_concat_hint):
+
+    def __init__(
+        self,
+        model,
+        num_streams: Union[int, str] = "AUTO",
+        cpu_pool: CPUPool = CPUPool(),
+        concat_output: bool = True,
+        input_split_hint: MultiStreamModuleHint = default_multi_stream_module_split_hint,
+        output_concat_hint: MultiStreamModuleHint = default_multi_stream_module_concat_hint,
+    ):
         super(MultiStreamModule, self).__init__()
-        assert type(cpu_pool) is CPUPool, "Input of cpu_pool must be provided with type of ipex.cpu.runtime.CPUPool"
+        assert (
+            type(cpu_pool) is CPUPool
+        ), "Input of cpu_pool must be provided with type of ipex.cpu.runtime.CPUPool"
         if not isinstance(model, torch.jit.ScriptModule):
-            warnings.warn("Creating MultiStreamModule on an nn.Module. This can be slow due "
-            "to Python Global Interpreter Lock (GIL). Suggest to use JIT ScriptModule for better performance.")
+            warnings.warn(
+                "Creating MultiStreamModule on an nn.Module. This can be slow due "
+                "to Python Global Interpreter Lock (GIL). Suggest to use JIT ScriptModule for better performance."
+            )
         self.cpu_pool = cpu_pool
         self.core_list = cpu_pool.core_ids
         if isinstance(num_streams, str):
             # For str input of num_streams, it must be "auto"
             if num_streams.upper() == "AUTO":
-                self.num_streams = get_default_num_streams(cpu_pool) # The default selected value when auto selection is on.
+                self.num_streams = get_default_num_streams(
+                    cpu_pool
+                )  # The default selected value when auto selection is on.
             else:
-                assert False, "Input of num_streams must be Number of instances or string \"AUTO\""
+                assert (
+                    False
+                ), 'Input of num_streams must be Number of instances or string "AUTO"'
         else:
-            assert isinstance(num_streams, int), "Input of num_streams must be Number of instances or string \"auto\""
+            assert isinstance(
+                num_streams, int
+            ), 'Input of num_streams must be Number of instances or string "auto"'
             self.num_streams = num_streams
 
         if self.num_streams > self.core_list.__len__():
             self.num_streams = self.core_list.__len__()
-            warnings.warn("The number of streams is larger than number of cores. The number of streams changes to {}.".format(self.num_streams))
+            warnings.warn(
+                "The number of streams is larger than number of cores. The number of streams changes to {}.".format(
+                    self.num_streams
+                )
+            )
 
         if self.num_streams == 1:
             # Sync execution path if num_stream is 1.
             self.model = model
         else:
             self.cores_per_instance = self.core_list.__len__() // self.num_streams
-            num_stream_allocated_extra_core = self.core_list.__len__() % self.num_streams
+            num_stream_allocated_extra_core = (
+                self.core_list.__len__() % self.num_streams
+            )
             self.tasks = []
             start_core_list_idx = 0
             end_core_list_idx = 0
@@ -125,10 +148,15 @@ class MultiStreamModule(nn.Module):
                 if j < num_stream_allocated_extra_core:
                     # If the core number is not divisible by stream number,
                     # the remainder streams(num_stream_allocated_extra_core) will be allocated one extra core.
-                    end_core_list_idx += (self.cores_per_instance + 1)
+                    end_core_list_idx += self.cores_per_instance + 1
                 else:
                     end_core_list_idx += self.cores_per_instance
-                self.tasks.append(Task(model, CPUPool(self.core_list[start_core_list_idx:end_core_list_idx])))
+                self.tasks.append(
+                    Task(
+                        model,
+                        CPUPool(self.core_list[start_core_list_idx:end_core_list_idx]),
+                    )
+                )
                 start_core_list_idx = end_core_list_idx
         self.concat_output = concat_output
         self.input_split_hint = input_split_hint
@@ -140,7 +168,9 @@ class MultiStreamModule(nn.Module):
         self.kwargs_streams_input = []
         for _ in range(self.num_streams):
             self.args_streams_input.append(copy.deepcopy(self.input_split_hint.args))
-            self.kwargs_streams_input.append(copy.deepcopy(self.input_split_hint.kwargs))
+            self.kwargs_streams_input.append(
+                copy.deepcopy(self.input_split_hint.kwargs)
+            )
 
         # Deep copy the output structure based on output_concat_hint.
         # self.output will be recursively visited and set to the concat value in place.
@@ -169,10 +199,14 @@ class MultiStreamModule(nn.Module):
         if stream_id < self.instance_need_extra_input:
             # Tail case, when the input image size larger than num_streams and not divisible,
             # the first remainder streams will have (mini_batch + 1) input size.
-            self.current_split_end_idx = self.current_split_end_idx + (self.batch_per_instance + 1)
+            self.current_split_end_idx = self.current_split_end_idx + (
+                self.batch_per_instance + 1
+            )
         else:
             # Input image size divisible of num_streams or input image size less than num_streams.
-            self.current_split_end_idx = self.current_split_end_idx + self.batch_per_instance
+            self.current_split_end_idx = (
+                self.current_split_end_idx + self.batch_per_instance
+            )
 
     def init_forward_status(self, split_size, stream_id):
         # This function should be invoke only once at each forward
@@ -193,70 +227,108 @@ class MultiStreamModule(nn.Module):
             self.instance_need_extra_input = 0
         self.update_split_idx(stream_id)
 
-    def _do_get_input_for_each_stream(self, hint_object, input_object, stream_input_object, idx_or_key, stream_id):
-        #* hint_object: input hint to tell whether we need to split corresponding
+    def _do_get_input_for_each_stream(
+        self, hint_object, input_object, stream_input_object, idx_or_key, stream_id
+    ):
+        # * hint_object: input hint to tell whether we need to split corresponding
         #       input_object at current position.
-        #* input_object: raw input used to split and generate stream_input_object
+        # * input_object: raw input used to split and generate stream_input_object
         #       at current position.
-        #* stream_input_object: Which will generated in place as the input for
+        # * stream_input_object: Which will generated in place as the input for
         #       current stream (marked by stream_id)
-        #* idx_or_key: idx (for list/tuple) and key (for dict) used for recursive
+        # * idx_or_key: idx (for list/tuple) and key (for dict) used for recursive
         #       visit of hint_object/input_object/stream_input_object.
-        #* stream_id: the stream we are visiting now.
+        # * stream_id: the stream we are visiting now.
         type_arg = type(hint_object[idx_or_key])
         if type_arg in [list]:
             for i in range(hint_object[idx_or_key].__len__()):
-                self._do_get_input_for_each_stream(hint_object[idx_or_key], input_object[idx_or_key], stream_input_object[idx_or_key], i, stream_id)
+                self._do_get_input_for_each_stream(
+                    hint_object[idx_or_key],
+                    input_object[idx_or_key],
+                    stream_input_object[idx_or_key],
+                    i,
+                    stream_id,
+                )
         if type_arg in [tuple]:
             # Tuple doesn't support item change in place
             # So we change it to list for next recursion and change it back to tuple.
             temp = list(stream_input_object[idx_or_key])
             for i in range(hint_object[idx_or_key].__len__()):
-                self._do_get_input_for_each_stream(hint_object[idx_or_key], input_object[idx_or_key], temp, i, stream_id)
+                self._do_get_input_for_each_stream(
+                    hint_object[idx_or_key],
+                    input_object[idx_or_key],
+                    temp,
+                    i,
+                    stream_id,
+                )
             stream_input_object[idx_or_key] = tuple(temp)
         elif type_arg in [dict]:
             for key in hint_object[idx_or_key]:
-                self._do_get_input_for_each_stream(hint_object[idx_or_key], input_object[idx_or_key], stream_input_object[idx_or_key], key, stream_id)
+                self._do_get_input_for_each_stream(
+                    hint_object[idx_or_key],
+                    input_object[idx_or_key],
+                    stream_input_object[idx_or_key],
+                    key,
+                    stream_id,
+                )
         elif (type_arg is int) or (hint_object[idx_or_key] is None):
             if hint_object[idx_or_key] is not None:
                 # If user tells us to split in this object,
                 if self.split_size is None:
                     # Init the input status for each stream here
                     # Here the stream_id must be 0
-                    self.init_forward_status(input_object[idx_or_key].size(hint_object[idx_or_key]), stream_id)
+                    self.init_forward_status(
+                        input_object[idx_or_key].size(hint_object[idx_or_key]),
+                        stream_id,
+                    )
                 # Get the split input for each stream
-                # Here we assume split along the outside dim, otherwise memory copy happens and obviously hurt multi stream module's performance.
+                # Here we assume split along the outside dim, otherwise memory copy happens and obviously \
+                # hurt multi stream module's performance.
                 if hint_object[idx_or_key] == 0:
                     # Split along dim 0, the slice will not create new tensor
-                    stream_input_object[idx_or_key] = input_object[idx_or_key][self.current_split_start_idx:self.current_split_end_idx]
+                    stream_input_object[idx_or_key] = input_object[idx_or_key][
+                        self.current_split_start_idx : self.current_split_end_idx
+                    ]
                 else:
                     # Otherwise, we use torch.narrow
                     length = self.current_split_end_idx - self.current_split_start_idx
-                    stream_input_object[idx_or_key] = input_object[idx_or_key].narrow(hint_object[idx_or_key], self.current_split_start_idx, length)
+                    stream_input_object[idx_or_key] = input_object[idx_or_key].narrow(
+                        hint_object[idx_or_key], self.current_split_start_idx, length
+                    )
             else:
                 # This object shouldn't be split, just set it as each stream's input
                 stream_input_object[idx_or_key] = input_object[idx_or_key]
         else:
-            assert False, "Generate stream input failed, unsupport input hint type of:{}".format(type_arg)
+            assert (
+                False
+            ), "Generate stream input failed, unsupport input hint type of:{}".format(
+                type_arg
+            )
         return None
 
-    def _get_input_for_each_stream(self, multi_stream_module_split_hint, *args, **kwargs):
+    def _get_input_for_each_stream(
+        self, multi_stream_module_split_hint, *args, **kwargs
+    ):
         # recursive once to init:
         #   1. Decide the actual self.used_num_streams (it may less than number stream when input bs is small)
         #   2. Init the current_split_start_idx and current_split_end_idx for inputs split
         #   3. Decide the actual input for stream_id 0
         for i in range(multi_stream_module_split_hint.args_len):
-            self._do_get_input_for_each_stream(hint_object = multi_stream_module_split_hint.args,
-                                            input_object = args,
-                                            stream_input_object = self.args_streams_input[0],
-                                            idx_or_key = i,
-                                            stream_id = 0)
+            self._do_get_input_for_each_stream(
+                hint_object=multi_stream_module_split_hint.args,
+                input_object=args,
+                stream_input_object=self.args_streams_input[0],
+                idx_or_key=i,
+                stream_id=0,
+            )
         for key in multi_stream_module_split_hint.kwargs:
-            self._do_get_input_for_each_stream(hint_object = multi_stream_module_split_hint.kwargs,
-                                        input_object = kwargs,
-                                        stream_input_object = self.kwargs_streams_input[0],
-                                        idx_or_key = key,
-                                        stream_id = 0)
+            self._do_get_input_for_each_stream(
+                hint_object=multi_stream_module_split_hint.kwargs,
+                input_object=kwargs,
+                stream_input_object=self.kwargs_streams_input[0],
+                idx_or_key=key,
+                stream_id=0,
+            )
         # After we get the self.used_num_streams then we can
         # decide the inputs for the left of used_num_streams
         for stream_id in range(1, self.used_num_streams):
@@ -265,33 +337,57 @@ class MultiStreamModule(nn.Module):
             # Here we put stream go through as the outer for loop,
             # Since we assume the multi_stream_module_split_hint is not complicated to be recursive generally.
             for i in range(multi_stream_module_split_hint.args_len):
-                self._do_get_input_for_each_stream(hint_object = multi_stream_module_split_hint.args,
-                                                input_object = args,
-                                                stream_input_object = self.args_streams_input[stream_id],
-                                                idx_or_key = i,
-                                                stream_id = stream_id)
+                self._do_get_input_for_each_stream(
+                    hint_object=multi_stream_module_split_hint.args,
+                    input_object=args,
+                    stream_input_object=self.args_streams_input[stream_id],
+                    idx_or_key=i,
+                    stream_id=stream_id,
+                )
             for key in multi_stream_module_split_hint.kwargs:
-                self._do_get_input_for_each_stream(hint_object = multi_stream_module_split_hint.kwargs,
-                                                input_object = kwargs,
-                                                stream_input_object = self.kwargs_streams_input[stream_id],
-                                                idx_or_key = key,
-                                                stream_id = stream_id)
+                self._do_get_input_for_each_stream(
+                    hint_object=multi_stream_module_split_hint.kwargs,
+                    input_object=kwargs,
+                    stream_input_object=self.kwargs_streams_input[stream_id],
+                    idx_or_key=key,
+                    stream_id=stream_id,
+                )
 
-    def _do_generate_outputs(self, hint_object, output_object, stream_output_object, idx_or_key, stream_id):
+    def _do_generate_outputs(
+        self, hint_object, output_object, stream_output_object, idx_or_key, stream_id
+    ):
         type_arg = type(hint_object[idx_or_key])
         if type_arg in [list]:
             for i in range(hint_object[idx_or_key].__len__()):
-                self._do_generate_outputs(hint_object[idx_or_key], output_object[idx_or_key], stream_output_object[idx_or_key], i, stream_id)
+                self._do_generate_outputs(
+                    hint_object[idx_or_key],
+                    output_object[idx_or_key],
+                    stream_output_object[idx_or_key],
+                    i,
+                    stream_id,
+                )
         elif type_arg in [tuple]:
             # Tuple doesn't support item change in place
             # So we change it to list for next recursion and change it back to tuple.
             temp = list(output_object[idx_or_key])
             for i in range(hint_object[idx_or_key].__len__()):
-                self._do_generate_outputs(hint_object[idx_or_key], temp, stream_output_object[idx_or_key], i, stream_id)
+                self._do_generate_outputs(
+                    hint_object[idx_or_key],
+                    temp,
+                    stream_output_object[idx_or_key],
+                    i,
+                    stream_id,
+                )
             output_object[idx_or_key] = tuple(temp)
         elif type_arg in [dict]:
             for key in hint_object[idx_or_key]:
-                self._do_generate_outputs(hint_object[idx_or_key], output_object[idx_or_key], stream_output_object[idx_or_key], key, stream_id)
+                self._do_generate_outputs(
+                    hint_object[idx_or_key],
+                    output_object[idx_or_key],
+                    stream_output_object[idx_or_key],
+                    key,
+                    stream_id,
+                )
         elif (type_arg is int) or (hint_object[idx_or_key] is None):
             if hint_object[idx_or_key] is not None:
                 if stream_id == 0:
@@ -302,31 +398,42 @@ class MultiStreamModule(nn.Module):
                 if stream_id == 0:
                     output_object[idx_or_key] = stream_output_object[idx_or_key]
         else:
-            assert False, "Generate outputs failed, unsupport output hint type of:{}".format(type_arg)
+            assert (
+                False
+            ), "Generate outputs failed, unsupport output hint type of:{}".format(
+                type_arg
+            )
         return None
 
     def _generate_outputs(self, stream_output_object, stream_id):
         # For each position, we will push the result generated by each stream into the list
-        # multi_stream_module_split_hint.args_len must be 1, since the module output will be a single output or tuple for multi outputs
+        # multi_stream_module_split_hint.args_len must be 1, since the module output will be a \
+        # single output or tuple for multi outputs
         if self.output_concat_hint.args:
-            self._do_generate_outputs(hint_object = self.output_concat_hint.args,
-                                    output_object = self.output.args,
-                                    stream_output_object = stream_output_object,
-                                    idx_or_key = 0,
-                                    stream_id = stream_id)
+            self._do_generate_outputs(
+                hint_object=self.output_concat_hint.args,
+                output_object=self.output.args,
+                stream_output_object=stream_output_object,
+                idx_or_key=0,
+                stream_id=stream_id,
+            )
         if self.output_concat_hint.kwargs:
             for key, value in self.output_concat_hint.kwargs.items():
-                self._do_generate_outputs(hint_object = self.output_concat_hint.kwargs,
-                            output_object = self.output.kwargs,
-                            stream_output_object = stream_output_object[0],
-                            idx_or_key = key,
-                            stream_id = stream_id)
+                self._do_generate_outputs(
+                    hint_object=self.output_concat_hint.kwargs,
+                    output_object=self.output.kwargs,
+                    stream_output_object=stream_output_object[0],
+                    idx_or_key=key,
+                    stream_id=stream_id,
+                )
 
     def _do_concat_output_for_each_stream(self, hint_object, output_object, idx_or_key):
         type_arg = type(hint_object[idx_or_key])
         if type_arg in [list]:
             for i in range(hint_object[idx_or_key].__len__()):
-                self._do_concat_output_for_each_stream(hint_object[idx_or_key], output_object[idx_or_key], i)
+                self._do_concat_output_for_each_stream(
+                    hint_object[idx_or_key], output_object[idx_or_key], i
+                )
         if type_arg in [tuple]:
             # Tuple doesn't support item change in place
             # So we change it to list for next recursion and change it back to tuple.
@@ -336,25 +443,35 @@ class MultiStreamModule(nn.Module):
             output_object[idx_or_key] = tuple(temp)
         elif type_arg in [dict]:
             for key in hint_object[idx_or_key]:
-                self._do_concat_output_for_each_stream(hint_object[idx_or_key], output_object[idx_or_key], key)
+                self._do_concat_output_for_each_stream(
+                    hint_object[idx_or_key], output_object[idx_or_key], key
+                )
         elif (type_arg is int) or (hint_object[idx_or_key] is None):
             if hint_object[idx_or_key] is not None:
-                output_object[idx_or_key] = torch.cat(output_object[idx_or_key], dim=hint_object[idx_or_key])
+                output_object[idx_or_key] = torch.cat(
+                    output_object[idx_or_key], dim=hint_object[idx_or_key]
+                )
         else:
-            assert False, "Concat output failed, unsupport output hint type of:{}".format(type_arg)
+            assert (
+                False
+            ), "Concat output failed, unsupport output hint type of:{}".format(type_arg)
         return None
 
     def _concat_output_for_each_stream(self):
         # Concat the output, when here each position is already a List of tensors to be concat.
         if self.output_concat_hint.args:
-            self._do_concat_output_for_each_stream(self.output_concat_hint.args, self.output.args, 0)
-        
+            self._do_concat_output_for_each_stream(
+                self.output_concat_hint.args, self.output.args, 0
+            )
+
         return_obj = dict()
         if self.output_concat_hint.kwargs:
             for key, value in self.output_concat_hint.kwargs.items():
-                self._do_concat_output_for_each_stream(self.output_concat_hint.kwargs, self.output.kwargs, key)
+                self._do_concat_output_for_each_stream(
+                    self.output_concat_hint.kwargs, self.output.kwargs, key
+                )
                 return_obj[key] = self.output.kwargs[key]
-        
+
         # If the output hint has both the args and kwargs, then we return them as a tuple.
         # Otherwise, return them as it is.
         if self.output_concat_hint.args and self.output_concat_hint.kwargs:
@@ -382,51 +499,84 @@ class MultiStreamModule(nn.Module):
         results_raw_future = []
         results_raw = []
         for stream_id in range(self.used_num_streams):
-            results_raw_future.append(self.tasks[stream_id](*(self.args_streams_input[stream_id]), **(self.kwargs_streams_input[stream_id])))
+            results_raw_future.append(
+                self.tasks[stream_id](
+                    *(self.args_streams_input[stream_id]),
+                    **(self.kwargs_streams_input[stream_id])
+                )
+            )
 
         for stream_id in range(self.used_num_streams):
-            # If we need to concat the output, for each position, we will push the result generated by each stream into a list for concat later.
-            # For self._generate_outputs: here we put results_raw_future[stream_id].get() into a [results_raw_future[stream_id].get()]
+            # If we need to concat the output, for each position, we will push the result generated \
+            # by each stream into a list for concat later.
+            # For self._generate_outputs: here we put results_raw_future[stream_id].get() into a \
+            # [results_raw_future[stream_id].get()]
             # to align the multi_stream_module_concat_hint structure.
-            self._generate_outputs([results_raw_future[stream_id].get()], stream_id)\
-                                if self.concat_output else\
-                                results_raw.append(results_raw_future[stream_id].get())
-        # If we need to concat the output, for each position, we will concat the result in the list (generate in self._generate_outputs).
-        return self._concat_output_for_each_stream() if self.concat_output else results_raw
+            self._generate_outputs(
+                [results_raw_future[stream_id].get()], stream_id
+            ) if self.concat_output else results_raw.append(
+                results_raw_future[stream_id].get()
+            )
+        # If we need to concat the output, for each position, we will concat the result in the list \
+        # (generate in self._generate_outputs).
+        return (
+            self._concat_output_for_each_stream() if self.concat_output else results_raw
+        )
 
     def get_stream_number(self):
         return self.num_streams
+
 
 class _MultiStreamBenchmarkModule(nn.Module):
     # Here is an internal Module for weight sharing benchmark
     # The diffence with MultiStreamModule:
     #    * The input will not be split. So each stream will run with the same input.
-    #    * The output will not be concat. But synchronization point for each stream still exsits at the end of the forward method.
-    def __init__(self, model, num_streams: Union[int, str] = "AUTO", cpu_pool: CPUPool = CPUPool()):
+    #    * The output will not be concat. But synchronization point for each stream still exsits at the end \
+    #      of the forward method.
+    def __init__(
+        self,
+        model,
+        num_streams: Union[int, str] = "AUTO",
+        cpu_pool: CPUPool = CPUPool(),
+    ):
         super(_MultiStreamBenchmarkModule, self).__init__()
-        assert type(cpu_pool) is CPUPool, "Input of cpu_pool must be provided with type of ipex.cpu.runtime.CPUPool"
+        assert (
+            type(cpu_pool) is CPUPool
+        ), "Input of cpu_pool must be provided with type of ipex.cpu.runtime.CPUPool"
         self.cpu_pool = cpu_pool
         self.core_list = cpu_pool.core_ids
         if isinstance(num_streams, str):
             # For str input of num_streams, it must be "auto"
             if num_streams.upper() == "AUTO":
-                self.num_streams = get_default_num_streams(cpu_pool) # The default selected value when auto selection is on.
+                self.num_streams = get_default_num_streams(
+                    cpu_pool
+                )  # The default selected value when auto selection is on.
             else:
-                assert False, "Input of num_streams must be Number of instances or string \"AUTO\""
+                assert (
+                    False
+                ), 'Input of num_streams must be Number of instances or string "AUTO"'
         else:
-            assert isinstance(num_streams, int), "Input of num_streams must be Number of instances or string \"auto\""
+            assert isinstance(
+                num_streams, int
+            ), 'Input of num_streams must be Number of instances or string "auto"'
             self.num_streams = num_streams
 
         if self.num_streams > self.core_list.__len__():
             self.num_streams = self.core_list.__len__()
-            warnings.warn("The number of streams is larger than number of cores. The number of streams changes to {}.".format(self.num_streams))
+            warnings.warn(
+                "The number of streams is larger than number of cores. The number of streams changes to {}.".format(
+                    self.num_streams
+                )
+            )
 
         if self.num_streams == 1:
             # Sync execution path if num_stream is 1.
             self.model = model
         else:
             self.cores_per_instance = self.core_list.__len__() // self.num_streams
-            num_stream_allocated_extra_core = self.core_list.__len__() % self.num_streams
+            num_stream_allocated_extra_core = (
+                self.core_list.__len__() % self.num_streams
+            )
             self.tasks = []
             start_core_list_idx = 0
             end_core_list_idx = 0
@@ -434,10 +584,15 @@ class _MultiStreamBenchmarkModule(nn.Module):
                 if j < num_stream_allocated_extra_core:
                     # If the core number is not divisible by stream number,
                     # the remainder streams(num_stream_allocated_extra_core) will be allocated one extra core.
-                    end_core_list_idx += (self.cores_per_instance + 1)
+                    end_core_list_idx += self.cores_per_instance + 1
                 else:
                     end_core_list_idx += self.cores_per_instance
-                self.tasks.append(Task(model, CPUPool(self.core_list[start_core_list_idx:end_core_list_idx])))
+                self.tasks.append(
+                    Task(
+                        model,
+                        CPUPool(self.core_list[start_core_list_idx:end_core_list_idx]),
+                    )
+                )
                 start_core_list_idx = end_core_list_idx
 
     def forward(self, *args, **kwargs):

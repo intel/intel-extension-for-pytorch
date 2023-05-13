@@ -3,20 +3,39 @@ import torch
 import torch.nn.functional as F
 import intel_extension_for_pytorch._C as core
 
-from ._utils import OpQuantizeabilityType, is_leaf, get_fqn_valid_for_module_dict_key, quantized_modules_has_weights, int8_int8_ops
-from ._quantization_state_utils import SeenQOpInfo, SeenNonQOpInfo, QTensorInfo, op_needs_quantization, get_input_observed_arg_idxs, \
-    get_weight_arg_idx, iterate_and_apply, get_input_args_quant_dequant_info, _raise_obs_not_found_error, get_weight_args_quant_dequant_info, \
-    _raise_obs_op_mismatch, ops_are_related, iterate_and_apply_convert
+from ._utils import (
+    OpQuantizeabilityType,
+    is_leaf,
+    get_fqn_valid_for_module_dict_key,
+    quantized_modules_has_weights,
+    int8_int8_ops,
+)
+from ._quantization_state_utils import (
+    SeenQOpInfo,
+    SeenNonQOpInfo,
+    QTensorInfo,
+    op_needs_quantization,
+    get_input_observed_arg_idxs,
+    get_weight_arg_idx,
+    iterate_and_apply,
+    get_input_args_quant_dequant_info,
+    _raise_obs_not_found_error,
+    get_weight_args_quant_dequant_info,
+    _raise_obs_op_mismatch,
+    ops_are_related,
+    iterate_and_apply_convert,
+)
 from ._smooth_quant import SmoothQuantActivationObserver, SmoothQuantWeightObserver
 
 
 OpConvertInfo = Tuple[
     # quantized equivalent of original op (None means keep original)
-    #Optional[Callable],
+    # Optional[Callable],
     # arg_quant_infos, each element is (scale, zp, dtype) for quantized and None otherwise
     List[Optional[Tuple[float, int, torch.dtype]]],
     List[bool],
 ]
+
 
 # TODO(future PR): maybe better name
 # TODO(future PR): add serialization support
@@ -26,13 +45,9 @@ class AutoQuantizationState(torch.nn.Module):
     `nn.Module` instance.
     """
 
-    idx : int
+    idx: int
 
-    def __init__(
-        self,
-        fqn: str,
-        qconfig: torch.ao.quantization.QConfig
-    ):
+    def __init__(self, fqn: str, qconfig: torch.ao.quantization.QConfig):
         super().__init__()
         self.idx = 0
         self.qconfig = qconfig
@@ -57,10 +72,14 @@ class AutoQuantizationState(torch.nn.Module):
         # note: this is filled out right before convert
         self.tensor_id_to_scale_zp: Dict[int, Tuple[torch.Tensor, torch.Tensor]] = {}
         self.idx_to_op_convert_info: Dict[int, OpConvertInfo] = {}
-        self.weight_tensor_id_to_scale_zp: Dict[str, Tuple[torch.Tensor, torch.Tensor]] = {}
+        self.weight_tensor_id_to_scale_zp: Dict[
+            str, Tuple[torch.Tensor, torch.Tensor]
+        ] = {}
         self.idx_to_op_weight_convert_info: Dict[int, OpConvertInfo] = {}
         self.tensor_id_to_smooth_quant_scaling_factor: Dict[int, torch.Tensor] = {}
-        self.weight_tensor_id_to_smooth_quant_scaling_factor: Dict[int, torch.Tensor] = {}
+        self.weight_tensor_id_to_smooth_quant_scaling_factor: Dict[
+            int, torch.Tensor
+        ] = {}
         self.idx_to_smooth_quant_scaling_factor: Dict[str, torch.Tensor] = {}
         self.idx_to_weight_updated_for_smooth_quant: set[str] = set()
 
@@ -70,20 +89,21 @@ class AutoQuantizationState(torch.nn.Module):
     def set_extra_state(self, state):
         self.tensor_id_to_scale_zp = state["tensor_id_to_scale_zp"]
         for _, seen_q_op_info in self.idx_to_seen_q_op_infos.items():
-            self.idx_to_op_convert_info[seen_q_op_info.idx] = \
-                self.calculate_op_convert_info(seen_q_op_info)
+            self.idx_to_op_convert_info[
+                seen_q_op_info.idx
+            ] = self.calculate_op_convert_info(seen_q_op_info)
 
     def has_at_least_one_seen_q_op_info(self) -> bool:
         return len(self.idx_to_seen_q_op_infos) > 0
 
     def validate_is_at_last_seen_idx(self) -> None:
-        is_at_last_seen_idx = (
-            len(self.idx_to_seen_q_op_infos) == 0 or
-            self.idx == len(self.idx_to_seen_q_op_infos)
+        is_at_last_seen_idx = len(self.idx_to_seen_q_op_infos) == 0 or self.idx == len(
+            self.idx_to_seen_q_op_infos
         )
         if not is_at_last_seen_idx:
             raise AssertionError(
-                f"Cur idx: {self.idx}, expected idx: {len(self.idx_to_seen_q_op_infos)}")
+                f"Cur idx: {self.idx}, expected idx: {len(self.idx_to_seen_q_op_infos)}"
+            )
 
     def extra_repr(self) -> str:
         s = ""
@@ -117,7 +137,7 @@ class AutoQuantizationState(torch.nn.Module):
             for k, v in self.weight_tensor_id_to_scale_zp.items():  # type: ignore[assignment]
                 s += f"  {k}: {v}\n"
             s += "}"
-        
+
         return s
 
     def _get_cur_seen_q_op_info(self):
@@ -132,7 +152,7 @@ class AutoQuantizationState(torch.nn.Module):
         """
         # torch.nn.Module __setattr__ has overhead,
         # this code is the explicit fast path for `self.idx = 0`
-        object.__setattr__(self, 'idx', 0)
+        object.__setattr__(self, "idx", 0)
 
     def cur_op_needs_hooks(self, cur_op: Callable) -> bool:
         return op_needs_quantization(cur_op)
@@ -142,7 +162,7 @@ class AutoQuantizationState(torch.nn.Module):
         This function is expected to be called before any new function or
         module call which needs hooks. It validates that the new function or
         module is of the expected type based on the order of execution.
-        """  
+        """
         try:
             seen_q_op_info = self._get_cur_seen_q_op_info()
             expected_op = seen_q_op_info.type
@@ -158,7 +178,7 @@ class AutoQuantizationState(torch.nn.Module):
         """
         # torch.nn.Module __setattr__ has overhead,
         # this code is the explicit fast path for `self.idx += 1`
-        object.__setattr__(self, 'idx', self.idx + 1)
+        object.__setattr__(self, "idx", self.idx + 1)
 
     def first_call_outputs_prepare_hook(
         self,
@@ -170,7 +190,8 @@ class AutoQuantizationState(torch.nn.Module):
         module right before they are returned to the parent, during tracing.
         """
         outputs = self._first_call_assign_qtensor_infos_to_mod_outputs(
-            outputs, qtensor_id)
+            outputs, qtensor_id
+        )
         return outputs
 
     def outputs_prepare_hook(
@@ -191,7 +212,7 @@ class AutoQuantizationState(torch.nn.Module):
         This function is expected to be called on the outputs of a converted
         module right before they are returned to the parent.
         """
-        #outputs = self._maybe_mod_outputs_dtype_transform(outputs)
+        # outputs = self._maybe_mod_outputs_dtype_transform(outputs)
         return outputs
 
     def first_call_op_prepare_before_hook(
@@ -214,7 +235,8 @@ class AutoQuantizationState(torch.nn.Module):
         The function returns modified `args` and `kwargs`.
         """
         return self._first_call_op_prepare_before_hook_create_subgraphs(
-            op, args, kwargs, qtensor_id, fqn, root_module, op_quantizeability_type)
+            op, args, kwargs, qtensor_id, fqn, root_module, op_quantizeability_type
+        )
 
     def op_prepare_before_hook(
         self,
@@ -245,14 +267,20 @@ class AutoQuantizationState(torch.nn.Module):
                 return arg
 
         args = iterate_and_apply(
-            args, seen_q_op_info.input_tensor_infos, _maybe_observe)
+            args, seen_q_op_info.input_tensor_infos, _maybe_observe
+        )
         # works for nn.module case
         weight_tensor_info = seen_q_op_info.weight_tensor_infos
 
         for i, tensor_info in enumerate(weight_tensor_info):
             tensor_id = tensor_info.id
-            if str(seen_q_op_info.idx) + "_" + str(tensor_id) in self.weight_tensor_id_to_observer:
-                observer = self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(tensor_id)]
+            if (
+                str(seen_q_op_info.idx) + "_" + str(tensor_id)
+                in self.weight_tensor_id_to_observer
+            ):
+                observer = self.weight_tensor_id_to_observer[
+                    str(seen_q_op_info.idx) + "_" + str(tensor_id)
+                ]
                 # if has bias, the dim is 1, we don't need run observer for it.
                 if isinstance(op, torch.nn.LSTM):
                     if op._flat_weights[i].dim() > 1:
@@ -279,7 +307,8 @@ class AutoQuantizationState(torch.nn.Module):
         * amend the current seen op with the tensor ID of the output
         """
         self._first_call_op_prepare_after_hook_adjust_subgraphs(
-            op, output, args, qtensor_id, op_quantizeability_type)
+            op, output, args, qtensor_id, op_quantizeability_type
+        )
         return output
 
     def op_prepare_after_hook(
@@ -295,11 +324,13 @@ class AutoQuantizationState(torch.nn.Module):
         TODO: remove this after all ops support INT8->FP32.
         """
         seen_q_op_info = self._get_cur_seen_q_op_info()
+
         def _observer_output(output, tensor_info):
             tensor_id = tensor_info.id
             if str(tensor_id) in self.tensor_id_to_observer:
                 obs = self.tensor_id_to_observer[str(tensor_id)]
                 obs(output.float())
+
         if isinstance(outputs, torch.Tensor):
             tensor_info = seen_q_op_info.output_tensor_infos[0]
             _observer_output(outputs, tensor_info)
@@ -334,13 +365,14 @@ class AutoQuantizationState(torch.nn.Module):
         # Insert mul before nn.Linear for SmoothQuant
         act_key = str(self.idx)
         if act_key in self.idx_to_smooth_quant_scaling_factor:
-            act_scaling_factors = \
-                self.idx_to_smooth_quant_scaling_factor[act_key]
+            act_scaling_factors = self.idx_to_smooth_quant_scaling_factor[act_key]
             if act_scaling_factors is not None:
                 args = list(args)
                 new_act = torch.mul(args[0], act_scaling_factors)
                 args[0] = new_act
-        args = iterate_and_apply_convert(args, arg_quant_infos, any_arg_quant_or_dequant_needed, op)
+        args = iterate_and_apply_convert(
+            args, arg_quant_infos, any_arg_quant_or_dequant_needed, op
+        )
         return op, args, kwargs
 
     def op_weight_convert_before_hook(
@@ -353,38 +385,62 @@ class AutoQuantizationState(torch.nn.Module):
         Returns potentially modified `op`, potentially modified `args`,
         potentially modified `kwargs`.
         """
-        arg_quant_infos, any_arg_quant_or_dequant_needed = self.get_op_weight_convert_info(op)
+        (
+            arg_quant_infos,
+            any_arg_quant_or_dequant_needed,
+        ) = self.get_op_weight_convert_info(op)
         new_args = []
-        if type(op) in [torch.nn.Conv2d, torch.nn.Conv3d, torch.nn.ConvTranspose2d, torch.nn.ConvTranspose3d, torch.nn.Linear]:
+        if type(op) in [
+            torch.nn.Conv2d,
+            torch.nn.Conv3d,
+            torch.nn.ConvTranspose2d,
+            torch.nn.ConvTranspose3d,
+            torch.nn.Linear,
+        ]:
             tensor_arg_idx = 0
             quant_info = arg_quant_infos[tensor_arg_idx]
-            if quant_info is not None and any_arg_quant_or_dequant_needed[tensor_arg_idx]:
+            if (
+                quant_info is not None
+                and any_arg_quant_or_dequant_needed[tensor_arg_idx]
+            ):
                 scale, zp, dtype = quant_info
                 weight = op.weight
                 ch_axis = 0
                 if type(op) in [torch.nn.ConvTranspose2d, torch.nn.ConvTranspose3d]:
                     ch_axis = 1
-                if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
+                if (
+                    torch.is_autocast_cpu_enabled()
+                    and core.get_autocast_dtype() == torch.bfloat16
+                ):
                     if weight.dtype == torch.bfloat16:
                         weight = weight.to(dtype=torch.float32)
                     if scale.numel() > 1:
-                        arg = torch.quantize_per_channel(weight, scale, zp, ch_axis, dtype)
+                        arg = torch.quantize_per_channel(
+                            weight, scale, zp, ch_axis, dtype
+                        )
                     else:
-                        arg = torch.quantize_per_tensor(weight, scale.item(), zp.item(), dtype)
+                        arg = torch.quantize_per_tensor(
+                            weight, scale.item(), zp.item(), dtype
+                        )
                     arg = arg.dequantize()
                     arg = arg.to(dtype=torch.bfloat16)
                 else:
                     # Update weight of nn.Linear for SmoothQuant
-                    wei_key = str(self.idx) + '_0'
+                    wei_key = str(self.idx) + "_0"
                     if wei_key in self.idx_to_smooth_quant_scaling_factor:
-                        wei_scaling_factors = \
-                            self.idx_to_smooth_quant_scaling_factor[wei_key]
+                        wei_scaling_factors = self.idx_to_smooth_quant_scaling_factor[
+                            wei_key
+                        ]
                         if wei_scaling_factors is not None:
                             weight = torch.mul(weight, wei_scaling_factors)
                     if scale.numel() > 1:
-                        arg = torch.quantize_per_channel(weight, scale, zp, ch_axis, dtype)
+                        arg = torch.quantize_per_channel(
+                            weight, scale, zp, ch_axis, dtype
+                        )
                     else:
-                        arg = torch.quantize_per_tensor(weight, scale.item(), zp.item(), dtype)
+                        arg = torch.quantize_per_tensor(
+                            weight, scale.item(), zp.item(), dtype
+                        )
                     arg = arg.dequantize()
                 new_args.append(arg)
             else:
@@ -392,17 +448,27 @@ class AutoQuantizationState(torch.nn.Module):
         elif isinstance(op, torch.nn.EmbeddingBag):
             tensor_arg_idx = 0
             quant_info = arg_quant_infos[tensor_arg_idx]
-            if quant_info is not None and any_arg_quant_or_dequant_needed[tensor_arg_idx]:
+            if (
+                quant_info is not None
+                and any_arg_quant_or_dequant_needed[tensor_arg_idx]
+            ):
                 scale, zp, dtype = quant_info
                 weight = op.weight
-                if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
+                if (
+                    torch.is_autocast_cpu_enabled()
+                    and core.get_autocast_dtype() == torch.bfloat16
+                ):
                     if weight.dtype == torch.bfloat16:
                         weight = weight.to(dtype=torch.float32)
-                    arg = torch.quantize_per_tensor(weight, scale.item(), zp.item(), dtype)
+                    arg = torch.quantize_per_tensor(
+                        weight, scale.item(), zp.item(), dtype
+                    )
                     arg = arg.dequantize()
                     arg = arg.to(dtype=torch.bfloat16)
                 else:
-                    arg = torch.quantize_per_tensor(op.weight, scale.item(), zp.item(), dtype)
+                    arg = torch.quantize_per_tensor(
+                        op.weight, scale.item(), zp.item(), dtype
+                    )
                     arg = arg.dequantize()
                 new_args.append(arg)
             else:
@@ -412,22 +478,38 @@ class AutoQuantizationState(torch.nn.Module):
             weights = op._flat_weights
             for tensor_arg_idx in range(0, len(arg_quant_infos), step):
                 quant_info = arg_quant_infos[tensor_arg_idx]
-                if quant_info is not None and any_arg_quant_or_dequant_needed[tensor_arg_idx]:
+                if (
+                    quant_info is not None
+                    and any_arg_quant_or_dequant_needed[tensor_arg_idx]
+                ):
                     w_ih = weights[tensor_arg_idx]
                     w_hh = weights[tensor_arg_idx + 1]
                     w_ih_scale, w_ih_zp, w_ih_dtype = quant_info
-                    w_hh_scale, w_hh_zp, w_hh_dtype = arg_quant_infos[tensor_arg_idx + 1]
-                    if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
+                    w_hh_scale, w_hh_zp, w_hh_dtype = arg_quant_infos[
+                        tensor_arg_idx + 1
+                    ]
+                    if (
+                        torch.is_autocast_cpu_enabled()
+                        and core.get_autocast_dtype() == torch.bfloat16
+                    ):
                         weight_if_bf16 = w_ih.dtype == torch.bfloat16
                         if weight_if_bf16:
                             w_ih = w_ih.to(dtype=torch.float32)
                             w_hh = w_hh.to(dtype=torch.float32)
                         if w_ih_scale.numel() > 1:
-                            w_ih = torch.quantize_per_channel(w_ih, w_ih_scale, w_ih_zp, 0, w_ih_dtype)
-                            w_hh = torch.quantize_per_channel(w_hh, w_hh_scale, w_hh_zp, 0, w_hh_dtype)
+                            w_ih = torch.quantize_per_channel(
+                                w_ih, w_ih_scale, w_ih_zp, 0, w_ih_dtype
+                            )
+                            w_hh = torch.quantize_per_channel(
+                                w_hh, w_hh_scale, w_hh_zp, 0, w_hh_dtype
+                            )
                         else:
-                            w_ih = torch.quantize_per_tensor(w_ih, w_ih_scale.item(), w_ih_zp.item(), w_ih_dtype)
-                            w_hh = torch.quantize_per_tensor(w_hh, w_hh_scale.item(), w_hh_zp.item(), w_hh_dtype)
+                            w_ih = torch.quantize_per_tensor(
+                                w_ih, w_ih_scale.item(), w_ih_zp.item(), w_ih_dtype
+                            )
+                            w_hh = torch.quantize_per_tensor(
+                                w_hh, w_hh_scale.item(), w_hh_zp.item(), w_hh_dtype
+                            )
                         w_ih = w_ih.dequantize()
                         w_hh = w_hh.dequantize()
                         if weight_if_bf16:
@@ -435,11 +517,19 @@ class AutoQuantizationState(torch.nn.Module):
                             w_hh = w_hh.to(dtype=torch.bfloat16)
                     else:
                         if w_ih_scale.numel() > 1:
-                            w_ih = torch.quantize_per_channel(w_ih, w_ih_scale, w_ih_zp, 0, w_ih_dtype)
-                            w_hh = torch.quantize_per_channel(w_hh, w_hh_scale, w_hh_zp, 0, w_hh_dtype)
+                            w_ih = torch.quantize_per_channel(
+                                w_ih, w_ih_scale, w_ih_zp, 0, w_ih_dtype
+                            )
+                            w_hh = torch.quantize_per_channel(
+                                w_hh, w_hh_scale, w_hh_zp, 0, w_hh_dtype
+                            )
                         else:
-                            w_ih = torch.quantize_per_tensor(w_ih, w_ih_scale, w_ih_zp, w_ih_dtype)
-                            w_hh = torch.quantize_per_tensor(w_hh, w_hh_scale, w_hh_zp, w_hh_dtype)
+                            w_ih = torch.quantize_per_tensor(
+                                w_ih, w_ih_scale, w_ih_zp, w_ih_dtype
+                            )
+                            w_hh = torch.quantize_per_tensor(
+                                w_hh, w_hh_scale, w_hh_zp, w_hh_dtype
+                            )
                         w_ih = w_ih.dequantize()
                         w_hh = w_hh.dequantize()
                     new_args.append(w_ih)
@@ -452,7 +542,7 @@ class AutoQuantizationState(torch.nn.Module):
                         new_args.append(weights[tensor_arg_idx + s])
 
         return new_args
-   
+
     def op_convert_after_hook(
         self,
         op: Callable,
@@ -465,17 +555,25 @@ class AutoQuantizationState(torch.nn.Module):
         # we need add fakeQuant here to make the quantized op call in
         # INT8 path. It can be removed after all op support INT8->fp32
         seen_q_op_info = self._get_cur_seen_q_op_info()
-        def _convert_output(output, tensor_info, insert_fake_quant, tensor_id_to_scale_zp):
+
+        def _convert_output(
+            output, tensor_info, insert_fake_quant, tensor_id_to_scale_zp
+        ):
             tensor_id, inf_dtype = tensor_info.id, tensor_info.inf_dtype
             # so if inf_dtype is torch.qint8, we need add fake quant here.
-            if tensor_id in tensor_id_to_scale_zp and inf_dtype in [torch.qint8, torch.quint8] and insert_fake_quant:
+            if (
+                tensor_id in tensor_id_to_scale_zp
+                and inf_dtype in [torch.qint8, torch.quint8]
+                and insert_fake_quant
+            ):
                 scale, zp = tensor_id_to_scale_zp[tensor_id]
                 output_is_bfloat16 = False
                 if output.dtype == torch.bfloat16:
                     output_is_bfloat16 = True
                     output = output.to(torch.float32)
                 output = torch.quantize_per_tensor(
-                    output, scale.item(), zp.item(), inf_dtype)
+                    output, scale.item(), zp.item(), inf_dtype
+                )
                 output = output.dequantize()
                 if output_is_bfloat16:
                     output = output.to(torch.bfloat16)
@@ -484,7 +582,9 @@ class AutoQuantizationState(torch.nn.Module):
         if isinstance(outputs, torch.Tensor):
             tensor_info = seen_q_op_info.output_tensor_infos[0]
             insert_fake_quant = seen_q_op_info.insert_fake_quant_after_outputs[0]
-            outputs = _convert_output(outputs, tensor_info, insert_fake_quant, self.tensor_id_to_scale_zp)
+            outputs = _convert_output(
+                outputs, tensor_info, insert_fake_quant, self.tensor_id_to_scale_zp
+            )
         elif isinstance(outputs, tuple):
             # TODO: handle other tuple subclasses more generically
             new_outputs = []
@@ -492,15 +592,22 @@ class AutoQuantizationState(torch.nn.Module):
             for output in outputs:
                 if isinstance(output, torch.Tensor):
                     tensor_info = seen_q_op_info.output_tensor_infos[idx]
-                    insert_fake_quant = seen_q_op_info.insert_fake_quant_after_outputs[idx]
-                    output = _convert_output(output, tensor_info, insert_fake_quant, self.tensor_id_to_scale_zp)
+                    insert_fake_quant = seen_q_op_info.insert_fake_quant_after_outputs[
+                        idx
+                    ]
+                    output = _convert_output(
+                        output,
+                        tensor_info,
+                        insert_fake_quant,
+                        self.tensor_id_to_scale_zp,
+                    )
                     new_outputs.append(output)
                     idx += 1
                 else:
                     new_outputs.append(output)
             # hacky check for collections.namedtuple, TODO improve this
             # https://stackoverflow.com/questions/2166818/how-to-check-if-an-object-is-an-instance-of-a-namedtuple
-            if hasattr(outputs, '_fields'):
+            if hasattr(outputs, "_fields"):
                 outputs = outputs.__class__(*new_outputs)
             else:
                 outputs = tuple(new_outputs)
@@ -516,7 +623,7 @@ class AutoQuantizationState(torch.nn.Module):
         Returns the information needed for convert time modifications to `op`.
         """
         return self.idx_to_op_convert_info[self.idx]
-    
+
     def get_op_weight_convert_info(
         self,
         op: Callable,
@@ -535,11 +642,17 @@ class AutoQuantizationState(torch.nn.Module):
         `get_op_convert_info`.
         """
         # calculate quant infos
-        arg_quant_infos, any_arg_quant_or_dequant_needed = \
-            get_input_args_quant_dequant_info(
-                seen_q_op_info, self.tensor_id_to_scale_zp)
+        (
+            arg_quant_infos,
+            any_arg_quant_or_dequant_needed,
+        ) = get_input_args_quant_dequant_info(
+            seen_q_op_info, self.tensor_id_to_scale_zp
+        )
 
-        return arg_quant_infos, any_arg_quant_or_dequant_needed,
+        return (
+            arg_quant_infos,
+            any_arg_quant_or_dequant_needed,
+        )
 
     def calculate_op_weight_convert_info(
         self,
@@ -550,11 +663,17 @@ class AutoQuantizationState(torch.nn.Module):
         `get_op_convert_info`.
         """
         # calculate quant infos
-        arg_quant_infos, any_arg_quant_or_dequant_needed = \
-            get_weight_args_quant_dequant_info(
-                seen_q_op_info, self.weight_tensor_id_to_scale_zp)
+        (
+            arg_quant_infos,
+            any_arg_quant_or_dequant_needed,
+        ) = get_weight_args_quant_dequant_info(
+            seen_q_op_info, self.weight_tensor_id_to_scale_zp
+        )
 
-        return arg_quant_infos, any_arg_quant_or_dequant_needed,
+        return (
+            arg_quant_infos,
+            any_arg_quant_or_dequant_needed,
+        )
 
     def _get_packed_param_name(self, seen_q_op_info: SeenQOpInfo) -> Optional[str]:
         """
@@ -572,9 +691,10 @@ class AutoQuantizationState(torch.nn.Module):
         This is a helper function for _first_call_assign_qtensor_infos_to_mod_outputs
         to handle iterables of tensors without code duplication.
         """
-        if not hasattr(output, '_qtensor_info'):
+        if not hasattr(output, "_qtensor_info"):
             output._qtensor_info = QTensorInfo(  # type: ignore[attr-defined]
-                qtensor_id[0], output.dtype, output.dtype)
+                qtensor_id[0], output.dtype, output.dtype
+            )
             qtensor_id[0] += 1
         self.output_qtensor_infos.append(output._qtensor_info)  # type: ignore[attr-defined]
         return output
@@ -593,19 +713,24 @@ class AutoQuantizationState(torch.nn.Module):
         """
         # TODO: handle objects with deeper nested tensors
         if isinstance(outputs, torch.Tensor):
-            self._first_call_assign_qtensor_infos_to_mod_outputs_tensor(outputs, qtensor_id)
+            self._first_call_assign_qtensor_infos_to_mod_outputs_tensor(
+                outputs, qtensor_id
+            )
         elif isinstance(outputs, tuple):
             # TODO: handle other tuple subclasses more generically
             new_outputs = []
             for output in outputs:
                 if isinstance(output, torch.Tensor):
-                    new_outputs.append(self._first_call_assign_qtensor_infos_to_mod_outputs_tensor(
-                        output, qtensor_id))
+                    new_outputs.append(
+                        self._first_call_assign_qtensor_infos_to_mod_outputs_tensor(
+                            output, qtensor_id
+                        )
+                    )
                 else:
                     new_outputs.append(output)
             # hacky check for collections.namedtuple, TODO improve this
             # https://stackoverflow.com/questions/2166818/how-to-check-if-an-object-is-an-instance-of-a-namedtuple
-            if hasattr(outputs, '_fields'):
+            if hasattr(outputs, "_fields"):
                 outputs = outputs.__class__(*new_outputs)
             else:
                 outputs = tuple(new_outputs)
@@ -619,7 +744,7 @@ class AutoQuantizationState(torch.nn.Module):
         arg: Any,
         arg_tensor_infos: List[Optional[QTensorInfo]],
         arg_tensor_force_inf_dtype: List[Optional[torch.dtype]],
-        qtensor_id: List[int]
+        qtensor_id: List[int],
     ) -> None:
         """
         Runs the prepare hook during first_call for individual
@@ -636,10 +761,11 @@ class AutoQuantizationState(torch.nn.Module):
 
         # If a tensor does not have an ID, add it. This allows
         # us to track inputs shared by multiple quantizeable modules.
-        if not hasattr(arg, '_qtensor_info'):
+        if not hasattr(arg, "_qtensor_info"):
             arg._qtensor_info = QTensorInfo(  # type: ignore[attr-defined]
-                qtensor_id[0], arg.dtype, arg.dtype)
-            
+                qtensor_id[0], arg.dtype, arg.dtype
+            )
+
             qtensor_id[0] += 1
         arg_tensor_infos.append(arg._qtensor_info)  # type: ignore[attr-defined]
         arg_tensor_force_inf_dtype.append(arg.dtype)
@@ -664,16 +790,23 @@ class AutoQuantizationState(torch.nn.Module):
             if isinstance(arg, (list, tuple)):
                 for inner_arg in arg:
                     self._first_call_op_prepare_before_hook_create_subgraphs_tensor(
-                        op, inner_arg, arg_tensor_infos, arg_tensor_force_inf_dtype, qtensor_id)
+                        op,
+                        inner_arg,
+                        arg_tensor_infos,
+                        arg_tensor_force_inf_dtype,
+                        qtensor_id,
+                    )
             else:
                 self._first_call_op_prepare_before_hook_create_subgraphs_tensor(
-                    op, arg, arg_tensor_infos, arg_tensor_force_inf_dtype, qtensor_id)
+                    op, arg, arg_tensor_infos, arg_tensor_force_inf_dtype, qtensor_id
+                )
 
         if op_quantizeability_type is OpQuantizeabilityType.NOT_QUANTIZEABLE:
             op_type_is_module = isinstance(op, torch.nn.Module)
-            op_type : Callable = type(op) if op_type_is_module else op  # type: ignore[assignment]
-            self.seen_nonq_op_infos.append(SeenNonQOpInfo(
-                str(op_type), fqn, arg_tensor_infos, []))
+            op_type: Callable = type(op) if op_type_is_module else op  # type: ignore[assignment]
+            self.seen_nonq_op_infos.append(
+                SeenNonQOpInfo(str(op_type), fqn, arg_tensor_infos, [])
+            )
             return args, kwargs
 
         if self.idx not in self.idx_to_seen_q_op_infos:
@@ -683,14 +816,32 @@ class AutoQuantizationState(torch.nn.Module):
             weight_idx = 0
             if type(op) in quantized_modules_has_weights:
                 if not isinstance(op, torch.nn.LSTM):
-                    weight_tensor_infos.append(QTensorInfo(weight_idx, op.weight.dtype, op.weight.dtype))
+                    weight_tensor_infos.append(
+                        QTensorInfo(weight_idx, op.weight.dtype, op.weight.dtype)
+                    )
                 else:
                     weights = op._flat_weights
                     for i in range(len(weights)):
-                        weight_tensor_infos.append(QTensorInfo(weight_idx, weights[weight_idx].dtype, weights[weight_idx].dtype))
+                        weight_tensor_infos.append(
+                            QTensorInfo(
+                                weight_idx,
+                                weights[weight_idx].dtype,
+                                weights[weight_idx].dtype,
+                            )
+                        )
                         weight_idx += 1
             self.idx_to_seen_q_op_infos[self.idx] = SeenQOpInfo(
-                self.idx, str(op_type), op_type_is_module, fqn, arg_tensor_infos, arg_tensor_force_inf_dtype, [], [], weight_tensor_infos, self.qconfig)
+                self.idx,
+                str(op_type),
+                op_type_is_module,
+                fqn,
+                arg_tensor_infos,
+                arg_tensor_force_inf_dtype,
+                [],
+                [],
+                weight_tensor_infos,
+                self.qconfig,
+            )
         return args, kwargs
 
     def _first_call_op_prepare_after_hook_adjust_subgraphs(
@@ -699,7 +850,7 @@ class AutoQuantizationState(torch.nn.Module):
         outputs: Any,
         args: Tuple[Any, ...],
         qtensor_id: List[int],
-        op_quantizeability_type: OpQuantizeabilityType
+        op_quantizeability_type: OpQuantizeabilityType,
     ) -> None:
         """
         After `op` was just executed, modifies the subgraph recorded
@@ -707,17 +858,22 @@ class AutoQuantizationState(torch.nn.Module):
         has to be done in the "after" hook because the output of the op
         does not exist in the "before" hook.
         """
+
         # TODO(future PR): handle non-tensor outputs
         def _add_output_qtensor_info(output):
             output._qtensor_info = QTensorInfo(
-                qtensor_id[0], output.dtype, output.dtype)  # type: ignore[arg-type]
+                qtensor_id[0], output.dtype, output.dtype
+            )  # type: ignore[arg-type]
             if op_quantizeability_type is OpQuantizeabilityType.QUANTIZEABLE:
                 target = self.idx_to_seen_q_op_infos[self.idx].output_tensor_infos
-                self.idx_to_seen_q_op_infos[self.idx].insert_fake_quant_after_outputs.append(False)
+                self.idx_to_seen_q_op_infos[
+                    self.idx
+                ].insert_fake_quant_after_outputs.append(False)
             else:
                 target = self.seen_nonq_op_infos[-1].output_tensor_infos
             target.append(output._qtensor_info)
             qtensor_id[0] += 1
+
         if isinstance(outputs, torch.Tensor):
             _add_output_qtensor_info(outputs)
         elif isinstance(outputs, tuple):
@@ -727,15 +883,18 @@ class AutoQuantizationState(torch.nn.Module):
 
     def _maybe_insert_input_observers(self, seen_q_op_info: SeenQOpInfo):
         input_observed_arg_idxs = get_input_observed_arg_idxs(
-            seen_q_op_info.type, seen_q_op_info.type_is_module)
+            seen_q_op_info.type, seen_q_op_info.type_is_module
+        )
 
         qconfig = seen_q_op_info.qconfig
         found_duplicate_input = False
         for idx, tensor_info in enumerate(seen_q_op_info.input_tensor_infos):
             if tensor_info is None:
                 continue
-            if input_observed_arg_idxs is not None and \
-                    idx not in input_observed_arg_idxs:
+            if (
+                input_observed_arg_idxs is not None
+                and idx not in input_observed_arg_idxs
+            ):
                 continue
             if qconfig is None:
                 # If qconfig is None, we do not need any input observers
@@ -745,10 +904,16 @@ class AutoQuantizationState(torch.nn.Module):
                 tensor_id = tensor_info.id  # type: ignore[attr-defined]
                 weight_arg_idx = get_weight_arg_idx(seen_q_op_info.type)
                 # avoid add weight observer for dynamic quantization.
-                if idx == weight_arg_idx and not isinstance(qconfig.activation(), torch.ao.quantization.PlaceholderObserver):
+                if idx == weight_arg_idx and not isinstance(
+                    qconfig.activation(), torch.ao.quantization.PlaceholderObserver
+                ):
                     # conv_transpose weight is iohw or iodhw, so we change the observer axis to 1.
-                    if seen_q_op_info.type in [str(F.conv_transpose2d), str(F.conv_transpose3d)] and \
-                        isinstance(qconfig.weight(), torch.ao.quantization.PerChannelMinMaxObserver):
+                    if seen_q_op_info.type in [
+                        str(F.conv_transpose2d),
+                        str(F.conv_transpose3d),
+                    ] and isinstance(
+                        qconfig.weight(), torch.ao.quantization.PerChannelMinMaxObserver
+                    ):
                         obs = qconfig.weight.with_args(ch_axis=1)()
                     else:
                         obs = qconfig.weight()
@@ -758,7 +923,7 @@ class AutoQuantizationState(torch.nn.Module):
                     self.tensor_id_to_observer[str(tensor_id)] = obs
                 else:
                     found_duplicate_input = True
-        
+
         # add weight observer if the op is nn.module and has a weight.
         for tensor_info in seen_q_op_info.weight_tensor_infos:
             if tensor_info is None:
@@ -771,33 +936,53 @@ class AutoQuantizationState(torch.nn.Module):
                 tensor_id = tensor_info.id  # type: ignore[attr-defined]
                 if seen_q_op_info.type == str(torch.nn.EmbeddingBag):
                     obs = qconfig.activation()
-                    self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(tensor_id)] = obs
-                elif not isinstance(qconfig.activation(), torch.ao.quantization.PlaceholderObserver):
-                    if seen_q_op_info.type in [str(torch.nn.ConvTranspose2d), str(torch.nn.ConvTranspose3d)] and \
-                        isinstance(qconfig.weight(), torch.ao.quantization.PerChannelMinMaxObserver):
+                    self.weight_tensor_id_to_observer[
+                        str(seen_q_op_info.idx) + "_" + str(tensor_id)
+                    ] = obs
+                elif not isinstance(
+                    qconfig.activation(), torch.ao.quantization.PlaceholderObserver
+                ):
+                    if seen_q_op_info.type in [
+                        str(torch.nn.ConvTranspose2d),
+                        str(torch.nn.ConvTranspose3d),
+                    ] and isinstance(
+                        qconfig.weight(), torch.ao.quantization.PerChannelMinMaxObserver
+                    ):
                         obs = qconfig.weight.with_args(ch_axis=1)()
                     else:
                         obs = qconfig.weight()
-                    self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(tensor_id)] = obs
+                    self.weight_tensor_id_to_observer[
+                        str(seen_q_op_info.idx) + "_" + str(tensor_id)
+                    ] = obs
         # LSTM, we don't know whether has bais or not, so we add observer for all them, but will not use them at convert step.
         # w_ih, w_hh share same observe, and b_ih, b_hh also share same observer
         if seen_q_op_info.type == str(torch.nn.LSTM):
-            if qconfig is not None and not isinstance(qconfig.activation(), torch.ao.quantization.PlaceholderObserver):
+            if qconfig is not None and not isinstance(
+                qconfig.activation(), torch.ao.quantization.PlaceholderObserver
+            ):
                 for i in range(0, len(seen_q_op_info.weight_tensor_infos), 2):
                     tensor_id = seen_q_op_info.weight_tensor_infos[i].id
                     obs = qconfig.weight()
-                    self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(tensor_id)] = obs
-                    self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(tensor_id + 1)] = obs
+                    self.weight_tensor_id_to_observer[
+                        str(seen_q_op_info.idx) + "_" + str(tensor_id)
+                    ] = obs
+                    self.weight_tensor_id_to_observer[
+                        str(seen_q_op_info.idx) + "_" + str(tensor_id + 1)
+                    ] = obs
 
         # SmoothQuant: Linear activation observer and weight observer should know each other
-        if seen_q_op_info.type == str(torch.nn.Linear) and \
-                qconfig is not None and \
-                isinstance(qconfig.activation(), SmoothQuantActivationObserver) and \
-                isinstance(qconfig.weight(), SmoothQuantWeightObserver):
+        if (
+            seen_q_op_info.type == str(torch.nn.Linear)
+            and qconfig is not None
+            and isinstance(qconfig.activation(), SmoothQuantActivationObserver)
+            and isinstance(qconfig.weight(), SmoothQuantWeightObserver)
+        ):
             x_tensor_id = seen_q_op_info.input_tensor_infos[0].id
             w_tensor_id = seen_q_op_info.weight_tensor_infos[0].id
             x_obs = self.tensor_id_to_observer[str(x_tensor_id)]
-            w_obs = self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(w_tensor_id)]
+            w_obs = self.weight_tensor_id_to_observer[
+                str(seen_q_op_info.idx) + "_" + str(w_tensor_id)
+            ]
             # Duplicate input:
             # (1) In modules like MHA, multiple linear layers may share the same activation tensor
             #   In other words, multiple weight tensors share one activation tensor
@@ -836,7 +1021,9 @@ class AutoQuantizationState(torch.nn.Module):
                     continue
                 else:
                     output_tensor_id = tensor_info.id
-                    self.tensor_id_to_observer[str(output_tensor_id)] = qconfig.activation()
+                    self.tensor_id_to_observer[
+                        str(output_tensor_id)
+                    ] = qconfig.activation()
 
     def insert_observers(self, root_module: torch.nn.Module):
         for _, seen_q_op_info in self.idx_to_seen_q_op_infos.items():
@@ -855,11 +1042,15 @@ class AutoQuantizationState(torch.nn.Module):
     # This is a hack to enable nn.Sequential to properly work with
     # this class.
     def forward(self, x):
-        raise NotImplementedError('Calling AutoQuantizationState.forward is not supported')
+        raise NotImplementedError(
+            "Calling AutoQuantizationState.forward is not supported"
+        )
         # return x
+
 
 class AutoQuantizationStateModuleDict(torch.nn.ModuleDict):
     pass
+
 
 def init_model_quant_state(model, module_id_to_fqn, configure):
     # Create a list before iterating because we are adding new
@@ -899,13 +1090,10 @@ def init_model_quant_state(model, module_id_to_fqn, configure):
         # the children.
 
         # On the parent, register this module in the FQN map
-        fqn_to_use_for_key = \
-            get_fqn_valid_for_module_dict_key(fqn)
-        model._fqn_to_auto_quant_state_map[fqn_to_use_for_key] = \
-            auto_quant_state
+        fqn_to_use_for_key = get_fqn_valid_for_module_dict_key(fqn)
+        model._fqn_to_auto_quant_state_map[fqn_to_use_for_key] = auto_quant_state
         # On the child, manually set the attribute without
         # going through the `torch.nn.Module.__setattr__`
         # function, to prevent this object from appearing in
         # the child's module hierarchy.
-        object.__setattr__(
-            v, '_auto_quant_state', auto_quant_state)
+        object.__setattr__(v, "_auto_quant_state", auto_quant_state)

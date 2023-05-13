@@ -1,21 +1,16 @@
-import math
 import torch
 from torch import nn
-from torch.nn.parameter import Parameter
-from torch.nn import init
-from torch.autograd import Function
 from .utils.blocked_layout import (
     BlockedParameter,
     BlockedModule,
     BlockedTensor,
     get_blocking_signature,
 )
-import time
-from contextlib import contextmanager
+
 try:
     from transformers.modeling_utils import apply_chunking_to_forward
     from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
-except:
+except ImportError:
     pass
 USE_BF16_PARAMS = True
 layer_use_bf16 = False
@@ -37,7 +32,7 @@ def print_grad_hook(var, name):
 
 
 def generate_mask(attention_mask):
-    assert not attention_mask is None, "attention_mask is None"
+    assert attention_mask is not None, "attention_mask is None"
     B, _, _, S = attention_mask.shape
     S1, S2 = BlockedModule.default_blocking_factors(S)
     attention_mask = attention_mask.view([B, S]).clone()
@@ -51,12 +46,13 @@ def generate_mask(attention_mask):
         seq_offsets = torch.cat([torch.zeros([1]), nnz // S2]).to(torch.long)
     else:
         msk = torch.ones_like(attention_mask).to(torch.bool)
-        seq_offsets = torch.cat([torch.zeros([1]), torch.ones([B])*S//S2]).to(torch.long)
+        seq_offsets = torch.cat([torch.zeros([1]), torch.ones([B]) * S // S2]).to(
+            torch.long
+        )
     seq_sqr_offsets = seq_offsets * seq_offsets
     seq_offsets = seq_offsets.cumsum(dim=0)
     seq_sqr_offsets = seq_sqr_offsets.cumsum(dim=0)
     return msk, attention_mask, seq_offsets, seq_sqr_offsets
-   
 
 
 class PadInput(torch.autograd.Function):
@@ -113,7 +109,7 @@ class UnpadInput(torch.autograd.Function):
 #             init.uniform_(self.bias, -bound, bound)
 #
 #     def forward(self, input):
-#         raise NotImplemented
+#         raise NotImplementedError
 #         return input
 
 
@@ -126,7 +122,7 @@ class DummyLinear(BlockedModule, torch.nn.Linear):
             self.bias = BlockedParameter(self.bias.data)
 
     def forward(self, input):
-        raise NotImplemented
+        raise NotImplementedError
         return input
 
 
@@ -138,7 +134,7 @@ class DummyLayerNorm(BlockedModule, torch.nn.LayerNorm):
             self.bias = BlockedParameter(self.bias.data)
 
     def forward(self, input):
-        raise NotImplemented
+        raise NotImplementedError
         return input
 
 
@@ -270,16 +266,25 @@ class BertSelfAttention(BlockedModule):
         ), "self.position_embedding_type other than absolute not supported"
 
         self.query.weight.set_blocking_param(
-            ([self.attention_head_size, self.attention_head_size], [0, 2, 3, 1],)
+            (
+                [self.attention_head_size, self.attention_head_size],
+                [0, 2, 3, 1],
+            )
         )
         self.key.weight.set_blocking_param(
-            ([self.attention_head_size, self.attention_head_size], [0, 2, 3, 1],)
+            (
+                [self.attention_head_size, self.attention_head_size],
+                [0, 2, 3, 1],
+            )
         )
         self.value.weight.set_blocking_param(
-            ([self.attention_head_size, self.attention_head_size], [0, 2, 3, 1],)
+            (
+                [self.attention_head_size, self.attention_head_size],
+                [0, 2, 3, 1],
+            )
         )
         self.blocked_input_signature = get_blocking_signature("SF", "SFSF")
-        if layer_use_bf16 == True and USE_BF16_PARAMS:
+        if layer_use_bf16 is True and USE_BF16_PARAMS:
             self.query.weight.set_blocking_param(
                 (
                     [self.attention_head_size, [self.attention_head_size // 2, 2]],
@@ -328,12 +333,14 @@ class BertSelfAttention(BlockedModule):
         seq_offsets=None,
         seq_sqr_offsets=None,
     ):
-        assert past_key_value == None, "past_key_value not supported"
+        assert past_key_value is None, "past_key_value not supported"
         self.maybe_block_params()
         if encoder_hidden_states is not None:
-            assert encoder_hidden_states.shape == hidden_states.shape, (
-                "Different shapes not supported(%s != %s)"
-                % (encoder_hidden_states.shape, hidden_states.shape,)
+            assert (
+                encoder_hidden_states.shape == hidden_states.shape
+            ), "Different shapes not supported(%s != %s)" % (
+                encoder_hidden_states.shape,
+                hidden_states.shape,
             )
             encoder_hidden_states = self.get_blocked_tensor(
                 encoder_hidden_states,
@@ -361,7 +368,8 @@ class BertSelfAttention(BlockedModule):
             # B, S1, N, S2, H = hidden_states.shape
             # S = S1 * S2
             # print("Before attention_mask shape = %s (%s)" % (attention_mask.shape, attention_mask.numel()))
-            # attention_mask = attention_mask.expand([B, N, S, S]).view([B, N, S1, S2, S1, S2]).permute([0, 2, 1, 4, 3, 5]).contiguous()
+            # attention_mask = attention_mask.expand([B, N, S, S]).view(
+            #   [B, N, S1, S2, S1, S2]).permute([0, 2, 1, 4, 3, 5]).contiguous()
             # assert (
             #     attention_mask.size(1) == attention_mask.size(2) == 1
             # ), "unsupported attention_mask shape %s" % (attention_mask.shape,)
@@ -373,12 +381,12 @@ class BertSelfAttention(BlockedModule):
             print(f"encoder_attention_mask: {encoder_attention_mask.shape}")
             # B, S1, N, S2, H = encoder_hidden_states.shape
             # S = S1 * S2
-            # encoder_attention_mask = encoder_attention_mask.expand([B, N, S, S]).view([B, N, S1, S2, S1, S2]).permute([0, 2, 1, 4, 3, 5]).contiguous()
+            # encoder_attention_mask = encoder_attention_mask.expand([B, N, S, S]).view(
+            #   [B, N, S1, S2, S1, S2]).permute([0, 2, 1, 4, 3, 5]).contiguous()
             assert (
                 encoder_attention_mask.size(1) == encoder_attention_mask.size(2) == 1
-            ), (
-                "unsupported encoder_attention_mask shape %s"
-                % (encoder_attention_mask.shape,)
+            ), "unsupported encoder_attention_mask shape %s" % (
+                encoder_attention_mask.shape,
             )
             encoder_attention_mask = encoder_attention_mask.contiguous()
         inputs.append(attention_mask if attention_mask is not None else torch.Tensor())
@@ -481,10 +489,13 @@ class BertOutputBase(BlockedModule):
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         # self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.dense.weight.set_blocking_param(
-            ([self.attention_head_size, self.attention_head_size], [0, 2, 3, 1],)
+            (
+                [self.attention_head_size, self.attention_head_size],
+                [0, 2, 3, 1],
+            )
         )
         self.blocked_input_signature = get_blocking_signature("SF", "SFSF")
-        if layer_use_bf16 == True and USE_BF16_PARAMS:
+        if layer_use_bf16 is True and USE_BF16_PARAMS:
             self.dense.weight.set_blocking_param(
                 (
                     [self.attention_head_size, [self.attention_head_size // 2, 2]],
@@ -496,7 +507,8 @@ class BertOutputBase(BlockedModule):
             self.LayerNorm.weight.set_blocking_param((None, None, torch.bfloat16))
             self.LayerNorm.bias.set_blocking_param((None, None, torch.bfloat16))
         self.use_bf16 = layer_use_bf16
-        # print(f"config.hidden_size = {config.hidden_size}, ifm = {ifm}, p = {config.hidden_dropout_prob}, eps = {config.layer_norm_eps}")
+        # print(f"config.hidden_size = {config.hidden_size}, ifm = {ifm},
+        # p = {config.hidden_dropout_prob}, eps = {config.layer_norm_eps}")
 
     def maybe_block_params(self):
         self.dense.weight.block()
@@ -580,7 +592,10 @@ class BertIntermediate(BlockedModule):
         self.dense = DummyLinear(config.hidden_size, config.intermediate_size)
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.dense.weight.set_blocking_param(
-            ([self.attention_head_size, self.attention_head_size], [0, 2, 3, 1],)
+            (
+                [self.attention_head_size, self.attention_head_size],
+                [0, 2, 3, 1],
+            )
         )
         assert config.hidden_act in ["gelu", "gelu_new"], (
             "Currently, only GELU new is supported in fused op, %s is given"
@@ -588,7 +603,7 @@ class BertIntermediate(BlockedModule):
         )
         self.hidden_act = config.hidden_act
         self.blocked_input_signature = get_blocking_signature("SF", "SFSF")
-        if layer_use_bf16 == True and USE_BF16_PARAMS:
+        if layer_use_bf16 is True and USE_BF16_PARAMS:
             self.dense.weight.set_blocking_param(
                 (
                     [self.attention_head_size, [self.attention_head_size // 2, 2]],
@@ -663,7 +678,9 @@ class BertEmbeddingsFunction(torch.autograd.Function):
             dwe,
             dpe,
             dte,
-        ) = torch.ops.torch_ipex.fused_embedding_layernorm_dropout_bwd_unpad(prob, pad_id, inputs)
+        ) = torch.ops.torch_ipex.fused_embedding_layernorm_dropout_bwd_unpad(
+            prob, pad_id, inputs
+        )
         grad_inps = (
             None,
             None,
@@ -717,7 +734,8 @@ class BertEmbeddings(BlockedModule):
         self.use_bf16 = layer_use_bf16
         if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
             print(
-                f"config.hidden_size = {config.hidden_size}, config.intermediate_size = {config.intermediate_size}, p = {config.hidden_dropout_prob}, eps = {config.layer_norm_eps}, bf16 = {layer_use_bf16}"
+                f"config.hidden_size = {config.hidden_size}, config.intermediate_size = {config.intermediate_size},\
+                p = {config.hidden_dropout_prob}, eps = {config.layer_norm_eps}, bf16 = {layer_use_bf16}"
             )
 
     def forward(
@@ -918,7 +936,8 @@ class BertLayer(nn.Module):
         if self.is_decoder and encoder_hidden_states is not None:
             assert hasattr(
                 self, "crossattention"
-            ), f"If `encoder_hidden_states` are passed, {self} has to be instantiated with cross-attention layers by setting `config.add_cross_attention=True`"
+            ), f"If `encoder_hidden_states` are passed, {self} has to be instantiated\
+                with cross-attention layers by setting `config.add_cross_attention=True`"
 
             # cross_attn cached key/values tuple is at positions 3,4 of past_key_value tuple
             cross_attn_past_key_value = (
@@ -986,7 +1005,7 @@ class BertEncoder(nn.Module):
         use_cache=None,
         output_attentions=False,
         output_hidden_states=False,
-        return_dict=True
+        return_dict=True,
     ):
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
@@ -1012,7 +1031,6 @@ class BertEncoder(nn.Module):
             past_key_value = past_key_values[i] if past_key_values is not None else None
 
             if getattr(self.config, "gradient_checkpointing", False) and self.training:
-
                 if use_cache:
                     logger.warning(
                         "`use_cache=True` is incompatible with `config.gradient_checkpointing=True`. Setting "
@@ -1160,8 +1178,9 @@ try:
         return False
 
     transformers.file_utils.is_tensor = is_tensor
-except:
+except ImportError:
     pass
+
 
 def block(model):
     for m in model.modules():

@@ -1,6 +1,11 @@
 import torch
-from torch.ao.quantization import UniformQuantizationObserverBase, HistogramObserver, PerChannelMinMaxObserver
+from torch.ao.quantization import (
+    UniformQuantizationObserverBase,
+    HistogramObserver,
+    PerChannelMinMaxObserver,
+)
 import copy
+
 
 class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
     """
@@ -58,11 +63,13 @@ class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
                 eps=eps,
             )
         else:
-            assert isinstance(act_ic_observer, UniformQuantizationObserverBase), \
-                f'act_ic_observer should be an instance of UniformQuantizationObserverBase ' \
-                f'or its subclass but got {type(act_ic_observer)}'
-            assert hasattr(act_ic_observer, 'ch_axis'), \
-                f'act_ic_observer should be a per-channel observer and observe input channel axis'
+            assert isinstance(act_ic_observer, UniformQuantizationObserverBase), (
+                f"act_ic_observer should be an instance of UniformQuantizationObserverBase "
+                f"or its subclass but got {type(act_ic_observer)}"
+            )
+            assert hasattr(
+                act_ic_observer, "ch_axis"
+            ), f"act_ic_observer should be a per-channel observer and observe input channel axis"
             self.ic_obs = act_ic_observer
         if act_observer is None:
             self.act_obs = HistogramObserver(
@@ -101,13 +108,23 @@ class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
         wei_max_per_ic = self.weight_obs.max_val
         act_min_per_ic = self.ic_obs.min_val
         act_max_per_ic = self.ic_obs.max_val
-        x_abs_max_per_ic = torch.max(torch.abs(act_min_per_ic), torch.abs(act_max_per_ic)) + 1e-6
-        w_abs_max_per_ic = torch.max(torch.abs(wei_min_per_ic), torch.abs(wei_max_per_ic)) + 1e-6
+        x_abs_max_per_ic = (
+            torch.max(torch.abs(act_min_per_ic), torch.abs(act_max_per_ic)) + 1e-6
+        )
+        w_abs_max_per_ic = (
+            torch.max(torch.abs(wei_min_per_ic), torch.abs(wei_max_per_ic)) + 1e-6
+        )
         # Note: activation's scaling factors are reciprocals of weight's
-        self.scaling_factors = torch.pow(w_abs_max_per_ic, 1 - self.alpha) / torch.pow(x_abs_max_per_ic, self.alpha)
+        self.scaling_factors = torch.pow(w_abs_max_per_ic, 1 - self.alpha) / torch.pow(
+            x_abs_max_per_ic, self.alpha
+        )
         # Apply scaling factors to each IC's min/max
-        act_min_per_ic_new = act_min_per_ic * self.scaling_factors.reshape(act_min_per_ic.shape)
-        act_max_per_ic_new = act_max_per_ic * self.scaling_factors.reshape(act_max_per_ic.shape)
+        act_min_per_ic_new = act_min_per_ic * self.scaling_factors.reshape(
+            act_min_per_ic.shape
+        )
+        act_max_per_ic_new = act_max_per_ic * self.scaling_factors.reshape(
+            act_max_per_ic.shape
+        )
         min_val_per_tensor = torch.min(act_min_per_ic_new)
         max_val_per_tensor = torch.max(act_max_per_ic_new)
         return self._calculate_qparams(min_val_per_tensor, max_val_per_tensor)
@@ -118,7 +135,10 @@ class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
         return self.scaling_factors
 
     def extra_repr(self):
-        return "smooth_quant_enabled={}, alpha={}".format(self.smooth_quant_enabled, self.alpha)
+        return "smooth_quant_enabled={}, alpha={}".format(
+            self.smooth_quant_enabled, self.alpha
+        )
+
 
 class SmoothQuantWeightObserver(UniformQuantizationObserverBase):
     """
@@ -192,11 +212,13 @@ class SmoothQuantWeightObserver(UniformQuantizationObserverBase):
                 eps=eps,
             )
         else:
-            assert isinstance(wei_ic_observer, UniformQuantizationObserverBase), \
-                f'wei_ic_observer should be an instance of UniformQuantizationObserverBase ' \
-                f'or its subclass but got {type(wei_ic_observer)}'
-            assert hasattr(wei_ic_observer, 'ch_axis'), \
-                f'wei_ic_observer should be a per-channel observer and observe input channel axis'
+            assert isinstance(wei_ic_observer, UniformQuantizationObserverBase), (
+                f"wei_ic_observer should be an instance of UniformQuantizationObserverBase "
+                f"or its subclass but got {type(wei_ic_observer)}"
+            )
+            assert hasattr(
+                wei_ic_observer, "ch_axis"
+            ), f"wei_ic_observer should be a per-channel observer and observe input channel axis"
             self.ic_obs = wei_ic_observer
         # if smooth_quant_enabled is false, this observer acts as
         # a normal observer
@@ -224,10 +246,16 @@ class SmoothQuantWeightObserver(UniformQuantizationObserverBase):
         act_max_per_ic = self.act_obs.max_val
         wei_min_per_ic = self.ic_obs.min_val
         wei_max_per_ic = self.ic_obs.max_val
-        w_abs_max_per_ic = torch.max(torch.abs(wei_min_per_ic), torch.abs(wei_max_per_ic)) + 1e-6
-        x_abs_max_per_ic = torch.max(torch.abs(act_min_per_ic), torch.abs(act_max_per_ic)) + 1e-6
+        w_abs_max_per_ic = (
+            torch.max(torch.abs(wei_min_per_ic), torch.abs(wei_max_per_ic)) + 1e-6
+        )
+        x_abs_max_per_ic = (
+            torch.max(torch.abs(act_min_per_ic), torch.abs(act_max_per_ic)) + 1e-6
+        )
         # Note: weight's scaling factors are reciprocals of activation's
-        self.scaling_factors = torch.pow(x_abs_max_per_ic, self.alpha) / torch.pow(w_abs_max_per_ic, 1 - self.alpha)
+        self.scaling_factors = torch.pow(x_abs_max_per_ic, self.alpha) / torch.pow(
+            w_abs_max_per_ic, 1 - self.alpha
+        )
 
         # Apply scaling factors to original weight
         # w.shape = [OC, IC], len(scaling_factors) = IC
@@ -243,4 +271,6 @@ class SmoothQuantWeightObserver(UniformQuantizationObserverBase):
         return self.scaling_factors
 
     def extra_repr(self):
-        return "smooth_quant_enabled={}, alpha={}".format(self.smooth_quant_enabled, self.alpha)
+        return "smooth_quant_enabled={}, alpha={}".format(
+            self.smooth_quant_enabled, self.alpha
+        )

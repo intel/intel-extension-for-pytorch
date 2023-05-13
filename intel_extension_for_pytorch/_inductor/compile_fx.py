@@ -15,7 +15,9 @@ def patch_codegen():
     def get_backend(scheduler, device):
         # TODO(jgong5): support xpu
         if device.type == "cpu":
-            if device not in scheduler.backends or not isinstance(scheduler.backends[device], IpexCppScheduling):
+            if device not in scheduler.backends or not isinstance(
+                scheduler.backends[device], IpexCppScheduling
+            ):
                 scheduler.backends[device] = IpexCppScheduling(scheduler)
         else:
             if device not in scheduler.backends:
@@ -41,8 +43,11 @@ def compile_fx(
     model: torch.fx.GraphModule,
     example_inputs: List[torch.Tensor],
     mode: Union[str, None] = None,
-    options: Optional[Dict[str, Union[str, builtins.int, builtins.bool]]] = None
+    options: Optional[Dict[str, Union[str, builtins.int, builtins.bool]]] = None,
 ):
     from torch._inductor.compile_fx import compile_fx as inductor_compile
+
     with patch_functions():
-        return inductor_compile(model, example_inputs, decompositions=get_decompositions())
+        return inductor_compile(
+            model, example_inputs, decompositions=get_decompositions()
+        )

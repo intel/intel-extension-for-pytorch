@@ -1,3 +1,5 @@
+# This Python file uses the following encoding: utf-8
+
 from typing import List, Union
 
 import torch
@@ -6,6 +8,7 @@ from torch.nn.modules.utils import _pair
 from torch.jit.annotations import BroadcastingList2
 
 from typing import List, Union
+
 
 def _cat(tensors: List[Tensor], dim: int = 0) -> Tensor:
     """
@@ -31,13 +34,17 @@ def _convert_boxes_to_roi_format(boxes: List[Tensor]) -> Tensor:
 def _check_roi_boxes_shape(boxes: Union[Tensor, List[Tensor]]):
     if isinstance(boxes, (list, tuple)):
         for _tensor in boxes:
-            assert _tensor.size(1) == 4, \
-                'The shape of the tensor in the boxes list is not correct as List[Tensor[L, 4]]'
+            assert (
+                _tensor.size(1) == 4
+            ), "The shape of the tensor in the boxes list is not correct as List[Tensor[L, 4]]"
     elif isinstance(boxes, torch.Tensor):
-        assert boxes.size(1) == 5, 'The boxes tensor shape is not correct as Tensor[K, 5]'
+        assert (
+            boxes.size(1) == 5
+        ), "The boxes tensor shape is not correct as Tensor[K, 5]"
     else:
-        assert False, 'boxes is expected to be a Tensor[L, 5] or a List[Tensor[K, 4]]'
+        assert False, "boxes is expected to be a Tensor[L, 5] or a List[Tensor[K, 4]]"
     return
+
 
 def roi_align(
     input: Tensor,
@@ -98,6 +105,12 @@ def roi_align(
     output_size = _pair(output_size)
     if not isinstance(rois, torch.Tensor):
         rois = _convert_boxes_to_roi_format(rois)
-    return torch.ops.torch_ipex.ROIAlign_forward(input, rois, spatial_scale,
-                                           output_size[0], output_size[1],
-                                           sampling_ratio, aligned)
+    return torch.ops.torch_ipex.ROIAlign_forward(
+        input,
+        rois,
+        spatial_scale,
+        output_size[0],
+        output_size[1],
+        sampling_ratio,
+        aligned,
+    )

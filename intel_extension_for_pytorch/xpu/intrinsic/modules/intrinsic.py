@@ -2,6 +2,7 @@ import torch
 import intel_extension_for_pytorch
 from torch.autograd import Function
 
+
 class InteractionFuncion(Function):
     @staticmethod
     def forward(ctx, input_mlp, input_emb):

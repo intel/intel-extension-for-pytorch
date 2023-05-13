@@ -291,9 +291,13 @@ def memory_summary(device: Union[Device, int] = None, abbreviated: bool = False)
     lines.append("=" * 75)
     lines.append(" {_:16} PyTorch XPU memory summary, device ID {device:<17d} ")
     lines.append("-" * 75)
-    lines.append("  {_:9} XPU OOMs: {num_ooms:<12d} | {_:6} xpuMalloc retries: {num_alloc_retries:<8d}  ")
+    lines.append(
+        "  {_:9} XPU OOMs: {num_ooms:<12d} | {_:6} xpuMalloc retries: {num_alloc_retries:<8d}  "
+    )
     lines.append("=" * 75)
-    lines.append("        Metric         | Cur Usage  | Peak Usage | Tot Alloc  | Tot Freed  ")
+    lines.append(
+        "        Metric         | Cur Usage  | Peak Usage | Tot Alloc  | Tot Freed  "
+    )
 
     for metric_key, metric_name, formatter in metrics_to_display:
         lines.append("-" * 75)
@@ -302,7 +306,12 @@ def memory_summary(device: Union[Device, int] = None, abbreviated: bool = False)
             submetrics.append(("large_pool", "      from large pool"))
             submetrics.append(("small_pool", "      from small pool"))
 
-        current_prefval, peak_prefval, allocated_prefval, freed_prefval = None, None, None, None
+        current_prefval, peak_prefval, allocated_prefval, freed_prefval = (
+            None,
+            None,
+            None,
+            None,
+        )
 
         for submetric_key, submetric_name in submetrics:
             prefix = metric_key + "." + submetric_key + "."
@@ -318,12 +327,14 @@ def memory_summary(device: Union[Device, int] = None, abbreviated: bool = False)
                 allocated_prefval = allocated
                 freed_prefval = freed
 
-            lines.append(" {:<21} | {} | {} | {} | {} ".format(
-                submetric_name,
-                formatter(current, current_prefval),
-                formatter(peak, peak_prefval),
-                formatter(allocated, allocated_prefval),
-                formatter(freed, freed_prefval)),
+            lines.append(
+                " {:<21} | {} | {} | {} | {} ".format(
+                    submetric_name,
+                    formatter(current, current_prefval),
+                    formatter(peak, peak_prefval),
+                    formatter(allocated, allocated_prefval),
+                    formatter(freed, freed_prefval),
+                ),
             )
 
     lines.append("=" * 75)

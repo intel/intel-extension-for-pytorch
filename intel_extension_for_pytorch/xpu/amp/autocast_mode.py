@@ -1,5 +1,6 @@
 import torch
 
+
 class autocast(torch.amp.autocast_mode.autocast):
     r"""
     See :class:`torch.autocast`.
@@ -7,4 +8,6 @@ class autocast(torch.amp.autocast_mode.autocast):
     """
 
     def __init__(self, enabled=True, dtype=torch.bfloat16, cache_enabled=True):
-        super().__init__("xpu", enabled=enabled, dtype=dtype, cache_enabled=cache_enabled)
+        super().__init__(
+            "xpu", enabled=enabled, dtype=dtype, cache_enabled=cache_enabled
+        )

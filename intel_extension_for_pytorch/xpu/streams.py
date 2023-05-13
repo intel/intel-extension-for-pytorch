@@ -20,8 +20,11 @@ class Stream(intel_extension_for_pytorch._C._XPUStreamBase):
         return hash((self.sycl_queue, self.device))
 
     def __repr__(self):
-        return ('<intel_extension_for_pytorch.Stream device={0} sycl_queue={1:#x}>'
-                .format(self.device, self.sycl_queue))
+        return (
+            "<intel_extension_for_pytorch.Stream device={0} sycl_queue={1:#x}>".format(
+                self.device, self.sycl_queue
+            )
+        )
 
     def wait_event(self, event):
         r"""Makes all future work submitted to the stream wait for an event.
@@ -61,9 +64,7 @@ class Stream(intel_extension_for_pytorch._C._XPUStreamBase):
         return event
 
     def synchronize(self):
-        r"""Wait for all the kernels in this stream to complete.
-
-        """
+        r"""Wait for all the kernels in this stream to complete."""
         super(Stream, self).synchronize()
 
 
@@ -74,7 +75,8 @@ class Event(intel_extension_for_pytorch._C._XPUEventBase):
     def record(self, stream=None):
         r"""Records the event in a given stream.
 
-        Uses ``intel_extension_for_pytorch.xpu.current_stream()`` if no stream is specified."""
+        Uses ``intel_extension_for_pytorch.xpu.current_stream()`` if no stream is specified.
+        """
         if stream is None:
             stream = intel_extension_for_pytorch.xpu.current_stream()
         super(Event, self).record(stream)
@@ -83,7 +85,8 @@ class Event(intel_extension_for_pytorch._C._XPUEventBase):
         r"""Makes all future work submitted to the given stream wait for this
         event.
 
-        Use ``intel_extension_for_pytorch.xpu.current_stream()`` if no stream is specified."""
+        Use ``intel_extension_for_pytorch.xpu.current_stream()`` if no stream is specified.
+        """
         if stream is None:
             stream = intel_extension_for_pytorch.xpu.current_stream()
         super(Event, self).wait(stream)
@@ -117,6 +120,6 @@ class Event(intel_extension_for_pytorch._C._XPUEventBase):
 
     def __repr__(self):
         if self.dpcpp_event:
-            return '<torch.xpu.Event {0:#x}>'.format(self._as_parameter_.value)
+            return "<torch.xpu.Event {0:#x}>".format(self._as_parameter_.value)
         else:
-            return '<torch.xpu.Event uninitialized>'
+            return "<torch.xpu.Event uninitialized>"

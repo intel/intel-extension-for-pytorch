@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 
+
 class FrozenBatchNorm2d(nn.Module):
     r"""
     BatchNorm2d where the batch statistics and the affine parameters are fixed
@@ -13,7 +14,8 @@ class FrozenBatchNorm2d(nn.Module):
         - Output: :math:`(N, C, H, W)` (same shape as input)
     """
 
-    def __init__(self,
+    def __init__(
+        self,
         num_features: int,
         eps: float = 1e-5,
     ):
@@ -25,4 +27,6 @@ class FrozenBatchNorm2d(nn.Module):
         self.register_buffer("running_var", torch.ones(num_features))
 
     def forward(self, input):
-        return torch.ops.torch_ipex.frozen_batch_norm(input, self.weight, self.bias, self.running_mean, self.running_var, self.eps)
+        return torch.ops.torch_ipex.frozen_batch_norm(
+            input, self.weight, self.bias, self.running_mean, self.running_var, self.eps
+        )

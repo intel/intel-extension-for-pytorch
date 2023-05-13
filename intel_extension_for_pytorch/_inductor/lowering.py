@@ -19,7 +19,9 @@ def _register_lowering(
     else:
         aten_fn = list(aten_fn)
     for fn in aten_fn:
-        lowering_overrides.update({fn: (decomp_fn, broadcast, type_promotion_kind, convert_input_to_bool)})
+        lowering_overrides.update(
+            {fn: (decomp_fn, broadcast, type_promotion_kind, convert_input_to_bool)}
+        )
 
 
 def register_lowering(
@@ -45,7 +47,17 @@ def patch_lowering():
 
     old_lowerings = lowerings
     lowerings = copy.copy(lowerings)
-    for fn, (decomp_fn, broadcast, type_promotion_kind, convert_input_to_bool) in lowering_overrides.items():
-        register_lowering(fn, broadcast=broadcast, type_promotion_kind=type_promotion_kind, convert_input_to_bool=convert_input_to_bool)(decomp_fn)
+    for fn, (
+        decomp_fn,
+        broadcast,
+        type_promotion_kind,
+        convert_input_to_bool,
+    ) in lowering_overrides.items():
+        register_lowering(
+            fn,
+            broadcast=broadcast,
+            type_promotion_kind=type_promotion_kind,
+            convert_input_to_bool=convert_input_to_bool,
+        )(decomp_fn)
     yield
     lowerings = old_lowerings

@@ -1,9 +1,7 @@
 import torch
-import functools
-import warnings
-import numpy as np
 import intel_extension_for_pytorch as ipex
 from .cpupool import CPUPool
+
 
 class Task(object):
     r"""

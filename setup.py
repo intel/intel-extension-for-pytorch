@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+# This Python file uses the following encoding: utf-8
+# !/usr/bin/env python
 
 # Welcome to the Intel Extension for PyTorch setup.py.
 #
@@ -74,7 +75,6 @@
 from __future__ import print_function
 from distutils.command.build_py import build_py
 from distutils.command.install import install
-from distutils.cmd import Command
 from distutils.version import LooseVersion
 from functools import lru_cache
 from subprocess import check_call, check_output
@@ -87,16 +87,12 @@ from typing import Any, Optional
 import sysconfig
 import distutils.ccompiler
 import distutils.command.clean
-import multiprocessing
-import multiprocessing.pool
 import os
 import glob
 import platform
 import shutil
 import subprocess
 import sys
-import copy
-import re
 import errno
 
 
