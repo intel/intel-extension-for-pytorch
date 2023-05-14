@@ -1,8 +1,10 @@
-From 2bfb6c76c6031cde0d80c5dcab534a2fdfbae71b Mon Sep 17 00:00:00 2001
-From: majing <jing1.ma@intel.com>
-Date: Fri, 18 Nov 2022 15:40:13 +0800
-Subject: [PATCH 07/15] Add API for intel XPU to register new tensor type (#87)
+From 7999687b0906cd7518ace477f660c2041436e295 Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
+Date: Fri, 21 Apr 2023 11:43:48 +0800
+Subject: [PATCH 3/9] Add API for intel XPU to register new tensor type (#87)
+ (#118)
 
+Co-authored-by: majing <jing1.ma@intel.com>
 Co-authored-by: chengjunlu <chengjun.lu@intel.com>
 ---
  torch/csrc/tensor/python_tensor.cpp | 152 +++++++++++++++-------------
@@ -251,7 +253,7 @@ index ab74e05341..5827f3b4ce 100644
  //
  // TODO: This is nuts!  There is no reason to let the default tensor type id
 diff --git a/torch/csrc/utils/tensor_types.cpp b/torch/csrc/utils/tensor_types.cpp
-index 8a20c93d87..0d3c6c1f31 100644
+index decf407b982..d4e4dd1d38c 100644
 --- a/torch/csrc/utils/tensor_types.cpp
 +++ b/torch/csrc/utils/tensor_types.cpp
 @@ -19,7 +19,7 @@ using namespace at;

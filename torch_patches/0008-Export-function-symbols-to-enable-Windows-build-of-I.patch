@@ -1,14 +1,15 @@
-From a42ba40aa64c8673e9446916d1e797e382a17811 Mon Sep 17 00:00:00 2001
-From: Escapeqyq <yiqin.qiu@intel.com>
-Date: Tue, 11 Apr 2023 05:48:18 -0700
-Subject: [PATCH 12/15] Export function symbols to enable Windows build of
- Intel Extension for PyTorch (#113)
+From 9a28c523e4747f2bd5feb4b73071dea6463dbc9a Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
+Date: Fri, 21 Apr 2023 14:41:17 +0800
+Subject: [PATCH 8/9] Export function symbols to enable Windows build of
+ Intel Extension for PyTorch (#113) (#124)
 
 * update 1.13.1
 * update syntax
 * update for linux ci
+
+Co-authored-by: Escapeqyq <yiqin.qiu@intel.com>
 ---
- c10/macros/Macros.h                  | 2 +-
  torch/csrc/Dtype.h                   | 4 +++-
  torch/csrc/DynamicTypes.h            | 2 +-
  torch/csrc/Exceptions.h              | 2 +-
@@ -17,22 +18,8 @@ Subject: [PATCH 12/15] Export function symbols to enable Windows build of
  torch/csrc/utils.h                   | 4 ++--
  torch/csrc/utils/object_ptr.h        | 3 ++-
  torch/csrc/utils/python_arg_parser.h | 2 +-
- 9 files changed, 15 insertions(+), 11 deletions(-)
+ 8 files changed, 14 insertions(+), 10 deletions(-)
 
-diff --git a/c10/macros/Macros.h b/c10/macros/Macros.h
-index 513def9845..c7e9c5aa13 100644
---- a/c10/macros/Macros.h
-+++ b/c10/macros/Macros.h
-@@ -347,8 +347,8 @@ __host__ __device__
- #endif // __CUDA_ARCH__
-     void
-     _wassert(wchar_t const* _Message, wchar_t const* _File, unsigned _Line);
--}
- #endif // __SYCL_DEVICE_ONLY__
-+}
- #endif // NDEBUG
- #define CUDA_KERNEL_ASSERT(cond)                                                                 \
-   if (C10_UNLIKELY(!(cond))) {                                                                   \
 diff --git a/torch/csrc/Dtype.h b/torch/csrc/Dtype.h
 index 648a8091d9..70cee858f9 100644
 --- a/torch/csrc/Dtype.h
@@ -48,10 +35,10 @@ index 648a8091d9..70cee858f9 100644
  
  void THPDtype_init(PyObject* module);
 diff --git a/torch/csrc/DynamicTypes.h b/torch/csrc/DynamicTypes.h
-index 6765916634..7a0f950637 100644
+index 7ca18942564..bb481556ab0 100644
 --- a/torch/csrc/DynamicTypes.h
 +++ b/torch/csrc/DynamicTypes.h
-@@ -32,6 +32,6 @@ at::Storage createStorageGetType(
+@@ -33,6 +33,6 @@ at::Storage createStorageGetType(
      bool& is_typed_storage);
  bool isStorage(PyObject* obj);
  
@@ -60,10 +47,10 @@ index 6765916634..7a0f950637 100644
  THPLayout* getTHPLayout(at::Layout layout);
  } // namespace torch
 diff --git a/torch/csrc/Exceptions.h b/torch/csrc/Exceptions.h
-index 89256c64bb..fdbf45a4dd 100644
+index 7c448ddc67f..819b261e29a 100644
 --- a/torch/csrc/Exceptions.h
 +++ b/torch/csrc/Exceptions.h
-@@ -307,7 +307,7 @@ struct TypeError : public PyTorchError {
+@@ -314,7 +314,7 @@ struct TypeError : public PyTorchError {
  // Translates to Python ValueError
  struct ValueError : public PyTorchError {
    using PyTorchError::PyTorchError;
@@ -73,10 +60,10 @@ index 89256c64bb..fdbf45a4dd 100644
      return PyExc_ValueError;
    }
 diff --git a/torch/csrc/Stream.h b/torch/csrc/Stream.h
-index 6a61e9ca08..e49105298f 100644
+index ec983203a12..656e37a4954 100644
 --- a/torch/csrc/Stream.h
 +++ b/torch/csrc/Stream.h
-@@ -1,12 +1,13 @@
+@@ -1,6 +1,7 @@
  #ifndef THP_STREAM_INC
  #define THP_STREAM_INC
  
@@ -84,7 +71,9 @@ index 6a61e9ca08..e49105298f 100644
  #include <torch/csrc/python_headers.h>
  
  struct THPStream {
-   PyObject_HEAD uint64_t cdata;
+@@ -8,7 +9,7 @@ struct THPStream {
+   int64_t device_type;
+   int64_t device_index;
  };
 -extern PyTypeObject* THPStreamClass;
 +extern TORCH_API PyTypeObject* THPStreamClass;
@@ -113,10 +102,10 @@ index 5827f3b4ce..8d74f66a2b 100644
  
  // Gets the ScalarType for the default tensor type.
 diff --git a/torch/csrc/utils.h b/torch/csrc/utils.h
-index fe8c834077..dff8c41a9a 100644
+index 925981fbb64..97c878dba33 100644
 --- a/torch/csrc/utils.h
 +++ b/torch/csrc/utils.h
-@@ -158,7 +158,7 @@ TORCH_PYTHON_API void THPUtils_invalidArguments(
+@@ -169,7 +169,7 @@ TORCH_PYTHON_API void THPUtils_invalidArguments(
  bool THPUtils_checkIntTuple(PyObject* arg);
  std::vector<int> THPUtils_unpackIntTuple(PyObject* arg);
  
@@ -125,7 +114,7 @@ index fe8c834077..dff8c41a9a 100644
      std::vector<PyMethodDef>& vector,
      PyMethodDef* methods);
  
-@@ -167,7 +167,7 @@ int THPUtils_getCallable(PyObject* arg, PyObject** result);
+@@ -178,7 +178,7 @@ int THPUtils_getCallable(PyObject* arg, PyObject** result);
  typedef THPPointer<THPGenerator> THPGeneratorPtr;
  typedef class THPPointer<THPStorage> THPStoragePtr;
  
@@ -151,10 +140,10 @@ index 359e177f4f..35302e2187 100644
    THPPointer() : ptr(nullptr){};
    explicit THPPointer(T* ptr) noexcept : ptr(ptr){};
 diff --git a/torch/csrc/utils/python_arg_parser.h b/torch/csrc/utils/python_arg_parser.h
-index 9b23af5829..26d58edd7e 100644
+index d9d14a83a9c..ae91c761190 100644
 --- a/torch/csrc/utils/python_arg_parser.h
 +++ b/torch/csrc/utils/python_arg_parser.h
-@@ -214,7 +214,7 @@ struct ParsedArgs {
+@@ -132,7 +132,7 @@ struct ParsedArgs {
    PyObject* args[N];
  };
  

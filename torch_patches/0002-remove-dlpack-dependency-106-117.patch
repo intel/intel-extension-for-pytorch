@@ -1,7 +1,7 @@
-From da935a4cfc83541e3583d5b6ac06f0f591718c9e Mon Sep 17 00:00:00 2001
+From f0a55fc2cc4af937f812c4a1b14bdc077b2988b4 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
-Date: Thu, 30 Mar 2023 13:26:44 +0800
-Subject: [PATCH 05/15] remove dlpack dependency (#106)
+Date: Fri, 21 Apr 2023 11:39:50 +0800
+Subject: [PATCH 2/9] remove dlpack dependency (#106) (#117)
 
 * remove dlpack dependency
 * rich comments
@@ -12,7 +12,7 @@ Subject: [PATCH 05/15] remove dlpack dependency (#106)
  3 files changed, 13 insertions(+), 5 deletions(-)
 
 diff --git a/aten/src/ATen/DLConvertor.cpp b/aten/src/ATen/DLConvertor.cpp
-index 817f983913..c10b25a229 100644
+index 68e5a42069c..84d198eba93 100644
 --- a/aten/src/ATen/DLConvertor.cpp
 +++ b/aten/src/ATen/DLConvertor.cpp
 @@ -92,7 +92,7 @@ DLDevice getDLDevice(const Tensor& tensor, const int64_t& device_id) {

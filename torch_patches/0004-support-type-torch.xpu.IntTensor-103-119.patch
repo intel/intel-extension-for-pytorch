@@ -1,13 +1,16 @@
-From 3763f34d652626761c1e0d67fbb4d070c9a7541c Mon Sep 17 00:00:00 2001
+From 727002bb34cfbbf84a1819fbad6136c92cc1326e Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
-Date: Tue, 14 Mar 2023 12:41:58 +0800
-Subject: [PATCH 10/15] support type(torch.xpu.IntTensor) (#103)
+Date: Fri, 21 Apr 2023 12:01:23 +0800
+Subject: [PATCH 4/9] support type(torch.xpu.IntTensor) (#103) (#119)
 
+* support type(torch.xpu.IntTensor) (#103)
+
+* format code
 ---
  tools/autograd/templates/VariableType.h    |  1 +
  torch/csrc/autograd/VariableTypeManual.cpp |  4 ++++
- torch/csrc/utils/tensor_types.cpp          | 12 ++++++++++++
- 3 files changed, 17 insertions(+)
+ torch/csrc/utils/tensor_types.cpp          | 13 +++++++++++++
+ 3 files changed, 18 insertions(+)
 
 diff --git a/tools/autograd/templates/VariableType.h b/tools/autograd/templates/VariableType.h
 index ad2abc2bdb..abad2f9338 100644
@@ -22,10 +25,10 @@ index ad2abc2bdb..abad2f9338 100644
  
    at::Tensor & unpack(Tensor & t, const char * name, int pos);
 diff --git a/torch/csrc/autograd/VariableTypeManual.cpp b/torch/csrc/autograd/VariableTypeManual.cpp
-index e276521ace..aa9a857b92 100644
+index 2998e65d975..705c6b0c9df 100644
 --- a/torch/csrc/autograd/VariableTypeManual.cpp
 +++ b/torch/csrc/autograd/VariableTypeManual.cpp
-@@ -44,6 +44,10 @@ C10_EXPORT std::vector<at::DeprecatedTypeProperties*> allCUDATypes() {
+@@ -46,6 +46,10 @@ C10_EXPORT std::vector<at::DeprecatedTypeProperties*> allCUDATypes() {
    return allTypesForBackends({Backend::CUDA, Backend::SparseCUDA});
  }
  
@@ -37,10 +40,10 @@ index e276521ace..aa9a857b92 100644
  const Variable& checked_cast_variable(
      const Tensor& t,
 diff --git a/torch/csrc/utils/tensor_types.cpp b/torch/csrc/utils/tensor_types.cpp
-index 0d3c6c1f31..c9a95df687 100644
+index d4e4dd1d38c..3df3e0b7ecc 100644
 --- a/torch/csrc/utils/tensor_types.cpp
 +++ b/torch/csrc/utils/tensor_types.cpp
-@@ -66,9 +66,12 @@ std::string type_to_string(const at::DeprecatedTypeProperties& type) {
+@@ -70,9 +70,12 @@ std::string type_to_string(const at::DeprecatedTypeProperties& type) {
  
  at::TensorOptions options_from_string(const std::string& str) {
    static std::string cuda_prefix("torch.cuda.");
@@ -53,12 +56,13 @@ index 0d3c6c1f31..c9a95df687 100644
    static std::unordered_map<std::string, at::DeprecatedTypeProperties*>
        cuda_map;
  
-@@ -91,6 +94,15 @@ at::TensorOptions options_from_string(const std::string& str) {
+@@ -95,6 +98,16 @@ at::TensorOptions options_from_string(const std::string& str) {
        }
      });
      map = &cuda_map;
-+  } else if (std::mismatch(xpu_prefix.begin(), xpu_prefix.end(), str.begin())
-+          .first == xpu_prefix.end()) {
++  } else if (
++      std::mismatch(xpu_prefix.begin(), xpu_prefix.end(), str.begin()).first ==
++      xpu_prefix.end()) {
 +    // torch.xpu. is prefix of str
 +    c10::call_once(xpu_once, []() {
 +      for (auto type : autograd::VariableType::allXPUTypes()) {

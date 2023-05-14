@@ -1,37 +1,38 @@
-From 396932c0b7dca55449977e52ab9f3477cebd6f75 Mon Sep 17 00:00:00 2001
-From: johnlu <chengjun.lu@intel.com>
-Date: Mon, 28 Mar 2022 20:49:03 +0800
-Subject: [PATCH 04/15] Add DLPack oneAPI support for the XPU device for
- experimental.
+From b53f0dfa108650b6f56ef89250d066105384b347 Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
+Date: Fri, 21 Apr 2023 11:35:16 +0800
+Subject: [PATCH 1/9] Add DLPack oneAPI support for the XPU device for
+ experimental. (#116)
 
+Co-authored-by: johnlu <chengjun.lu@intel.com>
 ---
  aten/src/ATen/Context.h                    |  8 +++
  aten/src/ATen/DLConvertor.cpp              | 16 +++--
  aten/src/ATen/Version.cpp                  |  4 ++
- aten/src/ATen/detail/XPUHooksInterface.cpp | 29 +++++++++
+ aten/src/ATen/detail/XPUHooksInterface.cpp | 30 +++++++++
  aten/src/ATen/detail/XPUHooksInterface.h   | 75 ++++++++++++++++++++++
  aten/src/ATen/dlpack.h                     | 44 +++++++++++--
  aten/src/ATen/ops/from_blob.h              |  4 +-
  caffe2/python/dlpack.h                     | 44 +++++++++++--
  torch/_tensor.py                           |  2 +
  torch/utils/dlpack.py                      |  1 +
- 10 files changed, 208 insertions(+), 19 deletions(-)
+ 10 files changed, 209 insertions(+), 19 deletions(-)
  create mode 100644 aten/src/ATen/detail/XPUHooksInterface.cpp
  create mode 100644 aten/src/ATen/detail/XPUHooksInterface.h
 
 diff --git a/aten/src/ATen/Context.h b/aten/src/ATen/Context.h
-index 43f4433b7c..ea2cb3f41d 100644
+index 8816fb0872a..679b8545cb9 100644
 --- a/aten/src/ATen/Context.h
 +++ b/aten/src/ATen/Context.h
-@@ -9,6 +9,7 @@
- #include <ATen/detail/CUDAHooksInterface.h>
+@@ -10,6 +10,7 @@
  #include <ATen/detail/HIPHooksInterface.h>
+ #include <ATen/detail/MPSHooksInterface.h>
  #include <ATen/detail/ORTHooksInterface.h>
 +#include <ATen/detail/XPUHooksInterface.h>
  #include <c10/core/QEngine.h>
  #include <c10/core/impl/DeviceGuardImplInterface.h>
  #include <c10/util/CallOnce.h>
-@@ -89,6 +90,9 @@ class TORCH_API Context {
+@@ -96,6 +97,9 @@ class TORCH_API Context {
    static bool hasXLA() {
      return c10::impl::hasDeviceGuardImpl(at::DeviceType::XLA);
    }
@@ -41,7 +42,7 @@ index 43f4433b7c..ea2cb3f41d 100644
    static bool hasLazy() {
      return c10::impl::hasDeviceGuardImpl(at::DeviceType::Lazy);
    }
-@@ -353,6 +357,10 @@ static inline bool hasORT() {
+@@ -371,6 +375,10 @@ static inline bool hasORT() {
    return globalContext().hasORT();
  }
  
@@ -53,7 +54,7 @@ index 43f4433b7c..ea2cb3f41d 100644
  static inline size_t getNumGPUs() {
    // WARNING: DO NOT ADD LOGIC TO HANDLE OTHER DEVICE TYPES TO THIS
 diff --git a/aten/src/ATen/DLConvertor.cpp b/aten/src/ATen/DLConvertor.cpp
-index 614dc46158..817f983913 100644
+index d795d3db44a..68e5a42069c 100644
 --- a/aten/src/ATen/DLConvertor.cpp
 +++ b/aten/src/ATen/DLConvertor.cpp
 @@ -90,13 +90,17 @@ DLDevice getDLDevice(const Tensor& tensor, const int64_t& device_id) {
@@ -84,18 +85,13 @@ index 614dc46158..817f983913 100644
      default:
        TORCH_CHECK(
            false, "Unsupported device_type: " + c10::to_string(ctx.device_type));
-@@ -249,7 +255,7 @@ DLManagedTensor* toDLPack(const Tensor& src) {
- }
- 
- Tensor fromDLPack(const DLManagedTensor* src) {
+@@ -261,13 +267,15 @@ Tensor fromDLPack(const DLManagedTensor* src) {
+ Tensor fromDLPack(
+     const DLManagedTensor* src,
+     std::function<void(void*)> deleter) {
 -  Device device = getATenDevice(src->dl_tensor.device);
 +  Device device = getATenDevice(src->dl_tensor.device, src->dl_tensor.data);
    ScalarType stype = toScalarType(src->dl_tensor.dtype);
-   auto deleter = [src](void* self) {
-     if (src->deleter) {
-@@ -258,10 +264,12 @@ Tensor fromDLPack(const DLManagedTensor* src) {
-     }
-   };
    if (!src->dl_tensor.strides) {
 -    return at::from_blob(src->dl_tensor.data,
 +    return at::from_blob(
@@ -125,12 +121,13 @@ index 4b9da640fb..350480e213 100644
      if (!pair.second.empty()) {
 diff --git a/aten/src/ATen/detail/XPUHooksInterface.cpp b/aten/src/ATen/detail/XPUHooksInterface.cpp
 new file mode 100644
-index 0000000000..d740068379
+index 00000000000..ad46a77959c
 --- /dev/null
 +++ b/aten/src/ATen/detail/XPUHooksInterface.cpp
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,30 @@
 +#include <ATen/detail/XPUHooksInterface.h>
 +
++#include <c10/util/CallOnce.h>
 +#include <c10/util/Exception.h>
 +
 +#include <cstddef>
@@ -143,8 +140,8 @@ index 0000000000..d740068379
 +static XPUHooksInterface *xpu_hooks = nullptr;
 +
 +const XPUHooksInterface &getXPUHooks() {
-+  static std::once_flag once;
-+  std::call_once(once, [] {
++  static c10::once_flag once;
++  c10::call_once(once, [] {
 +    xpu_hooks =
 +        XPUHooksRegistry()->Create("XPUHooks", XPUHooksArgs{}).release();
 +    if (!xpu_hooks) {
@@ -468,20 +465,20 @@ index 0ad1e119bc..3d33935d31 100644
    DLDataType dtype;
    /*! \brief The shape of the tensor */
 diff --git a/torch/_tensor.py b/torch/_tensor.py
-index fd3f338d51..7ec31661b1 100644
+index cabfcbf8983..411b2b8229f 100644
 --- a/torch/_tensor.py
 +++ b/torch/_tensor.py
-@@ -1347,6 +1347,8 @@ class Tensor(torch._C._TensorBase):
+@@ -1362,6 +1362,8 @@ class Tensor(torch._C._TensorBase):
              device_type = DLDeviceType.kDLGPU
-         elif self.device.type == "cpu":
+         elif torch_device_type == "cpu":
              device_type = DLDeviceType.kDLCPU
-+        elif self.device.type == 'xpu':
++        elif self.device.type == "xpu":
 +            device_type = DLDeviceType.kDLOneAPI
          else:
              raise ValueError(
-                 "Unknown device type {} for Dlpack".format(self.device.type)
+                 "Unknown device type {} for Dlpack".format(torch_device_type)
 diff --git a/torch/utils/dlpack.py b/torch/utils/dlpack.py
-index ae0aafceb1..a48abcad76 100644
+index 49fe6b4ea1b..f903de94eb6 100644
 --- a/torch/utils/dlpack.py
 +++ b/torch/utils/dlpack.py
 @@ -18,6 +18,7 @@ class DLDeviceType(enum.IntEnum):

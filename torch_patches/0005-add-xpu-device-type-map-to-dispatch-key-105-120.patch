@@ -1,17 +1,17 @@
-From 40e32d641e0a5394dfd354598421978ec5ff1f07 Mon Sep 17 00:00:00 2001
+From a5dec8aa8b6bb33e8a25ceeffa3e0fc00b62f346 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
-Date: Thu, 16 Mar 2023 17:21:17 +0800
-Subject: [PATCH 11/15] add xpu device type map to dispatch key (#105)
+Date: Fri, 21 Apr 2023 12:05:18 +0800
+Subject: [PATCH 5/9] add xpu device type map to dispatch key (#105) (#120)
 
 ---
  torch/library.h | 2 ++
  1 file changed, 2 insertions(+)
 
 diff --git a/torch/library.h b/torch/library.h
-index 69175d0756..d2fb602a3c 100644
+index 71b190e8a3e..a11fe6165d3 100644
 --- a/torch/library.h
 +++ b/torch/library.h
-@@ -356,6 +356,8 @@ inline CppFunction dispatch(c10::DeviceType type, Func&& raw_f) {
+@@ -362,6 +362,8 @@ inline CppFunction dispatch(c10::DeviceType type, Func&& raw_f) {
          return c10::DispatchKey::XLA;
        case c10::DeviceType::Lazy:
          return c10::DispatchKey::Lazy;
