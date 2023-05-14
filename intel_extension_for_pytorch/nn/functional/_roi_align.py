@@ -3,11 +3,9 @@
 from typing import List, Union
 
 import torch
-from torch import nn, Tensor
+from torch import Tensor
 from torch.nn.modules.utils import _pair
 from torch.jit.annotations import BroadcastingList2
-
-from typing import List, Union
 
 
 def _cat(tensors: List[Tensor], dim: int = 0) -> Tensor:
@@ -42,7 +40,7 @@ def _check_roi_boxes_shape(boxes: Union[Tensor, List[Tensor]]):
             boxes.size(1) == 5
         ), "The boxes tensor shape is not correct as Tensor[K, 5]"
     else:
-        assert False, "boxes is expected to be a Tensor[L, 5] or a List[Tensor[K, 4]]"
+        assert (False, "boxes is expected to be a Tensor[L, 5] or a List[Tensor[K, 4]]")
     return
 
 
@@ -55,11 +53,17 @@ def roi_align(
     aligned: bool = False,
 ) -> Tensor:
     """
-    Performs Region of Interest (RoI) Align operator with average pooling, as described in Mask R-CNN. It is optimized with parallelization and channels last support on the basis of the torchvision's roi_align.
+    Performs Region of Interest (RoI) Align operator with average pooling, as described in Mask R-CNN.
+    It is optimized with parallelization and channels last support on the basis of the torchvision's roi_align.
 
-    The semantics of Intel® Extension for PyTorch* roi_align is exactly the same as that of torchvision. We override roi_align in the torchvision with Intel® Extension for PyTorch* roi_align via ATen op registration. It is activated when Intel® Extension for PyTorch* is imported from the Python frontend or when it is linked by a C++ program. It is fully transparent to users.
+    The semantics of Intel® Extension for PyTorch* roi_align is exactly the same as that of torchvision.
+    We override roi_align in the torchvision with Intel® Extension for PyTorch* roi_align via ATen op registration.
+    It is activated when Intel® Extension for PyTorch* is imported from the Python frontend or when it is linked
+    by a C++ program. It is fully transparent to users.
 
-    In certain cases, if you are using a self-implemented roi_align class or function that behave exactly the same as the ones in torchvision, please import the optimized one in Intel® Extension for PyTorch* as the following examples to get performance boost on Intel platforms.
+    In certain cases, if you are using a self-implemented roi_align class or function that behave exactly the same as
+    the ones in torchvision, please import the optimized one in Intel® Extension for PyTorch* as the following
+    examples to get performance boost on Intel platforms.
 
     .. highlight:: python
     .. code-block:: python

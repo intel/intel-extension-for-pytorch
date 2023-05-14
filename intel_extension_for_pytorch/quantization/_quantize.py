@@ -1,7 +1,6 @@
 import copy
 import functools
 import os
-from typing import Tuple, Any
 import warnings
 
 import torch
@@ -9,7 +8,6 @@ from torch.ao.quantization import PlaceholderObserver, QConfig, QConfigMapping
 import torch.fx.experimental.optimization as optimization
 from torch.ao.nn.quantized.modules.utils import _quantize_weight
 import torch.ao.nn.quantized.dynamic as nnqd
-from torch.ao.quantization.quantize import propagate_qconfig_
 from torch.ao.quantization.quantization_mappings import (
     get_default_dynamic_quant_module_mappings,
 )
@@ -71,15 +69,15 @@ def prepare(model, configure, example_inputs=None, inplace=False, bn_folding=Tru
     else:
         try:
             prepare_model = copy.deepcopy(model)
-        except:
-            assert (
+        except BaseException:
+            AssertionError(
                 False
             ), "The model's copy is failed, please try set inplace to True to do the prepare"
     if bn_folding:
         try:
             prepare_model = optimization.fuse(prepare_model, inplace=inplace)
             prepare_model = linear_bn_fuse(prepare_model, inplace=inplace)
-        except:
+        except BaseException:
             warnings.warn("BatchNorm folding failed during the prepare process.")
 
     # replace dropout with identity to enable more fusion pattern.
@@ -277,8 +275,8 @@ def convert(model, inplace=False):
     else:
         try:
             convert_model = copy_prepared_model(model)
-        except:
-            assert (
+        except BaseException:
+            AssertionError(
                 False
             ), "The model's copy is failed, please try set inplace to True to do the convert"
 

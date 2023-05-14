@@ -1,11 +1,6 @@
-from typing import List, Union
-
-import torch
 from torch import nn, Tensor
-from torch.nn.modules.utils import _pair
 from torch.jit.annotations import BroadcastingList2
 
-from typing import List, Union
 from .. import functional as F
 
 

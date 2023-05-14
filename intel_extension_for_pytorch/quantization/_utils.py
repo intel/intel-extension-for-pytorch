@@ -206,7 +206,7 @@ def attach_scale_zp_values_to_model(
                 scale, zp = observer.calculate_qparams()
                 qstate.tensor_id_to_scale_zp[int(tensor_id)] = (scale, zp)
             else:
-                assert (
+                AssertionError(
                     False
                 ), "The observer's dtype only can be torch.quint8 or torch.qint8"
         for tensor_id, observer in qstate.weight_tensor_id_to_observer.items():
@@ -214,7 +214,7 @@ def attach_scale_zp_values_to_model(
                 scale, zp = observer.calculate_qparams()
                 qstate.weight_tensor_id_to_scale_zp[tensor_id] = (scale, zp)
             else:
-                assert (
+                AssertionError(
                     False
                 ), "The observer's dtype only can be torch.quint8 or torch.qint8"
         _attach_smooth_quant_scaling_factor_to_model(module)
@@ -256,14 +256,14 @@ def check_model_obsever_has_run(
             if observer.dtype in quantized_dtype:
                 return _check_observer_has_run(observer)
             else:
-                assert (
+                AssertionError(
                     False
                 ), "The observer's dtype only can be torch.quint8 or torch.qint8"
         for tensor_id, observer in qstate.weight_tensor_id_to_observer.items():
             if observer.dtype in quantized_dtype:
                 return _check_observer_has_run(observer)
             else:
-                assert (
+                AssertionError(
                     False
                 ), "The observer's dtype only can be torch.quint8 or torch.qint8"
 

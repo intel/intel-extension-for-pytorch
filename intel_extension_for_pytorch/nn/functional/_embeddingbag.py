@@ -1,5 +1,4 @@
 import torch
-import intel_extension_for_pytorch._C as core
 import warnings
 from typing import Optional, Tuple
 

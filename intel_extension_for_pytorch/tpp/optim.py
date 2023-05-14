@@ -401,7 +401,7 @@ class Lamb(Optimizer):
                 state["step"] += 1
 
                 if p.data.dtype == torch.bfloat16:
-                    assert False, "BF16 LAMB optimizer not implemented yet!"
+                    AssertionError(False, "BF16 LAMB optimizer not implemented yet!")
                     state["weight_norm"] = ipex_cpp.tpp_fused_split_lamb(
                         p.data,
                         low_bits,

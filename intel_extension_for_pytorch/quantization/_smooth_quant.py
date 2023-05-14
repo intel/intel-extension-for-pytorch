@@ -69,7 +69,7 @@ class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
             )
             assert hasattr(
                 act_ic_observer, "ch_axis"
-            ), f"act_ic_observer should be a per-channel observer and observe input channel axis"
+            ), "act_ic_observer should be a per-channel observer and observe input channel axis"
             self.ic_obs = act_ic_observer
         if act_observer is None:
             self.act_obs = HistogramObserver(
@@ -218,7 +218,7 @@ class SmoothQuantWeightObserver(UniformQuantizationObserverBase):
             )
             assert hasattr(
                 wei_ic_observer, "ch_axis"
-            ), f"wei_ic_observer should be a per-channel observer and observe input channel axis"
+            ), "wei_ic_observer should be a per-channel observer and observe input channel axis"
             self.ic_obs = wei_ic_observer
         # if smooth_quant_enabled is false, this observer acts as
         # a normal observer

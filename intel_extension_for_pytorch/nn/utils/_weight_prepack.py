@@ -8,7 +8,6 @@ import os
 
 from intel_extension_for_pytorch import optim, frontend
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _using_dnnl
-import intel_extension_for_pytorch._C as core
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +16,6 @@ def may_import_deepspeed_modules():
     try:
         # import deepspeed in a global space will raise circular import error
         # intel-extension-for-deepspeed imports both IPEX and deepspeed
-        import deepspeed
         from deepspeed.module_inject.layers import LinearAllreduce, LinearLayer
 
         return LinearAllreduce, LinearLayer
@@ -372,8 +370,10 @@ class _IPEXLinear(torch.nn.Module):
 class _IPEXLinearAllreduce(_IPEXLinear):
     def __init__(self, dense_module, use_dnnl):
         # _IPEXLinear __init__ func will save the bias value and then use it during forward.
-        # deepspeed LinearAllreduce will firstly calculate torch.matmul(x, w), then call the all_reduce and finally add the bias to the result.
-        # reference: https://github.com/microsoft/DeepSpeed/blob/f1d2a15b50fa83beb8fb8076fae883853f83b5ad/deepspeed/module_inject/layers.py#L19-L25
+        # deepspeed LinearAllreduce will firstly calculate torch.matmul(x, w), then call \
+        # the all_reduce and finally add the bias to the result.
+        # reference: https://github.com/microsoft/DeepSpeed/blob/\
+        #            f1d2a15b50fa83beb8fb8076fae883853f83b5ad/deepspeed/module_inject/layers.py#L19-L25
         # Thus we need to save the original bias here and use None as the bias during the __init__ func
         module_bias = dense_module.bias
         dense_module.bias = None
@@ -610,7 +610,7 @@ def weight_prepack_with_ipex(
     module, optimizer, params_attr, inplace=False, device_type="cpu"
 ):
     def convert(m, optimizer, params_attr):
-        if _should_prepack(m, is_training=(optimizer != None)) and (
+        if _should_prepack(m, is_training=(optimizer is not None)) and (
             m.weight.dtype == torch.float32
             or m.weight.dtype == torch.bfloat16
             or (

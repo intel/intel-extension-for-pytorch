@@ -1,5 +1,3 @@
-import json
-import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -92,7 +90,8 @@ conv_gemm_fs = [
 def _default_recipe_init(nodes):
     r"""
     This function is about init default recipe: setting the quantizable op's inf dtype to qint8 or quint8 according the qconfig,
-    there have some special cases, for some ops(interaction, EmbeddingBag), we only support some special quantization path, so if the related qconfig
+    there have some special cases, for some ops(interaction, EmbeddingBag), we only support some special \
+    quantization path, so if the related qconfig
     doesn't meet the requirements, we will not set their inf dtype.
     """
     for node in nodes:
@@ -113,7 +112,8 @@ def _default_recipe_init(nodes):
                     else:
                         tensor_info.inf_dtype = node.qconfig.activation().dtype
                     node.input_tensor_force_inf_dtype[idx] = tensor_info.inf_dtype
-            # For EmbeddingBag and interaction, we need to check the qconfig's setting, if not meet the requirements, reset the inputs'(or weight) inf dtype
+            # For EmbeddingBag and interaction, we need to check the qconfig's setting, if not meet the requirements, \
+            # reset the inputs'(or weight) inf dtype
             for tensor_info in node.weight_tensor_infos:
                 # nn.EmbeddingBag use activation observer and only support torch.qint8 and torch.per_tensor_symmetric
                 if (
@@ -372,7 +372,7 @@ def _check_has_quantizable_node_after_node(node):
 
 
 def _add_recipe(node):
-    """
+    r"""
     Case1: add has pre gemm node.
     Given  gemm     op             gemm         op                gemm       op
              \     /                 \         /                   \       /
@@ -484,8 +484,10 @@ def get_default_recipe(nodes):
     #   1. If it is a part of a quantized fusion pattern, don't need to quantize any inputs from inside the pattern.
     #   2. If any of its inputs outside the fusion pattern are from non-quantized op, don't quantize all inputs outside the pattern.
     #   3. If it is not part of a quantized fusion pattern, don't quantize all inputs if its one input from non-quantized op.
-    # 3. For quantizable ops (pooling, relu, flatten, interation and embedding) forcing quantized output, need to quantize its output if it is quantized.
-    # 4. For interation and embedding, we only support s8->s8 symmetric quantization, so if doesn't meet the requiresments, don't need to quantize its inputs.
+    # 3. For quantizable ops (pooling, relu, flatten, interation and embedding) forcing quantized output, need to \
+    #    quantize its output if it is quantized.
+    # 4. For interation and embedding, we only support s8->s8 symmetric quantization, so if doesn't meet the \
+    #    requiresments, don't need to quantize its inputs.
     # Note: the fusion pattern we are supported is conv/gemm/add + elt-wise, conv/gemm + add, conv/gemm + add + elt-wise.
     # which means some ops can be combined with a single op to compute, but they are mathematically equivalent.
     embedding_bag_ops = [
@@ -496,7 +498,7 @@ def get_default_recipe(nodes):
     for node in nodes:
         if isinstance(node, ParentNode):
             continue
-        if node.qconfig is not None and not node.type in (
+        if node.qconfig is not None and node.type not in (
             conv_gemm_ops + rnn_ops + embedding_bag_ops
         ):
             if node.type in add_ops:

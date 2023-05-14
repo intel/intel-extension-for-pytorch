@@ -7,7 +7,8 @@ def interaction(*args):
     Get the interaction feature beyond different kinds of features (like gender
     or hobbies), used in DLRM model.
 
-    For now, we only optimized "dot" interaction at `DLRM Github repo <https://github.com/facebookresearch/dlrm/blob/main/dlrm_s_pytorch.py#L475-L495>`_.
+    For now, we only optimized "dot" interaction at `DLRM Github repo
+    <https://github.com/facebookresearch/dlrm/blob/main/dlrm_s_pytorch.py#L475-L495>`_.
     Through this, we use the dot product to represent the interaction feature
     between two features.
 
@@ -21,7 +22,8 @@ def interaction(*args):
         *args: Multiple tensors which represent different features
 
     Shape
-        - Input: :math:`N * (B, D)`, where N is the number of different kinds of features, B is the batch size, D is feature size
+        - Input: :math:`N * (B, D)`, where N is the number of different kinds of features,
+            B is the batch size, D is feature size
         - Output: :math:`(B, D + N * ( N - 1 ) / 2)`
     """
 

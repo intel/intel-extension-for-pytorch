@@ -21,7 +21,8 @@ def tensor_to_channels_last_1d(t):
     return t
 
 
-# Port from https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/blob/920c7163c81d6c5098ba79ed482d57b1ded8521d/intel_extension_for_pytorch/xpu/utils.py#L6 and
+# Port from https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/blob/\
+#           920c7163c81d6c5098ba79ed482d57b1ded8521d/intel_extension_for_pytorch/xpu/utils.py#L6
 def to_channels_last_1d(t):
     cpu_scope = torch.nn.Conv1d
     xpu_scope = (torch.nn.Conv1d, torch.nn.BatchNorm1d, torch.nn.MaxPool1d)
@@ -43,7 +44,8 @@ def to_channels_last_1d(t):
     return t
 
 
-# Port from https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/blob/920c7163c81d6c5098ba79ed482d57b1ded8521d/intel_extension_for_pytorch/xpu/utils.py#L38
+# Port from https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/blob/\
+#           920c7163c81d6c5098ba79ed482d57b1ded8521d/intel_extension_for_pytorch/xpu/utils.py#L38
 def is_contiguous_channels_last_1d(input):
     if 3 != input.dim():
         return False

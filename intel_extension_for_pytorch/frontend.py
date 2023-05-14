@@ -1,7 +1,6 @@
 # This Python file uses the following encoding: utf-8
 
 import copy
-import sys
 import pkg_resources
 
 import torch
@@ -32,7 +31,7 @@ import intel_extension_for_pytorch._C as torch_ipex_cpp
 
 try:
     from . import tpp
-except:
+except BaseException:
     warnings.warn(
         "Please install transformers repo when you want to use fast_bert API."
     )
@@ -259,12 +258,14 @@ class GraphCapture(object):
                         else:
                             try:
                                 # Try JIT trace.
-                                # Tracing only records operations done when the given function is run on the given tensors.
-                                # Therefore, the returned ScriptModule will always run the same traced graph on any input.
-                                # This has some important implications when your module is expected to run different sets of operations,
-                                # depending on the input and/or the module state. In cases like these, tracing would not be appropriate,
-                                # and the tracer will try to emit warnings when doing something that may cause an incorrect trace to be produced.
-                                # Therefore, we catch these warnings and treat them as errors, and let TorchDynamo handle such models appropriately.
+                                # Tracing only records operations done when the given function is run on the given
+                                # tensors. Therefore, the returned ScriptModule will always run the same traced graph
+                                # on any input. This has some important implications when your module is expected
+                                # to run different sets of operations, depending on the input and/or the module state.
+                                # In cases like these, tracing would not be appropriate, and the tracer will try to
+                                # emit warnings when doing something that may cause an incorrect trace to be produced.
+                                # Therefore, we catch these warnings and treat them as errors, and let TorchDynamo
+                                # handle such models appropriately.
                                 with warnings.catch_warnings():
                                     warnings.filterwarnings(
                                         "error", category=TracerWarning
@@ -598,7 +599,7 @@ def optimize(
         if opt_properties.linear_bn_folding:
             try:
                 optimized_model = linear_bn_fuse(optimized_model, inplace=inplace)
-            except:
+            except BaseException:
                 warnings.warn(
                     "Linear BatchNorm folding failed during the optimize process."
                 )
@@ -1009,7 +1010,8 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         >>> # bfloat16 training case.
         >>> optimizer = ...
         >>> model.train()
-        >>> optimized_model, optimized_optimizer = ipex.fast_bert(model, dtype=torch.bfloat16, optimizer=optimizer, unpad=True, seed=args.seed)
+        >>> optimized_model, optimized_optimizer = ipex.fast_bert(model, dtype=torch.bfloat16,
+                optimizer=optimizer, unpad=True, seed=args.seed)
         >>> # running training step.
 
     """
@@ -1051,9 +1053,10 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         torch_ipex_cpp.xsmm_manual_seed(
             torch.tensor(torch.initial_seed()).to(torch.int32).abs().item()
         )
-    except:
+    except BaseException:
         warnings.warn(
-            "Set seed failed for libxsmm which may impact the training loss, you can call torch.manual_seed(N) before invoking fast_bert."
+            "Set seed failed for libxsmm which may impact the training loss, you can call \
+                torch.manual_seed(N) before invoking fast_bert."
         )
     # replace the original transfomers module object with tpp module which has the same functionality but with more
     # operator fusion optimization

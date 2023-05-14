@@ -116,7 +116,7 @@ class MultiStreamModule(nn.Module):
                     cpu_pool
                 )  # The default selected value when auto selection is on.
             else:
-                assert (
+                AssertionError(
                     False
                 ), 'Input of num_streams must be Number of instances or string "AUTO"'
         else:
@@ -299,7 +299,7 @@ class MultiStreamModule(nn.Module):
                 # This object shouldn't be split, just set it as each stream's input
                 stream_input_object[idx_or_key] = input_object[idx_or_key]
         else:
-            assert (
+            AssertionError(
                 False
             ), "Generate stream input failed, unsupport input hint type of:{}".format(
                 type_arg
@@ -398,7 +398,7 @@ class MultiStreamModule(nn.Module):
                 if stream_id == 0:
                     output_object[idx_or_key] = stream_output_object[idx_or_key]
         else:
-            assert (
+            AssertionError(
                 False
             ), "Generate outputs failed, unsupport output hint type of:{}".format(
                 type_arg
@@ -452,7 +452,7 @@ class MultiStreamModule(nn.Module):
                     output_object[idx_or_key], dim=hint_object[idx_or_key]
                 )
         else:
-            assert (
+            AssertionError(
                 False
             ), "Concat output failed, unsupport output hint type of:{}".format(type_arg)
         return None
@@ -552,7 +552,7 @@ class _MultiStreamBenchmarkModule(nn.Module):
                     cpu_pool
                 )  # The default selected value when auto selection is on.
             else:
-                assert (
+                AssertionError(
                     False
                 ), 'Input of num_streams must be Number of instances or string "AUTO"'
         else:

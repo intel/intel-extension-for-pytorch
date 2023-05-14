@@ -2,7 +2,6 @@ import os
 import copy
 from typing import List, Dict, Tuple, Any, Optional
 import torch
-import torch.nn.functional as F
 from torch.fx.node import map_aggregate
 from torch.ao.quantization import PlaceholderObserver
 from torch.quantization.qconfig import QConfig
@@ -54,7 +53,7 @@ def _convert_PackedSequence_to_tuple_lstm(args):
         input, batch_sizes, sorted_indices, unsorted_indices = args[0]
         args = (input, batch_sizes, sorted_indices, unsorted_indices)
     else:
-        assert (
+        AssertionError(
             False
         ), "_convert_PackedSequence_to_tuple args should be a tuple with size 2 or PackedSequence"
     return args
@@ -476,8 +475,9 @@ def auto_prepare(
                 self._qconf_summary = qconf_summary
                 load_qconf_summary_to_model(self, qconf_summary)
             else:
-                assert False, (
-                    "Can not load a empty file or none existed file" + qconf_summary
+                AssertionError(
+                    False,
+                    ("Can not load a empty file or none existed file" + qconf_summary),
                 )
 
     model.q_config = configure

@@ -2,9 +2,7 @@
 
 import sys
 import subprocess
-import copy
 import time
-from . import default_static_qconfig, prepare
 
 
 def autotune(
@@ -39,7 +37,8 @@ def autotune(
 
         if neural_compressor.__version__ != neural_compressor_version:
             raise RuntimeError(
-                "Please install Intel® Neural Compressor with version {} while the current version of Intel® Neural Compressor is {}.".format(
+                "Please install Intel® Neural Compressor with version {} while the current version of \
+                    Intel® Neural Compressor is {}.".format(
                     neural_compressor_version, neural_compressor.__version__
                 )
             )
@@ -55,8 +54,8 @@ def autotune(
                 ]
             )
             import neural_compressor
-        except:
-            assert (
+        except BaseException:
+            AssertionError(
                 False
             ), "Unable to import neural_compressor from the local environment."
     from neural_compressor import PostTrainingQuantConfig

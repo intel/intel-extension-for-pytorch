@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import sys
-from intel_extension_for_pytorch.optim import _optimizer_utils, _lamb
+from intel_extension_for_pytorch.optim import _optimizer_utils
 import types
 from ._model_convert import _LSTM
 from intel_extension_for_pytorch.nn.modules import (

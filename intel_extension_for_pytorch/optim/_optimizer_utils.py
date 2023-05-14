@@ -80,7 +80,7 @@ def patch_step_for_master_weight_training(optimizer):
                     # check have grad
                     if (
                         value[low_precision].requires_grad
-                        and value[low_precision].grad != None
+                        and value[low_precision].grad is not None
                     ):
                         k.grad = value[low_precision].grad.detach().float()
 
@@ -379,7 +379,7 @@ def patch_state_dict(optimizer):
                             ):
                                 state_value = params_attr["ctx"].to_public(state_value)
                             else:
-                                assert False, "unsupported op to unpack"
+                                AssertionError(False, "unsupported op to unpack")
                         v2[state_key] = state_value
         return opt_temp.state_dict()
 

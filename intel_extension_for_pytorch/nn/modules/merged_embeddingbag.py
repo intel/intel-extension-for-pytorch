@@ -238,7 +238,7 @@ class MergedEmbeddingBag(nn.Module):
             elif mode == "mean":
                 self.pooling_modes.append(PoolingMode.MEAN)
             else:
-                assert (
+                AssertionError(
                     False
                 ), r"MergedEmbeddingBag only support EmbeddingBag with model sum or mean"
             if weight is None:
@@ -262,7 +262,8 @@ class MergedEmbeddingBag(nn.Module):
             emb_shape = emb.weight.shape
             assert (
                 not emb.sparse
-            ), "MergedEmbeddingBag can only be used for dense gradient EmebddingBag. Please use MergedEmbeddingBagWith[Optimizer] for sparse gradient."
+            ), "MergedEmbeddingBag can only be used for dense gradient EmebddingBag. \
+                Please use MergedEmbeddingBagWith[Optimizer] for sparse gradient."
             embedding_specs.append(
                 EmbeddingSpec(
                     num_of_features=emb_shape[0],
@@ -310,7 +311,8 @@ class MergedEmbeddingBag(nn.Module):
             if indice.dim() == 2:
                 assert (
                     offset is None
-                ), "offset should be None if indice is 2-D tensor, https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/sparse.py#L355-L382"
+                ), "offset should be None if indice is 2-D tensor, \
+                    https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/sparse.py#L355-L382"
                 batch_size = indice.shape[0]
             else:
                 batch_size = offset.numel()
@@ -371,14 +373,16 @@ class MergedEmbeddingBag(nn.Module):
     ):
         r"""
         Args:
-            input (Tuple[Tensor]): a tuple of (indices, offsets, include_last_offsets(if not merged)/indices_with_row_offsets(if merged))
+            input (Tuple[Tensor]): a tuple of (indices, offsets, \
+                include_last_offsets(if not merged)/indices_with_row_offsets(if merged))
             need_linearize_indices_and_offsets: indicate whether input need to be linearized
         Returns:
             List[Tensor] output shape of `(batch_size, feature_size)` which length = num of tables.
         """
         assert (
             self.alldense
-        ), "MergedEmbeddingBag only support EmbeddingBag List with all dense gradient, please use MergedEmbeddingBagWith[Optimizer] for sparse gridient EmbeddingBag"
+        ), "MergedEmbeddingBag only support EmbeddingBag List with all dense gradient, please use \
+            MergedEmbeddingBagWith[Optimizer] for sparse gridient EmbeddingBag"
         if need_linearize_indices_and_offsets.item():
             indices, offsets, include_last_offsets = input
             (
@@ -488,7 +492,7 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
                     self.weights[i].float()
                 )
             else:
-                assert (
+                AssertionError(
                     False
                 ), r"MergedEmbeddingBag only support dtypes with bfloat, float and double"
             trails.append(trail)
@@ -500,7 +504,8 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
     ):
         r"""
         Args:
-            input (Tuple[Tensor]): a tuple of (indices, offsets, include_last_offsets(if not merged)/indices_with_row_offsets(if merged))
+            input (Tuple[Tensor]): a tuple of (indices, offsets, \
+                include_last_offsets(if not merged)/indices_with_row_offsets(if merged))
             need_linearize_indices_and_offsets: indicate whether input need to be linearized
         Returns:
             List[Tensor] output shape of `(batch_size, feature_size)` which length = num of tables.
