@@ -1,10 +1,9 @@
-
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 dtype = torch.float32
@@ -15,8 +14,12 @@ dpcpp_device = torch.device("xpu")
 class TestTorchMethod(TestCase):
     def test_elu(self, dtype=torch.float):
         def test_Xelu(Xelu):
-            x_cpu = torch.randn([3, 4], device=cpu_device, dtype=dtype, requires_grad=True)
-            grad_x = torch.ones(3, 4, device=cpu_device, dtype=dtype, requires_grad=True)
+            x_cpu = torch.randn(
+                [3, 4], device=cpu_device, dtype=dtype, requires_grad=True
+            )
+            grad_x = torch.ones(
+                3, 4, device=cpu_device, dtype=dtype, requires_grad=True
+            )
 
             y_cpu = Xelu(x_cpu)
             y_cpu.backward(grad_x)

@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 cpu_device = torch.device("cpu")
@@ -14,7 +14,6 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_layer_norm(self, dtype=torch.float):
-
         layer_norm = nn.LayerNorm([1, 3, 3])
         x_i = torch.randn([1, 1, 3, 3], device=cpu_device, dtype=dtype)
         grad_i = torch.randn([1, 1, 3, 3], device=cpu_device, dtype=dtype)
@@ -162,39 +161,40 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.float(), atol=1e-1, rtol=0)
 
     def test_layer_norm_fwd_bwd(self, dtype=torch.float):
-        formats = [torch.contiguous_format, torch.channels_last]    
+        formats = [torch.contiguous_format, torch.channels_last]
         input_shapes = [
-            [257, 1024], 
-            [1, 1024], 
-            [2, 4096, 320], 
-            [2, 1024, 640], 
-            [2, 256, 1280], 
-            [2, 64, 1280], 
-            [8192, 1024], 
-            [196, 512], 
-            [49, 1024], 
-            [49, 2048], 
-            [784, 256], 
-            [784, 512], 
-            [3136, 128], 
-            [16384, 1024], 
-            [2432, 1024], 
+            [257, 1024],
+            [1, 1024],
+            [2, 4096, 320],
+            [2, 1024, 640],
+            [2, 256, 1280],
+            [2, 64, 1280],
+            [8192, 1024],
+            [196, 512],
+            [49, 1024],
+            [49, 2048],
+            [784, 256],
+            [784, 512],
+            [3136, 128],
+            [16384, 1024],
+            [2432, 1024],
             [128, 4096],
-            [4, 4096], 
-            [24576, 1024], 
-            [16384, 768], 
+            [4, 4096],
+            [24576, 1024],
+            [16384, 768],
             [16384, 3072],
-            [257, 1023], 
-            [257, 1025], 
-            [257, 7], 
+            [257, 1023],
+            [257, 1025],
+            [257, 7],
             [1024, 512],
             [1024, 255],
-            [32, 2048*16*15 +1],
-            [32, 2048*16*16 +1],
+            [32, 2048 * 16 * 15 + 1],
+            [32, 2048 * 16 * 16 + 1],
             [1024, 384, 385],
             [1024, 384, 385],
             [20, 5, 10, 10],
-            [20, 5, 10, 10]]
+            [20, 5, 10, 10],
+        ]
         norm_shapes = [
             [1024],
             [1024],
@@ -221,19 +221,20 @@ class TestNNMethod(TestCase):
             [7],
             [512],
             [255],
-            [2048*16*15 +1],
-            [2048*16*16 +1],
+            [2048 * 16 * 15 + 1],
+            [2048 * 16 * 16 + 1],
             [384, 385],
             [385],
             [5, 10, 10],
-            [10, 10]]
+            [10, 10],
+        ]
 
         for idx, input_shape in enumerate(input_shapes):
             for format in formats:
                 norm_shape = norm_shapes[idx]
                 input = torch.randn(input_shape)
                 grad = torch.randn(input_shape)
-                if (input.dim() == 4): 
+                if input.dim() == 4:
                     input = input.to(memory_format=format)
                     grad = grad.to(memory_format=format)
 

@@ -3,7 +3,8 @@ from torch.nn.modules.utils import _pair
 
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
+
 
 class Fake_Q_Cat_Dequantize(torch.nn.Module):
     def __init__(self, dim, scale, zero_point):
@@ -19,6 +20,7 @@ class Fake_Q_Cat_Dequantize(torch.nn.Module):
         output_dq = torch.cat(cat_input, dim=self.dim)
         return output_dq
 
+
 class Q_Cat_Dequantize(torch.nn.Module):
     def __init__(self, dim, scale, zero_point):
         super(Q_Cat_Dequantize, self).__init__()
@@ -27,9 +29,12 @@ class Q_Cat_Dequantize(torch.nn.Module):
         self.zero_point = zero_point
 
     def forward(self, tensors):
-        output_q = torch.ops.quantized.cat(tensors, dim=self.dim, scale=self.scale, zero_point=self.zero_point)
+        output_q = torch.ops.quantized.cat(
+            tensors, dim=self.dim, scale=self.scale, zero_point=self.zero_point
+        )
         output_dq = torch.dequantize(output_q)
         return output_dq
+
 
 class Fake_Q_Conv_Relu_Cat_Dequantize(torch.nn.Module):
     def __init__(self, dim, scale, zero_point, scal):
@@ -43,12 +48,23 @@ class Fake_Q_Conv_Relu_Cat_Dequantize(torch.nn.Module):
         cat_input = []
         for i in range(len(tensors)):
             conv_out = None
-            packed_params = torch.ops.quantized.conv2d_prepack(weights[i], bias[i], _pair(1), _pair(0), _pair(1), 1)
-            relu_out = torch.ops.quantized.conv2d_relu(tensors[i], packed_params,
-                                                       _pair(1), _pair(0), _pair(1), 1, self.scale_list[i], self.zero_point)
+            packed_params = torch.ops.quantized.conv2d_prepack(
+                weights[i], bias[i], _pair(1), _pair(0), _pair(1), 1
+            )
+            relu_out = torch.ops.quantized.conv2d_relu(
+                tensors[i],
+                packed_params,
+                _pair(1),
+                _pair(0),
+                _pair(1),
+                1,
+                self.scale_list[i],
+                self.zero_point,
+            )
             cat_input.append(torch.dequantize(relu_out))
         output_dq = torch.cat(cat_input, dim=self.dim)
         return output_dq
+
 
 class Q_Conv_Relu_Cat_Dequantize(torch.nn.Module):
     def __init__(self, dim, scale, zero_point, scal, is_cpu=False):
@@ -63,16 +79,31 @@ class Q_Conv_Relu_Cat_Dequantize(torch.nn.Module):
         cat_input = []
         for i in range(len(tensors)):
             conv_out = None
-            packed_params = torch.ops.quantized.conv2d_prepack(weights[i], bias[i], _pair(1), _pair(0), _pair(1), 1)
+            packed_params = torch.ops.quantized.conv2d_prepack(
+                weights[i], bias[i], _pair(1), _pair(0), _pair(1), 1
+            )
             if self.is_cpu:
-                relu_out = torch.ops.quantized.conv2d_relu(tensors[i], packed_params,
-                                                           _pair(1), _pair(0), _pair(1), 1, self.scale_list[i], self.zero_point)
+                relu_out = torch.ops.quantized.conv2d_relu(
+                    tensors[i],
+                    packed_params,
+                    _pair(1),
+                    _pair(0),
+                    _pair(1),
+                    1,
+                    self.scale_list[i],
+                    self.zero_point,
+                )
             else:
-                relu_out = torch.ops.quantized.conv2d_relu(tensors[i], packed_params, self.scale_list[i], self.zero_point)
+                relu_out = torch.ops.quantized.conv2d_relu(
+                    tensors[i], packed_params, self.scale_list[i], self.zero_point
+                )
             cat_input.append(relu_out)
-        output_q = torch.ops.quantized.cat(cat_input, dim=self.dim, scale=self.scale, zero_point=self.zero_point)
+        output_q = torch.ops.quantized.cat(
+            cat_input, dim=self.dim, scale=self.scale, zero_point=self.zero_point
+        )
         output_dq = torch.dequantize(output_q)
         return output_dq
+
 
 class Fake_Q_Conv_Cat_Dequantize(torch.nn.Module):
     def __init__(self, dim, scale, zero_point, scale_list):
@@ -86,12 +117,23 @@ class Fake_Q_Conv_Cat_Dequantize(torch.nn.Module):
         cat_input = []
         for i in range(len(tensors)):
             conv_out = None
-            packed_params = torch.ops.quantized.conv2d_prepack(weights[i], bias[i], _pair(1), _pair(0), _pair(1), 1)
-            conv_out = torch.ops.quantized.conv2d(tensors[i], packed_params,
-                                                  _pair(1), _pair(0), _pair(1), 1, self.scale_list[i], self.zero_point)
+            packed_params = torch.ops.quantized.conv2d_prepack(
+                weights[i], bias[i], _pair(1), _pair(0), _pair(1), 1
+            )
+            conv_out = torch.ops.quantized.conv2d(
+                tensors[i],
+                packed_params,
+                _pair(1),
+                _pair(0),
+                _pair(1),
+                1,
+                self.scale_list[i],
+                self.zero_point,
+            )
             cat_input.append(torch.dequantize(conv_out))
         output_dq = torch.cat(cat_input, dim=self.dim)
         return output_dq
+
 
 class Q_Conv_Cat_Dequantize(torch.nn.Module):
     def __init__(self, dim, scale, zero_point, scale_list, is_cpu=False):
@@ -106,16 +148,31 @@ class Q_Conv_Cat_Dequantize(torch.nn.Module):
         cat_input = []
         for i in range(len(tensors)):
             conv_out = None
-            packed_params = torch.ops.quantized.conv2d_prepack(weights[i], bias[i], _pair(1), _pair(0), _pair(1), 1)
+            packed_params = torch.ops.quantized.conv2d_prepack(
+                weights[i], bias[i], _pair(1), _pair(0), _pair(1), 1
+            )
             if self.is_cpu:
-                conv_out = torch.ops.quantized.conv2d(tensors[i], packed_params,
-                                                      _pair(1), _pair(0), _pair(1), 1, self.scale_list[i], self.zero_point)
+                conv_out = torch.ops.quantized.conv2d(
+                    tensors[i],
+                    packed_params,
+                    _pair(1),
+                    _pair(0),
+                    _pair(1),
+                    1,
+                    self.scale_list[i],
+                    self.zero_point,
+                )
             else:
-                conv_out = torch.ops.quantized.conv2d(tensors[i], packed_params, self.scale_list[i], self.zero_point)
+                conv_out = torch.ops.quantized.conv2d(
+                    tensors[i], packed_params, self.scale_list[i], self.zero_point
+                )
             cat_input.append(conv_out)
-        output_q = torch.ops.quantized.cat(cat_input, dim=self.dim, scale=self.scale, zero_point=self.zero_point)
+        output_q = torch.ops.quantized.cat(
+            cat_input, dim=self.dim, scale=self.scale, zero_point=self.zero_point
+        )
         output_dq = torch.dequantize(output_q)
         return output_dq
+
 
 class TestTorchMethod(TestCase):
     def test_cat_array_quint8(self, dtype=torch.float):
@@ -134,14 +191,23 @@ class TestTorchMethod(TestCase):
         q_input2 = torch.quantize_per_tensor(input2, 0.5, zero_point, dtype_inputs)
         q_input3 = torch.quantize_per_tensor(input3, 0.6, zero_point, dtype_inputs)
 
-        output_int8 = torch.ops.quantized.cat([q_input1, q_input2, q_input3], dim=1, scale=0.02, zero_point=0)
+        output_int8 = torch.ops.quantized.cat(
+            [q_input1, q_input2, q_input3], dim=1, scale=0.02, zero_point=0
+        )
 
-        q_input1_gpu = torch.quantize_per_tensor(input1_gpu, 0.4, zero_point, dtype_inputs)
-        q_input2_gpu = torch.quantize_per_tensor(input2_gpu, 0.5, zero_point, dtype_inputs)
-        q_input3_gpu = torch.quantize_per_tensor(input3_gpu, 0.6, zero_point, dtype_inputs)
+        q_input1_gpu = torch.quantize_per_tensor(
+            input1_gpu, 0.4, zero_point, dtype_inputs
+        )
+        q_input2_gpu = torch.quantize_per_tensor(
+            input2_gpu, 0.5, zero_point, dtype_inputs
+        )
+        q_input3_gpu = torch.quantize_per_tensor(
+            input3_gpu, 0.6, zero_point, dtype_inputs
+        )
 
         output_gpu_int8 = torch.ops.quantized.cat(
-            [q_input1_gpu, q_input2_gpu, q_input3_gpu], dim=1, scale=0.02, zero_point=0)
+            [q_input1_gpu, q_input2_gpu, q_input3_gpu], dim=1, scale=0.02, zero_point=0
+        )
 
         self.assertEqual(output_int8, output_gpu_int8)
 
@@ -161,14 +227,23 @@ class TestTorchMethod(TestCase):
         q_input2 = torch.quantize_per_tensor(input2, 0.05, zero_point, dtype_inputs)
         q_input3 = torch.quantize_per_tensor(input3, 0.06, zero_point, dtype_inputs)
 
-        output_int8 = torch.ops.quantized.cat([q_input1, q_input2, q_input3], dim=1, scale=0.2, zero_point=0)
+        output_int8 = torch.ops.quantized.cat(
+            [q_input1, q_input2, q_input3], dim=1, scale=0.2, zero_point=0
+        )
 
-        q_input1_gpu = torch.quantize_per_tensor(input1_gpu, 0.04, zero_point, dtype_inputs)
-        q_input2_gpu = torch.quantize_per_tensor(input2_gpu, 0.05, zero_point, dtype_inputs)
-        q_input3_gpu = torch.quantize_per_tensor(input3_gpu, 0.06, zero_point, dtype_inputs)
+        q_input1_gpu = torch.quantize_per_tensor(
+            input1_gpu, 0.04, zero_point, dtype_inputs
+        )
+        q_input2_gpu = torch.quantize_per_tensor(
+            input2_gpu, 0.05, zero_point, dtype_inputs
+        )
+        q_input3_gpu = torch.quantize_per_tensor(
+            input3_gpu, 0.06, zero_point, dtype_inputs
+        )
 
         output_gpu_int8 = torch.ops.quantized.cat(
-            [q_input1_gpu, q_input2_gpu, q_input3_gpu], dim=1, scale=0.2, zero_point=0)
+            [q_input1_gpu, q_input2_gpu, q_input3_gpu], dim=1, scale=0.2, zero_point=0
+        )
 
         self.assertEqual(output_int8, output_gpu_int8)
 
@@ -228,38 +303,96 @@ class TestTorchMethod(TestCase):
         q_input5 = torch.quantize_per_tensor(input5, 0.06, zero_point_in, dtype_inputs)
         q_input6 = torch.quantize_per_tensor(input6, 0.06, zero_point_in, dtype_inputs)
 
-        q_weight1 = torch.quantize_per_tensor(weight1, 0.04, zero_point_w, dtype_weights)
-        q_weight2 = torch.quantize_per_tensor(weight2, 0.05, zero_point_w, dtype_weights)
-        q_weight3 = torch.quantize_per_tensor(weight3, 0.06, zero_point_w, dtype_weights)
-        q_weight4 = torch.quantize_per_tensor(weight4, 0.06, zero_point_w, dtype_weights)
-        q_weight5 = torch.quantize_per_tensor(weight5, 0.06, zero_point_w, dtype_weights)
-        q_weight6 = torch.quantize_per_tensor(weight6, 0.06, zero_point_w, dtype_weights)
+        q_weight1 = torch.quantize_per_tensor(
+            weight1, 0.04, zero_point_w, dtype_weights
+        )
+        q_weight2 = torch.quantize_per_tensor(
+            weight2, 0.05, zero_point_w, dtype_weights
+        )
+        q_weight3 = torch.quantize_per_tensor(
+            weight3, 0.06, zero_point_w, dtype_weights
+        )
+        q_weight4 = torch.quantize_per_tensor(
+            weight4, 0.06, zero_point_w, dtype_weights
+        )
+        q_weight5 = torch.quantize_per_tensor(
+            weight5, 0.06, zero_point_w, dtype_weights
+        )
+        q_weight6 = torch.quantize_per_tensor(
+            weight6, 0.06, zero_point_w, dtype_weights
+        )
 
-        model = Fake_Q_Conv_Cat_Dequantize(1, 0.5, zero_point_in, [0.2, 0.1, 0.2, 0.1, 0.2, 0.1])
-        output_cpu = model([q_input1, q_input2, q_input3, q_input4, q_input5, q_input6],
-                           [q_weight1, q_weight2, q_weight3, q_weight4, q_weight5, q_weight6],
-                           [bias1, bias2, bias3, bias4, bias5, bias6])
+        model = Fake_Q_Conv_Cat_Dequantize(
+            1, 0.5, zero_point_in, [0.2, 0.1, 0.2, 0.1, 0.2, 0.1]
+        )
+        output_cpu = model(
+            [q_input1, q_input2, q_input3, q_input4, q_input5, q_input6],
+            [q_weight1, q_weight2, q_weight3, q_weight4, q_weight5, q_weight6],
+            [bias1, bias2, bias3, bias4, bias5, bias6],
+        )
 
-        q_input1_gpu = torch.quantize_per_tensor(input1_gpu, 0.04, zero_point_in, dtype_inputs)
-        q_input2_gpu = torch.quantize_per_tensor(input2_gpu, 0.05, zero_point_in, dtype_inputs)
-        q_input3_gpu = torch.quantize_per_tensor(input3_gpu, 0.06, zero_point_in, dtype_inputs)
-        q_input4_gpu = torch.quantize_per_tensor(input4_gpu, 0.06, zero_point_in, dtype_inputs)
-        q_input5_gpu = torch.quantize_per_tensor(input5_gpu, 0.06, zero_point_in, dtype_inputs)
-        q_input6_gpu = torch.quantize_per_tensor(input6_gpu, 0.06, zero_point_in, dtype_inputs)
+        q_input1_gpu = torch.quantize_per_tensor(
+            input1_gpu, 0.04, zero_point_in, dtype_inputs
+        )
+        q_input2_gpu = torch.quantize_per_tensor(
+            input2_gpu, 0.05, zero_point_in, dtype_inputs
+        )
+        q_input3_gpu = torch.quantize_per_tensor(
+            input3_gpu, 0.06, zero_point_in, dtype_inputs
+        )
+        q_input4_gpu = torch.quantize_per_tensor(
+            input4_gpu, 0.06, zero_point_in, dtype_inputs
+        )
+        q_input5_gpu = torch.quantize_per_tensor(
+            input5_gpu, 0.06, zero_point_in, dtype_inputs
+        )
+        q_input6_gpu = torch.quantize_per_tensor(
+            input6_gpu, 0.06, zero_point_in, dtype_inputs
+        )
 
-        q_weight1_gpu = torch.quantize_per_tensor(weight1_gpu, 0.04, zero_point_w, dtype_weights)
-        q_weight2_gpu = torch.quantize_per_tensor(weight2_gpu, 0.05, zero_point_w, dtype_weights)
-        q_weight3_gpu = torch.quantize_per_tensor(weight3_gpu, 0.06, zero_point_w, dtype_weights)
-        q_weight4_gpu = torch.quantize_per_tensor(weight4_gpu, 0.06, zero_point_w, dtype_weights)
-        q_weight5_gpu = torch.quantize_per_tensor(weight5_gpu, 0.06, zero_point_w, dtype_weights)
-        q_weight6_gpu = torch.quantize_per_tensor(weight6_gpu, 0.06, zero_point_w, dtype_weights)
+        q_weight1_gpu = torch.quantize_per_tensor(
+            weight1_gpu, 0.04, zero_point_w, dtype_weights
+        )
+        q_weight2_gpu = torch.quantize_per_tensor(
+            weight2_gpu, 0.05, zero_point_w, dtype_weights
+        )
+        q_weight3_gpu = torch.quantize_per_tensor(
+            weight3_gpu, 0.06, zero_point_w, dtype_weights
+        )
+        q_weight4_gpu = torch.quantize_per_tensor(
+            weight4_gpu, 0.06, zero_point_w, dtype_weights
+        )
+        q_weight5_gpu = torch.quantize_per_tensor(
+            weight5_gpu, 0.06, zero_point_w, dtype_weights
+        )
+        q_weight6_gpu = torch.quantize_per_tensor(
+            weight6_gpu, 0.06, zero_point_w, dtype_weights
+        )
 
-        intput_gpu = (q_input1_gpu, q_input2_gpu, q_input3_gpu, q_input4_gpu, q_input5_gpu, q_input6_gpu)
-        weight_gpu = (q_weight1_gpu, q_weight2_gpu, q_weight3_gpu, q_weight4_gpu, q_weight5_gpu, q_weight6_gpu)
+        intput_gpu = (
+            q_input1_gpu,
+            q_input2_gpu,
+            q_input3_gpu,
+            q_input4_gpu,
+            q_input5_gpu,
+            q_input6_gpu,
+        )
+        weight_gpu = (
+            q_weight1_gpu,
+            q_weight2_gpu,
+            q_weight3_gpu,
+            q_weight4_gpu,
+            q_weight5_gpu,
+            q_weight6_gpu,
+        )
         bias_gpu = (bias1_gpu, bias2_gpu, bias3_gpu, bias4_gpu, bias5_gpu, bias6_gpu)
-        xpu_model = Q_Conv_Cat_Dequantize(1, 0.5, zero_point_out, [0.2, 0.1, 0.2, 0.1, 0.2, 0.1], False)
+        xpu_model = Q_Conv_Cat_Dequantize(
+            1, 0.5, zero_point_out, [0.2, 0.1, 0.2, 0.1, 0.2, 0.1], False
+        )
         xpu_model.to("xpu")
-        modelJit = torch.jit.trace(xpu_model, (intput_gpu, weight_gpu, bias_gpu), check_trace=False)
+        modelJit = torch.jit.trace(
+            xpu_model, (intput_gpu, weight_gpu, bias_gpu), check_trace=False
+        )
         with torch.no_grad():
             for i in range(2):
                 output_gpu = modelJit(intput_gpu, weight_gpu, bias_gpu)
@@ -321,38 +454,96 @@ class TestTorchMethod(TestCase):
         q_input5 = torch.quantize_per_tensor(input5, 0.06, zero_point_in, dtype_inputs)
         q_input6 = torch.quantize_per_tensor(input6, 0.06, zero_point_in, dtype_inputs)
 
-        q_weight1 = torch.quantize_per_tensor(weight1, 0.04, zero_point_w, dtype_weights)
-        q_weight2 = torch.quantize_per_tensor(weight2, 0.05, zero_point_w, dtype_weights)
-        q_weight3 = torch.quantize_per_tensor(weight3, 0.06, zero_point_w, dtype_weights)
-        q_weight4 = torch.quantize_per_tensor(weight4, 0.06, zero_point_w, dtype_weights)
-        q_weight5 = torch.quantize_per_tensor(weight5, 0.06, zero_point_w, dtype_weights)
-        q_weight6 = torch.quantize_per_tensor(weight6, 0.06, zero_point_w, dtype_weights)
+        q_weight1 = torch.quantize_per_tensor(
+            weight1, 0.04, zero_point_w, dtype_weights
+        )
+        q_weight2 = torch.quantize_per_tensor(
+            weight2, 0.05, zero_point_w, dtype_weights
+        )
+        q_weight3 = torch.quantize_per_tensor(
+            weight3, 0.06, zero_point_w, dtype_weights
+        )
+        q_weight4 = torch.quantize_per_tensor(
+            weight4, 0.06, zero_point_w, dtype_weights
+        )
+        q_weight5 = torch.quantize_per_tensor(
+            weight5, 0.06, zero_point_w, dtype_weights
+        )
+        q_weight6 = torch.quantize_per_tensor(
+            weight6, 0.06, zero_point_w, dtype_weights
+        )
 
-        model = Fake_Q_Conv_Relu_Cat_Dequantize(1, 0.5, zero_point_in, [0.2, 0.1, 0.2, 0.1, 0.2, 0.1])
-        output_cpu = model([q_input1, q_input2, q_input3, q_input4, q_input5, q_input6],
-                           [q_weight1, q_weight2, q_weight3, q_weight4, q_weight5, q_weight6],
-                           [bias1, bias2, bias3, bias4, bias5, bias6])
+        model = Fake_Q_Conv_Relu_Cat_Dequantize(
+            1, 0.5, zero_point_in, [0.2, 0.1, 0.2, 0.1, 0.2, 0.1]
+        )
+        output_cpu = model(
+            [q_input1, q_input2, q_input3, q_input4, q_input5, q_input6],
+            [q_weight1, q_weight2, q_weight3, q_weight4, q_weight5, q_weight6],
+            [bias1, bias2, bias3, bias4, bias5, bias6],
+        )
 
-        q_input1_gpu = torch.quantize_per_tensor(input1_gpu, 0.04, zero_point_in, dtype_inputs)
-        q_input2_gpu = torch.quantize_per_tensor(input2_gpu, 0.05, zero_point_in, dtype_inputs)
-        q_input3_gpu = torch.quantize_per_tensor(input3_gpu, 0.06, zero_point_in, dtype_inputs)
-        q_input4_gpu = torch.quantize_per_tensor(input4_gpu, 0.06, zero_point_in, dtype_inputs)
-        q_input5_gpu = torch.quantize_per_tensor(input5_gpu, 0.06, zero_point_in, dtype_inputs)
-        q_input6_gpu = torch.quantize_per_tensor(input6_gpu, 0.06, zero_point_in, dtype_inputs)
+        q_input1_gpu = torch.quantize_per_tensor(
+            input1_gpu, 0.04, zero_point_in, dtype_inputs
+        )
+        q_input2_gpu = torch.quantize_per_tensor(
+            input2_gpu, 0.05, zero_point_in, dtype_inputs
+        )
+        q_input3_gpu = torch.quantize_per_tensor(
+            input3_gpu, 0.06, zero_point_in, dtype_inputs
+        )
+        q_input4_gpu = torch.quantize_per_tensor(
+            input4_gpu, 0.06, zero_point_in, dtype_inputs
+        )
+        q_input5_gpu = torch.quantize_per_tensor(
+            input5_gpu, 0.06, zero_point_in, dtype_inputs
+        )
+        q_input6_gpu = torch.quantize_per_tensor(
+            input6_gpu, 0.06, zero_point_in, dtype_inputs
+        )
 
-        q_weight1_gpu = torch.quantize_per_tensor(weight1_gpu, 0.04, zero_point_w, dtype_weights)
-        q_weight2_gpu = torch.quantize_per_tensor(weight2_gpu, 0.05, zero_point_w, dtype_weights)
-        q_weight3_gpu = torch.quantize_per_tensor(weight3_gpu, 0.06, zero_point_w, dtype_weights)
-        q_weight4_gpu = torch.quantize_per_tensor(weight4_gpu, 0.06, zero_point_w, dtype_weights)
-        q_weight5_gpu = torch.quantize_per_tensor(weight5_gpu, 0.06, zero_point_w, dtype_weights)
-        q_weight6_gpu = torch.quantize_per_tensor(weight6_gpu, 0.06, zero_point_w, dtype_weights)
+        q_weight1_gpu = torch.quantize_per_tensor(
+            weight1_gpu, 0.04, zero_point_w, dtype_weights
+        )
+        q_weight2_gpu = torch.quantize_per_tensor(
+            weight2_gpu, 0.05, zero_point_w, dtype_weights
+        )
+        q_weight3_gpu = torch.quantize_per_tensor(
+            weight3_gpu, 0.06, zero_point_w, dtype_weights
+        )
+        q_weight4_gpu = torch.quantize_per_tensor(
+            weight4_gpu, 0.06, zero_point_w, dtype_weights
+        )
+        q_weight5_gpu = torch.quantize_per_tensor(
+            weight5_gpu, 0.06, zero_point_w, dtype_weights
+        )
+        q_weight6_gpu = torch.quantize_per_tensor(
+            weight6_gpu, 0.06, zero_point_w, dtype_weights
+        )
 
-        intput_gpu = (q_input1_gpu, q_input2_gpu, q_input3_gpu, q_input4_gpu, q_input5_gpu, q_input6_gpu)
-        weight_gpu = (q_weight1_gpu, q_weight2_gpu, q_weight3_gpu, q_weight4_gpu, q_weight5_gpu, q_weight6_gpu)
+        intput_gpu = (
+            q_input1_gpu,
+            q_input2_gpu,
+            q_input3_gpu,
+            q_input4_gpu,
+            q_input5_gpu,
+            q_input6_gpu,
+        )
+        weight_gpu = (
+            q_weight1_gpu,
+            q_weight2_gpu,
+            q_weight3_gpu,
+            q_weight4_gpu,
+            q_weight5_gpu,
+            q_weight6_gpu,
+        )
         bias_gpu = (bias1_gpu, bias2_gpu, bias3_gpu, bias4_gpu, bias5_gpu, bias6_gpu)
-        xpu_model = Q_Conv_Relu_Cat_Dequantize(1, 1.0, zero_point_out, [0.4, 0.2, 0.4, 0.2, 0.4, 0.2], False)
+        xpu_model = Q_Conv_Relu_Cat_Dequantize(
+            1, 1.0, zero_point_out, [0.4, 0.2, 0.4, 0.2, 0.4, 0.2], False
+        )
         xpu_model.to("xpu")
-        modelJit = torch.jit.trace(xpu_model, (intput_gpu, weight_gpu, bias_gpu), check_trace=False)
+        modelJit = torch.jit.trace(
+            xpu_model, (intput_gpu, weight_gpu, bias_gpu), check_trace=False
+        )
         with torch.no_grad():
             for i in range(2):
                 output_gpu = modelJit(intput_gpu, weight_gpu, bias_gpu)
@@ -377,9 +568,15 @@ class TestTorchMethod(TestCase):
         q_input3 = torch.quantize_per_tensor(input3, 0.06, zero_point, dtype_inputs)
 
         output_cpu = model_fake([q_input1, q_input2, q_input3])
-        q_input1_gpu = torch.quantize_per_tensor(input1_gpu, 0.04, zero_point, dtype_inputs)
-        q_input2_gpu = torch.quantize_per_tensor(input2_gpu, 0.05, zero_point, dtype_inputs)
-        q_input3_gpu = torch.quantize_per_tensor(input3_gpu, 0.06, zero_point, dtype_inputs)
+        q_input1_gpu = torch.quantize_per_tensor(
+            input1_gpu, 0.04, zero_point, dtype_inputs
+        )
+        q_input2_gpu = torch.quantize_per_tensor(
+            input2_gpu, 0.05, zero_point, dtype_inputs
+        )
+        q_input3_gpu = torch.quantize_per_tensor(
+            input3_gpu, 0.06, zero_point, dtype_inputs
+        )
 
         intput_gpu = [q_input1_gpu, q_input2_gpu, q_input3_gpu]
         model.to("xpu")
@@ -408,9 +605,15 @@ class TestTorchMethod(TestCase):
         q_input3 = torch.quantize_per_tensor(input3, 0.06, zero_point, dtype_inputs)
 
         output_cpu = model_fake([q_input1, q_input2, q_input3])
-        q_input1_gpu = torch.quantize_per_tensor(input1_gpu, 0.04, zero_point, dtype_inputs)
-        q_input2_gpu = torch.quantize_per_tensor(input2_gpu, 0.05, zero_point, dtype_inputs)
-        q_input3_gpu = torch.quantize_per_tensor(input3_gpu, 0.06, zero_point, dtype_inputs)
+        q_input1_gpu = torch.quantize_per_tensor(
+            input1_gpu, 0.04, zero_point, dtype_inputs
+        )
+        q_input2_gpu = torch.quantize_per_tensor(
+            input2_gpu, 0.05, zero_point, dtype_inputs
+        )
+        q_input3_gpu = torch.quantize_per_tensor(
+            input3_gpu, 0.06, zero_point, dtype_inputs
+        )
 
         intput_gpu = [q_input1_gpu, q_input2_gpu, q_input3_gpu]
         model.to("xpu")

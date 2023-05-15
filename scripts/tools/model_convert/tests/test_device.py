@@ -15,7 +15,7 @@ class TorchAPITests(unittest.TestCase):
         x = torch.cuda.device_count()
         y = torch.xpu.device_count()
         self.assertEqual(x, y)
-        
+
     def test_get_device_name(self):
         device_id = torch.xpu.current_device()
         x = torch.xpu.get_device_name(device_id)

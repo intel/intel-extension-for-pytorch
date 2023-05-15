@@ -2,11 +2,10 @@ import torch
 import random
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
-
 
 
 class ForeachTest:
@@ -32,6 +31,7 @@ class ForeachTest:
             else:
                 return self.func(input1_for_func, input2_for_func, alpha=scalar)
 
+
 class TestTorchMethod(TestCase):
     def test_foreach_add(self, dtype=torch.float):
         x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
@@ -39,13 +39,13 @@ class TestTorchMethod(TestCase):
         scalar = random.uniform(-5, 5)
 
         test = ForeachTest(torch._foreach_add)
-        cpu = test(x1, x2, 'cpu', is_inplace=False, scalar=scalar)
-        xpu = test(x1, x2, 'xpu', is_inplace=False, scalar=scalar)
+        cpu = test(x1, x2, "cpu", is_inplace=False, scalar=scalar)
+        xpu = test(x1, x2, "xpu", is_inplace=False, scalar=scalar)
         self.result_compare(cpu, xpu)
 
         test_ = ForeachTest(torch._foreach_add_)
-        cpu_inplace = test_(x1, x2, 'cpu', is_inplace=True, scalar=scalar)
-        xpu_inplace = test_(x1, x2, 'xpu', is_inplace=True, scalar=scalar)
+        cpu_inplace = test_(x1, x2, "cpu", is_inplace=True, scalar=scalar)
+        xpu_inplace = test_(x1, x2, "xpu", is_inplace=True, scalar=scalar)
         self.result_compare(cpu_inplace, xpu_inplace)
 
     def test_foreach_sub(self, dtype=torch.float):
@@ -54,13 +54,13 @@ class TestTorchMethod(TestCase):
         scalar = random.uniform(-5, 5)
 
         test = ForeachTest(torch._foreach_sub)
-        cpu = test(x1, x2, 'cpu', is_inplace=False, scalar=scalar)
-        xpu = test(x1, x2, 'xpu', is_inplace=False, scalar=scalar)
+        cpu = test(x1, x2, "cpu", is_inplace=False, scalar=scalar)
+        xpu = test(x1, x2, "xpu", is_inplace=False, scalar=scalar)
         self.result_compare(cpu, xpu)
 
         test_ = ForeachTest(torch._foreach_sub_)
-        cpu_inplace = test_(x1, x2, 'cpu', is_inplace=True, scalar=scalar)
-        xpu_inplace = test_(x1, x2, 'xpu', is_inplace=True, scalar=scalar)
+        cpu_inplace = test_(x1, x2, "cpu", is_inplace=True, scalar=scalar)
+        xpu_inplace = test_(x1, x2, "xpu", is_inplace=True, scalar=scalar)
         self.result_compare(cpu_inplace, xpu_inplace)
 
     def test_foreach_mul(self, dtype=torch.float):
@@ -69,13 +69,13 @@ class TestTorchMethod(TestCase):
         scalar = random.uniform(-5, 5)
 
         test = ForeachTest(torch._foreach_sub)
-        cpu = test(x1, x2, 'cpu')
-        xpu = test(x1, x2, 'xpu')
+        cpu = test(x1, x2, "cpu")
+        xpu = test(x1, x2, "xpu")
         self.result_compare(cpu, xpu)
 
         test_ = ForeachTest(torch._foreach_sub_)
-        cpu_inplace = test_(x1, x2, 'cpu', is_inplace=True)
-        xpu_inplace = test_(x1, x2, 'xpu', is_inplace=True)
+        cpu_inplace = test_(x1, x2, "cpu", is_inplace=True)
+        xpu_inplace = test_(x1, x2, "xpu", is_inplace=True)
         self.result_compare(cpu_inplace, xpu_inplace)
 
     def test_foreach_div(self, dtype=torch.float):
@@ -84,13 +84,13 @@ class TestTorchMethod(TestCase):
         scalar = random.uniform(-5, 5)
 
         test = ForeachTest(torch._foreach_div)
-        cpu = test(x1, x2, 'cpu')
-        xpu = test(x1, x2, 'xpu')
+        cpu = test(x1, x2, "cpu")
+        xpu = test(x1, x2, "xpu")
         self.result_compare(cpu, xpu)
 
         test_ = ForeachTest(torch._foreach_div_)
-        cpu_inplace = test_(x1, x2, 'cpu', is_inplace=True)
-        xpu_inplace = test_(x1, x2, 'xpu', is_inplace=True)
+        cpu_inplace = test_(x1, x2, "cpu", is_inplace=True)
+        xpu_inplace = test_(x1, x2, "xpu", is_inplace=True)
         self.result_compare(cpu_inplace, xpu_inplace)
 
     def result_compare(self, x1, x2):

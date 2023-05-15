@@ -41,6 +41,7 @@ except ImportError:
     from yaml import SafeDumper as Dumper  # type: ignore[misc]
 YamlDumper = Dumper
 
+
 # A custom loader for YAML that errors on duplicate keys.
 # This doesn't happen by default: see https://github.com/yaml/pyyaml/issues/165
 class YamlLoader(Loader):
@@ -84,6 +85,7 @@ Target = Enum(
 # occurrence of a parameter in the derivative formula
 IDENT_REGEX = r"(^|\W){}($|\W)"
 
+
 # TODO: Use a real parser here; this will get bamboozled
 def split_name_params(schema: str) -> Tuple[str, List[str]]:
     m = re.match(r"(\w+)(\.\w+)?\((.*)\)", schema)
@@ -98,6 +100,7 @@ S = TypeVar("S")
 
 # These two functions purposely return generators in analogy to map()
 # so that you don't mix up when you need to list() them
+
 
 # Map over function that may return None; omit Nones from output sequence
 def mapMaybe(func: Callable[[T], Optional[S]], xs: Iterable[T]) -> Iterator[S]:
@@ -231,7 +234,6 @@ class FileManager:
         base_env: Optional[Dict[str, Any]] = None,
         sharded_keys: Set[str],
     ) -> None:
-
         everything: Dict[str, Any] = {"shard_id": "Everything"}
         shards: List[Dict[str, Any]] = [
             {"shard_id": f"_{i}"} for i in range(num_shards)

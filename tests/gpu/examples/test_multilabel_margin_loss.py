@@ -7,7 +7,10 @@ import pytest
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_2d_block_array(), reason="Failed on ATSM only, will be fixed soon.")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_2d_block_array(),
+        reason="Failed on ATSM only, will be fixed soon.",
+    )
     def test_multiabel_margin_loss(self, dtype=torch.float):
         input = torch.randn(3, 5)
         target = torch.LongTensor(3, 5).random_(-1, 5)
@@ -23,7 +26,7 @@ class TestNNMethod(TestCase):
             input.requires_grad = True
             output = loss(input, target)
             # print(output)
-            if(reduc == "none"):
+            if reduc == "none":
                 output.backward(torch.ones_like(output, dtype=torch.float))
             else:
                 output.backward(torch.tensor((1.0), dtype=torch.float))
@@ -38,12 +41,10 @@ class TestNNMethod(TestCase):
             input.requires_grad = True
             output = loss(input, target)
             # print(output.cpu())
-            if(reduc == "none"):
-                output.backward(torch.ones_like(
-                    output, dtype=torch.float).to("xpu"))
+            if reduc == "none":
+                output.backward(torch.ones_like(output, dtype=torch.float).to("xpu"))
             else:
-                output.backward(torch.tensor(
-                    (1.0), dtype=torch.float).to("xpu"))
+                output.backward(torch.tensor((1.0), dtype=torch.float).to("xpu"))
             # print(input.grad.cpu())
             try:
                 return output, input
@@ -54,8 +55,7 @@ class TestNNMethod(TestCase):
         # print("cpu")
         output_cpu, input_cpu = _test_cpu(input_cpu, target_cpu, "none")
         # print("xpu")
-        output_dpcpp, input_dpcpp = _test_dpcpp(
-            input_dpcpp, target_dpcpp, "none")
+        output_dpcpp, input_dpcpp = _test_dpcpp(input_dpcpp, target_dpcpp, "none")
         self.assertEqual(output_cpu, output_dpcpp.cpu())
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())
 
@@ -63,8 +63,7 @@ class TestNNMethod(TestCase):
         # print("cpu")
         output_cpu, input_cpu = _test_cpu(input_cpu, target_cpu, "sum")
         # print("xpu")
-        output_dpcpp, input_dpcpp = _test_dpcpp(
-            input_dpcpp, target_dpcpp, "sum")
+        output_dpcpp, input_dpcpp = _test_dpcpp(input_dpcpp, target_dpcpp, "sum")
         self.assertEqual(output_cpu, output_dpcpp.cpu())
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())
 
@@ -72,8 +71,7 @@ class TestNNMethod(TestCase):
         # print("cpu")
         output_cpu, input_cpu = _test_cpu(input_cpu, target_cpu, "mean")
         # print("xpu")
-        output_dpcpp, input_dpcpp = _test_dpcpp(
-            input_dpcpp, target_dpcpp, "mean")
+        output_dpcpp, input_dpcpp = _test_dpcpp(input_dpcpp, target_dpcpp, "mean")
         self.assertEqual(output_cpu, output_dpcpp.cpu())
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())
 
@@ -90,7 +88,6 @@ class TestNNMethod(TestCase):
         # print('cpu')
         output_cpu, input_cpu = _test_cpu(input_cpu, target_cpu, "sum")
         # print("xpu")
-        output_dpcpp, input_dpcpp = _test_dpcpp(
-            input_dpcpp, target_dpcpp, "sum")
+        output_dpcpp, input_dpcpp = _test_dpcpp(input_dpcpp, target_dpcpp, "sum")
         self.assertTrue(torch.allclose(output_cpu, output_dpcpp.cpu(), rtol=5e-5))
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())

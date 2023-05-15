@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 import pytest
 
@@ -14,15 +14,19 @@ class Model(torch.nn.Module):
         super(Model, self).__init__()
         self.block = torch.nn.Sequential(
             torch.nn.Conv1d(3, 3, kernel_size=3, stride=1, padding=1, bias=False),
-            torch.nn.BatchNorm1d(3)
+            torch.nn.BatchNorm1d(3),
         )
 
     def forward(self, x):
         x = self.block(x)
         return x
 
+
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(
+        torch.xpu.using_onednn_layout(),
+        reason="channels last does not support onednn block format",
+    )
     def test_model_conversion_channels_last_1d(self, dtype=torch.float):
         model = Model()
         test_input = torch.rand([2, 3, 4])

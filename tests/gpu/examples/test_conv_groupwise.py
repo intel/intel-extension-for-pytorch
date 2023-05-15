@@ -19,14 +19,25 @@ class TestNN(NNTestCase):
     _do_xpu_memory_leak_check = True
     _do_xpu_non_default_stream = True
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_conv2d_depthwise(self, dtype=torch.float):
         torch.set_default_dtype(torch.double)
         for depth_multiplier in [1, 2]:
-            m = nn.Conv2d(2, 2 * depth_multiplier, kernel_size=3, groups=2).to("xpu", dtype)
-            i = torch.randn(2, 2, 6, 6, device="xpu", dtype=dtype).div_(2).requires_grad_()
+            m = nn.Conv2d(2, 2 * depth_multiplier, kernel_size=3, groups=2).to(
+                "xpu", dtype
+            )
+            i = (
+                torch.randn(2, 2, 6, 6, device="xpu", dtype=dtype)
+                .div_(2)
+                .requires_grad_()
+            )
             output = m(i)
-            grad_output = torch.randn(2, 2 * depth_multiplier, 4, 4, device="xpu", dtype=dtype) / 2
+            grad_output = (
+                torch.randn(2, 2 * depth_multiplier, 4, 4, device="xpu", dtype=dtype)
+                / 2
+            )
             output.backward(grad_output)
 
             offset = 1 * depth_multiplier
@@ -45,29 +56,51 @@ class TestNN(NNTestCase):
             output2 = m2(i2)
             output2.backward(grad_output[:, offset:].contiguous())
 
-            self.assertEqual(output, torch.cat([output1, output2], 1),
-                             atol=dtype2prec_DONTUSE[dtype], rtol=0)
-            self.assertEqual(i.grad.data,
-                             torch.cat([i1.grad.data, i2.grad.data], 1),
-                             atol=dtype2prec_DONTUSE[dtype], rtol=0)
-            self.assertEqual(m.bias.grad.data,
-                             torch.cat([m1.bias.grad.data,
-                                        m2.bias.grad.data], 0),
-                             atol=dtype2prec_DONTUSE[dtype], rtol=0)
-            self.assertEqual(m.weight.grad.data,
-                             torch.cat([m1.weight.grad.data,
-                                        m2.weight.grad.data], 0),
-                             atol=dtype2prec_DONTUSE[dtype], rtol=0)
+            self.assertEqual(
+                output,
+                torch.cat([output1, output2], 1),
+                atol=dtype2prec_DONTUSE[dtype],
+                rtol=0,
+            )
+            self.assertEqual(
+                i.grad.data,
+                torch.cat([i1.grad.data, i2.grad.data], 1),
+                atol=dtype2prec_DONTUSE[dtype],
+                rtol=0,
+            )
+            self.assertEqual(
+                m.bias.grad.data,
+                torch.cat([m1.bias.grad.data, m2.bias.grad.data], 0),
+                atol=dtype2prec_DONTUSE[dtype],
+                rtol=0,
+            )
+            self.assertEqual(
+                m.weight.grad.data,
+                torch.cat([m1.weight.grad.data, m2.weight.grad.data], 0),
+                atol=dtype2prec_DONTUSE[dtype],
+                rtol=0,
+            )
         torch.set_default_dtype(dtype_origin)
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_Conv3d_depthwise(self, dtype=torch.float):
         torch.set_default_dtype(torch.double)
         for depth_multiplier in [1, 2]:
-            m = nn.Conv3d(2, 2 * depth_multiplier, kernel_size=3, groups=2).to("xpu", dtype)
-            i = torch.randn(2, 2, 6, 6, 6, device="xpu", dtype=dtype).div_(2).requires_grad_()
+            m = nn.Conv3d(2, 2 * depth_multiplier, kernel_size=3, groups=2).to(
+                "xpu", dtype
+            )
+            i = (
+                torch.randn(2, 2, 6, 6, 6, device="xpu", dtype=dtype)
+                .div_(2)
+                .requires_grad_()
+            )
             output = m(i)
-            grad_output = torch.randn(2, 2 * depth_multiplier, 4, 4, 4, device="xpu", dtype=dtype) / 2
+            grad_output = (
+                torch.randn(2, 2 * depth_multiplier, 4, 4, 4, device="xpu", dtype=dtype)
+                / 2
+            )
             output.backward(grad_output)
 
             offset = 1 * depth_multiplier
@@ -86,23 +119,36 @@ class TestNN(NNTestCase):
             output2 = m2(i2)
             output2.backward(grad_output[:, offset:].contiguous())
 
-            self.assertEqual(output, torch.cat([output1, output2], 1),
-                             atol=dtype2prec_DONTUSE[dtype], rtol=0)
-            self.assertEqual(i.grad.data,
-                             torch.cat([i1.grad.data, i2.grad.data], 1),
-                             atol=dtype2prec_DONTUSE[dtype], rtol=0)
-            self.assertEqual(m.bias.grad.data,
-                             torch.cat([m1.bias.grad.data,
-                                        m2.bias.grad.data], 0),
-                             atol=dtype2prec_DONTUSE[dtype], rtol=0)
-            self.assertEqual(m.weight.grad.data,
-                             torch.cat([m1.weight.grad.data,
-                                        m2.weight.grad.data], 0),
-                             atol=dtype2prec_DONTUSE[dtype], rtol=0)
+            self.assertEqual(
+                output,
+                torch.cat([output1, output2], 1),
+                atol=dtype2prec_DONTUSE[dtype],
+                rtol=0,
+            )
+            self.assertEqual(
+                i.grad.data,
+                torch.cat([i1.grad.data, i2.grad.data], 1),
+                atol=dtype2prec_DONTUSE[dtype],
+                rtol=0,
+            )
+            self.assertEqual(
+                m.bias.grad.data,
+                torch.cat([m1.bias.grad.data, m2.bias.grad.data], 0),
+                atol=dtype2prec_DONTUSE[dtype],
+                rtol=0,
+            )
+            self.assertEqual(
+                m.weight.grad.data,
+                torch.cat([m1.weight.grad.data, m2.weight.grad.data], 0),
+                atol=dtype2prec_DONTUSE[dtype],
+                rtol=0,
+            )
         torch.set_default_dtype(dtype_origin)
 
     @dtypes(torch.double)
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_Conv2d_backward_depthwise(self, device="xpu", dtype=torch.double):
         torch.set_default_dtype(torch.double)
         x = torch.randn(2, 2, 4, 20, device=device, dtype=dtype, requires_grad=True)
@@ -110,21 +156,27 @@ class TestNN(NNTestCase):
 
         def conv2d_depthwise(x, weight):
             return torch.nn.functional.conv2d(
-                x, weight, bias=None, stride=(1, 10), groups=2)
+                x, weight, bias=None, stride=(1, 10), groups=2
+            )
 
         torch.autograd.gradcheck(conv2d_depthwise, (x, weight))
         torch.set_default_dtype(dtype_origin)
 
     @dtypes(torch.double)
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_Conv3d_backward_depthwise(self, device="xpu", dtype=torch.double):
         torch.set_default_dtype(torch.double)
         x = torch.randn(1, 2, 5, 5, 5, device=device, dtype=dtype, requires_grad=True)
-        weight = torch.randn(4, 1, 3, 3, 3, device=device, dtype=dtype, requires_grad=True)
+        weight = torch.randn(
+            4, 1, 3, 3, 3, device=device, dtype=dtype, requires_grad=True
+        )
 
         def conv3d_depthwise(x, weight):
             return torch.nn.functional.conv3d(
-                x, weight, bias=None, stride=(1, 1, 2), groups=2)
+                x, weight, bias=None, stride=(1, 1, 2), groups=2
+            )
 
         torch.autograd.gradcheck(conv3d_depthwise, (x, weight))
         torch.set_default_dtype(dtype_origin)

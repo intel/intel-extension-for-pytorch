@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -10,7 +10,6 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_max_unpooling2d(self, dtype=torch.float):
-
         input = torch.randn([2, 2, 4, 4, 4], device=cpu_device, dtype=dtype)
         pool = nn.MaxPool3d(2, stride=2, return_indices=True)
         output, indices = pool(input)

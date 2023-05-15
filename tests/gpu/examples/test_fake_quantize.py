@@ -6,7 +6,9 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_fake_quantize_per_channel_affine(self, dtype=torch.float):
         src_cpu = torch.randn([1, 3, 2, 2], requires_grad=True, dtype=torch.float)
         src_xpu = src_cpu.clone().detach().to("xpu")
@@ -20,10 +22,12 @@ class TestTorchMethod(TestCase):
         quant_min = torch.iinfo(data_type).min
         quant_max = torch.iinfo(data_type).max
 
-        dst_cpu = torch.fake_quantize_per_channel_affine(src_cpu, channel_scale_cpu,
-                                                         channel_zero_point_cpu, 1, quant_min, quant_max)
-        dst_xpu = torch.fake_quantize_per_channel_affine(src_xpu, channel_scale_xpu,
-                                                         channel_zero_point_xpu, 1, quant_min, quant_max)
+        dst_cpu = torch.fake_quantize_per_channel_affine(
+            src_cpu, channel_scale_cpu, channel_zero_point_cpu, 1, quant_min, quant_max
+        )
+        dst_xpu = torch.fake_quantize_per_channel_affine(
+            src_xpu, channel_scale_xpu, channel_zero_point_xpu, 1, quant_min, quant_max
+        )
 
         self.assertEqual(dst_cpu, dst_xpu.cpu())
 
@@ -34,7 +38,9 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(src_cpu.grad, src_xpu.grad.cpu())
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_fake_quantize_learnable_per_channel_affine(self, dtype=torch.float):
         src_cpu = torch.randn([1, 3, 2, 2])
         src_xpu = src_cpu.clone().to("xpu")
@@ -47,14 +53,32 @@ class TestTorchMethod(TestCase):
         quant_min = torch.iinfo(data_type).min
         quant_max = torch.iinfo(data_type).max
         grad_factor = 1.5
-        dst_cpu = torch._fake_quantize_learnable_per_channel_affine(src_cpu, channel_scale_cpu,
-                                                                    channel_zero_point_cpu, 1, quant_min, quant_max, grad_factor)
-        dst_xpu = torch._fake_quantize_learnable_per_channel_affine(src_xpu, channel_scale_xpu,
-                                                                    channel_zero_point_xpu, 1, quant_min, quant_max, grad_factor)
+        dst_cpu = torch._fake_quantize_learnable_per_channel_affine(
+            src_cpu,
+            channel_scale_cpu,
+            channel_zero_point_cpu,
+            1,
+            quant_min,
+            quant_max,
+            grad_factor,
+        )
+        dst_xpu = torch._fake_quantize_learnable_per_channel_affine(
+            src_xpu,
+            channel_scale_xpu,
+            channel_zero_point_xpu,
+            1,
+            quant_min,
+            quant_max,
+            grad_factor,
+        )
         self.assertEqual(dst_cpu, dst_xpu.cpu())
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
-    def test_fake_quantize_learnable_per_channel_affine_backward(self, dtype=torch.float):
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
+    def test_fake_quantize_learnable_per_channel_affine_backward(
+        self, dtype=torch.float
+    ):
         x_cpu = torch.randn([1, 3, 2, 2], requires_grad=True)
         x_xpu = x_cpu.clone().detach().to("xpu")
         x_xpu.requires_grad = True
@@ -67,10 +91,24 @@ class TestTorchMethod(TestCase):
         quant_min = torch.iinfo(data_type).min
         quant_max = torch.iinfo(data_type).max
         grad_factor = 1.5
-        y_cpu = torch._fake_quantize_learnable_per_channel_affine(x_cpu, channel_scale_cpu,
-                                                                  channel_zero_point_cpu, 1, quant_min, quant_max, grad_factor)
-        y_xpu = torch._fake_quantize_learnable_per_channel_affine(x_xpu, channel_scale_xpu,
-                                                                  channel_zero_point_xpu, 1, quant_min, quant_max, grad_factor)
+        y_cpu = torch._fake_quantize_learnable_per_channel_affine(
+            x_cpu,
+            channel_scale_cpu,
+            channel_zero_point_cpu,
+            1,
+            quant_min,
+            quant_max,
+            grad_factor,
+        )
+        y_xpu = torch._fake_quantize_learnable_per_channel_affine(
+            x_xpu,
+            channel_scale_xpu,
+            channel_zero_point_xpu,
+            1,
+            quant_min,
+            quant_max,
+            grad_factor,
+        )
 
         linear = torch.nn.Linear(2, 10)
         activation = torch.nn.ReLU()
@@ -104,10 +142,12 @@ class TestTorchMethod(TestCase):
         quant_min = torch.iinfo(data_type).min
         quant_max = torch.iinfo(data_type).max
 
-        dst_cpu = torch.fake_quantize_per_tensor_affine(src_cpu, scale_cpu,
-                                                        zero_point_cpu, quant_min, quant_max)
-        dst_xpu = torch.fake_quantize_per_tensor_affine(src_xpu, scale_xpu,
-                                                        zero_point_xpu, quant_min, quant_max)
+        dst_cpu = torch.fake_quantize_per_tensor_affine(
+            src_cpu, scale_cpu, zero_point_cpu, quant_min, quant_max
+        )
+        dst_xpu = torch.fake_quantize_per_tensor_affine(
+            src_xpu, scale_xpu, zero_point_xpu, quant_min, quant_max
+        )
 
         self.assertEqual(dst_cpu, dst_xpu.cpu())
 
@@ -130,13 +170,17 @@ class TestTorchMethod(TestCase):
         quant_min = torch.iinfo(data_type).min
         quant_max = torch.iinfo(data_type).max
         grad_factor = 1.5
-        dst_cpu = torch._fake_quantize_learnable_per_tensor_affine(src_cpu, scale_cpu,
-                                                                   zero_point_cpu, quant_min, quant_max, grad_factor)
-        dst_xpu = torch._fake_quantize_learnable_per_tensor_affine(src_xpu, scale_xpu,
-                                                                   zero_point_xpu, quant_min, quant_max, grad_factor)
+        dst_cpu = torch._fake_quantize_learnable_per_tensor_affine(
+            src_cpu, scale_cpu, zero_point_cpu, quant_min, quant_max, grad_factor
+        )
+        dst_xpu = torch._fake_quantize_learnable_per_tensor_affine(
+            src_xpu, scale_xpu, zero_point_xpu, quant_min, quant_max, grad_factor
+        )
         self.assertEqual(dst_cpu, dst_xpu.cpu())
 
-    def test_fake_quantize_learnable_per_tensor_affine_backward(self, dtype=torch.float):
+    def test_fake_quantize_learnable_per_tensor_affine_backward(
+        self, dtype=torch.float
+    ):
         x_cpu = torch.randn([1, 3, 2, 2], requires_grad=True)
         x_xpu = x_cpu.clone().detach().to("xpu")
         x_xpu.requires_grad = True
@@ -149,10 +193,12 @@ class TestTorchMethod(TestCase):
         quant_min = torch.iinfo(data_type).min
         quant_max = torch.iinfo(data_type).max
         grad_factor = 1.5
-        y_cpu = torch._fake_quantize_learnable_per_tensor_affine(x_cpu, scale_cpu,
-                                                                 zero_point_cpu, quant_min, quant_max, grad_factor)
-        y_xpu = torch._fake_quantize_learnable_per_tensor_affine(x_xpu, scale_xpu,
-                                                                 zero_point_xpu, quant_min, quant_max, grad_factor)
+        y_cpu = torch._fake_quantize_learnable_per_tensor_affine(
+            x_cpu, scale_cpu, zero_point_cpu, quant_min, quant_max, grad_factor
+        )
+        y_xpu = torch._fake_quantize_learnable_per_tensor_affine(
+            x_xpu, scale_xpu, zero_point_xpu, quant_min, quant_max, grad_factor
+        )
 
         linear = torch.nn.Linear(2, 10)
         activation = torch.nn.ReLU()
@@ -173,7 +219,9 @@ class TestTorchMethod(TestCase):
         self.assertEqual(y_cpu, y_xpu.cpu())
         self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
 
-    def test_fake_quantize_per_tensor_affine_cachemask_tensor_qparams(self, dtype=torch.float):
+    def test_fake_quantize_per_tensor_affine_cachemask_tensor_qparams(
+        self, dtype=torch.float
+    ):
         src_cpu = torch.randn([1, 3, 2, 2], requires_grad=True, dtype=torch.float)
         src_xpu = src_cpu.clone().detach().to("xpu")
         src_xpu.requires_grad = True
@@ -189,8 +237,20 @@ class TestTorchMethod(TestCase):
         quant_max = torch.iinfo(data_type).max
 
         dst_cpu = torch._fake_quantize_per_tensor_affine_cachemask_tensor_qparams(
-            src_cpu, scale_cpu, zero_point_cpu, fake_quant_cpu_enabled, quant_min, quant_max)
+            src_cpu,
+            scale_cpu,
+            zero_point_cpu,
+            fake_quant_cpu_enabled,
+            quant_min,
+            quant_max,
+        )
         dst_xpu = torch._fake_quantize_per_tensor_affine_cachemask_tensor_qparams(
-            src_xpu, scale_xpu, zero_point_xpu, fake_quant_xpu_enabled, quant_min, quant_max)
+            src_xpu,
+            scale_xpu,
+            zero_point_xpu,
+            fake_quant_xpu_enabled,
+            quant_min,
+            quant_max,
+        )
 
         self.assertEqual(dst_cpu[0], dst_xpu[0].cpu())

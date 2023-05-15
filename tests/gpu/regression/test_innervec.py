@@ -1,11 +1,11 @@
 import torch
-import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch  # noqa F401
 from torch.testing._internal.common_utils import TestCase
 import numpy as np
 from numpy import random
 
-cpu_device = torch.device('cpu')
-xpu_device = torch.device('xpu')
+cpu_device = torch.device("cpu")
+xpu_device = torch.device("xpu")
 torch.xpu.manual_seed(0)
 random.seed(0)
 
@@ -13,7 +13,7 @@ random.seed(0)
 # off numpy's handling for real/complex scalars.
 
 
-class ComplexScalar():
+class ComplexScalar:
     def __init__(self, val):
         self.val = val
 
@@ -27,7 +27,7 @@ class ComplexScalar():
 _COMPLEX_DIM = 0
 
 
-class ComplexTensor():
+class ComplexTensor:
     def __init__(self, re, im=None):
         # check dtypes
         if not isinstance(re, torch.Tensor):
@@ -41,7 +41,7 @@ class ComplexTensor():
         if im.dtype != torch.float32 and im.dtype != torch.float64:
             im = im.type(torch.get_default_dtype())
         if not re.shape == im.shape:
-            raise RuntimeError(f'Shape of re {re.shape} must match im {im.shape}')
+            raise RuntimeError(f"Shape of re {re.shape} must match im {im.shape}")
         self.tensor = torch.stack((re, im), dim=_COMPLEX_DIM)
         self.shape = re.shape
 
@@ -80,16 +80,20 @@ class ComplexTensor():
         return ComplexTensor(self.real().detach(), self.imag().detach())
 
     def squeeze(self, *args, **kwargs):
-        return ComplexTensor(self.real().squeeze(*args, **kwargs), self.imag().squeeze(*args, **kwargs))
+        return ComplexTensor(
+            self.real().squeeze(*args, **kwargs), self.imag().squeeze(*args, **kwargs)
+        )
 
     def to(self, *args, **kwargs):
-        return ComplexTensor(self.real().to(*args, **kwargs), self.imag().to(*args, **kwargs))
+        return ComplexTensor(
+            self.real().to(*args, **kwargs), self.imag().to(*args, **kwargs)
+        )
 
     def cpu(self):
-        return self.to('cpu')
+        return self.to("cpu")
 
     def cuda(self):
-        return self.to('cuda')
+        return self.to("cuda")
 
     def float(self):
         return self.to(torch.float32)
@@ -101,7 +105,7 @@ class ComplexTensor():
         return ComplexTensor(self.real(), -self.imag())
 
     def normsq(self):
-        return self.real()**2 + self.imag()**2
+        return self.real() ** 2 + self.imag() ** 2
 
     def arg(self):
         return torch.atan2(self.imag(), self.real())
@@ -124,8 +128,10 @@ class ComplexTensor():
         elif np.isscalar(other):  # special case wrapping scalar for convenience
             return ComplexScalar(other)
         else:
-            raise TypeError(f'Could upcast other of type {type(other)} for '
-                            'binary op with ComplexTensor')
+            raise TypeError(
+                f"Could upcast other of type {type(other)} for "
+                "binary op with ComplexTensor"
+            )
 
     def __add__(self, other):
         other = ComplexTensor.upcast(other)
@@ -140,14 +146,16 @@ class ComplexTensor():
 
     def __mul__(self, other):
         other = ComplexTensor.upcast(other)
-        return ComplexTensor(self.real() * other.real() - self.imag() * other.imag(),
-                             self.real() * other.imag() + self.imag() * other.real())
+        return ComplexTensor(
+            self.real() * other.real() - self.imag() * other.imag(),
+            self.real() * other.imag() + self.imag() * other.real(),
+        )
 
     def __truediv__(self, other):
         if np.isscalar(other):
             return self * (1 / other)
         other = ComplexTensor.upcast(other)
-        return self * (other**(-1))
+        return self * (other ** (-1))
 
     def __abs__(self):
         return torch.sqrt(self.normsq())
@@ -156,18 +164,21 @@ class ComplexTensor():
         norm = abs(self)
         arg = self.arg()
         # defines a choice of branch cut for non-integer b, matching numpy convention
-        return ComplexTensor(torch.cos(b * arg) * norm**b, torch.sin(b * arg) * norm**b)
+        return ComplexTensor(
+            torch.cos(b * arg) * norm**b, torch.sin(b * arg) * norm**b
+        )
 
     def __matmul__(self, other):
         return ComplexTensor(
             self.real() @ other.real() - self.imag() @ other.imag(),
-            self.real() @ other.imag() + self.imag() @ other.real())
+            self.real() @ other.imag() + self.imag() @ other.real(),
+        )
 
     def __str__(self):
-        return f'{self.real()} + 1j*{self.imag()}'
+        return f"{self.real()} + 1j*{self.imag()}"
 
     def __repr__(self):
-        return f'ComplexTensor({self.real()}, {self.imag()})'
+        return f"ComplexTensor({self.real()}, {self.imag()})"
 
     def __getitem__(self, ind):
         return ComplexTensor(self.real()[ind], self.imag()[ind])
@@ -177,7 +188,8 @@ class ComplexTensor():
         self.imag()[ind] = item.imag()
 
     def _not_implemented(self, *args, **kwargs):
-        raise NotImplementedError('Function is not implemented for ComplexTensor')
+        raise NotImplementedError("Function is not implemented for ComplexTensor")
+
     __iadd__ = __imul__ = _not_implemented
     __lt__ = __le__ = __eq__ = __ne__ = __ge__ = __gt__ = _not_implemented
     __not__ = __and__ = __or__ = _not_implemented
@@ -188,7 +200,7 @@ class ComplexTensor():
 
 def inner_vector(v1, v2):
     """Complex inner product of (batched) vectors `v1` and `v2`"""
-    assert v1.shape == v2.shape, 'vector shapes must match'
+    assert v1.shape == v2.shape, "vector shapes must match"
     inner = 0
     cpu_inner = 0
 
@@ -203,12 +215,18 @@ def inner_vector(v1, v2):
         cpu_inner = cpu_v1[..., i] * cpu_v2[..., i].conj() + cpu_inner
 
         # WRONG
-        if not (torch.allclose(cpu_inner.real(), inner.real().to(cpu_device))
-                and torch.allclose(cpu_inner.imag(), inner.imag().to(cpu_device))):
-            diff_real = torch.max(torch.abs(cpu_inner.real() - inner.real().to(cpu_device)))
-            diff_imag = torch.max(torch.abs(cpu_inner.imag() - inner.imag().to(cpu_device)))
-            print(str(i) + ': MaxDiff - real: ' + str(diff_real))
-            print(str(i) + ': MaxDiff - imag: ' + str(diff_imag))
+        if not (
+            torch.allclose(cpu_inner.real(), inner.real().to(cpu_device))
+            and torch.allclose(cpu_inner.imag(), inner.imag().to(cpu_device))
+        ):
+            diff_real = torch.max(
+                torch.abs(cpu_inner.real() - inner.real().to(cpu_device))
+            )
+            diff_imag = torch.max(
+                torch.abs(cpu_inner.imag() - inner.imag().to(cpu_device))
+            )
+            print(str(i) + ": MaxDiff - real: " + str(diff_real))
+            print(str(i) + ": MaxDiff - imag: " + str(diff_imag))
             raise AssertionError()
 
     return inner
@@ -242,7 +260,9 @@ class TestTorchMethod(TestCase):
             dim2 = random.randint(1, int(max_size / dim1) + 1)
             dim3 = random.randint(1, int(max_size / (dim1 * dim2)) + 1)
             dim4 = random.randint(1, int(max_size / (dim1 * dim2 * dim3)) + 1)
-            rand = torch.rand(dim1, dim2, dim3, dim4, lastdim, device=xpu_device, dtype=dtype)
+            rand = torch.rand(
+                dim1, dim2, dim3, dim4, lastdim, device=xpu_device, dtype=dtype
+            )
             print(rand.shape)
             inner = inner_vector(ComplexTensor(rand, rand), ComplexTensor(rand, rand))
             # 6D
@@ -251,6 +271,8 @@ class TestTorchMethod(TestCase):
             dim3 = random.randint(1, int(max_size / (dim1 * dim2)) + 1)
             dim4 = random.randint(1, int(max_size / (dim1 * dim2 * dim3)) + 1)
             dim5 = random.randint(1, int(max_size / (dim1 * dim2 * dim3 * dim4)) + 1)
-            rand = torch.rand(dim1, dim2, dim3, dim4, dim5, lastdim, device=xpu_device, dtype=dtype)
+            rand = torch.rand(
+                dim1, dim2, dim3, dim4, dim5, lastdim, device=xpu_device, dtype=dtype
+            )
             print(rand.shape)
             inner = inner_vector(ComplexTensor(rand, rand), ComplexTensor(rand, rand))

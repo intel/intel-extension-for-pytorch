@@ -1,12 +1,13 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+
 
 @pytest.mark.skipif(not torch.has_mkl, reason="torch build w/o mkl support")
 @pytest.mark.skipif("not torch.xpu.has_onemkl()")

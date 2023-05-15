@@ -7,13 +7,21 @@ import contextlib
 from typing import Generator
 import warnings
 
-__all__ = ['get_rng_state', 'get_rng_state_all',
-           'set_rng_state', 'set_rng_state_all',
-           'manual_seed', 'manual_seed_all',
-           'seed', 'seed_all', 'initial_seed', 'fork_rng']
+__all__ = [
+    "get_rng_state",
+    "get_rng_state_all",
+    "set_rng_state",
+    "set_rng_state_all",
+    "manual_seed",
+    "manual_seed_all",
+    "seed",
+    "seed_all",
+    "initial_seed",
+    "fork_rng",
+]
 
 
-def get_rng_state(device: Union[int, str, torch.device] = 'xpu') -> Tensor:
+def get_rng_state(device: Union[int, str, torch.device] = "xpu") -> Tensor:
     r"""Returns the random number generator state of the specified GPU as a ByteTensor.
 
     Args:
@@ -28,7 +36,7 @@ def get_rng_state(device: Union[int, str, torch.device] = 'xpu') -> Tensor:
     if isinstance(device, str):
         device = torch.device(device)
     elif isinstance(device, int):
-        device = torch.device('xpu', device)
+        device = torch.device("xpu", device)
     idx = device.index
     if idx is None:
         idx = torch.xpu.current_device()
@@ -45,7 +53,9 @@ def get_rng_state_all() -> List[Tensor]:
     return results
 
 
-def set_rng_state(new_state: Tensor, device: Union[int, str, torch.device] = 'xpu') -> None:
+def set_rng_state(
+    new_state: Tensor, device: Union[int, str, torch.device] = "xpu"
+) -> None:
     r"""Sets the random number generator state of the specified GPU.
 
     Args:
@@ -57,7 +67,7 @@ def set_rng_state(new_state: Tensor, device: Union[int, str, torch.device] = 'xp
     if isinstance(device, str):
         device = torch.device(device)
     elif isinstance(device, int):
-        device = torch.device('xpu', device)
+        device = torch.device("xpu", device)
 
     def cb():
         idx = cast(torch.device, device).index
@@ -127,6 +137,7 @@ def seed() -> None:
         If you are working with a multi-GPU model, this function will only initialize
         the seed on one GPU.  To initialize all GPUs, use :func:`seed_all`.
     """
+
     def cb():
         idx = torch.xpu.current_device()
         default_generator = torch.xpu.default_generators[idx]
@@ -140,6 +151,7 @@ def seed_all() -> None:
     It's safe to call this function if XPU is not available; in that
     case, it is silently ignored.
     """
+
     def cb():
         random_seed = 0
         seeded = False
@@ -172,7 +184,9 @@ _fork_rng_warned_already = False
 
 
 @contextlib.contextmanager
-def fork_rng(devices=None, enabled=True, _caller="fork_rng", _devices_kw="devices") -> Generator:
+def fork_rng(
+    devices=None, enabled=True, _caller="fork_rng", _devices_kw="devices"
+) -> Generator:
     """
     Forks the RNG, so that when you return, the RNG is reset
     to the state that it was previously in.
@@ -202,18 +216,22 @@ def fork_rng(devices=None, enabled=True, _caller="fork_rng", _devices_kw="device
         num_devices = torch.xpu.device_count()
         if num_devices > 1 and not _fork_rng_warned_already:
             warnings.warn(
-                ("XPU reports that you have {num_devices} available devices, and you "
-                 "have used {caller} without explicitly specifying which devices are being used. "
-                 "For safety, we initialize *every* XPU device by default, which "
-                 "can be quite slow if you have a lot of GPUs.  If you know that you are only "
-                 "making use of a few XPU devices, set the environment variable XPU_VISIBLE_DEVICES "
-                 "or the '{devices_kw}' keyword argument of {caller} with the set of devices "
-                 "you are actually using.  For example, if you are using CPU only, "
-                 "set XPU_VISIBLE_DEVICES= or devices=[]; if you are using "
-                 "GPU 0 only, set XPU_VISIBLE_DEVICES=0 or devices=[0].  To initialize "
-                 "all devices and suppress this warning, set the '{devices_kw}' keyword argument "
-                 "to `range(torch.xpu.device_count())`."
-                 ).format(num_devices=num_devices, caller=_caller, devices_kw=_devices_kw))
+                (
+                    "XPU reports that you have {num_devices} available devices, and you "
+                    "have used {caller} without explicitly specifying which devices are being used. "
+                    "For safety, we initialize *every* XPU device by default, which "
+                    "can be quite slow if you have a lot of GPUs.  If you know that you are only "
+                    "making use of a few XPU devices, set the environment variable XPU_VISIBLE_DEVICES "
+                    "or the '{devices_kw}' keyword argument of {caller} with the set of devices "
+                    "you are actually using.  For example, if you are using CPU only, "
+                    "set XPU_VISIBLE_DEVICES= or devices=[]; if you are using "
+                    "GPU 0 only, set XPU_VISIBLE_DEVICES=0 or devices=[0].  To initialize "
+                    "all devices and suppress this warning, set the '{devices_kw}' keyword argument "
+                    "to `range(torch.xpu.device_count())`."
+                ).format(
+                    num_devices=num_devices, caller=_caller, devices_kw=_devices_kw
+                )
+            )
             _fork_rng_warned_already = True
         devices = list(range(num_devices))
     else:

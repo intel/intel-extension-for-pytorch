@@ -6,7 +6,9 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_dist(self, dtype=torch.float32):
         x_cpu = torch.randn(4)
         y_cpu = torch.randn(4)

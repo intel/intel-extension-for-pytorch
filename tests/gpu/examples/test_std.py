@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -9,8 +9,14 @@ dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     def test_std(self, dtype=torch.float):
-        src = torch.randn((3, 4,), dtype=torch.float32,
-                          device=torch.device("cpu"))
+        src = torch.randn(
+            (
+                3,
+                4,
+            ),
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
         print("cpu src = ", src)
         print("cpu dst = ", src.std())
         print("cpu dst with dim = ", src.std(1))

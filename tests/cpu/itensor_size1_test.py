@@ -17,7 +17,13 @@ m.train()
 x = torch.randn(8, 2, 224, 224).to(memory_format=torch.channels_last).requires_grad_()
 origin_optimizer = torch.optim.SGD(m.parameters(), lr=0.01, momentum=0.9)
 example_input = torch.randn(8, 2, 224, 224)
-ipex_model, ipex_optimizer = ipex.optimize(m, dtype=torch.float, optimizer=origin_optimizer , level='O1', sample_input=example_input )
+ipex_model, ipex_optimizer = ipex.optimize(
+    m,
+    dtype=torch.float,
+    optimizer=origin_optimizer,
+    level="O1",
+    sample_input=example_input,
+)
 y = ipex_model(x).sum()
 ipex_optimizer.zero_grad()
 y.backward()

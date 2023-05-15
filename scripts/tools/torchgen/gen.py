@@ -356,7 +356,6 @@ def translate_args(
     sig: Union[CppSignature, DispatcherSignature],
     cpp_sig: CppSignature,
 ) -> str:
-
     # Adds SpecialArgName.possibly_redundant_memory_format NamedCType for memory_format bindings
     def add_spl_memory_format_binding(input_bindings: List[Binding]) -> List[Binding]:
         output_bindings: List[Binding] = []
@@ -1608,7 +1607,6 @@ def get_native_function_schema_registrations(
     aten_schema_registrations = []
     custom_namespace = None
     for namespace, funcs in ns_native_functions.items():
-
         schema_registrations_body = list(
             mapMaybe(RegisterSchema(schema_selector), funcs)
         )

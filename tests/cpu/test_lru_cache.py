@@ -4,6 +4,7 @@ import torch.nn as nn
 from common_utils import TestCase
 import intel_extension_for_pytorch as ipex
 
+
 class Conv2d(nn.Module):
     def __init__(self):
         super().__init__()
@@ -12,6 +13,7 @@ class Conv2d(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
+
 class Linear(nn.Module):
     def __init__(self):
         super().__init__()
@@ -19,6 +21,7 @@ class Linear(nn.Module):
 
     def forward(self, x):
         return self.linear(x)
+
 
 class MatmulDiv(nn.Module):
     def __init__(self):
@@ -29,9 +32,11 @@ class MatmulDiv(nn.Module):
         z = torch.matmul(x, y)
         return z.div(2.0)
 
+
 class Tester(TestCase):
     def test_a_lru_cache_resize(self):
         import os
+
         # Set LRU_CACHE_CAPACITY < 1024 to trigger resize
         os.environ["LRU_CACHE_CAPACITY"] = "512"
         # Conv
@@ -48,7 +53,8 @@ class Tester(TestCase):
         traced_model = torch.jit.trace(matmul, x).eval()
         traced_model.graph_for(x)
         # unset this environment variable
-        del os.environ['LRU_CACHE_CAPACITY']
+        del os.environ["LRU_CACHE_CAPACITY"]
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test = unittest.main()

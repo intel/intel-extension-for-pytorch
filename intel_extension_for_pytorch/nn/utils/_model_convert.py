@@ -16,7 +16,7 @@ class _LSTM(torch.nn.LSTM):
 
     # port from torch/nn/modules/rnn.py
     # replace the _VF.lstm with torch.ops.torch_ipex.lstm when the input is not PackedSequence
-    def forward(self, input, hx=None):  # noqa: F811
+    def forward(self, input, hx=None):
         orig_input = input
         # xxx: isinstance check needs to be in conditional for TorchScript to compile
         if isinstance(orig_input, PackedSequence):
@@ -30,13 +30,23 @@ class _LSTM(torch.nn.LSTM):
 
         if hx is None:
             num_directions = 2 if self.bidirectional else 1
-            real_hidden_size = self.proj_size if self.proj_size > 0 else self.hidden_size
-            h_zeros = torch.zeros(self.num_layers * num_directions,
-                                  max_batch_size, real_hidden_size,
-                                  dtype=input.dtype, device=input.device)
-            c_zeros = torch.zeros(self.num_layers * num_directions,
-                                  max_batch_size, self.hidden_size,
-                                  dtype=input.dtype, device=input.device)
+            real_hidden_size = (
+                self.proj_size if self.proj_size > 0 else self.hidden_size
+            )
+            h_zeros = torch.zeros(
+                self.num_layers * num_directions,
+                max_batch_size,
+                real_hidden_size,
+                dtype=input.dtype,
+                device=input.device,
+            )
+            c_zeros = torch.zeros(
+                self.num_layers * num_directions,
+                max_batch_size,
+                self.hidden_size,
+                dtype=input.dtype,
+                device=input.device,
+            )
             hx = (h_zeros, c_zeros)
         else:
             # Each batch of the hidden state should match the input sequence that
@@ -44,8 +54,17 @@ class _LSTM(torch.nn.LSTM):
             hx = self.permute_hidden(hx, sorted_indices)
 
         self.check_forward_args(input, hx, batch_sizes)
-        result = torch.ops.torch_ipex.ipex_lstm(input, hx, self._flat_weights, self.bias, self.num_layers,
-                                                self.dropout, self.training, self.bidirectional, self.batch_first)
+        result = torch.ops.torch_ipex.ipex_lstm(
+            input,
+            hx,
+            self._flat_weights,
+            self.bias,
+            self.num_layers,
+            self.dropout,
+            self.training,
+            self.bidirectional,
+            self.batch_first,
+        )
         output = result[0]
         hidden = result[1:]
 
@@ -56,10 +75,10 @@ def replace_params_in_optimizer(optimizer, param_dict):
     if optimizer is None:
         return
     for group in optimizer.param_groups:
-        for i, p in enumerate(group['params']):
+        for i, p in enumerate(group["params"]):
             if p in param_dict:
                 new_param = param_dict[p]
-                group['params'][i] = new_param
+                group["params"][i] = new_param
                 if p in optimizer.state:
                     optimizer.state[new_param] = optimizer.state.pop(p)
 
@@ -69,11 +88,21 @@ def replace_lstm_with_ipex_lstm(model, optimizer):
     # does not support the case where model itself is torch.nn.LSTM
     for child_name, child in model.named_children():
         if isinstance(child, torch.nn.LSTM):
-            assert hasattr(child, "weight_ih_l0"), "torch.nn.LSTM should have weight_ih_l0"
-            ipex_lstm = _LSTM(child.input_size, child.hidden_size,
-                              child.num_layers, child.bias, child.batch_first,
-                              child.dropout, child.bidirectional, child.proj_size,
-                              child.weight_ih_l0.device, child.weight_ih_l0.dtype)
+            assert hasattr(
+                child, "weight_ih_l0"
+            ), "torch.nn.LSTM should have weight_ih_l0"
+            ipex_lstm = _LSTM(
+                child.input_size,
+                child.hidden_size,
+                child.num_layers,
+                child.bias,
+                child.batch_first,
+                child.dropout,
+                child.bidirectional,
+                child.proj_size,
+                child.weight_ih_l0.device,
+                child.weight_ih_l0.dtype,
+            )
             ipex_lstm.__dict__ = copy.deepcopy(child.__dict__)
             setattr(model, child_name, ipex_lstm)
             param_dict = {}
@@ -105,7 +134,9 @@ def _save_to_state_dict(self, destination, prefix, keep_vars):
         if not hasattr(self, name):
             continue
         param_dict.update({name: para})
-        temp_param = torch.nn.Parameter(para.to(torch.float), requires_grad=para.requires_grad)
+        temp_param = torch.nn.Parameter(
+            para.to(torch.float), requires_grad=para.requires_grad
+        )
         setattr(self, name, temp_param)
     super(type(self), self)._save_to_state_dict(destination, prefix, keep_vars)
     for p in param_dict:
@@ -115,38 +146,51 @@ def _save_to_state_dict(self, destination, prefix, keep_vars):
 
 def convert_module_data_type(module, dtype):
     # convert weights(bias) of module to dtype to reduce dtype reorder
-    module_convert_list = [torch.nn.Conv2d,
-                           torch.nn.Conv3d,
-                           torch.nn.ConvTranspose2d,
-                           torch.nn.ConvTranspose3d,
-                           torch.nn.Linear,
-                           torch.nn.Embedding,
-                           torch.nn.LSTM]
+    module_convert_list = [
+        torch.nn.Conv2d,
+        torch.nn.Conv3d,
+        torch.nn.ConvTranspose2d,
+        torch.nn.ConvTranspose3d,
+        torch.nn.Linear,
+        torch.nn.Embedding,
+        torch.nn.LSTM,
+    ]
     for module_cls in module_convert_list:
         if isinstance(module, module_cls):
-            setattr(module, '_save_to_state_dict', types.MethodType(_save_to_state_dict, module))
+            module._save_to_state_dict = types.MethodType(_save_to_state_dict, module)
             if module_cls is torch.nn.LSTM:
                 for name, param in module.named_parameters():
-                    ori_data = getattr(getattr(module, name), "data") # noqa B009
+                    ori_data = getattr(module, name).data
                     ori_data_dtype = ori_data.dtype
-                    if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16 or ori_data_dtype == torch.half:
+                    if (
+                        ori_data_dtype == torch.float
+                        or ori_data_dtype == torch.bfloat16
+                        or ori_data_dtype == torch.half
+                    ):
                         casted_data = ori_data.detach().clone().to(dtype)
-                        setattr(getattr(module, name), "data", casted_data) # noqa B011
+                        getattr(module, name).data = casted_data
                     else:
                         warnings.warn(
-                            f"WARNING: Can't convert model's parameters dtyep from {ori_data_dtype} to {dtype}")
+                            f"WARNING: Can't convert model's parameters dtyep from {ori_data_dtype} to {dtype}"
+                        )
                         break
             else:
                 ori_data_dtype = module.weight.dtype
                 # Assume weight and bias have same dtype, only need check weight dtype here.
-                if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16 or ori_data_dtype == torch.half:
+                if (
+                    ori_data_dtype == torch.float
+                    or ori_data_dtype == torch.bfloat16
+                    or ori_data_dtype == torch.half
+                ):
                     weight_data = module.weight.detach().clone().to(dtype)
                     module.weight.data = weight_data
-                    if hasattr(module, 'bias') and module.bias is not None:
+                    if hasattr(module, "bias") and module.bias is not None:
                         bias_data = module.bias.detach().clone().to(dtype)
                         module.bias.data = bias_data
                 else:
-                    warnings.warn(f"WARNING: Can't convert model's parameters dtype from {ori_data_dtype} to {dtype}")
+                    warnings.warn(
+                        f"WARNING: Can't convert model's parameters dtype from {ori_data_dtype} to {dtype}"
+                    )
             break
     for child in module.children():
         convert_module_data_type(child, dtype)

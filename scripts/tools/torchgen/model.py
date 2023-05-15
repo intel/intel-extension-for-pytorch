@@ -32,6 +32,7 @@ from torchgen.utils import assert_never, NamespaceHelper, OrderedSet
 #   and you're expected to populate information once during
 #   construction.
 
+
 # Represent a source location; used for better error reporting
 @dataclass(frozen=True)
 class Location:
@@ -57,6 +58,7 @@ FUNCTIONALITY_KEYS = ["", "Quantized", "Sparse", "NestedTensor", "Autograd"]
 AUTOGRAD_KEYS = ["AutogradNestedTensor"] + [
     "Autograd" + component for component in BACKEND_COMPONENTS
 ]
+
 
 # This doesn't have to be in sync with the header, it only needs to contain
 # entries that we actually use in the codegen
@@ -233,6 +235,7 @@ dispatch_keys = [
     DispatchKey.ZeroTensor,
 ]
 
+
 # Dispatch keys that "support all backends".  These codegen slightly differently
 # then backend specific keys.
 def is_generic_dispatch_key(dk: DispatchKey) -> bool:
@@ -371,6 +374,7 @@ class DeviceCheckType(Enum):
 ViewSchemaKind = Enum(
     "ViewSchemaKind", ("aliasing", "aliasing_inplace", "non_aliasing")
 )
+
 
 # The basic input to the code generation is native_functions.yaml.
 # The name "native", BTW, comes from the distinction between native
@@ -971,6 +975,7 @@ class NativeFunction:
 
 
 SchemaKind = Enum("SchemaKind", ("functional", "inplace", "out", "mutable", "scratch"))
+
 
 # A structured kernel is guaranteed to have a functional and out variant, and
 # optionally an inplace variant.
@@ -1624,6 +1629,7 @@ class FunctionSchema:
 
 
 # Here is the rest of the data model, described more briefly.
+
 
 # Simplified version for what actually shows up in built-ins.
 # Look at alias_info.h for expanded syntax.  If you need the structure,
@@ -2345,6 +2351,7 @@ AUGMENTED_ASSIGNMENT_NAMES = [
     "xor",
     "or",
 ]
+
 
 # A BaseOperatorName is what we think of the operator name, without
 # the overload name.  Unusually, we don't represent this as just a

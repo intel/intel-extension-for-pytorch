@@ -1,34 +1,35 @@
-#reference: https://github.com/intel/neural-compressor/blob/15477100cef756e430c8ef8ef79729f0c80c8ce6/neural_compressor/objective.py
+# reference: https://github.com/intel/neural-compressor/blob/15477100cef756e430c8ef8ef79729f0c80c8ce6/neural_compressor/objective.py
 import subprocess
-import sys  
+import sys
+
 
 class MultiObjective(object):
     def __init__(self, program, program_args, tune_launcher):
-        self.program = program 
-        self.program_args = program_args 
+        self.program = program
+        self.program_args = program_args
         self.tune_launcher = tune_launcher
-            
+
     def evaluate(self, cfg):
         python = sys.executable
         cmd = [python]
         cmd.append("-m")
         cmd.append("intel_extension_for_pytorch.cpu.launch")
-        
+
         if self.tune_launcher:
             launcher_args = self.decode_launcer_cfg(cfg)
-            cmd += launcher_args 
-        
+            cmd += launcher_args
+
         cmd += [self.program]
         cmd += self.program_args
-        
+
         r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        
-        # todo: r.returncode != 0 
-        
-        output = str(r.stdout, "utf-8") 
+
+        # todo: r.returncode != 0
+
+        output = str(r.stdout, "utf-8")
         usr_objective_vals = self.extract_usr_objectives(output)
-        return usr_objective_vals 
-    
+        return usr_objective_vals
+
     def decode_launcer_cfg(self, cfg):
         ncore_per_instance = cfg["ncore_per_instance"]
         ninstances = cfg["ninstances"]
@@ -37,28 +38,28 @@ class MultiObjective(object):
         disable_numactl = cfg["disable_numactl"]
         disable_iomp = cfg["disable_iomp"]
         malloc = cfg["malloc"]
-            
+
         launcher_args = []
-        
+
         if ncore_per_instance != -1:
             launcher_args.append("--ncore_per_instance")
             launcher_args.append(str(ncore_per_instance))
-        
+
         if ninstances != -1:
             launcher_args.append("--ninstances")
             launcher_args.append(str(ninstances))
-        
-        if use_all_nodes == False:
+
+        if not use_all_nodes:
             launcher_args.append("--node_id")
             launcher_args.append("0")
-        
-        if use_logical_core == True:
+
+        if use_logical_core:
             launcher_args.append("--use_logical_core")
 
-        if disable_numactl == True:
+        if disable_numactl:
             launcher_args.append("--disable_numactl")
 
-        if disable_iomp == True:
+        if disable_iomp:
             launcher_args.append("--disable_iomp")
 
         if malloc == "tc":
@@ -67,18 +68,23 @@ class MultiObjective(object):
             launcher_args.append("--enable_jemalloc")
         elif malloc == "default":
             launcher_args.append("--use_default_allocator")
-            
+
         return launcher_args
-    
+
     def extract_usr_objectives(self, output):
         HYPERTUNE_TOKEN = "@hypertune"
         output = output.strip().splitlines()
-        
+
         objectives = []
         for i, s in enumerate(output):
             if HYPERTUNE_TOKEN in s:
                 try:
-                    objectives.append(float(output[i+1]))
-                except:
-                    raise RuntimeError("Extracting objective {} failed for {} file. Make sure to print an int/float value after the @hypertune token as the objective value to be minimized or maximized.".format(output[i], self.program))
+                    objectives.append(float(output[i + 1]))
+                except Exception:
+                    raise RuntimeError(
+                        "Extracting objective {} failed for {} file. Make sure to print an int/float value after the\
+                             @hypertune token as the objective value to be minimized or maximized.".format(
+                            output[i], self.program
+                        )
+                    )
         return objectives

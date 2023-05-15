@@ -1,6 +1,6 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 xpu_device = torch.device("xpu")
 cpu_device = torch.device("cpu")
@@ -47,7 +47,6 @@ class TestTorchMethod(TestCase):
             self.assertEqual(res_cpu, res_xpu.cpu())
 
     def test_addmm_activation(self, dtype=torch.float):
-
         m1_cpu = torch.randn([30, 40], dtype=dtype)
         m2_cpu = torch.randn([40, 12], dtype=dtype)
         x_cpu = torch.ones([30, 12], dtype=dtype)
@@ -81,20 +80,36 @@ class TestTorchMethod(TestCase):
         classNum = 2
 
         # source1
-        src1_cpu = torch.randn(bs, hidden, device=cpu_device, dtype=torch.float32).requires_grad_()
-        src1_xpu = torch.randn(bs, hidden, device=xpu_device, dtype=dtype).requires_grad_()
+        src1_cpu = torch.randn(
+            bs, hidden, device=cpu_device, dtype=torch.float32
+        ).requires_grad_()
+        src1_xpu = torch.randn(
+            bs, hidden, device=xpu_device, dtype=dtype
+        ).requires_grad_()
 
         # source2
-        src2_cpu = torch.randn(hidden, classNum, device=cpu_device, dtype=torch.float32).requires_grad_()
-        src2_xpu = torch.randn(hidden, classNum, device=xpu_device, dtype=dtype).requires_grad_()
+        src2_cpu = torch.randn(
+            hidden, classNum, device=cpu_device, dtype=torch.float32
+        ).requires_grad_()
+        src2_xpu = torch.randn(
+            hidden, classNum, device=xpu_device, dtype=dtype
+        ).requires_grad_()
 
         # bias
-        bias_cpu = torch.randn(bs, classNum, device=cpu_device, dtype=torch.float32).requires_grad_()
-        bias_xpu = torch.randn(bs, classNum, device=xpu_device, dtype=dtype).requires_grad_()
+        bias_cpu = torch.randn(
+            bs, classNum, device=cpu_device, dtype=torch.float32
+        ).requires_grad_()
+        bias_xpu = torch.randn(
+            bs, classNum, device=xpu_device, dtype=dtype
+        ).requires_grad_()
 
         # grad
-        grad_cpu = torch.randn(bs, classNum, device=cpu_device, dtype=torch.float32).requires_grad_()
-        grad_xpu = torch.randn(bs, classNum, device=xpu_device, dtype=dtype).requires_grad_()
+        grad_cpu = torch.randn(
+            bs, classNum, device=cpu_device, dtype=torch.float32
+        ).requires_grad_()
+        grad_xpu = torch.randn(
+            bs, classNum, device=xpu_device, dtype=dtype
+        ).requires_grad_()
 
         # align all
         src1_xpu.data = src1_cpu.data.to(device=xpu_device, dtype=dtype)
@@ -111,17 +126,33 @@ class TestTorchMethod(TestCase):
         dst_xpu.backward(grad_xpu)
 
         # check output
-        self.assertEqual(dst_cpu, dst_xpu.to(device=cpu_device, dtype=torch.float),
-                         atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(
+            dst_cpu,
+            dst_xpu.to(device=cpu_device, dtype=torch.float),
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
 
         # check src1 grad
-        self.assertEqual(src1_cpu.grad, src1_xpu.grad.to(device=cpu_device, dtype=torch.float),
-                         atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(
+            src1_cpu.grad,
+            src1_xpu.grad.to(device=cpu_device, dtype=torch.float),
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
 
         # check src2 grad
-        self.assertEqual(src2_cpu.grad, src2_xpu.grad.to(device=cpu_device, dtype=torch.float),
-                         atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(
+            src2_cpu.grad,
+            src2_xpu.grad.to(device=cpu_device, dtype=torch.float),
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
 
         # check bias grad
-        self.assertEqual(bias_cpu.grad, bias_xpu.grad.to(device=cpu_device, dtype=torch.float),
-                         atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(
+            bias_cpu.grad,
+            bias_xpu.grad.to(device=cpu_device, dtype=torch.float),
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )

@@ -26,7 +26,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(output, output_dpcpp.cpu())
 
     def test_pdist(self, dtype=torch.float):
-        for p in (0, 1, 2, 3, float('inf')):
+        for p in (0, 1, 2, 3, float("inf")):
             a = torch.randn([10, 15], requires_grad=True)
             y = torch.pdist(a, p)
             g = torch.ones_like(y, requires_grad=True)
@@ -34,10 +34,10 @@ class TestNNMethod(TestCase):
             grad_cpu = a.grad.detach().clone()
             a.grad.zero_()
 
-            a_xpu = a.to('xpu')
+            a_xpu = a.to("xpu")
             a_xpu.retain_grad()
             y_xpu = torch.pdist(a_xpu, p)
-            g_xpu = torch.ones_like(y_xpu, requires_grad=True).to('xpu')
+            g_xpu = torch.ones_like(y_xpu, requires_grad=True).to("xpu")
             y_xpu.backward(g_xpu)
             grad_xpu = a_xpu.grad.detach().clone()
             a_xpu.grad.zero_()
@@ -46,8 +46,7 @@ class TestNNMethod(TestCase):
             self.assertEqual(grad_cpu, grad_xpu)
 
     def test_cdist(self, dtype=torch.float):
-        for p in (0, 1, 2, 3, float('inf')):
-
+        for p in (0, 1, 2, 3, float("inf")):
             # small test: P < 25 & R < 25
             a = torch.randn([3, 10, 15], requires_grad=True)
             b = torch.randn([3, 5, 15], requires_grad=True)
@@ -57,12 +56,12 @@ class TestNNMethod(TestCase):
             grad_cpu = a.grad.detach().clone()
             a.grad.zero_()
 
-            a_xpu = a.to('xpu')
-            b_xpu = b.to('xpu')
+            a_xpu = a.to("xpu")
+            b_xpu = b.to("xpu")
             a_xpu.retain_grad()
             b_xpu.retain_grad()
             y_xpu = torch.cdist(a_xpu, b_xpu, p)
-            g_xpu = torch.ones_like(y_xpu, requires_grad=True).to('xpu')
+            g_xpu = torch.ones_like(y_xpu, requires_grad=True).to("xpu")
             y_xpu.backward(g_xpu)
             grad_xpu = a_xpu.grad.detach().clone()
             a_xpu.grad.zero_()
@@ -79,12 +78,12 @@ class TestNNMethod(TestCase):
             grad_cpu = a.grad.detach().clone()
             a.grad.zero_()
 
-            a_xpu = a.to('xpu')
-            b_xpu = b.to('xpu')
+            a_xpu = a.to("xpu")
+            b_xpu = b.to("xpu")
             a_xpu.retain_grad()
             b_xpu.retain_grad()
             y_xpu = torch.cdist(a_xpu, b_xpu, p)
-            g_xpu = torch.ones_like(y_xpu, requires_grad=True).to('xpu')
+            g_xpu = torch.ones_like(y_xpu, requires_grad=True).to("xpu")
             y_xpu.backward(g_xpu)
             grad_xpu = a_xpu.grad.detach().clone()
             a_xpu.grad.zero_()

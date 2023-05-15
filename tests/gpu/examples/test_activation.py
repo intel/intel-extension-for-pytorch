@@ -11,12 +11,10 @@ approximates = ["tanh", "none"]
 
 
 class TestNNMethod(TestCase):
-
     def test_activation_relu(self, dtype=torch.float):
         relu_ = torch.nn.functional.relu_
         relu = torch.nn.functional.relu
-        x_cpu = torch.tensor(
-            [[-0.1, 0.2], [-0.2, 0.3], [0.4, 0.5], [0.5, -0.6]])
+        x_cpu = torch.tensor([[-0.1, 0.2], [-0.2, 0.3], [0.4, 0.5], [0.5, -0.6]])
         x_dpcpp = x_cpu.to("xpu")
 
         relu_(x_cpu)
@@ -62,8 +60,7 @@ class TestNNMethod(TestCase):
     def test_activation_relu_channels_last(self, dtype=torch.float):
         x = torch.randn(1, 2, 3, 3, dtype=torch.float)
         w = torch.randn(2, 2, 3, 3, dtype=torch.float)
-        conv = torch.nn.Conv2d(2, 2, kernel_size=3,
-                               stride=1, padding=1, bias=False)
+        conv = torch.nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
         bn = torch.nn.BatchNorm2d(2)
         relu = torch.nn.ReLU()
         conv.weight.data = w
@@ -105,8 +102,7 @@ class TestNNMethod(TestCase):
         #  Will not check the result due to different random seeds on cpu and xpu
         RReLU = torch.nn.RReLU(0.1, 0.3)
         RReLU_dpcpp = copy.deepcopy(RReLU).to("xpu")
-        x_cpu = torch.tensor(
-            [[-0.1, 0.2], [-0.2, 0.3], [0.4, 0.5], [0.5, -0.6]])
+        x_cpu = torch.tensor([[-0.1, 0.2], [-0.2, 0.3], [0.4, 0.5], [0.5, -0.6]])
         x_dpcpp = x_cpu.to("xpu")
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)
@@ -123,8 +119,7 @@ class TestNNMethod(TestCase):
     def test_activation_gelu(self, dtype=torch.float):
         GELU = torch.nn.GELU()
         GELU_dpcpp = copy.deepcopy(GELU).to("xpu")
-        x_cpu = torch.tensor(
-            [[-0.1, 0.2], [-0.2, 0.3], [0.4, 0.5], [0.5, -0.6]])
+        x_cpu = torch.tensor([[-0.1, 0.2], [-0.2, 0.3], [0.4, 0.5], [0.5, -0.6]])
         x_dpcpp = x_cpu.to("xpu")
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)
@@ -163,8 +158,7 @@ class TestNNMethod(TestCase):
     def test_activation_prelu(self, dtype=torch.float):
         PReLU = torch.nn.PReLU(num_parameters=1)
         PReLU_dpcpp = copy.deepcopy(PReLU).to("xpu")
-        x_cpu = torch.tensor(
-            [[-0.1, 0.2], [-0.2, 0.3], [0.4, 0.5], [0.5, -0.6]])
+        x_cpu = torch.tensor([[-0.1, 0.2], [-0.2, 0.3], [0.4, 0.5], [0.5, -0.6]])
         x_dpcpp = x_cpu.to("xpu")
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)
@@ -200,7 +194,8 @@ class TestNNMethod(TestCase):
         PReLU = torch.nn.PReLU(num_parameters=3)
         PReLU_dpcpp = copy.deepcopy(PReLU).to("xpu")
         x_cpu = torch.tensor(
-            [[-0.1, 0.2, 2], [-0.2, 0.3, 2], [0.4, 0.5, 2], [0.5, -0.6, 3]])
+            [[-0.1, 0.2, 2], [-0.2, 0.3, 2], [0.4, 0.5, 2], [0.5, -0.6, 3]]
+        )
         x_dpcpp = x_cpu.to("xpu")
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)

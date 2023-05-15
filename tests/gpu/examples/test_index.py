@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 import numpy as np
 
@@ -64,16 +64,22 @@ class TestTorchMethod(TestCase):
         b = torch.rand([1, 20, 10])
         b_dpcpp = b.to(dpcpp_device)
         for i in range(5):
-            torch.ops.aten.index(x, torch.tensor([i]), out = b)
-            torch.ops.aten.index(x_dpcpp, torch.tensor([i]).to(dpcpp_device), out = b_dpcpp)
+            torch.ops.aten.index(x, torch.tensor([i]), out=b)
+            torch.ops.aten.index(
+                x_dpcpp, torch.tensor([i]).to(dpcpp_device), out=b_dpcpp
+            )
             self.assertEqual(b, b_dpcpp.to(cpu_device))
 
         b = torch.rand([1, 10])
         b_dpcpp = b.to(dpcpp_device)
         for i in range(5):
             for j in range(20):
-                torch.ops.aten.index(x, [torch.tensor([i]), torch.tensor([j])], out = b)
-                torch.ops.aten.index(x_dpcpp, [torch.tensor([i]).to(dpcpp_device), torch.tensor([j])], out = b_dpcpp)
+                torch.ops.aten.index(x, [torch.tensor([i]), torch.tensor([j])], out=b)
+                torch.ops.aten.index(
+                    x_dpcpp,
+                    [torch.tensor([i]).to(dpcpp_device), torch.tensor([j])],
+                    out=b_dpcpp,
+                )
                 self.assertEqual(b, b_dpcpp.to(cpu_device))
 
     def test_index_of_bool_mask(self, dtype=torch.float):

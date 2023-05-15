@@ -2,8 +2,7 @@ import torch
 from torch._six import inf
 from torch.distributions import Geometric
 from torch.testing._internal.common_utils import TestCase
-from torch.testing._internal.common_dtype import (
-   get_all_fp_dtypes, get_all_int_dtypes)
+from torch.testing._internal.common_dtype import get_all_fp_dtypes, get_all_int_dtypes
 from torch.testing._internal.common_device_type import dtypes
 
 import pytest
@@ -21,8 +20,8 @@ class TestTorchMethod(TestCase):
         s = 0.3
         self.assertEqual(Geometric(p).sample((8,)).size(), (8, 3))
         self.assertEqual(Geometric(1).sample(), 0)
-        self.assertEqual(Geometric(1).log_prob(torch.tensor(1.)), -inf)
-        self.assertEqual(Geometric(1).log_prob(torch.tensor(0.)), 0)
+        self.assertEqual(Geometric(1).log_prob(torch.tensor(1.0)), -inf)
+        self.assertEqual(Geometric(1).log_prob(torch.tensor(0.0)), 0)
         self.assertFalse(Geometric(p).sample().requires_grad)
         self.assertEqual(Geometric(r).sample((8,)).size(), (8,))
         self.assertEqual(Geometric(r).sample().size(), ())
@@ -41,12 +40,12 @@ class TestTorchMethod(TestCase):
 
     @dtypes(torch.float)
     def test_geometric_kstest(self, dtype=torch.int8):
-
         device = sycl_device
         # Add the manual_seed, for tests in experiment folder, this
         # seed would be set globally.
         torch.xpu.manual_seed(1234)
         from scipy import stats
+
         size = 1000
         for p in [0.2, 0.5, 0.8]:
             t = torch.empty(size, dtype=dtype, device=device).geometric_(p=p)

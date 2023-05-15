@@ -2,20 +2,22 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 import pytest
+
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_embedding(self, dtype=torch.float):
-
         print("Weights ...")
         # embed = nn.Embedding(138493, 64)
         embed = nn.Embedding(10, 3)
-        embed.weight.data.normal_(0., 0.01)
+        embed.weight.data.normal_(0.0, 0.01)
         print(embed.weight)
         print()
 
@@ -68,8 +70,7 @@ class TestTorchMethod(TestCase):
         weight_xpu = weight.to(dpcpp_device)
         self.assertEqual(weight, weight_xpu.to(cpu_device))
         idx = torch.tensor([4, 3, 4, 2])
-        idx_xpu = idx.to('xpu')
+        idx_xpu = idx.to("xpu")
         a = torch.embedding_renorm_(weight.detach(), idx, 0.5, 1.0)
         b = torch.embedding_renorm_(weight_xpu.detach(), idx_xpu, 0.5, 1.0)
         self.assertEqual(weight, weight_xpu.to(cpu_device))
-        

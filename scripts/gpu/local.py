@@ -16,9 +16,13 @@ from scripts.gpu.model import UseC10Dispatcher
 # sites are eliminated.  If you don't have a plan for how to get there,
 # DON'T add a new entry here.
 
+
 class Locals(threading.local):
     use_c10_dispatcher: Optional[UseC10Dispatcher] = None
+
+
 _locals = Locals()
+
 
 # The use_c10_dispatcher field in native_functions.yaml is used to
 # control codegen behavior, so that we can handle cases where
@@ -26,9 +30,11 @@ _locals = Locals()
 # state, use_c10_dispatcher should always be UseC10Dispatcher.full
 # and this flag can be eliminated.
 def use_c10_dispatcher() -> UseC10Dispatcher:
-    assert _locals.use_c10_dispatcher is not None, \
-        "need to initialize local.use_c10_dispatcher with local.parametrize"
+    assert (
+        _locals.use_c10_dispatcher is not None
+    ), "need to initialize local.use_c10_dispatcher with local.parametrize"
     return _locals.use_c10_dispatcher
+
 
 @contextmanager
 def parametrize(*, use_c10_dispatcher: UseC10Dispatcher) -> Iterator[None]:

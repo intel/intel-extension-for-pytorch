@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
-import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch  # noqa F401
 
 from torch.quantization.quantize_jit import (
     convert_jit,
@@ -9,6 +9,7 @@ from torch.quantization.quantize_jit import (
 )
 import pytest
 import time
+
 
 def trace_int8_model(model, device, test_input):
     model = model.to(device)
@@ -21,14 +22,12 @@ def trace_int8_model(model, device, test_input):
     print("start ", device, " calibration ...")
     qconfig_u8 = torch.quantization.QConfig(
         activation=torch.quantization.observer.MinMaxObserver.with_args(
-            qscheme=torch.per_tensor_symmetric,
-            reduce_range=False,
-            dtype=torch.quint8
+            qscheme=torch.per_tensor_symmetric, reduce_range=False, dtype=torch.quint8
         ),
-        weight=torch.quantization.default_weight_observer
+        weight=torch.quantization.default_weight_observer,
     )
 
-    modelJit = prepare_jit(modelJit, {'': qconfig_u8}, True)
+    modelJit = prepare_jit(modelJit, {"": qconfig_u8}, True)
 
     # do calibration
     test_input = test_input.to(device)
@@ -54,11 +53,14 @@ def trace_int8_model(model, device, test_input):
         print("finish ", device, " testing.......")
     return output
 
+
 class SimpleModule(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv = nn.Conv2d(3, 6, 3, 1, 1)
-        self.instance_norm = nn.InstanceNorm2d(6, **{'eps': 1e-5, 'affine': True, 'momentum': 0.1})
+        self.instance_norm = nn.InstanceNorm2d(
+            6, **{"eps": 1e-5, "affine": True, "momentum": 0.1}
+        )
 
     def forward(self, x):
         x = self.conv(x)
@@ -73,4 +75,3 @@ class TestQTensortoPlain(TestCase):
         with torch.no_grad():
             with torch.xpu.onednn_layout():
                 trace_int8_model(mod, "xpu", test_input)
-            

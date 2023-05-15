@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 """
     Motivation: When running block format ResNet-XX with using inplaced binary add and relu, 
@@ -17,7 +17,6 @@ cpu_device = torch.device("cpu")
 
 
 class TestTorchMethod(TestCase):
-
     def test_inplace_binary_and_relu(self, dtype=torch.float):
         with torch.xpu.onednn_layout():
             input_cpu = torch.randn([32, 64, 300, 300])

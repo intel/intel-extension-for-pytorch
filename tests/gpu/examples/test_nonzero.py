@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 cpu_device = torch.device("cpu")
@@ -10,15 +10,19 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_nonzero(self, dtype=torch.float):
-
         #
         # Test torch.nonzero on CPU device
         #
         a_cpu = torch.tensor([1, 1, 1, 0, 1], device=cpu_device)
-        b_cpu = torch.tensor([[0.6, 0.0, 0.0, 0.0],
-                              [0.0, 0.4, 0.0, 0.0],
-                              [0.0, 0.0, 1.2, 0.0],
-                              [0.0, 0.0, 0.0, -0.4]], device=cpu_device)
+        b_cpu = torch.tensor(
+            [
+                [0.6, 0.0, 0.0, 0.0],
+                [0.0, 0.4, 0.0, 0.0],
+                [0.0, 0.0, 1.2, 0.0],
+                [0.0, 0.0, 0.0, -0.4],
+            ],
+            device=cpu_device,
+        )
 
         print("For Tensor:", a_cpu)
         print("torch.nonzero on CPU returns", torch.nonzero(a_cpu))
@@ -29,13 +33,17 @@ class TestNNMethod(TestCase):
         print("\n")
 
         print("For Tensor:", a_cpu)
-        print("torch.nonzero with as_tuple TRUE on CPU returns",
-              torch.nonzero(a_cpu, as_tuple=True))
+        print(
+            "torch.nonzero with as_tuple TRUE on CPU returns",
+            torch.nonzero(a_cpu, as_tuple=True),
+        )
         print("\n")
 
         print("For Tensor:", b_cpu)
-        print("torch.nonzero with as_tuple TRUE on CPU returns",
-              torch.nonzero(b_cpu, as_tuple=True))
+        print(
+            "torch.nonzero with as_tuple TRUE on CPU returns",
+            torch.nonzero(b_cpu, as_tuple=True),
+        )
         print("\n")
 
         #
@@ -43,10 +51,15 @@ class TestNNMethod(TestCase):
         #
 
         a_dpcpp = torch.tensor([1, 1, 1, 0, 1], device=dpcpp_device)
-        b_dpcpp = torch.tensor([[0.6, 0.0, 0.0, 0.0],
-                                [0.0, 0.4, 0.0, 0.0],
-                                [0.0, 0.0, 1.2, 0.0],
-                                [0.0, 0.0, 0.0, -0.4]], device=dpcpp_device)
+        b_dpcpp = torch.tensor(
+            [
+                [0.6, 0.0, 0.0, 0.0],
+                [0.0, 0.4, 0.0, 0.0],
+                [0.0, 0.0, 1.2, 0.0],
+                [0.0, 0.0, 0.0, -0.4],
+            ],
+            device=dpcpp_device,
+        )
 
         print("For Tensor:", a_dpcpp.to("cpu"))
         print("torch.nonzero on dpcpp returns", torch.nonzero(a_dpcpp).cpu())
@@ -57,8 +70,10 @@ class TestNNMethod(TestCase):
         print("\n")
 
         print("For Tensor:", a_dpcpp.to("cpu"))
-        print("torch.nonzero with as_tuple TRUE on dpcpp returns",
-              torch.nonzero(a_dpcpp, as_tuple=True)[0].cpu())
+        print(
+            "torch.nonzero with as_tuple TRUE on dpcpp returns",
+            torch.nonzero(a_dpcpp, as_tuple=True)[0].cpu(),
+        )
         print("\n")
 
         print("For Tensor:", b_dpcpp.to("cpu"))
@@ -69,12 +84,18 @@ class TestNNMethod(TestCase):
         self.assertEqual(b_cpu, b_dpcpp.cpu())
         self.assertEqual(torch.nonzero(a_cpu), torch.nonzero(a_dpcpp).cpu())
         self.assertEqual(torch.nonzero(b_cpu), torch.nonzero(b_dpcpp).cpu())
-        self.assertEqual(torch.nonzero(a_cpu, as_tuple=True)[
-                         0], torch.nonzero(a_dpcpp, as_tuple=True)[0].cpu())
-        self.assertEqual(torch.nonzero(b_cpu, as_tuple=True)[
-                         0], torch.nonzero(b_dpcpp, as_tuple=True)[0].cpu())
-        self.assertEqual(torch.nonzero(b_cpu, as_tuple=True)[
-                         1], torch.nonzero(b_dpcpp, as_tuple=True)[1].cpu())
+        self.assertEqual(
+            torch.nonzero(a_cpu, as_tuple=True)[0],
+            torch.nonzero(a_dpcpp, as_tuple=True)[0].cpu(),
+        )
+        self.assertEqual(
+            torch.nonzero(b_cpu, as_tuple=True)[0],
+            torch.nonzero(b_dpcpp, as_tuple=True)[0].cpu(),
+        )
+        self.assertEqual(
+            torch.nonzero(b_cpu, as_tuple=True)[1],
+            torch.nonzero(b_dpcpp, as_tuple=True)[1].cpu(),
+        )
 
     def test_nonzero_with_large_dim(self, dtype=torch.float):
         a_cpu = torch.randn(4, 15000)

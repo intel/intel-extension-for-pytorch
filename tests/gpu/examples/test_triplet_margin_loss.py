@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -10,7 +10,6 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_triplet_margin_loss(self, dtype=torch.float):
-
         input = torch.randn(5, 6)
         positive = torch.randn(5, 6)
         negative = torch.randn(5, 6)
@@ -28,7 +27,7 @@ class TestNNMethod(TestCase):
             input.requires_grad = True
             output = loss(input, positive, negative)
             print(output)
-            if(reduc == "none"):
+            if reduc == "none":
                 output.backward(torch.ones(5, dtype=torch.float))
             else:
                 output.backward(torch.tensor((1.0), dtype=torch.float))
@@ -43,43 +42,42 @@ class TestNNMethod(TestCase):
             input.requires_grad = True
             output = loss(input, positive, negative)
             print(output.cpu())
-            if(reduc == "none"):
+            if reduc == "none":
                 output.backward(torch.ones(5, dtype=torch.float).to("xpu"))
             else:
-                output.backward(torch.tensor(
-                    (1.0), dtype=torch.float).to("xpu"))
+                output.backward(torch.tensor((1.0), dtype=torch.float).to("xpu"))
             print(input.grad.cpu())
             try:
                 return input, output
             finally:
                 input.grad.zero_()
 
-        print('none')
+        print("none")
         print("cpu")
-        input_cpu, output_cpu = _test_cpu(
-            input_cpu, posit_cpu, negat_cpu, "none")
+        input_cpu, output_cpu = _test_cpu(input_cpu, posit_cpu, negat_cpu, "none")
         print("xpu")
         input_dpcpp, output_dpcpp = _test_dpcpp(
-            input_dpcpp, posit_dpcpp, negat_dpcpp, "none")
+            input_dpcpp, posit_dpcpp, negat_dpcpp, "none"
+        )
         self.assertEqual(output_cpu, output_dpcpp.cpu())
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())
 
-        print('sum')
+        print("sum")
         print("cpu")
-        input_cpu, output_cpu = _test_cpu(
-            input_cpu, posit_cpu, negat_cpu, "sum")
+        input_cpu, output_cpu = _test_cpu(input_cpu, posit_cpu, negat_cpu, "sum")
         print("xpu")
         input_dpcpp, output_dpcpp = _test_dpcpp(
-            input_dpcpp, posit_dpcpp, negat_dpcpp, "sum")
+            input_dpcpp, posit_dpcpp, negat_dpcpp, "sum"
+        )
         self.assertEqual(output_cpu, output_dpcpp.cpu())
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())
 
-        print('mean')
+        print("mean")
         print("cpu")
-        input_cpu, output_cpu = _test_cpu(
-            input_cpu, posit_cpu, negat_cpu, "mean")
+        input_cpu, output_cpu = _test_cpu(input_cpu, posit_cpu, negat_cpu, "mean")
         print("xpu")
         input_dpcpp, output_dpcpp = _test_dpcpp(
-            input_dpcpp, posit_dpcpp, negat_dpcpp, "mean")
+            input_dpcpp, posit_dpcpp, negat_dpcpp, "mean"
+        )
         self.assertEqual(output_cpu, output_dpcpp.cpu())
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())

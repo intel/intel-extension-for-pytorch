@@ -262,18 +262,18 @@ class PythonArgument:
 
         # pyi deprecated signatures don't get defaults for their out arg
         treat_as_no_default = (
-            deprecated
-            and isinstance(self, PythonOutArgument)
-            and self.default == "None"
+            deprecated and
+            isinstance(self, PythonOutArgument) and
+            self.default == "None"
         )
 
         # add default
         if self.default is not None and not treat_as_no_default:
             if (
-                isinstance(self.type, ListType)
-                and self.type.elem == BaseType(BaseTy.int)
-                and self.default.startswith("{")
-                and self.default.endswith("}")
+                isinstance(self.type, ListType) and
+                self.type.elem == BaseType(BaseTy.int) and
+                self.default.startswith("{") and
+                self.default.endswith("}")
             ):
                 default = "(" + self.default[1:-1] + ")"
             else:
@@ -429,9 +429,9 @@ class PythonSignature:
         if num_args > 0:
             vararg_type = args[0].type
             if (
-                isinstance(vararg_type, ListType)
-                and str(vararg_type.elem) in ["int", "SymInt"]
-                and num_positionalargs == 1
+                isinstance(vararg_type, ListType) and
+                str(vararg_type.elem) in ["int", "SymInt"] and
+                num_positionalargs == 1
             ):
                 have_vararg_version = True
 
@@ -472,8 +472,8 @@ class PythonSignatureDeprecated(PythonSignature):
         return (
             PythonSignature.signature_str(
                 self, skip_outputs=skip_outputs, symint=symint
-            )
-            + "|deprecated"
+            ) +
+            "|deprecated"
         )
 
     def signature_str_pyi(self, *, skip_outputs: bool = False) -> str:
@@ -636,6 +636,7 @@ def has_tensor_options(f: NativeFunction) -> bool:
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
+
 # 'simple_type' was introduced by the old codegen, which is slightly
 # different from the python schema type, e.g.: doesn't have '?' suffix
 # for optional Tensor/TensorList; doesn't have '[size]' suffix for list type.
@@ -789,9 +790,9 @@ def signature_from_schema(
         has_tensor_return and not has_tensor_input_arg
     )
     is_like_or_new_function = (
-        category_override in ("new", "like")
-        or name.startswith("new_")
-        or name.endswith("_like")
+        category_override in ("new", "like") or
+        name.startswith("new_") or
+        name.endswith("_like")
     )
 
     tensor_options_args: List[PythonArgument] = []
@@ -839,8 +840,8 @@ def signature_from_schema(
                     "self.device()"
                     if is_like_or_new_function
                     else (
-                        topt_default_init("device")
-                        or "torch::tensors::get_default_device()"
+                        topt_default_init("device") or
+                        "torch::tensors::get_default_device()"
                     )
                 ),
             )
@@ -1201,6 +1202,7 @@ def cpp_dispatch_exprs(
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
+
 # We explicitly enumerate the PythonArgParser unpacking methods for all
 # supported types. This might be more verbose than necessary, partially
 # because of the irregularity of unpacking method naming, partially
@@ -1342,6 +1344,7 @@ TENSOR_OPTIONS_FIELDS = {
     "requires_grad": "bool?",
 }
 
+
 # bind arg parser outputs (python args) with dispatch lambda arguments (c++ args).
 def dispatch_lambda_exprs(
     ps: PythonSignature, f: NativeFunction, *, symint: bool = True
@@ -1370,9 +1373,9 @@ def dispatch_lambda_exprs(
             )
             lambda_args_exprs[name] = name
         elif (
-            isinstance(a, PythonOutArgument)
-            and len(a.outputs) > 1
-            and f.func.is_out_fn()
+            isinstance(a, PythonOutArgument) and
+            len(a.outputs) > 1 and
+            f.func.is_out_fn()
         ):
             inits.extend(
                 [
@@ -1390,7 +1393,8 @@ def dispatch_lambda_exprs(
             inits.extend(
                 [
                     f"auto __{name} = {arg_parser_expr};",
-                    f"c10::optional<DimnameList> {name} = __{name} ? c10::make_optional(DimnameList(__{name}.value())) : c10::nullopt;",  # noqa: B950
+                    f"c10::optional<DimnameList> {name} = __{name} ? \
+                        c10::make_optional(DimnameList(__{name}.value())) : c10::nullopt;",
                 ]
             )
             lambda_args_exprs[name] = name

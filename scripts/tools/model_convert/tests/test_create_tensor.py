@@ -13,8 +13,7 @@ class TorchCudaAPITests(unittest.TestCase):
         self.assertEqual(x.device.type, "xpu")
 
     def test_logspace(self):
-        x = torch.logspace(start=-10, end=10, steps=5,
-                           device=torch.device("cuda"))
+        x = torch.logspace(start=-10, end=10, steps=5, device=torch.device("cuda"))
         self.assertEqual(x.device.type, "xpu")
 
     def test_randperm(self):
@@ -22,7 +21,7 @@ class TorchCudaAPITests(unittest.TestCase):
         self.assertEqual(x.device.type, "xpu")
 
     def test_asarray(self):
-        a = torch.tensor([1, 2, 3]).to('cuda')
+        a = torch.tensor([1, 2, 3]).to("cuda")
         b = torch.asarray(a)
         self.assertEqual(b.device.type, "xpu")
 
@@ -41,8 +40,9 @@ class TorchCudaAPITests(unittest.TestCase):
         ccol_indices = (0, 1, 2)
         row_indices = (1, 0)
         values = ([[1]], [[2]])
-        x = torch.sparse_bsc_tensor(ccol_indices, row_indices, values, size=(
-            2, 2), device=torch.device("cuda"))
+        x = torch.sparse_bsc_tensor(
+            ccol_indices, row_indices, values, size=(2, 2), device=torch.device("cuda")
+        )
         self.assertEqual(x.device.type, "xpu")
 
     def test_rand_like(self):
@@ -51,7 +51,7 @@ class TorchCudaAPITests(unittest.TestCase):
         self.assertEqual(x.device.type, "xpu")
 
     def test_empty_like(self):
-        a = torch.empty((2, 3), dtype=torch.int32, device='cuda')
+        a = torch.empty((2, 3), dtype=torch.int32, device="cuda")
         x = torch.empty_like(a)
         self.assertEqual(x.device.type, "xpu")
 
@@ -66,7 +66,12 @@ class TorchCudaAPITests(unittest.TestCase):
         plain_indices = torch.tensor([0, 1, 0, 1])
         values = torch.tensor([1, 2, 3, 4])
         x = torch.sparse_compressed_tensor(
-            compressed_indices, plain_indices, values, layout=torch.sparse_csr, device=torch.device("cuda"))
+            compressed_indices,
+            plain_indices,
+            values,
+            layout=torch.sparse_csr,
+            device=torch.device("cuda"),
+        )
         self.assertEqual(x.device.type, "xpu")
 
     def test_linspace(self):
@@ -78,8 +83,13 @@ class TorchCudaAPITests(unittest.TestCase):
         actual_crow_indices = (0, 1, 2)
         actual_col_indices = (0, 1)
         actual_values = (1, 2)
-        x = torch.sparse_csr_tensor(actual_crow_indices, actual_col_indices, actual_values, size=(
-            2, 2), device=torch.device("cuda"))
+        x = torch.sparse_csr_tensor(
+            actual_crow_indices,
+            actual_col_indices,
+            actual_values,
+            size=(2, 2),
+            device=torch.device("cuda"),
+        )
         self.assertEqual(x.device.type, "xpu")
 
     def test_arange(self):
@@ -107,8 +117,13 @@ class TorchCudaAPITests(unittest.TestCase):
         actual_crow_indices = (0, 1, 2)
         actual_col_indices = (1, 0)
         actual_values = ([[1]], [[2]])
-        x = torch.sparse_bsr_tensor(actual_crow_indices, actual_col_indices, actual_values, size=(
-            2, 2), device=torch.device("cuda"))
+        x = torch.sparse_bsr_tensor(
+            actual_crow_indices,
+            actual_col_indices,
+            actual_values,
+            size=(2, 2),
+            device=torch.device("cuda"),
+        )
         self.assertEqual(x.device.type, "xpu")
 
     def test_blackman_window(self):
@@ -129,8 +144,9 @@ class TorchCudaAPITests(unittest.TestCase):
         ccol_indices = (0, 1, 2)
         row_indices = (1, 0)
         values = (1, 2)
-        x = torch.sparse_csc_tensor(ccol_indices, row_indices, values, size=(
-            2, 2), device=torch.device("cuda"))
+        x = torch.sparse_csc_tensor(
+            ccol_indices, row_indices, values, size=(2, 2), device=torch.device("cuda")
+        )
         self.assertEqual(x.device.type, "xpu")
 
     def test_range(self):
@@ -150,7 +166,7 @@ class TorchCudaAPITests(unittest.TestCase):
         self.assertEqual(x.device.type, "xpu")
 
     def test_tensor(self):
-        x = torch.tensor([[1., -1.], [1., -1.]], device=torch.device("cuda"))
+        x = torch.tensor([[1.0, -1.0], [1.0, -1.0]], device=torch.device("cuda"))
         self.assertEqual(x.device.type, "xpu")
 
     def test_empty_strided(self):
@@ -166,15 +182,16 @@ class TorchCudaAPITests(unittest.TestCase):
         self.assertEqual(x.device.type, "xpu")
 
     def test_empty_quantized(self):
-        x_q = torch.quantize_per_tensor(
-            torch.tensor([3.0]), 1.0, 0, torch.qint32)
+        x_q = torch.quantize_per_tensor(torch.tensor([3.0]), 1.0, 0, torch.qint32)
         x_pin = torch.empty_quantized(
-            [3], x_q, pin_memory=True, dtype=torch.qint32, device=torch.device("cuda"))
+            [3], x_q, pin_memory=True, dtype=torch.qint32, device=torch.device("cuda")
+        )
         self.assertEqual(x_pin.device.type, "xpu")
 
     def test_sparse_coo_tensor(self):
-        x = torch.sparse_coo_tensor(torch.empty([1, 0]), [], [
-                                    1], device=torch.device("cuda"))
+        x = torch.sparse_coo_tensor(
+            torch.empty([1, 0]), [], [1], device=torch.device("cuda")
+        )
         self.assertEqual(x.device.type, "xpu")
 
     def test_zeros(self):
@@ -190,8 +207,7 @@ class TorchCudaAPITests(unittest.TestCase):
         self.assertEqual(x.device.type, "xpu")
 
     def test_bartlett_window(self):
-        x = torch.bartlett_window(
-            0, periodic=False, device=torch.device("cuda"))
+        x = torch.bartlett_window(0, periodic=False, device=torch.device("cuda"))
         self.assertEqual(x.device.type, "xpu")
 
 

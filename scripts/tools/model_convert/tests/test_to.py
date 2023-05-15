@@ -14,7 +14,7 @@ class TorchCudaAPITests(unittest.TestCase):
 
     def test_cuda_int(self):
         n = torch.cuda.device_count()
-        x = torch.empty(4, 5).cuda(n-1)
+        x = torch.empty(4, 5).cuda(n - 1)
         self.assertEqual(x.device.type, "xpu")
 
     def test_cuda_none(self):

@@ -1,9 +1,9 @@
 from functools import partial, update_wrapper
 
 import torch
-from torch.testing._internal.common_utils import (TestCase)
+from torch.testing._internal.common_utils import TestCase
 
-from torch.testing._internal.common_device_type import (dtypes)
+from torch.testing._internal.common_device_type import dtypes
 
 import intel_extension_for_pytorch  # noqa
 import pytest
@@ -31,12 +31,12 @@ INTEGRAL_DTYPES = [
     # torch.bool,
 ]
 
-'''
+"""
 COMPLEX_DTYPES=[
     torch.cfloat,
     torch.cdouble
     ]
-'''
+"""
 
 OP_TEST_FOR_FLOATING = [
     torch.neg,
@@ -88,17 +88,16 @@ OP_TEST_FOR_INTEGER_ = [
     "__ior__(3)",
 ]
 
-OP_TEST_FOR_BACKWARD = [
-    torch.logit
-]
+OP_TEST_FOR_BACKWARD = [torch.logit]
 
 
 class TetsTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     @dtypes(FLOATING_DTYPES)
     def test_unary_op_for_floating(self, dtype=torch.float):
-        a = torch.randn(
-            [2, 2, 2, 2], dtype=torch.float)
+        a = torch.randn([2, 2, 2, 2], dtype=torch.float)
 
         x_cpu = torch.as_tensor(a, dtype=dtype)
         x_xpu = torch.as_tensor(a, dtype=dtype, device="xpu")
@@ -109,7 +108,8 @@ class TetsTorchMethod(TestCase):
             self.assertEqual(y_cpu, y_xpu.cpu())
 
         for op_str in OP_TEST_FOR_FLOATING_:
-            exec("""
+            exec(
+                """
 x_cpu_clone = x_cpu.clone()
 x_xpu_clone = x_xpu.clone()
 y_cpu = x_cpu_clone.{}
@@ -117,13 +117,14 @@ y_xpu = x_xpu_clone.{}
 print("CPU {}: ", y_cpu)
 print("XPU {}: ", y_xpu.cpu())
 self.assertEqual(y_cpu, y_xpu.cpu())
-                """.format(op_str, op_str, op_str, op_str)
-                 )
+                """.format(
+                    op_str, op_str, op_str, op_str
+                )
+            )
 
     @dtypes(INTEGRAL_DTYPES)
     def test_unary_op_for_integer(self, dtype=torch.int):
-        a = torch.randint(
-            -5, 5, [2, 2, 2, 2], dtype=torch.int)
+        a = torch.randint(-5, 5, [2, 2, 2, 2], dtype=torch.int)
 
         x_cpu = torch.as_tensor(a, dtype=dtype)
         x_xpu = torch.as_tensor(a, dtype=dtype, device="xpu")
@@ -134,7 +135,8 @@ self.assertEqual(y_cpu, y_xpu.cpu())
             self.assertEqual(y_cpu, y_xpu.cpu())
 
         for op_str in OP_TEST_FOR_INTEGER_:
-            exec("""
+            exec(
+                """
 x_cpu_clone = x_cpu.clone()
 x_xpu_clone = x_xpu.clone()
 y_cpu = x_cpu_clone.{}
@@ -142,10 +144,14 @@ y_xpu = x_xpu_clone.{}
 print("CPU {}: ", y_cpu)
 print("XPU {}: ", y_xpu.cpu())
 self.assertEqual(y_cpu, y_xpu.cpu())
-                """.format(op_str, op_str, op_str, op_str)
-                 )
+                """.format(
+                    op_str, op_str, op_str, op_str
+                )
+            )
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     @dtypes([torch.float, torch.half, torch.bfloat16])
     def test_unary_op_signbit(self, dtype=torch.float):
         x_cpu = torch.randn(5, 5, requires_grad=True)
@@ -160,14 +166,14 @@ self.assertEqual(y_cpu, y_xpu.cpu())
     def test_unary_op_round_with_decimals(self, dtype=torch.float):
         x_cpu = torch.tensor([4.7, -2.3, 9.1, -7.7])
         x_xpu = x_cpu.clone().to("xpu")
-        
+
         for dec in [0, 3, -3]:
             round_cpu = torch.round(x_cpu, decimals=dec)
             round_xpu = torch.round(x_xpu, decimals=dec)
             self.assertEqual(round_cpu, round_xpu.cpu())
 
     def _test_unary_backward(self, op, x_cpu, x_xpu, param):
-        if (len(param) == 0):
+        if len(param) == 0:
             y_cpu = op(x_cpu)
             y_xpu = op(x_xpu)
         else:
@@ -180,15 +186,16 @@ self.assertEqual(y_cpu, y_xpu.cpu())
         print("XPU {}: {}".format(op.__name__, x_xpu.grad))
         self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     @dtypes(FLOATING_DTYPES)
     def test_unary_backward_for_floating(self, dtype=torch.float):
-        x_cpu = torch.randn(
-            [2, 2, 2, 2], dtype=dtype, requires_grad=True)
+        x_cpu = torch.randn([2, 2, 2, 2], dtype=dtype, requires_grad=True)
         x_xpu = x_cpu.clone().detach().to("xpu").requires_grad_(True)
 
         for op in OP_TEST_FOR_BACKWARD:
             param = {}
             if op == torch.logit:
-                param['eps'] = 0.15
+                param["eps"] = 0.15
             self._test_unary_backward(op, x_cpu, x_xpu, param)

@@ -8,15 +8,23 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_embedding_bag_all(self, dtype=torch.float32):
         weight_elem = 56
         for weight_feature_size in [1, 127, 128]:
-            for mode in ['sum', 'mean', 'max']:
+            for mode in ["sum", "mean", "max"]:
                 for include_last_offset in [False, True]:
                     for padding_idx in [None, 29, 10]:
-                        embedding = nn.EmbeddingBag(weight_elem, weight_feature_size, mode=mode, scale_grad_by_freq=False,
-                                                    include_last_offset=include_last_offset, padding_idx=padding_idx)
+                        embedding = nn.EmbeddingBag(
+                            weight_elem,
+                            weight_feature_size,
+                            mode=mode,
+                            scale_grad_by_freq=False,
+                            include_last_offset=include_last_offset,
+                            padding_idx=padding_idx,
+                        )
                         input = torch.Tensor([9, 29, 49, 39, 19, 29, 19, 9, 0]).long()
                         if include_last_offset == False:
                             offsets = torch.Tensor([0, 1, 2, 4, 7]).long()
@@ -41,7 +49,14 @@ class TestTorchMethod(TestCase):
                         print("test xpu", output_xpu.cpu())
                         print("test cpu grad", grad_weight_cpu)
                         print("test xpu grad", grad_weight_xpu.cpu())
-                        self.assertEqual(output, output_xpu.cpu().float(), atol=1e-5, rtol=1e-5)
+                        self.assertEqual(
+                            output, output_xpu.cpu().float(), atol=1e-5, rtol=1e-5
+                        )
                         # FIXME: Skip max + padding_idx case. No backend implementation.
-                        if not (mode == 'max' and padding_idx != None):
-                            self.assertEqual(grad_weight_cpu, grad_weight_xpu.cpu().float(), atol=1e-5, rtol=1e-5)
+                        if not (mode == "max" and padding_idx != None):
+                            self.assertEqual(
+                                grad_weight_cpu,
+                                grad_weight_xpu.cpu().float(),
+                                atol=1e-5,
+                                rtol=1e-5,
+                            )

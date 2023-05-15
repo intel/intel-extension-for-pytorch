@@ -1,7 +1,9 @@
 import torch
 from transformers import BertModel
+
 ############# code changes ###############
 import intel_extension_for_pytorch as ipex
+
 ############# code changes ###############
 
 model = BertModel.from_pretrained("bert-base-uncased")
@@ -19,7 +21,7 @@ model = ipex.optimize(model, dtype=torch.bfloat16)
 #################### code changes #################
 
 with torch.no_grad():
-  ########################### code changes ########################
-  with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
-  ########################### code changes ########################
-    model(data)
+    ########################### code changes ########################
+    with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+    ########################### code changes ########################
+        model(data)

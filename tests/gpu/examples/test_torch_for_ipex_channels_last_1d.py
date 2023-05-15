@@ -47,9 +47,13 @@ class TestNNMethod(TestCase):
         self.assertEqual(x.stride(), x_rep.stride())
         self.assertEqual(x.is_contiguous(), x_rep.is_contiguous())
         self.assertEqual(
-            torch.xpu.is_contiguous_channels_last_1d(x), torch.xpu.is_contiguous_channels_last_1d(x_rep))
-    
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+            torch.xpu.is_contiguous_channels_last_1d(x),
+            torch.xpu.is_contiguous_channels_last_1d(x_rep),
+        )
+
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_memory_format_operators(self):
         def _chunk_op(x, y):
             x1, x2 = x.chunk(2, dim=1)
@@ -181,7 +185,10 @@ class TestNNMethod(TestCase):
                 self.assertEqual(result, result_c)
                 self.assertTrue(
                     torch.xpu.is_contiguous_channels_last_1d(result),
-                    "result of the '{}' is not in '{}' format".format(inspect.getsource(fn).strip(), "channels last 1d"))
+                    "result of the '{}' is not in '{}' format".format(
+                        inspect.getsource(fn).strip(), "channels last 1d"
+                    ),
+                )
 
             for fn in bias_fns:
                 x_c = x.contiguous()
@@ -191,7 +198,10 @@ class TestNNMethod(TestCase):
                 self.assertEqual(result, result_c)
                 self.assertTrue(
                     torch.xpu.is_contiguous_channels_last_1d(result),
-                    "result of the '{}' is not in '{}' format".format(inspect.getsource(fn).strip(), "channels last 1d"))
+                    "result of the '{}' is not in '{}' format".format(
+                        inspect.getsource(fn).strip(), "channels last 1d"
+                    ),
+                )
 
             for fn in return_contig_fns:
                 x_c = x.contiguous()
@@ -201,16 +211,24 @@ class TestNNMethod(TestCase):
                 self.assertEqual(result, result_c)
                 self.assertTrue(
                     result.is_contiguous(memory_format=torch.contiguous_format),
-                    "result of the '{}' is not in '{}' format".format(inspect.getsource(fn).strip(), torch.contiguous_format))
+                    "result of the '{}' is not in '{}' format".format(
+                        inspect.getsource(fn).strip(), torch.contiguous_format
+                    ),
+                )
 
         _test_helper(
             torch.xpu.to_channels_last_1d(torch.randn((4, 3, 8), device=dpcpp_device)),
             abs(torch.randn((4, 3, 8), device=dpcpp_device)) + 1,
-            torch.xpu.to_channels_last_1d(torch.randn((1, 3, 1), device=dpcpp_device)))
+            torch.xpu.to_channels_last_1d(torch.randn((1, 3, 1), device=dpcpp_device)),
+        )
 
-    def _test_memory_format_transformations(self, input_generator_fn, transformation_fn,
-                                            compare_data=True, default_is_preserve=False):
-
+    def _test_memory_format_transformations(
+        self,
+        input_generator_fn,
+        transformation_fn,
+        compare_data=True,
+        default_is_preserve=False,
+    ):
         # xc is a channels last 1d tensor
         xc = input_generator_fn()
         # xc is not memory dense, but looks like channels last 1d
@@ -240,13 +258,21 @@ class TestNNMethod(TestCase):
             permutation = list(range(len(x.shape)))
             random.shuffle(permutation)
             x = x.permute(permutation)
-            self.assertEqual(x.stride(), transformation_fn(x, memory_format=torch.preserve_format).stride())
-    
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+            self.assertEqual(
+                x.stride(),
+                transformation_fn(x, memory_format=torch.preserve_format).stride(),
+            )
+
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_memory_format_to(self):
         def get_generator(shape):
             def input_generator_fn():
-                return torch.xpu.to_channels_last_1d(torch.randn(shape, device=dpcpp_device, dtype=torch.float32))
+                return torch.xpu.to_channels_last_1d(
+                    torch.randn(shape, device=dpcpp_device, dtype=torch.float32)
+                )
+
             return input_generator_fn
 
         def transformation_fn(tensor, **kwargs):
@@ -254,13 +280,19 @@ class TestNNMethod(TestCase):
 
         shape = (4, 3, 8)
         self._test_memory_format_transformations(
-            get_generator(shape), transformation_fn, default_is_preserve=True)
-    
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+            get_generator(shape), transformation_fn, default_is_preserve=True
+        )
+
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_memory_format_type(self):
         def get_generator(shape):
             def input_generator_fn():
-                return torch.xpu.to_channels_last_1d(torch.randn(shape, device=dpcpp_device, dtype=torch.float32))
+                return torch.xpu.to_channels_last_1d(
+                    torch.randn(shape, device=dpcpp_device, dtype=torch.float32)
+                )
+
             return input_generator_fn
 
         def transformation_fn(tensor, **kwargs):
@@ -268,13 +300,19 @@ class TestNNMethod(TestCase):
 
         shape = (4, 3, 8)
         self._test_memory_format_transformations(
-            get_generator(shape), transformation_fn, default_is_preserve=True)
+            get_generator(shape), transformation_fn, default_is_preserve=True
+        )
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_memory_format_clone(self):
         def get_generator(shape):
             def input_generator_fn():
-                return torch.xpu.to_channels_last_1d(torch.randn(shape, device=dpcpp_device, dtype=torch.float32))
+                return torch.xpu.to_channels_last_1d(
+                    torch.randn(shape, device=dpcpp_device, dtype=torch.float32)
+                )
+
             return input_generator_fn
 
         def transformation_fn(tensor, **kwargs):
@@ -282,29 +320,43 @@ class TestNNMethod(TestCase):
 
         shape = (4, 3, 8)
         self._test_memory_format_transformations(
-            get_generator(shape), transformation_fn, default_is_preserve=True)
-    
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+            get_generator(shape), transformation_fn, default_is_preserve=True
+        )
+
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_memory_format_type_shortcuts(self):
         def get_generator(shape, dtype):
             def input_generator_fn():
-                return torch.xpu.to_channels_last_1d(torch.randn(shape, device=dpcpp_device, dtype=dtype).clamp(0, 1).round())
-            return input_generator_fn
+                return torch.xpu.to_channels_last_1d(
+                    torch.randn(shape, device=dpcpp_device, dtype=dtype)
+                    .clamp(0, 1)
+                    .round()
+                )
 
+            return input_generator_fn
 
         def get_fn(fn_name):
             def transformation_fn(tensor, **kwargs):
                 fn = getattr(tensor, fn_name)
                 return fn(**kwargs)
+
             return transformation_fn
 
-        shortcuts = ['byte', 'char', 'double', 'bool', 'half', 'int', 'long', 'short']
+        shortcuts = ["byte", "char", "double", "bool", "half", "int", "long", "short"]
 
         shape = (4, 3, 8)
         for fn_name in shortcuts:
             self._test_memory_format_transformations(
-                get_generator(shape, torch.float32), get_fn(fn_name), default_is_preserve=True)
+                get_generator(shape, torch.float32),
+                get_fn(fn_name),
+                default_is_preserve=True,
+            )
 
         # Test 'float' separately to avoid float->float no-op.
         self._test_memory_format_transformations(
-            get_generator(shape, torch.float64), get_fn('float'), default_is_preserve=True)
+            get_generator(shape, torch.float64),
+            get_fn("float"),
+            default_is_preserve=True,
+        )

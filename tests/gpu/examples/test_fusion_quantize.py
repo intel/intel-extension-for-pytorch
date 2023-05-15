@@ -23,7 +23,7 @@ class ConvSigmoid(torch.nn.Module):
             torch.nn.Conv2d(3, 3, kernel_size=7, stride=2, padding=3, bias=False),
             torch.nn.Sigmoid(),
             torch.nn.Conv2d(3, 3, kernel_size=7, stride=2, padding=3, bias=False),
-            torch.nn.Sigmoid()
+            torch.nn.Sigmoid(),
         )
         self.block[0].weight.data.fill_(1)
         self.block[2].weight.data.fill_(1)
@@ -58,9 +58,13 @@ class Mish(torch.nn.Module):
 class ConvMish(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = torch.nn.Conv2d(8, 8, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv1 = torch.nn.Conv2d(
+            8, 8, kernel_size=1, stride=1, padding=0, bias=False
+        )
         self.activation = Mish()
-        self.conv2 = torch.nn.Conv2d(8, 8, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv2 = torch.nn.Conv2d(
+            8, 8, kernel_size=1, stride=1, padding=0, bias=False
+        )
 
     def forward(self, x):
         x = self.conv1(x)
@@ -72,9 +76,13 @@ class ConvMish(torch.nn.Module):
 class ConvMishAdd(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = torch.nn.Conv2d(8, 8, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv1 = torch.nn.Conv2d(
+            8, 8, kernel_size=1, stride=1, padding=0, bias=False
+        )
         self.activation = Mish()
-        self.conv2 = torch.nn.Conv2d(8, 8, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv2 = torch.nn.Conv2d(
+            8, 8, kernel_size=1, stride=1, padding=0, bias=False
+        )
 
     def forward(self, x):
         x = self.conv1(x)
@@ -84,20 +92,28 @@ class ConvMishAdd(torch.nn.Module):
         x = x + h
         return x
 
+
 class ConvBinaryBias(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.block = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=256, out_channels=128, kernel_size=1, bias=True),
+            torch.nn.Conv2d(
+                in_channels=256, out_channels=128, kernel_size=1, bias=True
+            ),
             torch.nn.ReLU(),
-            torch.nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1, bias=True),
+            torch.nn.Conv2d(
+                in_channels=128, out_channels=256, kernel_size=3, padding=1, bias=True
+            ),
             torch.nn.ReLU(),
-            torch.nn.Conv2d(in_channels=256, out_channels=128, kernel_size=3, padding=1, bias=False),
+            torch.nn.Conv2d(
+                in_channels=256, out_channels=128, kernel_size=3, padding=1, bias=False
+            ),
         )
 
     def forward(self, x):
         x = self.block(x)
         return x
+
 
 class ConvSiLU(torch.nn.Module):
     def __init__(self):
@@ -106,11 +122,13 @@ class ConvSiLU(torch.nn.Module):
             torch.nn.Conv2d(3, 3, kernel_size=1, stride=1, padding=0, bias=False),
             torch.nn.SiLU(inplace=True),
             torch.nn.Conv2d(3, 3, kernel_size=1, stride=1, padding=0, bias=False),
-            torch.nn.SiLU(inplace=True)
+            torch.nn.SiLU(inplace=True),
         )
+
     def forward(self, x):
         x = self.block(x)
         return x
+
 
 def impe_fp32_model(model, device, test_input):
     modelImpe = model.to(device)
@@ -124,11 +142,9 @@ def impe_int8_model(model, device, test_input):
 
     qconfig_u8 = torch.quantization.QConfig(
         activation=torch.quantization.observer.MinMaxObserver.with_args(
-            qscheme=torch.per_tensor_symmetric,
-            reduce_range=False,
-            dtype=torch.quint8
+            qscheme=torch.per_tensor_symmetric, reduce_range=False, dtype=torch.quint8
         ),
-        weight=torch.quantization.default_weight_observer
+        weight=torch.quantization.default_weight_observer,
     )
     modelImpe.qconfig = qconfig_u8
 
@@ -154,14 +170,12 @@ def trace_int8_model(model, device, test_input):
     print("start ", device, " calibration ...")
     qconfig_u8 = torch.quantization.QConfig(
         activation=torch.quantization.observer.MinMaxObserver.with_args(
-            qscheme=torch.per_tensor_symmetric,
-            reduce_range=False,
-            dtype=torch.quint8
+            qscheme=torch.per_tensor_symmetric, reduce_range=False, dtype=torch.quint8
         ),
-        weight=torch.quantization.default_weight_observer
+        weight=torch.quantization.default_weight_observer,
     )
 
-    modelJit = prepare_jit(modelJit, {'': qconfig_u8}, True)
+    modelJit = prepare_jit(modelJit, {"": qconfig_u8}, True)
 
     # do calibration
     test_input = test_input.to(device)
@@ -198,7 +212,9 @@ class TestTorchMethod(TestCase):
         xpu_res = trace_int8_model(model, "xpu", test_input)
         impe_res = impe_int8_model(model1, "xpu", test_input)
         # imperatie path has an extra quantized&dequatnize pair, which includes more error
-        np.testing.assert_almost_equal(xpu_res.cpu().numpy(), impe_res.cpu().numpy(), decimal=1)
+        np.testing.assert_almost_equal(
+            xpu_res.cpu().numpy(), impe_res.cpu().numpy(), decimal=1
+        )
 
         # cpu vs. xpu
         # For model that impe path is unreachable, we can compare int8 result
@@ -206,10 +222,14 @@ class TestTorchMethod(TestCase):
         model = model.to("cpu")
         cpu_res = model(test_input)
         xpu_res = trace_int8_model(model, "xpu", test_input)
-        cpu_res = torch.quantize_per_tensor(cpu_res, 1.0 / 255.0 *2.0, 0, torch.qint8)
-        xpu_res = torch.quantize_per_tensor(xpu_res, 1.0 / 255.0 *2.0, 0, torch.qint8)
+        cpu_res = torch.quantize_per_tensor(cpu_res, 1.0 / 255.0 * 2.0, 0, torch.qint8)
+        xpu_res = torch.quantize_per_tensor(xpu_res, 1.0 / 255.0 * 2.0, 0, torch.qint8)
         # fbgemm and onednn use different scale here
-        np.testing.assert_almost_equal(xpu_res.dequantize().cpu().numpy(), impe_res.dequantize().cpu().numpy(), decimal=1)
+        np.testing.assert_almost_equal(
+            xpu_res.dequantize().cpu().numpy(),
+            impe_res.dequantize().cpu().numpy(),
+            decimal=1,
+        )
 
     def test_qConv2d_leakyrelu(self, dtype=torch.float):
         model = ConvLeakyRelu()
@@ -219,7 +239,9 @@ class TestTorchMethod(TestCase):
         # For model that JIT and impe path are both reachable.
         xpu_res = trace_int8_model(model, "xpu", test_input.clone())
         xpu_ref = impe_fp32_model(model, "xpu", test_input.clone())
-        self.assertEqual(xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(
+            xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol
+        )
 
     def test_qConv2d_mish(self, dtype=torch.float):
         model = ConvMish()
@@ -229,7 +251,9 @@ class TestTorchMethod(TestCase):
         # For model that JIT and impe path are both reachable.
         xpu_res = trace_int8_model(model, "xpu", test_input.clone())
         xpu_ref = impe_fp32_model(model, "xpu", test_input.clone())
-        self.assertEqual(xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(
+            xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol
+        )
 
     def test_qConv2d_mish_add(self, dtype=torch.float):
         model = ConvMishAdd()
@@ -239,7 +263,9 @@ class TestTorchMethod(TestCase):
         # For model that JIT and impe path are both reachable.
         xpu_res = trace_int8_model(model, "xpu", test_input.clone())
         xpu_ref = impe_fp32_model(model, "xpu", test_input.clone())
-        self.assertEqual(xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(
+            xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol
+        )
 
     def test_conv_binary_bias(self, dtype=torch.float):
         model = ConvBinaryBias()
@@ -254,4 +280,6 @@ class TestTorchMethod(TestCase):
         # For model that JIT and impe path are both reachable.
         xpu_res = trace_int8_model(model, "xpu", test_input.clone())
         xpu_ref = impe_fp32_model(model, "xpu", test_input.clone())
-        self.assertEqual(xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(
+            xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol
+        )

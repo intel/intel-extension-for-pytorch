@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 cpu_device = torch.device("cpu")
@@ -9,7 +9,6 @@ xpu_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-
     def test_reduce_ops(self, dtype=torch.float):
         user_cpu = torch.randn([1, 64, 32], device=cpu_device)
         res_cpu = torch.mean(user_cpu, 2, False)
@@ -45,7 +44,9 @@ class TestTorchMethod(TestCase):
         user_cpu = torch.randn([4, 8, 16, 32], device=cpu_device)
         res_cpu = torch.sum(user_cpu, 2, True)
         print("begin xpu compute:")
-        res_xpu = torch.sum(user_cpu.to(memory_format=torch.channels_last).to("xpu"), 2, True)
+        res_xpu = torch.sum(
+            user_cpu.to(memory_format=torch.channels_last).to("xpu"), 2, True
+        )
         print("xpu result:")
         print(res_xpu.cpu())
         self.assertEqual(res_cpu, res_xpu.cpu())

@@ -16,9 +16,7 @@ def write_file(path, content):
 
 def search_and_replace_via_ast(file_list):
     for input_file in file_list:
-        convert.run(input_file,
-                    execute=False,
-                    export=True)
+        convert.run(input_file, execute=False, export=True)
 
 
 def search_and_replace(from_value, to_value, file_list, in_place, regex_match, verbose):
@@ -41,7 +39,11 @@ def search_and_replace(from_value, to_value, file_list, in_place, regex_match, v
             change_happen = True
             change_file_list.append(input_file)
             if verbose:
-                print('replace {0} to {1} in file {2}'.format(from_value, to_value, file_list))
+                print(
+                    "replace {0} to {1} in file {2}".format(
+                        from_value, to_value, file_list
+                    )
+                )
             write_file(new_input_file, new_content)
 
     return change_happen, change_file_list
@@ -52,24 +54,39 @@ def main():
     Main function of search and replacement parser.
     """
     parser = argparse.ArgumentParser(description=f"search and replace string parser")
-    parser.add_argument('--from-value', '-f', required=True,
-                        help='specify the search string')
-    parser.add_argument('--file-list', '-l', required=True,
-                        help='search the search string from these files, to be parsed in string format: "a,b,c,d,e" NO SPACE in this string!')
-    parser.add_argument('--to-value', '-t', required=True,
-                        help='specify the replacement string')
-    parser.add_argument('--in-place', '-i',
-                        action="store_true", help='change files in-place')
-    parser.add_argument('--regex-match', '-r',
-                        action="store_true", help='use regex matching')
-    parser.add_argument('--verbose', '-v',
-                        action="store_true", help='turn on verbose mode')
+    parser.add_argument(
+        "--from-value", "-f", required=True, help="specify the search string"
+    )
+    parser.add_argument(
+        "--file-list",
+        "-l",
+        required=True,
+        help='search the search string from these files, to be parsed in string format: "a,b,c,d,e" NO SPACE in this string!',
+    )
+    parser.add_argument(
+        "--to-value", "-t", required=True, help="specify the replacement string"
+    )
+    parser.add_argument(
+        "--in-place", "-i", action="store_true", help="change files in-place"
+    )
+    parser.add_argument(
+        "--regex-match", "-r", action="store_true", help="use regex matching"
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="turn on verbose mode"
+    )
     args = parser.parse_args()
     file_list = args.file_list
     if (args.file_list is not None) and (args.file_list != "Null"):
         file_list = file_list.split(",")
-    search_and_replace(args.from_value, args.to_value, file_list,
-                       args.in_place, args.regex_match, args.verbose)
+    search_and_replace(
+        args.from_value,
+        args.to_value,
+        file_list,
+        args.in_place,
+        args.regex_match,
+        args.verbose,
+    )
 
 
 if __name__ == "__main__":

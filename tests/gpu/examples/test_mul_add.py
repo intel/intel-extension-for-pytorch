@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 dpcpp_device = torch.device("xpu")
 cpu_device = torch.device("cpu")
@@ -10,7 +10,6 @@ cpu_device = torch.device("cpu")
 
 class TestTorchMethod(TestCase):
     def test_padded(self, dtype=torch.float):
-
         C = 2
         x = torch.randn(1, C, 3, 3)
         y = torch.randn(1, C, 3, 3)
@@ -38,7 +37,6 @@ class TestTorchMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp_2.cpu())
 
     def test_expand(self, dtype=torch.float):
-
         C = 16
         x = torch.randn(1, C, 3, 3)
         y = torch.randn(1, C, 1, 1)

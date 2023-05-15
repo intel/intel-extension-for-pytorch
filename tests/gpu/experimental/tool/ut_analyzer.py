@@ -17,11 +17,11 @@ ALL_PATHS: dict = {
     "script_path": script_path,
     "root_path": root_path,
     "common_path": os.path.join(root_path, "common"),
-    "test_path"  : os.path.join(root_path, "test"),
+    "test_path": os.path.join(root_path, "test"),
     "config_path": os.path.join(root_path, "config"),
-    "env_path"   : os.path.join(root_path, "env"),
-    "tool_path"  : os.path.join(root_path, "tool"),
-    "log_path"   : os.path.join(root_path, "log"),
+    "env_path": os.path.join(root_path, "env"),
+    "tool_path": os.path.join(root_path, "tool"),
+    "log_path": os.path.join(root_path, "log"),
 }
 raw_log_path: str = ""
 anls_log_path: str = ""
@@ -31,11 +31,11 @@ need_classify = False
 final_result = OrderedDict()
 
 
-class AnlsLogBase():
+class AnlsLogBase:
     def __init__(self, logfile):
         self.logfile = logfile
         self.data_valid = True
-        self.time_consume = 0.  # this param saves time consuming for each test class
+        self.time_consume = 0.0  # this param saves time consuming for each test class
         self.total_set = set()
         self.pass_set = set()
         self.expected_failure_set = set()
@@ -50,66 +50,66 @@ class AnlsLogBase():
         self.DEBUG_MSG = ""
 
     def analysis(self):
-        hasResult = False   # to mark if result line is found.
-        hasRet = False      # to mark if reture line is found.
+        hasResult = False  # to mark if result line is found.
+        hasRet = False  # to mark if reture line is found.
 
         data = read_file(self.logfile)
         # search for result line like "Ran 1234 tests in 678.90s"
-        resultLine = re.search(r'^Ran (\d+) test[s]? in ([\d\.]+)s', data, re.M)
-        returnLine = re.search(r'^OK|^FAILED', data, re.M)
+        resultLine = re.search(r"^Ran (\d+) test[s]? in ([\d\.]+)s", data, re.M)
+        returnLine = re.search(r"^OK|^FAILED", data, re.M)
         if returnLine is not None:
             hasRet = True
         if resultLine is not None:
             hasResult = True
             self.time_consume = float(resultLine.group(2))
-            
+
             self.total_set = match_cases(
-                data,
-                r'(^test_\S*?) \([^()]*?\)((?!^test_|\n\n).)*',
-                *(0,))
+                data, r"(^test_\S*?) \([^()]*?\)((?!^test_|\n\n).)*", *(0,)
+            )
             self.pass_set = match_cases(
-                data,
-                r'(^test_\w+) \([^()]+\)((?!^test_|\n\n).)*?ok$',
-                *(0,))
+                data, r"(^test_\w+) \([^()]+\)((?!^test_|\n\n).)*?ok$", *(0,)
+            )
             self.expected_failure_set = match_cases(
                 data,
-                r'(^test_\w+) \([^()]+\)((?!^test_|\n\n).)*?expected failure$',
-                *(0,))
+                r"(^test_\w+) \([^()]+\)((?!^test_|\n\n).)*?expected failure$",
+                *(0,),
+            )
             self.error_set = match_cases(
-                data,
-                r'(^test_\w+) \([^()]+\)((?!^test_|\n\n).)*?ERROR$',
-                *(0,))
+                data, r"(^test_\w+) \([^()]+\)((?!^test_|\n\n).)*?ERROR$", *(0,)
+            )
             self.fail_set = match_cases(
-                data,
-                r'(^test_\w+) \([^()]+\)((?!^test_|\n\n).)*?FAIL$',
-                *(0,))
+                data, r"(^test_\w+) \([^()]+\)((?!^test_|\n\n).)*?FAIL$", *(0,)
+            )
             self.skip_set = match_cases(
                 data,
-                r'(^test_\w+) \([^()]+\)((?!^test_|\n\n).)*?skipped (((?!^test_|\n\n).)*)$',
-                *(0, 2))
+                r"(^test_\w+) \([^()]+\)((?!^test_|\n\n).)*?skipped (((?!^test_|\n\n).)*)$",
+                *(0, 2),
+            )
             for case, msg in self.skip_set:
-                if re.search(r'not ready on XPU', msg, re.M) is not None:
+                if re.search(r"not ready on XPU", msg, re.M) is not None:
                     self.not_ready_set.add((case, msg))
-                elif re.search(r'.not.implemented.', msg, re.M) is not None:
+                elif re.search(r".not.implemented.", msg, re.M) is not None:
                     self.not_impl_set.add((case, msg))
-                elif re.search(r'dtype not support on XPU', msg, re.M) is not None:
+                elif re.search(r"dtype not support on XPU", msg, re.M) is not None:
                     self.not_dtype_set.add((case, msg))
             self.error_detailed_set = match_cases(
                 data,
-r"""======================================================================
+                r"""======================================================================
 ERROR: (test_\w+) \([^()]+\).*?
 ----------------------------------------------------------------------
 Traceback .+?
 (^\S+Error):?(.*?)(?<=\n\n)""",
-                *(0, 1, 2))
+                *(0, 1, 2),
+            )
             self.fail_detailed_set = match_cases(
                 data,
-r"""======================================================================
+                r"""======================================================================
 FAIL: (test_\w+) \([^()]+\).*?
 ----------------------------------------------------------------------
 Traceback .+?
 (^\S+Error):?(.*?)(?<=\n\n)""",
-                *(0, 1, 2))
+                *(0, 1, 2),
+            )
 
             try:
                 assert len(self.error_set) == len(self.error_detailed_set)
@@ -185,10 +185,11 @@ def anls_reduce(anls_list):
 
     return anls_ret
 
+
 def analysis_final():
     global final_result, saveref, need_compare, need_classify, anls_log_path
 
-    total_time = 0.
+    total_time = 0.0
     total_ran = 0
     total_pass = 0
     total_fail = 0
@@ -209,7 +210,7 @@ def analysis_final():
         else:
             raise f"{full_name} has 0 logs related, which is invalid"
         anls_log = final_result[full_name]
-        
+
         if anls_log.data_valid is True:
             total_time += anls_log.time_consume
             total_ran += len(anls_log.total_set) - len(anls_log.skip_set)
@@ -225,44 +226,56 @@ def analysis_final():
             error_set.update(anls_log.error_set)
             fail_set.update(anls_log.fail_set)
     # print sets result to file
-    write_file(os.path.join(anls_log_path, "pass_list.log"),
-               "\n".join([x[0] for x in pass_set]))
-    write_file(os.path.join(anls_log_path, "fail_list.log"),
-               "\n".join([x[0] for x in fail_set]))
-    write_file(os.path.join(anls_log_path, "error_list.log"),
-               "\n".join([x[0] for x in error_set]))
+    write_file(
+        os.path.join(anls_log_path, "pass_list.log"),
+        "\n".join([x[0] for x in pass_set]),
+    )
+    write_file(
+        os.path.join(anls_log_path, "fail_list.log"),
+        "\n".join([x[0] for x in fail_set]),
+    )
+    write_file(
+        os.path.join(anls_log_path, "error_list.log"),
+        "\n".join([x[0] for x in error_set]),
+    )
     if saveref:
-        write_file(os.path.join(anls_log_path, "pass_list_ref.log"),
-                   "\n".join([x[0] for x in pass_set]))
+        write_file(
+            os.path.join(anls_log_path, "pass_list_ref.log"),
+            "\n".join([x[0] for x in pass_set]),
+        )
 
     # print result to screen
     formatStr = "{:64}{:>16}{:>16}{:>16}{:>16}{:>16}{:>16}|{:>16}{:>16}"
     title = formatStr.format(
-            "TestClass",
-            "Time(s)",
-            "Total Ran",
-            "Passed",
-            "Failures",
-            "Errors",
-            "Skipped",
-            "XPU not impl",
-            "XPU not dtype")
+        "TestClass",
+        "Time(s)",
+        "Total Ran",
+        "Passed",
+        "Failures",
+        "Errors",
+        "Skipped",
+        "XPU not impl",
+        "XPU not dtype",
+    )
     titlewidth = len(title)
     print("=" * titlewidth)
     print(title)
     print("-" * titlewidth)
     total_devisor = max(total_ran, 1)
     print(str(total_pass) + f"({format(total_pass / total_devisor * 100, '.2f')}%)")
-    print(formatStr.format(
-        "Total",
-        format(total_time, '.3f'),
-        total_ran,
-        str(total_pass) + f"({format(total_pass / total_devisor * 100, '.2f')}%)",
-        str(total_fail) + f"({format(total_fail / total_devisor * 100, '.2f')}%)",
-        str(total_error) + f"({format(total_error / total_devisor * 100, '.2f')}%)",
-        total_not_ready,
-        total_not_impl,
-        total_not_dtype))
+    print(
+        formatStr.format(
+            "Total",
+            format(total_time, ".3f"),
+            total_ran,
+            str(total_pass) + f"({format(total_pass / total_devisor * 100, '.2f')}%)",
+            str(total_fail) + f"({format(total_fail / total_devisor * 100, '.2f')}%)",
+            str(total_error) + f"({format(total_error / total_devisor * 100, '.2f')}%)",
+            total_not_ready,
+            total_not_impl,
+            total_not_dtype,
+        )
+    )
     print("-" * titlewidth)
     for full_name, anls_log in final_result.items():
         if anls_log.data_valid is True:
@@ -274,16 +287,19 @@ def analysis_final():
             not_ready = len(anls_log.not_ready_set)
             not_impl = len(anls_log.not_impl_set)
             not_dtype = len(anls_log.not_dtype_set)
-            print(formatStr.format(
-                full_name,
-                format(anls_log.time_consume, '.3f'),
-                ran,
-                str(passed) + f"({format(passed / devisor * 100, '.2f')}%)",
-                str(failed) + f"({format(failed / devisor * 100, '.2f')}%)",
-                str(errored) + f"({format(errored / devisor * 100, '.2f')}%)",
-                not_ready,
-                not_impl,
-                not_dtype))
+            print(
+                formatStr.format(
+                    full_name,
+                    format(anls_log.time_consume, ".3f"),
+                    ran,
+                    str(passed) + f"({format(passed / devisor * 100, '.2f')}%)",
+                    str(failed) + f"({format(failed / devisor * 100, '.2f')}%)",
+                    str(errored) + f"({format(errored / devisor * 100, '.2f')}%)",
+                    not_ready,
+                    not_impl,
+                    not_dtype,
+                )
+            )
         else:
             print("{:64}{}".format(full_name, "DATA INVALID, see DEBUGGING messages"))
             DEBUG_MSG += anls_log.DEBUG_MSG
@@ -294,7 +310,7 @@ def analysis_final():
     if need_compare:
         pass_ref_set = set()
         data = read_file(os.path.join(anls_log_path, "pass_list_ref.log"))
-        lines = data.split('\n')
+        lines = data.split("\n")
         map(lambda l: pass_ref_set.add(l.strip()), lines)
         pass_ref_set.discard("")
         regression_set = pass_ref_set - pass_set
@@ -312,21 +328,26 @@ def analysis_final():
         data_for_write = ""
         for full_name, anls_log in final_result.items():
             for case, err_type, err_msg in anls_log.error_detailed_set:
-                data_for_write += '\t'.join([full_name + "::" + case,
-                                             err_type,
-                                             err_msg.replace('\n', ' ')])
-                data_for_write += '\n'
-        write_file(os.path.join(anls_log_path, 'for_xlsx/error_list.for_xlsx.txt'),
-                   data_for_write)
+                data_for_write += "\t".join(
+                    [full_name + "::" + case, err_type, err_msg.replace("\n", " ")]
+                )
+                data_for_write += "\n"
+        write_file(
+            os.path.join(anls_log_path, "for_xlsx/error_list.for_xlsx.txt"),
+            data_for_write,
+        )
         data_for_write = ""
         for full_name, anls_log in final_result.items():
             for case, fail_type, fail_msg in anls_log.fail_detailed_set:
-                data_for_write += '\t'.join([full_name + "::" + case,
-                                             fail_type,
-                                             fail_msg.replace('\n', ' ')])
-                data_for_write += '\n'
-        write_file(os.path.join(anls_log_path, 'for_xlsx/fail_list.for_xlsx.txt'),
-                   data_for_write)
+                data_for_write += "\t".join(
+                    [full_name + "::" + case, fail_type, fail_msg.replace("\n", " ")]
+                )
+                data_for_write += "\n"
+        write_file(
+            os.path.join(anls_log_path, "for_xlsx/fail_list.for_xlsx.txt"),
+            data_for_write,
+        )
+
 
 def analysis(fname, clsname, logfile, Q):
     global final_result
@@ -336,27 +357,28 @@ def analysis(fname, clsname, logfile, Q):
     full_name = fname + "::" + clsname
     Q.put((full_name, anls_instance))
 
+
 def run_analysis(test_map):
     global final_result
     process_list = []
 
     for path, dir_list, file_list in os.walk(raw_log_path):
         for logfile in file_list:
-            namelist = logfile.split('.')
+            namelist = logfile.split(".")
             if len(namelist) != 4:
-                continue    # we won't analysis logs for spec case test
+                continue  # we won't analysis logs for spec case test
             fname = namelist[0] + ".py"
             clsname = namelist[1]
             epoch = namelist[2]
             extname = namelist[3]
-            if extname != 'log':
-                continue    # we ingnore invalid logfiles which not end with ".log"
+            if extname != "log":
+                continue  # we ingnore invalid logfiles which not end with ".log"
             if (fname not in test_map) or (clsname[:-3] not in test_map[fname]):
-                continue    # we only analysis logs for recognized fname::clsname
+                continue  # we only analysis logs for recognized fname::clsname
             full_log_path = os.path.join(path, logfile)
             Q = Queue()
             p = Process(target=analysis, args=(fname, clsname, full_log_path, Q))
-            p.deamon=True
+            p.deamon = True
             p.start()
             process_list.append(p)
             full_name, anls_instance = Q.get()
@@ -369,34 +391,36 @@ def run_analysis(test_map):
 
     analysis_final()
 
+
 def main():
     global script_path, root_path, ALL_PATHS, raw_log_path, anls_log_path, need_compare, need_classify
 
     # parse args
     parser = argparse.ArgumentParser(description="Auto script for analysing raw logs")
     parser.add_argument(
-            '--logdir',
-            metavar='logdir',
-            dest='logdir',
-            default=ALL_PATHS["log_path"],
-            type=str,
-            help="the path of logfiles stored, it should be a directory and must have 'raw_logs' under this path")
+        "--logdir",
+        metavar="logdir",
+        dest="logdir",
+        default=ALL_PATHS["log_path"],
+        type=str,
+        help="the path of logfiles stored, it should be a directory and must have 'raw_logs' under this path",
+    )
     parser.add_argument(
-            '--saveref',
-            action="store_true",
-            help="save reference pass list if no break tests")
+        "--saveref",
+        action="store_true",
+        help="save reference pass list if no break tests",
+    )
     parser.add_argument(
-            '--compare',
-            action="store_true",
-            help="compare current pass list against reference to see if regression occurred")
+        "--compare",
+        action="store_true",
+        help="compare current pass list against reference to see if regression occurred",
+    )
     parser.add_argument(
-            '--classify',
-            action="store_true",
-            help="output classified error/failure list for xlsx.")
-    parser.add_argument(
-            '--clean',
-            action="store_true",
-            help="clean analysis logs")
+        "--classify",
+        action="store_true",
+        help="output classified error/failure list for xlsx.",
+    )
+    parser.add_argument("--clean", action="store_true", help="clean analysis logs")
 
     args = parser.parse_args()
     raw_log_path = os.path.join(args.logdir, "raw_logs")
@@ -414,7 +438,7 @@ def main():
                     os.remove(full_path)
                     print("Removed old logfile: {}".format(full_path))
         os._exit(0)
-    elif need_clean is True:    # anls_log_path not exist
+    elif need_clean is True:  # anls_log_path not exist
         print("Task skipped: clean path '{}' not exist".format(anls_log_path))
         os._exit(0)
 
@@ -428,5 +452,6 @@ def main():
     # run analysis with multi-process
     run_analysis(test_map)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

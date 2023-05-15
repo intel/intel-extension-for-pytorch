@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 import pytest
 
 
@@ -16,8 +16,7 @@ class TestNNMethod(TestCase):
         x_dpcpp = x_cpu.to(dpcpp_device)
         grad_cpu = torch.randn([32, 32, 32, 32], device=cpu_device)
         grad_dpcpp = grad_cpu.to(dpcpp_device)
-        max_pool = nn.FractionalMaxPool2d(
-            2, output_size=(32, 32), return_indices=True)
+        max_pool = nn.FractionalMaxPool2d(2, output_size=(32, 32), return_indices=True)
 
         # cpu
         x_cpu.requires_grad_(True)
@@ -39,14 +38,16 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu[0], y_dpcpp[0].to(cpu_device))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
-    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(
+        torch.xpu.using_onednn_layout(),
+        reason="channels last does not support onednn block format",
+    )
     def test_fractional_max_pool2d_channels_last(self, dtype=torch.float):
         x_cpu = torch.randn([32, 32, 64, 64], device=cpu_device, dtype=dtype)
         x_dpcpp = x_cpu.to(memory_format=torch.channels_last).to(dpcpp_device)
         grad_cpu = torch.randn([32, 32, 32, 32], device=cpu_device)
         grad_dpcpp = grad_cpu.to(dpcpp_device)
-        max_pool = nn.FractionalMaxPool2d(
-            2, output_size=(32, 32), return_indices=True)
+        max_pool = nn.FractionalMaxPool2d(2, output_size=(32, 32), return_indices=True)
 
         # cpu
         x_cpu.requires_grad_(True)
@@ -63,7 +64,11 @@ class TestNNMethod(TestCase):
         grad_dpcpp = grad_cpu.to(dpcpp_device)
         y_dpcpp[0].backward(grad_dpcpp)
         print("y_dpcpp backward", x_dpcpp.grad.cpu())
-        self.assertEqual(y_dpcpp[0].is_contiguous(memory_format=torch.channels_last), True)
-        self.assertEqual(x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True)
+        self.assertEqual(
+            y_dpcpp[0].is_contiguous(memory_format=torch.channels_last), True
+        )
+        self.assertEqual(
+            x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True
+        )
         self.assertEqual(y_cpu[0], y_dpcpp[0].to(cpu_device))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))

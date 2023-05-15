@@ -2,6 +2,7 @@ import torch
 import threading
 import numpy as np
 from torch.testing._internal.common_utils import TestCase
+
 try:
     import intel_extension_for_pytorch
 except Exception:
@@ -35,8 +36,8 @@ test_shapes = [
 ]
 
 
-def get_normalized_time(time_: str, base='us') -> float:
-    norm = {'s': 1e9, 'ms': 1e6, 'us': 1e3, 'ns': 1.0}
+def get_normalized_time(time_: str, base="us") -> float:
+    norm = {"s": 1e9, "ms": 1e6, "us": 1e3, "ns": 1.0}
     time_ = time_.strip()
     t = time_[:-2]
     b = time_[-2:]
@@ -47,51 +48,56 @@ def get_normalized_time(time_: str, base='us') -> float:
     try:
         return float(t) * b_
     except Exception as e:
-        return float('nan')
+        return float("nan")
 
 
 def run_binary_fn(info, fn, dtype, dynamiccast=False, runs=10):
     def identify_time(string):
         tokens = string.split()
         return tokens[-1]
+
     if len(info) == 4:
-        tensor1 = torch.as_strided(torch.randn(
-            info[0][0] * info[1][0]), info[0], info[1])
-        tensor2 = torch.as_strided(torch.randn(
-            info[2][0] * info[3][0]), info[2], info[3])
+        tensor1 = torch.as_strided(
+            torch.randn(info[0][0] * info[1][0]), info[0], info[1]
+        )
+        tensor2 = torch.as_strided(
+            torch.randn(info[2][0] * info[3][0]), info[2], info[3]
+        )
     elif len(info) == 2:
         tensor1 = torch.randn(info[0])
         tensor2 = torch.randn(info[1])
-    tensor1 = eval('tensor1.' + dtype.strip() + '()')
+    tensor1 = eval("tensor1." + dtype.strip() + "()")
     if not dynamiccast:
-        tensor2 = eval('tensor2.' + dtype.strip() + '()')
+        tensor2 = eval("tensor2." + dtype.strip() + "()")
     else:
-        tensor2 = eval('tensor2.float()')
+        tensor2 = eval("tensor2.float()")
     durs = []
     maxdiffs = []
     for i in range(runs):
-        ret_cpu = eval('tensor1.cpu() ' + fn + ' tensor2.cpu()')
+        ret_cpu = eval("tensor1.cpu() " + fn + " tensor2.cpu()")
         if intel_extension_for_pytorch:
             tensor1_, tensor2_ = tensor1.xpu(), tensor2.xpu()
             with torch.autograd.profiler_legacy.profile(True, use_xpu=True) as prof:
                 if i == 0 and mb:
                     mb.enable_verbose()
-                ret_gpu = eval('tensor1_ ' + fn + ' tensor2_')
+                ret_gpu = eval("tensor1_ " + fn + " tensor2_")
                 if i == 0 and mb:
                     mb.disable_verbose()
-            timeinfo = str(prof.key_averages().table(
-                sort_by="self_cpu_time_total"))
+            timeinfo = str(prof.key_averages().table(sort_by="self_cpu_time_total"))
             maxdiff = float((ret_cpu.xpu() - ret_gpu).abs().max().item())
         else:
             tensor1_, tensor2_ = tensor1.cuda(), tensor2.cuda()
-            with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CUDA, ]) as prof:
+            with torch.profiler.profile(
+                activities=[
+                    torch.profiler.ProfilerActivity.CUDA,
+                ]
+            ) as prof:
                 if i == 0 and mb:
                     mb.enable_verbose()
-                ret_gpu = eval('tensor1_ ' + fn + ' tensor2_')
+                ret_gpu = eval("tensor1_ " + fn + " tensor2_")
                 if i == 0 and mb:
                     mb.disable_verbose()
-            timeinfo = str(prof.key_averages().table(
-                sort_by="self_cpu_time_total"))
+            timeinfo = str(prof.key_averages().table(sort_by="self_cpu_time_total"))
             maxdiff = float((ret_cpu.cuda() - ret_gpu).abs().max().item())
         if VERBOSE_ONLY:
             return
@@ -104,8 +110,17 @@ def run_binary_fn(info, fn, dtype, dynamiccast=False, runs=10):
     durs, maxdiffs = sorted(durs), sorted(maxdiffs)
     dur_ = durs[len(durs) // 2]
     maxdiff_ = maxdiffs[len(maxdiffs) - 1]
-    assert(maxdiff_ < 1e-4)
-    print('maxdiff: ' + str(maxdiff_) + ', dur(us): ' + str(dur_) + '  ' + str(info) + ' ' + str(dtype))
+    assert maxdiff_ < 1e-4
+    print(
+        "maxdiff: "
+        + str(maxdiff_)
+        + ", dur(us): "
+        + str(dur_)
+        + "  "
+        + str(info)
+        + " "
+        + str(dtype)
+    )
     return dur_
 
 
@@ -363,20 +378,20 @@ def perf_gap(index, ref, runtime, enabled):
     perfreg = ref / runtime
     print(perfreg)
     if enabled:
-        if perfreg < 0.5: # not stable here
+        if perfreg < 0.5:  # not stable here
             raise
     return index + 1
 
 
 def get_binary_bandwidth():
-    print('get_binary_bandwidth...')
+    print("get_binary_bandwidth...")
     if mb:
         mb.disable_verbose()
     shape0 = [16, 16, 512, 512]
-    timeus = run_binary_fn([shape0, shape0], '+', 'float')
+    timeus = run_binary_fn([shape0, shape0], "+", "float")
     total_bytes = np.prod(shape0) * 3 * 4
-    bw = total_bytes / (timeus/1000000.0) / (1024**3)
-    print('bw: ', bw)
+    bw = total_bytes / (timeus / 1000000.0) / (1024**3)
+    print("bw: ", bw)
     if mb:
         mb.enable_verbose()
     return bw
@@ -386,28 +401,48 @@ def run_tests():
     bw = get_binary_bandwidth()
     enable_perf_test = False
     if bw > 99999:
-        print('enable perf test')
+        print("enable perf test")
         enable_perf_test = True
-    test_types = ['float', 'half', 'bfloat16']
+    test_types = ["float", "half", "bfloat16"]
     if len(baseline_pvcb4) > 100:
-        baselines = baseline_pvcb4.strip().split('\n')
+        baselines = baseline_pvcb4.strip().split("\n")
         baselines = [float(line.split()[-1]) for line in baselines]
         index = 0
         for dtype in test_types:
             for item in test_shapes:
-                index = perf_gap(index, baselines[index], run_binary_fn(item, '+', dtype), enable_perf_test)
-                index = perf_gap(index, baselines[index], run_binary_fn(item, '-', dtype), enable_perf_test)
-                index = perf_gap(index, baselines[index], run_binary_fn(item, '*', dtype), enable_perf_test)
-                if dtype != 'float':  # dynamic cast
-                    index = perf_gap(index, baselines[index], run_binary_fn(item, '*', dtype, True), enable_perf_test)
+                index = perf_gap(
+                    index,
+                    baselines[index],
+                    run_binary_fn(item, "+", dtype),
+                    enable_perf_test,
+                )
+                index = perf_gap(
+                    index,
+                    baselines[index],
+                    run_binary_fn(item, "-", dtype),
+                    enable_perf_test,
+                )
+                index = perf_gap(
+                    index,
+                    baselines[index],
+                    run_binary_fn(item, "*", dtype),
+                    enable_perf_test,
+                )
+                if dtype != "float":  # dynamic cast
+                    index = perf_gap(
+                        index,
+                        baselines[index],
+                        run_binary_fn(item, "*", dtype, True),
+                        enable_perf_test,
+                    )
     else:
         for dtype in test_types:
             for item in test_shapes:
-                run_binary_fn(item, '+', dtype)
-                run_binary_fn(item, '-', dtype)
-                run_binary_fn(item, '*', dtype)
-                if dtype != 'float':  # dynamic cast
-                    run_binary_fn(item, '*', dtype, True)
+                run_binary_fn(item, "+", dtype)
+                run_binary_fn(item, "-", dtype)
+                run_binary_fn(item, "*", dtype)
+                if dtype != "float":  # dynamic cast
+                    run_binary_fn(item, "*", dtype, True)
 
 
 class TestTensorMethod(TestCase):
@@ -415,7 +450,7 @@ class TestTensorMethod(TestCase):
         run_tests()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     mutex = threading.Lock()
     with mutex:
         run_tests()

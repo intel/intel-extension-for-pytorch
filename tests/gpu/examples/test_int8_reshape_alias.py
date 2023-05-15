@@ -2,7 +2,7 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import time
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 from torch.jit._recursive import wrap_cpp_module
 from torch.quantization.quantize_jit import (
@@ -26,6 +26,7 @@ class Net(torch.nn.Module):
         x = self.fc(x)
         return x
 
+
 class TestInt8ReshapeAlias(TestCase):
     def test_int8_reshape_alias(self):
         model = Net()
@@ -48,12 +49,12 @@ class TestInt8ReshapeAlias(TestCase):
                 activation=torch.quantization.observer.MinMaxObserver.with_args(
                     qscheme=torch.per_tensor_symmetric,
                     reduce_range=False,
-                    dtype=torch.qint8
+                    dtype=torch.qint8,
                 ),
-                weight=torch.quantization.default_weight_observer
+                weight=torch.quantization.default_weight_observer,
             )
 
-            modelJit = prepare_jit(modelJit, {'': qconfig}, True)
+            modelJit = prepare_jit(modelJit, {"": qconfig}, True)
             modelJit = modelJit.to("xpu")
 
             # do calibration

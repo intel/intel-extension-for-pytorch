@@ -5,7 +5,9 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_grad_scaling_update_scale(self, device="xpu", dtype=torch.float):
         growth = 2.0
         backoff = 0.25
@@ -15,16 +17,22 @@ class TestTorchMethod(TestCase):
         found_inf = torch.full((1,), 0.0, dtype=torch.float, device="xpu")
 
         # Simulates 2 consecutive unskipped iterations
-        torch._amp_update_scale_(scale, growth_tracker, found_inf, growth, backoff, growth_interval)
+        torch._amp_update_scale_(
+            scale, growth_tracker, found_inf, growth, backoff, growth_interval
+        )
         self.assertEqual(growth_tracker, 1)
         self.assertEqual(scale, 4.0)
-        torch._amp_update_scale_(scale, growth_tracker, found_inf, growth, backoff, growth_interval)
+        torch._amp_update_scale_(
+            scale, growth_tracker, found_inf, growth, backoff, growth_interval
+        )
         self.assertEqual(growth_tracker, 0)
         self.assertEqual(scale, 8.0)
 
         # Simulates a skipped iteration
         found_inf.fill_(1.0)
-        torch._amp_update_scale_(scale, growth_tracker, found_inf, growth, backoff, growth_interval)
+        torch._amp_update_scale_(
+            scale, growth_tracker, found_inf, growth, backoff, growth_interval
+        )
         self.assertEqual(growth_tracker, 0)
         self.assertEqual(scale, 2.0)
 
@@ -35,9 +43,9 @@ class TestTorchMethod(TestCase):
         size = 10
         g = torch.full((size, size), 4.0, dtype=dtype, device="xpu")
         ginf = g.clone()
-        ginf[2, 2] = float('inf')
+        ginf[2, 2] = float("inf")
         gnan = g.clone()
-        gnan[2, 2] = float('nan')
+        gnan[2, 2] = float("nan")
 
         # Tries selected combinations of
         #  - contiguous grads
@@ -60,13 +68,17 @@ class TestTorchMethod(TestCase):
 
         for grads, has_inf in cases:
             found_inf.zero_()
-            torch._amp_foreach_non_finite_check_and_unscale_(grads, found_inf, inv_scale)
+            torch._amp_foreach_non_finite_check_and_unscale_(
+                grads, found_inf, inv_scale
+            )
             if has_inf:
                 self.assertEqual(found_inf, 1.0)
             else:
                 self.assertEqual(found_inf, 0.0)
                 for grad in grads:
-                    self.assertEqual(grad.cpu(), torch.ones_like(grad), rtol=1e-5, atol=1e-7)
+                    self.assertEqual(
+                        grad.cpu(), torch.ones_like(grad), rtol=1e-5, atol=1e-7
+                    )
 
         # When passing lists with mismatched dtypes to a raw
         # _amp_foreach_non_finite_check_and_unscale_ call,

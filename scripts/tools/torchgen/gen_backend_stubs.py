@@ -45,7 +45,6 @@ def parse_backend_yaml(
     grouped_native_functions: Sequence[Union[NativeFunction, NativeFunctionsGroup]],
     backend_indices: Dict[DispatchKey, BackendIndex],
 ) -> ParsedExternalYaml:
-
     native_functions_map: Dict[OperatorName, NativeFunction] = {
         f.func.name: f
         for f in concatMap(
@@ -351,11 +350,21 @@ def main() -> None:
         help="path to the source C++ file containing kernel definitions",
     )
     parser.add_argument(
-        '--simple_trace', action='store_true', default=False, help='simple trace the entry to ipex')
+        "--simple_trace",
+        action="store_true",
+        default=False,
+        help="simple trace the entry to ipex",
+    )
 
     options = parser.parse_args()
 
-    run(options.source_yaml, options.output_dir, options.dry_run, options.simple_trace, options.impl_path)
+    run(
+        options.source_yaml,
+        options.output_dir,
+        options.dry_run,
+        options.simple_trace,
+        options.impl_path,
+    )
 
 
 def gen_dispatchkey_nativefunc_headers(
@@ -536,9 +545,12 @@ TORCH_API void Register${backend_name}${dispatch_key}NativeFunctions() {
 
 
 def run(
-    source_yaml: str, output_dir: str, dry_run: bool, simple_trace: bool, impl_path: Optional[str] = None
+    source_yaml: str,
+    output_dir: str,
+    dry_run: bool,
+    simple_trace: bool,
+    impl_path: Optional[str] = None,
 ) -> None:
-
     # Assumes that this file lives at PYTORCH_ROOT/torchgen/gen_backend_stubs.py
     pytorch_root = pathlib.Path(__file__).parent.parent.absolute()
     template_dir = os.path.join(pytorch_root, "torchgen/packaged/ATen/templates")
@@ -550,9 +562,7 @@ def run(
 
     fm = make_file_manager(output_dir)
 
-    native_yaml_path = os.path.join(
-        pytorch_root, "torchgen/yaml/native_functions.yaml"
-    )
+    native_yaml_path = os.path.join(pytorch_root, "torchgen/yaml/native_functions.yaml")
     tags_yaml_path = os.path.join(pytorch_root, "torchgen/yaml/tags.yaml")
     parsed_yaml = parse_native_yaml(native_yaml_path, tags_yaml_path)
     native_functions, backend_indices = (

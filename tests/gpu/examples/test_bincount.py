@@ -13,10 +13,11 @@ class TestTorchMethod(TestCase):
         y_dpcpp = y_cpu.to("xpu")
         self.assertEqual(x_cpu, x_dpcpp.cpu())
         self.assertEqual(y_cpu, y_dpcpp.cpu())
-        self.assertEqual(torch.bincount(x_cpu),
-                         torch.bincount(x_dpcpp).cpu())
+        self.assertEqual(torch.bincount(x_cpu), torch.bincount(x_dpcpp).cpu())
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_histc(self, dtype=torch.float):
         x_cpu = torch.randint(0, 8, (5,), dtype=torch.double)
         x_dpcpp = x_cpu.to("xpu")

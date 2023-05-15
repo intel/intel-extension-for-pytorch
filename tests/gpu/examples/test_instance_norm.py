@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -43,10 +43,23 @@ class TestNNMethod(TestCase):
         xpu_result = xpu_module(xpu_result)
         self.assertEqual(cpu_result, xpu_result.to("cpu"))
 
-    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(
+        torch.xpu.using_onednn_layout(),
+        reason="channels last does not support onednn block format",
+    )
     def test_instance_norm2d_channels_last(self, dtype=torch.float):
-        shapes = [(1, 3, 7, 7), (2, 2, 3, 3), (4, 4, 4, 4), (4, 4, 1, 2), (4, 1, 4, 4),
-                  (4, 1, 4, 1), (4, 1, 1, 4), (1, 4, 1, 4), (1, 4, 4, 1), (4, 1, 2, 1)]
+        shapes = [
+            (1, 3, 7, 7),
+            (2, 2, 3, 3),
+            (4, 4, 4, 4),
+            (4, 4, 1, 2),
+            (4, 1, 4, 4),
+            (4, 1, 4, 1),
+            (4, 1, 1, 4),
+            (1, 4, 1, 4),
+            (1, 4, 4, 1),
+            (4, 1, 2, 1),
+        ]
         for shape in shapes:
             N, C, H, W = shape[0], shape[1], shape[2], shape[3]
             test_conv = torch.nn.Conv2d(C, C, kernel_size=(3, 3), padding=(1, 1))
@@ -79,7 +92,10 @@ class TestNNMethod(TestCase):
             ch_xpu_result = ch_xpu_module(ch_xpu_result)
             self.assertEqual(ch_cpu_result, ch_xpu_result.to("cpu"))
 
-    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(
+        torch.xpu.using_onednn_layout(),
+        reason="channels last does not support onednn block format",
+    )
     def test_instance_norm3d_channels_last(self, dtype=torch.float):
         shapes = [(1, 3, 7, 7, 5), (3, 3, 7, 7, 5)]
         for shape in shapes:
@@ -108,7 +124,9 @@ class TestNNMethod(TestCase):
             ch_cpu_result = ch_module(ch_cpu_result)
 
             ch_xpu_conv = test_conv.to("xpu").to(memory_format=torch.channels_last_3d)
-            ch_xpu_module = test_module.to("xpu").to(memory_format=torch.channels_last_3d)
+            ch_xpu_module = test_module.to("xpu").to(
+                memory_format=torch.channels_last_3d
+            )
             ch_xpu_input = rand_input.to("xpu").to(memory_format=torch.channels_last_3d)
             ch_xpu_result = ch_xpu_conv(ch_xpu_input)
             ch_xpu_result = ch_xpu_module(ch_xpu_result)

@@ -2,7 +2,7 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 import copy
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 to_block_cpu_float = torch.nn.Conv2d(4, 4, kernel_size=3, padding=1)
@@ -41,7 +41,9 @@ def to_block_dpcpp(x, dtype=None):
         return to_block_dpcpp_float(x)
 
 
-def create_block_format_tensor_4d(seed, contiguous=True, to_channels_last=False, dtype=torch.float):
+def create_block_format_tensor_4d(
+    seed, contiguous=True, to_channels_last=False, dtype=torch.float
+):
     torch.manual_seed(seed)
     with torch.xpu.onednn_layout():
         inputs = torch.randn([2, 4, 3, 3], dtype=dtype)
@@ -50,13 +52,17 @@ def create_block_format_tensor_4d(seed, contiguous=True, to_channels_last=False,
         inputs_xpu = inputs.xpu()
         if not contiguous:
             inputs = torch.testing._internal.common_utils.noncontiguous_like(inputs)
-            inputs_xpu = torch.testing._internal.common_utils.noncontiguous_like(inputs_xpu)
+            inputs_xpu = torch.testing._internal.common_utils.noncontiguous_like(
+                inputs_xpu
+            )
         inputs_block = to_block_cpu(inputs, dtype)
         inputs_xpu_block = to_block_dpcpp(inputs_xpu, dtype)
         return inputs_block, inputs_xpu_block
 
 
-def create_plain_format_tensor_4d(seed, contiguous=True, to_channels_last=False, dtype=torch.float):
+def create_plain_format_tensor_4d(
+    seed, contiguous=True, to_channels_last=False, dtype=torch.float
+):
     torch.manual_seed(seed)
     inputs = torch.randn([2, 4, 3, 3], dtype=dtype)
     if to_channels_last:
@@ -70,10 +76,17 @@ def create_plain_format_tensor_4d(seed, contiguous=True, to_channels_last=False,
     return inputs_block, inputs_xpu_block
 
 
-def invoke_binary(fn, in_plain_1, in_plain_xpu_1,
-                  in_plain_2, in_plain_xpu_2,
-                  in_block_1, in_block_xpu_1,
-                  in_block_2, in_block_xpu_2):
+def invoke_binary(
+    fn,
+    in_plain_1,
+    in_plain_xpu_1,
+    in_plain_2,
+    in_plain_xpu_2,
+    in_block_1,
+    in_block_xpu_1,
+    in_block_2,
+    in_block_xpu_2,
+):
     out_plain = fn(in_plain_1, in_plain_2)
     out_plain_xpu = fn(in_plain_xpu_1, in_plain_xpu_2)
     with torch.xpu.onednn_layout():
@@ -89,15 +102,29 @@ class TestTorchMethod(TestCase):
     def binary_case(self, fn):
         # test contiguous case
         is_contiguous = True
-        input_plain_1, input_plain_xpu_1 = create_plain_format_tensor_4d(10, is_contiguous)
-        input_block_1, input_block_xpu_1 = create_block_format_tensor_4d(10, is_contiguous)
-        input_plain_2, input_plain_xpu_2 = create_plain_format_tensor_4d(2, is_contiguous)
-        input_block_2, input_block_xpu_2 = create_block_format_tensor_4d(2, is_contiguous)
+        input_plain_1, input_plain_xpu_1 = create_plain_format_tensor_4d(
+            10, is_contiguous
+        )
+        input_block_1, input_block_xpu_1 = create_block_format_tensor_4d(
+            10, is_contiguous
+        )
+        input_plain_2, input_plain_xpu_2 = create_plain_format_tensor_4d(
+            2, is_contiguous
+        )
+        input_block_2, input_block_xpu_2 = create_block_format_tensor_4d(
+            2, is_contiguous
+        )
         output_plain, output_plain_xpu, output_block, output_block_xpu = invoke_binary(
-            fn, input_plain_1, input_plain_xpu_1,
-            input_plain_2, input_plain_xpu_2,
-            input_block_1, input_block_xpu_1,
-            input_block_2, input_block_xpu_2)
+            fn,
+            input_plain_1,
+            input_plain_xpu_1,
+            input_plain_2,
+            input_plain_xpu_2,
+            input_block_1,
+            input_block_xpu_1,
+            input_block_2,
+            input_block_xpu_2,
+        )
         assert torch.xpu.is_onednn_layout(output_plain_xpu) == False
         assert torch.xpu.is_onednn_layout(output_block_xpu) == True
         self.assertEqual(output_plain, output_block)
@@ -110,28 +137,50 @@ class TestTorchMethod(TestCase):
         input_plain_2, input_plain_xpu_2 = create_plain_format_tensor_4d(2, True, True)
         input_block_2, input_block_xpu_2 = create_block_format_tensor_4d(2, True, True)
         output_plain, output_plain_xpu, output_block, output_block_xpu = invoke_binary(
-            fn, input_plain_1, input_plain_xpu_1,
-            input_plain_2, input_plain_xpu_2,
-            input_block_1, input_block_xpu_1,
-            input_block_2, input_block_xpu_2)
+            fn,
+            input_plain_1,
+            input_plain_xpu_1,
+            input_plain_2,
+            input_plain_xpu_2,
+            input_block_1,
+            input_block_xpu_1,
+            input_block_2,
+            input_block_xpu_2,
+        )
         assert torch.xpu.is_onednn_layout(output_plain_xpu) == False
         assert torch.xpu.is_onednn_layout(output_block_xpu) == True
         self.assertEqual(output_plain, output_block)
         self.assertEqual(output_plain, output_plain_xpu.cpu())
         self.assertEqual(output_plain, output_block_xpu.cpu())
-        self.assertTrue(output_plain_xpu.is_contiguous(memory_format=torch.channels_last))
+        self.assertTrue(
+            output_plain_xpu.is_contiguous(memory_format=torch.channels_last)
+        )
 
         # test non-contiguous case
         is_contiguous = False
-        input_plain_1, input_plain_xpu_1 = create_plain_format_tensor_4d(10, is_contiguous)
-        input_block_1, input_block_xpu_1 = create_block_format_tensor_4d(10, is_contiguous)
-        input_plain_2, input_plain_xpu_2 = create_plain_format_tensor_4d(2, is_contiguous)
-        input_block_2, input_block_xpu_2 = create_block_format_tensor_4d(2, is_contiguous)
+        input_plain_1, input_plain_xpu_1 = create_plain_format_tensor_4d(
+            10, is_contiguous
+        )
+        input_block_1, input_block_xpu_1 = create_block_format_tensor_4d(
+            10, is_contiguous
+        )
+        input_plain_2, input_plain_xpu_2 = create_plain_format_tensor_4d(
+            2, is_contiguous
+        )
+        input_block_2, input_block_xpu_2 = create_block_format_tensor_4d(
+            2, is_contiguous
+        )
         output_plain, output_plain_xpu, output_block, output_block_xpu = invoke_binary(
-            fn, input_plain_1, input_plain_xpu_1,
-            input_plain_2, input_plain_xpu_2,
-            input_block_1, input_block_xpu_1,
-            input_block_2, input_block_xpu_2)
+            fn,
+            input_plain_1,
+            input_plain_xpu_1,
+            input_plain_2,
+            input_plain_xpu_2,
+            input_block_1,
+            input_block_xpu_1,
+            input_block_2,
+            input_block_xpu_2,
+        )
         assert torch.xpu.is_onednn_layout(output_plain_xpu) == False
         assert torch.xpu.is_onednn_layout(output_block_xpu) == True
         self.assertEqual(output_plain, output_block)
@@ -139,15 +188,29 @@ class TestTorchMethod(TestCase):
         self.assertEqual(output_plain, output_block_xpu.cpu())
 
         # bf16 test
-        input_plain_1, input_plain_xpu_1 = create_plain_format_tensor_4d(10, True, False, torch.bfloat16)
-        input_block_1, input_block_xpu_1 = create_block_format_tensor_4d(10, True, False, torch.bfloat16)
-        input_plain_2, input_plain_xpu_2 = create_plain_format_tensor_4d(2, True, False, torch.bfloat16)
-        input_block_2, input_block_xpu_2 = create_block_format_tensor_4d(2, True, False, torch.bfloat16)
+        input_plain_1, input_plain_xpu_1 = create_plain_format_tensor_4d(
+            10, True, False, torch.bfloat16
+        )
+        input_block_1, input_block_xpu_1 = create_block_format_tensor_4d(
+            10, True, False, torch.bfloat16
+        )
+        input_plain_2, input_plain_xpu_2 = create_plain_format_tensor_4d(
+            2, True, False, torch.bfloat16
+        )
+        input_block_2, input_block_xpu_2 = create_block_format_tensor_4d(
+            2, True, False, torch.bfloat16
+        )
         output_plain, output_plain_xpu, output_block, output_block_xpu = invoke_binary(
-            fn, input_plain_1, input_plain_xpu_1,
-            input_plain_2, input_plain_xpu_2,
-            input_block_1, input_block_xpu_1,
-            input_block_2, input_block_xpu_2)
+            fn,
+            input_plain_1,
+            input_plain_xpu_1,
+            input_plain_2,
+            input_plain_xpu_2,
+            input_block_1,
+            input_block_xpu_1,
+            input_block_2,
+            input_block_xpu_2,
+        )
         assert torch.xpu.is_onednn_layout(output_plain_xpu) == False
         assert torch.xpu.is_onednn_layout(output_block_xpu) == True
         self.assertEqual(output_plain, output_block)
@@ -155,20 +218,34 @@ class TestTorchMethod(TestCase):
         self.assertEqual(output_plain, output_block_xpu.cpu())
 
         # slice test
-        input_plain_1, input_plain_xpu_1 = create_plain_format_tensor_4d(10, True, False, torch.bfloat16)
-        input_block_1, input_block_xpu_1 = create_block_format_tensor_4d(10, True, False, torch.bfloat16)
-        input_plain_2, input_plain_xpu_2 = create_plain_format_tensor_4d(2, True, False, torch.bfloat16)
-        input_block_2, input_block_xpu_2 = create_block_format_tensor_4d(2, True, False, torch.bfloat16)
+        input_plain_1, input_plain_xpu_1 = create_plain_format_tensor_4d(
+            10, True, False, torch.bfloat16
+        )
+        input_block_1, input_block_xpu_1 = create_block_format_tensor_4d(
+            10, True, False, torch.bfloat16
+        )
+        input_plain_2, input_plain_xpu_2 = create_plain_format_tensor_4d(
+            2, True, False, torch.bfloat16
+        )
+        input_block_2, input_block_xpu_2 = create_block_format_tensor_4d(
+            2, True, False, torch.bfloat16
+        )
         input_plain_1 = input_plain_1.transpose(2, 3)
         input_plain_xpu_1 = input_plain_xpu_1.transpose(2, 3)
         input_block_1 = input_block_1.transpose(2, 3)
         input_block_xpu_1 = input_block_xpu_1.transpose(2, 3)
         assert input_block_xpu_1.is_contiguous() == False
         output_plain, output_plain_xpu, output_block, output_block_xpu = invoke_binary(
-            fn, input_plain_1, input_plain_xpu_1,
-            input_plain_2, input_plain_xpu_2,
-            input_block_1, input_block_xpu_1,
-            input_block_2, input_block_xpu_2)
+            fn,
+            input_plain_1,
+            input_plain_xpu_1,
+            input_plain_2,
+            input_plain_xpu_2,
+            input_block_1,
+            input_block_xpu_1,
+            input_block_2,
+            input_block_xpu_2,
+        )
         assert torch.xpu.is_onednn_layout(output_plain_xpu) == False
         assert torch.xpu.is_onednn_layout(output_block_xpu) == False
         self.assertEqual(output_plain, output_block)

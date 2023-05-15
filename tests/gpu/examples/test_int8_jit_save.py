@@ -4,12 +4,13 @@ import torch.nn as nn
 import copy
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 from torch.quantization.quantize_jit import (
     convert_jit,
     prepare_jit,
 )
+
 
 class M(torch.nn.Module):
     def __init__(self):
@@ -20,7 +21,7 @@ class M(torch.nn.Module):
             nn.Conv2d(3, ic, kernel_size=3, stride=1, padding=1, bias=False),
             nn.ReLU(),
             nn.Conv2d(ic, c, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.ReLU()
+            nn.ReLU(),
         )
         self.fc = nn.Linear(c * 64, 256)
 
@@ -30,17 +31,18 @@ class M(torch.nn.Module):
         res1 = self.fc(res1)
         return res1
 
+
 class ConvBias(torch.nn.Module):
     def __init__(self):
         super(ConvBias, self).__init__()
         self.block = nn.Sequential(
-            nn.Conv2d(3, 3, kernel_size=3, stride=1, padding=1, bias=True),
-            nn.ReLU()
+            nn.Conv2d(3, 3, kernel_size=3, stride=1, padding=1, bias=True), nn.ReLU()
         )
         print(self.block[0].bias)
 
     def forward(self, x):
         return self.block(x)
+
 
 class LinearBias(torch.nn.Module):
     def __init__(self):
@@ -51,6 +53,7 @@ class LinearBias(torch.nn.Module):
     def forward(self, x):
         x = self.fc(x)
         return x
+
 
 def trace_int8_model(model, device, test_input):
     model = model.to(device)
@@ -64,14 +67,12 @@ def trace_int8_model(model, device, test_input):
     print("start ", device, " calibration ...")
     qconfig_u8 = torch.quantization.QConfig(
         activation=torch.quantization.observer.MinMaxObserver.with_args(
-            qscheme=torch.per_tensor_symmetric,
-            reduce_range=False,
-            dtype=torch.quint8
+            qscheme=torch.per_tensor_symmetric, reduce_range=False, dtype=torch.quint8
         ),
-        weight=torch.quantization.default_weight_observer
+        weight=torch.quantization.default_weight_observer,
     )
 
-    modelJit = prepare_jit(modelJit, {'': qconfig_u8}, True)
+    modelJit = prepare_jit(modelJit, {"": qconfig_u8}, True)
 
     # do calibration
     test_input = test_input.to(device)
@@ -89,8 +90,12 @@ def trace_int8_model(model, device, test_input):
             test_res = modelJit(test_input.to(device))
     return modelJit, test_res
 
+
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_jit_quantization_save(), reason="Int8 jit save is not compiled")
+    @pytest.mark.skipif(
+        not torch.xpu.has_jit_quantization_save(),
+        reason="Int8 jit save is not compiled",
+    )
     def test_composite(self, dtype=torch.float):
         model = M()
         test_input = torch.rand([1, 3, 8, 8])

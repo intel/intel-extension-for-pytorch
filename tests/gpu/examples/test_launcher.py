@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 import subprocess
 from itertools import product
@@ -9,14 +9,18 @@ import os
 from tempfile import mkstemp
 import uuid
 
-cpu_device = torch.device('cpu')
-xpu_device = torch.device('xpu')
+cpu_device = torch.device("cpu")
+xpu_device = torch.device("xpu")
 device_pool = [cpu_device, xpu_device]
 dtype_pool = [torch.float64, torch.bfloat16]
 
+
 class TestLauncherXPU(TestCase):
-    launcher_scripts = [['python', '-m', 'intel_extension_for_pytorch.xpu.launch'],
-                       ['ipexrun', 'xpu']]
+    launcher_scripts = [
+        ["python", "-m", "intel_extension_for_pytorch.xpu.launch"],
+        ["ipexrun", "xpu"],
+    ]
+
     def _generate_temp_test_file(self, sv, tv, sd, td):
         script_data = f"""import torch
 
@@ -79,8 +83,12 @@ print("All check passed.")
 """
         program_absolute_path = os.path.abspath(__file__)
         program_absolute_path_dir = os.path.dirname(program_absolute_path)
-        generate_file_suffix = str(hash(program_absolute_path)) + str(uuid.uuid1()) + "_test_launcher"
-        _, generate_file = mkstemp(suffix=generate_file_suffix, dir=program_absolute_path_dir, text=True)
+        generate_file_suffix = (
+            str(hash(program_absolute_path)) + str(uuid.uuid1()) + "_test_launcher"
+        )
+        _, generate_file = mkstemp(
+            suffix=generate_file_suffix, dir=program_absolute_path_dir, text=True
+        )
         with open(generate_file, "w") as f:
             f.write(script_data)
 
@@ -92,10 +100,14 @@ print("All check passed.")
         mixed_prod = product(dev_prod, dtype_prod)
         for launcher in self.launcher_scripts:
             for (src_dev, tgt_dev), (src_dtype, tgt_dtype) in mixed_prod:
-                generate_file = self._generate_temp_test_file(src_dev, tgt_dev, src_dtype, tgt_dtype)
+                generate_file = self._generate_temp_test_file(
+                    src_dev, tgt_dev, src_dtype, tgt_dtype
+                )
                 expected_msg = "All check passed."
-                cmd = ' '.join(launcher) + " --convert-fp64-to-fp32 " + generate_file
-                r = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                cmd = " ".join(launcher) + " --convert-fp64-to-fp32 " + generate_file
+                r = subprocess.run(
+                    cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+                )
                 try:
                     assert r.returncode == 0
                     assert expected_msg in str(r.stdout, "utf-8")

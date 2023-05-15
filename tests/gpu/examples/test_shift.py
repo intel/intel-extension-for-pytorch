@@ -2,7 +2,7 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa F401
-import pytest # noqa F401
+import pytest  # noqa F401
 
 
 class TestTorchMethod(TestCase):

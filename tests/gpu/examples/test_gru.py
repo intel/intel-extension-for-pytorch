@@ -150,5 +150,9 @@ class TestNNMethod(TestCase):
 
                 self.assertEqual(output, output_xpu.float().cpu(), atol=3e-2, rtol=8e-3)
                 self.assertEqual(hn, hn_xpu.float().cpu(), atol=3e-2, rtol=8e-3)
-                self.assertEqual(input.grad, input_xpu.grad.float().cpu(), atol=3e-2, rtol=8e-3)
-                self.assertEqual(h0.grad, h0_xpu.grad.float().cpu(), atol=3e-2, rtol=8e-3)
+                self.assertEqual(
+                    input.grad, input_xpu.grad.float().cpu(), atol=3e-2, rtol=8e-3
+                )
+                self.assertEqual(
+                    h0.grad, h0_xpu.grad.float().cpu(), atol=3e-2, rtol=8e-3
+                )

@@ -27,10 +27,15 @@ from random import shuffle
 
 import torch
 from torch.autograd import gradcheck, Variable
-from torch.distributions import (Bernoulli, Exponential, Multinomial, Normal,
-                                 Uniform, Dirichlet)
-from torch.testing._internal.common_utils import (TestCase, load_tests,
-                                                  set_rng_seed)
+from torch.distributions import (
+    Bernoulli,
+    Exponential,
+    Multinomial,
+    Normal,
+    Uniform,
+    Dirichlet,
+)
+from torch.testing._internal.common_utils import TestCase, load_tests, set_rng_seed
 
 import intel_extension_for_pytorch  # noqa
 
@@ -71,26 +76,43 @@ def is_all_nan(tensor):
 
 
 #  Register all distributions for generic tests.
-Example = namedtuple('Example', ['Dist', 'params'])
+Example = namedtuple("Example", ["Dist", "params"])
 EXAMPLES = [
-    Example(Bernoulli, [
-        {'probs': torch.tensor([0.7, 0.2, 0.4], dtype=torch.double, requires_grad=True)},
-        {'probs': torch.tensor([0.3], dtype=torch.double, requires_grad=True)},
-        {'probs': 0.3},
-        {'logits': torch.tensor([0.], dtype=torch.double, requires_grad=True)},
-    ]),
-    Example(Dirichlet, [
-        {'concentration': torch.randn(2, 3).exp().requires_grad_()},
-        {'concentration': torch.randn(4).exp().requires_grad_()},
-    ])
+    Example(
+        Bernoulli,
+        [
+            {
+                "probs": torch.tensor(
+                    [0.7, 0.2, 0.4], dtype=torch.double, requires_grad=True
+                )
+            },
+            {"probs": torch.tensor([0.3], dtype=torch.double, requires_grad=True)},
+            {"probs": 0.3},
+            {"logits": torch.tensor([0.0], dtype=torch.double, requires_grad=True)},
+        ],
+    ),
+    Example(
+        Dirichlet,
+        [
+            {"concentration": torch.randn(2, 3).exp().requires_grad_()},
+            {"concentration": torch.randn(4).exp().requires_grad_()},
+        ],
+    ),
 ]
 
 BAD_EXAMPLES = [
-    Example(Bernoulli, [
-        {'probs': torch.tensor([1.1, 0.2, 0.4], dtype=torch.double, requires_grad=True)},
-        {'probs': torch.tensor([-0.5], dtype=torch.double, requires_grad=True)},
-        {'probs': 1.00001},
-    ])
+    Example(
+        Bernoulli,
+        [
+            {
+                "probs": torch.tensor(
+                    [1.1, 0.2, 0.4], dtype=torch.double, requires_grad=True
+                )
+            },
+            {"probs": torch.tensor([-0.5], dtype=torch.double, requires_grad=True)},
+            {"probs": 1.00001},
+        ],
+    )
 ]
 
 cpu_device = torch.device("cpu")
@@ -98,7 +120,6 @@ sycl_device = torch.device("xpu")
 
 
 class TestDistributions(TestCase):
-
     def _gradcheck_log_prob(self, dist_ctor, ctor_params):
         torch.set_default_dtype(torch.double)
         #  performs gradient checks on log_prob
@@ -127,7 +148,9 @@ class TestDistributions(TestCase):
             asset_fn(i, val.squeeze(), log_prob)
         torch.set_default_dtype(dtype_origin)
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_bernoulli(self):
         torch.set_default_dtype(torch.double)
         p = torch.tensor([0.7, 0.2, 0.4], requires_grad=True)
@@ -140,7 +163,13 @@ class TestDistributions(TestCase):
         self.assertFalse(Bernoulli(p_dpcpp).sample().requires_grad)
         self.assertEqual(Bernoulli(r_dpcpp).sample((8,)).size(), (8,))
         self.assertEqual(Bernoulli(r_dpcpp).sample().size(), ())
-        self.assertEqual(Bernoulli(r_dpcpp).sample((3, 2)).size(), (3, 2,))
+        self.assertEqual(
+            Bernoulli(r_dpcpp).sample((3, 2)).size(),
+            (
+                3,
+                2,
+            ),
+        )
         self.assertEqual(Bernoulli(s).sample().size(), ())
         self._gradcheck_log_prob(Bernoulli, (p,))
 
@@ -149,14 +178,18 @@ class TestDistributions(TestCase):
             self.assertEqual(log_prob, math.log(prob if val else 1 - prob))
 
         self._check_log_prob(Bernoulli(p_dpcpp), ref_log_prob)
-        self._check_log_prob(Bernoulli(logits=p_dpcpp.log() - (-p_dpcpp).log1p()), ref_log_prob)
+        self._check_log_prob(
+            Bernoulli(logits=p_dpcpp.log() - (-p_dpcpp).log1p()), ref_log_prob
+        )
         self.assertRaises(NotImplementedError, Bernoulli(r_dpcpp).rsample)
 
         #  check entropy computation
         #  TO DO: implement dpcpp entropy
         # self.assertEqual(Bernoulli(p_dpcpp).entropy(), torch.tensor([0.6108, 0.5004, 0.6730]), prec=1e-4)
         self.assertEqual(Bernoulli(torch.tensor([0.0])).entropy(), torch.tensor([0.0]))
-        self.assertEqual(Bernoulli(s).entropy(), torch.tensor(0.6108), atol=1e-4, rtol=0)
+        self.assertEqual(
+            Bernoulli(s).entropy(), torch.tensor(0.6108), atol=1e-4, rtol=0
+        )
         torch.set_default_dtype(dtype_origin)
 
     def test_log_normal(self):
@@ -213,15 +246,23 @@ class TestDistributions(TestCase):
         dist = Multinomial(total_count, probs=p)
         x = dist.sample()
         log_prob = dist.log_prob(x)
-        expected = torch.tensor(scipy.stats.multinomial.logpmf(x.cpu().numpy(), n=total_count,
-                                p=dist.probs.detach().cpu().numpy()), dtype=x.dtype)
+        expected = torch.tensor(
+            scipy.stats.multinomial.logpmf(
+                x.cpu().numpy(), n=total_count, p=dist.probs.detach().cpu().numpy()
+            ),
+            dtype=x.dtype,
+        )
         self.assertEqual(log_prob, expected)
 
         dist = Multinomial(total_count, logits=p.log())
         x = dist.sample()
         log_prob = dist.log_prob(x)
-        expected = torch.tensor(scipy.stats.multinomial.logpmf(x.cpu().numpy(), n=total_count,
-                                p=dist.probs.detach().cpu().numpy()), dtype=x.dtype)
+        expected = torch.tensor(
+            scipy.stats.multinomial.logpmf(
+                x.cpu().numpy(), n=total_count, p=dist.probs.detach().cpu().numpy()
+            ),
+            dtype=x.dtype,
+        )
         self.assertEqual(log_prob, expected)
 
     def test_multinomial_2d(self):
@@ -231,7 +272,9 @@ class TestDistributions(TestCase):
         p = torch.tensor(probabilities, requires_grad=True, device=sycl_device)
         s = torch.tensor(probabilities_1, requires_grad=True, device=sycl_device)
         self.assertEqual(Multinomial(total_count, p).sample().size(), (2, 3))
-        self.assertEqual(Multinomial(total_count, p).sample(sample_shape=(3, 4)).size(), (3, 4, 2, 3))
+        self.assertEqual(
+            Multinomial(total_count, p).sample(sample_shape=(3, 4)).size(), (3, 4, 2, 3)
+        )
         self.assertEqual(Multinomial(total_count, p).sample((6,)).size(), (6, 2, 3))
         set_rng_seed(0)
         # self._gradcheck_log_prob(lambda p: Multinomial(total_count, p), [p])
@@ -239,8 +282,10 @@ class TestDistributions(TestCase):
 
         #  sample check for extreme value of probs
         # self.assertEqual(Multinomial(total_count, s).sample().to(cpu_device), torch.tensor([[total_count, 0], [0, total_count]]))
-    
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_normal(self):
         loc = torch.randn(5, 5, requires_grad=True, device=sycl_device)
         scale = torch.randn(5, 5).abs().requires_grad_().to("xpu")
@@ -252,13 +297,17 @@ class TestDistributions(TestCase):
         self.assertEqual(Normal(loc, scale).sample((7,)).size(), (7, 5, 5))
         self.assertEqual(Normal(loc_1d, scale_1d).sample((1,)).size(), (1, 1))
         self.assertEqual(Normal(loc_1d, scale_1d).sample().size(), (1,))
-        self.assertEqual(Normal(0.2, .6).sample((1,)).size(), (1,))
+        self.assertEqual(Normal(0.2, 0.6).sample((1,)).size(), (1,))
         self.assertEqual(Normal(-0.7, 50.0).sample((1,)).size(), (1,))
 
         #  sample check for extreme value of mean, std
         set_rng_seed(1)
-        self.assertEqual(Normal(loc_delta, scale_delta).sample(sample_shape=(1, 2)),
-                         torch.tensor([[[1.0, 0.0], [1.0, 0.0]]]), rtol=1e-4, atol=1e-4)
+        self.assertEqual(
+            Normal(loc_delta, scale_delta).sample(sample_shape=(1, 2)),
+            torch.tensor([[[1.0, 0.0], [1.0, 0.0]]]),
+            rtol=1e-4,
+            atol=1e-4,
+        )
 
         # self._gradcheck_log_prob(Normal, (loc, scale))
         # self._gradcheck_log_prob(Normal, (loc, 1.0))
@@ -278,8 +327,9 @@ class TestDistributions(TestCase):
         def ref_log_prob(idx, x, log_prob):
             m = loc.view(-1)[idx]
             s = scale.view(-1)[idx]
-            expected = (math.exp(-(x - m) ** 2 / (2 * s ** 2)) /
-                        math.sqrt(2 * math.pi * s ** 2))
+            expected = math.exp(-((x - m) ** 2) / (2 * s**2)) / math.sqrt(
+                2 * math.pi * s**2
+            )
             self.assertAlmostEqual(log_prob, math.log(expected), places=3)
 
         # self._check_log_prob(Normal(loc, scale), ref_log_prob)
@@ -335,7 +385,9 @@ class TestDistributions(TestCase):
             expected = scipy.stats.gamma.logpdf(x.to("cpu"), a, scale=1 / b)
             self.assertEqual(log_prob.to("cpu"), expected, atol=1e-3, rtol=0)
 
-        self._check_log_prob(torch.distributions.Gamma(alpha.to("xpu"), beta.to("xpu")), ref_log_prob)
+        self._check_log_prob(
+            torch.distributions.Gamma(alpha.to("xpu"), beta.to("xpu")), ref_log_prob
+        )
 
     def test_s_standard_gamma_grad(self):
         alpha_cpu = torch.randn(2, 3, requires_grad=True).abs()
@@ -354,17 +406,33 @@ class TestDistributions(TestCase):
         print("grad_xpu: ", grad_xpu.grad.to("cpu"))
         self.assertEqual(grad_xpu.grad.to("cpu"), grad_cpu.grad)
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_binomial_log_prob(self):
-        for prop in [0., 0.5, 0.3, 0.05, 0.02, 0.75, 0.9, 1.]:
+        for prop in [0.0, 0.5, 0.3, 0.05, 0.02, 0.75, 0.9, 1.0]:
             total_count = torch.tensor([[8, 70, 100], [3000, 80000, 700000]]).to("xpu")
-            bin0 = torch.distributions.Binomial(total_count, torch.tensor(1.).to("xpu"))
+            bin0 = torch.distributions.Binomial(
+                total_count, torch.tensor(1.0).to("xpu")
+            )
             self.assertEqualIgnoreType(bin0.sample().to("cpu"), total_count.to("cpu"))
-            bin1 = torch.distributions.Binomial(total_count, torch.tensor(prop).to("xpu"))
+            bin1 = torch.distributions.Binomial(
+                total_count, torch.tensor(prop).to("xpu")
+            )
             samples = bin1.sample(torch.Size((100000,)))
             self.assertTrue((samples <= total_count.type_as(samples)).all())
-            self.assertEqual(samples.mean(dim=0) / total_count, bin1.mean / total_count, atol=0.02, rtol=0)
-            self.assertEqual(samples.var(dim=0) / total_count, bin1.variance / total_count, atol=0.02, rtol=0)
+            self.assertEqual(
+                samples.mean(dim=0) / total_count,
+                bin1.mean / total_count,
+                atol=0.02,
+                rtol=0,
+            )
+            self.assertEqual(
+                samples.var(dim=0) / total_count,
+                bin1.variance / total_count,
+                atol=0.02,
+                rtol=0,
+            )
 
     def test_dirichlet_shape(self):
         alpha = torch.randn(2, 3).exp().requires_grad_().to("xpu")
@@ -382,23 +450,30 @@ class TestDistributions(TestCase):
         self.assertEqual(dist.sample((5, 4)).size(), torch.Size((5, 4, 3, 2)))
         self.tensor_sample_1 = torch.ones(3, 2).to("xpu")
         self.tensor_sample_2 = torch.ones(3, 2, 3).to("xpu")
-        simplex_sample = self.tensor_sample_1 / self.tensor_sample_1.sum(-1, keepdim=True)
+        simplex_sample = self.tensor_sample_1 / self.tensor_sample_1.sum(
+            -1, keepdim=True
+        )
         self.assertEqual(dist.log_prob(simplex_sample).size(), torch.Size((3,)))
         self.assertRaises(ValueError, dist.log_prob, self.tensor_sample_2)
         simplex_sample = torch.ones(3, 1, 2).to("xpu")
         simplex_sample = simplex_sample / simplex_sample.sum(-1).unsqueeze(-1)
         self.assertEqual(dist.log_prob(simplex_sample).size(), torch.Size((3, 3)))
-       
-    @pytest.mark.skipif(not torch.xpu.utils.has_2d_block_array(), reason="Failed on ATSM only, will be fixed soon.")
+
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_2d_block_array(),
+        reason="Failed on ATSM only, will be fixed soon.",
+    )
     def test_dirichlet_mean_var(self):
         num_samples = 1000000
         alpha = torch.exp(torch.randn(3, dtype=torch.float, device=sycl_device))
         dist = torch.distributions.Dirichlet(alpha)
         samples_ret = dist.sample((num_samples,))
-       
-        alpha_sum = alpha.sum(dim=0);
-        ref_mean = alpha / alpha_sum;
-        ref_var = (alpha * (alpha_sum - alpha)) / (alpha_sum * alpha_sum * (alpha_sum + 1))
+
+        alpha_sum = alpha.sum(dim=0)
+        ref_mean = alpha / alpha_sum
+        ref_var = (alpha * (alpha_sum - alpha)) / (
+            alpha_sum * alpha_sum * (alpha_sum + 1)
+        )
         self.assertEqual(samples_ret.mean(dim=0).cpu(), ref_mean, atol=5e-3, rtol=5e-3)
         self.assertEqual(samples_ret.var(dim=0).cpu(), ref_var, atol=5e-3, rtol=5e-3)
 

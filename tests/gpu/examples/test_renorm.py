@@ -5,7 +5,9 @@ import pytest
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_renorm_float32(self, dtype=torch.float32):
         x_cpu = torch.ones(3, 3).to(dtype=dtype)
 
@@ -21,7 +23,9 @@ class TestNNMethod(TestCase):
         renorm2_dpcpp = torch.renorm(x_dpcpp, 1, 0, 5)
         self.assertEqual(renorm2, renorm2_dpcpp.cpu())
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_renorm_float64(self, dtype=torch.float64):
         x_cpu = torch.ones(3, 3).to(dtype=dtype)
 

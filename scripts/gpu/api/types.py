@@ -2,10 +2,12 @@ from scripts.gpu.model import *
 from dataclasses import dataclass
 from typing import Optional, Union, Sequence
 
+
 # Represents the implicit *this argument for method calls in C++ API
 @dataclass(frozen=True)
 class ThisArgument:
     argument: Argument
+
 
 # Bundle of arguments that represent a TensorOptions in the C++ API.
 @dataclass(frozen=True)
@@ -17,6 +19,7 @@ class TensorOptionsArguments:
 
     def all(self) -> Sequence[Argument]:
         return [self.dtype, self.layout, self.device, self.pin_memory]
+
 
 # Describe a argument (e.g., the x in "f(int x)") in the C++ API
 @dataclass(frozen=True)
@@ -44,20 +47,24 @@ class CppArgument:
     def str_no_default(self) -> str:
         return f"{self.type} {self.name}"
 
+
 @dataclass(frozen=True)
 class CppExpr:
     type: str
     expr: str
+
 
 @dataclass(frozen=True)
 class DispatcherExpr:
     type: str
     expr: str
 
+
 @dataclass(frozen=True)
 class LegacyDispatcherExpr:
     type: str
     expr: str
+
 
 @dataclass(frozen=True)
 class DispatcherArgument:
@@ -69,6 +76,7 @@ class DispatcherArgument:
 
     def __str__(self) -> str:
         return f"{self.type} {self.name}"
+
 
 @dataclass(frozen=True)
 class LegacyDispatcherArgument:

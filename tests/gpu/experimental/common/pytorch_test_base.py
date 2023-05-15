@@ -27,18 +27,20 @@ RUN_XPU = TEST_XPU
 RUNXPU_MULTI_GPU = TEST_MULTIGPU
 RUN_XPU_HALF = RUN_XPU
 
-PYTORCH_XPU_MEMCHECK = os.getenv('PYTORCH_XPU_MEMCHECK', '0') == '1'
-TEST_SKIP_XPU_MEM_LEAK_CHECK = os.getenv('PYTORCH_TEST_SKIP_XPU_MEM_LEAK_CHECK', '0') == '1'
+PYTORCH_XPU_MEMCHECK = os.getenv("PYTORCH_XPU_MEMCHECK", "0") == "1"
+TEST_SKIP_XPU_MEM_LEAK_CHECK = (
+    os.getenv("PYTORCH_TEST_SKIP_XPU_MEM_LEAK_CHECK", "0") == "1"
+)
 
 DEFAULT_FLOATING_PRECISION = 1e-3
 
 log = logging.getLogger(__name__)
 TORCH_TEST_PRECISIONS = {
     # test_name : floating_precision,
-    'test_pow_xpu_float32': 0.0035,
-    'test_pow_xpu_float64': 0.0045,
-    'test_var_neg_dim_xpu_bfloat16': 0.01,
-    'test_sum_xpu_bfloat16': 0.1,
+    "test_pow_xpu_float32": 0.0035,
+    "test_pow_xpu_float64": 0.0045,
+    "test_var_neg_dim_xpu_bfloat16": 0.01,
+    "test_sum_xpu_bfloat16": 0.1,
 }
 
 DISABLED_TORCH_TESTS_ANY = {
@@ -62,38 +64,48 @@ def get_skip_list_from_json():
                     skip_dict[test_cls].add(case)
     return skip_dict
 
+
 def set_skip_list_to_json(skip_dict):
     data = json.dumps(skip_dict, indent=2)
     script_path = os.path.split(os.path.realpath(__file__))[0]
     with open(os.path.join(script_path, "../config/skip_list.json"), "w") as save_f:
         save_f.write(data)
 
+
 def get_skip_keys_from_json():
     script_path = os.path.split(os.path.realpath(__file__))[0]
     skip_keys_json = list()
-    with open(os.path.join(script_path, "../config/skip_keys_list.json"), "r") as load_f:
+    with open(
+        os.path.join(script_path, "../config/skip_keys_list.json"), "r"
+    ) as load_f:
         skip_keys_json = json.load(load_f)
     return skip_keys_json
+
 
 def set_skip_keys_to_json(skip_keys_list):
     data = json.dumps(skip_keys_list, indent=2)
     script_path = os.path.split(os.path.realpath(__file__))[0]
-    with open(os.path.join(script_path, "../config/skip_keys_list.json"), "w") as save_f:
+    with open(
+        os.path.join(script_path, "../config/skip_keys_list.json"), "w"
+    ) as save_f:
         save_f.write(data)
 
 
 DISABLED_TORCH_TESTS_XPU_ONLY = get_skip_list_from_json()
 DISABLED_TEST_KEYS = get_skip_keys_from_json()
 
+
 def tf32_is_not_fp32():
     if not torch.xpu.is_available():
         return False
     return True
 
+
 @contextlib.contextmanager
 def tf32_off():
     # FixMe: we can't support tf32 right now
     yield
+
 
 @contextlib.contextmanager
 def tf32_on(self, tf32_precision=1e-4):
@@ -106,6 +118,7 @@ def tf32_on(self, tf32_precision=1e-4):
         yield
     finally:
         self.precision = old_precision
+
 
 def tf32_on_and_off(tf32_precision=1e-5):
     def with_tf32_disabled(self, function_call):
@@ -125,18 +138,20 @@ def tf32_on_and_off(tf32_precision=1e-5):
             for k, v in zip(arg_names, args):
                 kwargs[k] = v
             cond = tf32_is_not_fp32()
-            if 'device' in kwargs:
-                cond = cond and (torch.device(kwargs['device']).type == 'xpu')
-            if 'dtype' in kwargs:
-                cond = cond and (kwargs['dtype'] in {torch.float32, torch.complex64})
+            if "device" in kwargs:
+                cond = cond and (torch.device(kwargs["device"]).type == "xpu")
+            if "dtype" in kwargs:
+                cond = cond and (kwargs["dtype"] in {torch.float32, torch.complex64})
             if cond:
-                with_tf32_disabled(kwargs['self'], lambda: f(**kwargs))
-                with_tf32_enabled(kwargs['self'], lambda: f(**kwargs))
+                with_tf32_disabled(kwargs["self"], lambda: f(**kwargs))
+                with_tf32_enabled(kwargs["self"], lambda: f(**kwargs))
             else:
                 f(**kwargs)
 
         return wrapped
+
     return wrapper
+
 
 def with_tf32_off(f):
     @functools.wraps(f)
@@ -147,18 +162,19 @@ def with_tf32_off(f):
     return wrapped
 
 
-
 __xpu_ctx_rng_initialized = False
+
 
 def initialize_xpu_context_rng():
     global __xpu_ctx_rng_initialized
-    assert TEST_XPU, 'XPU must be available when calling initialized_xpu_context_rng'
+    assert TEST_XPU, "XPU must be available when calling initialized_xpu_context_rng"
     if not __xpu_ctx_rng_initialized:
         for i in range(torch.xpu.device_count()):
             torch.randn(1, device="xpu:{}".format(i))
         __xpu_ctx_rng_initialized = True
 
-class XPUMemoryLeakCheck():
+
+class XPUMemoryLeakCheck:
     def __init__(self, testcase, name=None):
         self.name = testcase.id() if name is None else name
         self.testcase = testcase
@@ -181,10 +197,15 @@ class XPUMemoryLeakCheck():
 
         for i, (before, after) in enumerate(zip(self.befores, afters)):
             self.testcase.assertEqual(
-                before, after, msg='{} leaked {} bytes XPU memory on device {}'.format(
-                    self.name, after - before, i))
+                before,
+                after,
+                msg="{} leaked {} bytes XPU memory on device {}".format(
+                    self.name, after - before, i
+                ),
+            )
 
-class XPUNonDefaultStream():
+
+class XPUNonDefaultStream:
     def __enter__(self):
         beforeDevice = torch.xpu.current_device()
         self.beforeStreams = []
@@ -197,25 +218,31 @@ class XPUNonDefaultStream():
     def __exit__(self, exec_type, exec_value, traceback):
         beforeDevice = torch.xpu.current_device()
         for d in range(torch.xpu.device_count()):
-            intel_extension_for_pytorch._C._setCurrentStream(self.beforeStreams[d]._cdata)
+            intel_extension_for_pytorch._C._setCurrentStream(
+                self.beforeStreams[d]._cdata
+            )
         torch.xpu.set_device(beforeDevice)
+
 
 def skipXPUMemoryLeakCheckIf(condition):
     def dec(fn):
-        if getattr(fn, '_do_xpu_memory_leak_check', True):
+        if getattr(fn, "_do_xpu_memory_leak_check", True):
             fn._do_xpu_memory_leak_check = not condition
         return fn
+
     return dec
+
 
 def skipXPUNonDefaultStreamIf(condition):
     def dec(fn):
-        if getattr(fn, '_do_xpu_non_default_stream', True):
+        if getattr(fn, "_do_xpu_non_default_stream", True):
             fn._do_xpu_non_default_stream = not condition
         return fn
+
     return dec
 
-class TestCase(TorchTestCase):
 
+class TestCase(TorchTestCase):
     def _should_stop_test_suite(self):
         return False
 
@@ -234,19 +261,23 @@ class TestCase(TorchTestCase):
 
     _ignore_not_implemented_error = True
 
-    def __init__(self, method_name='runTest'):
+    def __init__(self, method_name="runTest"):
         super().__init__(method_name)
 
         test_method = getattr(self, method_name, None)
         if test_method is not None:
             # Wraps the tested method if we should do XPU memory check.
             if not TEST_SKIP_XPU_MEM_LEAK_CHECK:
-                self._do_xpu_memory_leak_check &= getattr(test_method, '_do_xpu_memory_leak_check', True)
+                self._do_xpu_memory_leak_check &= getattr(
+                    test_method, "_do_xpu_memory_leak_check", True
+                )
                 if self._do_xpu_memory_leak_check and not IS_WINDOWS:
                     self.wrap_with_xpu_policy(method_name, self.assertLeaksNoXPUTensors)
 
             # Wraps the tested method if we should enforce non default XPU stream.
-            self._do_xpu_non_default_stream &= getattr(test_method, '_do_xpu_non_default_stream', True)
+            self._do_xpu_non_default_stream &= getattr(
+                test_method, "_do_xpu_non_default_stream", True
+            )
             if self._do_xpu_non_default_stream and not IS_WINDOWS:
                 self.wrap_with_xpu_policy(method_name, self.enforceNonDefaultStream)
 
@@ -260,13 +291,16 @@ class TestCase(TorchTestCase):
     def wrap_with_xpu_policy(self, method_name, policy):
         test_method = getattr(self, method_name)
         fullname = self.id().lower()
-        if TEST_XPU and ('gpu' in fullname or 'xpu' in fullname):
-            setattr(self, method_name, super().wrap_method_with_policy(test_method, policy))
+        if TEST_XPU and ("gpu" in fullname or "xpu" in fullname):
+            setattr(
+                self, method_name, super().wrap_method_with_policy(test_method, policy)
+            )
 
     def run(self, result=None):
         super().run(result=result)
         if self._should_stop_test_suite():
             result.stop()
+
 
 def match_name(name, name_list):
     for should_skip in name_list:
@@ -274,20 +308,23 @@ def match_name(name, name_list):
             return True
     return False
 
+
 def match_key(name, key_list):
     for key in key_list:
         if re.search(key, name, re.M | re.I) is not None:
             return True
     return False
 
+
 def match_dtype(name, dtypes):
-    name_set = set(name.split('_'))
+    name_set = set(name.split("_"))
     for dtype in dtypes:
         if isinstance(dtype, str) and dtype in name_set:
             return True
-        if isinstance(dtype, torch.dtype) and str(dtype).split('.')[-1] in name_set:
+        if isinstance(dtype, torch.dtype) and str(dtype).split(".")[-1] in name_set:
             return True
     return False
+
 
 def union_of_enabled_tests(sets):
     union = collections.defaultdict(set)
@@ -296,29 +333,32 @@ def union_of_enabled_tests(sets):
             union[k] = union[k] | v
     return union
 
+
 def _update_param_kwargs(param_kwargs, name, value):
-    """ Adds a kwarg with the specified name and value to the param_kwargs dict. """
+    """Adds a kwarg with the specified name and value to the param_kwargs dict."""
     if isinstance(value, list) or isinstance(value, tuple):
         # Make name plural (e.g. devices / dtypes) if the value is composite.
-        param_kwargs['{}s'.format(name)] = value
+        param_kwargs["{}s".format(name)] = value
     elif value:
         param_kwargs[name] = value
 
     # Leave param_kwargs as-is when value is None.
 
+
 DISABLED_TORCH_TESTS_XPU = union_of_enabled_tests(
-    [DISABLED_TORCH_TESTS_ANY, DISABLED_TORCH_TESTS_XPU_ONLY])
+    [DISABLED_TORCH_TESTS_ANY, DISABLED_TORCH_TESTS_XPU_ONLY]
+)
 
 DISABLED_TORCH_TESTS = {
-    'CPU': DISABLED_TORCH_TESTS_ANY,
-    'XPU': DISABLED_TORCH_TESTS_XPU,
+    "CPU": DISABLED_TORCH_TESTS_ANY,
+    "XPU": DISABLED_TORCH_TESTS_XPU,
 }
 
-tol = namedtuple('tol', ['atol', 'rtol'])
+tol = namedtuple("tol", ["atol", "rtol"])
 
 
 class DPCPPTestBase(DeviceTypeTestBase):
-    device_type = 'xpu'
+    device_type = "xpu"
     unsupported_dtypes = {
         torch.complex,
         torch.complex32,
@@ -327,7 +367,7 @@ class DPCPPTestBase(DeviceTypeTestBase):
         torch.cdouble,
         torch.cfloat,
     }
-    primary_device = ''
+    primary_device = ""
     precision = DEFAULT_FLOATING_PRECISION
 
     @staticmethod
@@ -344,40 +384,44 @@ class DPCPPTestBase(DeviceTypeTestBase):
 
     @classmethod
     def get_all_devices(cls):
-        primary_device_idx = int(cls.get_primary_device().split(':')[1])
+        primary_device_idx = int(cls.get_primary_device().split(":")[1])
         num_devices = torch.xpu.device_count()
 
         prim_device = cls.get_primary_device()
-        xpu_str = 'xpu:{0}'
-        non_primary_devices = [xpu_str.format(idx) for idx in range(num_devices) if idx != primary_device_idx]
+        xpu_str = "xpu:{0}"
+        non_primary_devices = [
+            xpu_str.format(idx)
+            for idx in range(num_devices)
+            if idx != primary_device_idx
+        ]
         return [prim_device] + non_primary_devices
 
     @classmethod
     def setUpClass(cls):
         # Acquires the current device as the primary (test) device
-        cls.primary_device = 'xpu:{0}'.format(torch.xpu.current_device())
+        cls.primary_device = "xpu:{0}".format(torch.xpu.current_device())
 
     # Returns the dtypes the test has requested.
     # Prefers device-specific dtype specifications over generic ones.
     @classmethod
     def _get_dtypes(cls, test):
-        if not hasattr(test, 'dtypes'):
+        if not hasattr(test, "dtypes"):
             return None
-        return test.dtypes.get(cls.device_type, test.dtypes.get('all', None))
+        return test.dtypes.get(cls.device_type, test.dtypes.get("all", None))
 
     def _get_precision_override(self, test, dtype):
-        if not hasattr(test, 'precision_overrides'):
+        if not hasattr(test, "precision_overrides"):
             return self.precision
         return test.precision_overrides.get(dtype, self.precision)
 
     def _get_tolerance_override(self, test, dtype):
-        if not hasattr(test, 'tolerance_overrides'):
+        if not hasattr(test, "tolerance_overrides"):
             return self.precision, self.rel_tol
         return test.tolerance_overrides.get(dtype, tol(self.precision, self.rel_tol))
 
     def _apply_precision_override_for_test(self, test, param_kwargs):
-        dtype = param_kwargs['dtype'] if 'dtype' in param_kwargs else None
-        dtype = param_kwargs['dtypes'] if 'dtypes' in param_kwargs else dtype
+        dtype = param_kwargs["dtype"] if "dtype" in param_kwargs else None
+        dtype = param_kwargs["dtypes"] if "dtypes" in param_kwargs else dtype
         if dtype:
             self.precision = self._get_precision_override(test, dtype)
             self.precision, self.rel_tol = self._get_tolerance_override(test, dtype)
@@ -389,7 +433,9 @@ class DPCPPTestBase(DeviceTypeTestBase):
         reason: str = "not ready on XPU"
         class_name = cls.__name__
         real_device_type = cls.device_type.upper()
-        assert real_device_type in DISABLED_TORCH_TESTS, 'Unsupported device type:' + real_device_type
+        assert real_device_type in DISABLED_TORCH_TESTS, (
+            "Unsupported device type:" + real_device_type
+        )
         disabled_torch_tests = DISABLED_TORCH_TESTS[real_device_type]
         disabled_test_keys = DISABLED_TEST_KEYS
 
@@ -399,7 +445,9 @@ class DPCPPTestBase(DeviceTypeTestBase):
             return test(self, cls.device_type)
 
         @wraps(test)
-        def disallowed_key(self, test=test, reason="case has skip key and won't run on XPU"):
+        def disallowed_key(
+            self, test=test, reason="case has skip key and won't run on XPU"
+        ):
             raise unittest.SkipTest(reason)
             return test(self, cls.device_type)
 
@@ -415,11 +463,11 @@ class DPCPPTestBase(DeviceTypeTestBase):
                 # Add the device param kwarg if the test needs device or devices.
                 param_kwargs = {} if param_kwargs is None else param_kwargs
                 test_sig_params = inspect.signature(test).parameters
-                if 'device' in test_sig_params or 'devices' in test_sig_params:
+                if "device" in test_sig_params or "devices" in test_sig_params:
                     device_arg: str = cls.get_primary_device()
-                    if hasattr(test, 'num_required_devices'):
+                    if hasattr(test, "num_required_devices"):
                         device_arg = cls.get_all_devices()
-                    _update_param_kwargs(param_kwargs, 'device', device_arg)
+                    _update_param_kwargs(param_kwargs, "device", device_arg)
 
                 # Sets precision and runs test
                 # Note: precision is reset after the test is run
@@ -458,7 +506,11 @@ class DPCPPTestBase(DeviceTypeTestBase):
             yield (test, test_suffix, {})
 
         # Parametrization decorators set the parametrize_fn attribute on the test.
-        parametrize_fn = test.parametrize_fn if hasattr(test, 'parametrize_fn') else default_parametrize_fn
+        parametrize_fn = (
+            test.parametrize_fn
+            if hasattr(test, "parametrize_fn")
+            else default_parametrize_fn
+        )
 
         # If one of the @dtypes* decorators is present, also parametrize over the dtypes set by it.
         dtypes = cls._get_dtypes(test)
@@ -471,23 +523,34 @@ class DPCPPTestBase(DeviceTypeTestBase):
 
                     # Note that an empty test suffix is set here so that the dtype can be appended
                     # later after the device.
-                    yield (test, '', param_kwargs)
+                    yield (test, "", param_kwargs)
 
-            parametrize_fn = compose_parametrize_fns(dtype_parametrize_fn, parametrize_fn)
+            parametrize_fn = compose_parametrize_fns(
+                dtype_parametrize_fn, parametrize_fn
+            )
 
         # Instantiate the parametrized tests.
-        for (test, test_suffix, param_kwargs) in parametrize_fn(test, generic_cls, cls):
-            test_suffix = '' if test_suffix == '' else '_' + test_suffix
-            device_suffix = '_' + cls.device_type
+        for test, test_suffix, param_kwargs in parametrize_fn(test, generic_cls, cls):
+            test_suffix = "" if test_suffix == "" else "_" + test_suffix
+            device_suffix = "_" + cls.device_type
 
             # Note: device and dtype suffix placement
             # Special handling here to place dtype(s) after device according to test name convention.
             dtype_kwarg = None
-            if 'dtype' in param_kwargs or 'dtypes' in param_kwargs:
-                dtype_kwarg = param_kwargs['dtypes'] if 'dtypes' in param_kwargs else param_kwargs['dtype']
-            test_name = '{}{}{}{}'.format(name, test_suffix, device_suffix, _dtype_test_suffix(dtype_kwarg))
+            if "dtype" in param_kwargs or "dtypes" in param_kwargs:
+                dtype_kwarg = (
+                    param_kwargs["dtypes"]
+                    if "dtypes" in param_kwargs
+                    else param_kwargs["dtype"]
+                )
+            test_name = "{}{}{}{}".format(
+                name, test_suffix, device_suffix, _dtype_test_suffix(dtype_kwarg)
+            )
 
-            instantiate_test_helper(cls=cls, name=test_name, test=test, param_kwargs=param_kwargs)
+            instantiate_test_helper(
+                cls=cls, name=test_name, test=test, param_kwargs=param_kwargs
+            )
+
 
 #         parametrize_fn = test.parametrize_fn if hasattr(test, 'parametrize_fn') else default_parametrize_fn
 #         for (test, test_suffix, param_kwargs) in parametrize_fn(test, generic_cls, cls):
@@ -506,77 +569,77 @@ class DPCPPTestBase(DeviceTypeTestBase):
 #                     instantiate_test_helper(cls=cls, name=full_name, test=test, param_kwargs=all_param_kwargs)
 
 
-    # @classmethod
-    # def instantiate_test(cls, name, test, *, generic_cls=None):
-    #     test_name = name + '_' + cls.device_type
-    #     reason: str = "not ready on XPU"
-    #     class_name = cls.__name__
-    #     real_device_type = cls.device_type.upper()
-    #     assert real_device_type in DISABLED_TORCH_TESTS, 'Unsupported device type:' + real_device_type
-    #     disabled_torch_tests = DISABLED_TORCH_TESTS[real_device_type]
+# @classmethod
+# def instantiate_test(cls, name, test, *, generic_cls=None):
+#     test_name = name + '_' + cls.device_type
+#     reason: str = "not ready on XPU"
+#     class_name = cls.__name__
+#     real_device_type = cls.device_type.upper()
+#     assert real_device_type in DISABLED_TORCH_TESTS, 'Unsupported device type:' + real_device_type
+#     disabled_torch_tests = DISABLED_TORCH_TESTS[real_device_type]
 
-    #     @wraps(test)
-    #     def disallowed_test(self, test=test, reason=reason):
-    #         raise unittest.SkipTest(reason)
-    #         return test(self, cls.device_type)
+#     @wraps(test)
+#     def disallowed_test(self, test=test, reason=reason):
+#         raise unittest.SkipTest(reason)
+#         return test(self, cls.device_type)
 
-    #     if (match_name(test_name, disabled_torch_tests.get(class_name)) or
-    #             match_name(name, disabled_torch_tests.get(class_name))):
-    #         assert not hasattr(
-    #             cls, test_name), 'Redefinition of test {0}'.format(test_name)
-    #         setattr(cls, reason, "test")
-    #         setattr(cls, test_name, disallowed_test)
-    #     else:  # Test is allowed
-    #         dtype_combinations = cls._get_dtypes(test)
-    #         if dtype_combinations is None:  # Tests without dtype variants are instantiated as usual
-    #             super().instantiate_test(name, copy.deepcopy(test), generic_cls=generic_cls)
-    #         else:  # Tests with dtype variants have unsupported dtypes skipped
-    #             # Sets default precision for floating types to bfloat16 precision
-    #             if not hasattr(test, 'precision_overrides'):
-    #                 test.precision_overrides = {}
-    #             xpu_dtypes = []
-    #             for dtype_combination in dtype_combinations:
-    #                 if type(dtype_combination) == torch.dtype:
-    #                     dtype_combination = (dtype_combination,)
-    #                 dtype_test_name = test_name
-    #                 skipped = False
-    #                 for dtype in dtype_combination:
-    #                     dtype_test_name += '_' + str(dtype).split('.')[1]
-    #                 for dtype in dtype_combination:
-    #                     if dtype in cls.unsupported_dtypes:
-    #                         reason = 'XPU does not support dtype {0}'.format(
-    #                             str(dtype))
+#     if (match_name(test_name, disabled_torch_tests.get(class_name)) or
+#             match_name(name, disabled_torch_tests.get(class_name))):
+#         assert not hasattr(
+#             cls, test_name), 'Redefinition of test {0}'.format(test_name)
+#         setattr(cls, reason, "test")
+#         setattr(cls, test_name, disallowed_test)
+#     else:  # Test is allowed
+#         dtype_combinations = cls._get_dtypes(test)
+#         if dtype_combinations is None:  # Tests without dtype variants are instantiated as usual
+#             super().instantiate_test(name, copy.deepcopy(test), generic_cls=generic_cls)
+#         else:  # Tests with dtype variants have unsupported dtypes skipped
+#             # Sets default precision for floating types to bfloat16 precision
+#             if not hasattr(test, 'precision_overrides'):
+#                 test.precision_overrides = {}
+#             xpu_dtypes = []
+#             for dtype_combination in dtype_combinations:
+#                 if type(dtype_combination) == torch.dtype:
+#                     dtype_combination = (dtype_combination,)
+#                 dtype_test_name = test_name
+#                 skipped = False
+#                 for dtype in dtype_combination:
+#                     dtype_test_name += '_' + str(dtype).split('.')[1]
+#                 for dtype in dtype_combination:
+#                     if dtype in cls.unsupported_dtypes:
+#                         reason = 'XPU does not support dtype {0}'.format(
+#                             str(dtype))
 
-    #                         @wraps(test)
-    #                         def skipped_test(self, *args, reason=reason, **kwargs):
-    #                             raise unittest.SkipTest(reason)
+#                         @wraps(test)
+#                         def skipped_test(self, *args, reason=reason, **kwargs):
+#                             raise unittest.SkipTest(reason)
 
-    #                         assert not hasattr(
-    #                             cls, dtype_test_name), 'Redefinition of test {0}'.format(
-    #                             dtype_test_name)
-    #                         skipped = True
-    #                         setattr(cls, dtype_test_name, skipped_test)
-    #                         break
-    #                     if dtype in [torch.float, torch.double, torch.bfloat16]:
-    #                         floating_precision = DPCPPTestBase._alt_lookup(
-    #                             TORCH_TEST_PRECISIONS,
-    #                             [dtype_test_name, test_name, test.__name__],
-    #                             DEFAULT_FLOATING_PRECISION)
-    #                         if dtype not in test.precision_overrides or test.precision_overrides[
-    #                                 dtype] < floating_precision:
-    #                             test.precision_overrides[dtype] = floating_precision
+#                         assert not hasattr(
+#                             cls, dtype_test_name), 'Redefinition of test {0}'.format(
+#                             dtype_test_name)
+#                         skipped = True
+#                         setattr(cls, dtype_test_name, skipped_test)
+#                         break
+#                     if dtype in [torch.float, torch.double, torch.bfloat16]:
+#                         floating_precision = DPCPPTestBase._alt_lookup(
+#                             TORCH_TEST_PRECISIONS,
+#                             [dtype_test_name, test_name, test.__name__],
+#                             DEFAULT_FLOATING_PRECISION)
+#                         if dtype not in test.precision_overrides or test.precision_overrides[
+#                                 dtype] < floating_precision:
+#                             test.precision_overrides[dtype] = floating_precision
 
-    #                 if class_name in disabled_torch_tests and match_name(
-    #                         dtype_test_name, disabled_torch_tests[class_name]):
-    #                     skipped = True
-    #                     setattr(cls, dtype_test_name, disallowed_test)
-    #                 if not skipped:
-    #                     xpu_dtypes.append(
-    #                         dtype_combination
-    #                         if len(dtype_combination) > 1 else dtype_combination[0])
-    #             if len(xpu_dtypes) != 0:
-    #                 test.dtypes[cls.device_type] = xpu_dtypes
-    #                 super().instantiate_test(name, copy.deepcopy(test), generic_cls=generic_cls)
+#                 if class_name in disabled_torch_tests and match_name(
+#                         dtype_test_name, disabled_torch_tests[class_name]):
+#                     skipped = True
+#                     setattr(cls, dtype_test_name, disallowed_test)
+#                 if not skipped:
+#                     xpu_dtypes.append(
+#                         dtype_combination
+#                         if len(dtype_combination) > 1 else dtype_combination[0])
+#             if len(xpu_dtypes) != 0:
+#                 test.dtypes[cls.device_type] = xpu_dtypes
+#                 super().instantiate_test(name, copy.deepcopy(test), generic_cls=generic_cls)
 
 
 class dtypes(object):
@@ -585,37 +648,42 @@ class dtypes(object):
     def __init__(self, *args, **kwargs):
         if len(args) > 0 and isinstance(args[0], (list, tuple)):
             for arg in args:
-                assert isinstance(arg, (list, tuple)), \
-                    "When one dtype variant is a tuple or list, " \
-                    "all dtype variants must be. " \
+                assert isinstance(arg, (list, tuple)), (
+                    "When one dtype variant is a tuple or list, "
+                    "all dtype variants must be. "
                     "Received non-list non-tuple dtype {0}".format(str(arg))
-                assert all(isinstance(dtype, torch.dtype) for dtype in arg), "Unknown dtype in {0}".format(str(arg))
+                )
+                assert all(
+                    isinstance(dtype, torch.dtype) for dtype in arg
+                ), "Unknown dtype in {0}".format(str(arg))
         else:
-            assert all(isinstance(arg, torch.dtype) for arg in args), "Unknown dtype in {0}".format(str(args))
+            assert all(
+                isinstance(arg, torch.dtype) for arg in args
+            ), "Unknown dtype in {0}".format(str(args))
 
         self.args = args
-        self.device_type = kwargs.get('device_type', 'all')
+        self.device_type = kwargs.get("device_type", "all")
 
     def __call__(self, fn):
-        d = getattr(fn, 'dtypes', {})
-        assert self.device_type not in d, "dtypes redefinition for {0}".format(self.device_type)
+        d = getattr(fn, "dtypes", {})
+        assert self.device_type not in d, "dtypes redefinition for {0}".format(
+            self.device_type
+        )
         d[self.device_type] = self.args
         fn.dtypes = d
         return fn
 
-class dtypesIfXPU(dtypes):
 
+class dtypesIfXPU(dtypes):
     def __init__(self, *args):
         super(dtypesIfXPU, self).__init__(*args, device_type="xpu")
 
 
 class onlyOn(object):
-
     def __init__(self, device_type):
         self.device_type = device_type
 
     def __call__(self, fn):
-
         @wraps(fn)
         def only_fn(slf, *args, **kwargs):
             if self.device_type != slf.device_type:
@@ -626,16 +694,18 @@ class onlyOn(object):
 
         return only_fn
 
+
 # Overrides specified dtypes on the CPU.
 
+
 def onlyXPU(fn):
-    return onlyOn('xpu')(fn)
+    return onlyOn("xpu")(fn)
 
 
 def onlyOnCPUAndXPU(fn):
     @wraps(fn)
     def only_fn(self, device, *args, **kwargs):
-        if self.device_type != 'cpu' and self.device_type != 'xpu':
+        if self.device_type != "cpu" and self.device_type != "xpu":
             reason = "Doesn't run on {0}".format(self.device_type)
             raise unittest.SkipTest(reason)
 
@@ -648,56 +718,63 @@ def skipIfXPU(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if TEST_XPU:
-            raise unittest.SkipTest(
-                "test doesn't currently work on the XPU stack")
+            raise unittest.SkipTest("test doesn't currently work on the XPU stack")
         else:
             fn(*args, **kwargs)
+
     return wrapper
+
 
 def skipXPUIfNoOneMKL(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if not torch.xpu.has_onemkl():
-            raise unittest.SkipTest(
-                "test doesn't currently work without oneMKL")
+            raise unittest.SkipTest("test doesn't currently work without oneMKL")
         else:
             fn(*args, **kwargs)
+
     return wrapper
 
-class skipIf(object):
 
+class skipIf(object):
     def __init__(self, dep, reason, device_type=None):
         self.dep = dep
         self.reason = reason
         self.device_type = device_type
 
     def __call__(self, fn):
-
         @wraps(fn)
         def dep_fn(slf, device, *args, **kwargs):
             if self.device_type is None or self.device_type == slf.device_type:
-                if (isinstance(self.dep, str) and getattr(slf, self.dep, True)) or (isinstance(self.dep, bool) and self.dep):
+                if (isinstance(self.dep, str) and getattr(slf, self.dep, True)) or (
+                    isinstance(self.dep, bool) and self.dep
+                ):
                     raise unittest.SkipTest(self.reason)
 
             return fn(slf, device, *args, **kwargs)
+
         return dep_fn
 
 
 class skipXPUIf(skipIf):
-
     def __init__(self, dep, reason):
-        super().__init__(dep, reason, device_type='xpu')
+        super().__init__(dep, reason, device_type="xpu")
 
 
 def _has_sufficient_memory(device, size):
-    if torch.device(device).type == 'xpu':
+    if torch.device(device).type == "xpu":
         if not torch.xpu.is_available():
             return False
         gc.collect()
         torch.xpu.empty_cache()
-        return torch.xpu.get_device_properties(device).total_memory - torch.xpu.memory_allocated(device) >= size
+        return (
+            torch.xpu.get_device_properties(device).total_memory
+            - torch.xpu.memory_allocated(device)
+            >= size
+        )
     else:
-        raise unittest.SkipTest('Unknown device type')
+        raise unittest.SkipTest("Unknown device type")
+
 
 def largeTensorTest(size, device=None):
     """Skip test if the device has insufficient memory to run the test
@@ -710,7 +787,7 @@ def largeTensorTest(size, device=None):
     """
     if isinstance(size, str):
         assert size.endswith("GB") or size.endswith("gb"), "only bytes or GB supported"
-        size = 1024 ** 3 * int(size[:-2])
+        size = 1024**3 * int(size[:-2])
 
     def inner(fn):
         @wraps(fn)
@@ -718,11 +795,14 @@ def largeTensorTest(size, device=None):
             size_bytes = size(self, *args, **kwargs) if callable(size) else size
             _device = device if device is not None else self.get_primary_device()
             if not _has_sufficient_memory(_device, size_bytes):
-                raise unittest.SkipTest('Insufficient {} memory'.format(_device))
+                raise unittest.SkipTest("Insufficient {} memory".format(_device))
 
             return fn(self, *args, **kwargs)
+
         return dep_fn
+
     return inner
+
 
 class XPUSyncGuard:
     def __init__(self, sync_debug_mode):
@@ -735,5 +815,6 @@ class XPUSyncGuard:
 
     def __exit__(self, exception_type, exception_value, traceback):
         torch.xpu.set_sync_debug_mode(self.debug_mode_restore)
+
 
 TEST_CLASS = DPCPPTestBase

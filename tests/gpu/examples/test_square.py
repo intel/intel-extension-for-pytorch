@@ -1,11 +1,10 @@
 import torch
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 from torch.testing._internal.common_utils import TestCase
 
 
 class TestTorchMethod(TestCase):
-
     def test_square(self, dtype=torch.float):
         dtype = torch.float
 

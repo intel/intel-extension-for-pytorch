@@ -24,4 +24,5 @@ exclude =
     ./tests,
     ./scripts,
     ./third_party,
+    ./examples,
     *.pyi

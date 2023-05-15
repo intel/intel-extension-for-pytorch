@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 import numpy as np
 
@@ -30,8 +30,7 @@ class TestTorchMethod(TestCase):
         print(mask_dpcpp.to(cpu_device).nonzero())
         print("x_dpcpp[mask_dpcpp]:")
         print(x_dpcpp[mask_dpcpp].to("cpu"))
-        self.assertEqual(mask_cpu.nonzero(),
-                         mask_dpcpp.to(cpu_device).nonzero())
+        self.assertEqual(mask_cpu.nonzero(), mask_dpcpp.to(cpu_device).nonzero())
         self.assertEqual(x_cpu[mask_cpu], x_dpcpp[mask_dpcpp].to(cpu_device))
 
         # index put
@@ -58,13 +57,21 @@ class TestTorchMethod(TestCase):
         cpu_device = torch.device("cpu")
         dpcpp_device = torch.device("xpu")
 
-        accumulate=True
+        accumulate = True
         x_cpu = torch.zeros([4, 512, 128], dtype=dtype, device=cpu_device)
         y_cpu = torch.ones([4, 15000, 128], dtype=dtype, device=cpu_device)
         x_dpcpp = x_cpu.to(dpcpp_device)
         y_dpcpp = y_cpu.to(dpcpp_device)
-        index_cpu = [torch.ones([4, 15000, 128], device=cpu_device).to(torch.long), torch.ones([4, 15000, 128], device=cpu_device).to(torch.long), torch.ones([4, 15000, 128], device=cpu_device).to(torch.long)]
-        index_dpcpp = [torch.ones([4, 15000, 128], device=dpcpp_device).to(torch.long), torch.ones([4, 15000, 128], device=dpcpp_device).to(torch.long), torch.ones([4, 15000, 128], device=dpcpp_device).to(torch.long)]
+        index_cpu = [
+            torch.ones([4, 15000, 128], device=cpu_device).to(torch.long),
+            torch.ones([4, 15000, 128], device=cpu_device).to(torch.long),
+            torch.ones([4, 15000, 128], device=cpu_device).to(torch.long),
+        ]
+        index_dpcpp = [
+            torch.ones([4, 15000, 128], device=dpcpp_device).to(torch.long),
+            torch.ones([4, 15000, 128], device=dpcpp_device).to(torch.long),
+            torch.ones([4, 15000, 128], device=dpcpp_device).to(torch.long),
+        ]
 
         z_cpu = x_cpu.index_put_(index_cpu, y_cpu, accumulate)
 
@@ -75,18 +82,28 @@ class TestTorchMethod(TestCase):
         self.assertEqual(z_cpu, z_xpu.cpu())
 
     def test_index_put_outer_inner(self, dtype=torch.long):
-        #XXX using long to avoid accumulate error caused by order of combiniation
+        # XXX using long to avoid accumulate error caused by order of combiniation
         torch.use_deterministic_algorithms(True)
-        batch = 15 # outer
-        stride = 33 # inner
+        batch = 15  # outer
+        stride = 33  # inner
         numel = 17
-        a = torch.randint(0, 5, (batch, numel, stride), dtype=dtype, device=torch.device('xpu'))
-        b = torch.randint(0, 5, (batch, numel, stride), dtype=dtype, device=torch.device('xpu'))
+        a = torch.randint(
+            0, 5, (batch, numel, stride), dtype=dtype, device=torch.device("xpu")
+        )
+        b = torch.randint(
+            0, 5, (batch, numel, stride), dtype=dtype, device=torch.device("xpu")
+        )
         idx = a < b
         idx_ = torch.nonzero(idx, as_tuple=True)
         nonzero = torch.nonzero(idx)
         idx_ = (None, idx_[1], None)
-        values = torch.randint(0, 5, (batch, nonzero.shape[0], stride), dtype=dtype, device=torch.device('xpu'))
+        values = torch.randint(
+            0,
+            5,
+            (batch, nonzero.shape[0], stride),
+            dtype=dtype,
+            device=torch.device("xpu"),
+        )
         a_cpu = a.cpu()
         idx_cpu = (None, idx_[1].cpu(), None)
         values_cpu = values.cpu()

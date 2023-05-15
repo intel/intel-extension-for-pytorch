@@ -2,8 +2,8 @@ import os
 
 import torch
 import torch.multiprocessing as mp
-from torch.testing._internal.common_utils import (TestCase, IS_WINDOWS, TEST_WITH_TSAN)
-import intel_extension_for_pytorch # noqa
+from torch.testing._internal.common_utils import TestCase, IS_WINDOWS, TEST_WITH_TSAN
+import intel_extension_for_pytorch  # noqa
 
 import pytest
 
@@ -11,20 +11,24 @@ import pytest
 def queue_get_exception(inqueue, outqueue):
     os.close(2)  # hide expected error message
     try:
-        torch.zeros(5, 5).to('xpu')
+        torch.zeros(5, 5).to("xpu")
     except Exception as e:
         outqueue.put(e)
     else:
-        outqueue.put('no exception')
+        outqueue.put("no exception")
 
 
-@pytest.mark.skipif(TEST_WITH_TSAN, reason="TSAN is not fork-safe since we're forking in a multi-threaded environment")
+@pytest.mark.skipif(
+    TEST_WITH_TSAN,
+    reason="TSAN is not fork-safe since we're forking in a multi-threaded environment",
+)
 class TestTorchMethod(TestCase):
-
-    @pytest.mark.skipif(IS_WINDOWS, reason='not applicable to Windows (only fails with fork)')
+    @pytest.mark.skipif(
+        IS_WINDOWS, reason="not applicable to Windows (only fails with fork)"
+    )
     def test_xpu_bad_call(self):
         # Initialize XPU
-        t = torch.zeros(5, 5).to('xpu')
+        t = torch.zeros(5, 5).to("xpu")
         inq = mp.Queue()
         outq = mp.Queue()
         p = mp.Process(target=queue_get_exception, args=(inq, outq))
@@ -33,9 +37,12 @@ class TestTorchMethod(TestCase):
         p.join()
         self.assertIsInstance(outq.get(), RuntimeError)
 
-    @pytest.mark.skipif(IS_WINDOWS, reason='not applicable to Windows (only fails with fork)')
+    @pytest.mark.skipif(
+        IS_WINDOWS, reason="not applicable to Windows (only fails with fork)"
+    )
     def test_wrong_xpu_fork(self):
-        stderr = TestCase.runWithPytorchAPIUsageStderr("""\
+        stderr = TestCase.runWithPytorchAPIUsageStderr(
+            """\
 import torch
 import intel_extension_for_pytorch
 from torch.multiprocessing import Process
@@ -52,5 +59,6 @@ if __name__ == "__main__":
         processes.append(p)
     for p in processes:
         p.join()
-""")
+"""
+        )
         self.assertRegex(stderr, "Cannot re-initialize XPU in forked subprocess.")

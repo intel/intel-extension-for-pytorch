@@ -1,8 +1,7 @@
-
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 cpu_device = torch.device("cpu")
@@ -11,7 +10,6 @@ xpu_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_qbinary(self, dtype=torch.float):
-
         x_cpu = torch.randn([1, 1, 3, 3], device=cpu_device)
         y_cpu = torch.randn([1, 1, 3, 3], device=cpu_device)
 

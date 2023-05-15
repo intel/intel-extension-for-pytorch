@@ -9,10 +9,12 @@ from math import sqrt
 
 import intel_extension_for_pytorch  # noqa
 
-from torch.quantization.quantize_jit import (convert_jit, prepare_jit)
+from torch.quantization.quantize_jit import convert_jit, prepare_jit
 from torch.jit._recursive import wrap_cpp_module
 
 import pytest
+
+
 class TestNNMethod(TestCase):
     def test_rnn_weight_norm(self):
         def check_weight_norm(l, name, num_params):
@@ -40,20 +42,24 @@ class TestNNMethod(TestCase):
             # ('weight_ih_l0_v' and 'weight_ih_l0_g') should be removed.
             self.assertTrue(name in l._parameters)
             self.assertIsNotNone(l._parameters[name])
-            self.assertTrue(name + '_v' not in l._parameters)
-            self.assertTrue(name + '_g' not in l._parameters)
+            self.assertTrue(name + "_v" not in l._parameters)
+            self.assertTrue(name + "_g" not in l._parameters)
             self.assertTrue(name in dict(l.named_parameters()))
             self.assertIsNotNone(dict(l.named_parameters())[name])
-            self.assertTrue(name + '_v' not in dict(l.named_parameters()))
-            self.assertTrue(name + '_g' not in dict(l.named_parameters()))
+            self.assertTrue(name + "_v" not in dict(l.named_parameters()))
+            self.assertTrue(name + "_g" not in dict(l.named_parameters()))
 
-        check_weight_norm(torch.nn.LSTM(32, 32).to("xpu"), 'weight_ih_l0', 4)
-        check_weight_norm(torch.nn.LSTM(32, 32, proj_size=16).to("xpu"), 'weight_hr_l0', 5)
+        check_weight_norm(torch.nn.LSTM(32, 32).to("xpu"), "weight_ih_l0", 4)
+        check_weight_norm(
+            torch.nn.LSTM(32, 32, proj_size=16).to("xpu"), "weight_hr_l0", 5
+        )
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_weight_norm(self):
-        input = torch.randn(3, 5).to('xpu')
-        m = nn.Linear(5, 7).to('xpu')
+        input = torch.randn(3, 5).to("xpu")
+        m = nn.Linear(5, 7).to("xpu")
         expected_output = m(input)
 
         # add weight normalization
@@ -66,8 +72,8 @@ class TestNNMethod(TestCase):
 
         # remove weight norm
         m = torch.nn.utils.remove_weight_norm(m)
-        self.assertFalse(hasattr(m, 'weight_g'))
-        self.assertFalse(hasattr(m, 'weight_v'))
+        self.assertFalse(hasattr(m, "weight_g"))
+        self.assertFalse(hasattr(m, "weight_v"))
         self.assertEqual(m(input), expected_output)
 
         # test with dim=1
@@ -82,7 +88,7 @@ class TestNNMethod(TestCase):
         m = torch.nn.utils.weight_norm(m, dim=None)
         self.assertEqual(m(input), expected_output)
 
-        with self.assertRaisesRegex(RuntimeError, 'register two weight_norm hooks'):
+        with self.assertRaisesRegex(RuntimeError, "register two weight_norm hooks"):
             m = torch.nn.utils.weight_norm(m)
             m = torch.nn.utils.weight_norm(m)
 
@@ -90,7 +96,9 @@ class TestNNMethod(TestCase):
         input = torch.randn(3, 5, requires_grad=False)
         g = torch.randn(3, 5)
         res, norm = torch._weight_norm_interface(input, g, dim=0)
-        xpu_res, xpu_norm = torch._weight_norm_interface(input.to("xpu"), g.to("xpu"), dim=0)
+        xpu_res, xpu_norm = torch._weight_norm_interface(
+            input.to("xpu"), g.to("xpu"), dim=0
+        )
         self.assertEqual(xpu_res.cpu(), res)
         m = nn.Linear(5, 7)
         xpu_m = copy.deepcopy(m).to("xpu")
@@ -150,7 +158,10 @@ class TestNNMethod(TestCase):
         self.assertEqual(v.grad, v_xpu.grad.cpu(), atol=1e-3, rtol=1e-5)
         self.assertEqual(g.grad, g_xpu.grad.cpu(), atol=1e-3, rtol=1e-5)
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_2d_block_array(), reason="Randomly failed on ATSM only, will be fixed soon.")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_2d_block_array(),
+        reason="Randomly failed on ATSM only, will be fixed soon.",
+    )
     def test_weight_norm_large_batch(self):
         v = torch.randn(8193, 8193).requires_grad_(True)
         g = torch.randn(8193).requires_grad_(True)

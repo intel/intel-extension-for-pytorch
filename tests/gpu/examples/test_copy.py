@@ -2,10 +2,11 @@ import torch
 import pytest
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+
 
 class TestTorchMethod(TestCase):
     def test_copy_d_to_h_no_contiguous(self, dtype=torch.float):
@@ -25,11 +26,19 @@ class TestTorchMethod(TestCase):
         self.assertEqual(output, output_xpu.cpu())
 
     def test_copy_quantize_tensor(self, dtype=torch.qint8):
-        qtensor1 = torch.quantize_per_tensor(torch.tensor([-1.0, 0.0, 1.0, 2.0], device=dpcpp_device), 0.1, 10, dtype=dtype)
+        qtensor1 = torch.quantize_per_tensor(
+            torch.tensor([-1.0, 0.0, 1.0, 2.0], device=dpcpp_device),
+            0.1,
+            10,
+            dtype=dtype,
+        )
         qtensor2 = qtensor1.clone()
         self.assertEqual(qtensor1.to(cpu_device), qtensor2.to(cpu_device))
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_2d_block_array(), reason="Skipped on ATS-M due to memory limitation")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_2d_block_array(),
+        reason="Skipped on ATS-M due to memory limitation",
+    )
     def test_copy_big_numel(self, dtype=torch.float):
         tensor1 = torch.rand([8, 2048, 50304], dtype=dtype, device=dpcpp_device)
         tensor2 = tensor1.clone()

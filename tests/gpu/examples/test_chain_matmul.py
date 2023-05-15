@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -57,7 +57,9 @@ class TestTorchMethod(TestCase):
         data_n = torch.randn([5, 6], device=cpu_device)
         data_n_dpcpp = data_n.to(dpcpp_device)
         res = torch.chain_matmul(data_x, data_y, data_z, data_n)
-        res_dpcpp = torch.chain_matmul(data_x_dpcpp, data_y_dpcpp, data_z_dpcpp, data_n_dpcpp)
+        res_dpcpp = torch.chain_matmul(
+            data_x_dpcpp, data_y_dpcpp, data_z_dpcpp, data_n_dpcpp
+        )
         print("cpu input x", data_x)
         print("cpu input y", data_y)
         print("cpu input z", data_z)

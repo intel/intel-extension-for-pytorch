@@ -1,11 +1,12 @@
 import torch
-import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch  # noqa F401
 from functools import wraps
 from torch.nn.parallel.scatter_gather import _is_namedtuple
 
 
 def override_tensor_totype():
     r"""Override _tensor_totype to avoid triggering fp64 error when printing XPU tensor on ATS-M"""
+
     def fp64_tensor_totype_wrapper(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
@@ -16,13 +17,17 @@ def override_tensor_totype():
                 if torch.is_tensor(kwarg) and kwarg.is_xpu:
                     return kwarg.to(torch.float)
             return f(*args, **kwargs)
+
         return wrapper
 
-    torch._tensor_str.tensor_totype = fp64_tensor_totype_wrapper(torch._tensor_str.tensor_totype)
+    torch._tensor_str.tensor_totype = fp64_tensor_totype_wrapper(
+        torch._tensor_str.tensor_totype
+    )
 
 
 def override_assert_equal():
     r"""Override assertEqual to avoid triggering fp64 error on tensor comparison in test case"""
+
     def args_to_xpu(args):
         if torch.is_tensor(args) and args.is_xpu:
             return args.to("cpu")
@@ -42,6 +47,7 @@ def override_assert_equal():
         def wrapper(*args, **kwargs):
             args = args_to_xpu(args)
             return f(*args, **kwargs)
+
         return wrapper
 
     r"""
@@ -53,21 +59,25 @@ def override_assert_equal():
     `disable_global_flags` with an empty one to keep the flag `__allow_nonbracketed_mutation_flag`
     from being changed.
     """
+
     def _disable_global_flags():
         pass
 
     torch.backends.disable_global_flags = _disable_global_flags
     from torch.testing._internal.common_utils import TestCase
+
     TestCase.assertEqual = fp64_assert_equal_wrapper(TestCase.assertEqual)
 
 
 # background streams used for copying
 _streams = None
 
+
 def override_get_stream():
     r"""
     This function overrides `_get_stream` in PyTorch to provide XPU support.
     """
+
     def _get_stream(device: int):
         r"""
         Gets a background stream for copying between CPU and XPU.
@@ -89,13 +99,15 @@ def override_recursive_to():
     r"""
     This function overrides `_recursive_to` in PyTorch to provide XPU support for data movement.
     """
+
     def _recursive_to(inputs, target_gpu, use_side_stream_for_tensor_copies):
         r"""
         Recursively moves input to the target_gpu, used in XPU distributed training.
         """
+
         def to_map(obj):
             if isinstance(obj, torch.Tensor):
-                if obj.device == torch.device('xpu', target_gpu):
+                if obj.device == torch.device("xpu", target_gpu):
                     return (obj,)
                 if not use_side_stream_for_tensor_copies:
                     return (obj.to(target_gpu),)
@@ -145,45 +157,53 @@ class WrapAPI:
         @wraps(api)
         def new_api(*args, **kwargs):
             new_args = list(args)
-            assert isinstance(args[0], torch.Tensor), "torch.Tensor.to wrapper got non-Tensor for the 1st argument"
+            assert isinstance(
+                args[0], torch.Tensor
+            ), "torch.Tensor.to wrapper got non-Tensor for the 1st argument"
             src_dtype = args[0].dtype
             src_device = args[0].device
             dst_dtype = kwargs.get("dtype")
             dst_device = kwargs.get("device")
             if dst_dtype is None and dst_device is None:
-                if len(args) > 1 and isinstance(args[1], torch.Tensor):     # torch.Tensor.to(other, ...)
-                    kwargs['dtype'] = args[1].dtype
-                    kwargs['device'] = args[1].device
+                if len(args) > 1 and isinstance(
+                    args[1], torch.Tensor
+                ):  # torch.Tensor.to(other, ...)
+                    kwargs["dtype"] = args[1].dtype
+                    kwargs["device"] = args[1].device
                     new_args.pop(1)
-                elif len(args) > 1 and isinstance(args[1], torch.dtype):    # torch.Tensor.to(dtype, ...)
-                    kwargs['dtype'] = args[1]
-                    kwargs['device'] = src_device
+                elif len(args) > 1 and isinstance(
+                    args[1], torch.dtype
+                ):  # torch.Tensor.to(dtype, ...)
+                    kwargs["dtype"] = args[1]
+                    kwargs["device"] = src_device
                     new_args.pop(1)
-                elif len(args) > 2 and isinstance(args[2], torch.dtype):    # torch.Tensor.to(device, dtype, ...)
-                    kwargs['dtype'] = args[2]
-                    kwargs['device'] = args[1]
+                elif len(args) > 2 and isinstance(
+                    args[2], torch.dtype
+                ):  # torch.Tensor.to(device, dtype, ...)
+                    kwargs["dtype"] = args[2]
+                    kwargs["device"] = args[1]
                     new_args.pop(2)
                     new_args.pop(1)
-                elif len(args) > 1:                                         # torch.Tensor.to(device, ...)
-                    kwargs['dtype'] = src_dtype
-                    kwargs['device'] = args[1]
+                elif len(args) > 1:  # torch.Tensor.to(device, ...)
+                    kwargs["dtype"] = src_dtype
+                    kwargs["device"] = args[1]
                     new_args.pop(1)
             elif dst_device is None:
-                if len(args) > 1:                                           # torch.Tensor.to(device, dtype=dtype, ...)
-                    kwargs['device'] = args[1]
+                if len(args) > 1:  # torch.Tensor.to(device, dtype=dtype, ...)
+                    kwargs["device"] = args[1]
                     new_args.pop(1)
-                else:                                                       # torch.Tensor.to(dtype=dtype, ...)
-                    kwargs['device'] = src_device
-            elif dst_dtype is None:                                         # torch.Tensor.to(device=device, ...)
-                kwargs['dtype'] = src_dtype
-            else:                                                           # torch.Tensor.to(device=device, dtype=dtype, ...)
+                else:  # torch.Tensor.to(dtype=dtype, ...)
+                    kwargs["device"] = src_device
+            elif dst_dtype is None:  # torch.Tensor.to(device=device, ...)
+                kwargs["dtype"] = src_dtype
+            else:  # torch.Tensor.to(device=device, dtype=dtype, ...)
                 pass
 
             new_args = tuple(new_args)
-            if cls.only_device and 'xpu' not in str(kwargs['device']):
+            if cls.only_device and "xpu" not in str(kwargs["device"]):
                 pass
-            elif kwargs['dtype'] == cls.user_defined_src_dtype:
-                kwargs['dtype'] = cls.user_defined_dst_dtype
+            elif kwargs["dtype"] == cls.user_defined_src_dtype:
+                kwargs["dtype"] = cls.user_defined_dst_dtype
             return api(*new_args, **kwargs)
 
         return new_api
@@ -195,12 +215,13 @@ class WrapAPI:
             new_args = list(args)
             dst_dtype = kwargs.get("dtype")
             dst_device = kwargs.get("device")
-            if cls.only_device and 'xpu' not in str(dst_device):
+            if cls.only_device and "xpu" not in str(dst_device):
                 return api(*args, **kwargs)
             if dst_dtype == cls.user_defined_src_dtype:
-                kwargs['dtype'] = cls.user_defined_dst_dtype
+                kwargs["dtype"] = cls.user_defined_dst_dtype
             new_args = tuple(new_args)
             return api(*new_args, **kwargs)
+
         return new_api
 
     @classmethod
@@ -208,20 +229,22 @@ class WrapAPI:
         @wraps(api)
         def new_api(*args, **kwargs):
             new_args = list(args)
-            assert len(args) > 0 and isinstance(args[0], torch.Tensor), \
-                f"Current api {api} got non-Tensor for the 1st arguement"
+            assert len(args) > 0 and isinstance(
+                args[0], torch.Tensor
+            ), f"Current api {api} got non-Tensor for the 1st arguement"
             dst_device = args[0].device
             dst_dtype = args[0].dtype
             resign_dtype = kwargs.get("dtype")
             resign_dev = kwargs.get("device")
             dst_device = resign_dev if resign_dev is not None else dst_device
             dst_dtype = resign_dtype if resign_dtype is not None else dst_dtype
-            if cls.only_device and 'xpu' not in str(dst_device):
+            if cls.only_device and "xpu" not in str(dst_device):
                 return api(*args, **kwargs)
             if dst_dtype == cls.user_defined_src_dtype:
-                kwargs['dtype'] = cls.user_defined_dst_dtype
+                kwargs["dtype"] = cls.user_defined_dst_dtype
             new_args = tuple(new_args)
             return api(*new_args, **kwargs)
+
         return new_api
 
 

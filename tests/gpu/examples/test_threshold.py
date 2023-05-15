@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 cpu_device = torch.device("cpu")
@@ -11,7 +11,6 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_threshold(self, dtype=torch.float):
-
         # functionality
         x_ref = torch.ones([2, 2], device=cpu_device)
         x_ref[0][0] = 1

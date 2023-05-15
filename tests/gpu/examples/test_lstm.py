@@ -5,24 +5,33 @@ from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 
 import pytest
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
-cpu_device = torch.device('cpu')
+cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_lstm(self, dtype=torch.float):
         rnn = nn.LSTM(2, 4, 2, bidirectional=True)
 
-        input = torch.tensor([[[1, 2]]], dtype=torch.float,
-                             device=cpu_device)  # (1,1,2)
+        input = torch.tensor(
+            [[[1, 2]]], dtype=torch.float, device=cpu_device
+        )  # (1,1,2)
         input.requires_grad = True
-        h0 = torch.tensor([[[2, 3, 2, 3]], [[3, 4, 3, 4]], [[4, 5, 4, 5]], [
-            [5, 6, 5, 6]]], dtype=torch.float, device=cpu_device)  # (4,1,2)
-        c0 = torch.tensor([[[6, 7, 6, 7]], [[7, 8, 7, 8]], [[8, 9, 8, 9]], [
-            [9, 1, 9, 1]]], dtype=torch.float, device=cpu_device)  # (4,1,2)
+        h0 = torch.tensor(
+            [[[2, 3, 2, 3]], [[3, 4, 3, 4]], [[4, 5, 4, 5]], [[5, 6, 5, 6]]],
+            dtype=torch.float,
+            device=cpu_device,
+        )  # (4,1,2)
+        c0 = torch.tensor(
+            [[[6, 7, 6, 7]], [[7, 8, 7, 8]], [[8, 9, 8, 9]], [[9, 1, 9, 1]]],
+            dtype=torch.float,
+            device=cpu_device,
+        )  # (4,1,2)
         h0.requires_grad = True
         c0.requires_grad = True
         output, (hn, cn) = rnn(input, (h0, c0))
@@ -30,8 +39,9 @@ class TestNNMethod(TestCase):
         print("cpu hn = ", hn)
         print("cpu cn = ", cn)
 
-        grad_out = torch.tensor([[[1, 2, 3, 4, 5, 6, 7, 8]]],
-                                dtype=torch.float, device=cpu_device)  # (1,1,8)
+        grad_out = torch.tensor(
+            [[[1, 2, 3, 4, 5, 6, 7, 8]]], dtype=torch.float, device=cpu_device
+        )  # (1,1,8)
         grad_out = Variable(grad_out, requires_grad=True)
         output.backward(grad_out)
         input_grad = input.grad
@@ -47,19 +57,25 @@ class TestNNMethod(TestCase):
         for i in range(len(param_grad)):
             print(param_grad[i])
 
-        input_dpcpp = torch.tensor(
-            [[[1, 2]]], dtype=torch.float, device=dpcpp_device)
+        input_dpcpp = torch.tensor([[[1, 2]]], dtype=torch.float, device=dpcpp_device)
         input_dpcpp.requires_grad = True
         rnn_dpcpp = rnn.to("xpu")
         rnn_dpcpp.zero_grad()
-        h0_dpcpp = torch.tensor([[[2, 3, 2, 3]], [[3, 4, 3, 4]], [[4, 5, 4, 5]], [
-            [5, 6, 5, 6]]], dtype=torch.float, device=dpcpp_device)
-        c0_dpcpp = torch.tensor([[[6, 7, 6, 7]], [[7, 8, 7, 8]], [[8, 9, 8, 9]], [
-            [9, 1, 9, 1]]], dtype=torch.float, device=dpcpp_device)
+        h0_dpcpp = torch.tensor(
+            [[[2, 3, 2, 3]], [[3, 4, 3, 4]], [[4, 5, 4, 5]], [[5, 6, 5, 6]]],
+            dtype=torch.float,
+            device=dpcpp_device,
+        )
+        c0_dpcpp = torch.tensor(
+            [[[6, 7, 6, 7]], [[7, 8, 7, 8]], [[8, 9, 8, 9]], [[9, 1, 9, 1]]],
+            dtype=torch.float,
+            device=dpcpp_device,
+        )
         h0_dpcpp.requires_grad = True
         c0_dpcpp.requires_grad = True
         output_dpcpp, (hn_dpcpp, cn_dpcpp) = rnn_dpcpp(
-            input_dpcpp, (h0_dpcpp, c0_dpcpp))
+            input_dpcpp, (h0_dpcpp, c0_dpcpp)
+        )
         print("dpcpp output = ", output_dpcpp.cpu())
         print("dpcpp hn = ", hn_dpcpp.cpu())
         print("dpcpp cn = ", cn_dpcpp.cpu())
@@ -113,8 +129,10 @@ class TestNNMethod(TestCase):
         self.assertEqual(output_cpu, output_xpu.cpu())
         self.assertEqual(hy_cpu, hy_xpu.cpu())
         self.assertEqual(cy_cpu, cy_xpu.cpu())
-    
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_lstm_rnnt(self, dtype=torch.float):
         rnn = nn.LSTM(240, 1024, num_layers=2)
         rnn_xpu = copy.deepcopy(rnn).to("xpu")
@@ -187,7 +205,9 @@ class TestNNMethod(TestCase):
             self.assertEqual(h0.grad, h0_xpu.grad.cpu())
             self.assertEqual(c0.grad, c0_xpu.grad.cpu())
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_lstm_bf16(self, dtype=torch.bfloat16):
         rnn = nn.LSTM(320, 320, num_layers=2)
         rnn_xpu = copy.deepcopy(rnn).to("xpu").to(torch.bfloat16)

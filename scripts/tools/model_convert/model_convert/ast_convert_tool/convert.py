@@ -9,7 +9,7 @@ def run(full_path, execute=False, export=False):
     f_ast = None
     new_data = None
 
-    with open(full_path, 'r') as in_f:
+    with open(full_path, "r") as in_f:
         # read source codes
         data = in_f.read()
         # parse source codes to ast object
@@ -37,7 +37,7 @@ def run(full_path, execute=False, export=False):
     export_file_path = full_path
     if export:
         export_file_path = new_full_path
-    with open(export_file_path, 'w') as out_f:
+    with open(export_file_path, "w") as out_f:
         out_f.write(new_data)
 
     if execute is True:

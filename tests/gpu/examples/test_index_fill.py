@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -22,7 +22,6 @@ class TestTorchMethod(TestCase):
         print("x_dpcpp = ", x_dpcpp.to("cpu"))
         self.assertEqual(x, x_dpcpp.to(cpu_device))
 
-
     def test_mult_dim(self, dtype=torch.float):
         a_cpu = torch.randn(11, 22, 1025, 22, 11)
         a_xpu = a_cpu.to(dpcpp_device)
@@ -32,7 +31,6 @@ class TestTorchMethod(TestCase):
         b_cpu = a_cpu.index_fill(2, idx_cpu, 1.11111)
         b_xpu = a_xpu.index_fill(2, idx_xpu, 1.11111)
         self.assertEqual(b_cpu, b_xpu.to(cpu_device))
-
 
     def test_mult_transposed_dim(self, dtype=torch.float):
         a_cpu = torch.randn(11, 22, 1024, 22, 11)
@@ -45,7 +43,6 @@ class TestTorchMethod(TestCase):
         b_cpu = a_cpu.index_fill(2, idx_cpu, 1.11111)
         b_xpu = a_xpu.index_fill(2, idx_xpu, 1.11111)
         self.assertEqual(b_cpu, b_xpu.to(cpu_device))
-
 
     def test_mult_strided_dim(self, dtype=torch.float):
         a_cpu = torch.randn(8, 8, 8)

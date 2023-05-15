@@ -7,7 +7,9 @@ import pytest
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_pdist(self, dtype=torch.float):
         # cpu
         input = torch.randn(10, 512)
@@ -24,8 +26,7 @@ class TestNNMethod(TestCase):
         output_dpcpp = nn.functional.pdist(input1_dpcpp)
         # print(output_dpcpp.size())
         # print(output_dpcpp.cpu())
-        output_dpcpp.backward(torch.ones(
-            output_dpcpp.size(), device="xpu"))
+        output_dpcpp.backward(torch.ones(output_dpcpp.size(), device="xpu"))
         # print(input1_dpcpp.grad.cpu())
         self.assertEqual(output, output_dpcpp.cpu())
         self.assertEqual(input.grad, input1_dpcpp.grad.cpu())

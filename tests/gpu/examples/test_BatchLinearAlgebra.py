@@ -5,7 +5,7 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 from functools import partial
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 from torch.testing import make_tensor
 import pytest
 import numpy as np
@@ -15,7 +15,9 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX")
+    @pytest.mark.skipif(
+        not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX"
+    )
     def test_batch_linear_algebra(self, dtype=torch.float):
         x_cpu = torch.randn(5, 5)
 
@@ -30,13 +32,11 @@ class TestTorchMethod(TestCase):
 
         print("y_cpu", torch.tril(y_cpu2))
         print("y_dpcpp", torch.tril(y_dpcpp2).to("cpu"))
-        self.assertEqual(torch.tril(y_cpu2),
-                         torch.tril(y_dpcpp2).to(cpu_device))
+        self.assertEqual(torch.tril(y_cpu2), torch.tril(y_dpcpp2).to(cpu_device))
 
         print("y_cpu", torch.triu(y_cpu2))
         print("y_dpcpp", torch.triu(y_dpcpp2).to("cpu"))
-        self.assertEqual(torch.triu(y_cpu2),
-                         torch.triu(y_dpcpp2).to(cpu_device))
+        self.assertEqual(torch.triu(y_cpu2), torch.triu(y_dpcpp2).to(cpu_device))
 
     @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_cholesky(self, dtype=torch.float):
@@ -140,12 +140,11 @@ class TestTorchMethod(TestCase):
         for size in [(3, 3), (5, 5), (10, 10)]:
             A = torch.rand(size)
             P, L, U = torch.linalg.lu(A)
-            A_xpu = A.to('xpu')
+            A_xpu = A.to("xpu")
             P_xpu, L_xpu, U_xpu = torch.linalg.lu(A_xpu)
             self.assertEqual(P_xpu.to(cpu_device), P)
             self.assertEqual(L_xpu.to(cpu_device), L)
             self.assertEqual(U_xpu.to(cpu_device), U)
-
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     def test_lu(self, dtype=torch.float):
@@ -158,14 +157,14 @@ class TestTorchMethod(TestCase):
             A = torch.randn(size, dtype=dtype)
 
             # CPU
-            A_cpu = A.to('cpu')
+            A_cpu = A.to("cpu")
             LU_cpu, pivot_cpu = torch.lu(A_cpu)
             _validate(A_cpu, LU_cpu, pivot_cpu)
             LU_cpu, pivot_cpu = A_cpu.lu()
             _validate(A_cpu, LU_cpu, pivot_cpu)
 
             # XPU
-            A_xpu = A.to('xpu')
+            A_xpu = A.to("xpu")
             LU_xpu, pivot_xpu = torch.lu(A_xpu)
             _validate(A_xpu.cpu(), LU_xpu.cpu(), pivot_xpu.cpu())
             LU_xpu, pivot_xpu = A_xpu.lu()
@@ -177,24 +176,26 @@ class TestTorchMethod(TestCase):
             b_ = torch.matmul(A, x)
             self.assertEqual(b, b_, rtol=1.3e-6, atol=0.02)
 
-        for sizeA, sizeb in [[(3, 3), (3, 1)],
-                             [(2, 3, 3), (2, 3, 1)],
-                             [(2, 3, 3), (2, 3, 5)],
-                             [(128, 64, 64), (128, 64, 4)]]:
+        for sizeA, sizeb in [
+            [(3, 3), (3, 1)],
+            [(2, 3, 3), (2, 3, 1)],
+            [(2, 3, 3), (2, 3, 5)],
+            [(128, 64, 64), (128, 64, 4)],
+        ]:
             A = torch.randn(sizeA, dtype=dtype)
             b = torch.randn(sizeb, dtype=dtype)
 
             # CPU
-            A_cpu = A.to('cpu')
-            b_cpu = b.to('cpu')
+            A_cpu = A.to("cpu")
+            b_cpu = b.to("cpu")
             x_cpu = torch.lu_solve(b_cpu, *A_cpu.lu())
             _validate(A_cpu, x_cpu, b_cpu)
             x_cpu = b_cpu.lu_solve(*A_cpu.lu())
             _validate(A_cpu, x_cpu, b_cpu)
 
             # XPU
-            A_xpu = A.to('xpu')
-            b_xpu = b.to('xpu')
+            A_xpu = A.to("xpu")
+            b_xpu = b.to("xpu")
             x_xpu = torch.lu_solve(b_xpu, *A_xpu.lu())
             _validate(A_xpu.cpu(), x_xpu.cpu(), b_xpu.cpu())
             x_xpu = b_xpu.lu_solve(*A_xpu.lu())
@@ -207,49 +208,57 @@ class TestTorchMethod(TestCase):
             d = torch.zeros_like(d_)
             self.assertEqual(d, d_, rtol=1.3e-6, atol=5e-5)
 
-        for sizeA, sizeb in [[(3, 3), (3, 1)],
-                             [(2, 3, 3), (2, 3, 1)],
-                             [(2, 3, 3), (2, 3, 5)],
-                             [(2, 3, 1, 4, 4), (2, 3, 1, 4, 6)]]:
+        for sizeA, sizeb in [
+            [(3, 3), (3, 1)],
+            [(2, 3, 3), (2, 3, 1)],
+            [(2, 3, 3), (2, 3, 5)],
+            [(2, 3, 1, 4, 4), (2, 3, 1, 4, 6)],
+        ]:
             A = torch.randn(sizeA, dtype=dtype)
             b = torch.randn(sizeb, dtype=dtype)
 
             # CPU
-            A_cpu = A.to('cpu')
-            b_cpu = b.to('cpu')
+            A_cpu = A.to("cpu")
+            b_cpu = b.to("cpu")
             x_cpu = torch.linalg.solve(A_cpu, b_cpu)
             _validate(A_cpu, x_cpu, b_cpu)
 
             # XPU
-            A_xpu = A.to('xpu')
-            b_xpu = b.to('xpu')
+            A_xpu = A.to("xpu")
+            b_xpu = b.to("xpu")
             x_xpu = torch.linalg.solve(A_xpu, b_xpu)
             _validate(A_xpu.cpu(), x_xpu.cpu(), b_xpu.cpu())
 
     @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_inverse(self, dtype=torch.float):
         def _validate(A, A_):
-            self.assertEqual(torch.matmul(A, A_), torch.eye(A.size(-1)).expand_as(A),
-                             rtol=1.3e-6, atol=0.005)
+            self.assertEqual(
+                torch.matmul(A, A_),
+                torch.eye(A.size(-1)).expand_as(A),
+                rtol=1.3e-6,
+                atol=0.005,
+            )
 
         for size in [(3, 3), (2, 3, 3), (128, 64, 64)]:
             A = torch.randn(size, dtype=dtype)
 
             # CPU
-            A_cpu = A.to('cpu')
+            A_cpu = A.to("cpu")
             Ai_cpu = torch.inverse(A_cpu)
             _validate(A_cpu, Ai_cpu)
             Ai_cpu = A_cpu.inverse()
             _validate(A_cpu, Ai_cpu)
 
             # XPU
-            A_xpu = A.to('xpu')
+            A_xpu = A.to("xpu")
             Ai_xpu = torch.inverse(A_xpu)
             _validate(A_xpu.cpu(), Ai_xpu.cpu())
             Ai_xpu = A_xpu.inverse()
             _validate(A_xpu.cpu(), Ai_xpu.cpu())
 
-    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX")
+    @pytest.mark.skipif(
+        not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX"
+    )
     def test_qr(self, dtype=torch.float):
         def _validate(A, Q, R):
             if Q.size(0) != 0:
@@ -266,7 +275,7 @@ class TestTorchMethod(TestCase):
 
                 print("mode is ", mode)
                 # CPU
-                A_cpu = A.to('cpu')
+                A_cpu = A.to("cpu")
                 q_cpu, r_cpu = torch.linalg.qr(A_cpu, mode=mode)
                 print("ON CPU:")
                 print("A = ", A_cpu)
@@ -275,7 +284,7 @@ class TestTorchMethod(TestCase):
                 _validate(A_cpu, q_cpu, r_cpu)
 
                 # XPU
-                A_xpu = A.to('xpu')
+                A_xpu = A.to("xpu")
                 q_xpu, r_xpu = torch.linalg.qr(A_xpu, mode=mode)
                 print("ON XPU:")
                 print("A = ", A_xpu.cpu())
@@ -285,7 +294,9 @@ class TestTorchMethod(TestCase):
 
                 self.assertEqual(r_cpu, r_xpu, rtol=1.3e-6, atol=5e-5)
 
-    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX")
+    @pytest.mark.skipif(
+        not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX"
+    )
     def test_ormqr(self, dtype=torch.float):
         A = torch.randn(8, 5)
         c = torch.randn(8, 8)
@@ -293,14 +304,14 @@ class TestTorchMethod(TestCase):
         for left, transpose in itertools.product([True, False], [True, False]):
             print("torch.ormqr:")
             # ON CPU
-            A_cpu = A.to('cpu')
-            c_cpu = c.to('cpu')
+            A_cpu = A.to("cpu")
+            c_cpu = c.to("cpu")
             a_cpu, tau_cpu = torch.geqrf(A_cpu)
             c__cpu = torch.ormqr(a_cpu, tau_cpu, c_cpu, left, transpose)
             print("cpu: c_ = ", c__cpu.cpu())
             # ON GPU
-            A_xpu = A.to('xpu')
-            c_xpu = c.to('xpu')
+            A_xpu = A.to("xpu")
+            c_xpu = c.to("xpu")
             a_xpu, tau_xpu = torch.geqrf(A_xpu)
             c__xpu = torch.ormqr(a_xpu, tau_xpu, c_xpu, left, transpose)
             print("xpu: c_ = ", c__xpu.cpu())
@@ -309,43 +320,57 @@ class TestTorchMethod(TestCase):
 
             print("torch.tensor.ormqr:")
             # ON CPU
-            A_cpu = A.to('cpu')
-            c_cpu = c.to('cpu')
+            A_cpu = A.to("cpu")
+            c_cpu = c.to("cpu")
             a_cpu, tau_cpu = A_cpu.geqrf()
             c__cpu = a_cpu.ormqr(tau_cpu, c_cpu, left, transpose)
             print("cpu: c_ = ", c__cpu)
             # ON XPU
-            A_xpu = A.to('xpu')
-            c_xpu = c.to('xpu')
+            A_xpu = A.to("xpu")
+            c_xpu = c.to("xpu")
             a_xpu, tau_xpu = A_xpu.geqrf()
             c__xpu = a_xpu.ormqr(tau_xpu, c_xpu, left, transpose)
             print("xpu: c_ = ", c__xpu.cpu())
             # validate
             self.assertEqual(c__cpu, c__xpu)
 
-
-    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX")
+    @pytest.mark.skipif(
+        not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX"
+    )
     def test_cholesky_ex(self, device=dpcpp_device, dtype=torch.float32):
         from torch.testing._internal.common_utils import random_hermitian_pd_matrix
 
         def run_test(n, batch):
-            A_CPU = random_hermitian_pd_matrix(n, *batch, dtype=dtype, device=cpu_device)
+            A_CPU = random_hermitian_pd_matrix(
+                n, *batch, dtype=dtype, device=cpu_device
+            )
             A_XPU = A_CPU.detach().to(dpcpp_device)
             L_CPU, info_CPU = torch.linalg.cholesky_ex(A_CPU)
             L_XPU, info_XPU = torch.linalg.cholesky_ex(A_XPU)
             self.assertEqual(L_CPU, L_XPU.to("cpu"))
-            self.assertEqual(info_CPU, info_XPU.to('cpu'))
-            
+            self.assertEqual(info_CPU, info_XPU.to("cpu"))
+
         ns = (0, 3, 5)
-        batches = ((), (2, ), (2, 1))
+        batches = ((), (2,), (2, 1))
         for n, batch in itertools.product(ns, batches):
             run_test(n, batch)
 
-    def _gen_shape_inputs_linalg_triangular_solve(self, shape, dtype, device, well_conditioned=False):
+    def _gen_shape_inputs_linalg_triangular_solve(
+        self, shape, dtype, device, well_conditioned=False
+    ):
         make_arg = partial(make_tensor, dtype=dtype, device=device)
         make_randn = partial(torch.randn, dtype=dtype, device=device)
         b, n, k = shape
-        for left, uni, expand_a, tr_a, conj_a, expand_b, tr_b, conj_b in itertools.product((True, False), repeat=8):
+        for (
+            left,
+            uni,
+            expand_a,
+            tr_a,
+            conj_a,
+            expand_b,
+            tr_b,
+            conj_b,
+        ) in itertools.product((True, False), repeat=8):
             # expand means that we generate a batch of matrices with a stride of zero in the batch dimension
             if (conj_a or conj_b) and not dtype.is_complex:
                 continue
@@ -376,9 +401,9 @@ class TestTorchMethod(TestCase):
 
             diag = A.diagonal(0, -2, -1)
             if uni:
-                diag.fill_(1.)
+                diag.fill_(1.0)
             else:
-                diag[diag.abs() < 1e-6] = 1.
+                diag[diag.abs() < 1e-6] = 1.0
 
             B = make_arg(size_b)
 
@@ -397,31 +422,38 @@ class TestTorchMethod(TestCase):
             yield A, B, left, not tr_a, uni
 
     def _test_linalg_solve_triangular(self, A, B, upper, left, uni):
-        A_cpu = A.to('cpu').detach()
-        B_cpu = B.to('cpu').detach()
+        A_cpu = A.to("cpu").detach()
+        B_cpu = B.to("cpu").detach()
 
-        X_xpu = torch.linalg.solve_triangular(A, B, upper=upper, left=left, unitriangular=uni)
+        X_xpu = torch.linalg.solve_triangular(
+            A, B, upper=upper, left=left, unitriangular=uni
+        )
         if left:
             result = A @ X_xpu
-            result.to('cpu')
+            result.to("cpu")
             self.assertEqual(result, B_cpu, atol=1e-1, rtol=1e-1)
         else:
             result = X_xpu @ A
-            result.to('cpu')
+            result.to("cpu")
             self.assertEqual(result, B_cpu, atol=1e-1, rtol=1e-1)
         out_xpu = B
         # B may be expanded
         if not B.is_contiguous() and not B.transpose(-2, -1).is_contiguous():
             out_xpu = B.clone()
 
-        torch.linalg.solve_triangular(A, B, upper=upper, left=left, unitriangular=uni, out=out_xpu)
-        self.assertEqual(X_xpu.to('cpu'), out_xpu, atol=1e-3, rtol=1e-4)
+        torch.linalg.solve_triangular(
+            A, B, upper=upper, left=left, unitriangular=uni, out=out_xpu
+        )
+        self.assertEqual(X_xpu.to("cpu"), out_xpu, atol=1e-3, rtol=1e-4)
 
-        X_cpu = torch.linalg.solve_triangular(A_cpu, B_cpu, upper=upper, left=left, unitriangular=uni)
+        X_cpu = torch.linalg.solve_triangular(
+            A_cpu, B_cpu, upper=upper, left=left, unitriangular=uni
+        )
         self.assertEqual(X_cpu, X_xpu, atol=1e-3, rtol=1e-4)
 
-
-    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX")
+    @pytest.mark.skipif(
+        not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX"
+    )
     def test_linalg_solve_triangular(self):
         device = dpcpp_device
         # turn to fp32 avoid fp64 error on atsm
@@ -434,4 +466,3 @@ class TestTorchMethod(TestCase):
         for b, n, k in itertools.product(bs, ns, ks):
             for A, B, left, upper, uni in gen_inputs((b, n, k), dtype, device):
                 self._test_linalg_solve_triangular(A, B, upper, left, uni)
-

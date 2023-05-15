@@ -1,4 +1,5 @@
-#reference: https://github.com/intel/neural-compressor/blob/15477100cef756e430c8ef8ef79729f0c80c8ce6/neural_compressor/conf/dotdict.py
+# reference:
+# https://github.com/intel/neural-compressor/blob/15477100cef756e430c8ef8ef79729f0c80c8ce6/neural_compressor/conf/dotdict.py
 class DotDict(dict):
     """access yaml using attributes instead of using the dictionary notation.
     Args:
@@ -12,7 +13,7 @@ class DotDict(dict):
             for key in value:
                 self.__setitem__(key, value[key])
         else:
-            raise TypeError('expected dict')
+            raise TypeError("expected dict")
 
     def __getitem__(self, key):
         value = self.get(key, None)
@@ -21,11 +22,13 @@ class DotDict(dict):
     def __setitem__(self, key, value):
         if isinstance(value, dict) and not isinstance(value, DotDict):
             value = DotDict(value)
-        if isinstance(value, list) and len(value) == 1 and isinstance(
-                value[0], dict):
+        if isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict):
             value = DotDict(value[0])
-        if isinstance(value, list) and len(value) > 1 and all(isinstance(
-                v, dict) for v in value):
+        if (
+            isinstance(value, list) and
+            len(value) > 1 and
+            all(isinstance(v, dict) for v in value)
+        ):
             value = DotDict({k: v for d in value for k, v in d.items()})
         super(DotDict, self).__setitem__(key, value)
 

@@ -48,11 +48,15 @@ class verbose(object):
             return
         try:
             st = torch._C._verbose.mkldnn_set_verbose(self.level)
-            assert bool(st), "Failed to set Verbose mode of MKLDNN in PyTorch. Please consider to disable this verbose scope."
+            assert bool(
+                st
+            ), "Failed to set Verbose mode of MKLDNN in PyTorch. Please consider to disable this verbose scope."
         except BaseException:
             pass
         st = core.mkldnn_set_verbose(self.level)
-        assert bool(st), "Failed to set Verbose mode of MKLDNN in IPEX. Please consider to disable this verbose scope."
+        assert bool(
+            st
+        ), "Failed to set Verbose mode of MKLDNN in IPEX. Please consider to disable this verbose scope."
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

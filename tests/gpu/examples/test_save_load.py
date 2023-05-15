@@ -17,10 +17,13 @@ input_channel = 3
 train_num_iter = 5
 eval_num_iter = 3
 lr = 0.01
-checkpoint_path_str = './_checkpoint.test.case.test_xpu_checkpoint_save_load_integrity_and_accuracy.pth.tar'
+checkpoint_path_str = "./_checkpoint.test.case.test_xpu_checkpoint_save_load_integrity_and_accuracy.pth.tar"
+
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_save_load(self):
         a = torch.ones([10], dtype=torch.float64)
         a = a.to(xpu_device)
@@ -36,18 +39,23 @@ class TestTorchMethod(TestCase):
         b = torch.load(ckpt.name, map_location=lambda storage, loc: storage.xpu(0))
         self.assertEqual(a, b.to(cpu_device))
 
-    @pytest.mark.skipif(torch.xpu.device_count() < 2, reason="doesn't support with one device")
+    @pytest.mark.skipif(
+        torch.xpu.device_count() < 2, reason="doesn't support with one device"
+    )
     def test_serialization_multi_map_location(self):
-        a = torch.randn(5, device='xpu:0')
+        a = torch.randn(5, device="xpu:0")
         ckpt = tempfile.NamedTemporaryFile()
         torch.save(a, ckpt.name)
-        b = torch.load(ckpt.name, map_location={'xpu:0':'xpu:1'})
+        b = torch.load(ckpt.name, map_location={"xpu:0": "xpu:1"})
         self.assertEqual(a.to(cpu_device), b.to(cpu_device))
-        self.assertEqual(b.device.__str__(), 'xpu:1')
+        self.assertEqual(b.device.__str__(), "xpu:1")
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_xpu_checkpoint_save_load_integrity_and_accuracy(self):
-        device = 'xpu'
+        device = "xpu"
+
         def training_step(model_xpu, optimizer_xpu, criterion, dtype):
             input = torch.randn(batch_size, input_channel, 224, 224)
             target = torch.empty(batch_size, dtype=torch.long).random_(1000)
@@ -88,9 +96,11 @@ class TestTorchMethod(TestCase):
             torch.save(state, filename)
 
         for dtype in [torch.float32, torch.bfloat16]:
-            print('dtype = ', dtype)
+            print("dtype = ", dtype)
             # create model
-            model_xpu = models.__dict__['resnet18'](pretrained=True).to(device=device).train()
+            model_xpu = (
+                models.__dict__["resnet18"](pretrained=True).to(device=device).train()
+            )
             optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr)
             criterion = nn.CrossEntropyLoss()
 
@@ -98,7 +108,9 @@ class TestTorchMethod(TestCase):
                 os.remove(checkpoint_path_str)
 
             # process torch.xpu.optimize
-            model_xpu, optimizer_xpu = torch.xpu.optimize(model=model_xpu, dtype=dtype, optimizer=optimizer_xpu)
+            model_xpu, optimizer_xpu = torch.xpu.optimize(
+                model=model_xpu, dtype=dtype, optimizer=optimizer_xpu
+            )
 
             # mimic model train, then eval
             for _ in range(train_num_iter):
@@ -108,32 +120,50 @@ class TestTorchMethod(TestCase):
                 eval_step(model_xpu, dtype)
             torch.xpu.synchronize()
 
-            save_checkpoint({'model_state_dict': model_xpu.state_dict(), 'optimizer_state_dict': optimizer_xpu.state_dict()})
+            save_checkpoint(
+                {
+                    "model_state_dict": model_xpu.state_dict(),
+                    "optimizer_state_dict": optimizer_xpu.state_dict(),
+                }
+            )
             if os.path.isfile(checkpoint_path_str):
                 # load checkpoint
                 checkpoint = torch.load(checkpoint_path_str, map_location=device)
-                print('load checkpoint')
+                print("load checkpoint")
 
                 # create model
-                new_model = models.__dict__['resnet18'](pretrained=False).to(device=device).train()
-                print('create model')
+                new_model = (
+                    models.__dict__["resnet18"](pretrained=False)
+                    .to(device=device)
+                    .train()
+                )
+                print("create model")
 
                 # create optimizer
                 new_optimizer = torch.optim.SGD(new_model.parameters(), lr=lr)
-                print('create model')
+                print("create model")
 
                 # optimize
-                new_model, new_optimizer = torch.xpu.optimize(model=new_model, dtype=dtype, optimizer=new_optimizer)
+                new_model, new_optimizer = torch.xpu.optimize(
+                    model=new_model, dtype=dtype, optimizer=new_optimizer
+                )
 
                 # load state dict
-                new_model.load_state_dict(checkpoint['model_state_dict'])
-                new_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-                print('load state dict')
+                new_model.load_state_dict(checkpoint["model_state_dict"])
+                new_optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+                print("load state dict")
 
                 # check
-                print('checking...')
-                self.assertEqual(model_xpu.state_dict(), new_model.state_dict(), atol=1e-6, rtol=1e-6)
-                self.assertEqual(optimizer_xpu.state_dict(), new_optimizer.state_dict(), atol=1e-6, rtol=1e-6)
+                print("checking...")
+                self.assertEqual(
+                    model_xpu.state_dict(), new_model.state_dict(), atol=1e-6, rtol=1e-6
+                )
+                self.assertEqual(
+                    optimizer_xpu.state_dict(),
+                    new_optimizer.state_dict(),
+                    atol=1e-6,
+                    rtol=1e-6,
+                )
                 os.remove(checkpoint_path_str)
             else:
-                assert False, "save checkpoint failed for xpu model" # noqa B011
+                assert False, "save checkpoint failed for xpu model"  # noqa B011

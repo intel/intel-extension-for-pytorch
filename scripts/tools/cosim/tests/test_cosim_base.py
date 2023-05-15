@@ -5,6 +5,7 @@ import torch.nn as nn
 import intel_extension_for_pytorch
 import cosim
 
+
 class BaseModule(nn.Module):
     def __init__(self):
         super().__init__()
@@ -24,8 +25,9 @@ class BaseModule(nn.Module):
         x = self.relu(x)
         return x, x
 
+
 class CompositeModule(nn.Module):
-    def  __init__(self):
+    def __init__(self):
         super().__init__()
         self.m1 = BaseModule()
         self.m2 = BaseModule()
@@ -38,27 +40,24 @@ class CompositeModule(nn.Module):
         x = x1 + x2 + bias
         return x * 2
 
+
 class SequentialModule(nn.Module):
     def __init__(self):
         super().__init__()
-        self.model = nn.Sequential(OrderedDict([
-                ('c1', CompositeModule()),
-                ('c2', CompositeModule())
-            ]
-        ))
+        self.model = nn.Sequential(
+            OrderedDict([("c1", CompositeModule()), ("c2", CompositeModule())])
+        )
 
     def forward(self, x):
         x = self.model(x)
         # x = self.fc(x)
         return x
 
+
 class ModuleListModule(nn.Module):
     def __init__(self):
         super().__init__()
-        self.modellist = nn.ModuleList([
-            SequentialModule(),
-            SequentialModule()
-        ])
+        self.modellist = nn.ModuleList([SequentialModule(), SequentialModule()])
 
     def forward(self, x):
         y = None
@@ -66,12 +65,15 @@ class ModuleListModule(nn.Module):
             x = layer(x)
         return x
 
-if __name__ == '__main__':
-    model = ModuleListModule().to('xpu')
+
+if __name__ == "__main__":
+    model = ModuleListModule().to("xpu")
     cosim_model = cosim.CosimModule(model)
-    a = torch.randn(2, 3, 16, 16, requires_grad=True, device='xpu', dtype=torch.float32)
+    a = torch.randn(2, 3, 16, 16, requires_grad=True, device="xpu", dtype=torch.float32)
     for epoch in range(5):
         bc = cosim_model(a)
         bc.backward(torch.ones_like(bc))
-        cosim_model.plot_result(file='cosim_outputs/1/')
-        a = torch.randn(2, 3, 16, 16, requires_grad=True, device='xpu', dtype=torch.float32)
+        cosim_model.plot_result(file="cosim_outputs/1/")
+        a = torch.randn(
+            2, 3, 16, 16, requires_grad=True, device="xpu", dtype=torch.float32
+        )

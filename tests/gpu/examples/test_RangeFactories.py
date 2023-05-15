@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 cpu_device = torch.device("cpu")
@@ -10,7 +10,6 @@ dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     def test_RangeFactories(self, dtype=torch.float):
-
         # x=torch.tensor([1,1,1,1,1], device=cpu_device)
         x = torch.logspace(start=-10, end=10, steps=5, device=cpu_device)
         y = torch.linspace(start=-10, end=10, steps=5, device=cpu_device)

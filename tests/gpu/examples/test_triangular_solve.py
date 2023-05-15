@@ -1,4 +1,3 @@
-
 import torch
 from torch.testing._internal.common_utils import TestCase
 
@@ -20,8 +19,8 @@ class TestTorchMethod(TestCase):
         # print(c)
         # print(d)
 
-        a_xpu = a.to('xpu')
-        b_xpu = b.to('xpu')
+        a_xpu = a.to("xpu")
+        b_xpu = b.to("xpu")
         c_xpu, d_xpu = torch.triangular_solve(b_xpu, a_xpu)
 
         # print(c_xpu.cpu())
@@ -29,8 +28,10 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(c, c_xpu.cpu())
         self.assertEqual(d, d_xpu.cpu())
-    
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_triangular_solve_double(self, dtype=torch.double):
         a = torch.randn([3, 3, 3]).double()

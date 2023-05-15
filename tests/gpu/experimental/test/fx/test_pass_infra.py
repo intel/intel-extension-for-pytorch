@@ -11,6 +11,7 @@ from torch.fx.passes.infra.pass_manager import (
     _topological_sort_passes,
 )
 
+
 def replace_add_with_mul_pass(gm):
     modified = False
     for node in gm.graph.nodes:
@@ -19,6 +20,7 @@ def replace_add_with_mul_pass(gm):
             modified = True
     return PassResult(gm, modified)
 
+
 def replace_mul_with_div_pass(gm):
     modified = False
     for node in gm.graph.nodes:
@@ -26,6 +28,7 @@ def replace_mul_with_div_pass(gm):
             node.target = torch.div
             modified = True
     return PassResult(gm, modified)
+
 
 class AddModule(torch.nn.Module):
     def __init__(self):
@@ -45,7 +48,9 @@ class TestPassManager(TestCase):
 
         m = AddModule()
         traced_m = torch.fx.symbolic_trace(m)
-        pm = PassManager(passes=[replace_add_with_mul_pass, replace_mul_with_div_pass], steps=5)
+        pm = PassManager(
+            passes=[replace_add_with_mul_pass, replace_mul_with_div_pass], steps=5
+        )
 
         pm.validate_constraints()
         self.assertEqual(len(pm.passes), 2)
@@ -72,7 +77,6 @@ class TestPassManager(TestCase):
         with self.assertRaises(RuntimeError):
             pm.validate_constraints()
 
-
     def test_pass_manager_checks(self):
         """
         Tests that users can add in check functions correctly
@@ -85,6 +89,7 @@ class TestPassManager(TestCase):
             for node in graph_module.graph.nodes:
                 if node.op == "call_function" and node.target != torch.div:
                     raise ValueError("Target should be div!")
+
         pm.add_checks(check_div_target)
 
         with self.assertRaises(ValueError):
@@ -94,6 +99,7 @@ class TestPassManager(TestCase):
         """
         Checks that we error if we pass in a check function with the wrong parameters
         """
+
         def check_bad_args(graph_module, i):
             pass
 
@@ -154,19 +160,24 @@ class TestPassManager(TestCase):
         ]
         with self.assertRaises(RuntimeError) as e:
             _topological_sort_passes(passes, constraints)
-        expected_error_msg = f"Circular dependency detected within the following passes: {passes}"
+        expected_error_msg = (
+            f"Circular dependency detected within the following passes: {passes}"
+        )
         self.assertEqual(e.exception.args[0], expected_error_msg)
 
     def test_pass_manager_error(self):
         """
         Tests error catching + debug
         """
+
         def pass_fail(graph_module):
             raise RuntimeError("bad")
 
         m = AddModule()
         traced_m = torch.fx.symbolic_trace(m)
-        pm = PassManager(passes=[replace_add_with_mul_pass, replace_mul_with_div_pass, pass_fail])
+        pm = PassManager(
+            passes=[replace_add_with_mul_pass, replace_mul_with_div_pass, pass_fail]
+        )
 
         # Comment out this line to see the actual error message
         with self.assertRaises(RuntimeError):

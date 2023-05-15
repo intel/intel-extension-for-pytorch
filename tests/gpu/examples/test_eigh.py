@@ -1,4 +1,8 @@
-from torch.testing._internal.common_utils import random_hermitian_matrix, TestCase, random_symmetric_matrix
+from torch.testing._internal.common_utils import (
+    random_hermitian_matrix,
+    TestCase,
+    random_symmetric_matrix,
+)
 from torch.testing._internal.common_device_type import dtypes
 from torch.testing import make_tensor
 
@@ -16,9 +20,10 @@ dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_linalg_eigh(self, dtype=torch.float64):
-
         matrix_cpu = random_hermitian_matrix(3, 1, dtype=dtype, device=cpu_device)
         matrix_gpu = matrix_cpu.clone().detach().to(dpcpp_device)
 
@@ -28,7 +33,9 @@ class TestTorchMethod(TestCase):
         self.assertEqual(V, V_xpu.to(cpu_device))
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_eigvalsh(self, dtype=torch.float64, device=dpcpp_device):
         def run_test(shape, batch, uplo):
             matrix = random_hermitian_matrix(shape, *batch, dtype=dtype, device=device)
@@ -43,13 +50,15 @@ class TestTorchMethod(TestCase):
             self.assertEqual(ans, actual_w)
 
         shapes = (0, 3, 5)
-        batches = ((), (3, ), (2, 2))
+        batches = ((), (3,), (2, 2))
         uplos = ["U", "L"]
         for shape, batch, uplo in itertools.product(shapes, batches, uplos):
             run_test(shape, batch, uplo)
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_eigh_lower_uplo(self, device=dpcpp_device, dtype=torch.float64):
         def run_test(shape, batch, uplo):
             # check lower case uplo
@@ -66,9 +75,10 @@ class TestTorchMethod(TestCase):
 
     @dtypes(torch.float32, torch.float64)
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_eigh_errors_and_warnings(self, dtype=torch.float64, device=dpcpp_device):
-
         # eigh requires a square matrix
         t = torch.randn(2, 3, device=device, dtype=dtype)
         with self.assertRaisesRegex(RuntimeError, "must be batches of square matrices"):
@@ -77,9 +87,9 @@ class TestTorchMethod(TestCase):
         # eigh requires 'uplo' parameter to be 'U' or 'L'
         t = torch.randn(3, 3, device=device, dtype=dtype)
         for uplo in ["a", "wrong"]:
-            with self.assertRaisesRegex(RuntimeError, "be \'L\' or \'U\'"):
+            with self.assertRaisesRegex(RuntimeError, "be 'L' or 'U'"):
                 torch.linalg.eigh(t, UPLO=uplo)
-            with self.assertRaisesRegex(ValueError, "be \'L\' or \'U\'"):
+            with self.assertRaisesRegex(ValueError, "be 'L' or 'U'"):
                 np.linalg.eigh(t.cpu().numpy(), UPLO=uplo)
 
         # if non-empty out tensor with wrong shape is passed a warning is given
@@ -92,13 +102,19 @@ class TestTorchMethod(TestCase):
             torch.linalg.eigh(a, out=(out_w, out_v))
             # Check warning occurs
             self.assertEqual(len(w), 2)
-            self.assertTrue("An output with one or more elements was resized" in str(w[-2].message))
-            self.assertTrue("An output with one or more elements was resized" in str(w[-1].message))
+            self.assertTrue(
+                "An output with one or more elements was resized" in str(w[-2].message)
+            )
+            self.assertTrue(
+                "An output with one or more elements was resized" in str(w[-1].message)
+            )
 
         # dtypes should be safely castable
         out_w = torch.empty(0, dtype=real_dtype, device=device)
         out_v = torch.empty(0, dtype=torch.int, device=device)
-        with self.assertRaisesRegex(RuntimeError, "but got eigenvectors with dtype Int"):
+        with self.assertRaisesRegex(
+            RuntimeError, "but got eigenvectors with dtype Int"
+        ):
             torch.linalg.eigh(a, out=(out_w, out_v))
 
         out_w = torch.empty(0, dtype=torch.int, device=device)
@@ -111,18 +127,23 @@ class TestTorchMethod(TestCase):
             wrong_device = cpu_device if device != cpu_device else dpcpp_device
             out_w = torch.empty(0, device=wrong_device, dtype=dtype)
             out_v = torch.empty(0, device=device, dtype=dtype)
-            with self.assertRaisesRegex(RuntimeError, "tensors to be on the same device"):
+            with self.assertRaisesRegex(
+                RuntimeError, "tensors to be on the same device"
+            ):
                 torch.linalg.eigh(a, out=(out_w, out_v))
             out_w = torch.empty(0, device=device, dtype=dtype)
             out_v = torch.empty(0, device=wrong_device, dtype=dtype)
-            with self.assertRaisesRegex(RuntimeError, "tensors to be on the same device"):
+            with self.assertRaisesRegex(
+                RuntimeError, "tensors to be on the same device"
+            ):
                 torch.linalg.eigh(a, out=(out_w, out_v))
 
     @dtypes(torch.float32, torch.float64)
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_eigh_non_contiguous(self, dtype=torch.float64, device=dpcpp_device):
-
         def run_test(matrix, uplo):
             self.assertFalse(matrix.is_contiguous())
             expected_w, expected_v = np.linalg.eigh(matrix.cpu().numpy(), UPLO=uplo)
@@ -144,7 +165,7 @@ class TestTorchMethod(TestCase):
             run_test(matrix, uplo)
 
         shapes = (3, 5)
-        batches = ((4, ), (4, 2))
+        batches = ((4,), (4, 2))
         uplos = ["U", "L"]
         for shape, batch, uplo in itertools.product(shapes, batches, uplos):
             run_test_permuted(shape, batch, uplo)
@@ -157,14 +178,18 @@ class TestTorchMethod(TestCase):
             x = random_hermitian_matrix(dims[-1], *dims[:-2]).requires_grad_()
             w, v = torch.linalg.eigh(x)
             (w.sum() + abs(v).sum()).backward()
-            self.assertEqual(x.grad, x.grad.conj().transpose(-1, -2))  # Check the gradient is Hermitian
+            self.assertEqual(
+                x.grad, x.grad.conj().transpose(-1, -2)
+            )  # Check the gradient is Hermitian
 
         for dims, uplo in itertools.product([(3, 3), (1, 1, 3, 3)], ["L", "U"]):
             run_test(dims, uplo)
 
     @dtypes(torch.float32, torch.float64)
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_eigvalsh_non_contiguous(self, device=dpcpp_device, dtype=torch.float64):
         def run_test(matrix, uplo):
             self.assertFalse(matrix.is_contiguous())
@@ -185,7 +210,7 @@ class TestTorchMethod(TestCase):
             run_test(matrix, uplo)
 
         shapes = (3, 5)
-        batches = ((4, ), (4, 2))
+        batches = ((4,), (4, 2))
         uplos = ["U", "L"]
         for shape, batch, uplo in itertools.product(shapes, batches, uplos):
             run_test_permuted(shape, batch, uplo)
@@ -194,13 +219,17 @@ class TestTorchMethod(TestCase):
     # for float32 or complex64 results might be very different from float64 or complex128
     @dtypes(torch.float64)
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_eigvals_numpy(self, device=dpcpp_device, dtype=torch.float64):
         def run_test(shape, *, symmetric=True):
             if not dtype.is_complex and symmetric:
                 # for symmetric real-valued inputs eigenvalues and eigenvectors have imaginary part equal to zero
                 # unlike NumPy the result is not cast to float32 or float64 dtype in this case
-                a = random_symmetric_matrix(shape[-1], *shape[:-2], dtype=dtype, device=device)
+                a = random_symmetric_matrix(
+                    shape[-1], *shape[:-2], dtype=dtype, device=device
+                )
             else:
                 a = make_tensor(shape, dtype=dtype, device=device)
             actual = torch.linalg.eigvals(a)
@@ -222,19 +251,26 @@ class TestTorchMethod(TestCase):
 
             self.assertEqual(expected, sorted_actual, exact_dtype=False)
 
-        shapes = [(0, 0),  # Empty matrix
-                  (5, 5),  # Single matrix
-                  (0, 0, 0), (0, 5, 5),  # Zero batch dimension tensors
-                  (2, 5, 5),  # 3-dim tensors
-                  (2, 1, 5, 5)]  # 4-dim tensors
+        shapes = [
+            (0, 0),  # Empty matrix
+            (5, 5),  # Single matrix
+            (0, 0, 0),
+            (0, 5, 5),  # Zero batch dimension tensors
+            (2, 5, 5),  # 3-dim tensors
+            (2, 1, 5, 5),
+        ]  # 4-dim tensors
         for shape in shapes:
             run_test(shape)
             run_test(shape, symmetric=True)
 
     @dtypes(torch.float32, torch.float64)
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
-    def test_eigvalsh_errors_and_warnings(self, device=dpcpp_device, dtype=torch.float64):
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
+    def test_eigvalsh_errors_and_warnings(
+        self, device=dpcpp_device, dtype=torch.float64
+    ):
         # eigvalsh requires a square matrix
         t = torch.randn(2, 3, device=device, dtype=dtype)
         with self.assertRaisesRegex(RuntimeError, "must be batches of square matrices"):
@@ -243,9 +279,9 @@ class TestTorchMethod(TestCase):
         # eigvalsh requires 'uplo' parameter to be 'U' or 'L'
         t = torch.randn(3, 3, device=device, dtype=dtype)
         for uplo in ["a", "wrong"]:
-            with self.assertRaisesRegex(RuntimeError, "be \'L\' or \'U\'"):
+            with self.assertRaisesRegex(RuntimeError, "be 'L' or 'U'"):
                 torch.linalg.eigvalsh(t, UPLO=uplo)
-            with self.assertRaisesRegex(ValueError, "be \'L\' or \'U\'"):
+            with self.assertRaisesRegex(ValueError, "be 'L' or 'U'"):
                 np.linalg.eigvalsh(t.cpu().numpy(), UPLO=uplo)
 
         # if non-empty out tensor with wrong shape is passed a warning is given
@@ -256,7 +292,9 @@ class TestTorchMethod(TestCase):
             torch.linalg.eigvalsh(t, out=out)
             # Check warning occurs
             self.assertEqual(len(w), 1)
-            self.assertTrue("An output with one or more elements was resized" in str(w[-1].message))
+            self.assertTrue(
+                "An output with one or more elements was resized" in str(w[-1].message)
+            )
 
         # dtypes should be safely castable
         out = torch.empty(0, dtype=torch.int, device=device)
@@ -267,12 +305,16 @@ class TestTorchMethod(TestCase):
         if torch.xpu.is_available():
             wrong_device = cpu_device if device != cpu_device else dpcpp_device
             out = torch.empty(0, device=wrong_device, dtype=dtype)
-            with self.assertRaisesRegex(RuntimeError, "tensors to be on the same device"):
+            with self.assertRaisesRegex(
+                RuntimeError, "tensors to be on the same device"
+            ):
                 torch.linalg.eigvalsh(t, out=out)
-    
+
     @dtypes(torch.float32, torch.float64)
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_linalg_eigh_out(self, device=dpcpp_device, dtype=torch.float64):
         matrix_cpu = random_hermitian_matrix(3, 1, dtype=dtype, device=cpu_device)
         values_cpu = torch.zeros(matrix_cpu.size())
@@ -280,7 +322,7 @@ class TestTorchMethod(TestCase):
         matrix_xpu = matrix_cpu.clone().detach().to(dpcpp_device)
         values_xpu = values_cpu.clone().detach().to(dpcpp_device)
         vector_xpu = vector_cpu.clone().detach().to(dpcpp_device)
-        
+
         L_cpu, V_cpu = torch._linalg_eigh(matrix_cpu, "L", True)
         L_xpu, V_xpu = torch._linalg_eigh(matrix_xpu, "L", True)
         self.assertEqual(L_cpu, L_xpu.to(cpu_device))

@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 import pytest
 
@@ -19,8 +19,14 @@ class TestTorchMethod(TestCase):
         print("CPU Result:")
         print(res_cpu)
 
-        res_dpcpp = torch.cat((user_cpu1.to(dpcpp_device), user_cpu2.to(
-            dpcpp_device), user_cpu3.to(dpcpp_device)), dim=1)
+        res_dpcpp = torch.cat(
+            (
+                user_cpu1.to(dpcpp_device),
+                user_cpu2.to(dpcpp_device),
+                user_cpu3.to(dpcpp_device),
+            ),
+            dim=1,
+        )
         print("SYCL Result:")
         print(res_dpcpp.cpu())
         self.assertEqual(res_cpu, res_dpcpp.to(cpu_device))
@@ -48,7 +54,8 @@ class TestTorchMethod(TestCase):
             self.assertEqual(res_cpu, res_xpu.cpu())
             self.assertEqual(
                 res_cpu.is_contiguous(memory_format=torch.channels_last),
-                res_xpu.is_contiguous(memory_format=torch.channels_last))
+                res_xpu.is_contiguous(memory_format=torch.channels_last),
+            )
 
         print("cat case2: plain, block, block")
         x_cpu1 = torch.randn([1, 2, 28, 28], device=cpu_device)
@@ -72,7 +79,8 @@ class TestTorchMethod(TestCase):
             self.assertEqual(res_cpu, res_xpu.cpu())
             self.assertEqual(
                 res_cpu.is_contiguous(memory_format=torch.channels_last),
-                res_xpu.is_contiguous(memory_format=torch.channels_last))
+                res_xpu.is_contiguous(memory_format=torch.channels_last),
+            )
 
         print("cat case3: CL, block, plain")
         x_cpu1 = torch.randn([1, 2, 28, 28], device=cpu_device)
@@ -96,7 +104,8 @@ class TestTorchMethod(TestCase):
             self.assertEqual(res_cpu, res_xpu.cpu())
             self.assertEqual(
                 res_cpu.is_contiguous(memory_format=torch.channels_last),
-                res_xpu.is_contiguous(memory_format=torch.channels_last))
+                res_xpu.is_contiguous(memory_format=torch.channels_last),
+            )
 
         print("cat case4: plain, block, CL")
         x_cpu1 = torch.randn([1, 2, 28, 28], device=cpu_device)
@@ -120,9 +129,12 @@ class TestTorchMethod(TestCase):
             self.assertEqual(res_cpu, res_xpu.cpu())
             self.assertEqual(
                 res_cpu.is_contiguous(memory_format=torch.channels_last),
-                res_xpu.is_contiguous(memory_format=torch.channels_last))
+                res_xpu.is_contiguous(memory_format=torch.channels_last),
+            )
 
-    @pytest.mark.skipif(torch.xpu.device_count() == 1, reason="doesn't support with one device")
+    @pytest.mark.skipif(
+        torch.xpu.device_count() == 1, reason="doesn't support with one device"
+    )
     def test_cat_multi_device(self, dtype=torch.float):
         x_cpu1 = torch.randn([1, 2, 28, 28], device=cpu_device)
         x_cpu2 = torch.randn([1, 2, 28, 28], device=cpu_device)
@@ -133,14 +145,46 @@ class TestTorchMethod(TestCase):
         self.assertEqual(res_cpu, res_xpu.cpu())
 
     def test_cat_size0_tensor(self):
-        output1_cpu = torch.cat((torch.tensor([],device='cpu'), torch.tensor([1],device='cpu')), dim=0)
-        output2_cpu = torch.cat((torch.tensor([],device='cpu'), torch.tensor([1,2],device='cpu')), dim=0)
-        output3_cpu = torch.cat((torch.tensor([],device='cpu'), torch.tensor([[1,2],[3,4]],device='cpu')), dim=0)
-        output4_cpu = torch.cat((torch.tensor([],device='cpu'), torch.tensor([[[1]],[[2]]],device='cpu')), dim=0)
-        output1_xpu = torch.cat((torch.tensor([],device='xpu'), torch.tensor([1],device='xpu')), dim=0)
-        output2_xpu = torch.cat((torch.tensor([],device='xpu'), torch.tensor([1,2],device='xpu')), dim=0)
-        output3_xpu = torch.cat((torch.tensor([],device='xpu'), torch.tensor([[1,2],[3,4]],device='xpu')), dim=0)
-        output4_xpu = torch.cat((torch.tensor([],device='xpu'), torch.tensor([[[1]],[[2]]],device='xpu')), dim=0)
+        output1_cpu = torch.cat(
+            (torch.tensor([], device="cpu"), torch.tensor([1], device="cpu")), dim=0
+        )
+        output2_cpu = torch.cat(
+            (torch.tensor([], device="cpu"), torch.tensor([1, 2], device="cpu")), dim=0
+        )
+        output3_cpu = torch.cat(
+            (
+                torch.tensor([], device="cpu"),
+                torch.tensor([[1, 2], [3, 4]], device="cpu"),
+            ),
+            dim=0,
+        )
+        output4_cpu = torch.cat(
+            (
+                torch.tensor([], device="cpu"),
+                torch.tensor([[[1]], [[2]]], device="cpu"),
+            ),
+            dim=0,
+        )
+        output1_xpu = torch.cat(
+            (torch.tensor([], device="xpu"), torch.tensor([1], device="xpu")), dim=0
+        )
+        output2_xpu = torch.cat(
+            (torch.tensor([], device="xpu"), torch.tensor([1, 2], device="xpu")), dim=0
+        )
+        output3_xpu = torch.cat(
+            (
+                torch.tensor([], device="xpu"),
+                torch.tensor([[1, 2], [3, 4]], device="xpu"),
+            ),
+            dim=0,
+        )
+        output4_xpu = torch.cat(
+            (
+                torch.tensor([], device="xpu"),
+                torch.tensor([[[1]], [[2]]], device="xpu"),
+            ),
+            dim=0,
+        )
         self.assertEqual(output1_cpu, output1_xpu.cpu())
         self.assertEqual(output2_cpu, output2_xpu.cpu())
         self.assertEqual(output3_cpu, output3_xpu.cpu())

@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-from torch.quantization.quantize_jit import (convert_jit, prepare_jit)
+from torch.quantization.quantize_jit import convert_jit, prepare_jit
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 torch._C._jit_set_profiling_mode(False)
@@ -41,15 +41,17 @@ class TestTorchMethod(TestCase):
             activation=torch.quantization.observer.MinMaxObserver.with_args(
                 qscheme=torch.per_tensor_symmetric,
                 reduce_range=False,
-                dtype=torch.qint8
+                dtype=torch.qint8,
             ),
-            weight=torch.quantization.default_weight_observer
+            weight=torch.quantization.default_weight_observer,
         )
-        jit_model = prepare_jit(jit_model,
-                                {
-                                    '': qconfig_s8,
-                                },
-                                True)
+        jit_model = prepare_jit(
+            jit_model,
+            {
+                "": qconfig_s8,
+            },
+            True,
+        )
 
         jit_model = jit_model.to("xpu")
         modelJit = convert_jit(jit_model, True)

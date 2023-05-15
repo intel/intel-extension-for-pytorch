@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 class TestNNMethod(TestCase):
@@ -29,7 +29,6 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.to("cpu"))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to("cpu"))
 
-
     def test_replication_pad2d(self, dtype=torch.float):
         x_cpu = torch.arange(2 * 3 * 6 * 8, dtype=dtype).reshape(2, 3, 6, 8)
         x_dpcpp = x_cpu.to("xpu")
@@ -52,7 +51,6 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(y_cpu, y_dpcpp.to("cpu"))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to("cpu"))
-
 
     def test_replication_pad3d(self, dtype=torch.float):
         x_cpu = torch.arange(2 * 3 * 6 * 8, dtype=dtype).reshape(2, 3, 6, 8)

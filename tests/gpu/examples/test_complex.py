@@ -14,7 +14,9 @@ class TestTorchMethod(TestCase):
         y_xpu = torch.complex(real_xpu, img_xpu)
         self.assertEqual(y_cpu, y_xpu.to("cpu"))
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_complex_double(self, dtype=torch.double):
         img = torch.randn([5, 5], dtype=dtype)
         real = torch.randn([5, 5], dtype=dtype)
@@ -36,12 +38,12 @@ class TestTorchMethod(TestCase):
         self.assertEqual(input.conj(), input_xpu.conj().to("cpu"))
 
     def test_complex_norm(self, dtype=torch.cfloat):
-        input = torch.tensor([0.9701+0.7078j, 0.345-1.764j])
+        input = torch.tensor([0.9701 + 0.7078j, 0.345 - 1.764j])
         input_xpu = input.to("xpu")
         self.assertEqual(torch.norm(input), torch.norm(input_xpu).to("cpu"))
 
     def test_complex_copy(self, dtype=torch.chalf):
-        input = torch.tensor([0.9701+0.7078j, 0.345-1.764j], dtype=dtype)
+        input = torch.tensor([0.9701 + 0.7078j, 0.345 - 1.764j], dtype=dtype)
         print(input.type())
         output1 = input.to("xpu")
         output2 = output1.clone()

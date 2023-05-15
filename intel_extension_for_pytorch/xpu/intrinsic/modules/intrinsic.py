@@ -1,6 +1,7 @@
 import torch
-import intel_extension_for_pytorch # noqa F401
+import intel_extension_for_pytorch  # noqa F401
 from torch.autograd import Function
+
 
 class InteractionFuncion(Function):
     @staticmethod

@@ -7,10 +7,8 @@ import pytest
 
 class TestTorchMethod(TestCase):
     def test_logical_and(self, dtype=torch.float):
-        input1 = torch.tensor(
-            [0, 1, 10, 0], dtype=torch.int8)
-        input2 = torch.tensor(
-            [4, 0, 1, 0], dtype=torch.int8)
+        input1 = torch.tensor([0, 1, 10, 0], dtype=torch.int8)
+        input2 = torch.tensor([4, 0, 1, 0], dtype=torch.int8)
 
         # TODO: check for diferent dtype
         array1 = [input1, input1.half(), input1.bool()]
@@ -50,15 +48,14 @@ class TestTorchMethod(TestCase):
         # print(result)
         # print("SYCL result:")
         result_dpcpp = torch.logical_and(
-            input1.to("xpu"), input2.to("xpu"), out=out.to("xpu"))
+            input1.to("xpu"), input2.to("xpu"), out=out.to("xpu")
+        )
         # print(result_dpcpp.to("cpu"))
         self.assertEqual(result, result_dpcpp)
 
     def test_logical_or(self, dtype=torch.float):
-        input1 = torch.tensor(
-            [0, 1, 10, 0], dtype=torch.int8)
-        input2 = torch.tensor(
-            [4, 0, 1, 0], dtype=torch.int8)
+        input1 = torch.tensor([0, 1, 10, 0], dtype=torch.int8)
+        input2 = torch.tensor([4, 0, 1, 0], dtype=torch.int8)
 
         # TODO: check for diferent dtype
         array1 = [input1, input1.half(), input1.bool()]
@@ -98,15 +95,14 @@ class TestTorchMethod(TestCase):
         # print(result)
         # print("SYCL result:")
         result_dpcpp = torch.logical_or(
-            input1.to("xpu"), input2.to("xpu"), out=out.to("xpu"))
+            input1.to("xpu"), input2.to("xpu"), out=out.to("xpu")
+        )
         # print(result_dpcpp.to("cpu"))
         self.assertEqual(result, result_dpcpp)
 
     def test_logical_xor(self, dtype=torch.float):
-        input1 = torch.tensor(
-            [0, 1, 10, 0], dtype=torch.int8)
-        input2 = torch.tensor(
-            [4, 0, 1, 0], dtype=torch.int8)
+        input1 = torch.tensor([0, 1, 10, 0], dtype=torch.int8)
+        input2 = torch.tensor([4, 0, 1, 0], dtype=torch.int8)
 
         # TODO: check for diferent dtype
         array1 = [input1, input1.half(), input1.bool()]
@@ -146,6 +142,7 @@ class TestTorchMethod(TestCase):
         # print(result)
         # print("SYCL result:")
         result_dpcpp = torch.logical_xor(
-            input1.to("xpu"), input2.to("xpu"), out=out.to("xpu"))
+            input1.to("xpu"), input2.to("xpu"), out=out.to("xpu")
+        )
         # print(result_dpcpp.to("cpu"))
         self.assertEqual(result, result_dpcpp)

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 cpu_device = torch.device("cpu")
@@ -182,7 +182,6 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(output_cpu[0], output_xpu[0].to(cpu_device))
         self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
-
 
     def test_adative_max_pool2d_blk_format(self, dtype=torch.float):
         x = torch.randn([10, 16, 30, 40])

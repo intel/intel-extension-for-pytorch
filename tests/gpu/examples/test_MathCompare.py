@@ -6,9 +6,10 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_math_compare(self, dtype=torch.float):
-
         x = torch.tensor([[True, True], [True, True]])
         y = torch.tensor([[1, 2], [3, 4]])
         z = torch.tensor([[1, 1], [4, 4]])

@@ -5,45 +5,50 @@ import logging
 
 from intel_extension_for_pytorch import optim, frontend
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _using_dnnl
-import intel_extension_for_pytorch._C as core # noqa F401
 
 logger = logging.getLogger(__name__)
 
+
 def _save_weight_bias_to_state_dict(self, destination, prefix):
     if self.bias is not None:
-        if hasattr(self, 'master_bias'):
+        if hasattr(self, "master_bias"):
             bias = self.master_bias
-        elif hasattr(self, 'bias_trail'):
+        elif hasattr(self, "bias_trail"):
             bias = torch.ops.torch_ipex.cat_bfloat16_float(self.bias, self.bias_trail)
         else:
             bias = self.bias.float()
-        destination[prefix + 'bias'] = bias.detach()
-    if hasattr(self, 'master_weight'):
+        destination[prefix + "bias"] = bias.detach()
+    if hasattr(self, "master_weight"):
         weight = self.master_weight
-    elif hasattr(self, 'weight_trail'):
+    elif hasattr(self, "weight_trail"):
         weight = torch.ops.torch_ipex.cat_bfloat16_float(self.weight, self.weight_trail)
     else:
         weight = self.weight.float()
-    destination[prefix + 'weight'] = self.ctx.to_public(weight.detach())
+    destination[prefix + "weight"] = self.ctx.to_public(weight.detach())
+
 
 def _load_from_state_dict_pre_hook(self, state_dict, prefix):
-    w_name = prefix + 'weight'
-    b_name = prefix + 'bias'
+    w_name = prefix + "weight"
+    b_name = prefix + "bias"
     fp32_loaded_weight = state_dict[w_name]
     weight_trail = None
-    if hasattr(self, 'master_weight'):
+    if hasattr(self, "master_weight"):
         loaded_weight = fp32_loaded_weight.bfloat16()
-    elif hasattr(self, 'weight_trail'):
-        loaded_weight, weight_trail = torch.ops.torch_ipex.split_float_bfloat16(fp32_loaded_weight)
+    elif hasattr(self, "weight_trail"):
+        loaded_weight, weight_trail = torch.ops.torch_ipex.split_float_bfloat16(
+            fp32_loaded_weight
+        )
     else:
         loaded_weight = fp32_loaded_weight.to(self.weight.dtype)
     if b_name in state_dict:
         loaded_bias = state_dict[b_name]
-        if hasattr(self, 'master_bias'):
+        if hasattr(self, "master_bias"):
             self.master_bias.copy_(loaded_bias)
             loaded_bias = loaded_bias.bfloat16()
-        elif hasattr(self, 'bias_trail'):
-            loaded_bias, bias_trail = torch.ops.torch_ipex.split_float_bfloat16(loaded_bias)
+        elif hasattr(self, "bias_trail"):
+            loaded_bias, bias_trail = torch.ops.torch_ipex.split_float_bfloat16(
+                loaded_bias
+            )
             self.bias_trail.copy_(bias_trail)
         else:
             loaded_bias = loaded_bias.to(self.bias.dtype)
@@ -51,17 +56,25 @@ def _load_from_state_dict_pre_hook(self, state_dict, prefix):
         loaded_bias = None
     return loaded_weight, loaded_bias, fp32_loaded_weight, weight_trail
 
+
 def _load_from_state_dict_post_hook(self, loaded_ctx, fp32_loaded_weight, weight_trail):
     _load_from_state_dict_pre_hook
     self.ctx.load_from_ctx(loaded_ctx)
-    if hasattr(self, 'master_weight'):
+    if hasattr(self, "master_weight"):
         self.master_weight.copy_(self.ctx.pack(fp32_loaded_weight))
-    elif hasattr(self, 'weight_trail'):
+    elif hasattr(self, "weight_trail"):
         self.weight_trail.copy_(self.ctx.pack(weight_trail))
 
+
 class _IPEXConvNd(nn.Module):
-    __constants__ = ['stride', 'padding', 'dilation', 'groups',
-                     'out_channels', 'kernel_size']
+    __constants__ = [
+        "stride",
+        "padding",
+        "dilation",
+        "groups",
+        "out_channels",
+        "kernel_size",
+    ]
 
     def __init__(self, dense_module):
         super(_IPEXConvNd, self).__init__()
@@ -72,58 +85,93 @@ class _IPEXConvNd(nn.Module):
         self.padding = dense_module.padding
         self.dilation = dense_module.dilation
         self.groups = dense_module.groups
-        self.prepack_input_shape = dense_module.input_shape if hasattr(dense_module, "input_shape") else []
-        self.weight_channels_last = dense_module.weight.is_contiguous(memory_format=torch.channels_last) \
-            or dense_module.weight.is_contiguous(memory_format=torch.channels_last_3d)
+        self.prepack_input_shape = (
+            dense_module.input_shape if hasattr(dense_module, "input_shape") else []
+        )
+        self.weight_channels_last = dense_module.weight.is_contiguous(
+            memory_format=torch.channels_last
+        ) or dense_module.weight.is_contiguous(memory_format=torch.channels_last_3d)
 
         # TODO: ".clone()" will make weight shared by multiple module not shared anymore
         # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
         if dense_module.bias is not None:
             self.bias = nn.Parameter(
                 dense_module.bias.detach().clone(),
-                requires_grad=dense_module.bias.requires_grad)
-            if hasattr(dense_module, 'master_bias'):
+                requires_grad=dense_module.bias.requires_grad,
+            )
+            if hasattr(dense_module, "master_bias"):
                 self.master_bias = dense_module.master_bias
-            elif hasattr(dense_module, 'bias_trail'):
+            elif hasattr(dense_module, "bias_trail"):
                 self.bias_trail = dense_module.bias_trail
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
         # create conv op context
         self.ctx = torch.ops.ipex_prepack.convolution_prepack(
-            dense_module.weight, self.bias, self.stride, self.padding,
-            self.dilation, self.groups,
-            self.weight_channels_last, self.prepack_input_shape
+            dense_module.weight,
+            self.bias,
+            self.stride,
+            self.padding,
+            self.dilation,
+            self.groups,
+            self.weight_channels_last,
+            self.prepack_input_shape,
         )
 
-        self.weight = nn.Parameter(self.ctx.get_weight(), requires_grad=dense_module.weight.requires_grad)
+        self.weight = nn.Parameter(
+            self.ctx.get_weight(), requires_grad=dense_module.weight.requires_grad
+        )
 
         # pack master_weight or weight_trail if needed
-        if hasattr(dense_module, 'master_weight'):
+        if hasattr(dense_module, "master_weight"):
             self.master_weight = self.ctx.pack(
                 dense_module.master_weight.detach().clone()
             )
-        elif hasattr(dense_module, 'weight_trail'):
+        elif hasattr(dense_module, "weight_trail"):
             self.weight_trail = self.ctx.pack(
                 dense_module.weight_trail.detach().clone(),
             )
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
-        assert not keep_vars, "can not using keep_vars true when to save _IPEXConvNd's parameters"
+        assert (
+            not keep_vars
+        ), "can not using keep_vars true when to save _IPEXConvNd's parameters"
         _save_weight_bias_to_state_dict(self, destination, prefix)
 
-    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
-                              missing_keys, unexpected_keys, error_msgs):
+    def _load_from_state_dict(
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
+    ):
         with torch.no_grad():
-            loaded_weight, loaded_bias, fp32_loaded_weight, weight_trail = _load_from_state_dict_pre_hook(self, state_dict, prefix)
+            (
+                loaded_weight,
+                loaded_bias,
+                fp32_loaded_weight,
+                weight_trail,
+            ) = _load_from_state_dict_pre_hook(self, state_dict, prefix)
             loaded_ctx = torch.ops.ipex_prepack.convolution_prepack(
-                loaded_weight, loaded_bias, self.stride, self.padding,
-                self.dilation, self.groups,
-                self.weight_channels_last, self.prepack_input_shape
+                loaded_weight,
+                loaded_bias,
+                self.stride,
+                self.padding,
+                self.dilation,
+                self.groups,
+                self.weight_channels_last,
+                self.prepack_input_shape,
             )
-            _load_from_state_dict_post_hook(self, loaded_ctx, fp32_loaded_weight, weight_trail)
+            _load_from_state_dict_post_hook(
+                self, loaded_ctx, fp32_loaded_weight, weight_trail
+            )
 
     def forward(self, x):
-        return torch.ops.torch_ipex.convolution_forward(x, self.weight, self.bias, self.ctx.get_data_handle())
+        return torch.ops.torch_ipex.convolution_forward(
+            x, self.weight, self.bias, self.ctx.get_data_handle()
+        )
 
 
 class _IPEXConv1d(_IPEXConvNd):
@@ -158,30 +206,35 @@ class _IPEXLinear(torch.nn.Module):
         if dense_module.bias is not None:
             self.bias = nn.Parameter(
                 dense_module.bias.detach().clone(),
-                requires_grad=dense_module.bias.requires_grad)
-            if hasattr(dense_module, 'master_bias'):
+                requires_grad=dense_module.bias.requires_grad,
+            )
+            if hasattr(dense_module, "master_bias"):
                 self.master_bias = dense_module.master_bias
-            elif hasattr(dense_module, 'bias_trail'):
+            elif hasattr(dense_module, "bias_trail"):
                 self.bias_trail = dense_module.bias_trail
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
 
         # create linear op context
         if self.use_dnnl:
-            self.ctx = torch.ops.ipex_prepack.linear_prepack(dense_module.weight,
-                                                             self.bias, self.batch_size_collapsed)
+            self.ctx = torch.ops.ipex_prepack.linear_prepack(
+                dense_module.weight, self.bias, self.batch_size_collapsed
+            )
         else:
-            self.ctx = torch.ops.ipex_prepack.mkl_sgemm_prepack(dense_module.weight,
-                                                                self.bias, self.batch_size_collapsed)
+            self.ctx = torch.ops.ipex_prepack.mkl_sgemm_prepack(
+                dense_module.weight, self.bias, self.batch_size_collapsed
+            )
 
-        self.weight = nn.Parameter(self.ctx.get_weight(), requires_grad=dense_module.weight.requires_grad)
+        self.weight = nn.Parameter(
+            self.ctx.get_weight(), requires_grad=dense_module.weight.requires_grad
+        )
 
         # pack master_weight or weight_trail if needed
-        if hasattr(dense_module, 'master_weight'):
+        if hasattr(dense_module, "master_weight"):
             self.master_weight = self.ctx.pack(
                 dense_module.master_weight.detach().clone()
             )
-        elif hasattr(dense_module, 'weight_trail'):
+        elif hasattr(dense_module, "weight_trail"):
             self.weight_trail = self.ctx.pack(
                 dense_module.weight_trail.detach().clone(),
             )
@@ -189,27 +242,57 @@ class _IPEXLinear(torch.nn.Module):
     def forward(self, x):
         if self.use_dnnl:
             return torch.ops.torch_ipex.ipex_linear(
-                x, self.weight, self.bias, self.ctx.get_data_handle())
+                x, self.weight, self.bias, self.ctx.get_data_handle()
+            )
         else:
             return torch.ops.torch_ipex.ipex_MKLSGEMM(
-                x, self.weight, self.bias, self.ctx.get_data_handle())
+                x, self.weight, self.bias, self.ctx.get_data_handle()
+            )
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
-        assert not keep_vars, "can not using keep_vars true when to save _IPEXLinear's parameters"
+        assert (
+            not keep_vars
+        ), "can not using keep_vars true when to save _IPEXLinear's parameters"
         _save_weight_bias_to_state_dict(self, destination, prefix)
 
-    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
-                              missing_keys, unexpected_keys, error_msgs):
+    def _load_from_state_dict(
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
+    ):
         with torch.no_grad():
-            loaded_weight, loaded_bias, fp32_loaded_weight, weight_trail = _load_from_state_dict_pre_hook(self, state_dict, prefix)
-            pack_fn = torch.ops.ipex_prepack.linear_prepack if self.use_dnnl else torch.ops.ipex_prepack.mkl_sgemm_prepack
+            (
+                loaded_weight,
+                loaded_bias,
+                fp32_loaded_weight,
+                weight_trail,
+            ) = _load_from_state_dict_pre_hook(self, state_dict, prefix)
+            pack_fn = (
+                torch.ops.ipex_prepack.linear_prepack
+                if self.use_dnnl
+                else torch.ops.ipex_prepack.mkl_sgemm_prepack
+            )
             loaded_ctx = pack_fn(loaded_weight, loaded_bias, self.batch_size_collapsed)
-            _load_from_state_dict_post_hook(self, loaded_ctx, fp32_loaded_weight, weight_trail)
+            _load_from_state_dict_post_hook(
+                self, loaded_ctx, fp32_loaded_weight, weight_trail
+            )
 
 
 class _IPEXConvTransposeNd(nn.Module):
-    __constants__ = ['stride', 'padding', 'dilation', 'groups',
-                     'out_channels', 'kernel_size', 'output_padding']
+    __constants__ = [
+        "stride",
+        "padding",
+        "dilation",
+        "groups",
+        "out_channels",
+        "kernel_size",
+        "output_padding",
+    ]
 
     def __init__(self, dense_module):
         super(_IPEXConvTransposeNd, self).__init__()
@@ -221,59 +304,93 @@ class _IPEXConvTransposeNd(nn.Module):
         self.groups = dense_module.groups
         self.dilation = dense_module.dilation
         self.output_padding = dense_module.output_padding
-        self.prepack_input_shape = dense_module.input_shape if hasattr(dense_module, "input_shape") else []
-        self.weight_channels_last = dense_module.weight.is_contiguous(memory_format=torch.channels_last) \
-            or dense_module.weight.is_contiguous(memory_format=torch.channels_last_3d)
+        self.prepack_input_shape = (
+            dense_module.input_shape if hasattr(dense_module, "input_shape") else []
+        )
+        self.weight_channels_last = dense_module.weight.is_contiguous(
+            memory_format=torch.channels_last
+        ) or dense_module.weight.is_contiguous(memory_format=torch.channels_last_3d)
 
         if dense_module.bias is not None:
             self.bias = nn.Parameter(
                 dense_module.bias.detach().clone(),
-                requires_grad=dense_module.bias.requires_grad)
-            if hasattr(dense_module, 'master_bias'):
+                requires_grad=dense_module.bias.requires_grad,
+            )
+            if hasattr(dense_module, "master_bias"):
                 self.master_bias = dense_module.master_bias
-            elif hasattr(dense_module, 'bias_trail'):
+            elif hasattr(dense_module, "bias_trail"):
                 self.bias_trail = dense_module.bias_trail
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
         # create conv op context
         self.ctx = torch.ops.ipex_prepack.conv_transpose_prepack(
-            dense_module.weight, self.bias, self.stride, self.padding,
-            self.output_padding, self.groups, self.dilation,
-            self.weight_channels_last, self.prepack_input_shape
+            dense_module.weight,
+            self.bias,
+            self.stride,
+            self.padding,
+            self.output_padding,
+            self.groups,
+            self.dilation,
+            self.weight_channels_last,
+            self.prepack_input_shape,
         )
 
-        self.weight = nn.Parameter(self.ctx.get_weight(), requires_grad=dense_module.weight.requires_grad)
+        self.weight = nn.Parameter(
+            self.ctx.get_weight(), requires_grad=dense_module.weight.requires_grad
+        )
 
         # pack master_weight or weight_trail if needed
-        if hasattr(dense_module, 'master_weight'):
+        if hasattr(dense_module, "master_weight"):
             self.master_weight = self.ctx.pack(
-                dense_module.master_weight.detach().clone())
-        elif hasattr(dense_module, 'weight_trail'):
+                dense_module.master_weight.detach().clone()
+            )
+        elif hasattr(dense_module, "weight_trail"):
             self.weight_trail = self.ctx.pack(
                 dense_module.weight_trail.detach().clone()
             )
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
-        assert not keep_vars, "can not using keep_vars true when to save _IPEXConvTransposeNd's parameters"
+        assert (
+            not keep_vars
+        ), "can not using keep_vars true when to save _IPEXConvTransposeNd's parameters"
         _save_weight_bias_to_state_dict(self, destination, prefix)
 
-    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
-                              missing_keys, unexpected_keys, error_msgs):
+    def _load_from_state_dict(
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
+    ):
         with torch.no_grad():
-            loaded_weight, loaded_bias, fp32_loaded_weight, weight_trail = _load_from_state_dict_pre_hook(self, state_dict, prefix)
+            (
+                loaded_weight,
+                loaded_bias,
+                fp32_loaded_weight,
+                weight_trail,
+            ) = _load_from_state_dict_pre_hook(self, state_dict, prefix)
             loaded_ctx = torch.ops.ipex_prepack.conv_transpose_prepack(
-                loaded_weight, loaded_bias, self.stride, self.padding,
-                self.output_padding, self.groups, self.dilation,
-                self.weight_channels_last, self.prepack_input_shape
+                loaded_weight,
+                loaded_bias,
+                self.stride,
+                self.padding,
+                self.output_padding,
+                self.groups,
+                self.dilation,
+                self.weight_channels_last,
+                self.prepack_input_shape,
             )
-            _load_from_state_dict_post_hook(self, loaded_ctx, fp32_loaded_weight, weight_trail)
+            _load_from_state_dict_post_hook(
+                self, loaded_ctx, fp32_loaded_weight, weight_trail
+            )
 
     def forward(self, x):
         return torch.ops.torch_ipex.conv_transpose(
-            x,
-            self.weight,
-            self.bias,
-            self.ctx.get_data_handle())
+            x, self.weight, self.bias, self.ctx.get_data_handle()
+        )
 
 
 class _IPEXConvTranspose2d(_IPEXConvTransposeNd):
@@ -302,19 +419,24 @@ def _should_prepack(module, is_training):
     # If hook is on `weight` or `bias`, will not prepack.
     if module._forward_pre_hooks is not None:
         for _, hook in module._forward_pre_hooks.items():
-            if hasattr(hook, 'name') and (hook.name == 'weight' or hook.name == 'bias'):
+            if hasattr(hook, "name") and (hook.name == "weight" or hook.name == "bias"):
                 return False
     if module._forward_hooks is not None:
         for _, hook in module._forward_hooks.items():
-            if hasattr(hook, 'name') and (hook.name == 'weight' or hook.name == 'bias'):
+            if hasattr(hook, "name") and (hook.name == "weight" or hook.name == "bias"):
                 return False
     if module._backward_hooks is not None:
         for _, hook in module._backward_hooks.items():
-            if hasattr(hook, 'name') and (hook.name == 'weight' or hook.name == 'bias'):
+            if hasattr(hook, "name") and (hook.name == "weight" or hook.name == "bias"):
                 return False
 
     # for training, if auto_kernel_selection(onednn) is off, IPEX won't prepack FP32 linear.
-    if isinstance(module, torch.nn.Linear) and not _using_dnnl() and is_training and module.weight.dtype is torch.float:
+    if (
+        isinstance(module, torch.nn.Linear)
+        and not _using_dnnl()
+        and is_training
+        and module.weight.dtype is torch.float
+    ):
         return False
     if isinstance(module, torch.nn.ConvTranspose2d):
         if module.padding[0] - module.output_padding[0] + module.stride[0] <= 0:
@@ -334,60 +456,76 @@ def _should_prepack(module, is_training):
     return True
 
 
-def weight_prepack_with_ipex(module, optimizer, params_attr, device_type='cpu'):
+def weight_prepack_with_ipex(module, optimizer, params_attr, device_type="cpu"):
     def convert(m, optimizer, params_attr):
-        if _should_prepack(m, is_training=(optimizer is not None)) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16 or m.weight.dtype == torch.half): # noqa B950
+        if _should_prepack(m, is_training=(optimizer is not None)) and (
+            m.weight.dtype == torch.float32
+            or m.weight.dtype == torch.bfloat16
+            or m.weight.dtype == torch.half
+        ):
             weight = m.master_weight if hasattr(m, "master_weight") else m.weight
             if weight not in params_attr:
                 params_attr[weight] = {}
             if type(m) is torch.nn.Linear:
                 if m.weight.dtype == torch.half:
                     new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU[type(m)](m, use_dnnl=True)
-                elif m.weight.dtype == torch.float32 and optimizer is None \
-                    and frontend.get_fp32_math_mode(device="cpu") == frontend.FP32MathMode.FP32 \
-                        and not _using_dnnl():
+                elif (
+                    m.weight.dtype == torch.float32
+                    and optimizer is None
+                    and frontend.get_fp32_math_mode(device="cpu")
+                    == frontend.FP32MathMode.FP32
+                    and not _using_dnnl()
+                ):
                     new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU[type(m)](m, use_dnnl=False)
                 else:
-                    assert m.weight.dtype in [torch.float32, torch.bfloat16], "Only float, bf16 and fp16 are supported"
+                    assert m.weight.dtype in [
+                        torch.float32,
+                        torch.bfloat16,
+                    ], "Only float, bf16 and fp16 are supported"
                     new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU[type(m)](m, use_dnnl=True)
             else:
                 new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU[type(m)](m)
 
             # move original layer info to new prepacked layer
-            if hasattr(m, 'master_weight_split'):
-                setattr(new_m, 'master_weight_split', m.master_weight_split)
+            if hasattr(m, "master_weight_split"):
+                new_m.master_weight_split = m.master_weight_split
 
-            params_attr[weight].update({
-                'op': type(m),
-                'ctx': new_m.ctx})
+            params_attr[weight].update({"op": type(m), "ctx": new_m.ctx})
             if hasattr(new_m, "weight_channels_last"):
-                params_attr[weight]['weight_channels_last'] = new_m.weight_channels_last,
-            if 'bf16_param' in params_attr[weight]:
-                params_attr[weight]['bf16_param'] = new_m.weight
-            elif 'trail' in params_attr[weight]:
-                params_attr[weight]['trail'] = new_m.weight_trail
-            if 'fp16_param' in params_attr[weight]:
-                params_attr[weight]['fp16_param'] = new_m.weight
+                params_attr[weight]["weight_channels_last"] = (
+                    new_m.weight_channels_last,
+                )
+            if "bf16_param" in params_attr[weight]:
+                params_attr[weight]["bf16_param"] = new_m.weight
+            elif "trail" in params_attr[weight]:
+                params_attr[weight]["trail"] = new_m.weight_trail
+            if "fp16_param" in params_attr[weight]:
+                params_attr[weight]["fp16_param"] = new_m.weight
             # update entry from origin weight to packed weight, from origin bias to cloned bias
-            new_weight = new_m.master_weight if hasattr(m, "master_weight") else new_m.weight
+            new_weight = (
+                new_m.master_weight if hasattr(m, "master_weight") else new_m.weight
+            )
             params_attr[new_weight] = params_attr.pop(weight)
             params_pair = {weight: new_weight}
-            if hasattr(m, 'bias') and m.bias is not None:
+            if hasattr(m, "bias") and m.bias is not None:
                 bias = m.master_bias if hasattr(m, "master_bias") else m.bias
-                new_bias = new_m.master_bias if hasattr(m, "master_bias") else new_m.bias
+                new_bias = (
+                    new_m.master_bias if hasattr(m, "master_bias") else new_m.bias
+                )
                 params_pair.update({bias: new_bias})
                 if bias in params_attr:
-                    if 'bf16_param' in params_attr[bias]:
-                        params_attr[bias]['bf16_param'] = new_m.bias
-                    elif 'trail' in params_attr[bias]:
-                        params_attr[bias]['trail'] = new_m.bias_trail
-                    if 'fp16_param' in params_attr[bias]:
-                        params_attr[bias]['fp16_param'] = new_m.bias
+                    if "bf16_param" in params_attr[bias]:
+                        params_attr[bias]["bf16_param"] = new_m.bias
+                    elif "trail" in params_attr[bias]:
+                        params_attr[bias]["trail"] = new_m.bias_trail
+                    if "fp16_param" in params_attr[bias]:
+                        params_attr[bias]["fp16_param"] = new_m.bias
                     if bias in params_attr:
                         params_attr[new_bias] = params_attr.pop(bias)
             # replace optimizer's param with prepacked param, also prepack its state.
             optim._optimizer_utils.pack_optimizer_params_and_states(
-                optimizer, params_pair, params_attr, m.weight.dtype)
+                optimizer, params_pair, params_attr, m.weight.dtype
+            )
             return new_m
         else:
             return m
@@ -398,23 +536,29 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, device_type='cpu'):
             setattr(new_m, name, convert_rec(sub_m, optimizer, params_attr)[0])
         return new_m, optimizer, params_attr
 
-    if device_type == 'cpu':
-        opt_model, opt_optmizer, params_attr = convert_rec(module, optimizer, params_attr)
+    if device_type == "cpu":
+        opt_model, opt_optmizer, params_attr = convert_rec(
+            module, optimizer, params_attr
+        )
         if opt_optmizer is not None:
-            setattr(opt_optmizer, 'params_attr', params_attr) # noqa B010
+            opt_optmizer.params_attr = params_attr
             optim._optimizer_utils.patch_load_state_dict(opt_optmizer)
             optim._optimizer_utils.patch_state_dict(opt_optmizer)
         return opt_model, opt_optmizer, params_attr
 
 
 def record_input_shape_for_prepack(module, sample_input):
-
     def hook_function(self, input):
         # input for linear/conv/transpose conv received here will be Tuple[Tensor]
         self.input_shape = input[0].shape
 
     def register_hook_function(module):
-        if type(module) in [torch.nn.Linear, torch.nn.Conv1d, torch.nn.Conv2d, torch.nn.ConvTranspose2d]:
+        if type(module) in [
+            torch.nn.Linear,
+            torch.nn.Conv1d,
+            torch.nn.Conv2d,
+            torch.nn.ConvTranspose2d,
+        ]:
             module.register_forward_pre_hook(hook_function)
 
     def register_hook_function_rec(module):

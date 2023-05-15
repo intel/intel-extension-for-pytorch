@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 dpcpp_device = torch.device("xpu")
 cpu_device = torch.device("cpu")
@@ -9,7 +9,6 @@ cpu_device = torch.device("cpu")
 
 class TestTorchMethod(TestCase):
     def test_addmv(self, dtype=torch.float):
-
         m1_cpu = torch.randn([2, 3], dtype=dtype)
         m2_cpu = torch.randn([3], dtype=dtype)
         x_cpu = torch.ones([2], dtype=dtype)

@@ -43,10 +43,11 @@ _GRAMMAR = r"""
     %ignore WS
     """
 
-_PARSER = lark.Lark(_GRAMMAR, parser='lalr', propagate_positions=True)
+_PARSER = lark.Lark(_GRAMMAR, parser="lalr", propagate_positions=True)
 
 _XPARSER = lark.Lark(
-    _GRAMMAR, parser='lalr', propagate_positions=True, keep_all_tokens=True)
+    _GRAMMAR, parser="lalr", propagate_positions=True, keep_all_tokens=True
+)
 
 _DECL_HEADER = """// This file contains all native_functions supported by DPCPP:GPU,
 // that can be registered to and the schema string that they should be registered with
@@ -58,25 +59,25 @@ _DECL_HEADER = """// This file contains all native_functions supported by DPCPP:
 def gen_output_file(args, name):
     if not args.gpu_decl:
         return sys.stdout
-    return open(os.path.join(args.gpu_decl, name), 'w')
+    return open(os.path.join(args.gpu_decl, name), "w")
 
 
 def gen_decl_output_file(args):
-    return gen_output_file(args, 'RegistrationDeclarations_DPCPP.h')
+    return gen_output_file(args, "RegistrationDeclarations_DPCPP.h")
 
 
 def is_tensor_api(fndef):
-    fndef = fndef.replace('at::', '')
-    fndef = fndef.replace('c10::Device', 'Device')
-    m = re.search(r'\bTensor\b', fndef)
+    fndef = fndef.replace("at::", "")
+    fndef = fndef.replace("c10::Device", "Device")
+    m = re.search(r"\bTensor\b", fndef)
     return m is not None, fndef
 
 
 def extract_functions(path):
     functions = []
     errors = []
-    for line in open(path, 'r'):
-        m = re.match(r'\s*([^\s].*); //\s+(.*)', line)
+    for line in open(path, "r"):
+        m = re.match(r"\s*([^\s].*); //\s+(.*)", line)
         if not m:
             continue
         functions.append(line)
@@ -95,24 +96,24 @@ def get_mapsig_key(mapsig):
     # PyTorch generates std::tuple<> without space among the tuple types,
     # which would require special understanding in the string rewriter.
     # Since we are using this as simple key, we can just string the spaces.
-    return mapsig.replace(' ', '')
+    return mapsig.replace(" ", "")
 
 
 def parse_override_keys(path):
     functions = []
-    for line in open(path, 'r'):
+    for line in open(path, "r"):
         line = line.strip()
-        m = re.match(r'static\s+(.*)', line)
+        m = re.match(r"static\s+(.*)", line)
         if m:
-            m = re.match(r'(.*)aten[:][:](.*)>(.*)', line)
+            m = re.match(r"(.*)aten[:][:](.*)>(.*)", line)
             if m:
                 functions.append(m.group(2))
             else:
-                print("Please add schema for the Op >>> \"", line, "\"")
+                print('Please add schema for the Op >>> "', line, '"')
 
     keys = []
     for fndef in functions:
-        new = "aten::" + fndef.split('(')[0] + "("
+        new = "aten::" + fndef.split("(")[0] + "("
         if new not in keys:
             keys.append(new)
 
@@ -122,84 +123,104 @@ def parse_override_keys(path):
 def generate(args):
     fndefs, errors = extract_functions(args.alldecl)
     print(
-        'Extracted {} functions ({} errors) from {}'.format(
-            len(fndefs), len(errors), args.alldecl),
-        file=sys.stderr)
+        "Extracted {} functions ({} errors) from {}".format(
+            len(fndefs), len(errors), args.alldecl
+        ),
+        file=sys.stderr,
+    )
     assert len(errors) == 0
 
     specific = parse_override_keys(args.ipextype)
     print(
-        '{} function dpcpp type in {}'.format(len(specific), args.ipextype),
-        file=sys.stderr)
+        "{} function dpcpp type in {}".format(len(specific), args.ipextype),
+        file=sys.stderr,
+    )
 
     specific_qint = parse_override_keys(args.ipextype_qint)
     print(
-        '{} function dpcpp type in {}'.format(len(specific_qint), args.ipextype_qint),
-        file=sys.stderr)
+        "{} function dpcpp type in {}".format(len(specific_qint), args.ipextype_qint),
+        file=sys.stderr,
+    )
 
     dedicated = parse_override_keys(args.dedicatedtype)
     print(
-        '{} function dedicated overrides in {}'.format(len(dedicated), args.dedicatedtype),
-        file=sys.stderr)
+        "{} function dedicated overrides in {}".format(
+            len(dedicated), args.dedicatedtype
+        ),
+        file=sys.stderr,
+    )
 
     dispatchstub = parse_override_keys(args.dispatchstubtype)
     print(
-        '{} function dispatchstub overrides in {}'.format(len(dispatchstub), args.dispatchstubtype),
-        file=sys.stderr)
+        "{} function dispatchstub overrides in {}".format(
+            len(dispatchstub), args.dispatchstubtype
+        ),
+        file=sys.stderr,
+    )
 
-    ordecls = ''
+    ordecls = ""
     for fndef in fndefs:
         for override in specific:
             m = re.search(r"{}".format(override), fndef)
             if m:
-                ordecls += '{}\n'.format(fndef)
+                ordecls += "{}\n".format(fndef)
         for override in specific_qint:
-            if override not in specific and override not in dedicated and override not in dispatchstub:
+            if (
+                override not in specific
+                and override not in dedicated
+                and override not in dispatchstub
+            ):
                 m = re.search(r"{}".format(override), fndef)
                 if m:
-                    ordecls += '{}\n'.format(fndef)
+                    ordecls += "{}\n".format(fndef)
         for override in dedicated:
             m = re.search(r"{}".format(override), fndef)
             if m:
-                ordecls += '{}\n'.format(fndef)
+                ordecls += "{}\n".format(fndef)
         for override in dispatchstub:
             m = re.search(r"{}".format(override), fndef)
             if m:
-                ordecls += '{}\n'.format(fndef)
+                ordecls += "{}\n".format(fndef)
 
     print(
         _DECL_HEADER.format(gen=os.path.basename(sys.argv[0]), hfuncs=ordecls),
-        file=gen_decl_output_file(args))
+        file=gen_decl_output_file(args),
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('--gpu_decl', type=str)
+    arg_parser.add_argument("--gpu_decl", type=str)
     arg_parser.add_argument(
-        'ipextype',
+        "ipextype",
         type=str,
-        metavar='IPEX_TYPE_FILE',
-        help='The path to the IPEX ATEN overrides file')
+        metavar="IPEX_TYPE_FILE",
+        help="The path to the IPEX ATEN overrides file",
+    )
     arg_parser.add_argument(
-        'ipextype_qint',
+        "ipextype_qint",
         type=str,
-        metavar='IPEX_TYPE_FILE',
-        help='The path to the IPEX ATEN overrides file')
+        metavar="IPEX_TYPE_FILE",
+        help="The path to the IPEX ATEN overrides file",
+    )
     arg_parser.add_argument(
-        'dedicatedtype',
+        "dedicatedtype",
         type=str,
-        metavar='DEDICATED_TYPE_FILE',
-        help='The path to the DEDICATED ATEN file')
+        metavar="DEDICATED_TYPE_FILE",
+        help="The path to the DEDICATED ATEN file",
+    )
     arg_parser.add_argument(
-        'dispatchstubtype',
+        "dispatchstubtype",
         type=str,
-        metavar='DISPATCH_STUB_TYPE_FILE',
-        help='The path to the DISPATCH STUB ATEN file')
+        metavar="DISPATCH_STUB_TYPE_FILE",
+        help="The path to the DISPATCH STUB ATEN file",
+    )
     arg_parser.add_argument(
-        'alldecl',
+        "alldecl",
         type=str,
-        metavar='ALL_PROTOTYPE',
-        help='The path to the RegistrationFunctions.h file')
+        metavar="ALL_PROTOTYPE",
+        help="The path to the RegistrationFunctions.h file",
+    )
     args, files = arg_parser.parse_known_args()
     for file in files:
         print(file)

@@ -1,10 +1,11 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+
 
 class TestTorchMethod(TestCase):
     def test_sparse(self, dtype=torch.float):
@@ -40,9 +41,11 @@ class TestTorchMethod(TestCase):
             x = torch.rand(size)
             y = torch.zeros(size)
             src_cpu = torch.where(x > 0.8, x, y)
-            src_xpu = src_cpu.clone().to('xpu')
-            self.assertEqual(src_cpu.to_sparse(), src_xpu.to_sparse().to('cpu'))
-            self.assertEqual(src_cpu.to_sparse().sparse_dim(), src_xpu.to_sparse().sparse_dim())
+            src_xpu = src_cpu.clone().to("xpu")
+            self.assertEqual(src_cpu.to_sparse(), src_xpu.to_sparse().to("cpu"))
+            self.assertEqual(
+                src_cpu.to_sparse().sparse_dim(), src_xpu.to_sparse().sparse_dim()
+            )
 
     def test_efficientzerotensor(self, dtype=torch.float):
         sizes = [(10, 10), (10, 1), (4, 5, 6)]
@@ -53,11 +56,10 @@ class TestTorchMethod(TestCase):
             self.assertEqual(x_cpu.dim(), x_xpu.dim())
 
     def test_sparse_dense_convert(self):
-        i = torch.LongTensor([[2,4]])
-        v = torch.FloatTensor([[1,3], [5,7]])
+        i = torch.LongTensor([[2, 4]])
+        v = torch.FloatTensor([[1, 3], [5, 7]])
         x = torch.sparse.FloatTensor(i, v).to_dense()
         i_xpu = i.to("xpu")
         v_xpu = v.to("xpu")
         x_xpu = torch.sparse.FloatTensor(i_xpu, v_xpu).to_dense()
         self.assertEqual(x, x_xpu.cpu())
-

@@ -1,5 +1,5 @@
 import torch
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 import pytest
 
 from torch.testing._internal.common_utils import TestCase
@@ -21,10 +21,9 @@ class TestTorchMethod(TestCase):
         dqX = torch.dequantize(q_input_cpu)
         Y_ref = torch.sigmoid(dqX)
         # Here, we quantize output use opaque u8 tensor setting.
-        qY_ref = torch.quantize_per_tensor(Y_ref, 1.0/255.0*2, 0, torch.qint8)
+        qY_ref = torch.quantize_per_tensor(Y_ref, 1.0 / 255.0 * 2, 0, torch.qint8)
         dqY_ref = qY_ref.dequantize()
 
         self.assertEqual(result_functional.to("cpu"), dqY_ref)
         self.assertEqual(result_inplace.to("cpu"), dqY_ref)
         self.assertEqual(result_out.to("cpu"), dqY_ref)
-

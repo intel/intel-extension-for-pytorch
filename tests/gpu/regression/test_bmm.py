@@ -1,11 +1,14 @@
 import torch
-import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch  # noqa F401
 import pytest
 from torch.testing._internal.common_utils import TestCase
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="Complex128 not unsupported by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(),
+        reason="Complex128 not unsupported by this device",
+    )
     def test_bmm(self):
         batch1 = torch.randn([49152, 27, 3], dtype=torch.complex128)
         batch2 = torch.randn([49152, 3, 1], dtype=torch.complex128)

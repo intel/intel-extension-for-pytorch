@@ -7,9 +7,13 @@ import torch.jit.quantized
 
 # Testing utils
 from torch.testing._internal.common_dtype import floating_and_complex_types_and
-from torch.testing._internal.common_utils import TestCase, \
-    freeze_rng_state, TemporaryFileName, enable_profiling_mode_for_profiling_tests, is_iterable_of_tensors
-from torch.testing._internal.common_utils import enable_profiling_mode  # noqa: F401
+from torch.testing._internal.common_utils import (
+    TestCase,
+    freeze_rng_state,
+    TemporaryFileName,
+    enable_profiling_mode_for_profiling_tests,
+    is_iterable_of_tensors,
+)
 
 # Override XPU testing utils
 from .pytorch_test_base import TestCase
@@ -21,27 +25,43 @@ from torch._C import TensorType
 
 import io
 
+
 def check_output_types(self, func, ref_outputs, args, kwargs):
-    graph = getattr(func, 'last_graph', None)
+    graph = getattr(func, "last_graph", None)
     types = [o.type() for o in graph.outputs()]
     self.assertTrue(len(types) == 1)
     t = types[0]
     torch._C._jit_assert_is_instance(ref_outputs, t)
 
-# Test names in this set are only checked for a single derivative
-nn_functional_single_grad = frozenset('test_nn_' + name for name in [
-    'pdist',
-    'multilabel_margin_loss',
-    'max_unpool3d',
-    'multi_margin_loss',
-    'binary_cross_entropy',
-    'binary_cross_entropy_size_average',
-    'ctc_loss',
-    'grid_sample',
-])
 
-def check_against_reference(self, func, reference_func, output_func, args, kwargs=None,
-                            allow_unused=True, check_types=True, no_grad=False, no_gradgrad=False):
+# Test names in this set are only checked for a single derivative
+nn_functional_single_grad = frozenset(
+    "test_nn_" + name
+    for name in [
+        "pdist",
+        "multilabel_margin_loss",
+        "max_unpool3d",
+        "multi_margin_loss",
+        "binary_cross_entropy",
+        "binary_cross_entropy_size_average",
+        "ctc_loss",
+        "grid_sample",
+    ]
+)
+
+
+def check_against_reference(
+    self,
+    func,
+    reference_func,
+    output_func,
+    args,
+    kwargs=None,
+    allow_unused=True,
+    check_types=True,
+    no_grad=False,
+    no_gradgrad=False,
+):
     """Verifies a function performs identically to some reference implementation.
 
     Commonly, this is used to verify that a JIT implementation
@@ -53,9 +73,12 @@ def check_against_reference(self, func, reference_func, output_func, args, kwarg
     def allSum(vs):
         if isinstance(vs, torch.Tensor):
             vs = (vs,)
-        return sum((i + 1) * v.sum()
-                   for i, v in enumerate(vs)
-                   if v is not None and v.dtype in floating_and_complex_types_and(torch.half, torch.bfloat16))
+        return sum(
+            (i + 1) * v.sum()
+            for i, v in enumerate(vs)
+            if v is not None
+            and v.dtype in floating_and_complex_types_and(torch.half, torch.bfloat16)
+        )
 
     def clone_tensor(t, preserve_requires_grad):
         require_grad = preserve_requires_grad and t.requires_grad
@@ -104,34 +127,44 @@ def check_against_reference(self, func, reference_func, output_func, args, kwarg
         # test single grad case
         recording_inputs = clone_inputs(preserve_requires_grad=True)
         recording_tensors = get_recording_tensors(recording_inputs)
-        outputs = output_func(self.runAndSaveRNG(reference_func, recording_inputs, kwargs))
-        grads = torch.autograd.grad(allSum(outputs), recording_tensors,
-                                    allow_unused=allow_unused)
+        outputs = output_func(
+            self.runAndSaveRNG(reference_func, recording_inputs, kwargs)
+        )
+        grads = torch.autograd.grad(
+            allSum(outputs), recording_tensors, allow_unused=allow_unused
+        )
         outputs_test = output_func(self.runAndSaveRNG(func, recording_inputs, kwargs))
-        grads_test = torch.autograd.grad(allSum(outputs_test), recording_tensors,
-                                         allow_unused=allow_unused)
+        grads_test = torch.autograd.grad(
+            allSum(outputs_test), recording_tensors, allow_unused=allow_unused
+        )
         self.assertEqual(outputs, outputs_test)
         self.assertEqual(grads, grads_test)
         # test the grad grad case
         if self._testMethodName in nn_functional_single_grad or no_gradgrad:
             return
 
-        outputs = output_func(self.runAndSaveRNG(reference_func, recording_inputs, kwargs))
+        outputs = output_func(
+            self.runAndSaveRNG(reference_func, recording_inputs, kwargs)
+        )
         l1 = allSum(outputs)
-        grads = torch.autograd.grad(l1, recording_tensors, create_graph=True,
-                                    allow_unused=allow_unused)
+        grads = torch.autograd.grad(
+            l1, recording_tensors, create_graph=True, allow_unused=allow_unused
+        )
 
-        l2 = (allSum(grads) * l1)
+        l2 = allSum(grads) * l1
         grads2 = torch.autograd.grad(l2, recording_tensors, allow_unused=allow_unused)
         recording_inputs = clone_inputs(preserve_requires_grad=True)
         recording_tensors = get_recording_tensors(recording_inputs)
         outputs_test = output_func(self.runAndSaveRNG(func, recording_inputs, kwargs))
         l1_test = allSum(outputs_test)
         grads_test = torch.autograd.grad(
-            l1_test, recording_tensors, create_graph=True, allow_unused=allow_unused)
+            l1_test, recording_tensors, create_graph=True, allow_unused=allow_unused
+        )
 
-        l2_test = (allSum(grads_test) * l1_test)
-        grads2_test = torch.autograd.grad(l2_test, recording_tensors, allow_unused=allow_unused)
+        l2_test = allSum(grads_test) * l1_test
+        grads2_test = torch.autograd.grad(
+            l2_test, recording_tensors, allow_unused=allow_unused
+        )
 
         self.assertEqual(outputs, outputs_test)
         self.assertEqual(grads, grads_test)
@@ -139,6 +172,7 @@ def check_against_reference(self, func, reference_func, output_func, args, kwarg
             if g2 is None and g2_test is None:
                 continue
             self.assertEqual(g2, g2_test, atol=5e-4, rtol=1e-4)
+
 
 class JitCommonTestCase(TestCase):
     def createFunctionFromGraph(self, trace):
@@ -153,8 +187,12 @@ class JitCommonTestCase(TestCase):
         m_import = self.getExportImportCopy(m)
         a = self.runAndSaveRNG(m, inputs)
         b = self.runAndSaveRNG(m_import, inputs)
-        self.assertEqual(a, b, "Results of original model and "
-                               "exported/imported version of model differed")
+        self.assertEqual(
+            a,
+            b,
+            "Results of original model and "
+            "exported/imported version of model differed",
+        )
 
     def runAndSaveRNG(self, func, inputs, kwargs=None):
         kwargs = kwargs if kwargs else {}
@@ -175,14 +213,22 @@ class JitCommonTestCase(TestCase):
             torch.jit.save(imported, fname)
             return torch.jit.load(fname, map_location=map_location)
 
-    def autoDiffErrorMessage(self, should_autodiff_node, nodes_not_in_diff_graph,
-                             fusion_nodes_not_found, non_fusible_nodes_being_fused,
-                             fusion_nodes_found, nodes_in_diff_graph):
+    def autoDiffErrorMessage(
+        self,
+        should_autodiff_node,
+        nodes_not_in_diff_graph,
+        fusion_nodes_not_found,
+        non_fusible_nodes_being_fused,
+        fusion_nodes_found,
+        nodes_in_diff_graph,
+    ):
         err_msg = "\nFailure in testing nodes' autodifferentiation. "
         if should_autodiff_node:
-            err_msg += "One or more nodes were expected to be autodiffed, " \
-                "but were not found in specified fusible/nonfusible " \
+            err_msg += (
+                "One or more nodes were expected to be autodiffed, "
+                "but were not found in specified fusible/nonfusible "
                 "DifferentiableGraph groups. \nSpecifically:"
+            )
             # The node is intended to appear in a differentiable graph but doesn't
             diff_nodes_missing = []
             # The node is intended to appear in a differentiable graph
@@ -204,52 +250,72 @@ class JitCommonTestCase(TestCase):
                 else:
                     fusion_nodes_missing.append(node)
             if len(diff_nodes_missing) > 0:
-                err_msg += f"\n  {diff_nodes_missing} were not in one of the " \
-                    "DifferentiableGraphs when they were expected to be. " \
-                    "Did you intend for these nodes to be autodiffed? " \
+                err_msg += (
+                    f"\n  {diff_nodes_missing} were not in one of the "
+                    "DifferentiableGraphs when they were expected to be. "
+                    "Did you intend for these nodes to be autodiffed? "
                     "If not, remove them from the list of nonfusible nodes."
+                )
             if len(diff_nodes_in_fusion) > 0:
-                err_msg += f"\n  {diff_nodes_in_fusion} were found in one of the FusionGroups " \
-                    "when they were expected to be just in a DifferentiableGraph. If it was " \
-                    "intended for these nodes to be in FusionGroups, reclassify these nodes as " \
-                    "fusible nodes. If these nodes were not intended to be fused, your " \
+                err_msg += (
+                    f"\n  {diff_nodes_in_fusion} were found in one of the FusionGroups "
+                    "when they were expected to be just in a DifferentiableGraph. If it was "
+                    "intended for these nodes to be in FusionGroups, reclassify these nodes as "
+                    "fusible nodes. If these nodes were not intended to be fused, your "
                     "autodifferentiation logic might be wrong."
+                )
             if len(fusion_nodes_missing) > 0:
-                err_msg += f"\n  {fusion_nodes_missing} were not in one of the FusionGroups " \
-                    "of the DifferentiableGraphs when they were expected to be. " \
-                    "They were also not found in an outer DifferentiableGraph. Did you " \
-                    "intend for these nodes to be autodifferentiated? If not, you should " \
-                    "remove these nodes from the test's fusible nodes. Otherwise your " \
+                err_msg += (
+                    f"\n  {fusion_nodes_missing} were not in one of the FusionGroups "
+                    "of the DifferentiableGraphs when they were expected to be. "
+                    "They were also not found in an outer DifferentiableGraph. Did you "
+                    "intend for these nodes to be autodifferentiated? If not, you should "
+                    "remove these nodes from the test's fusible nodes. Otherwise your "
                     "autodifferentiation logic might be wrong."
+                )
             if len(fusion_nodes_in_diff) > 0:
-                err_msg += f"\n  {fusion_nodes_in_diff} were not in one of the FusionGroups " \
-                    "of the DifferentiableGraphs when they were expected to be, " \
-                    "instead they were found just in an outer DifferentiableGraph. " \
-                    "Did you intend for these nodes to be fused? If not, you should " \
-                    "move these nodes into the test's nonfusible nodes. Otherwise your " \
+                err_msg += (
+                    f"\n  {fusion_nodes_in_diff} were not in one of the FusionGroups "
+                    "of the DifferentiableGraphs when they were expected to be, "
+                    "instead they were found just in an outer DifferentiableGraph. "
+                    "Did you intend for these nodes to be fused? If not, you should "
+                    "move these nodes into the test's nonfusible nodes. Otherwise your "
                     "autodifferentiation logic might be wrong."
+                )
         else:
-            err_msg += "One or more nodes were not expected to be autodiffed " \
-                "but were found in a DifferentiableGraph or in a FusionGroup " \
-                "of a DifferentiableGraph. Did you intend for these nodes to be " \
-                "autodiffed? If so, change this test to expect autodifferentiation. " \
+            err_msg += (
+                "One or more nodes were not expected to be autodiffed "
+                "but were found in a DifferentiableGraph or in a FusionGroup "
+                "of a DifferentiableGraph. Did you intend for these nodes to be "
+                "autodiffed? If so, change this test to expect autodifferentiation. "
                 "\nSpecifically:"
+            )
             if len(fusion_nodes_found) > 0:
-                err_msg += f"\n  {fusion_nodes_found} were not expected to be in " \
-                    "one of the DifferentiableGraphs, but appeared in a FusionGroup " \
+                err_msg += (
+                    f"\n  {fusion_nodes_found} were not expected to be in "
+                    "one of the DifferentiableGraphs, but appeared in a FusionGroup "
                     "of a DifferentiableGraph. "
+                )
             if len(nodes_in_diff_graph) > 0:
-                err_msg += f"\n  {nodes_in_diff_graph} were not expected to " \
+                err_msg += (
+                    f"\n  {nodes_in_diff_graph} were not expected to "
                     "be in one of the DifferentiableGraphs but were."
+                )
         return err_msg
 
-    def assertAutodiffNode(self, graph, should_autodiff_node, nonfusible_nodes, fusible_nodes):
-        diff_nodes = graph.findAllNodes('prim::DifferentiableGraph')
-        diff_subgraphs = [node.g('Subgraph') for node in diff_nodes]
+    def assertAutodiffNode(
+        self, graph, should_autodiff_node, nonfusible_nodes, fusible_nodes
+    ):
+        diff_nodes = graph.findAllNodes("prim::DifferentiableGraph")
+        diff_subgraphs = [node.g("Subgraph") for node in diff_nodes]
 
         # Note: currently no tests have fusible_nodes
-        fusion_nodes = list(chain.from_iterable([g.findAllNodes('prim::FusionGroup') for g in diff_subgraphs]))
-        fusion_subgraphs = [node.g('Subgraph') for node in fusion_nodes]
+        fusion_nodes = list(
+            chain.from_iterable(
+                [g.findAllNodes("prim::FusionGroup") for g in diff_subgraphs]
+            )
+        )
+        fusion_subgraphs = [node.g("Subgraph") for node in fusion_nodes]
 
         # For any non-fusible node, it must show up in one of the DifferentiableGraphs.
         nodes_in_diff_graph = []
@@ -275,19 +341,31 @@ class JitCommonTestCase(TestCase):
         found_all_fusible_nodes = len(fusion_nodes_found) == len(fusible_nodes)
 
         if should_autodiff_node is not None:
-            err_msg = self.autoDiffErrorMessage(should_autodiff_node,
-                                                nodes_not_in_diff_graph,
-                                                fusion_nodes_not_found,
-                                                non_fusible_nodes_being_fused,
-                                                fusion_nodes_found,
-                                                nodes_in_diff_graph)
-            self.assertEqual(should_autodiff_node,
-                             found_all_nonfusible_nodes and found_all_fusible_nodes, err_msg)
+            err_msg = self.autoDiffErrorMessage(
+                should_autodiff_node,
+                nodes_not_in_diff_graph,
+                fusion_nodes_not_found,
+                non_fusible_nodes_being_fused,
+                fusion_nodes_found,
+                nodes_in_diff_graph,
+            )
+            self.assertEqual(
+                should_autodiff_node,
+                found_all_nonfusible_nodes and found_all_fusible_nodes,
+                err_msg,
+            )
 
-    def checkShapeAnalysis(self, out_sizes: Union[List[int], List[List[int]]],
-                           traced_graph, assert_propagation, constant_prop=True):
+    def checkShapeAnalysis(
+        self,
+        out_sizes: Union[List[int], List[List[int]]],
+        traced_graph,
+        assert_propagation,
+        constant_prop=True,
+    ):
         # repropagte input shapes provided by tracing,
-        prev_symbolic_shapes_test_enabled = torch._C._jit_symbolic_shapes_test_mode_enabled()
+        prev_symbolic_shapes_test_enabled = (
+            torch._C._jit_symbolic_shapes_test_mode_enabled()
+        )
         for enable_test_mode in [True, False]:
             # here we are testing allowing/disallowing substituting in complete shapes as constants,
             # disallowing constants helps stress test partial eval and substitution pipeline

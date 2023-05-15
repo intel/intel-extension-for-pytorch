@@ -21,8 +21,9 @@ class Lamb(torch.optim.Optimizer):
         https://arxiv.org/abs/1904.00962
     """
 
-    def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
-                 weight_decay=0, fused=False):
+    def __init__(
+        self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0, fused=False
+    ):
         if not 0.0 <= lr:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if not 0.0 <= eps:
@@ -33,8 +34,9 @@ class Lamb(torch.optim.Optimizer):
             raise ValueError("Invalid beta parameter at index 1: {}".format(betas[1]))
         if not 0.0 <= weight_decay:
             raise ValueError("Invalid weight_decay value: {}".format(weight_decay))
-        defaults = dict(lr=lr, betas=betas, eps=eps,
-                        weight_decay=weight_decay, fused=fused)
+        defaults = dict(
+            lr=lr, betas=betas, eps=eps, weight_decay=weight_decay, fused=fused
+        )
         super(Lamb, self).__init__(params, defaults)
         self.params_attr = {}
         self.fused = fused
@@ -62,33 +64,35 @@ class Lamb(torch.optim.Optimizer):
             trails = []
             state_steps = []
 
-            for p in group['params']:
+            for p in group["params"]:
                 grad = p.grad
                 if grad is not None:
                     params_with_grad.append(p)
                     if grad.is_sparse:
-                        raise RuntimeError('Lamb does not support sparse gradients')
-                    if grad.device != torch.device('cpu'):
-                        raise RuntimeError('Lamb supports only CPU device')
+                        raise RuntimeError("Lamb does not support sparse gradients")
+                    if grad.device != torch.device("cpu"):
+                        raise RuntimeError("Lamb supports only CPU device")
                     grads.append(grad)
 
                     state = self.state[p]
                     # Lazy state initialization
                     if len(state) == 0:
-                        state['step'] = 0
-                        buffer_dtype = p.dtype if p.dtype is torch.float64 else torch.float
-                        state['exp_avg'] = torch.zeros(p.shape, dtype=buffer_dtype)
-                        state['exp_avg_sq'] = torch.zeros(p.shape, dtype=buffer_dtype)
+                        state["step"] = 0
+                        buffer_dtype = (
+                            p.dtype if p.dtype is torch.float64 else torch.float
+                        )
+                        state["exp_avg"] = torch.zeros(p.shape, dtype=buffer_dtype)
+                        state["exp_avg_sq"] = torch.zeros(p.shape, dtype=buffer_dtype)
 
-                    exp_avgs.append(state['exp_avg'])
-                    exp_avg_sqs.append(state['exp_avg_sq'])
+                    exp_avgs.append(state["exp_avg"])
+                    exp_avg_sqs.append(state["exp_avg_sq"])
 
                     # update the steps for each param group update
-                    state['step'] += 1
+                    state["step"] += 1
                     # record the step after step update
-                    state_steps.append(state['step'])
+                    state_steps.append(state["step"])
 
-            beta1, beta2 = group['betas']
+            beta1, beta2 = group["betas"]
             _lamb_impl(
                 params_with_grad,
                 grads,
@@ -97,7 +101,8 @@ class Lamb(torch.optim.Optimizer):
                 state_steps,
                 beta1,
                 beta2,
-                group['lr'],
-                group['weight_decay'],
-                group['eps'])
+                group["lr"],
+                group["weight_decay"],
+                group["eps"],
+            )
         return loss

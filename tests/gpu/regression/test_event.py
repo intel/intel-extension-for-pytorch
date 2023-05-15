@@ -4,7 +4,8 @@ from torch.testing._internal.common_utils import TestCase
 class TestTorchXPUMethod(TestCase):
     def test_event_record(self):
         import torch
-        import intel_extension_for_pytorch  # noqa
+        import intel_extension_for_pytorch  # noqa F401
+
         ev = torch.xpu.Event(enable_timing=True)
         # before the fix,
         # AttributeError: module 'intel_extension_for_pytorch #noqa' has no attribute 'current_stream'
@@ -13,7 +14,8 @@ class TestTorchXPUMethod(TestCase):
 
     def test_event_elapsed_time(self):
         import torch
-        import intel_extension_for_pytorch  # noqa
+        import intel_extension_for_pytorch  # noqa F401
+
         t1 = torch.rand(1024, 1024).to("xpu")
         t2 = torch.rand(1024, 1024).to("xpu")
         torch.xpu.synchronize()

@@ -28,6 +28,7 @@ def mapping_to(obj, device, dtype):
         return OrderedDict(map(func2D, obj.items()))
     return obj
 
+
 def clone_module(module):
     if not isinstance(module, torch.nn.Module):
         return module
@@ -37,25 +38,23 @@ def clone_module(module):
     clone._buffers = clone._buffers.copy()
     clone._modules = clone._modules.copy()
 
-    if hasattr(clone, '_parameters'):
+    if hasattr(clone, "_parameters"):
         for param_key in module._parameters:
             if module._parameters[param_key] is not None:
                 param = module._parameters[param_key]
                 cloned = param.clone()
                 clone._parameters[param_key] = cloned
 
-    if hasattr(clone, '_buffers'):
+    if hasattr(clone, "_buffers"):
         for buffer_key in module._buffers:
             if clone._buffers[buffer_key] is not None:
                 buff = module._buffers[buffer_key]
                 cloned = buff.clone()
                 clone._buffers[buffer_key] = cloned
 
-    if hasattr(clone, '_modules'):
+    if hasattr(clone, "_modules"):
         for module_key in clone._modules:
-            clone._modules[module_key] = clone_module(
-                module._modules[module_key]
-            )
+            clone._modules[module_key] = clone_module(module._modules[module_key])
 
     # if hasattr(clone, 'flatten_parameters'):
     #     clone = clone._apply(lambda x: x)
@@ -66,8 +65,9 @@ CALLED_NODES = []
 NODE_ID_MAP = {}
 UUID = 0
 
+
 class CosimModule(nn.Module):
-    def __init__(self, m, tDev='cpu', tDtype=torch.float32):
+    def __init__(self, m, tDev="cpu", tDtype=torch.float32):
         super().__init__()
         try:
             torch.tensor(1, device=tDev, dtype=tDtype)
@@ -76,13 +76,13 @@ class CosimModule(nn.Module):
             assert False, errmsg
         finally:
             self.target_device = tDev
-            self.target_dtype  = tDtype
+            self.target_dtype = tDtype
             # for now we aspect that user always want to enable cosim test
             self.enabled = True
             # for now we disable inf, nan check for temporary
             self.check_inf = False
             self.check_nan = False
-            
+
         self.modules_path_list = []
         for name, mod in m.named_modules():
             self.modules_path_list.append(name)
@@ -98,30 +98,28 @@ class CosimModule(nn.Module):
         NODE_ID_MAP = {}
         UUID = 0
 
-
-
     def forward(self, *inputs, **kwargs):
         return self.top_module(*inputs, **kwargs)
 
     def wrap_modules(self, cur_m):
         if cur_m._modules:
             cur_m._modules = OrderedDict(
-                map(lambda kv: (
-                    kv[0],
-                    self.wrap_modules(kv[1])),
-                    cur_m._modules.items()))
+                map(
+                    lambda kv: (kv[0], self.wrap_modules(kv[1])), cur_m._modules.items()
+                )
+            )
             return CosimWrapper(cur_m, self.target_device, self.target_dtype, False)
         else:
             return CosimWrapper(cur_m, self.target_device, self.target_dtype, True)
-    
+
     def set_names(self, cur_module):
-        assert isinstance(cur_module, CosimWrapper), \
-            f"Current module not be wrapped. type(cur_module) is {type(cur_module)}"
+        assert isinstance(
+            cur_module, CosimWrapper
+        ), f"Current module not be wrapped. type(cur_module) is {type(cur_module)}"
         cur_module._set_name(self.modules_path_list[self.idx])
         self.idx += 1
         for module in cur_module.cosim_module._modules.values():
             self.set_names(module)
-
 
     def plot_result(self, file="cosim_outputs/"):
         def _cal_max_diff(origin_outputs, cosim_outputs):
@@ -137,35 +135,37 @@ class CosimModule(nn.Module):
                 tolerance = atol + rtol * torch.abs(b_cpu)
                 diffmask = absdiff > tolerance
                 errors = absdiff[diffmask]
-                return max(errors) if errors.numel() > 0 else 0.
-            
+                return max(errors) if errors.numel() > 0 else 0.0
+
             def get_scalar_diff(a, b):
                 absdiff = abs(a - b)
                 tolerance = atol + rtol * abs(b)
                 if absdiff > tolerance:
                     return absdiff
                 else:
-                    return 0.
-
+                    return 0.0
 
             diffs = []
-            assert type(origin_outputs) == type(cosim_outputs), \
-                f"origin_output's type({type(origin_outputs)}) is not equal" \
-                f" to cosim output's type({type(cosim_outputs)})." \
+            assert type(origin_outputs) == type(cosim_outputs), (
+                f"origin_output's type({type(origin_outputs)}) is not equal"
+                f" to cosim output's type({type(cosim_outputs)})."
                 f" Please report to cosim tool's developer(xunsong.huang@intel.com)"
+            )
             if origin_outputs is None:
                 diffs.append(None)
-            elif isinstance(origin_outputs, torch.Tensor) \
-                    and isinstance(cosim_outputs, torch.Tensor):
+            elif isinstance(origin_outputs, torch.Tensor) and isinstance(
+                cosim_outputs, torch.Tensor
+            ):
                 diffs.append(get_tensor_diff(origin_outputs, cosim_outputs))
             else:
                 # experimental, not tested yet
                 for oo, co in zip(origin_outputs, cosim_outputs):
-                    assert type(oo) == type(co), \
-                        f"origin_output's type({type(oo)}) is not equal" \
-                        f" to cosim output's type({type(co)})." \
-                        f" Please report to cosim tool's developer" \
+                    assert type(oo) == type(co), (
+                        f"origin_output's type({type(oo)}) is not equal"
+                        f" to cosim output's type({type(co)})."
+                        f" Please report to cosim tool's developer"
                         f"(xunsong.huang@intel.com)"
+                    )
                     if oo is None:
                         diffs.append(None)
                     elif isinstance(oo, torch.Tensor):
@@ -177,14 +177,21 @@ class CosimModule(nn.Module):
                         diffs.append(get_scalar_diff(oo, co))
             return diffs
 
-        node_attr = dict(style='filled',
-                         shape='box',
-                         align='left',
-                         fontsize='12',
-                         ranksep='0.1',
-                         height='0.2')
-        dot= Digraph(node_attr=node_attr, graph_attr=dict(size='12,12',
-                                                           rankdir='RL',))
+        node_attr = dict(
+            style="filled",
+            shape="box",
+            align="left",
+            fontsize="12",
+            ranksep="0.1",
+            height="0.2",
+        )
+        dot = Digraph(
+            node_attr=node_attr,
+            graph_attr=dict(
+                size="12,12",
+                rankdir="RL",
+            ),
+        )
 
         def gen_unique_id(cur_path):
             global UUID
@@ -194,26 +201,25 @@ class CosimModule(nn.Module):
         def add_node(cur_path, msg, flag):
             global NODE_ID_MAP
             node_id = gen_unique_id(cur_path)
-            if '.' not in cur_path:
+            if "." not in cur_path:
                 print("got root path: ", cur_path)
-                dot.node(node_id, cur_path, fillcolor='lightblue')
+                dot.node(node_id, cur_path, fillcolor="lightblue")
             else:
-                parent = cur_path.rsplit('.', 1)[0]
+                parent = cur_path.rsplit(".", 1)[0]
                 print("cur_path is: ", cur_path)
                 print("parent is: ", parent)
                 if parent not in NODE_ID_MAP:
                     add_node(parent, "", False)
                 if msg == "":
                     msg = f"NODE: {cur_path}"
-                    dot.node(node_id, msg, fillcolor='lightblue')
+                    dot.node(node_id, msg, fillcolor="lightblue")
                 else:
                     if flag:
-                        dot.node(node_id, msg, fillcolor='pink')
+                        dot.node(node_id, msg, fillcolor="pink")
                     else:
-                        dot.node(node_id, msg, fillcolor='green')
+                        dot.node(node_id, msg, fillcolor="green")
                 dot.edge(node_id, NODE_ID_MAP[parent])
             NODE_ID_MAP[cur_path] = node_id
-
 
         global CALLED_NODES
 
@@ -229,7 +235,7 @@ class CosimModule(nn.Module):
                 for i in range(len(output_diffs)):
                     print(f"\toutput #{i}'s max error: {output_diffs[i]}")
                     msg += f"output #{i}'s max error: {output_diffs[i]}\n"
-                    if output_diffs[i] is not None and output_diffs[i] > 0.:
+                    if output_diffs[i] is not None and output_diffs[i] > 0.0:
                         over_error = True
                 print("-> This node has cosim grad comparasion results for inputs.")
                 origin_grads = node.grads_list
@@ -238,20 +244,19 @@ class CosimModule(nn.Module):
                 for i in range(len(grad_diffs)):
                     print(f"\tgrad of input #{i}'s max error: {grad_diffs[i]}")
                     msg += f"grad of input #{i}'s max error: {grad_diffs[i]}\n"
-                    if grad_diffs[i] is not None and \
-                            isinstance(grad_diffs[i], Iterable):
+                    if grad_diffs[i] is not None and isinstance(
+                        grad_diffs[i], Iterable
+                    ):
                         for g in grad_diffs[i]:
-                            if g is not None and g > 0.:
+                            if g is not None and g > 0.0:
                                 over_error = True
-                    elif grad_diffs[i] is not None and grad_diffs[i] > 0.:
+                    elif grad_diffs[i] is not None and grad_diffs[i] > 0.0:
                         over_error = True
                 add_node(node.cosim_path, msg, over_error)
             node.visited += 1
 
         resize_graph(dot)
-        file = os.path.join(file,
-                            str(time.time_ns()), 
-                            "cosim_result.gv")
+        file = os.path.join(file, str(time.time_ns()), "cosim_result.gv")
         self._clear_cosim()
         return dot.render(file)
 
@@ -292,14 +297,14 @@ class CosimWrapper(nn.Module):
         self.visited = 0
 
     def register_bwd_hook(self, outputs, cosim_outputs=None):
-
         cur_output = None
         cur_cosim_output = None
 
         def _backward_hook(grad):
             if self.should_do_cosim:
-                cosim_grad = grad.detach().clone().to(
-                    self.target_device, self.target_dtype)
+                cosim_grad = (
+                    grad.detach().clone().to(self.target_device, self.target_dtype)
+                )
                 if cur_cosim_output is not None:
                     self.cosim_grads_list.append(cur_cosim_output.grad_fn(cosim_grad))
                 print(self.cosim_path, "'s cosim grad is computed.'")
@@ -309,8 +314,7 @@ class CosimWrapper(nn.Module):
             self.grads_list.append(cur_output.grad_fn(cur_grad))
             return grad
 
-        if isinstance(outputs, torch.Tensor) and \
-                outputs.requires_grad is True:
+        if isinstance(outputs, torch.Tensor) and outputs.requires_grad is True:
             cur_output = outputs
             cur_output.retain_grad()
             cur_cosim_output = cosim_outputs
@@ -319,12 +323,14 @@ class CosimWrapper(nn.Module):
             cur_output.register_hook(_backward_hook)
         else:
             for o in outputs:
-                if isinstance(o, torch.Tensor) and \
-                        o.requires_grad is True:
+                if isinstance(o, torch.Tensor) and o.requires_grad is True:
                     cur_output = o
                     cur_output.retain_grad()
-                    cur_cosim_output = cosim_outputs[outputs.index(o)] \
-                        if cosim_outputs is not None else None
+                    cur_cosim_output = (
+                        cosim_outputs[outputs.index(o)]
+                        if cosim_outputs is not None
+                        else None
+                    )
                     if cur_cosim_output is not None:
                         cur_cosim_output.retain_grad()
                     cur_output.register_hook(_backward_hook)
@@ -343,18 +349,18 @@ class CosimWrapper(nn.Module):
             cosim_kwargs = mapping_to(kwargs, device=t_dev, dtype=t_dtype)
             self.cosim_kwargs_list.append(cosim_kwargs)
             cosim_layer = CosimWrapper(
-                clone_module(self.cosim_module), t_dev, t_dtype, False)
+                clone_module(self.cosim_module), t_dev, t_dtype, False
+            )
             cosim_layer.load_state_dict(self.state_dict())
             cosim_layer.to(t_dev, t_dtype)
             self.cosim_outputs_list.append(
-                cosim_layer(*self.cosim_inputs_list[-1],
-                            **self.cosim_kwargs_list[-1]))
+                cosim_layer(*self.cosim_inputs_list[-1], **self.cosim_kwargs_list[-1])
+            )
         self.outputs_list.append(
-            self.cosim_module(*self.inputs_list[-1],
-                              **self.kwargs_list[-1]))
+            self.cosim_module(*self.inputs_list[-1], **self.kwargs_list[-1])
+        )
         if self.should_do_cosim:
             self.register_bwd_hook(self.outputs_list[-1], self.cosim_outputs_list[-1])
         else:
             self.register_bwd_hook(self.outputs_list[-1])
         return self.outputs_list[-1]
-

@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -12,10 +12,12 @@ dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     def test_softshrink(self, dtype=torch.float):
-        x_cpu = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.2, 1.7]],
-                             requires_grad=True, device=cpu_device)
+        x_cpu = torch.tensor(
+            [[0.5, 1.5, 0.1], [2.2, 1.2, 1.7]], requires_grad=True, device=cpu_device
+        )
         y_cpu_output = torch.tensor(
-            [[0.5, 1.5, 0.1], [2.2, 1.2, 1.7]], requires_grad=True, device=cpu_device)
+            [[0.5, 1.5, 0.1], [2.2, 1.2, 1.7]], requires_grad=True, device=cpu_device
+        )
 
         y = F.softshrink(x_cpu, 1)
         y.backward(y_cpu_output)
@@ -25,10 +27,12 @@ class TestTorchMethod(TestCase):
         print("softshrink:", y)
         print("softshrink x_cpu_grad = ", x_cpu.grad)
 
-        x_dpcpp = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.2, 1.7]],
-                               requires_grad=True, device=dpcpp_device)
+        x_dpcpp = torch.tensor(
+            [[0.5, 1.5, 0.1], [2.2, 1.2, 1.7]], requires_grad=True, device=dpcpp_device
+        )
         y_dpcpp_output = torch.tensor(
-            [[0.5, 1.5, 0.1], [2.2, 1.2, 1.7]], requires_grad=True, device=dpcpp_device)
+            [[0.5, 1.5, 0.1], [2.2, 1.2, 1.7]], requires_grad=True, device=dpcpp_device
+        )
 
         y_dpcpp = F.softshrink(x_dpcpp, 1)
         y_dpcpp.backward(y_dpcpp_output)

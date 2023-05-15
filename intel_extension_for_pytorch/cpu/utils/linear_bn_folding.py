@@ -7,10 +7,11 @@ import copy
 
 def linear_bn_fuse(model: nn.Module, inplace=False) -> nn.Module:
     # implementation follows https://github.com/pytorch/pytorch/blob/master/torch/fx/experimental/optimization.py#L50
-    patterns = [(nn.Linear, nn.BatchNorm1d),
-                (nn.Linear, nn.BatchNorm2d),
-                (nn.Linear, nn.BatchNorm3d),
-                ]
+    patterns = [
+        (nn.Linear, nn.BatchNorm1d),
+        (nn.Linear, nn.BatchNorm2d),
+        (nn.Linear, nn.BatchNorm3d),
+    ]
 
     if not inplace:
         model = copy.deepcopy(model)

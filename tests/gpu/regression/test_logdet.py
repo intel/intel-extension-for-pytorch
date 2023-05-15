@@ -1,10 +1,11 @@
 import torch
-import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch  # noqa F401
 from torch.testing._internal.common_utils import TestCase
+
 
 class TestFill(TestCase):
     def test_logdet_backward(self):
-        det = torch.rand([4,4])
+        det = torch.rand([4, 4])
         det_xpu = det.to("xpu")
         det.requires_grad_(True)
         det_xpu.requires_grad_(True)

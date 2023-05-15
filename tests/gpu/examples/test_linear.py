@@ -8,7 +8,9 @@ import pytest
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_linear(self, dtype=torch.float):
         # cpu
         linear = nn.Linear(4, 2)
@@ -17,8 +19,11 @@ class TestNNMethod(TestCase):
         linear_weight_cpu = linear.weight.clone()
         # print("linear weight", linear_weight_cpu)
 
-        x_cpu = torch.tensor([[1.23, 2.34, 6.45, 2.22], [0.23, 1.34, 7.45, 1.22]],
-                             requires_grad=True, dtype=dtype)
+        x_cpu = torch.tensor(
+            [[1.23, 2.34, 6.45, 2.22], [0.23, 1.34, 7.45, 1.22]],
+            requires_grad=True,
+            dtype=dtype,
+        )
         # print("x_cpu", x_cpu)
 
         z_cpu = linear(x_cpu)
@@ -42,8 +47,12 @@ class TestNNMethod(TestCase):
         linear_weight_dpcpp = linear_dpcpp.weight.clone()
         # print("dpcpp linear weight", linear_weight_dpcpp.cpu())
 
-        x_dpcpp = torch.tensor([[1.23, 2.34, 6.45, 2.22], [0.23, 1.34, 7.45, 1.22]],
-                               requires_grad=True, device="xpu", dtype=dtype)
+        x_dpcpp = torch.tensor(
+            [[1.23, 2.34, 6.45, 2.22], [0.23, 1.34, 7.45, 1.22]],
+            requires_grad=True,
+            device="xpu",
+            dtype=dtype,
+        )
         # print("x_dpcpp", x_dpcpp.to("cpu"))
 
         z_dpcpp = linear_dpcpp(x_dpcpp)

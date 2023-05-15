@@ -1,6 +1,10 @@
 from scripts.gpu.model import *
 
-from scripts.gpu.api.types import TensorOptionsArguments, LegacyDispatcherArgument, ThisArgument
+from scripts.gpu.api.types import (
+    TensorOptionsArguments,
+    LegacyDispatcherArgument,
+    ThisArgument,
+)
 import scripts.gpu.api.cpp as cpp
 
 from typing import Union, Sequence
@@ -13,37 +17,46 @@ from typing import Union, Sequence
 # kernels.  To be deleted eventually.  Dispatcher calls use
 # this when you are not use_c10_dispatcher: full.
 
+
 def name(func: FunctionSchema) -> str:
     name = str(func.name.name)
     # TODO: delete this!
     if func.is_out_fn():
-        name += '_out'
+        name += "_out"
     if func.name.overload_name:
-        name += f'_{func.name.overload_name}'
+        name += f"_{func.name.overload_name}"
     return name
 
+
 def argumenttype_type(t: Type, *, mutable: bool) -> str:
-    if str(t) == 'Tensor?':
+    if str(t) == "Tensor?":
         if mutable:
-            return 'Tensor &'
+            return "Tensor &"
         else:
-            return 'const Tensor &'
-    elif str(t) == 'Tensor?[]':
-        return 'TensorList'
+            return "const Tensor &"
+    elif str(t) == "Tensor?[]":
+        return "TensorList"
     return cpp.argumenttype_type(t, mutable=mutable)
+
 
 def returns_type(rs: Sequence[Return]) -> str:
     return cpp.returns_type(rs)
 
+
 def argument_type(a: Argument) -> str:
     return argumenttype_type(a.type, mutable=a.is_write)
 
-def argument(a: Union[Argument, ThisArgument, TensorOptionsArguments]) -> LegacyDispatcherArgument:
+
+def argument(
+    a: Union[Argument, ThisArgument, TensorOptionsArguments]
+) -> LegacyDispatcherArgument:
     if isinstance(a, Argument):
         return LegacyDispatcherArgument(
             type=argument_type(a),
             name=a.name,
-            default=cpp.default_expr(a.default, a.type) if a.default is not None else None,
+            default=cpp.default_expr(a.default, a.type)
+            if a.default is not None
+            else None,
             argument=a,
         )
     elif isinstance(a, ThisArgument):
@@ -58,17 +71,18 @@ def argument(a: Union[Argument, ThisArgument, TensorOptionsArguments]) -> Legacy
         # TODO: expunge this logic entirely
         default = None
         if all(x.default == "None" for x in a.all()):
-            default = '{}'
+            default = "{}"
         elif a.dtype.default == "long":
-            default = 'at::kLong'  # TODO: this is wrong
+            default = "at::kLong"  # TODO: this is wrong
         return LegacyDispatcherArgument(
-            type='const TensorOptions &',
-            name='options',
+            type="const TensorOptions &",
+            name="options",
             default=default,
             argument=a,
         )
     else:
         assert_never(a)
+
 
 def arguments(func: FunctionSchema) -> Sequence[LegacyDispatcherArgument]:
     return list(map(argument, cpp.group_arguments(func)))

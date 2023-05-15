@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -47,10 +47,11 @@ class TestNNMethod(TestCase):
         print("y_dpcpp = ", y_dpcpp.cpu())
         print("x_dpcpp.grad", x_dpcpp.grad.cpu())
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device).float(), rtol=10e-4, atol=10e-2)
-        self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device).float(), rtol=10e-4, atol=10e-2)
+        self.assertEqual(
+            x_cpu.grad, x_dpcpp.grad.to(cpu_device).float(), rtol=10e-4, atol=10e-2
+        )
 
     def test_batch_norm(self, dtype=torch.float):
-
         x_i = torch.randn([2, 2, 3, 3], device=cpu_device)
         grad_i = torch.randn([2, 2, 3, 3], device=cpu_device)
 
@@ -181,10 +182,19 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
-    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d(), reason="doesn't enable channels last 1d")
+    @pytest.mark.skipif(
+        not torch.xpu.has_channels_last_1d(), reason="doesn't enable channels last 1d"
+    )
     def test_channels_last_1d_fwd_and_bwd(self, dtype=torch.float):
-        shapes = [(1, 2, 3), (2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
-                  (4, 1, 1), (1, 4, 4)]
+        shapes = [
+            (1, 2, 3),
+            (2, 2, 3),
+            (4, 4, 4),
+            (4, 4, 1),
+            (4, 1, 4),
+            (4, 1, 1),
+            (1, 4, 4),
+        ]
         for shape in shapes:
             print("\n================== test shape: ", shape, "==================")
             N, C, W = shape[0], shape[1], shape[2]
@@ -215,21 +225,35 @@ class TestNNMethod(TestCase):
 
             y_dpcpp.backward(grad_dpcpp)
 
-            if 1 == y_dpcpp.shape[1] or 1 == y_dpcpp.shape[2] or \
-               (1 == y_dpcpp.shape[1] and 1 == y_dpcpp.shape[2]):
+            if (
+                1 == y_dpcpp.shape[1]
+                or 1 == y_dpcpp.shape[2]
+                or (1 == y_dpcpp.shape[1] and 1 == y_dpcpp.shape[2])
+            ):
                 self.assertEqual(y_dpcpp.is_contiguous(), True)
-                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(y_dpcpp), True)
+                self.assertEqual(
+                    torch.xpu.is_contiguous_channels_last_1d(y_dpcpp), True
+                )
             else:
                 self.assertEqual(y_dpcpp.is_contiguous(), False)
-                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(y_dpcpp), True)
+                self.assertEqual(
+                    torch.xpu.is_contiguous_channels_last_1d(y_dpcpp), True
+                )
 
-            if 1 == x_dpcpp.grad.shape[1] or 1 == x_dpcpp.grad.shape[2] or \
-               (1 == x_dpcpp.grad.shape[1] and 1 == x_dpcpp.grad.shape[2]):
+            if (
+                1 == x_dpcpp.grad.shape[1]
+                or 1 == x_dpcpp.grad.shape[2]
+                or (1 == x_dpcpp.grad.shape[1] and 1 == x_dpcpp.grad.shape[2])
+            ):
                 self.assertEqual(x_dpcpp.grad.is_contiguous(), True)
-                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(x_dpcpp.grad), True)
+                self.assertEqual(
+                    torch.xpu.is_contiguous_channels_last_1d(x_dpcpp.grad), True
+                )
             else:
                 self.assertEqual(x_dpcpp.grad.is_contiguous(), False)
-                self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(x_dpcpp.grad), True)
+                self.assertEqual(
+                    torch.xpu.is_contiguous_channels_last_1d(x_dpcpp.grad), True
+                )
 
             print("y_dpcpp = ", y_dpcpp.cpu())
             print("x_dpcpp.grad", x_dpcpp.grad.cpu())
@@ -237,8 +261,18 @@ class TestNNMethod(TestCase):
             self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
     def test_channels_last_fwd_and_bwd(self, dtype=torch.float):
-        shapes = [(1, 2, 3, 3), (2, 2, 3, 3), (4, 4, 4, 4), (4, 4, 1, 1), (4, 1, 4, 4),
-                  (4, 1, 4, 1), (4, 1, 1, 4), (1, 4, 1, 4), (1, 4, 4, 1), (4, 1, 1, 1)]
+        shapes = [
+            (1, 2, 3, 3),
+            (2, 2, 3, 3),
+            (4, 4, 4, 4),
+            (4, 4, 1, 1),
+            (4, 1, 4, 4),
+            (4, 1, 4, 1),
+            (4, 1, 1, 4),
+            (1, 4, 1, 4),
+            (1, 4, 4, 1),
+            (4, 1, 1, 1),
+        ]
         for shape in shapes:
             print("\n================== test shape: ", shape, "==================")
             N, C, H, W = shape[0], shape[1], shape[2], shape[3]
@@ -269,21 +303,43 @@ class TestNNMethod(TestCase):
 
             y_dpcpp.backward(grad_dpcpp)
 
-            if 1 == y_dpcpp.shape[1] or (1 == y_dpcpp.shape[2] and 1 == y_dpcpp.shape[3]) or \
-               (1 == y_dpcpp.shape[1] and 1 == y_dpcpp.shape[2] and 1 == y_dpcpp.shape[3]):
+            if (
+                1 == y_dpcpp.shape[1]
+                or (1 == y_dpcpp.shape[2] and 1 == y_dpcpp.shape[3])
+                or (
+                    1 == y_dpcpp.shape[1]
+                    and 1 == y_dpcpp.shape[2]
+                    and 1 == y_dpcpp.shape[3]
+                )
+            ):
                 self.assertEqual(y_dpcpp.is_contiguous(), True)
-                self.assertEqual(y_dpcpp.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    y_dpcpp.is_contiguous(memory_format=torch.channels_last), True
+                )
             else:
                 self.assertEqual(y_dpcpp.is_contiguous(), False)
-                self.assertEqual(y_dpcpp.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    y_dpcpp.is_contiguous(memory_format=torch.channels_last), True
+                )
 
-            if 1 == x_dpcpp.grad.shape[1] or (1 == x_dpcpp.grad.shape[2] and 1 == x_dpcpp.grad.shape[3]) or \
-               (1 == x_dpcpp.grad.shape[1] and 1 == x_dpcpp.grad.shape[2] and 1 == x_dpcpp.grad.shape[3]):
+            if (
+                1 == x_dpcpp.grad.shape[1]
+                or (1 == x_dpcpp.grad.shape[2] and 1 == x_dpcpp.grad.shape[3])
+                or (
+                    1 == x_dpcpp.grad.shape[1]
+                    and 1 == x_dpcpp.grad.shape[2]
+                    and 1 == x_dpcpp.grad.shape[3]
+                )
+            ):
                 self.assertEqual(x_dpcpp.grad.is_contiguous(), True)
-                self.assertEqual(x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True
+                )
             else:
                 self.assertEqual(x_dpcpp.grad.is_contiguous(), False)
-                self.assertEqual(x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True
+                )
 
             print("y_dpcpp = ", y_dpcpp.cpu())
             print("x_dpcpp.grad", x_dpcpp.grad.cpu())
@@ -291,10 +347,16 @@ class TestNNMethod(TestCase):
             self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
     def test_batch_norm_gather_stats(self):
-        input = torch.randn(1, 3, 3, 3, device='xpu')
+        input = torch.randn(1, 3, 3, 3, device="xpu")
         mean, invstd = torch.batch_norm_gather_stats(
-            input, mean=torch.ones(64, 3, device='xpu'), invstd=torch.ones(64, 3, device='xpu'),
-            running_mean=None, running_var=None  , momentum=.1, eps=1e-5, count=2
+            input,
+            mean=torch.ones(64, 3, device="xpu"),
+            invstd=torch.ones(64, 3, device="xpu"),
+            running_mean=None,
+            running_var=None,
+            momentum=0.1,
+            eps=1e-5,
+            count=2,
         )
-        self.assertEqual(mean, torch.ones(3, device='xpu'))
-        self.assertEqual(invstd, torch.ones(3, device='xpu'))
+        self.assertEqual(mean, torch.ones(3, device="xpu"))
+        self.assertEqual(invstd, torch.ones(3, device="xpu"))

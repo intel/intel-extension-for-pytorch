@@ -7,7 +7,7 @@ def interaction(*args):
     Get the interaction feature beyond different kinds of features (like gender
     or hobbies), used in DLRM model.
 
-    For now, we only optimized "dot" interaction at `DLRM Github repo 
+    For now, we only optimized "dot" interaction at `DLRM Github repo
     <https://github.com/facebookresearch/dlrm/blob/main/dlrm_s_pytorch.py#L475-L495>`_.
     Through this, we use the dot product to represent the interaction feature
     between two features.

@@ -1,20 +1,36 @@
 import os
 import copy
-from typing import List, Dict, Tuple, Any, Optional
+from typing import List, Dict, Tuple, Any
 import torch
-import torch.nn.functional as F
 from torch.fx.node import map_aggregate
 from torch.ao.quantization import PlaceholderObserver
 from torch.quantization.qconfig import QConfig
 from torch.nn.utils.rnn import PackedSequence
 
-from ._utils import get_torch_function_hook_type, HookType, get_module_hook_type, OpQuantizeabilityType, \
-    attach_op_convert_info_to_model, save_quant_state, attach_scale_zp_values_to_model, convert_quant_state_map_to_nodes, \
-        sync_pool_and_lstm_input_output_scale_zp, module_call_to_function_call, quantized_modules_has_weights, \
-        load_qconf_summary_to_model, get_fqn_valid_for_module_dict_key, check_model_obsever_has_run
-from ._quantization_state import AutoQuantizationState, AutoQuantizationStateModuleDict, init_model_quant_state
+from ._utils import (
+    get_torch_function_hook_type,
+    HookType,
+    get_module_hook_type,
+    OpQuantizeabilityType,
+    attach_op_convert_info_to_model,
+    save_quant_state,
+    attach_scale_zp_values_to_model,
+    convert_quant_state_map_to_nodes,
+    sync_pool_and_lstm_input_output_scale_zp,
+    module_call_to_function_call,
+    quantized_modules_has_weights,
+    load_qconf_summary_to_model,
+    get_fqn_valid_for_module_dict_key,
+    check_model_obsever_has_run,
+)
+from ._quantization_state import (
+    AutoQuantizationState,
+    AutoQuantizationStateModuleDict,
+    init_model_quant_state,
+)
 from ._recipe import get_default_recipe
 from ._module_swap_utils import swap_child_modules
+
 
 # AutoQuantizationState lives in parent module's _modules.
 # Currently, `torch.nn.Sequential`'s forward iterates over all
@@ -28,6 +44,7 @@ def _nn_sequential_patched_forward(cls, input):
             input = module(input)
     return input
 
+
 def _check_add_has_scalar_input(args):
     r"""
     This function is about check add whether has scalar input.
@@ -37,31 +54,37 @@ def _check_add_has_scalar_input(args):
             return True
     return False
 
+
 def _convert_PackedSequence_to_tuple_lstm(args):
-     if isinstance(args, tuple) and len(args) == 2:   # (PackedSequence, hx)
+    if isinstance(args, tuple) and len(args) == 2:  # (PackedSequence, hx)
         input, batch_sizes, sorted_indices, unsorted_indices = args[0]
         args = (input, batch_sizes, sorted_indices, unsorted_indices, args[-1])
-     elif isinstance(args, tuple) and len(args) == 1:   # (PackedSequence, )
-         input, batch_sizes, sorted_indices, unsorted_indices = args[0]
-         args = (input, batch_sizes, sorted_indices, unsorted_indices)
-     else:
-         assert False, "_convert_PackedSequence_to_tuple args should be a tuple with size 2 or PackedSequence"
-     return args
+    elif isinstance(args, tuple) and len(args) == 1:  # (PackedSequence, )
+        input, batch_sizes, sorted_indices, unsorted_indices = args[0]
+        args = (input, batch_sizes, sorted_indices, unsorted_indices)
+    else:
+        assert_status = False
+        assert (
+            assert_status
+        ), "_convert_PackedSequence_to_tuple args should be a tuple with size 2 or PackedSequence"
+    return args
+
 
 def _convert_tuple_to_PackedSequence_lstm(args):
-    assert isinstance(args, tuple) and len(args) >= 4 and len(args) <=5, "_convert_tuple_to_PackedSequence input should be a tuple(5=<size >=4)"
+    assert (
+        isinstance(args, tuple) and len(args) >= 4 and len(args) <= 5
+    ), "_convert_tuple_to_PackedSequence input should be a tuple(5=<size >=4)"
     if len(args) == 4:
         return (PackedSequence(*args),)
     else:
         return (PackedSequence(*args[:-1]), args[-1])
-    
+
 
 def auto_prepare(
-    model : torch.nn.Module,
+    model: torch.nn.Module,
     configure: QConfig,
     example_inputs: Tuple[Any],
 ) -> torch.nn.Module:
-
     def convert_to_interception_proxy(x):
         if isinstance(x, torch.Tensor):
             return x.as_subclass(QuantizationPrepareTensorProxy)  # type: ignore[arg-type]
@@ -70,7 +93,7 @@ def auto_prepare(
 
     cur_module = None
     first_call = True
-    module_stack : List[torch.nn.Module] = []
+    module_stack: List[torch.nn.Module] = []
     # Counter for tensor IDs, will be modified inplace by quant state.
     # This is used to track tensors from output ops to input ops. For example,
     # if op_n had a tensor output with id=1, and op_n+2 had a tensor input with
@@ -106,11 +129,11 @@ def auto_prepare(
             nonlocal global_disable_torch_function_override
             if (
                 # global override means disable the override here
-                global_disable_torch_function_override or
-                # to prevent printing things from going into an infinite loop
-                func == torch.Tensor.__repr__ or
                 # we don't need to override getters in this framework
-                func.__name__ == '__get__'
+                # to prevent printing things from going into an infinite loop
+                global_disable_torch_function_override
+                or func == torch.Tensor.__repr__
+                or func.__name__ == "__get__"
             ):
                 return super().__torch_function__(func, types, args, kwargs)
 
@@ -124,7 +147,11 @@ def auto_prepare(
             # case, scalar+scalar, pytorch trace will convert the first input as a tensor at convert step,
             # but we didn't collect the quant info at calibration step, which can't get
             # quant info here(asster KeyError), so we disable torch.add(tensor, scaler) quantizaiton.
-            if hook_type is HookType.OP_HOOKS and func in [torch.add, torch.Tensor.add] and _check_add_has_scalar_input(args):
+            if (
+                hook_type is HookType.OP_HOOKS and
+                func in [torch.add, torch.Tensor.add] and
+                _check_add_has_scalar_input(args)
+            ):
                 hook_type = None
 
             if hook_type is HookType.OP_HOOKS:
@@ -135,49 +162,77 @@ def auto_prepare(
                 # run "before" hook
                 if first_call:
                     args, kwargs = qstate.first_call_op_prepare_before_hook(
-                        func, args, kwargs, qtensor_id, fqn, parent_module, OpQuantizeabilityType.QUANTIZEABLE)
+                        func,
+                        args,
+                        kwargs,
+                        qtensor_id,
+                        fqn,
+                        parent_module,
+                        OpQuantizeabilityType.QUANTIZEABLE,
+                    )
                 else:
-                    args, kwargs = qstate.op_prepare_before_hook(
-                        func, args, kwargs)
+                    args, kwargs = qstate.op_prepare_before_hook(func, args, kwargs)
                 # forward
                 output = super().__torch_function__(func, types, args, kwargs)
                 # run "after" hook
                 if first_call:
                     output = qstate.first_call_op_prepare_after_hook(
-                        func, output, args, qtensor_id, OpQuantizeabilityType.QUANTIZEABLE)
+                        func,
+                        output,
+                        args,
+                        qtensor_id,
+                        OpQuantizeabilityType.QUANTIZEABLE,
+                    )
                 else:
                     output = qstate.op_prepare_after_hook(
-                        func, output, args, global_op_idx)
+                        func, output, args, global_op_idx
+                    )
                 qstate.mark_cur_op_complete(func)
             else:
                 # Hook type is not HookType.OP_HOOKS, if first_call is True we
                 # record the DAG of non-quantizeable ops.
                 if first_call:
-                    qstate = getattr(parent_module, '_auto_quant_state', None)
+                    qstate = getattr(parent_module, "_auto_quant_state", None)
                     if qstate:
-                        fqn = module_id_to_fqn.get(id(parent_module), None) \
-                            if parent_module else None
+                        fqn = (
+                            module_id_to_fqn.get(id(parent_module), None)
+                            if parent_module
+                            else None
+                        )
                         args, kwargs = qstate.first_call_op_prepare_before_hook(
-                            func, args, kwargs, qtensor_id, fqn, parent_module, OpQuantizeabilityType.NOT_QUANTIZEABLE)
+                            func,
+                            args,
+                            kwargs,
+                            qtensor_id,
+                            fqn,
+                            parent_module,
+                            OpQuantizeabilityType.NOT_QUANTIZEABLE,
+                        )
 
                 output = super().__torch_function__(func, types, args, kwargs)
 
                 if first_call:
-                    qstate = getattr(parent_module, '_auto_quant_state', None)
+                    qstate = getattr(parent_module, "_auto_quant_state", None)
                     if qstate:
                         output = qstate.first_call_op_prepare_after_hook(
-                            func, output, args, qtensor_id, OpQuantizeabilityType.NOT_QUANTIZEABLE)
+                            func,
+                            output,
+                            args,
+                            qtensor_id,
+                            OpQuantizeabilityType.NOT_QUANTIZEABLE,
+                        )
 
             if output is NotImplemented:
                 with torch._C.DisableTorchFunction():
                     output = func(*args, **kwargs).as_subclass(
-                        QuantizationPrepareTensorProxy)
+                        QuantizationPrepareTensorProxy
+                    )
                 assert output is not NotImplemented
 
             return output
 
         def __repr__(self):
-            return f'QuantizationPrepareTensorProxy({super().__repr__()})'
+            return f"QuantizationPrepareTensorProxy({super().__repr__()})"
 
         # TODO(future PR): add other math overrides
 
@@ -219,8 +274,9 @@ def auto_prepare(
 
                     hook_type = get_module_hook_type(parent_module, cur_module)
                     if hook_type is HookType.OP_HOOKS:
-                        parent_qstate: AutoQuantizationState = \
-                            parent_module._auto_quant_state  # type: ignore[union-attr, assignment]
+                        parent_qstate: AutoQuantizationState = (
+                            parent_module._auto_quant_state
+                        )  # type: ignore[union-attr, assignment]
                         # before hooks
                         if not first_call:
                             parent_qstate.validate_cur_op(cur_module)
@@ -229,24 +285,36 @@ def auto_prepare(
                         # Therefore, we do not need to override any of its
                         # children. Disabling the overrides for performance.
                         nonlocal global_disable_torch_function_override
-                        old_global_disable_torch_function_override = \
+                        old_global_disable_torch_function_override = (
                             global_disable_torch_function_override
+                        )
                         global_disable_torch_function_override = True
-                        is_lstm_packed_input = isinstance(cur_module, torch.nn.LSTM) and isinstance(args[0], PackedSequence)
+                        is_lstm_packed_input = isinstance(
+                            cur_module, torch.nn.LSTM
+                        ) and isinstance(args[0], PackedSequence)
                         if is_lstm_packed_input:
                             args = _convert_PackedSequence_to_tuple_lstm(args)
                         if first_call:
                             # mypy ignore is used instead of assert because this
                             # runs on every forward and assert has a performance cost
-                            args, kwargs = parent_qstate.first_call_op_prepare_before_hook(
-                                cur_module, args, kwargs, qtensor_id,
-                                fqn, cur_module, # type: ignore[arg-type]
-                                OpQuantizeabilityType.QUANTIZEABLE)
+                            (
+                                args,
+                                kwargs,
+                            ) = parent_qstate.first_call_op_prepare_before_hook(
+                                cur_module,
+                                args,
+                                kwargs,
+                                qtensor_id,
+                                fqn,
+                                cur_module,  # type: ignore[arg-type]
+                                OpQuantizeabilityType.QUANTIZEABLE,
+                            )
                         else:
                             # mypy ignore is used instead of assert because this
                             # runs on every forward and assert has a performance cost
                             args, kwargs = parent_qstate.op_prepare_before_hook(
-                                cur_module, args, kwargs)  # type: ignore[arg-type]
+                                cur_module, args, kwargs
+                            )  # type: ignore[arg-type]
 
                         if is_lstm_packed_input:
                             args = _convert_tuple_to_PackedSequence_lstm(args)
@@ -254,19 +322,26 @@ def auto_prepare(
                         # original forward
                         output = orig_module_call(self, *args, **kwargs)
                         # Re-enable the overrides.
-                        global_disable_torch_function_override = \
+                        global_disable_torch_function_override = (
                             old_global_disable_torch_function_override
+                        )
 
                         # after hooks
                         if is_lstm_packed_input:
                             output = _convert_PackedSequence_to_tuple_lstm(output)
                         if first_call:
                             output = parent_qstate.first_call_op_prepare_after_hook(
-                                cur_module, output, args, qtensor_id, OpQuantizeabilityType.QUANTIZEABLE)
+                                cur_module,
+                                output,
+                                args,
+                                qtensor_id,
+                                OpQuantizeabilityType.QUANTIZEABLE,
+                            )
                         else:
                             output = parent_qstate.op_prepare_after_hook(
-                                cur_module, output, args, global_op_idx)
-                        
+                                cur_module, output, args, global_op_idx
+                            )
+
                         if is_lstm_packed_input:
                             output = _convert_tuple_to_PackedSequence_lstm(output)
 
@@ -280,7 +355,8 @@ def auto_prepare(
                         # after hooks
                         if first_call:
                             output = cur_qstate.first_call_outputs_prepare_hook(
-                                output, qtensor_id)
+                                output, qtensor_id
+                            )
                         else:
                             output = cur_qstate.outputs_prepare_hook(output)
 
@@ -288,28 +364,42 @@ def auto_prepare(
                     elif hook_type is HookType.ARG_DEQUANTS:
                         if first_call and parent_module is not None:
                             parent_qstate_fc = getattr(
-                                parent_module, '_auto_quant_state', None)
+                                parent_module, "_auto_quant_state", None
+                            )
                             if parent_qstate_fc:
-                                args, kwargs = \
-                                    parent_qstate_fc.first_call_op_prepare_before_hook(
-                                        cur_module, args, kwargs, qtensor_id, fqn,
-                                        cur_module,
-                                        OpQuantizeabilityType.NOT_QUANTIZEABLE)
+                                (
+                                    args,
+                                    kwargs,
+                                ) = parent_qstate_fc.first_call_op_prepare_before_hook(
+                                    cur_module,
+                                    args,
+                                    kwargs,
+                                    qtensor_id,
+                                    fqn,
+                                    cur_module,
+                                    OpQuantizeabilityType.NOT_QUANTIZEABLE,
+                                )
 
                         output = orig_module_call(self, *args, **kwargs)
                         # if this fp32 was inplace, make sure to set the output dtype
                         # back to torch.float
-                        if hasattr(output, '_qtensor_info'):
+                        if hasattr(output, "_qtensor_info"):
                             del output._qtensor_info
 
                         if first_call and parent_module is not None:
                             parent_qstate_fc = getattr(
-                                parent_module, '_auto_quant_state', None)
+                                parent_module, "_auto_quant_state", None
+                            )
                             if parent_qstate_fc:
-                                output = \
+                                output = (
                                     parent_qstate_fc.first_call_op_prepare_after_hook(
-                                        cur_module, output, args, qtensor_id,
-                                        OpQuantizeabilityType.NOT_QUANTIZEABLE)
+                                        cur_module,
+                                        output,
+                                        args,
+                                        qtensor_id,
+                                        OpQuantizeabilityType.NOT_QUANTIZEABLE,
+                                    )
+                                )
                     else:
                         output = orig_module_call(self, *args, **kwargs)
 
@@ -324,13 +414,13 @@ def auto_prepare(
             try:
                 if first_call:
                     init_model_quant_state(self, module_id_to_fqn, configure)
-               
+
                 global_op_idx[0] = 0
                 output = super().__call__(*new_args, **new_kwargs)
 
                 if first_call:
                     for _, v in self.named_modules():
-                        if hasattr(v, '_auto_quant_state'):
+                        if hasattr(v, "_auto_quant_state"):
                             v._auto_quant_state.insert_observers(v)
                 return output
             finally:
@@ -342,11 +432,13 @@ def auto_prepare(
             r"""
             This function is about save model's quant_state_map to a json file.
             """
-            assert qconf_summary is not None, "A configure file name should be given to save the qconf_summary"
+            assert (
+                qconf_summary is not None
+            ), "A configure file name should be given to save the qconf_summary"
             quant_state_map = self._fqn_to_auto_quant_state_map
             # If user have given a json file, we will save the qconf_summary according to the user's setting,
             # otherwise,  we will first get a default_recipe, and then save the default_recipe's setting.
-            if not hasattr(self, '_qconf_summary'):
+            if not hasattr(self, "_qconf_summary"):
                 # compute scales and zero_point.
                 attach_scale_zp_values_to_model(model)
                 nodes = convert_quant_state_map_to_nodes(quant_state_map)
@@ -363,46 +455,55 @@ def auto_prepare(
             # Setting model qconf_summary attr which can be easily to check the whether the scale/zp has been computed.
             self._qconf_summary = qconf_summary
             save_quant_state(quant_state_map, qconf_summary)
-        
+
         def load_qconf_summary(self, qconf_summary):
             r"""
             This function is about load the user qconf_summary, which will overwrite the model's quant_state_map.
             """
-            if (os.path.exists(qconf_summary) and os.stat(qconf_summary).st_size != 0):
+            if os.path.exists(qconf_summary) and os.stat(qconf_summary).st_size != 0:
                 self._qconf_summary = qconf_summary
                 load_qconf_summary_to_model(self, qconf_summary)
             else:
-                assert False, "Can not load a empty file or none existed file" + qconf_summary
+                assert_status = False
+                assert assert_status, (
+                    "Can not load a empty file or none existed file" + qconf_summary
+                )
 
     model.q_config = configure
     # For Dynamic quantization, most user model has a dynamic control flow, the DBR
-    # doesn't support it now, so there skip DRB when user want to run dynamic quantization. 
+    # doesn't support it now, so there skip DRB when user want to run dynamic quantization.
     if not isinstance(configure.activation(), PlaceholderObserver):
         model.__class__ = QuantizationInterceptionModule
         # init model quantization state using example_inputs
         model(*example_inputs)
     return model
 
+
 def copy_prepared_model(model):
     copied_model = copy.deepcopy(model)
     copied_model.q_config = model.q_config
     if isinstance(copied_model.q_config.activation(), PlaceholderObserver):
         return copied_model
-    copied_model._fqn_to_auto_quant_state_map = copy.deepcopy(model._fqn_to_auto_quant_state_map)
+    copied_model._fqn_to_auto_quant_state_map = copy.deepcopy(
+        model._fqn_to_auto_quant_state_map
+    )
     named_modules = list(copied_model.named_modules())
     for fqn, v in named_modules:
         fqn_to_use_for_key = get_fqn_valid_for_module_dict_key(fqn)
         if fqn_to_use_for_key in copied_model._fqn_to_auto_quant_state_map:
-            auto_quant_state = copied_model._fqn_to_auto_quant_state_map[fqn_to_use_for_key]
-            object.__setattr__(v, '_auto_quant_state', auto_quant_state)
-    if hasattr(model, '_qconf_summary'):
+            auto_quant_state = copied_model._fqn_to_auto_quant_state_map[
+                fqn_to_use_for_key
+            ]
+            object.__setattr__(v, "_auto_quant_state", auto_quant_state)
+    if hasattr(model, "_qconf_summary"):
         copied_model._qconf_summary = copy.deepcopy(model._qconf_summary)
     copied_model.__class__ = model.__class__
     return copied_model
 
+
 def auto_convert(
-    module : torch.nn.Module,
-    ) -> torch.nn.Module:
+    module: torch.nn.Module,
+) -> torch.nn.Module:
     def convert_to_dispatch_proxy(x):
         if isinstance(x, torch.Tensor):
             return x.as_subclass(QuantizationConvertTensorProxy)  # type: ignore[arg-type]
@@ -433,11 +534,11 @@ def auto_convert(
             nonlocal global_disable_torch_function_override
             if (
                 # global override means disable the override here
-                global_disable_torch_function_override or
-                # to prevent printing things from going into an infinite loop
-                func == torch.Tensor.__repr__ or
                 # we don't need to override getters in this framework
-                func.__name__ == '__get__'
+                # to prevent printing things from going into an infinite loop
+                global_disable_torch_function_override
+                or func == torch.Tensor.__repr__
+                or func.__name__ == "__get__"
             ):
                 return super().__torch_function__(func, types, args, kwargs)
 
@@ -449,7 +550,11 @@ def auto_convert(
             # case, scalar+scalar, pytorch trace will convert the first input as a tensor,
             # but we didn't collect the quant info at calibration step, which can't get
             # quant info here(asster KeyError), so we disable torch.add(tensor, scaler) quantizaiton.
-            if hook_type is HookType.OP_HOOKS and func in [torch.add, torch.Tensor.add] and _check_add_has_scalar_input(args):
+            if (
+                hook_type is HookType.OP_HOOKS and
+                func in [torch.add, torch.Tensor.add] and
+                _check_add_has_scalar_input(args)
+            ):
                 hook_type = None
 
             if hook_type is HookType.OP_HOOKS:
@@ -457,14 +562,14 @@ def auto_convert(
                 # before hooks
                 qstate.validate_cur_op(func)
                 func, args, kwargs = qstate.op_convert_before_hook(
-                    func, args, kwargs, parent_module)  # type: ignore[arg-type]
+                    func, args, kwargs, parent_module
+                )  # type: ignore[arg-type]
 
                 # forward
                 output = super().__torch_function__(func, types, args, kwargs)
 
                 # after hooks
-                output = qstate.op_convert_after_hook(
-                    func, output)
+                output = qstate.op_convert_after_hook(func, output)
                 qstate.mark_cur_op_complete(func)
             else:  # HookType.NONE
                 output = super().__torch_function__(func, types, args, kwargs)
@@ -472,15 +577,16 @@ def auto_convert(
             if output is NotImplemented:
                 with torch._C.DisableTorchFunction():
                     output = func(*args, **kwargs).as_subclass(
-                        QuantizationConvertTensorProxy)
+                        QuantizationConvertTensorProxy
+                    )
                 assert output is not NotImplemented
             return output
 
         def __repr__(self):
-            return f'QuantizationConvertTensorProxy({super().__repr__()})'
+            return f"QuantizationConvertTensorProxy({super().__repr__()})"
 
     cur_module = None
-    module_stack : List[torch.nn.Module] = []
+    module_stack: List[torch.nn.Module] = []
 
     assert len(module.__class__.__bases__) == 1
 
@@ -521,38 +627,43 @@ def auto_convert(
                     hook_type = get_module_hook_type(parent_module, cur_module)
                     if hook_type is HookType.OP_HOOKS:
                         # before hooks
-                        qstate: AutoQuantizationState = \
-                            parent_module._auto_quant_state  # type: ignore[union-attr, assignment]
+                        qstate: AutoQuantizationState = (
+                            parent_module._auto_quant_state
+                        )  # type: ignore[union-attr, assignment]
                         qstate.validate_cur_op(cur_module)
 
                         # If we are in this hook, `cur_module` is a leaf module.
                         # Therefore, we do not need to override any of its
                         # children. Disabling the overrides for performance.
-                        old_global_disable_torch_function_override = \
+                        old_global_disable_torch_function_override = (
                             global_disable_torch_function_override
+                        )
                         global_disable_torch_function_override = True
-                        is_lstm_packed_input = isinstance(cur_module, torch.nn.LSTM) and isinstance(args[0], PackedSequence)
+                        is_lstm_packed_input = isinstance(
+                            cur_module, torch.nn.LSTM
+                        ) and isinstance(args[0], PackedSequence)
                         if is_lstm_packed_input:
                             args = _convert_PackedSequence_to_tuple_lstm(args)
                         _, args, kwargs = qstate.op_convert_before_hook(
-                            cur_module, args, kwargs, cur_module)
+                            cur_module, args, kwargs, cur_module
+                        )
                         if is_lstm_packed_input:
                             args = _convert_tuple_to_PackedSequence_lstm(args)
                         if type(cur_module) in quantized_modules_has_weights:
                             weights = qstate.op_weight_convert_before_hook(cur_module)
                             output = module_call_to_function_call(self, args, weights)
                         else:
-                             output = orig_module_call(self, *args, **kwargs)
+                            output = orig_module_call(self, *args, **kwargs)
                         # after hooks
                         if is_lstm_packed_input:
                             output = _convert_PackedSequence_to_tuple_lstm(output)
-                        output = qstate.op_convert_after_hook(
-                            cur_module, output)
+                        output = qstate.op_convert_after_hook(cur_module, output)
                         if is_lstm_packed_input:
                             output = _convert_tuple_to_PackedSequence_lstm(output)
                         # Re-enable the override.
-                        global_disable_torch_function_override = \
+                        global_disable_torch_function_override = (
                             old_global_disable_torch_function_override
+                        )
 
                         qstate.mark_cur_op_complete(cur_module)
                     elif hook_type is HookType.MODULE_IO_HOOKS:
@@ -564,13 +675,15 @@ def auto_convert(
                         # after hooks
                         # For the sake of performance, we assume no overrides
                         # are needed for quantizing/dequantizing things
-                        old_global_disable_torch_function_override = \
+                        old_global_disable_torch_function_override = (
                             global_disable_torch_function_override
+                        )
                         global_disable_torch_function_override = True
-                        
+
                         output = cur_qstate.outputs_convert_hook(output)
-                        global_disable_torch_function_override = \
+                        global_disable_torch_function_override = (
                             old_global_disable_torch_function_override
+                        )
                         cur_qstate.validate_is_at_last_seen_idx()
                     else:
                         output = orig_module_call(self, *args, **kwargs)
@@ -595,11 +708,11 @@ def auto_convert(
             finally:
                 torch.nn.Module.__call__ = orig_module_call
                 torch.nn.Sequential.forward = orig_nn_sequential_forward  # type: ignore[assignment]
- 
+
     # If module doesn't have a configure_file attr, we can say that user didn't run save_qconf_summary method which have
     # computed the scales and zp, or didn't use the user's setting from a given json file(load_qconf_summary), we need to compute
     # the scale and zp here.
-    if not hasattr(module, '_qconf_summary'):
+    if not hasattr(module, "_qconf_summary"):
         quant_state_map = module._fqn_to_auto_quant_state_map
         # compute scales and zero_point.
         attach_scale_zp_values_to_model(module)

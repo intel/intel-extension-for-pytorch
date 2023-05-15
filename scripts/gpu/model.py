@@ -5,11 +5,13 @@ from typing import List, Sequence, Dict, Optional, Iterator, Tuple, Set, NoRetur
 from enum import Enum
 import itertools
 
+
 # A little trick from https://github.com/python/mypy/issues/6366
 # for getting mypy to do exhaustiveness checking
 # TODO: put this somewhere else, maybe
 def assert_never(x: NoReturn) -> NoReturn:
     raise AssertionError("Unhandled type: {}".format(type(x).__name__))
+
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 #
@@ -35,6 +37,7 @@ def assert_never(x: NoReturn) -> NoReturn:
 #   and you're expected to populate information once during
 #   construction.
 
+
 # Represent a source location; used for better error reporting
 @dataclass(frozen=True)
 class Location:
@@ -44,13 +47,14 @@ class Location:
     def __str__(self) -> str:
         return "{}:{}".format(self.file, self.line)
 
-# Valid values of the 'variants' field in native_functions.yaml
-Variant = Enum('Variant', ('function', 'method'))
 
-UseC10Dispatcher = Enum('UseC10Dispatcher', (
-    'full',
-    'with_codegenerated_unboxing_wrapper'
-))
+# Valid values of the 'variants' field in native_functions.yaml
+Variant = Enum("Variant", ("function", "method"))
+
+UseC10Dispatcher = Enum(
+    "UseC10Dispatcher", ("full", "with_codegenerated_unboxing_wrapper")
+)
+
 
 # The basic input to the code generation is native_functions.yaml.
 # The name "native", BTW, comes from the distinction between native
@@ -71,7 +75,7 @@ class NativeFunction:
     # (This type is quoted as we are forward referencing a type
     # defined later in the file.  I opted for this ordering of the
     # classes for expository clarity.)
-    func: 'FunctionSchema'
+    func: "FunctionSchema"
 
     # Corresponds to the 'use_c10_dispatcher' field.  The default
     # is 'with_codegenerated_unboxing_wrapper'
@@ -105,70 +109,77 @@ class NativeFunction:
 
     # The location in the YAML file were this native function entry was
     # defined.  This is for conveniently reporting error messages!
-    loc: 'Location'
+    loc: "Location"
 
     # NB: The benefit of defining a dataclass is that we automatically get
     # a constructor defined for all the fields we specify.  No need
     # to explicitly write it out.
 
     @staticmethod
-    def from_yaml(ei: Dict[str, object], loc: 'Location') -> 'NativeFunction':
+    def from_yaml(ei: Dict[str, object], loc: "Location") -> "NativeFunction":
         """
         Parse a NativeFunction from a dictionary as directly parsed
         from native_functions.yaml
         """
         e = ei.copy()
 
-        funcs = e.pop('func')
-        assert isinstance(funcs, str), f'not a str: {funcs}'
+        funcs = e.pop("func")
+        assert isinstance(funcs, str), f"not a str: {funcs}"
         func = FunctionSchema.parse(funcs)
 
-        use_c10_dispatcher_s = e.pop('use_c10_dispatcher', None)
+        use_c10_dispatcher_s = e.pop("use_c10_dispatcher", None)
         if use_c10_dispatcher_s is None:
             use_c10_dispatcher = UseC10Dispatcher.with_codegenerated_unboxing_wrapper
-        elif use_c10_dispatcher_s == 'full':
+        elif use_c10_dispatcher_s == "full":
             use_c10_dispatcher = UseC10Dispatcher.full
         else:
             raise AssertionError(
-                f'use_c10_dispatcher must be unset or set to full, got {use_c10_dispatcher}')
+                f"use_c10_dispatcher must be unset or set to full, got {use_c10_dispatcher}"
+            )
 
-        variants_s = e.pop('variants', 'function')
+        variants_s = e.pop("variants", "function")
         assert isinstance(variants_s, str)
         variants: Set[Variant] = set()
-        for v in variants_s.split(', '):
-            if v == 'function':
+        for v in variants_s.split(", "):
+            if v == "function":
                 variants.add(Variant.function)
-            elif v == 'method':
+            elif v == "method":
                 variants.add(Variant.method)
             else:
-                raise AssertionError(f'illegal variant {v}')
+                raise AssertionError(f"illegal variant {v}")
 
-        manual_kernel_registration = e.pop('manual_kernel_registration', False)
-        assert isinstance(manual_kernel_registration, bool), f'not a bool: {manual_kernel_registration}'
+        manual_kernel_registration = e.pop("manual_kernel_registration", False)
+        assert isinstance(
+            manual_kernel_registration, bool
+        ), f"not a bool: {manual_kernel_registration}"
 
-        device_guard = e.pop('device_guard', True)
-        assert isinstance(device_guard, bool), f'not a bool: {device_guard}'
+        device_guard = e.pop("device_guard", True)
+        assert isinstance(device_guard, bool), f"not a bool: {device_guard}"
 
-        python_module = e.pop('python_module', None)
-        assert python_module is None or isinstance(python_module, str), f'not a str: {python_module}'
+        python_module = e.pop("python_module", None)
+        assert python_module is None or isinstance(
+            python_module, str
+        ), f"not a str: {python_module}"
 
-        category_override = e.pop('category_override', None)
-        assert category_override is None or isinstance(category_override, str), f'not a str: {category_override}'
+        category_override = e.pop("category_override", None)
+        assert category_override is None or isinstance(
+            category_override, str
+        ), f"not a str: {category_override}"
 
-        raw_dispatch = e.pop('dispatch', None)
+        raw_dispatch = e.pop("dispatch", None)
         assert raw_dispatch is None or isinstance(raw_dispatch, dict), e
         dispatch: Optional[Dict[str, str]] = None
         if raw_dispatch is not None:
             dispatch = {}
             for ks, v in raw_dispatch.items():
-                if ks == '__line__':
+                if ks == "__line__":
                     continue  # not worth tracking line numbers for dispatch entries
                 assert isinstance(ks, str), e
                 assert isinstance(v, str), e
                 for k in ks.split(","):
                     dispatch[k.strip()] = v
 
-        e.pop('__line__')
+        e.pop("__line__")
         assert not e, f"leftover entries: {e}"
 
         return NativeFunction(
@@ -192,10 +203,13 @@ class NativeFunction:
     # encoded in the type system.
     def __post_init__(self) -> None:
         if self.func.out_arguments:
-            assert self.variants == {Variant.function}, "Native functions with out arguments MUST " \
-                "be declared with only function variant; e.g., variants: function; " \
-                "otherwise you will tickle a Python argument binding bug " \
+            assert self.variants == {Variant.function}, (
+                "Native functions with out arguments MUST "
+                "be declared with only function variant; e.g., variants: function; "
+                "otherwise you will tickle a Python argument binding bug "
                 "(which usually manifests itself as the result variable being undefined.)"
+            )
+
 
 # The function schema is undoubtedly the most important data structure
 # in all of the codegen, as it defines the type signature for operators,
@@ -253,30 +267,34 @@ class NativeFunction:
 @dataclass(frozen=True)
 class FunctionSchema:
     # The name of the operator this function schema describes.
-    name: 'OperatorName'
+    name: "OperatorName"
 
     # NB: Sequence here is intentional, to make it read only
-    arguments: Sequence['Argument']
-    kwarg_only_arguments: Sequence['Argument']  # but not including out args
+    arguments: Sequence["Argument"]
+    kwarg_only_arguments: Sequence["Argument"]  # but not including out args
     # Unlike in the previous codegen, we have factored out 'out' arguments
     # in the canonical representation, removing them from kwarg
     # arguments.  This choice is justified by numerous downstream
     # transformations which treat out arguments specially; additionally,
     # you can see that canonicity is not violated!
-    out_arguments: Sequence['Argument']  # these are also kwarg-only
+    out_arguments: Sequence["Argument"]  # these are also kwarg-only
 
     # TODO: Need to handle collisions with argument names at some point
-    returns: Sequence['Return']
+    returns: Sequence["Return"]
 
-    def schema_order_arguments(self) -> Iterator['Argument']:
-        return itertools.chain(self.arguments, self.kwarg_only_arguments, self.out_arguments)
+    def schema_order_arguments(self) -> Iterator["Argument"]:
+        return itertools.chain(
+            self.arguments, self.kwarg_only_arguments, self.out_arguments
+        )
 
     @staticmethod
-    def parse(func: str) -> 'FunctionSchema':
+    def parse(func: str) -> "FunctionSchema":
         # We should probably get a proper parser here
-        assert ' -> ' in func, "function schema missing return type (spaces are mandatory)"
-        func_decl, return_decl = [x.strip() for x in func.split(' -> ')]
-        ops, args = func_decl.split('(', 1)
+        assert (
+            " -> " in func
+        ), "function schema missing return type (spaces are mandatory)"
+        func_decl, return_decl = [x.strip() for x in func.split(" -> ")]
+        ops, args = func_decl.split("(", 1)
         assert args[-1] == ")", "Expecting closing )"
         args = args[:-1]
         name = OperatorName.parse(ops)
@@ -287,39 +305,42 @@ class FunctionSchema:
             arguments=arguments,
             kwarg_only_arguments=kwarg_only_arguments,
             out_arguments=out_arguments,
-            returns=returns
+            returns=returns,
         )
-        assert str(r) == func, f'{str(r)} != {func}'
+        assert str(r) == func, f"{str(r)} != {func}"
         return r
 
     def __post_init__(self) -> None:
         for arg, ret in zip(self.out_arguments, self.returns):
-            assert arg.annotation == ret.annotation, \
-                "Out arguments must have matching return Tensor; furthermore, " \
+            assert arg.annotation == ret.annotation, (
+                "Out arguments must have matching return Tensor; furthermore, "
                 "the ith-argument needs to correspond to the ith return"
+            )
         if self.out_arguments:
-            assert len(self.out_arguments) == len(self.returns), \
-                "Must return as many arguments as there are out arguments"
+            assert len(self.out_arguments) == len(
+                self.returns
+            ), "Must return as many arguments as there are out arguments"
         if self.name.name.inplace:
             # TODO: fixme
             if str(self.name) not in [
-                    '_amp_non_finite_check_and_unscale_',
-                    '_foreach_add_scalar_list_',
-                    '_foreach_sub_scalar_list_',
-                    '_foreach_mul_scalar_list_',
-                    '_foreach_div_scalar_list_',
-                    '_foreach_add_.Scalar',
-                    '_foreach_sub_.Scalar',
-                    '_foreach_mul_.Scalar',
-                    '_foreach_div_.Scalar',
-                    '_foreach_add_.List',
-                    '_foreach_sub_.List',
-                    '_foreach_mul_.List',
-                    '_foreach_div_.List',
-                    '_foreach_exp_',
-                    '_foreach_sqrt_',
-                    '_foreach_addcmul_',
-                    '_foreach_addcdiv_']:
+                "_amp_non_finite_check_and_unscale_",
+                "_foreach_add_scalar_list_",
+                "_foreach_sub_scalar_list_",
+                "_foreach_mul_scalar_list_",
+                "_foreach_div_scalar_list_",
+                "_foreach_add_.Scalar",
+                "_foreach_sub_.Scalar",
+                "_foreach_mul_.Scalar",
+                "_foreach_div_.Scalar",
+                "_foreach_add_.List",
+                "_foreach_sub_.List",
+                "_foreach_mul_.List",
+                "_foreach_div_.List",
+                "_foreach_exp_",
+                "_foreach_sqrt_",
+                "_foreach_addcmul_",
+                "_foreach_addcdiv_",
+            ]:
                 assert len(self.returns) == 1
 
     def is_out_fn(self) -> bool:
@@ -355,17 +376,19 @@ class FunctionSchema:
         all_arguments: List[str] = []
         all_arguments.extend(map(str, self.arguments))
         if self.kwarg_only_arguments or self.out_arguments:
-            all_arguments.append('*')
+            all_arguments.append("*")
         all_arguments.extend(map(str, self.kwarg_only_arguments))
         all_arguments.extend(map(str, self.out_arguments))
-        all_arguments_str = ', '.join(all_arguments)
+        all_arguments_str = ", ".join(all_arguments)
         if len(self.returns) == 1:
             returns = str(self.returns[0])  # omit parentheses
         else:
-            returns = '(' + ', '.join(map(str, self.returns)) + ')'
-        return f'{self.name}({all_arguments_str}) -> {returns}'
+            returns = "(" + ", ".join(map(str, self.returns)) + ")"
+        return f"{self.name}({all_arguments_str}) -> {returns}"
+
 
 # Here is the rest of the data model, described more briefly.
+
 
 # Simplified version for what actually shows up in built-ins.
 # Look at alias_info.h for expanded syntax.  If you need the structure,
@@ -380,19 +403,20 @@ class Annotation:
     is_write: bool
 
     @staticmethod
-    def parse(ann: str) -> 'Annotation':
-        m = re.match(r'^([a-z])(!?)$', ann)
-        assert m is not None, f'unrecognized alias annotation {ann}'
+    def parse(ann: str) -> "Annotation":
+        m = re.match(r"^([a-z])(!?)$", ann)
+        assert m is not None, f"unrecognized alias annotation {ann}"
         alias_set = [m.group(1)]
-        is_write = m.group(2) == '!'
+        is_write = m.group(2) == "!"
         r = Annotation(alias_set=alias_set, is_write=is_write)
-        assert str(r) == ann, f'{r} != {ann}'
+        assert str(r) == ann, f"{r} != {ann}"
         return r
 
     def __str__(self) -> str:
-        alias_set = '|'.join(self.alias_set)
-        is_write = '!' if self.is_write else ''
-        return f'{alias_set}{is_write}'
+        alias_set = "|".join(self.alias_set)
+        is_write = "!" if self.is_write else ""
+        return f"{alias_set}{is_write}"
+
 
 # The base class for the type system.  This is also loosely modeled
 # off of jit_type.h, but we've simplified the hierarchy to focus
@@ -403,17 +427,17 @@ class Annotation:
 @dataclass(frozen=True)
 class Type:
     @staticmethod
-    def parse(t: str) -> 'Type':
+    def parse(t: str) -> "Type":
         r = Type._parse(t)
-        assert str(r) == t, f'{r} != {t}'
+        assert str(r) == t, f"{r} != {t}"
         return r
 
     @staticmethod
-    def _parse(t: str) -> 'Type':
-        m = re.match(r'^(.+)\?$', t)
+    def _parse(t: str) -> "Type":
+        m = re.match(r"^(.+)\?$", t)
         if m is not None:
             return OptionalType(Type.parse(m.group(1)))
-        m = re.match(r'^(.+)\[([0-9]+)?\]$', t)
+        m = re.match(r"^(.+)\[([0-9]+)?\]$", t)
         if m is not None:
             size = int(m.group(2)) if m.group(2) is not None else None
             return ListType(elem=Type.parse(m.group(1)), size=size)
@@ -436,35 +460,40 @@ class Type:
     def is_nullable(self) -> bool:
         raise NotImplementedError
 
-    def is_list_like(self) -> Optional['ListType']:
+    def is_list_like(self) -> Optional["ListType"]:
         raise NotImplementedError
 
+
 # Base types are simple, atomic types with no further structure
-BaseTy = Enum('BaseTy', (
-    'Generator',
-    'ScalarType',
-    'Tensor',
-    'int',
-    'Dimname',
-    'float',
-    'str',
-    'bool',
-    'Layout',
-    'Device',
-    'Scalar',
-    'MemoryFormat',
-    'QScheme',
-    'Storage',
-    'Stream',
-    'ConstQuantizerPtr',  # TODO: rename
-))
+BaseTy = Enum(
+    "BaseTy",
+    (
+        "Generator",
+        "ScalarType",
+        "Tensor",
+        "int",
+        "Dimname",
+        "float",
+        "str",
+        "bool",
+        "Layout",
+        "Device",
+        "Scalar",
+        "MemoryFormat",
+        "QScheme",
+        "Storage",
+        "Stream",
+        "ConstQuantizerPtr",  # TODO: rename
+    ),
+)
+
 
 @dataclass(frozen=True)
 class BaseType(Type):
     name: BaseTy
 
     def __str__(self) -> str:
-        return f'{self.name.name}'
+        return f"{self.name.name}"
 
     def is_tensor_like(self) -> bool:
         return self.name == BaseTy.Tensor
@@ -472,8 +501,9 @@ class BaseType(Type):
     def is_nullable(self) -> bool:
         return False
 
-    def is_list_like(self) -> Optional['ListType']:
+    def is_list_like(self) -> Optional["ListType"]:
         return None
+
 
 # Optional types may be specified, or may also be validly given None
 @dataclass(frozen=True)
@@ -481,7 +511,7 @@ class OptionalType(Type):
     elem: Type
 
     def __str__(self) -> str:
-        return f'{self.elem}?'
+        return f"{self.elem}?"
 
     def is_tensor_like(self) -> bool:
         return self.elem.is_tensor_like()
@@ -489,8 +519,9 @@ class OptionalType(Type):
     def is_nullable(self) -> bool:
         return True
 
-    def is_list_like(self) -> Optional['ListType']:
+    def is_list_like(self) -> Optional["ListType"]:
         return self.elem.is_list_like()
+
 
 # List types specify that we may have multiples of an element.  We
 # also support explicit sizes on list types, but these have
@@ -505,8 +536,8 @@ class ListType(Type):
     size: Optional[int]
 
     def __str__(self) -> str:
-        size = f'{self.size}' if self.size else ''
-        return f'{self.elem}[{size}]'
+        size = f"{self.size}" if self.size else ""
+        return f"{self.elem}[{size}]"
 
     def is_tensor_like(self) -> bool:
         return self.elem.is_tensor_like()
@@ -514,8 +545,9 @@ class ListType(Type):
     def is_nullable(self) -> bool:
         return self.elem.is_nullable()
 
-    def is_list_like(self) -> Optional['ListType']:
+    def is_list_like(self) -> Optional["ListType"]:
         return self
+
 
 @dataclass(frozen=True)
 class Argument:
@@ -548,22 +580,26 @@ class Argument:
     annotation: Optional[Annotation]
 
     @staticmethod
-    def parse(arg: str) -> 'Argument':
+    def parse(arg: str) -> "Argument":
         name: str
         default: Optional[str]
-        type_and_annot, name_and_default = arg.rsplit(' ', 1)
-        if '=' in name_and_default:
-            name, default = name_and_default.split('=')
+        type_and_annot, name_and_default = arg.rsplit(" ", 1)
+        if "=" in name_and_default:
+            name, default = name_and_default.split("=")
         else:
             name = name_and_default
             default = None
         # TODO: deduplicate annotation matching with Return
-        match = re.match(r'Tensor\((.+)\)(.*)', type_and_annot)
+        match = re.match(r"Tensor\((.+)\)(.*)", type_and_annot)
         annotation: Optional[Annotation]
         if match:
             # If you update this, make sure the __str__ still works too
-            assert match.group(2) in ['', '?', '[]'], 'unrecognized alias analysis form with Tensor'
-            type_s = 'Tensor' + match.group(2)
+            assert match.group(2) in [
+                "",
+                "?",
+                "[]",
+            ], "unrecognized alias analysis form with Tensor"
+            type_s = "Tensor" + match.group(2)
             annotation = Annotation.parse(match.group(1))
         else:
             type_s = type_and_annot
@@ -575,7 +611,7 @@ class Argument:
             default=default,
             annotation=annotation,
         )
-        assert str(r) == arg, f'{str(r)} != {arg}'
+        assert str(r) == arg, f"{str(r)} != {arg}"
         return r
 
     @property
@@ -583,16 +619,16 @@ class Argument:
         return self.annotation is not None and self.annotation.is_write
 
     def __str__(self) -> str:
-        type = f'{self.type}'
+        type = f"{self.type}"
         if self.annotation:
-            assert type in ['Tensor', 'Tensor?', 'Tensor[]']
-            type = type.replace('Tensor', f'Tensor({self.annotation})')
+            assert type in ["Tensor", "Tensor?", "Tensor[]"]
+            type = type.replace("Tensor", f"Tensor({self.annotation})")
         if self.name is None:
             return type
         else:
-            mb_default = ''
+            mb_default = ""
             if self.default:
-                mb_default = f'={self.default}'
+                mb_default = f"={self.default}"
             return f"{type} {self.name}{mb_default}"
 
 
@@ -603,19 +639,23 @@ class Return:
     annotation: Optional[Annotation]
 
     @staticmethod
-    def parse(arg: str) -> 'Return':
+    def parse(arg: str) -> "Return":
         name: Optional[str]
-        if ' ' in arg:
-            type_and_annot, name = arg.rsplit(' ', 1)
+        if " " in arg:
+            type_and_annot, name = arg.rsplit(" ", 1)
         else:
             type_and_annot = arg
             name = None
-        match = re.match(r'Tensor\((.+)\)(.*)', type_and_annot)
+        match = re.match(r"Tensor\((.+)\)(.*)", type_and_annot)
         annotation: Optional[Annotation]
         if match:
             # If you update this, make sure the __str__ still works too
-            assert match.group(2) in ['', '?', '[]'], 'unrecognized alias analysis form with Tensor'
-            type_s = 'Tensor' + match.group(2)
+            assert match.group(2) in [
+                "",
+                "?",
+                "[]",
+            ], "unrecognized alias analysis form with Tensor"
+            type_s = "Tensor" + match.group(2)
             annotation = Annotation.parse(match.group(1))
         else:
             type_s = type_and_annot
@@ -626,7 +666,7 @@ class Return:
             type=type,
             annotation=annotation,
         )
-        assert str(r) == arg, f'{str(r)} != {arg}'
+        assert str(r) == arg, f"{str(r)} != {arg}"
         return r
 
     @property
@@ -634,10 +674,10 @@ class Return:
         return self.annotation is not None and self.annotation.is_write
 
     def __str__(self) -> str:
-        type = f'{self.type}'
+        type = f"{self.type}"
         if self.annotation:
-            assert type in ['Tensor', 'Tensor?', 'Tensor[]']
-            type = type.replace('Tensor', f'Tensor({self.annotation})')
+            assert type in ["Tensor", "Tensor?", "Tensor[]"]
+            type = type.replace("Tensor", f"Tensor({self.annotation})")
         if self.name is None:
             return type
         else:
@@ -647,7 +687,20 @@ class Return:
 # Names that validly are __iXXX__ indicating inplace operations.
 # Taken from https://www.python.org/dev/peps/pep-0203/#new-methods
 # NB: PyTorch hasn't actually implemented all of these
-AUGMENTED_ASSIGNMENT_NAMES = ['add', 'sub', 'mul', 'div', 'mod', 'pow', 'lshift', 'rshift', 'and', 'xor', 'or']
+AUGMENTED_ASSIGNMENT_NAMES = [
+    "add",
+    "sub",
+    "mul",
+    "div",
+    "mod",
+    "pow",
+    "lshift",
+    "rshift",
+    "and",
+    "xor",
+    "or",
+]
+
 
 # A BaseOperatorName is what we think of the operator name, without
 # the overload name.  Unusually, we don't represent this as just a
@@ -662,16 +715,17 @@ class BaseOperatorName:
     dunder_method: bool
 
     @staticmethod
-    def parse(op: str) -> 'BaseOperatorName':
-        assert op != ''
-        assert not op.endswith('_out'), \
-            "_out suffix is reserved and not permitted for operator names; " \
+    def parse(op: str) -> "BaseOperatorName":
+        assert op != ""
+        assert not op.endswith("_out"), (
+            "_out suffix is reserved and not permitted for operator names; "
             "did you mean to specify an out overload name instead?"
-        m = re.match(r'^__([^_]+)__$', op)
+        )
+        m = re.match(r"^__([^_]+)__$", op)
         if m is not None:
             dunder_method = True
             base = m.group(1)
-            if any(base == f'i{n}' for n in AUGMENTED_ASSIGNMENT_NAMES):
+            if any(base == f"i{n}" for n in AUGMENTED_ASSIGNMENT_NAMES):
                 inplace = True
                 base = base[1:]
             else:
@@ -680,26 +734,27 @@ class BaseOperatorName:
                 # has been historically true for dunder methods
                 # we support  (but, if we ever got, say, __int__, this would
                 # be wrong!)
-                assert base[0] != 'i'
+                assert base[0] != "i"
         else:
             dunder_method = False
             base = op
-            if base[-1] == '_':
+            if base[-1] == "_":
                 inplace = True
                 base = base[:-1]
             else:
                 inplace = False
         r = BaseOperatorName(base=base, inplace=inplace, dunder_method=dunder_method)
-        assert str(r) == op, f'{str(r)} != {op}'
+        assert str(r) == op, f"{str(r)} != {op}"
         return r
 
     def __str__(self) -> str:
         if self.dunder_method:
-            i = 'i' if self.inplace else ''
-            return f'__{i}{self.base}__'
+            i = "i" if self.inplace else ""
+            return f"__{i}{self.base}__"
         else:
-            i = '_' if self.inplace else ''
-            return f'{self.base}{i}'
+            i = "_" if self.inplace else ""
+            return f"{self.base}{i}"
+
 
 # Operator name is the base operator name along with the (typically not
 # user visible) overload string.
@@ -709,17 +764,14 @@ class OperatorName:
     overload_name: str
 
     @staticmethod
-    def parse(op_name: str) -> 'OperatorName':
-        if '.' in op_name:
-            name, overload_name = op_name.split('.', 1)
+    def parse(op_name: str) -> "OperatorName":
+        if "." in op_name:
+            name, overload_name = op_name.split(".", 1)
         else:
             name = op_name
-            overload_name = ''
-        r = OperatorName(
-            name=BaseOperatorName.parse(name),
-            overload_name=overload_name
-        )
-        assert str(r) == op_name, f'{str(r)} != {op_name}'
+            overload_name = ""
+        r = OperatorName(name=BaseOperatorName.parse(name), overload_name=overload_name)
+        assert str(r) == op_name, f"{str(r)} != {op_name}"
         return r
 
     def __str__(self) -> str:
@@ -728,23 +780,28 @@ class OperatorName:
         else:
             return f"{self.name}"
 
+
 # Helper functions for parsing argument lists (both inputs and returns)
+
 
 def parse_returns(return_decl: str) -> Sequence[Return]:
     """
     Input: '()'
     Output: []
     """
-    if return_decl == '()':
+    if return_decl == "()":
         return []
-    if return_decl[0] == '(' and return_decl[-1] == ')':
+    if return_decl[0] == "(" and return_decl[-1] == ")":
         return_decl = return_decl[1:-1]
     returns = []
-    for arg in return_decl.split(', '):
+    for arg in return_decl.split(", "):
         returns.append(Return.parse(arg))
     return returns
 
-def parse_arguments(args: str) -> Tuple[Sequence[Argument], Sequence[Argument], Sequence[Argument]]:
+
+def parse_arguments(
+    args: str,
+) -> Tuple[Sequence[Argument], Sequence[Argument], Sequence[Argument]]:
     """
     Input: 'int x, int y, int z'
     Output: positional args, kwarg only args
@@ -756,11 +813,13 @@ def parse_arguments(args: str) -> Tuple[Sequence[Argument], Sequence[Argument], 
 
     # TODO: Use a real parser here; this will get bamboozled
     # by signatures that contain things like std::array<bool, 2> (note the space)
-    for arg in args.split(', '):
+    for arg in args.split(", "):
         if not arg:
             continue
-        if arg == '*':
-            assert arguments_acc is arguments, "invalid syntax: kwarg-only specifier * can only occur once"
+        if arg == "*":
+            assert (
+                arguments_acc is arguments
+            ), "invalid syntax: kwarg-only specifier * can only occur once"
             arguments_acc = kwarg_only_arguments
             continue
         parg = Argument.parse(arg)

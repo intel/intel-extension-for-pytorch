@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 cpu_device = torch.device("cpu")
@@ -47,9 +47,15 @@ class TestNNMethod(TestCase):
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_softmax(self, dtype=torch.float):
-        x_cpu = torch.tensor([[[1.5357e+00, -2.4013e+01, -9.2085e+01],
-                               [6.2914e-01, 6.7819e+01, -9.3087e+01],
-                               [2.2412e+00, -1.0471e+02, -1.3249e+02]]])
+        x_cpu = torch.tensor(
+            [
+                [
+                    [1.5357e00, -2.4013e01, -9.2085e01],
+                    [6.2914e-01, 6.7819e01, -9.3087e01],
+                    [2.2412e00, -1.0471e02, -1.3249e02],
+                ]
+            ]
+        )
 
         y_cpu_output = torch.randn(x_cpu.shape)
         x_dpcpp = x_cpu.clone().to("xpu")
@@ -68,7 +74,15 @@ class TestNNMethod(TestCase):
         x_dpcpp.requires_grad_()
         self.softmax_basic(x_cpu, y_cpu_output, x_dpcpp, y_dpcpp_output)
 
-        shape = [[8], [7, 8], [8192, 64], [8192, 8192], [7, 8, 512], [16, 7, 8, 512], [16, 7, 8, 512, 35]]
+        shape = [
+            [8],
+            [7, 8],
+            [8192, 64],
+            [8192, 8192],
+            [7, 8, 512],
+            [16, 7, 8, 512],
+            [16, 7, 8, 512, 35],
+        ]
         for i in range(len(shape)):
             for j in range(len(shape[i])):
                 dim = j - 1
@@ -85,16 +99,19 @@ class TestNNMethod(TestCase):
                 self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_softmax_non_contiguous(self, dtype=torch.float):
-
-        x_cpu = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]],
-                             requires_grad=True, device=cpu_device).as_strided([2, 3], [1, 2])
+        x_cpu = torch.tensor(
+            [[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device=cpu_device
+        ).as_strided([2, 3], [1, 2])
         y_cpu_output = torch.tensor(
-            [[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device=cpu_device)
+            [[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device=cpu_device
+        )
 
-        x_dpcpp = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]],
-                               requires_grad=True, device=dpcpp_device).as_strided([2, 3], [1, 2])
+        x_dpcpp = torch.tensor(
+            [[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device=dpcpp_device
+        ).as_strided([2, 3], [1, 2])
         y_dpcpp_output = torch.tensor(
-            [[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device=dpcpp_device)
+            [[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device=dpcpp_device
+        )
 
         print("x:", x_cpu)
         print("x_dpcpp:", x_dpcpp.cpu())
@@ -137,23 +154,27 @@ class TestNNMethod(TestCase):
             self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_softmax_bwd(self, dtype=torch.float):
-        x_cpu = torch.tensor([[[[0.5, 1.5, 0.1],
-                                [2.2, 1.3, 1.7],
-                                [0.1, 1.1, 0.8]]]],
-                             requires_grad=True, device=cpu_device)
-        y_cpu_output = torch.tensor([[[[0.5, 1.5, 0.1],
-                                       [2.2, 1.3, 1.7],
-                                       [0.1, 1.1, 0.8]]]],
-                                    requires_grad=True, device=cpu_device)
+        x_cpu = torch.tensor(
+            [[[[0.5, 1.5, 0.1], [2.2, 1.3, 1.7], [0.1, 1.1, 0.8]]]],
+            requires_grad=True,
+            device=cpu_device,
+        )
+        y_cpu_output = torch.tensor(
+            [[[[0.5, 1.5, 0.1], [2.2, 1.3, 1.7], [0.1, 1.1, 0.8]]]],
+            requires_grad=True,
+            device=cpu_device,
+        )
 
-        x_dpcpp = torch.tensor([[[[0.5, 1.5, 0.1],
-                                [2.2, 1.3, 1.7],
-                                [0.1, 1.1, 0.8]]]],
-                               requires_grad=True, device=dpcpp_device)
-        y_dpcpp_output = torch.tensor([[[[0.5, 1.5, 0.1],
-                                         [2.2, 1.3, 1.7],
-                                         [0.1, 1.1, 0.8]]]],
-                                      requires_grad=True, device=dpcpp_device)
+        x_dpcpp = torch.tensor(
+            [[[[0.5, 1.5, 0.1], [2.2, 1.3, 1.7], [0.1, 1.1, 0.8]]]],
+            requires_grad=True,
+            device=dpcpp_device,
+        )
+        y_dpcpp_output = torch.tensor(
+            [[[[0.5, 1.5, 0.1], [2.2, 1.3, 1.7], [0.1, 1.1, 0.8]]]],
+            requires_grad=True,
+            device=dpcpp_device,
+        )
 
         print("x:", x_cpu)
         print("x_dpcpp:", x_dpcpp.cpu())
@@ -178,23 +199,27 @@ class TestNNMethod(TestCase):
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_softmax_bwd_non_contiguous(self, dtype=torch.float):
-        x_cpu = torch.tensor([[[[0.5, 1.5, 0.1],
-                                [2.2, 1.3, 1.7],
-                                [0.1, 1.1, 0.8]]]],
-                             requires_grad=True, device=cpu_device).as_strided([1, 1, 3, 3], [9, 9, 1, 3])
-        y_cpu_output = torch.tensor([[[[0.5, 1.5, 0.1],
-                                       [2.2, 1.3, 1.7],
-                                       [0.1, 1.1, 0.8]]]],
-                                    requires_grad=True, device=cpu_device)
+        x_cpu = torch.tensor(
+            [[[[0.5, 1.5, 0.1], [2.2, 1.3, 1.7], [0.1, 1.1, 0.8]]]],
+            requires_grad=True,
+            device=cpu_device,
+        ).as_strided([1, 1, 3, 3], [9, 9, 1, 3])
+        y_cpu_output = torch.tensor(
+            [[[[0.5, 1.5, 0.1], [2.2, 1.3, 1.7], [0.1, 1.1, 0.8]]]],
+            requires_grad=True,
+            device=cpu_device,
+        )
 
-        x_dpcpp = torch.tensor([[[[0.5, 1.5, 0.1],
-                                [2.2, 1.3, 1.7],
-                                [0.1, 1.1, 0.8]]]],
-                               requires_grad=True, device=dpcpp_device).as_strided([1, 1, 3, 3], [9, 9, 1, 3])
-        y_dpcpp_output = torch.tensor([[[[0.5, 1.5, 0.1],
-                                         [2.2, 1.3, 1.7],
-                                         [0.1, 1.1, 0.8]]]],
-                                      requires_grad=True, device=dpcpp_device)
+        x_dpcpp = torch.tensor(
+            [[[[0.5, 1.5, 0.1], [2.2, 1.3, 1.7], [0.1, 1.1, 0.8]]]],
+            requires_grad=True,
+            device=dpcpp_device,
+        ).as_strided([1, 1, 3, 3], [9, 9, 1, 3])
+        y_dpcpp_output = torch.tensor(
+            [[[[0.5, 1.5, 0.1], [2.2, 1.3, 1.7], [0.1, 1.1, 0.8]]]],
+            requires_grad=True,
+            device=dpcpp_device,
+        )
 
         print("x:", x_cpu)
         print("x_dpcpp:", x_dpcpp.cpu())

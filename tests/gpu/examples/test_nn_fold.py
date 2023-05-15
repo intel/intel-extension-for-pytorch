@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -26,8 +26,9 @@ class TestNNMethod(TestCase):
         inp = torch.randn(1, 3, 10, 12)
         w = torch.randn(2, 3, 4, 5)
         inp_unf = torch.nn.functional.unfold(inp, (4, 5))
-        out_unf = inp_unf.transpose(1, 2).matmul(
-            w.view(w.size(0), -1).t()).transpose(1, 2)
+        out_unf = (
+            inp_unf.transpose(1, 2).matmul(w.view(w.size(0), -1).t()).transpose(1, 2)
+        )
         out = torch.nn.functional.fold(out_unf, (7, 8), (1, 1))
         # or equivalently (and avoiding a copy),
         # out = out_unf.view(1, 2, 7, 8)

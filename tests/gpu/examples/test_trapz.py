@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 import pytest
 
@@ -15,7 +15,7 @@ else:
 
 @pytest.mark.skipif("not TEST_NUMPY")
 class TestTorchMethod(TestCase):
-    def test_trapz(self, device=torch.device('xpu')):
+    def test_trapz(self, device=torch.device("xpu")):
         def test_dx(sizes, dim, dx, device):
             t = torch.randn(sizes, device=device)
             actual = torch.trapz(t, dx=dx, dim=dim)
@@ -37,17 +37,17 @@ class TestTorchMethod(TestCase):
         test_dx((0, 2), 0, 1.0, device)
         test_dx((0, 2), 1, 1.0, device)
         test_x((2, 3, 4), 1, [1.0, 2.0, 3.0], device)
-        test_x((10, 2), 0, [2.0, 3.0, 4.0, 7.0, 11.0, 14.0, 22.0, 26.0, 26.1, 30.3], device)
+        test_x(
+            (10, 2), 0, [2.0, 3.0, 4.0, 7.0, 11.0, 14.0, 22.0, 26.0, 26.1, 30.3], device
+        )
         test_x((1, 10), 0, [1.0], device)
         test_x((0, 2), 0, [], device)
         test_x((0, 2), 1, [1.0, 2.0], device)
-        with self.assertRaisesRegex(
-                IndexError,
-                'Dimension out of range'):
+        with self.assertRaisesRegex(IndexError, "Dimension out of range"):
             test_x((2, 3), 2, [], device)
             test_dx((2, 3), 2, 1.0, device)
         with self.assertRaisesRegex(
-                RuntimeError,
-                'There must be one `x` value for each sample point'):
+            RuntimeError, "There must be one `x` value for each sample point"
+        ):
             test_x((2, 3), 1, [1.0, 2.0], device)
             test_x((2, 3), 1, [1.0, 2.0, 3.0, 4.0], device)

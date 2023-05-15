@@ -7,7 +7,7 @@ class TorchCudaAPITests(unittest.TestCase):
     def test_data_loader(self):
         class Dataset(torch.utils.data.Dataset):
             def __init__(self):
-                'Dataset Initialization'
+                "Dataset Initialization"
                 pass
 
             def __len__(self):
@@ -19,7 +19,8 @@ class TorchCudaAPITests(unittest.TestCase):
 
         dataset = Dataset()
         loader = torch.utils.data.DataLoader(
-            dataset, batch_size=256, pin_memory=True, pin_memory_device='cuda')
+            dataset, batch_size=256, pin_memory=True, pin_memory_device="cuda"
+        )
 
         for _, sample in enumerate(loader):
             sample = sample.cuda()

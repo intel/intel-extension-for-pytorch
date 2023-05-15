@@ -8,9 +8,10 @@ from argparse import RawTextHelpFormatter
 from tempfile import mkstemp
 import uuid
 
-format_str = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.INFO, format=format_str)
 logger = logging.getLogger(__name__)
+
 
 def apply_monkey_patch(program, dtype, auto_ipex_verbose, disable_ipex_graph_mode):
     # Auto apply the ipex features
@@ -91,14 +92,20 @@ def module_call_wrapper(mod, *args, **kwargs):
         return _orig_module_call(mod, *args, **kwargs)
     return forward(mod, *args, **kwargs)
 
-setattr(torch.nn.Module, "__call__", module_call_wrapper)\n""".format(dtype.lower() == "bfloat16", auto_ipex_verbose, disable_ipex_graph_mode)
+setattr(torch.nn.Module, "__call__", module_call_wrapper)\n""".format(
+        dtype.lower() == "bfloat16", auto_ipex_verbose, disable_ipex_graph_mode
+    )
 
     original_program_lines.insert(0, monkey_patch)
 
     program_absolute_path = os.path.abspath(program)
     program_absolute_path_dir = os.path.dirname(program_absolute_path)
-    generate_file_suffix = str(hash(program_absolute_path)) + str(uuid.uuid1()) + "_auto_ipex"
-    _, generate_file = mkstemp(suffix=generate_file_suffix, dir=program_absolute_path_dir, text=True)
+    generate_file_suffix = (
+        str(hash(program_absolute_path)) + str(uuid.uuid1()) + "_auto_ipex"
+    )
+    _, generate_file = mkstemp(
+        suffix=generate_file_suffix, dir=program_absolute_path_dir, text=True
+    )
 
     # Write the monkey_patched content to temp file
     with open(generate_file, "w") as f:
@@ -106,8 +113,11 @@ setattr(torch.nn.Module, "__call__", module_call_wrapper)\n""".format(dtype.lowe
 
     return generate_file
 
+
 def _exec(args):
-    monkey_patch_program = apply_monkey_patch(args.program, args.dtype, args.auto_ipex_verbose, args.disable_ipex_graph_mode)
+    monkey_patch_program = apply_monkey_patch(
+        args.program, args.dtype, args.auto_ipex_verbose, args.disable_ipex_graph_mode
+    )
     try:
         cmd = []
         cmd.append(sys.executable)
@@ -122,40 +132,65 @@ def _exec(args):
         if os.path.exists(monkey_patch_program):
             os.remove(monkey_patch_program)
 
+
 def add_auto_ipex_params(parser, auto_ipex_default_enabled=False):
     group = parser.add_argument_group("Code_Free Parameters")
-    group.add_argument("--auto_ipex", action='store_true', default=auto_ipex_default_enabled,
-                       help="Auto enabled the ipex optimization feature")
-    group.add_argument("--dtype", metavar='\b', default="float32", type=str,
-                       choices=['float32', 'bfloat16'],
-                       help="The data type to run inference. float32 or bfloat16 is allowed.")
-    group.add_argument("--auto_ipex_verbose", action='store_true', default=False,
-                       help="This flag is only used for debug and UT of auto ipex.")
-    group.add_argument("--disable_ipex_graph_mode", action='store_true', default=False,
-                       help="Enable the Graph Mode for ipex.optimize")
+    group.add_argument(
+        "--auto_ipex",
+        action="store_true",
+        default=auto_ipex_default_enabled,
+        help="Auto enabled the ipex optimization feature",
+    )
+    group.add_argument(
+        "--dtype",
+        metavar="\b",
+        default="float32",
+        type=str,
+        choices=["float32", "bfloat16"],
+        help="The data type to run inference. float32 or bfloat16 is allowed.",
+    )
+    group.add_argument(
+        "--auto_ipex_verbose",
+        action="store_true",
+        default=False,
+        help="This flag is only used for debug and UT of auto ipex.",
+    )
+    group.add_argument(
+        "--disable_ipex_graph_mode",
+        action="store_true",
+        default=False,
+        help="Enable the Graph Mode for ipex.optimize",
+    )
+
 
 def parse_args():
     """
     Helper function parsing the command line options
     @retval ArgumentParser
     """
-    parser = ArgumentParser(description="This is a script for auto apply ipex optimization."
-                                        "\n################################# Basic usage ############################# \n"
-                                        "\n 1. Apply ipex optimization with fp32 data type\n"
-                                        "\n   >>> python -m intel_extension_for_pytorch.cpu.auto_ipex python_script args \n"
-                                        "\n 2. Apply ipex optimization with bf16 data type\n"
-                                        "\n   >>> python -m intel_extension_for_pytorch.cpu.auto_ipex --dtype bfloat16 python_script args \n",
-                                        formatter_class=RawTextHelpFormatter)
+    parser = ArgumentParser(
+        description="This is a script for auto apply ipex optimization."
+        "\n################################# Basic usage ############################# \n"
+        "\n 1. Apply ipex optimization with fp32 data type\n"
+        "\n   >>> python -m intel_extension_for_pytorch.cpu.auto_ipex python_script args \n"
+        "\n 2. Apply ipex optimization with bf16 data type\n"
+        "\n   >>> python -m intel_extension_for_pytorch.cpu.auto_ipex --dtype bfloat16 python_script args \n",
+        formatter_class=RawTextHelpFormatter,
+    )
 
     add_auto_ipex_params(parser, auto_ipex_default_enabled=True)
 
     # positional
-    parser.add_argument("program", type=str,
-                        help="The full path to the proram/script to be launched. "
-                             "followed by all the arguments for the script")
+    parser.add_argument(
+        "program",
+        type=str,
+        help="The full path to the proram/script to be launched. "
+        "followed by all the arguments for the script",
+    )
     # rest from the training program
-    parser.add_argument('program_args', nargs=REMAINDER)
+    parser.add_argument("program_args", nargs=REMAINDER)
     return parser.parse_args()
+
 
 def main():
     env_before = set(os.environ.keys())
@@ -174,7 +209,9 @@ def main():
                 if len(matches) > 0:
                     lst_valid.append(item)
                 else:
-                    logger.warning("{} doesn't exist. Removing it from LD_PRELOAD.".format(item))
+                    logger.warning(
+                        "{} doesn't exist. Removing it from LD_PRELOAD.".format(item)
+                    )
         if len(lst_valid) > 0:
             os.environ["LD_PRELOAD"] = ":".join(lst_valid)
         else:
@@ -184,7 +221,8 @@ def main():
 
     for x in sorted(set(os.environ.keys()) - env_before):
         # Print the added ENV
-        logger.debug('{0}={1}'.format(x, os.environ[x]))
+        logger.debug("{0}={1}".format(x, os.environ[x]))
+
 
 if __name__ == "__main__":
     main()

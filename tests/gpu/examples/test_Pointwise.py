@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -10,8 +10,9 @@ dpcpp_device = torch.device("xpu")
 
 class TestTensorMethod(TestCase):
     def test_addcdiv(self, dtype=torch.float):
-        x = torch.tensor([[0.6580, -1.0969, -0.4614],
-                          [-0.1034, -0.5790, 0.1497]], device=cpu_device)
+        x = torch.tensor(
+            [[0.6580, -1.0969, -0.4614], [-0.1034, -0.5790, 0.1497]], device=cpu_device
+        )
         # x_dpcpp = torch.tensor([[ 0.6580, -1.0969, -0.4614], [-0.1034, -0.5790,  0.1497]], device = dpcpp_device)
         x_dpcpp = x.to("xpu")
 
@@ -29,8 +30,9 @@ class TestTensorMethod(TestCase):
         self.assertEqual(x, x_dpcpp.cpu())
 
     def test_addcdiv_bf16(self, dtype=torch.float):
-        x = torch.tensor([[0.6580, -1.0969, -0.4614],
-                          [-0.1034, -0.5790, 0.1497]], device=cpu_device)
+        x = torch.tensor(
+            [[0.6580, -1.0969, -0.4614], [-0.1034, -0.5790, 0.1497]], device=cpu_device
+        )
         # x_dpcpp = torch.tensor([[ 0.6580, -1.0969, -0.4614], [-0.1034, -0.5790,  0.1497]], device = dpcpp_device)
         x_dpcpp = x.to("xpu").to(torch.bfloat16)
 
@@ -48,8 +50,9 @@ class TestTensorMethod(TestCase):
         # self.assertEqual(x, x_dpcpp.cpu(), prec=0.1)
 
     def test_addcmul(self, dtype=torch.float):
-        x = torch.tensor([[0.6580, -1.0969, -0.4614],
-                          [-0.1034, -0.5790, 0.1497]], device=cpu_device)
+        x = torch.tensor(
+            [[0.6580, -1.0969, -0.4614], [-0.1034, -0.5790, 0.1497]], device=cpu_device
+        )
         # x_dpcpp = torch.tensor([[ 0.6580, -1.0969, -0.4614], [-0.1034, -0.5790,  0.1497]], device = dpcpp_device)
         x_dpcpp = x.to("xpu")
 
@@ -67,8 +70,9 @@ class TestTensorMethod(TestCase):
         self.assertEqual(x, x_dpcpp.cpu())
 
     def test_addcmul_bf16(self, dtype=torch.float):
-        x = torch.tensor([[0.6580, -1.0969, -0.4614],
-                          [-0.1034, -0.5790, 0.1497]], device=cpu_device)
+        x = torch.tensor(
+            [[0.6580, -1.0969, -0.4614], [-0.1034, -0.5790, 0.1497]], device=cpu_device
+        )
         # x_dpcpp = torch.tensor([[ 0.6580, -1.0969, -0.4614], [-0.1034, -0.5790,  0.1497]], device = dpcpp_device)
         x_dpcpp = x.to("xpu").to(torch.bfloat16)
 
@@ -86,8 +90,9 @@ class TestTensorMethod(TestCase):
         # self.assertEqual(x, x_dpcpp.cpu(), prec=0.1)
 
     def test_lerp(self, dtype=torch.float):
-        x = torch.tensor([[0.6580, -1.0969, -0.4614],
-                          [-0.1034, -0.5790, 0.1497]], device=cpu_device)
+        x = torch.tensor(
+            [[0.6580, -1.0969, -0.4614], [-0.1034, -0.5790, 0.1497]], device=cpu_device
+        )
         # x_dpcpp = torch.tensor([[ 0.6580, -1.0969, -0.4614], [-0.1034, -0.5790,  0.1497]], device = dpcpp_device)
         x_dpcpp = x.to("xpu")
 

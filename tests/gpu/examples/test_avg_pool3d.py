@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -22,7 +22,10 @@ class TestNNMethod(TestCase):
         y_cpu.backward(torch.ones([1, 8, 8, 24, 24], device=cpu_device))
         # print("y_cpu backward", x_cpu.grad)
 
-        x_dpcpp = torch.ones([1, 8, 8, 24, 24], device=dpcpp_device,)
+        x_dpcpp = torch.ones(
+            [1, 8, 8, 24, 24],
+            device=dpcpp_device,
+        )
         x_dpcpp.requires_grad_(True)
         y_dpcpp = avg_pool(x_dpcpp)
 
@@ -35,7 +38,9 @@ class TestNNMethod(TestCase):
 
     def test_channels_last_simple_fwd(self, dtype=torch.float):
         x_cpu = torch.ones([8, 8, 24, 24, 24], device=cpu_device)
-        x_dpcpp = torch.ones([8, 8, 24, 24, 24], device=dpcpp_device).to(memory_format=torch.channels_last_3d)
+        x_dpcpp = torch.ones([8, 8, 24, 24, 24], device=dpcpp_device).to(
+            memory_format=torch.channels_last_3d
+        )
         avg_pool = nn.AvgPool3d(kernel_size=3, stride=1, padding=1)
 
         # cpu
@@ -49,7 +54,9 @@ class TestNNMethod(TestCase):
     def test_channels_last_simple_bwd(self, dtype=torch.float):
         x_cpu = torch.ones([8, 8, 8, 8, 8], device=cpu_device)
         grad_cpu = torch.ones([8, 8, 8, 8, 8], device=cpu_device)
-        x_dpcpp = torch.ones([8, 8, 8, 8, 8], device=dpcpp_device).to(memory_format=torch.channels_last_3d)
+        x_dpcpp = torch.ones([8, 8, 8, 8, 8], device=dpcpp_device).to(
+            memory_format=torch.channels_last_3d
+        )
         grad_dpcpp = grad_cpu.to(dpcpp_device)
         avg_pool = nn.AvgPool3d(kernel_size=3, stride=1, padding=1)
 
@@ -94,16 +101,16 @@ class TestNNMethod(TestCase):
 
         # 4D strided input - (C,D,H,W) -> (C,H,W,D)
         # CPU
-        input_cpu = x.clone().permute(0,2,3,1)
+        input_cpu = x.clone().permute(0, 2, 3, 1)
         input_cpu.requires_grad_(True)
-        grad_cpu = grad.clone().permute(0,2,3,1)
+        grad_cpu = grad.clone().permute(0, 2, 3, 1)
         output_cpu = m(input_cpu)
         output_cpu.backward(grad_cpu)
 
         # XPU
-        input_xpu = x.clone().permute(0,2,3,1).to(dpcpp_device)
+        input_xpu = x.clone().permute(0, 2, 3, 1).to(dpcpp_device)
         input_xpu.requires_grad_(True)
-        grad_xpu = grad.clone().permute(0,2,3,1).to(dpcpp_device)
+        grad_xpu = grad.clone().permute(0, 2, 3, 1).to(dpcpp_device)
         output_xpu = m(input_xpu)
         output_xpu.backward(grad_xpu)
 

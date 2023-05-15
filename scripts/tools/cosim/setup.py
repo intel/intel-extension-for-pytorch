@@ -4,6 +4,7 @@ import os
 import shutil
 import glob
 
+
 class CosimClean(distutils.command.clean.clean, object):
     def clean_dir(self, d):
         if not os.path.exists(d):
@@ -18,23 +19,23 @@ class CosimClean(distutils.command.clean.clean, object):
                     print(f"removing '{filename}' (and everything under it)")
 
     def run(self):
-        self.clean_dir('build')
-        self.clean_dir('cosim.egg-info')
-        self.clean_dir('dist')
+        self.clean_dir("build")
+        self.clean_dir("cosim.egg-info")
+        self.clean_dir("dist")
         distutils.command.clean.clean.run(self)
 
 
 cmdclass = {
-    'clean': CosimClean,
+    "clean": CosimClean,
 }
 
 setup(
-    name='cosim',
-    version='1.0',
-    description='cosim plugin',
-    packages=['cosim'],
-    install_requires=['torch', 'intel_extension_for_pytorch'],
-    package_data={'': ['*']},
+    name="cosim",
+    version="1.0",
+    description="cosim plugin",
+    packages=["cosim"],
+    install_requires=["torch", "intel_extension_for_pytorch"],
+    package_data={"": ["*"]},
     cmdclass=cmdclass,
     include_package_data=True,
 )

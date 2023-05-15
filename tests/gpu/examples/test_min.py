@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -30,18 +30,19 @@ class TestTorchMethod(TestCase):
         #
         print("Testing cmin OP!\n")
         c_dpcpp = torch.randn(4).to("xpu")
-        d_dpcpp = torch.tensor(
-            [0.0120, -0.9505, -0.3025, -1.4899], device=dpcpp_device)
+        d_dpcpp = torch.tensor([0.0120, -0.9505, -0.3025, -1.4899], device=dpcpp_device)
         e_dpcpp = torch.min(c_dpcpp, d_dpcpp)
 
         print("For Tensor:", c_dpcpp.to("cpu"))
         print("For Tensor:", d_dpcpp.to("cpu"))
-        print("torch.min on cpu returns", torch.min(
-            c_dpcpp.to("cpu"), d_dpcpp.to("cpu")))
+        print(
+            "torch.min on cpu returns", torch.min(c_dpcpp.to("cpu"), d_dpcpp.to("cpu"))
+        )
         print("torch.min on dpcpp device returns", e_dpcpp.to("cpu"))
         print("\n")
-        self.assertEqual(torch.min(
-            c_dpcpp.to("cpu"), d_dpcpp.to("cpu")), e_dpcpp.to("cpu"))
+        self.assertEqual(
+            torch.min(c_dpcpp.to("cpu"), d_dpcpp.to("cpu")), e_dpcpp.to("cpu")
+        )
 
         #
         # Test min OP.
@@ -55,8 +56,11 @@ class TestTorchMethod(TestCase):
 
         print("For Tensor:", a_cpu)
         print("torch.min on cpu returns", torch.min(a_cpu, -2))
-        print("torch.min on dpcpp device returns",
-              b_dpcpp.to("cpu"), b_dpcpp_index.to("cpu"))
+        print(
+            "torch.min on dpcpp device returns",
+            b_dpcpp.to("cpu"),
+            b_dpcpp_index.to("cpu"),
+        )
         print("\n")
         self.assertEqual(torch.min(a_cpu, -2)[0], b_dpcpp.to("cpu"))
         self.assertEqual(torch.min(a_cpu, -2)[1], b_dpcpp_index.to("cpu"))
@@ -67,8 +71,11 @@ class TestTorchMethod(TestCase):
 
         print("For Tensor:", a_cpu)
         print("torch.min on cpu returns", torch.min(a_cpu, -1))
-        print("torch.min on dpcpp device returns",
-              b_dpcpp.to("cpu"), b_dpcpp_index.to("cpu"))
+        print(
+            "torch.min on dpcpp device returns",
+            b_dpcpp.to("cpu"),
+            b_dpcpp_index.to("cpu"),
+        )
         print("\n")
         self.assertEqual(torch.min(a_cpu, -1)[0], b_dpcpp.to("cpu"))
         self.assertEqual(torch.min(a_cpu, -1)[1], b_dpcpp_index.to("cpu"))
@@ -79,8 +86,11 @@ class TestTorchMethod(TestCase):
 
         print("For Tensor:", a_cpu)
         print("torch.min on cpu returns", torch.min(a_cpu, 0))
-        print("torch.min on dpcpp device returns",
-              b_dpcpp.to("cpu"), b_dpcpp_index.to("cpu"))
+        print(
+            "torch.min on dpcpp device returns",
+            b_dpcpp.to("cpu"),
+            b_dpcpp_index.to("cpu"),
+        )
         print("\n")
         self.assertEqual(torch.min(a_cpu, 0)[0], b_dpcpp.to("cpu"))
         self.assertEqual(torch.min(a_cpu, 0)[1], b_dpcpp_index.to("cpu"))
@@ -91,8 +101,11 @@ class TestTorchMethod(TestCase):
 
         print("For Tensor:", a_cpu)
         print("torch.min on cpu returns", torch.min(a_cpu, 1))
-        print("torch.min on dpcpp device returns",
-              b_dpcpp.to("cpu"), b_dpcpp_index.to("cpu"))
+        print(
+            "torch.min on dpcpp device returns",
+            b_dpcpp.to("cpu"),
+            b_dpcpp_index.to("cpu"),
+        )
         print("\n")
         self.assertEqual(torch.min(a_cpu, 1)[0], b_dpcpp.to("cpu"))
         self.assertEqual(torch.min(a_cpu, 1)[1], b_dpcpp_index.to("cpu"))

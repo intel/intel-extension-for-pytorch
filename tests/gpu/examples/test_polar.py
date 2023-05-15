@@ -18,7 +18,9 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(y_cpu, y_xpu.to("cpu"))
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_polar_double(self, dtype=torch.double):
         abs_cpu = torch.randn([5, 5], dtype=dtype)
         angle_cpu = torch.randn([5, 5], dtype=dtype)

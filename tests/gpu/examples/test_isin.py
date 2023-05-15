@@ -1,16 +1,16 @@
 import torch
 import intel_extension_for_pytorch  # noqa
 from torch.testing._internal.common_utils import TestCase
-from torch.testing._internal.common_dtype import (
-    all_types, all_types_and
-)
+from torch.testing._internal.common_dtype import all_types, all_types_and
 from itertools import product
 import numpy as np
 import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_isin(self, device="xpu", dtype=torch.float):
         def assert_isin_equal(a, b):
             # Compare to the numpy reference implementation.
@@ -22,7 +22,9 @@ class TestTorchMethod(TestCase):
 
         # multi-dim tensor, multi-dim tensor
         a = torch.arange(24, device=device, dtype=dtype).reshape([2, 3, 4])
-        b = torch.tensor([[10, 20, 30], [0, 1, 3], [11, 22, 33]], device=device, dtype=dtype)
+        b = torch.tensor(
+            [[10, 20, 30], [0, 1, 3], [11, 22, 33]], device=device, dtype=dtype
+        )
         assert_isin_equal(a, b)
 
         # zero-dim tensor
@@ -66,16 +68,56 @@ class TestTorchMethod(TestCase):
                 c = torch.isin(a, b, assume_unique=True, invert=invert)
                 self.assertEqual(c, ec)
 
-                a = torch.tensor([5, 4, 5, 3, 4, 4, 3, 4, 3, 5, 2, 1, 5, 5], device=device, dtype=dtype)
+                a = torch.tensor(
+                    [5, 4, 5, 3, 4, 4, 3, 4, 3, 5, 2, 1, 5, 5],
+                    device=device,
+                    dtype=dtype,
+                )
                 b = torch.tensor([2, 3, 4] * mult, device=device, dtype=dtype)
-                ec = define_expected([False, True, False, True, True, True, True, True, True,
-                                      False, True, False, False, False], invert=invert)
+                ec = define_expected(
+                    [
+                        False,
+                        True,
+                        False,
+                        True,
+                        True,
+                        True,
+                        True,
+                        True,
+                        True,
+                        False,
+                        True,
+                        False,
+                        False,
+                        False,
+                    ],
+                    invert=invert,
+                )
                 c = torch.isin(a, b, invert=invert)
                 self.assertEqual(c, ec)
 
-                b = torch.tensor([2, 3, 4] * mult + [5, 5, 4] * mult, device=device, dtype=dtype)
-                ec = define_expected([True, True, True, True, True, True, True, True, True, True,
-                                      True, False, True, True], invert=invert)
+                b = torch.tensor(
+                    [2, 3, 4] * mult + [5, 5, 4] * mult, device=device, dtype=dtype
+                )
+                ec = define_expected(
+                    [
+                        True,
+                        True,
+                        True,
+                        True,
+                        True,
+                        True,
+                        True,
+                        True,
+                        True,
+                        True,
+                        True,
+                        False,
+                        True,
+                        True,
+                    ],
+                    invert=invert,
+                )
                 c = torch.isin(a, b, invert=invert)
                 self.assertEqual(c, ec)
 
@@ -89,13 +131,17 @@ class TestTorchMethod(TestCase):
                 for assume_unique in [False, True]:
                     a = torch.arange(6, device=device, dtype=dtype).reshape([2, 3])
                     b = torch.arange(3, 30, device=device, dtype=dtype)
-                    ec = define_expected([[False, False, False], [True, True, True]], invert=invert)
+                    ec = define_expected(
+                        [[False, False, False], [True, True, True]], invert=invert
+                    )
                     c = torch.isin(a, b, invert=invert, assume_unique=assume_unique)
                     self.assertEqual(c, ec)
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_isin_different_dtypes(self, device="xpu"):
-        supported_types = all_types() if device == 'cpu' else all_types_and(torch.half)
+        supported_types = all_types() if device == "cpu" else all_types_and(torch.half)
         for mult in [1, 10]:
             for assume_unique in [False, True]:
                 for dtype1, dtype2 in product(supported_types, supported_types):
@@ -107,11 +153,11 @@ class TestTorchMethod(TestCase):
 
     def test_isin_different_devices(self, device="xpu", dtype=torch.float):
         a = torch.arange(6, device=device, dtype=dtype).reshape([2, 3])
-        b = torch.arange(3, 30, device='cpu', dtype=dtype)
+        b = torch.arange(3, 30, device="cpu", dtype=dtype)
         with self.assertRaises(RuntimeError):
             torch.isin(a, b)
 
-        c = torch.arange(6, device='cpu', dtype=dtype).reshape([2, 3])
+        c = torch.arange(6, device="cpu", dtype=dtype).reshape([2, 3])
         d = torch.arange(3, 30, device=device, dtype=dtype)
         with self.assertRaises(RuntimeError):
             torch.isin(c, d)

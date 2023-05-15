@@ -8,10 +8,11 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_lgamma(self, dtype=torch.float):
-        a = np.array([[0.5, 1, 1.5],
-                      [2.5, 3, 3.5]])
+        a = np.array([[0.5, 1, 1.5], [2.5, 3, 3.5]])
         data = torch.from_numpy(a)
         x = data.clone().detach()
         x_dpcpp = x.to("xpu")
@@ -27,11 +28,12 @@ class TestTorchMethod(TestCase):
         x_dpcpp.lgamma_()
 
         self.assertEqual(x, x_dpcpp.cpu())
-    
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_lgamma_bf16(self, dtype=torch.bfloat16):
-        a = np.array([[0.5, 1, 1.5],
-                      [2.5, 3, 3.5]])
+        a = np.array([[0.5, 1, 1.5], [2.5, 3, 3.5]])
         data = torch.from_numpy(a)
         x = data.clone().detach()
         x_dpcpp = x.to("xpu")
@@ -47,11 +49,12 @@ class TestTorchMethod(TestCase):
         x_dpcpp.lgamma_()
 
         self.assertEqual(x, x_dpcpp.cpu())
-    
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_lgamma_out(self, dtype=torch.float):
-        a = np.array([[0.5, 1, 1.5],
-                      [2.5, 3, 3.5]])
+        a = np.array([[0.5, 1, 1.5], [2.5, 3, 3.5]])
         data = torch.from_numpy(a)
         x = data.clone().detach()
         c_result = torch.zeros_like(x)
@@ -63,10 +66,11 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(y, y_dpcpp.cpu())
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_mvlgamma(self, dtype=torch.float):
-        a = np.array([[1.6835, 1.8474, 1.1929],
-                      [1.0475, 1.7162, 1.4180]])
+        a = np.array([[1.6835, 1.8474, 1.1929], [1.0475, 1.7162, 1.4180]])
         data = torch.from_numpy(a)
         x = data.clone().detach()
         x_dpcpp = x.to("xpu")
@@ -80,11 +84,12 @@ class TestTorchMethod(TestCase):
         x.mvlgamma_(2)
         x_dpcpp.mvlgamma_(2)
         self.assertEqual(x, x_dpcpp.cpu())
-    
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_mvlgamma_out(self, dtype=torch.float):
-        a = np.array([[4.5, 2, 1.5],
-                      [2.5, 3, 3.5]])
+        a = np.array([[4.5, 2, 1.5], [2.5, 3, 3.5]])
         data = torch.from_numpy(a)
         x = data.clone().detach()
         c_result = torch.zeros_like(x)
@@ -96,11 +101,12 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(y, y_dpcpp.cpu())
 
-
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_polygamma(self, dtype=torch.float):
         x_cpu = torch.tensor([1, 0.5])
-        x_xpu = x_cpu.to('xpu')
+        x_xpu = x_cpu.to("xpu")
 
         for n in range(5):
             y_cpu = torch.polygamma(n, x_cpu)

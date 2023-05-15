@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")
@@ -15,7 +15,7 @@ class TestTensorMethod(TestCase):
         x_cpu_list = x_cpu.tolist()
         x_xpu_list = x_xpu.tolist()
 
-        print('x_cpu.tolist() = ', x_cpu_list)
-        print('x_xpu.tolist() = ', x_xpu_list)
+        print("x_cpu.tolist() = ", x_cpu_list)
+        print("x_xpu.tolist() = ", x_xpu_list)
 
         self.assertEqual(x_cpu_list, x_xpu_list)

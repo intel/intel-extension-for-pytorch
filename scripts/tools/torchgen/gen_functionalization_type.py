@@ -71,11 +71,11 @@ MUTABLE_OPS_NOT_USING_FUNCTIONALIZATION = (
 # - gen_composite_view_copy_kernel
 #     Generates view_copy() composite kernels for all view_copy operators.
 
+
 # Generates the body of the default composite C++ kernel for a {view}_copy NativeFunction
 # See Note [view_copy NativeFunctions]
 @with_native_function
 def gen_composite_view_copy_kernel(g: NativeFunctionsViewGroup) -> Optional[str]:
-
     if g.view_copy is None:
         return None
 
@@ -420,7 +420,7 @@ def get_mutable_redispatch_return_names(
 ) -> Tuple[List[str], List[str]]:
     aliased_returns = []
     non_aliased_returns = []
-    for (i, name) in enumerate(f.func.aliased_return_names()):
+    for i, name in enumerate(f.func.aliased_return_names()):
         if name is not None:
             aliased_returns.append(name)
         else:
@@ -463,7 +463,7 @@ def wrap_propagate_mutations_and_return(
     # First, take all of the newly created outputs from the inner call and wrap them into functional tensors
     updates = []
     non_aliased_wrapped_ret_names = []
-    for (i, inner_ret) in enumerate(
+    for i, inner_ret in enumerate(
         non_aliased_inner_rets[: len(non_aliased_outer_rets)]
     ):
         ret_name = f"output_{i}"
@@ -475,7 +475,7 @@ def wrap_propagate_mutations_and_return(
 
     # Next, take all of the mutated outputs from the inner call corresponding to mutated inputs,
     # and propogate the mutations
-    for (outer_arg, inner_ret) in zip(
+    for outer_arg, inner_ret in zip(
         mutable_arg_names, non_aliased_inner_rets[len(non_aliased_outer_rets) :]
     ):
         updates.append(
@@ -616,6 +616,7 @@ def emit_inplace_functionalization_body(
 # The below functions generate RegisterFunctionalization.cpp
 # These files provide the kernels that run the functionalization pass, which can be opted into
 # per backend (e.g. XLA or Vulkan), or as a composable transform (functionalize() in functorch).
+
 
 # See Note [Functionalization Pass: View Inverses].
 def gen_functionalization_view_inverse_declaration(

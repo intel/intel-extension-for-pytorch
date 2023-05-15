@@ -1,24 +1,30 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 import torch.nn.functional as F
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 from torch.quantization.quantize_jit import (
     convert_jit,
     prepare_jit,
 )
 
+
 class ConvUpsample(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = torch.nn.Conv2d(8, 8, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv1 = torch.nn.Conv2d(
+            8, 8, kernel_size=1, stride=1, padding=0, bias=False
+        )
         self.relu = torch.nn.LeakyReLU(0.1, inplace=True)
 
     def forward(self, x):
         x = self.conv1(x)
         x = self.relu(x)
-        y = F.interpolate(x, size=(x.size()[2], x.size()[3]), scale_factor=None, mode='nearest')
+        y = F.interpolate(
+            x, size=(x.size()[2], x.size()[3]), scale_factor=None, mode="nearest"
+        )
         return torch.cat((y, x), dim=1)
+
 
 def trace_int8_model(model, device, test_input):
     model = model.to(device)
@@ -31,14 +37,12 @@ def trace_int8_model(model, device, test_input):
     print("start ", device, " calibration ...")
     qconfig_u8 = torch.quantization.QConfig(
         activation=torch.quantization.observer.MinMaxObserver.with_args(
-            qscheme=torch.per_tensor_symmetric,
-            reduce_range=False,
-            dtype=torch.quint8
+            qscheme=torch.per_tensor_symmetric, reduce_range=False, dtype=torch.quint8
         ),
-        weight=torch.quantization.default_weight_observer
+        weight=torch.quantization.default_weight_observer,
     )
 
-    modelJit = prepare_jit(modelJit, {'': qconfig_u8}, True)
+    modelJit = prepare_jit(modelJit, {"": qconfig_u8}, True)
 
     # do calibration
     test_input = test_input.to(device)
@@ -56,9 +60,12 @@ def trace_int8_model(model, device, test_input):
         output = modelJit(test_input)
     return output
 
+
 class TestNNMethod(TestCase):
     def test_q_upsamle_nearest(self, dtype=torch.float):
-        x_cpu = torch.randn((2, 3, 5, 5), dtype=torch.float32, device=torch.device("cpu"))
+        x_cpu = torch.randn(
+            (2, 3, 5, 5), dtype=torch.float32, device=torch.device("cpu")
+        )
         x_gpu = x_cpu.to("xpu")
         scales = [6, 8]
         rsf = False
@@ -69,9 +76,11 @@ class TestNNMethod(TestCase):
         q_gpu = torch.quantize_per_tensor(x_gpu, q_scale, 0, dtype_inputs)
 
         output_cpu = torch.nn.functional.interpolate(
-            q_cpu, scale_factor=scales, mode='nearest', recompute_scale_factor=rsf)
+            q_cpu, scale_factor=scales, mode="nearest", recompute_scale_factor=rsf
+        )
         output_gpu = torch.nn.functional.interpolate(
-            q_gpu, scale_factor=scales, mode='nearest', recompute_scale_factor=rsf)
+            q_gpu, scale_factor=scales, mode="nearest", recompute_scale_factor=rsf
+        )
 
         self.assertEqual(output_cpu, output_gpu)
 

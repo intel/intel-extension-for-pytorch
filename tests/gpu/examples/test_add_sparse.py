@@ -1,10 +1,11 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+
 
 class TestTorchMethod(TestCase):
     def test_sparse(self, dtype=torch.float):

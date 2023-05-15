@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 cpu_device = torch.device("cpu")
@@ -36,7 +36,9 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
-    def test_LeakyReLU_channels_last_fwd(self, Xelu=nn.LeakyReLU(0.1), dtype=torch.float):
+    def test_LeakyReLU_channels_last_fwd(
+        self, Xelu=nn.LeakyReLU(0.1), dtype=torch.float
+    ):
         x_cpu = torch.randn([1, 2, 3, 4], device=cpu_device, requires_grad=True)
         y_cpu = Xelu(x_cpu)
         print("cpu output ", y_cpu)
@@ -60,8 +62,12 @@ class TestNNMethod(TestCase):
         Xelu.to("xpu")
         Xelu.zero_grad()
 
-        x_dpcpp = Variable(x_cpu.to("xpu").to(memory_format=torch.channels_last), requires_grad=True)
-        grad_dpcpp = Variable(grad_x.to("xpu").to(memory_format=torch.channels_last), requires_grad=True)
+        x_dpcpp = Variable(
+            x_cpu.to("xpu").to(memory_format=torch.channels_last), requires_grad=True
+        )
+        grad_dpcpp = Variable(
+            grad_x.to("xpu").to(memory_format=torch.channels_last), requires_grad=True
+        )
 
         y_dpcpp = Xelu(x_dpcpp)
         y_dpcpp.backward(grad_dpcpp)
@@ -71,7 +77,9 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
-    def test_inplace_LeakyReLU_channels_last_fwd(self, Xelu=nn.LeakyReLU(0.1, inplace=True), dtype=torch.float):
+    def test_inplace_LeakyReLU_channels_last_fwd(
+        self, Xelu=nn.LeakyReLU(0.1, inplace=True), dtype=torch.float
+    ):
         x_cpu = torch.randn([1, 2, 3, 4], device=cpu_device)
         ref_cpu = x_cpu.detach().clone()
         y_cpu = Xelu(x_cpu)

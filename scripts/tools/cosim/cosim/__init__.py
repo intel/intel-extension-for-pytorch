@@ -1,3 +1,3 @@
 from .cosim import CosimModule
 
-__all__ = ['CosimModule']
+__all__ = ["CosimModule"]

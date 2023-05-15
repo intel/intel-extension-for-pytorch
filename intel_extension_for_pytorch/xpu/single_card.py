@@ -2,12 +2,11 @@ import os
 import tempfile
 import torch
 import torch.distributed as dist
-import intel_extension_for_pytorch  # noqa
-import oneccl_bindings_for_pytorch  # noqa
+import intel_extension_for_pytorch  # noqa F401
+import oneccl_bindings_for_pytorch  # noqa F401
 
 
 class single_card_dist:
-
     r"""DistributedDataParallel(DDP) scaling API for XPU devices on one card.
 
     This API wraps pytorch DDP related module, and provides a simple usage to
@@ -59,10 +58,15 @@ class single_card_dist:
         self.train_dataset = train_dataset
 
         # Initialize the process group with ccl backend
-        rank = int(os.environ['RANK'])
-        world_size = int(os.environ['WORLD_SIZE'])
+        rank = int(os.environ["RANK"])
+        world_size = int(os.environ["WORLD_SIZE"])
 
-        dist.init_process_group(backend='ccl', init_method=os.environ['INIT_FILE'], rank=rank, world_size=world_size)
+        dist.init_process_group(
+            backend="ccl",
+            init_method=os.environ["INIT_FILE"],
+            rank=rank,
+            world_size=world_size,
+        )
 
         self.rank = dist.get_rank()
         self.model = self.get_ddp_model()
@@ -74,7 +78,7 @@ class single_card_dist:
         Use torch.multiprocessing to spawn N (world_size) processes.
         """
         with tempfile.NamedTemporaryFile() as file:
-            os.environ['INIT_FILE'] = "file://{}".format(file.name)
+            os.environ["INIT_FILE"] = "file://{}".format(file.name)
         proc = torch.multiprocessing.get_context("spawn").Process
 
         processes = []
@@ -86,12 +90,9 @@ class single_card_dist:
             child_env["PMI_SIZE"] = str(world_size)
             child_env["PMI_RANK"] = str(rank)
 
-            os.environ['RANK'] = child_env["PMI_RANK"]
-            os.environ['WORLD_SIZE'] = child_env["PMI_SIZE"]
-            process = proc(
-                target=fn,
-                name="process " + str(rank),
-                args=args)
+            os.environ["RANK"] = child_env["PMI_RANK"]
+            os.environ["WORLD_SIZE"] = child_env["PMI_SIZE"]
+            process = proc(target=fn, name="process " + str(rank), args=args)
 
             process.start()
             print(f"Start process {rank} with pid {process.pid}")
@@ -128,7 +129,8 @@ class single_card_dist:
             self.model,
             device_ids=[self.xpu_device],
             output_device=self.xpu_device,
-            find_unused_parameters=True)
+            find_unused_parameters=True,
+        )
 
     # data sampler
     def get_train_sampler(self):

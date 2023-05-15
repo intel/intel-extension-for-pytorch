@@ -1,5 +1,7 @@
 # coding: utf-8
+import re
 import torch
+
 try:
     import torchvision
 except ImportError:
@@ -16,24 +18,26 @@ import platform
 # Load the extension module
 ################################################################################
 
-if sys.platform == 'win32':
-    pfiles_path = os.getenv('ProgramFiles', 'C:\\Program Files')
-    py_dll_path = os.path.join(sys.exec_prefix, 'Library', 'bin')
-    th_dll_path = os.path.join(os.path.dirname(__file__), 'bin')
+if sys.platform == "win32":
+    pfiles_path = os.getenv("ProgramFiles", "C:\\Program Files")
+    py_dll_path = os.path.join(sys.exec_prefix, "Library", "bin")
+    th_dll_path = os.path.join(os.path.dirname(__file__), "bin")
 
     # When users create a virtualenv that inherits the base environment,
     # we will need to add the corresponding library directory into
     # DLL search directories. Otherwise, it will rely on `PATH` which
     # is dependent on user settings.
     if sys.exec_prefix != sys.base_exec_prefix:
-        base_py_dll_path = os.path.join(sys.base_exec_prefix, 'Library', 'bin')
+        base_py_dll_path = os.path.join(sys.base_exec_prefix, "Library", "bin")
     else:
-        base_py_dll_path = ''
+        base_py_dll_path = ""
 
-    dll_paths = list(filter(os.path.exists, [th_dll_path, py_dll_path, base_py_dll_path]))
+    dll_paths = list(
+        filter(os.path.exists, [th_dll_path, py_dll_path, base_py_dll_path])
+    )
 
-    kernel32 = ctypes.WinDLL('kernel32.dll', use_last_error=True)
-    with_load_library_flags = hasattr(kernel32, 'AddDllDirectory')
+    kernel32 = ctypes.WinDLL("kernel32.dll", use_last_error=True)
+    with_load_library_flags = hasattr(kernel32, "AddDllDirectory")
     prev_error_mode = kernel32.SetErrorMode(0x0001)
 
     kernel32.LoadLibraryW.restype = ctypes.c_void_p
@@ -52,14 +56,16 @@ if sys.platform == 'win32':
                 raise err
 
     try:
-        ctypes.CDLL('vcruntime140.dll')
-        ctypes.CDLL('msvcp140.dll')
-        ctypes.CDLL('vcruntime140_1.dll')
+        ctypes.CDLL("vcruntime140.dll")
+        ctypes.CDLL("msvcp140.dll")
+        ctypes.CDLL("vcruntime140_1.dll")
     except OSError:
-        print('''Microsoft Visual C++ Redistributable is not installed, this may lead to the DLL load failure.
-                 It can be downloaded at https://aka.ms/vs/16/release/vc_redist.x64.exe''')
+        print(
+            """Microsoft Visual C++ Redistributable is not installed, this may lead to the DLL load failure.
+                 It can be downloaded at https://aka.ms/vs/16/release/vc_redist.x64.exe"""
+        )
 
-    dlls = glob.glob(os.path.join(th_dll_path, '*.dll'))
+    dlls = glob.glob(os.path.join(th_dll_path, "*.dll"))
     path_patched = False
     for dll in dlls:
         is_loaded = False
@@ -74,7 +80,7 @@ if sys.platform == 'win32':
                 is_loaded = True
         if not is_loaded:
             if not path_patched:
-                os.environ['PATH'] = ';'.join(dll_paths + [os.environ['PATH']])
+                os.environ["PATH"] = ";".join(dll_paths + [os.environ["PATH"]])
                 path_patched = True
             res = kernel32.LoadLibraryW(dll)
             if res is None:
@@ -101,9 +107,10 @@ from .cpu.utils.verbose import verbose
 
 from . import _C
 from ._version import (__version__, __ipex_gitrev__, __torch_gitrev__,
-            __gpu_onednn_gitrev__, __cpu_ideep_gitrev__, __build_type__)
+                       __gpu_onednn_gitrev__, __cpu_ideep_gitrev__, __build_type__)
 
 from .cpu.utils import _cpu_isa, _custom_fx_tracer
+
 _cpu_isa.check_minimal_isa_support()
 
 
@@ -127,14 +134,14 @@ def _here_paths():
 
 
 def include_paths():
-    '''
+    """
     Get the include paths required to build a C++ extension.
 
     Returns:
         A list of include path strings.
-    '''
+    """
     ipex_path = _here_paths()
-    lib_include = os.path.join(ipex_path, 'include')
+    lib_include = os.path.join(ipex_path, "include")
     paths = [
         lib_include,
         # os.path.join(lib_include, 'more')
@@ -143,14 +150,14 @@ def include_paths():
 
 
 def library_paths():
-    '''
+    """
     Get the library paths required to build a C++ extension.
 
     Returns:
         A list of library path strings.
-    '''
+    """
     ipex_path = _here_paths()
-    lib_path = os.path.join(ipex_path, 'lib')
+    lib_path = os.path.join(ipex_path, "lib")
     paths = [
         lib_path,
     ]
@@ -158,21 +165,24 @@ def library_paths():
 
 
 # Path to folder containing CMake definitions for torch ipex package
-cmake_prefix_path = os.path.join(os.path.dirname(__file__), 'share', 'cmake')
+cmake_prefix_path = os.path.join(os.path.dirname(__file__), "share", "cmake")
 
 
 # For CPU
 torch_version = ''
 ipex_version = ''
-import re
-matches = re.match(r'(\d+\.\d+).*', torch.__version__) # noqa W605
+matches = re.match(r'(\d+\.\d+).*', torch.__version__)
 if matches and len(matches.groups()) == 1:
     torch_version = matches.group(1)
-matches = re.match(r'(\d+\.\d+).*', __version__) # noqa W605
+matches = re.match(r'(\d+\.\d+).*', __version__)
 if matches and len(matches.groups()) == 1:
     ipex_version = matches.group(1)
-if torch_version == '' or ipex_version == '' or torch_version != ipex_version:
-    print('ERROR! Intel® Extension for PyTorch* needs to work with PyTorch \
+if torch_version == "" or ipex_version == "" or torch_version != ipex_version:
+    print(
+        "ERROR! Intel® Extension for PyTorch* needs to work with PyTorch \
       {0}.*, but PyTorch {1} is found. Please switch to the matching version \
-          and run again.'.format(ipex_version, torch.__version__))
+          and run again.".format(
+            ipex_version, torch.__version__
+        )
+    )
     exit(127)

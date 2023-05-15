@@ -1,6 +1,6 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 #  import matplotlib.pyplot as plt
 
@@ -38,15 +38,15 @@ dpcpp_device = torch.device("xpu")
 class TestTorchMethod(TestCase):
     def test_multinomial_align_to_cuda(self):
         torch.xpu.manual_seed(1234)
-        a = torch.rand(20, device='xpu')
+        a = torch.rand(20, device="xpu")
         outl = []
-        for i in range (20):
+        for i in range(20):
             out = torch.multinomial(a, 1)
             outl.append(out.item())
         ref = [8, 15, 2, 5, 15, 11, 12, 11, 4, 8, 1, 19, 7, 10, 9, 7, 10, 8, 16, 1]
         for c, r in zip(outl, ref):
             if c != r:
-                raise RuntimeError('test_multinomial_align_to_cuda error')
+                raise RuntimeError("test_multinomial_align_to_cuda error")
 
     def test_multinomial(self, dtype=torch.float):
         #  create a tensor of weights
@@ -84,12 +84,12 @@ class TestTorchMethod(TestCase):
         x2_1 = x2_1.transpose(0, 1)
         for i in range(len(x2)):
             y2 = x2[i].cpu().bincount().unsqueeze(0).float().renorm(1, 0, 1)
-            y2_1 = x2_1[i].cpu().bincount().unsqueeze(
-                0).float().renorm(1, 0, 1)
+            y2_1 = x2_1[i].cpu().bincount().unsqueeze(0).float().renorm(1, 0, 1)
 
         # print("x_cpu.transpose(0,1)[0] replacement=False", x_cpu2[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
         # print("x_xpu.transpose(0,1)[0] replacement=False", x_xpu2[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
         self.assertEqual(y2, y2_1)
+
 
 #  TODO: test full bincount distribution over all trails with no replacement
 #  weights = weights.unsqueeze(0).renorm(1, 0, 1).squeeze()
@@ -99,11 +99,11 @@ class TestTorchMethod(TestCase):
 #  weights[torch.argmax(weights)] = 0
 #  w0 = weights[1]*renorm_1d(remove_w(weights, 1))[0] +
 #       weights[2]*renorm_1d(remove_w(weights, 2))[0] + weights[3]*renorm_1d(remove_w(weights, 3))[0]
-#  w1 = weights[0]*renorm_1d(remove_w(weights, 0))[1] + 
+#  w1 = weights[0]*renorm_1d(remove_w(weights, 0))[1] +
 #       weights[2]*renorm_1d(remove_w(weights, 2))[1] + weights[3]*renorm_1d(remove_w(weights, 3))[1]
-#  w2 = weights[0]*renorm_1d(remove_w(weights, 0))[2] + 
+#  w2 = weights[0]*renorm_1d(remove_w(weights, 0))[2] +
 #       weights[1]*renorm_1d(remove_w(weights, 1))[2] + weights[3]*renorm_1d(remove_w(weights, 3))[2]
-#  w3 = weights[0]*renorm_1d(remove_w(weights, 0))[3] + 
+#  w3 = weights[0]*renorm_1d(remove_w(weights, 0))[3] +
 #       weights[1]*renorm_1d(remove_w(weights, 1))[3] + weights[2]*renorm_1d(remove_w(weights, 2))[3]
 #  w1 = weights[1]*weights[0] + weights[1]*weights[2] + weights[1]*weights[3]
 #  w2 = weights[2]*weights[0] + weights[2]*weights[1] + weights[2]*weights[3]
@@ -124,7 +124,7 @@ class TestTorchMethod(TestCase):
 # 	 w3 = chose_prob(weights, i, 3, 4)
 # 	 print("r ", w0, w1, w2, w3)
 # 	 print("x", x[i].bincount().unsqueeze(0).float().renorm(1, 0, 1))
-# 
+#
 # 	 print("weights", weights)
 #  print("x", x.float().renorm(1, 0, 1))
 
@@ -132,7 +132,7 @@ class TestTorchMethod(TestCase):
 #  print("x replacement=False", x.to(cpu_device))
 #  torch.multinomial(weights, 4) #  ERROR!
 #  y = torch.multinomial(weights, 4, replacement=True)
-# 
+#
 #  print("numpy ", np_data)
 #  plt.hist(np_data)
 #  plt.show()

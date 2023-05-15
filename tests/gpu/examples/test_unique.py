@@ -1,14 +1,14 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 N = 1024
 M = 5
 
-class TestTorchMethod(TestCase):
 
+class TestTorchMethod(TestCase):
     def test_single_unique(self):
         a_cpu = torch.randint(0, 100, [N], dtype=torch.long)
         a_xpu = a_cpu.xpu()
@@ -29,7 +29,6 @@ class TestTorchMethod(TestCase):
         for item in list_output_xpu:
             self.assertTrue(item in list_output_cpu)
 
-
     def test_inverse_unique(self):
         a_cpu = torch.randint(0, 100, [N], dtype=torch.long)
         a_xpu = a_cpu.xpu()
@@ -39,35 +38,44 @@ class TestTorchMethod(TestCase):
         self.assertEqual(output_cpu, output_xpu)
         self.assertEqual(inverse_cpu, inverse_xpu)
 
-
     def test_inverse_counts_unique(self):
         a_cpu = torch.randint(0, 100, [N], dtype=torch.long)
         a_xpu = a_cpu.xpu()
 
-        output_cpu, inverse_cpu, counts_cpu = torch.unique(a_cpu, sorted=True, return_inverse=True, return_counts=True)
-        output_xpu, inverse_xpu, counts_xpu = torch.unique(a_xpu, sorted=True, return_inverse=True, return_counts=True)
+        output_cpu, inverse_cpu, counts_cpu = torch.unique(
+            a_cpu, sorted=True, return_inverse=True, return_counts=True
+        )
+        output_xpu, inverse_xpu, counts_xpu = torch.unique(
+            a_xpu, sorted=True, return_inverse=True, return_counts=True
+        )
         self.assertEqual(output_cpu, output_xpu)
         self.assertEqual(inverse_cpu, inverse_xpu)
         self.assertEqual(counts_cpu, counts_xpu)
-
 
     def test_dim0_unique(self):
         a_cpu = torch.randint(0, 5, [N, M], dtype=torch.long)
         a_xpu = a_cpu.xpu()
 
-        output_cpu, inverse_cpu, counts_cpu = torch.unique(a_cpu, sorted=True, return_inverse=True, return_counts=True, dim=0)
-        output_xpu, inverse_xpu, counts_xpu = torch.unique(a_xpu, sorted=True, return_inverse=True, return_counts=True, dim=0)
+        output_cpu, inverse_cpu, counts_cpu = torch.unique(
+            a_cpu, sorted=True, return_inverse=True, return_counts=True, dim=0
+        )
+        output_xpu, inverse_xpu, counts_xpu = torch.unique(
+            a_xpu, sorted=True, return_inverse=True, return_counts=True, dim=0
+        )
         self.assertEqual(output_cpu, output_xpu)
         self.assertEqual(inverse_cpu, inverse_xpu)
         self.assertEqual(counts_cpu, counts_xpu)
-
 
     def test_dim1_unique(self):
         a_cpu = torch.randint(0, 5, [N, M], dtype=torch.long)
         a_xpu = a_cpu.xpu()
 
-        output_cpu, inverse_cpu, counts_cpu = torch.unique(a_cpu, sorted=True, return_inverse=True, return_counts=True, dim=1)
-        output_xpu, inverse_xpu, counts_xpu = torch.unique(a_xpu, sorted=True, return_inverse=True, return_counts=True, dim=1)
+        output_cpu, inverse_cpu, counts_cpu = torch.unique(
+            a_cpu, sorted=True, return_inverse=True, return_counts=True, dim=1
+        )
+        output_xpu, inverse_xpu, counts_xpu = torch.unique(
+            a_xpu, sorted=True, return_inverse=True, return_counts=True, dim=1
+        )
         self.assertEqual(output_cpu, output_xpu)
         self.assertEqual(inverse_cpu, inverse_xpu)
         self.assertEqual(counts_cpu, counts_xpu)
@@ -79,8 +87,12 @@ class TestTorchMethod(TestCase):
         a_cpu[2047] = 2046
         a_xpu = a_cpu.xpu()
 
-        output_cpu, inverse_cpu, counts_cpu = torch.unique(a_cpu, sorted=True, return_inverse=True, return_counts=True)
-        output_xpu, inverse_xpu, counts_xpu = torch.unique(a_xpu, sorted=True, return_inverse=True, return_counts=True)
+        output_cpu, inverse_cpu, counts_cpu = torch.unique(
+            a_cpu, sorted=True, return_inverse=True, return_counts=True
+        )
+        output_xpu, inverse_xpu, counts_xpu = torch.unique(
+            a_xpu, sorted=True, return_inverse=True, return_counts=True
+        )
         self.assertEqual(output_cpu, output_xpu)
         self.assertEqual(inverse_cpu, inverse_xpu)
         self.assertEqual(counts_cpu, counts_xpu)

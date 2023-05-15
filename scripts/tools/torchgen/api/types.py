@@ -31,6 +31,7 @@ TENSOR_LIST_LIKE_CTYPES = [
 SpecialArgName = Enum("SpecialArgName", ("possibly_redundant_memory_format",))
 ArgName = Union[str, SpecialArgName]
 
+
 # This class shouldn't be created directly; instead, use/create one of the singletons below.
 @dataclass(frozen=True)
 class BaseCppType:
@@ -573,6 +574,7 @@ class CppSignatureGroup:
             symint_signature=symint_signature,
             symint_faithful_signature=symint_faithful_signature,
         )
+
 
 @dataclass(frozen=True)
 class DispatcherSignature:

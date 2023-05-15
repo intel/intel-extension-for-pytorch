@@ -2,7 +2,7 @@
 
 import torch
 from torch.testing._internal.common_utils import TestCase
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -17,7 +17,7 @@ class TestTorchMethod(TestCase):
         # may produce different U and V tensors.
 
         a = torch.randn(5, 5)
-        a_xpu = a.to('xpu')
+        a_xpu = a.to("xpu")
 
         u, s, v = torch.svd(a)
         r_cpu = torch.mm(torch.mm(u, torch.diag(s)), v.t())
@@ -33,13 +33,15 @@ class TestTorchMethod(TestCase):
         # while the SVD result is still correct. Different platforms, like Numpy, or inputs on different device types,
         # may produce different U and V tensors.
         a = torch.randn(5, 5, 5)
-        a_xpu = a.to('xpu')
+        a_xpu = a.to("xpu")
 
         u, s, v = torch.svd(a)
         r_cpu = torch.matmul(torch.matmul(u, torch.diag_embed(s)), v.transpose(-2, -1))
 
         u_xpu, s_xpu, v_xpu = torch.svd(a_xpu)
-        r_xpu = torch.matmul(torch.matmul(u_xpu, torch.diag_embed(s_xpu)), v_xpu.transpose(-2, -1))
+        r_xpu = torch.matmul(
+            torch.matmul(u_xpu, torch.diag_embed(s_xpu)), v_xpu.transpose(-2, -1)
+        )
 
         self.assertEqual(r_cpu, r_xpu.cpu())
 
@@ -50,7 +52,7 @@ class TestTorchMethod(TestCase):
         # may produce different U and V tensors.
 
         a = torch.randn(5, 5)
-        a_xpu = a.to('xpu').to(torch.cfloat)
+        a_xpu = a.to("xpu").to(torch.cfloat)
 
         u, s, v = torch.svd(a)
         r_cpu = torch.mm(torch.mm(u, torch.diag(s)), v.t())
@@ -72,7 +74,7 @@ class TestTorchMethod(TestCase):
         # while the SVD result is still correct. Different platforms, like Numpy, or inputs on different device types,
         # may produce different U and V tensors.
         a = torch.randn(5, 5, 5)
-        a_xpu = a.to('xpu').to(torch.cfloat)
+        a_xpu = a.to("xpu").to(torch.cfloat)
 
         u, s, v = torch.svd(a)
         r_cpu = torch.matmul(torch.matmul(u, torch.diag_embed(s)), v.transpose(-2, -1))
@@ -84,6 +86,8 @@ class TestTorchMethod(TestCase):
         self.assertEqual(v, v_xpu.to(torch.float32).cpu())
         u_xpu = u_xpu.to(torch.float32)
         v_xpu = v_xpu.to(torch.float32)
-        r_xpu = torch.matmul(torch.matmul(u_xpu, torch.diag_embed(s_xpu)), v_xpu.transpose(-2, -1))
+        r_xpu = torch.matmul(
+            torch.matmul(u_xpu, torch.diag_embed(s_xpu)), v_xpu.transpose(-2, -1)
+        )
 
         self.assertEqual(r_cpu, r_xpu.cpu())

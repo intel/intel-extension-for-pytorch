@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -74,16 +74,25 @@ class TestTorchMethod(TestCase):
 
         # change dtype
         self.assertRaises(RuntimeError, lambda: f_xpu.set_(d_xpu.storage()))
-        self.assertRaises(RuntimeError, lambda: f_xpu.set_(d_xpu.storage(), 0, d_xpu.size(), d_xpu.stride()))
+        self.assertRaises(
+            RuntimeError,
+            lambda: f_xpu.set_(d_xpu.storage(), 0, d_xpu.size(), d_xpu.stride()),
+        )
         self.assertRaises(RuntimeError, lambda: f_xpu.set_(d_xpu))
 
         # change device
         # cpu -> xpu
         self.assertRaises(RuntimeError, lambda: f_cpu.set_(f_xpu.storage()))
-        self.assertRaises(RuntimeError, lambda: f_cpu.set_(f_xpu.storage(), 0, f_xpu.size(), f_xpu.stride()))
+        self.assertRaises(
+            RuntimeError,
+            lambda: f_cpu.set_(f_xpu.storage(), 0, f_xpu.size(), f_xpu.stride()),
+        )
         self.assertRaises(RuntimeError, lambda: f_cpu.set_(f_xpu))
 
         # xpu -> cpu
         self.assertRaises(RuntimeError, lambda: f_xpu.set_(f_cpu.storage()))
-        self.assertRaises(RuntimeError, lambda: f_xpu.set_(f_cpu.storage(), 0, f_cpu.size(), f_cpu.stride()))
+        self.assertRaises(
+            RuntimeError,
+            lambda: f_xpu.set_(f_cpu.storage(), 0, f_cpu.size(), f_cpu.stride()),
+        )
         self.assertRaises(RuntimeError, lambda: f_xpu.set_(f_cpu))

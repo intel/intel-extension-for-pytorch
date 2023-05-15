@@ -1,6 +1,6 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 class TestNNMethod(TestCase):
@@ -24,16 +24,22 @@ class TestNNMethod(TestCase):
         float_mod.bias = torch.nn.Parameter(torch.rand(dims[1]))
 
         dqY_ref = float_mod(dqX)
-        qY_ref = torch.quantize_per_tensor(dqY_ref, y_scale, y_zero_point, dtype=torch.qint8)  # for assert equal
+        qY_ref = torch.quantize_per_tensor(
+            dqY_ref, y_scale, y_zero_point, dtype=torch.qint8
+        )  # for assert equal
         print("--------float ends--------")
 
-        quant_mod = q_cls(dims[1], float_mod.weight, float_mod.bias, y_scale, y_zero_point)
+        quant_mod = q_cls(
+            dims[1], float_mod.weight, float_mod.bias, y_scale, y_zero_point
+        )
         qY = quant_mod(qX)
         print("--------quantized cpu ends--------")
 
         quant_mod_xpu = quant_mod.to("xpu")
         qX_gpu = X.to("xpu")
-        qX_xpu = torch.quantize_per_tensor(qX_gpu, x_scale, x_zero_point, dtype=torch.qint8)
+        qX_xpu = torch.quantize_per_tensor(
+            qX_gpu, x_scale, x_zero_point, dtype=torch.qint8
+        )
         qY_xpu = quant_mod_xpu(qX_xpu)
 
         qY_dequantized = torch.dequantize(qY)

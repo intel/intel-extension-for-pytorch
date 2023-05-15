@@ -4,7 +4,7 @@ import torch.nn as nn
 from typing import Tuple
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -13,11 +13,12 @@ dpcpp_device = torch.device("xpu")
 
 # Ported from quantization/core/test_workflow_ops.py
 def _get_scale_zp(
-        min_val: float,
-        max_val: float,
-        dtype: torch.dtype,
-        reduce_range: bool = False,
-        preserve_sparsity: bool = False) -> Tuple[float, int]:
+    min_val: float,
+    max_val: float,
+    dtype: torch.dtype,
+    reduce_range: bool = False,
+    preserve_sparsity: bool = False,
+) -> Tuple[float, int]:
     """
     Calculate the quantization parameters (scale, zero_point)
     based on the min and max element of the tensor
@@ -36,9 +37,7 @@ def _get_scale_zp(
     if min_val < 0 and max_val > 0 and preserve_sparsity:
         symmetric_qmin = int(-((qmax - qmin) / 2 + 1))
         symmetric_qmax = int((qmax - qmin) / 2)
-        max_scale = max(
-            abs(min_val / symmetric_qmin), abs(max_val / symmetric_qmax)
-        )
+        max_scale = max(abs(min_val / symmetric_qmin), abs(max_val / symmetric_qmax))
         min_val = max_scale * symmetric_qmin
         max_val = max_scale * symmetric_qmax
     min_val = min(min_val, 0.0)
@@ -76,8 +75,8 @@ def _get_tensor_min_max(
     X: torch.Tensor,
     running_min: float = float("inf"),
     running_max: float = float("-inf"),
-    averaging_const: float = 0.01) -> Tuple[float, float]:
-
+    averaging_const: float = 0.01,
+) -> Tuple[float, float]:
     min_val = X.min().to(dtype=torch.float32).item()
     max_val = X.max().to(dtype=torch.float32).item()
 
@@ -91,14 +90,25 @@ def _get_tensor_min_max(
 
 # Reference method for fake quantize
 # Note: because scale/zero_point are left as float in the actual kernel, this mimics how fake_quant works for float16/64
-def _fake_quantize_per_tensor_affine_reference(X, scale, zero_point, quant_min, quant_max):
+def _fake_quantize_per_tensor_affine_reference(
+    X, scale, zero_point, quant_min, quant_max
+):
     dtype = X.dtype
-    res = ((torch.clamp(torch.round(X.to(torch.float32) * (1.0 / scale) + zero_point), quant_min, quant_max) - zero_point) * scale)
+    res = (
+        torch.clamp(
+            torch.round(X.to(torch.float32) * (1.0 / scale) + zero_point),
+            quant_min,
+            quant_max,
+        )
+        - zero_point
+    ) * scale
     return res.to(dtype)
 
 
 class TestNNMethod(TestCase):
-    def test_fused_obs_fake_quant_moving_avg(self, device=dpcpp_device, symmetric_quant=True) -> None:
+    def test_fused_obs_fake_quant_moving_avg(
+        self, device=dpcpp_device, symmetric_quant=True
+    ) -> None:
         """
         Tests the case where we call the fused_obs_fake_quant op multiple times
         and update the running_min and max of the activation tensors.
@@ -166,7 +176,6 @@ class TestNNMethod(TestCase):
             self.assertEqual(in_running_max_ref, in_running_max_op)
             self.assertEqual(out.cpu(), x_in.cpu())
 
-
         # Test empty input works
         x = torch.empty(0, 5, device=device)
         out = pt_op(
@@ -186,4 +195,3 @@ class TestNNMethod(TestCase):
         )
         output_shape = (0, 5)
         self.assertEqual(out.shape, output_shape)
-

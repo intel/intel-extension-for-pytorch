@@ -1,5 +1,5 @@
 import torch
-import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch  # noqa F401
 from torch.testing._internal.common_utils import TestCase
 
 cpu_device = torch.device("cpu")
@@ -14,8 +14,16 @@ class TestTorchMethod(TestCase):
         buckets = torch.randn(8, 32768).to(torch.int64)
         buckets_xpu = buckets.to(xpu_device)
 
-        ticker = torch.arange(total_hashes * seqlen, device=cpu_device).unsqueeze(0).expand_as(buckets)
-        ticker_xpu = torch.arange(total_hashes * seqlen, device=xpu_device).unsqueeze(0).expand_as(buckets_xpu)
+        ticker = (
+            torch.arange(total_hashes * seqlen, device=cpu_device)
+            .unsqueeze(0)
+            .expand_as(buckets)
+        )
+        ticker_xpu = (
+            torch.arange(total_hashes * seqlen, device=xpu_device)
+            .unsqueeze(0)
+            .expand_as(buckets_xpu)
+        )
         buckets_and_t = seqlen * buckets + (ticker % seqlen)
         buckets_and_t_xpu = seqlen * buckets_xpu + (ticker_xpu % seqlen)
         buckets_and_t = buckets_and_t.detach()

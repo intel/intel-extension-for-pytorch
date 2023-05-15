@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -9,7 +9,14 @@ dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     def test_var(self, dtype=torch.float):
-        src = torch.randn((3, 4,), dtype=dtype, device=cpu_device)
+        src = torch.randn(
+            (
+                3,
+                4,
+            ),
+            dtype=dtype,
+            device=cpu_device,
+        )
         print("cpu src = ", src)
         print("cpu dst = ", src.var())
         print("cpu dst with dim = ", src.var(1))
@@ -27,7 +34,14 @@ class TestTorchMethod(TestCase):
         self.assertEqual(torch.var(src, 1), torch.var(src_dpcpp, 1).to(cpu_device))
 
     def test_var_correction(self, dtype=torch.float):
-        src = torch.randn((3, 4,), dtype=dtype, device=cpu_device)
+        src = torch.randn(
+            (
+                3,
+                4,
+            ),
+            dtype=dtype,
+            device=cpu_device,
+        )
         cpu = torch.empty(4, device=cpu_device)
         torch.var(src, 0, unbiased=True, out=cpu)
         cpu_corr = torch.empty(4, device=cpu_device)

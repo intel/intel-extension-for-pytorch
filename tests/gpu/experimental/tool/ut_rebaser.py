@@ -10,12 +10,18 @@ import re
 import shutil
 import sys
 from multiprocessing import Pool
-from file_utils import save_to_json, load_from_json, read_file, write_file, \
-                       copy_dir_or_file, touch_init_py
+from file_utils import (
+    save_to_json,
+    load_from_json,
+    read_file,
+    write_file,
+    copy_dir_or_file,
+    touch_init_py,
+)
 
 
 class NodeTransformer(ast.NodeTransformer):
-    """ main transformer for replacing string in ast nodes """
+    """main transformer for replacing string in ast nodes"""
 
     make_restore: bool
     cuda_to_xpu_map: dict
@@ -24,16 +30,16 @@ class NodeTransformer(ast.NodeTransformer):
         super().__init__()
         self.make_restore = make_restore
         self.cuda_to_xpu_map = {
-            'cuda': 'xpu',
-            'CUDA': 'XPU',
-            'Cuda': 'XPU',
-            b'cuda': b'xpu',
-            b'CUDA': b'XPU',
-            b'Cuda': b'XPU',
+            "cuda": "xpu",
+            "CUDA": "XPU",
+            "Cuda": "XPU",
+            b"cuda": b"xpu",
+            b"CUDA": b"XPU",
+            b"Cuda": b"XPU",
         }
 
     def _replace(self, obj):
-        """ implementation of replacement and restorer """
+        """implementation of replacement and restorer"""
         for key, val in self.cuda_to_xpu_map.items():
             (key, val) = (val, key) if self.make_restore else (key, val)
             if isinstance(obj, type(key)):
@@ -41,65 +47,69 @@ class NodeTransformer(ast.NodeTransformer):
         return obj
 
     def visit_Constant(self, node):
-        """ replace `cuda` to `xpu` for ast.Constant """
+        """replace `cuda` to `xpu` for ast.Constant"""
         self.generic_visit(node)
         node.value = self._replace(node.value)
         return node
 
     def visit_Attribute(self, node):
-        """ replace `cuda` to `xpu` for ast.Attribute """
+        """replace `cuda` to `xpu` for ast.Attribute"""
         self.generic_visit(node)
         node.attr = self._replace(node.attr)
         return node
 
     def visit_FunctionDef(self, node):
-        """ replace `cuda` to `xpu` for ast.FunctionDef """
+        """replace `cuda` to `xpu` for ast.FunctionDef"""
         self.generic_visit(node)
         node.name = self._replace(node.name)
         return node
 
     def visit_ClassDef(self, node):
-        """ replace `cuda` to `xpu` for ast.ClassDef """
+        """replace `cuda` to `xpu` for ast.ClassDef"""
         self.generic_visit(node)
         node.name = self._replace(node.name)
         return node
 
     def visit_Name(self, node):
-        """ replace `cuda` to `xpu` for ast.Name """
+        """replace `cuda` to `xpu` for ast.Name"""
         self.generic_visit(node)
         node.id = self._replace(node.id)
         return node
 
     def visit_arg(self, node):
-        """ replace `cuda` to `xpu` for ast.arg """
+        """replace `cuda` to `xpu` for ast.arg"""
         self.generic_visit(node)
         node.arg = self._replace(node.arg)
         return node
 
     def visit_keyword(self, node):
-        """ replace `cuda` to `xpu` for ast.keyword """
+        """replace `cuda` to `xpu` for ast.keyword"""
         self.generic_visit(node)
         node.arg = self._replace(node.arg)
         return node
+
+
 # class NodeTransformer end.
 
 
 class DecoTransformer(NodeTransformer):
-    """ This transformer only for flatting given decorators """
+    """This transformer only for flatting given decorators"""
 
     def visit_IfExp(self, node):
-        """ For decorator dtypesIfXPU, there is no need
-            to select different versions for mapping dtypes """
+        """For decorator dtypesIfXPU, there is no need
+        to select different versions for mapping dtypes"""
         self.generic_visit(node)
         return node.body
+
+
 # class DecoTransformer end.
 
 
-class TestFileModifier():
-    """ This class focuses on adjust the given test file """
+class TestFileModifier:
+    """This class focuses on adjust the given test file"""
 
     def replace_cuda_with_xpu_(self, f_ast):
-        """ To replace all `cuda` with `xpu` except for decorators """
+        """To replace all `cuda` with `xpu` except for decorators"""
         print("------ Start to modify cuda to xpu ... ", end="")
         transformer = NodeTransformer()
         # replace all `cuda` with `xpu`
@@ -110,7 +120,8 @@ class TestFileModifier():
             if isinstance(node, (ast.ClassDef, ast.FunctionDef)):
                 restorer = NodeTransformer(make_restore=True)
                 node.decorator_list = [
-                    restorer.visit(deco) for deco in node.decorator_list]
+                    restorer.visit(deco) for deco in node.decorator_list
+                ]
             return node
 
         for node in ast.walk(f_ast):
@@ -118,7 +129,7 @@ class TestFileModifier():
         print("SUCCESS")
 
     def add_xpu_imports_(self, f_ast):
-        """ To add necessary xpu imports at the head of test file """
+        """To add necessary xpu imports at the head of test file"""
         print("------ Start to add necessary xpu imports ... ", end="")
         # 1. Get the first lineno of classdef or functiondef,
         #    we assume that this line is where the code body starts.
@@ -143,55 +154,73 @@ class TestFileModifier():
         #        we will import all the same modules from common.jit_utils
         # import utils
         pytorch_test_base_node = ast.ImportFrom(
-            module='common.pytorch_test_base',
+            module="common.pytorch_test_base",
             names=[
-                ast.alias(name='TestCase'),
-                ast.alias(name='dtypesIfXPU'),
-                ast.alias(name='TEST_XPU'),
-                ast.alias(name='TEST_MULTIGPU'),
-                ast.alias(name='largeTensorTest'),
-                ],
-            level=0)
+                ast.alias(name="TestCase"),
+                ast.alias(name="dtypesIfXPU"),
+                ast.alias(name="TEST_XPU"),
+                ast.alias(name="TEST_MULTIGPU"),
+                ast.alias(name="largeTensorTest"),
+            ],
+            level=0,
+        )
         # import common_nn
         old_common_nn_nodes = [
-            node for node in f_ast.body
+            node
+            for node in f_ast.body
             if isinstance(node, ast.ImportFrom)
-            and node.module == 'torch.testing._internal.common_nn']
+            and node.module == "torch.testing._internal.common_nn"
+        ]
         common_nn_node_names = [
             name for node in old_common_nn_nodes for name in node.names
-            ]
-        common_nn_node = ast.ImportFrom(
-            module='common.common_nn',
-            names=common_nn_node_names,
-            level=0) if common_nn_node_names else None
+        ]
+        common_nn_node = (
+            ast.ImportFrom(
+                module="common.common_nn", names=common_nn_node_names, level=0
+            )
+            if common_nn_node_names
+            else None
+        )
         # import common_jit
         old_common_jit_nodes = [
-            node for node in f_ast.body
+            node
+            for node in f_ast.body
             if isinstance(node, ast.ImportFrom)
-            and node.module == 'torch.testing._internal.common_jit']
+            and node.module == "torch.testing._internal.common_jit"
+        ]
         common_jit_node_names = [
             name for node in old_common_jit_nodes for name in node.names
-            ]
-        common_jit_node = ast.ImportFrom(
-            module='common.common_jit',
-            names=common_jit_node_names,
-            level=0) if common_jit_node_names else None
+        ]
+        common_jit_node = (
+            ast.ImportFrom(
+                module="common.common_jit", names=common_jit_node_names, level=0
+            )
+            if common_jit_node_names
+            else None
+        )
         # import jit_utils
         old_jit_utils_nodes = [
-            node for node in f_ast.body
+            node
+            for node in f_ast.body
             if isinstance(node, ast.ImportFrom)
-            and node.module == 'torch.testing._internal.jit_utils']
+            and node.module == "torch.testing._internal.jit_utils"
+        ]
         jit_utils_node_names = [
             name for node in old_jit_utils_nodes for name in node.names
-            ]
-        jit_utils_node = ast.ImportFrom(
-            module='common.jit_utils',
-            names=jit_utils_node_names,
-            level=0) if jit_utils_node_names else None
-        imp_nodes = [pytorch_test_base_node,
-                     common_nn_node,
-                     common_jit_node,
-                     jit_utils_node]
+        ]
+        jit_utils_node = (
+            ast.ImportFrom(
+                module="common.jit_utils", names=jit_utils_node_names, level=0
+            )
+            if jit_utils_node_names
+            else None
+        )
+        imp_nodes = [
+            pytorch_test_base_node,
+            common_nn_node,
+            common_jit_node,
+            jit_utils_node,
+        ]
         while None in imp_nodes:
             imp_nodes.remove(None)
         # 3. add xpu import right above the code body
@@ -199,7 +228,7 @@ class TestFileModifier():
         print("SUCCESS")
 
     def add_xpu_decorators_(self, f_ast):
-        """ To add xpu style decorators to necessary functions """
+        """To add xpu style decorators to necessary functions"""
 
         print("------ Start to add necessary xpu decorators ... ", end="")
 
@@ -213,18 +242,22 @@ class TestFileModifier():
 
             # i. find dtypesIfCUDA and add dtypesIfXPU right above it
             def _find_cuda_dtypes_deco(deco):
-                if isinstance(deco, ast.Call) \
-                        and isinstance(deco.func, ast.Name) \
-                        and deco.func.id == 'dtypesIfCUDA':
+                if (
+                    isinstance(deco, ast.Call)
+                    and isinstance(deco.func, ast.Name)
+                    and deco.func.id == "dtypesIfCUDA"
+                ):
                     return True
                 return False
 
             cuda_dtypes_deco_idx = list(
-                map(lambda deco:
-                    deco_list.index(deco)
+                map(
+                    lambda deco: deco_list.index(deco)
                     if _find_cuda_dtypes_deco(deco)
                     else -1,
-                    deco_list))
+                    deco_list,
+                )
+            )
             carry = 0
             for idx in cuda_dtypes_deco_idx:
                 if idx == -1:
@@ -240,25 +273,28 @@ class TestFileModifier():
             return new_decos
 
         new_decos = [
-            ast.unparse(deco) for deco in
-            [_add_xpu_decos_to_node(node) for node in ast.walk(f_ast)]
-            if deco]
+            ast.unparse(deco)
+            for deco in [_add_xpu_decos_to_node(node) for node in ast.walk(f_ast)]
+            if deco
+        ]
 
         print("SUCCESS")
         for deco in new_decos:
             print(f"-------- Added xpu deco: {deco}")
 
     def run(self, f_ast):
-        """ main entrance of class TestFileModifier """
+        """main entrance of class TestFileModifier"""
         self.replace_cuda_with_xpu_(f_ast)
         self.add_xpu_imports_(f_ast)
         self.add_xpu_decorators_(f_ast)
         ast.fix_missing_locations(f_ast)
+
+
 # class TestFileModifier end.
 
 
-class ImportHelper():
-    """ This helper focuses on handling dependancy issues """
+class ImportHelper:
+    """This helper focuses on handling dependancy issues"""
 
     src_dir: str
     tgt_dir: str
@@ -269,23 +305,22 @@ class ImportHelper():
         self.tgt_dir = t_dir
 
     def try_to_import_module(self, module_name):
-        """ return (True, module_name) if succeed,
-            else return (False, missed_module_name) """
+        """return (True, module_name) if succeed,
+        else return (False, missed_module_name)"""
         try:
             importlib.import_module(module_name)
             return True, module_name
         except ModuleNotFoundError as err:
             print("\n------ ", err)
-            res = re.match(r"No module named \'(.*)\'", str(err),
-                           re.M | re.S | re.I)
-            assert res is not None, \
-                f"ModuleNotFoundError mismatch in re.match," \
-                f" the error msg is {err}"
+            res = re.match(r"No module named \'(.*)\'", str(err), re.M | re.S | re.I)
+            assert res is not None, (
+                f"ModuleNotFoundError mismatch in re.match," f" the error msg is {err}"
+            )
             return False, res.group(1)
 
     def run(self, rel_path):
-        """ main entrance for class ImportHelper """
-        module_name = os.path.splitext(rel_path)[0].replace('/', '.')
+        """main entrance for class ImportHelper"""
+        module_name = os.path.splitext(rel_path)[0].replace("/", ".")
         # add work dir to sys.path for searching modules
         if self.tgt_dir not in sys.path:
             sys.path.append(self.tgt_dir)
@@ -293,7 +328,7 @@ class ImportHelper():
         status, missed_module = self.try_to_import_module(module_name)
         while status is False:
             print("FAILED")
-            rel_path = missed_module.replace('.', '/')
+            rel_path = missed_module.replace(".", "/")
             maybe_src_path = os.path.join(self.src_dir, rel_path)
             maybe_src_file = maybe_src_path + ".py"
             tgt_path = os.path.join(self.tgt_dir, rel_path)
@@ -303,15 +338,16 @@ class ImportHelper():
             if os.path.exists(tgt_file):
                 os.remove(tgt_file)
             copy_dir_or_file(maybe_src_file, tgt_file)
-            print(f"---- Retry to import copied module {module_name}... ",
-                  end="")
+            print(f"---- Retry to import copied module {module_name}... ", end="")
             status, missed_module = self.try_to_import_module(module_name)
         print("SUCCESS")
+
+
 # class ImportHelper end.
 
 
-class SelectHelper():
-    """ This helper fork sub-processes for each file and makes control """
+class SelectHelper:
+    """This helper fork sub-processes for each file and makes control"""
 
     src_dir: str
     tgt_dir: str
@@ -325,12 +361,15 @@ class SelectHelper():
         self.test_map = {}
 
     def check_instantiate_call(self, top_node):
-        """ check whether `instantiate_device_type_tests` in test file"""
+        """check whether `instantiate_device_type_tests` in test file"""
         ret_list = []
-        call_nodes = [node for node in ast.walk(top_node)
-                      if isinstance(node, ast.Call)
-                      and isinstance(node.func, ast.Name)
-                      and node.func.id == 'instantiate_device_type_tests']
+        call_nodes = [
+            node
+            for node in ast.walk(top_node)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "instantiate_device_type_tests"
+        ]
         # select all instantiate_device_type_tests(cls, globals()) call nodes,
         # except for 'only_for'
         for node in call_nodes:
@@ -339,14 +378,13 @@ class SelectHelper():
             if len(args) > 1 and args[1].func.id != "globals":
                 continue
             keywords = node.keywords
-            has_only_for = any(map(lambda k: k.arg == 'only_for', keywords))
-            if not has_only_for and \
-               not re.search(r'cuda', clsname, re.M | re.S | re.I):
+            has_only_for = any(map(lambda k: k.arg == "only_for", keywords))
+            if not has_only_for and not re.search(r"cuda", clsname, re.M | re.S | re.I):
                 ret_list.append(clsname)
         return ret_list
 
     def select_file(self, src_full_path):
-        """ From here each process handle a single file """
+        """From here each process handle a single file"""
         self.rel_path = os.path.relpath(src_full_path, self.src_dir)
         print(f"-- Checking file {self.rel_path} ... ", end="")
         f_ast = ast.parse(read_file(src_full_path))
@@ -367,7 +405,7 @@ class SelectHelper():
         return "", []
 
     def run(self, file_list):
-        """ main entrance for class SelectHelper, processes fork from here """
+        """main entrance for class SelectHelper, processes fork from here"""
         results = []
         with Pool(os.cpu_count()) as pool:
             results = pool.map(self.select_file, file_list)
@@ -378,16 +416,16 @@ class SelectHelper():
             if result[1]:
                 self.test_map[result[0]] = result[1]
         # generate test map (and json file)
-        test_map_json_file = os.path.join(self.tgt_dir,
-                                          "../config/test_map.json")
+        test_map_json_file = os.path.join(self.tgt_dir, "../config/test_map.json")
         save_to_json(self.test_map, test_map_json_file)
-        print(f"Generated {{test_file: [test_classes]}} map:"
-              f" {test_map_json_file}")
+        print(f"Generated {{test_file: [test_classes]}} map:" f" {test_map_json_file}")
+
+
 # class SelectHelper end.
 
 
-class Worker():
-    """ main worker for rebasement, only be instantiated by parent process """
+class Worker:
+    """main worker for rebasement, only be instantiated by parent process"""
 
     temp_work_dir: str = ""
 
@@ -410,29 +448,30 @@ class Worker():
             print(f"Deleted temp work directory: {self.temp_work_dir}")
 
     def keep_old_files(self, old_test_dir, keep_file_list):
-        """ select and copy those files that should be kept during rebasing """
+        """select and copy those files that should be kept during rebasing"""
         print("Collecting old files those should be kept ...")
         for dir_name in keep_file_list:
             file_list = glob.glob(os.path.join(old_test_dir, dir_name))
             for f_name in file_list:
-                temp_file = os.path.join(self.temp_work_dir,
-                                         os.path.relpath(f_name, old_test_dir))
+                temp_file = os.path.join(
+                    self.temp_work_dir, os.path.relpath(f_name, old_test_dir)
+                )
                 shutil.copyfile(f_name, temp_file)
                 print(f"-- Copied old file to temp dir: {temp_file}")
 
     def select_files_and_copy(self, src_dir):
-        """ To select which test file contains device test should be copied """
+        """To select which test file contains device test should be copied"""
         print("Collecting test files for device ...")
         file_list = glob.glob(os.path.join(src_dir, "**/*.py"), recursive=True)
-        temp_test_dir = os.path.join(self.temp_work_dir, 'test')
+        temp_test_dir = os.path.join(self.temp_work_dir, "test")
         select_helper = SelectHelper(src_dir, temp_test_dir)
         select_helper.run(file_list)
 
     def copy_temp_to_target_dir(self, tgt_dir):
-        """ finally copy files from temp work dir to target dir """
+        """finally copy files from temp work dir to target dir"""
 
         def clean_target_dir(tgt_dir):
-            """ clear target directory preparing for copy files in"""
+            """clear target directory preparing for copy files in"""
             if os.path.exists(tgt_dir):
                 shutil.rmtree(tgt_dir)
                 print(f"Cleaned target directory: {tgt_dir}")
@@ -440,86 +479,97 @@ class Worker():
         clean_target_dir(tgt_dir)
         shutil.copytree(self.temp_work_dir, tgt_dir)
         print(f"Copied temp work directory to: {tgt_dir}")
+
+
 # class Worker end.
 
 
 def backup_old_files(ipex_test_dir):
-    """ backup old experimental folder to experimental.old """
-    backup_path = ipex_test_dir + '.old'
+    """backup old experimental folder to experimental.old"""
+    backup_path = ipex_test_dir + ".old"
     os.rename(ipex_test_dir, backup_path)
     print(f"Backup-ed old test files to: {backup_path}")
 
 
 def main():
-    """ the main entrance of ut rebaser """
+    """the main entrance of ut rebaser"""
     # parse args
-    parser = argparse.ArgumentParser(
-        description="Rebase tool for PyTorch ported UTs")
+    parser = argparse.ArgumentParser(description="Rebase tool for PyTorch ported UTs")
     parser.add_argument(
-        '-p', '--pytorch-dir',
-        metavar='PYTORCH-DIR',
-        dest='pytorch_root_dir',
+        "-p",
+        "--pytorch-dir",
+        metavar="PYTORCH-DIR",
+        dest="pytorch_root_dir",
         default="",
         type=str,
         required=True,
-        help='Root directory of the source codes of PyTorch,'
-        ' and this path should contain \'test\' folder under it.')
+        help="Root directory of the source codes of PyTorch,"
+        " and this path should contain 'test' folder under it.",
+    )
     parser.add_argument(
-        '-x', '--ipex-dir',
-        metavar='IPEX-DIR',
-        dest='ipex_root_dir',
+        "-x",
+        "--ipex-dir",
+        metavar="IPEX-DIR",
+        dest="ipex_root_dir",
         default="",
         type=str,
         required=True,
-        help='Root directory of Intel® Extension for PyTorch*,'
-        ' and this path should contain \'tests/gpu/experimental\''
-        ' folder under it.')
+        help="Root directory of Intel® Extension for PyTorch*,"
+        " and this path should contain 'tests/gpu/experimental'"
+        " folder under it.",
+    )
     parser.add_argument(
-        '-o', '--target-dir',
-        metavar='TARGET-DIR',
-        dest='target_dir',
+        "-o",
+        "--target-dir",
+        metavar="TARGET-DIR",
+        dest="target_dir",
         default=None,
         type=str,
-        help='Target directory to store output files.'
-        ' As default, output files will be saved under'
-        ' <ipex_root>/tests/gpu/experimental/')
+        help="Target directory to store output files."
+        " As default, output files will be saved under"
+        " <ipex_root>/tests/gpu/experimental/",
+    )
     parser.add_argument(
-        '-i', '--no-backup',
-        action='store_true',
-        help='If this flag is set True,'
-        ' this tool won\'t backup old experimental/'
-        ' and will replace all things under experimental/ with new files.')
+        "-i",
+        "--no-backup",
+        action="store_true",
+        help="If this flag is set True,"
+        " this tool won't backup old experimental/"
+        " and will replace all things under experimental/ with new files.",
+    )
 
     args = parser.parse_args()
-    pytorch_root_dir = os.path.realpath(
-        os.path.expanduser(args.pytorch_root_dir))
-    assert os.path.exists(pytorch_root_dir), \
-        f"Source directory of PyTorch does not exist." \
-        f" Please re-check --pytorch-dir flag.\nError directory: " \
+    pytorch_root_dir = os.path.realpath(os.path.expanduser(args.pytorch_root_dir))
+    assert os.path.exists(pytorch_root_dir), (
+        f"Source directory of PyTorch does not exist."
+        f" Please re-check --pytorch-dir flag.\nError directory: "
         f"{pytorch_root_dir}"
+    )
     pytorch_test_dir = os.path.join(pytorch_root_dir, "test")
-    assert os.path.exists(pytorch_root_dir), \
-        f"Source directory of PyTorch's tests does not exist." \
-        f" Please re-check --pytorch-dir flag.\nError directory: " \
+    assert os.path.exists(pytorch_root_dir), (
+        f"Source directory of PyTorch's tests does not exist."
+        f" Please re-check --pytorch-dir flag.\nError directory: "
         f"{pytorch_test_dir}"
-    ipex_root_dir = os.path.realpath(
-        os.path.expanduser(args.ipex_root_dir))
-    assert os.path.exists(ipex_root_dir), \
-        f"Source directory of Intel® Extension for PyTorch* does not exist." \
-        f" Please re-check --ipex-dir flag.\nError directory: " \
+    )
+    ipex_root_dir = os.path.realpath(os.path.expanduser(args.ipex_root_dir))
+    assert os.path.exists(ipex_root_dir), (
+        f"Source directory of Intel® Extension for PyTorch* does not exist."
+        f" Please re-check --ipex-dir flag.\nError directory: "
         f"{ipex_root_dir}"
+    )
     ipex_test_dir = os.path.join(ipex_root_dir, "tests/gpu/experimental")
-    assert os.path.exists(ipex_test_dir), \
-        f"Source directory of Intel® Extension for PyTorch*'s" \
-        f" experimental tests does not exist." \
-        f" Please re-check --ipex-dir flag.\nError directory: " \
+    assert os.path.exists(ipex_test_dir), (
+        f"Source directory of Intel® Extension for PyTorch*'s"
+        f" experimental tests does not exist."
+        f" Please re-check --ipex-dir flag.\nError directory: "
         f"{ipex_root_dir}"
-    target_test_dir = \
-        args.target_dir if args.target_dir is not None else ipex_test_dir
+    )
+    target_test_dir = args.target_dir if args.target_dir is not None else ipex_test_dir
     script_dir = os.path.dirname(os.path.realpath(__file__))
 
     keep_files_list = load_from_json(
-        os.path.join(script_dir, "../config/keep_files_list.json"))
+        os.path.join(script_dir, "../config/keep_files_list.json")
+    )
 
     print("========= Rebase work START =========")
     worker = Worker()
@@ -533,5 +583,5 @@ def main():
     print("========= Rebase work DONE! =========")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

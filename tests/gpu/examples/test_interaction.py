@@ -1,7 +1,9 @@
 import torch
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 from torch.testing._internal.common_utils import TestCase
+
 torch.set_printoptions(profile="full")
+
 
 class TestFusionMethod(TestCase):
     def test_interaction_fusion(self):

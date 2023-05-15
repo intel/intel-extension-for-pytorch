@@ -6,7 +6,9 @@ import pytest
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_random(self):
         # This test is flaky with p<=(2/(ub-lb))^200=6e-36
         original_dtype = torch.get_default_dtype()
@@ -58,13 +60,15 @@ class TestNNMethod(TestCase):
             for to_ in tos:
                 t = torch.empty(size, dtype=torch.bool, device="xpu")
                 if to_ > from_:
-                    if not (min_val <= from_ <= max_val) or not (min_val <= (to_ - 1) <= max_val):
+                    if not (min_val <= from_ <= max_val) or not (
+                        min_val <= (to_ - 1) <= max_val
+                    ):
                         if not (min_val <= from_ <= max_val):
                             return True
-                    #        self.assertWarnsRegex(
-                    #            lambda: t.random_(from_, to_),
-                    #            "from is out of bounds"
-                    #        )
+                        #        self.assertWarnsRegex(
+                        #            lambda: t.random_(from_, to_),
+                        #            "from is out of bounds"
+                        #        )
                         if not (min_val <= (to_ - 1) <= max_val):
                             return True
                     #        self.assertWarnsRegex(
@@ -75,14 +79,20 @@ class TestNNMethod(TestCase):
                         t.random_(from_, to_)
                         range_ = to_ - from_
                         delta = 1
-                        self.assertTrue(from_ <= t.to(torch.int).min().cpu() < (from_ + delta))
-                        self.assertTrue((to_ - delta) <= t.to(torch.int).max().cpu() < to_)
+                        self.assertTrue(
+                            from_ <= t.to(torch.int).min().cpu() < (from_ + delta)
+                        )
+                        self.assertTrue(
+                            (to_ - delta) <= t.to(torch.int).max().cpu() < to_
+                        )
                 else:
                     self.assertRaisesRegex(
                         RuntimeError,
-                        "random_ expects 'from' to be less than 'to', but got from=" +
-                        str(from_) + " >= to=" + str(to_),
-                        lambda: t.random_(from_, to_)
+                        "random_ expects 'from' to be less than 'to', but got from="
+                        + str(from_)
+                        + " >= to="
+                        + str(to_),
+                        lambda: t.random_(from_, to_),
                     )
 
     def test_random_full_range(self):
@@ -101,8 +111,8 @@ class TestNNMethod(TestCase):
             from_ = int(max(torch.finfo(dtype).min, int64_min_val))
             to_inc_ = int(min(torch.finfo(dtype).max, int64_max_val))
         elif dtype == torch.bfloat16:
-            from_ = int(max(-3.389531389251535e+38, int64_min_val))
-            to_inc_ = int(min(3.389531389251535e+38, int64_max_val))
+            from_ = int(max(-3.389531389251535e38, int64_min_val))
+            to_inc_ = int(min(3.389531389251535e38, int64_max_val))
         else:
             from_ = int(max(torch.iinfo(dtype).min, int64_min_val))
             to_inc_ = int(min(torch.iinfo(dtype).max, int64_max_val))
@@ -146,23 +156,41 @@ class TestNNMethod(TestCase):
         else:
             min_val = torch.iinfo(dtype).min
             max_val = torch.iinfo(dtype).max
-            froms = [int64_min_val, min_val - 1, min_val, -42, 0, 42, max_val, max_val + 1]
-            tos = [min_val - 1, min_val, -42, 0, 42, max_val, max_val + 1, int64_max_val]
+            froms = [
+                int64_min_val,
+                min_val - 1,
+                min_val,
+                -42,
+                0,
+                42,
+                max_val,
+                max_val + 1,
+            ]
+            tos = [
+                min_val - 1,
+                min_val,
+                -42,
+                0,
+                42,
+                max_val,
+                max_val + 1,
+                int64_max_val,
+            ]
 
         for from_ in froms:
             for to_ in tos:
                 t = torch.empty(size, device="xpu")
                 if to_ > from_:
-                    if not (min_val <= from_ <= max_val) or not (min_val <= (to_ - 1) <= max_val):
+                    if not (min_val <= from_ <= max_val) or not (
+                        min_val <= (to_ - 1) <= max_val
+                    ):
                         if not (min_val <= from_ <= max_val):
                             self.assertWarnsRegex(
-                                lambda: t.random_(from_, to_),
-                                "from is out of bounds"
+                                lambda: t.random_(from_, to_), "from is out of bounds"
                             )
                         if not (min_val <= (to_ - 1) <= max_val):
                             self.assertWarnsRegex(
-                                lambda: t.random_(from_, to_),
-                                "to - 1 is out of bounds"
+                                lambda: t.random_(from_, to_), "to - 1 is out of bounds"
                             )
                     else:
                         t.random_(from_, to_)
@@ -171,17 +199,31 @@ class TestNNMethod(TestCase):
                         if dtype == torch.bfloat16:
                             # Less strict checks because of rounding errors
                             # TODO investigate rounding errors
-                            self.assertTrue(from_ <= t.cpu().to(torch.double).min() < (from_ + delta))
-                            self.assertTrue((to_ - delta) < t.cpu().to(torch.double).max() <= to_)
+                            self.assertTrue(
+                                from_
+                                <= t.cpu().to(torch.double).min()
+                                < (from_ + delta)
+                            )
+                            self.assertTrue(
+                                (to_ - delta) < t.cpu().to(torch.double).max() <= to_
+                            )
                         else:
-                            self.assertTrue(from_ <= t.cpu().to(torch.double).min() < (from_ + delta))
-                            self.assertTrue((to_ - delta) <= t.cpu().to(torch.double).max() < to_)
+                            self.assertTrue(
+                                from_
+                                <= t.cpu().to(torch.double).min()
+                                < (from_ + delta)
+                            )
+                            self.assertTrue(
+                                (to_ - delta) <= t.cpu().to(torch.double).max() < to_
+                            )
                 else:
                     self.assertRaisesRegex(
                         RuntimeError,
-                        "random_ expects 'from' to be less than 'to', but got from=" +
-                        str(from_) + " >= to=" + str(to_),
-                        lambda: t.random_(from_, to_)
+                        "random_ expects 'from' to be less than 'to', but got from="
+                        + str(from_)
+                        + " >= to="
+                        + str(to_),
+                        lambda: t.random_(from_, to_),
                     )
 
     def test_random_to(self):
@@ -213,7 +255,16 @@ class TestNNMethod(TestCase):
         else:
             min_val = torch.iinfo(dtype).min
             max_val = torch.iinfo(dtype).max
-            tos = [min_val - 1, min_val, -42, 0, 42, max_val, max_val + 1, int64_max_val]
+            tos = [
+                min_val - 1,
+                min_val,
+                -42,
+                0,
+                42,
+                max_val,
+                max_val + 1,
+                int64_max_val,
+            ]
 
         from_ = 0
         for to_ in tos:
@@ -221,8 +272,7 @@ class TestNNMethod(TestCase):
             if to_ > from_:
                 if not (min_val <= (to_ - 1) <= max_val):
                     self.assertWarnsRegex(
-                        lambda: t.random_(to_),
-                        "to - 1 is out of bounds"
+                        lambda: t.random_(to_), "to - 1 is out of bounds"
                     )
                 else:
                     t.random_(to_)
@@ -231,19 +281,32 @@ class TestNNMethod(TestCase):
                     if dtype == torch.bfloat16:
                         # Less strict checks because of rounding errors
                         # TODO investigate rounding errors
-                        self.assertTrue(from_ <= t.cpu().to(torch.double).min() < (from_ + delta))
-                        self.assertTrue((to_ - delta) < t.cpu().to(torch.double).max() <= to_)
+                        self.assertTrue(
+                            from_ <= t.cpu().to(torch.double).min() < (from_ + delta)
+                        )
+                        self.assertTrue(
+                            (to_ - delta) < t.cpu().to(torch.double).max() <= to_
+                        )
                     else:
-                        self.assertTrue(from_ <= t.cpu().to(torch.double).min() < (from_ + delta))
-                        self.assertTrue((to_ - delta) <= t.cpu().to(torch.double).max() < to_)
+                        self.assertTrue(
+                            from_ <= t.cpu().to(torch.double).min() < (from_ + delta)
+                        )
+                        self.assertTrue(
+                            (to_ - delta) <= t.cpu().to(torch.double).max() < to_
+                        )
             else:
                 self.assertRaisesRegex(
                     RuntimeError,
-                    "random_ expects 'from' to be less than 'to', but got from=" + str(from_) + " >= to=" + str(to_),
-                    lambda: t.random_(from_, to_)
+                    "random_ expects 'from' to be less than 'to', but got from="
+                    + str(from_)
+                    + " >= to="
+                    + str(to_),
+                    lambda: t.random_(from_, to_),
                 )
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_random_default(self):
         # TODO: https://github.com/pytorch/pytorch/issues/33793
         dtype = torch.double

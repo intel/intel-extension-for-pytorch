@@ -21,9 +21,9 @@ def tensor_to_channels_last_1d(t):
         t = t.view(t.size(0), t.size(1), t.size(3))
     return t
 
+
 # Port from
 # https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/blob/920c7163c81d6c5098ba79ed482d57b1ded8521d/intel_extension_for_pytorch/xpu/utils.py#L6 # noqa B950
-# and
 
 
 def to_channels_last_1d(t):

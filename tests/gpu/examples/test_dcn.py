@@ -14,31 +14,57 @@ import torchvision
 
 class _DCNv2(Function):
     @staticmethod
-    def forward(ctx, input, offset, mask, weight, bias,
-                stride, padding, dilation, deformable_groups):
+    def forward(
+        ctx,
+        input,
+        offset,
+        mask,
+        weight,
+        bias,
+        stride,
+        padding,
+        dilation,
+        deformable_groups,
+    ):
         ctx.stride = _pair(stride)
         ctx.padding = _pair(padding)
         ctx.dilation = _pair(dilation)
         ctx.kernel_size = _pair(weight.shape[2:4])
         ctx.deformable_groups = deformable_groups
-        output = torch.ops.torch_ipex.dcn_v2_forward(input, weight, bias,
-                                            offset, mask,
-                                            ctx.kernel_size[0], ctx.kernel_size[1],
-                                            ctx.stride[0], ctx.stride[1],
-                                            ctx.padding[0], ctx.padding[1],
-                                            ctx.dilation[0], ctx.dilation[1],
-                                            ctx.deformable_groups)
+        output = torch.ops.torch_ipex.dcn_v2_forward(
+            input,
+            weight,
+            bias,
+            offset,
+            mask,
+            ctx.kernel_size[0],
+            ctx.kernel_size[1],
+            ctx.stride[0],
+            ctx.stride[1],
+            ctx.padding[0],
+            ctx.padding[1],
+            ctx.dilation[0],
+            ctx.dilation[1],
+            ctx.deformable_groups,
+        )
         ctx.save_for_backward(input, offset, mask, weight, bias)
         return output
 
 
-
 dcn_v2_conv = _DCNv2.apply
 
-class DCNv2(nn.Module):
 
-    def __init__(self, in_channels, out_channels,
-                 kernel_size, stride, padding, dilation=1, deformable_groups=1):
+class DCNv2(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride,
+        padding,
+        dilation=1,
+        deformable_groups=1,
+    ):
         super(DCNv2, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -48,8 +74,9 @@ class DCNv2(nn.Module):
         self.dilation = _pair(dilation)
         self.deformable_groups = deformable_groups
 
-        self.weight = nn.Parameter(torch.Tensor(
-            out_channels, in_channels, *self.kernel_size))
+        self.weight = nn.Parameter(
+            torch.Tensor(out_channels, in_channels, *self.kernel_size)
+        )
         self.bias = nn.Parameter(torch.Tensor(out_channels))
         self.reset_parameters()
 
@@ -57,39 +84,64 @@ class DCNv2(nn.Module):
         n = self.in_channels
         for k in self.kernel_size:
             n *= k
-        stdv = 1. / math.sqrt(n)
+        stdv = 1.0 / math.sqrt(n)
         self.weight.data.uniform_(-stdv, stdv)
         self.bias.data.zero_()
 
     def forward(self, input, offset, mask):
-        assert 2 * self.deformable_groups * self.kernel_size[0] * self.kernel_size[1] == \
-            offset.shape[1]
-        assert self.deformable_groups * self.kernel_size[0] * self.kernel_size[1] == \
-            mask.shape[1]
-        return dcn_v2_conv(input, offset, mask,
-                           self.weight,
-                           self.bias,
-                           self.stride,
-                           self.padding,
-                           self.dilation,
-                           self.deformable_groups)
+        assert (
+            2 * self.deformable_groups * self.kernel_size[0] * self.kernel_size[1]
+            == offset.shape[1]
+        )
+        assert (
+            self.deformable_groups * self.kernel_size[0] * self.kernel_size[1]
+            == mask.shape[1]
+        )
+        return dcn_v2_conv(
+            input,
+            offset,
+            mask,
+            self.weight,
+            self.bias,
+            self.stride,
+            self.padding,
+            self.dilation,
+            self.deformable_groups,
+        )
 
 
 class DCN(DCNv2):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride,
+        padding,
+        dilation=1,
+        deformable_groups=1,
+    ):
+        super(DCN, self).__init__(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride,
+            padding,
+            dilation,
+            deformable_groups,
+        )
 
-    def __init__(self, in_channels, out_channels,
-                 kernel_size, stride, padding,
-                 dilation=1, deformable_groups=1):
-        super(DCN, self).__init__(in_channels, out_channels,
-                                  kernel_size, stride, padding, dilation, deformable_groups)
-
-        channels_ = self.deformable_groups * 3 * self.kernel_size[0] * self.kernel_size[1]
-        self.conv_offset_mask = nn.Conv2d(self.in_channels,
-                                          channels_,
-                                          kernel_size=self.kernel_size,
-                                          stride=self.stride,
-                                          padding=self.padding,
-                                          bias=True)
+        channels_ = (
+            self.deformable_groups * 3 * self.kernel_size[0] * self.kernel_size[1]
+        )
+        self.conv_offset_mask = nn.Conv2d(
+            self.in_channels,
+            channels_,
+            kernel_size=self.kernel_size,
+            stride=self.stride,
+            padding=self.padding,
+            bias=True,
+        )
         self.init_offset()
 
     def init_offset(self):
@@ -101,12 +153,17 @@ class DCN(DCNv2):
         o1, o2, mask = torch.chunk(out, 3, dim=1)
         offset = torch.cat((o1, o2), dim=1)
         mask = torch.sigmoid(mask)
-        return dcn_v2_conv(input, offset, mask,
-                           self.weight, self.bias,
-                           self.stride,
-                           self.padding,
-                           self.dilation,
-                           self.deformable_groups)
+        return dcn_v2_conv(
+            input,
+            offset,
+            mask,
+            self.weight,
+            self.bias,
+            self.stride,
+            self.padding,
+            self.dilation,
+            self.deformable_groups,
+        )
 
 
 class TestNNMethod(TestCase):
@@ -132,10 +189,34 @@ class TestNNMethod(TestCase):
         mask = torch.randn(bs, grp * k_h * k_w, o_h, o_w)
         offset = torch.randn(bs, 2 * grp * k_h * k_w, o_h, o_w)
         bias = None
-        ref = torchvision.ops.deform_conv2d(input, offset, weight, bias, (stride_h, stride_w), (pad_h, pad_w), (dilation_h, dilation_w), mask)
+        ref = torchvision.ops.deform_conv2d(
+            input,
+            offset,
+            weight,
+            bias,
+            (stride_h, stride_w),
+            (pad_h, pad_w),
+            (dilation_h, dilation_w),
+            mask,
+        )
         input_xpu = input.to("xpu")
         offset_xpu = offset.to("xpu")
         weight_xpu = weight.to("xpu")
         mask_xpu = mask.to("xpu")
-        ret = torch.ops.torch_ipex.dcn_v2_forward(input_xpu, weight_xpu, bias, offset_xpu, mask_xpu, k_h, k_w, stride_h, stride_w, pad_h, pad_w, dilation_h, dilation_w, grp)
+        ret = torch.ops.torch_ipex.dcn_v2_forward(
+            input_xpu,
+            weight_xpu,
+            bias,
+            offset_xpu,
+            mask_xpu,
+            k_h,
+            k_w,
+            stride_h,
+            stride_w,
+            pad_h,
+            pad_w,
+            dilation_h,
+            dilation_w,
+            grp,
+        )
         self.assertEqual(ret.to("cpu"), ref)

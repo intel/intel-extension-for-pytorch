@@ -1,16 +1,20 @@
 import torch
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 import warnings
 import numpy as np
 import pytest
-from torch.testing._internal.common_utils import (TestCase, freeze_rng_state)
+from torch.testing._internal.common_utils import TestCase, freeze_rng_state
 from torch.testing._internal.common_device_type import dtypes
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
+
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_2d_block_array(), reason="Failed on ATSM only, will be fixed soon.")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_2d_block_array(),
+        reason="Failed on ATSM only, will be fixed soon.",
+    )
     def test_tensorinv_empty(self, device=dpcpp_device, dtype=torch.float64):
         for ind in range(1, 4):
             # Check for empty inputs. NumPy does not work for these cases.
@@ -20,7 +24,6 @@ class TestTorchMethod(TestCase):
 
     @dtypes(torch.float, torch.double)
     def test_linalg_matrix_exp_batch(self, device=dpcpp_device, dtype=torch.float32):
-
         def run_test(*n):
             tensors_batch = torch.zeros(n, dtype=dtype, device=device)
             tensors_batch = tensors_batch.view(-1, n[-2], n[-1])
@@ -28,7 +31,9 @@ class TestTorchMethod(TestCase):
             num_matrices = tensors_batch.size(0)
             tensors_list = []
             for i in range(num_matrices):
-                tensors_list.append(torch.randn(n[-2], n[-1], dtype=dtype, device=device))
+                tensors_list.append(
+                    torch.randn(n[-2], n[-1], dtype=dtype, device=device)
+                )
 
             for i in range(num_matrices):
                 tensors_batch[i, ...] = tensors_list[i]
@@ -38,7 +43,7 @@ class TestTorchMethod(TestCase):
 
             for i, tensor_exp in enumerate(tensors_exp_map):
                 # compute on cpu avoid unexpected error on atsm
-                self.assertEqual(tensors_exp_batch[i, ...].to('cpu'), tensor_exp)
+                self.assertEqual(tensors_exp_batch[i, ...].to("cpu"), tensor_exp)
 
         # small batch of matrices
         run_test(3, 2, 2)
@@ -53,21 +58,27 @@ class TestTorchMethod(TestCase):
         run_test(3, 3, 5, 5)
 
     @dtypes(torch.complex64)
-    def test_linalg_matrix_exp_no_warnings(self, device=dpcpp_device, dtype=torch.complex64):
+    def test_linalg_matrix_exp_no_warnings(
+        self, device=dpcpp_device, dtype=torch.complex64
+    ):
         # this tests https://github.com/pytorch/pytorch/issues/80948
         with freeze_rng_state():
             torch.manual_seed(42)
             tens = 0.5 * torch.randn(10, 3, 3, dtype=dtype, device=device)
-            tens = (0.5 * (tens.transpose(-1, -2) + tens))
+            tens = 0.5 * (tens.transpose(-1, -2) + tens)
             with warnings.catch_warnings(record=True) as w:
                 tens.imag = torch.matrix_exp(tens.imag)
                 self.assertFalse(len(w))
 
     @dtypes(torch.float, torch.double, torch.complex64, torch.complex128)
-    def test_linalg_matrix_exp_boundary_cases(self, device=dpcpp_device, dtype=torch.float32):
+    def test_linalg_matrix_exp_boundary_cases(
+        self, device=dpcpp_device, dtype=torch.float32
+    ):
         expm = torch.linalg.matrix_exp
 
-        with self.assertRaisesRegex(RuntimeError, "Expected a floating point or complex tensor"):
+        with self.assertRaisesRegex(
+            RuntimeError, "Expected a floating point or complex tensor"
+        ):
             expm(torch.randn(3, 3).type(torch.int))
 
         with self.assertRaisesRegex(RuntimeError, "must have at least 2 dimensions"):
@@ -85,7 +96,9 @@ class TestTorchMethod(TestCase):
         expm = torch.linalg.matrix_exp
         # check zero matrix
         x = torch.zeros(20, 20, dtype=dtype, device=device)
-        self.assertTrue((expm(x) == torch.eye(20, 20, dtype=dtype, device=device)).all().item())
+        self.assertTrue(
+            (expm(x) == torch.eye(20, 20, dtype=dtype, device=device)).all().item()
+        )
 
         def normalize_to_1_operator_norm(sample, desired_norm):
             sample_norm, _ = sample.abs().sum(-2).max(-1)
@@ -110,8 +123,8 @@ class TestTorchMethod(TestCase):
                     5.978858893805233e-04,  # deg 2
                     5.116619363445086e-02,  # deg 4
                     5.800524627688768e-01,  # deg 8
-                    1.461661507209034e+00,  # deg 12
-                    3.010066362817634e+00   # deg 18
+                    1.461661507209034e00,  # deg 12
+                    3.010066362817634e00,  # deg 18
                 ]
             else:  # if torch.double
                 thetas = [
@@ -120,7 +133,7 @@ class TestTorchMethod(TestCase):
                     3.397168839976962e-04,  # deg 4
                     4.991228871115323e-02,  # deg 8
                     2.996158913811580e-01,  # deg 12
-                    1.090863719290036e+00   # deg 18
+                    1.090863719290036e00,  # deg 18
                 ]
 
             # generate input
@@ -130,17 +143,14 @@ class TestTorchMethod(TestCase):
             qinv_ = qinv.cpu().numpy()
             d = torch.randn(n[:-1], dtype=dtype, device=device)
             x = torch.from_numpy(
-                np.matmul(q_, np.matmul(torch.diag_embed(d).cpu().numpy(), qinv_))).to(device)
+                np.matmul(q_, np.matmul(torch.diag_embed(d).cpu().numpy(), qinv_))
+            ).to(device)
             x_norm, _ = x.abs().sum(-2).max(-1)
 
             # test simple analytic whatever norm generated
             mexp = expm(x)
             mexp_analytic = np.matmul(
-                q_,
-                np.matmul(
-                    torch.diag_embed(d.exp()).cpu().numpy(),
-                    qinv_
-                )
+                q_, np.matmul(torch.diag_embed(d.exp()).cpu().numpy(), qinv_)
             )
             self.assertEqual(mexp, mexp_analytic, atol=1e-3, rtol=0.0)
 
@@ -158,9 +168,11 @@ class TestTorchMethod(TestCase):
                 mexp_analytic = np.matmul(
                     q_,
                     np.matmul(
-                        torch.diag_embed((d / x_norm.unsqueeze(-1) * sample_norm).exp()).cpu().numpy(),
-                        qinv_
-                    )
+                        torch.diag_embed((d / x_norm.unsqueeze(-1) * sample_norm).exp())
+                        .cpu()
+                        .numpy(),
+                        qinv_,
+                    ),
                 )
                 self.assertEqual(mexp, mexp_analytic, atol=1e-3, rtol=0.0)
 
@@ -189,8 +201,9 @@ class TestTorchMethod(TestCase):
         run_test(3, 3, 200, 200)
 
     @dtypes(torch.float, torch.double, torch.cfloat, torch.cdouble)
-    def test_linalg_matrix_exp_compare_with_taylor(self, device=dpcpp_device, dtype=torch.float32):
-
+    def test_linalg_matrix_exp_compare_with_taylor(
+        self, device=dpcpp_device, dtype=torch.float32
+    ):
         def normalize_to_1_operator_norm(sample, desired_norm):
             sample_norm, _ = sample.abs().sum(-2).max(-1)
             sample_to_1_norm = sample / sample_norm.unsqueeze(-1).unsqueeze(-1)
@@ -209,7 +222,9 @@ class TestTorchMethod(TestCase):
 
         def get_taylor_approximation(a, deg):
             a_ = a.cpu().numpy()
-            identity = torch.eye(a.size(-2), a.size(-1), dtype=dtype, device=device).expand_as(a)
+            identity = torch.eye(
+                a.size(-2), a.size(-1), dtype=dtype, device=device
+            ).expand_as(a)
             res = identity.cpu().numpy()
             taylor_term = identity.cpu().numpy()
 
@@ -224,7 +239,7 @@ class TestTorchMethod(TestCase):
                 return get_taylor_approximation(a, 12)
             else:
                 s = int(torch.log2(a.abs().pow(2).sum().sqrt()).ceil().item())
-                b = a / (2 ** s)
+                b = a / (2**s)
                 b = get_taylor_approximation(b, 18)
                 for _ in range(s):
                     b = np.matmul(b, b)
@@ -238,8 +253,8 @@ class TestTorchMethod(TestCase):
                     5.978858893805233e-04,  # deg 2
                     5.116619363445086e-02,  # deg 4
                     5.800524627688768e-01,  # deg 8
-                    1.461661507209034e+00,  # deg 12
-                    3.010066362817634e+00   # deg 18
+                    1.461661507209034e00,  # deg 12
+                    3.010066362817634e00,  # deg 18
                 ]
             else:  # if torch.double
                 thetas = [
@@ -248,7 +263,7 @@ class TestTorchMethod(TestCase):
                     3.397168839976962e-04,  # deg 4
                     4.991228871115323e-02,  # deg 8
                     2.996158913811580e-01,  # deg 12
-                    1.090863719290036e+00   # deg 18
+                    1.090863719290036e00,  # deg 18
                 ]
 
             # generate norms to test different degree expansions
@@ -265,7 +280,7 @@ class TestTorchMethod(TestCase):
                 mexp = torch.linalg.matrix_exp(x)
                 mexp_taylor = scale_square(x, deg)
 
-                self.assertEqual(mexp.to('cpu'), mexp_taylor, atol=1e-2, rtol=0.0)
+                self.assertEqual(mexp.to("cpu"), mexp_taylor, atol=1e-2, rtol=0.0)
 
         # single matrix
         run_test(2, 2)

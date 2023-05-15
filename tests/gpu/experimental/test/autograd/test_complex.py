@@ -71,7 +71,9 @@ class TestAutogradComplex(TestCase):
         # modified inplace
         res = x1.unbind(0)
 
-        with self.assertRaisesRegex(RuntimeError, "output of a function that returns multiple views"):
+        with self.assertRaisesRegex(
+            RuntimeError, "output of a function that returns multiple views"
+        ):
             res[0] += torch.rand(2, requires_grad=True)
 
         x.requires_grad_(True)
@@ -80,7 +82,9 @@ class TestAutogradComplex(TestCase):
         # modified inplace
         res = x1.unbind(0)
 
-        with self.assertRaisesRegex(RuntimeError, "output of a function that returns multiple views"):
+        with self.assertRaisesRegex(
+            RuntimeError, "output of a function that returns multiple views"
+        ):
             res[0] += torch.rand(2, requires_grad=True)
 
     def as_identity(self):
@@ -101,5 +105,5 @@ class TestAutogradComplex(TestCase):
         self.assertEqual(z.grad, z1.grad)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_tests()

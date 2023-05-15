@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -53,7 +53,7 @@ class TestNNMethod(TestCase):
     #     y_dpcpp = avg_pool(x_dpcpp)
     #     print("y_dpcpp", y_dpcpp.cpu())
     #     self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
-    
+
     def test_channels_last_simple_fwd(self, dtype=torch.float):
         x_cpu = torch.randn([1, 4, 4, 4, 4], device=cpu_device)
         x_dpcpp = x_cpu.to(dpcpp_device).to(memory_format=torch.channels_last_3d)
@@ -241,7 +241,6 @@ class TestNNMethod(TestCase):
             conv_dpcpp2 = conv_cpu2.to(dpcpp_device)
             output_xpu = conv_dpcpp2(pool_dpcpp(conv_dpcpp1(input_xpu)))
             output_xpu.backward(grad_xpu)
-        
+
         self.assertEqual(output_cpu, output_xpu.to(cpu_device))
         self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
-

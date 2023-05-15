@@ -7,13 +7,15 @@ import pytest
 
 class TestNNMethod(TestCase):
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_pinverse(self):
         a = torch.randn(5, 3)
         b = torch.pinverse(a)
         # print('output cpu = ', b)
 
-        a_xpu = a.detach().to('xpu')
+        a_xpu = a.detach().to("xpu")
         b_xpu = torch.pinverse(a_xpu)
         # print('output xpu = ', b_xpu.cpu())
 
@@ -23,7 +25,7 @@ class TestNNMethod(TestCase):
         b = torch.pinverse(a)
         # print('output cpu = ', b)
 
-        a_xpu = a.detach().to('xpu')
+        a_xpu = a.detach().to("xpu")
         b_xpu = torch.pinverse(a_xpu)
         # print('output xpu = ', b_xpu.cpu())
 

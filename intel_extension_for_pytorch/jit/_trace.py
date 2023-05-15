@@ -26,8 +26,8 @@ def need_to_disable_check_trace_for_XPU(*args, **kwargs):
         else:
             pass
 
-    if 'example_inputs' in kwargs:
-        example_inputs = kwargs['example_inputs']
+    if "example_inputs" in kwargs:
+        example_inputs = kwargs["example_inputs"]
         if isinstance(example_inputs, torch.Tensor):
             device_type_list.append(example_inputs.device.type)
         elif isinstance(example_inputs, tuple) or isinstance(example_inputs, list):
@@ -37,8 +37,12 @@ def need_to_disable_check_trace_for_XPU(*args, **kwargs):
         else:
             pass
 
-    is_xpu = all([elm == 'xpu' for elm in device_type_list])
-    if is_xpu and ('check_trace' not in kwargs) and (not torch.xpu.has_2d_block_array()):
+    is_xpu = all([elm == "xpu" for elm in device_type_list])
+    if (
+        is_xpu
+        and ("check_trace" not in kwargs)
+        and (not torch.xpu.has_2d_block_array())
+    ):
         return True
 
     return False
@@ -54,12 +58,15 @@ def jit_trace_wrapper(f):
 
         # For running XPU workload and the platform unsupports 2d block,
         # the check_trace is here disabled in jit trace to avoid double computing
-        if torch.xpu.is_available() and need_to_disable_check_trace_for_XPU(*args, **kwargs):
-            kwargs['check_trace'] = False
+        if torch.xpu.is_available() and need_to_disable_check_trace_for_XPU(
+            *args, **kwargs
+        ):
+            kwargs["check_trace"] = False
 
         traced = f(*args, **kwargs)
         torch.set_autocast_cache_enabled(prev)
         return traced
+
     return wrapper
 
 

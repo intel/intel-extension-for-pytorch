@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 import tempfile
 
 
@@ -20,7 +20,7 @@ class TestJitSaveLoadMethod(TestCase):
     def test_jit_save_load(self):
         # // you can find a simple model in tests/example/test_fusion.py
         model = Conv2dRelu(2, 2, kernel_size=3, stride=1, bias=True)
-        model = model.to('xpu').eval()
+        model = model.to("xpu").eval()
         origin_modelJit = torch.jit.script(model)
         ckpt = tempfile.NamedTemporaryFile()
         origin_modelJit.save(ckpt.name)

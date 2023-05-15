@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -9,7 +9,6 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_take(self, dtype=torch.float):
-
         src = torch.rand(2, 3)
         print(src)
 
@@ -18,7 +17,8 @@ class TestNNMethod(TestCase):
 
         src_dpcpp = src.to("xpu")
         idx_dpcpp = torch.tensor(
-            [0, 2, 5], device=torch.device("xpu"), dtype=torch.long)
+            [0, 2, 5], device=torch.device("xpu"), dtype=torch.long
+        )
         print(idx_dpcpp.shape)
         dst_dpcpp_1 = torch.take(src_dpcpp, idx_dpcpp)
         # dst_dpcpp_2 = torch.take(dst_dpcpp_1, torch.tensor([0], device=torch.device("xpu"), dtype=torch.long))

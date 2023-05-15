@@ -8,7 +8,7 @@ import copy
 
 import intel_extension_for_pytorch  # noqa
 
-from torch.quantization.quantize_jit import (convert_jit, prepare_jit)
+from torch.quantization.quantize_jit import convert_jit, prepare_jit
 from torch.jit._recursive import wrap_cpp_module
 
 import pytest
@@ -70,6 +70,7 @@ class MulAddScalar(torch.nn.Module):
         ret = input * m1 + 1.0
         return ret
 
+
 class MulScalarAddScalar(torch.nn.Module):
     def __init__(self) -> None:
         super(MulScalarAddScalar, self).__init__()
@@ -79,6 +80,7 @@ class MulScalarAddScalar(torch.nn.Module):
         input = F.relu(self.conv(input))
         ret = input * 3.0 + 1.0
         return ret
+
 
 class MulScalarAdd(torch.nn.Module):
     def __init__(self) -> None:
@@ -90,6 +92,7 @@ class MulScalarAdd(torch.nn.Module):
         ret = input * 2.0 + m2
         return ret
 
+
 class MulAdd(torch.nn.Module):
     def __init__(self) -> None:
         super(MulAdd, self).__init__()
@@ -99,6 +102,7 @@ class MulAdd(torch.nn.Module):
         ret = F.relu(self.conv(input))
         ret = ret * m1 + m2
         return ret
+
 
 class Mish(torch.nn.Module):
     def __init__(self):
@@ -118,12 +122,14 @@ class MatmulSum(torch.nn.Module):
         y += a
         return y
 
+
 class MatmulSqrt(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulSqrt, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.sqrt(torch.matmul(m1, m2))
+        return torch.sqrt(torch.matmul(m1, m2))
+
 
 class TMatmulSqrt(torch.nn.Module):
     def __init__(self) -> None:
@@ -131,257 +137,295 @@ class TMatmulSqrt(torch.nn.Module):
 
     def forward(self, m1, m2):
         return torch.sqrt(torch.matmul(m1, m2.t()))
+
+
 class MatmulAbs(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulAbs, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.abs(torch.matmul(m1, m2))
+        return torch.abs(torch.matmul(m1, m2))
+
 
 class TMatmulAbs(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulAbs, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.abs(torch.matmul(m1, m2.t()))
+        return torch.abs(torch.matmul(m1, m2.t()))
+
 
 class MatmulTanh(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulTanh, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.tanh(torch.matmul(m1, m2))
+        return torch.tanh(torch.matmul(m1, m2))
+
 
 class TMatmulTanh(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulTanh, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.tanh(torch.matmul(m1, m2.t()))
+        return torch.tanh(torch.matmul(m1, m2.t()))
+
 
 class MatmulSquare(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulSquare, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.square(torch.matmul(m1, m2))
+        return torch.square(torch.matmul(m1, m2))
+
 
 class TMatmulSquare(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulSquare, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.square(torch.matmul(m1, m2.t()))
+        return torch.square(torch.matmul(m1, m2.t()))
+
 
 class MatmulRelu(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulRelu, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.relu(torch.matmul(m1, m2))
+        return torch.relu(torch.matmul(m1, m2))
+
 
 class TMatmulRelu(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulRelu, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.relu(torch.matmul(m1, m2.t()))
+        return torch.relu(torch.matmul(m1, m2.t()))
+
 
 class MatmulSigmoid(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulSigmoid, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.sigmoid(torch.matmul(m1, m2))
+        return torch.sigmoid(torch.matmul(m1, m2))
+
 
 class TMatmulSigmoid(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulSigmoid, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.sigmoid(torch.matmul(m1, m2.t()))
+        return torch.sigmoid(torch.matmul(m1, m2.t()))
+
 
 class MatmulExp(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulExp, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.exp(torch.matmul(m1, m2))
+        return torch.exp(torch.matmul(m1, m2))
+
 
 class TMatmulExp(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulExp, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.exp(torch.matmul(m1, m2.t()))
+        return torch.exp(torch.matmul(m1, m2.t()))
+
 
 class MatmulLog(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulLog, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.log(torch.matmul(m1, m2))
+        return torch.log(torch.matmul(m1, m2))
+
 
 class TMatmulLog(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulLog, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.log(torch.matmul(m1, m2.t()))
+        return torch.log(torch.matmul(m1, m2.t()))
+
 
 class MatmulRound(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulRound, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.round(torch.matmul(m1, m2))
+        return torch.round(torch.matmul(m1, m2))
+
 
 class TMatmulRound(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulRound, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.round(torch.matmul(m1, m2.t()))
+        return torch.round(torch.matmul(m1, m2.t()))
+
 
 class MatmulLogsigmoid(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulLogsigmoid, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.logsigmoid(torch.matmul(m1, m2))
+        return F.logsigmoid(torch.matmul(m1, m2))
+
 
 class TMatmulLogsigmoid(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulLogsigmoid, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.logsigmoid(torch.matmul(m1, m2.t()))
+        return F.logsigmoid(torch.matmul(m1, m2.t()))
+
 
 class MatmulHardsiwsh(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulHardsiwsh, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.hardswish(torch.matmul(m1, m2))
+        return F.hardswish(torch.matmul(m1, m2))
+
 
 class TMatmulHardswish(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulHardswish, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.hardswish(torch.matmul(m1, m2.t()))
+        return F.hardswish(torch.matmul(m1, m2.t()))
+
 
 class MatmulMish(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulMish, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.mish(torch.matmul(m1, m2))
+        return F.mish(torch.matmul(m1, m2))
+
 
 class TMatmulMish(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulMish, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.mish(torch.matmul(m1, m2.t()))
+        return F.mish(torch.matmul(m1, m2.t()))
+
 
 class MatmulSilu(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulSilu, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.silu(torch.matmul(m1, m2))
+        return F.silu(torch.matmul(m1, m2))
+
 
 class TMatmulSilu(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulSilu, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.silu(torch.matmul(m1, m2.t()))
+        return F.silu(torch.matmul(m1, m2.t()))
+
 
 class MatmulGelu(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulGelu, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.gelu(torch.matmul(m1, m2))
+        return F.gelu(torch.matmul(m1, m2))
+
 
 class TMatmulGelu(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulGelu, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.gelu(torch.matmul(m1, m2.t()))
+        return F.gelu(torch.matmul(m1, m2.t()))
+
 
 class MatmulHardsigmoid(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulHardsigmoid, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.hardsigmoid(torch.matmul(m1, m2))
+        return F.hardsigmoid(torch.matmul(m1, m2))
+
 
 class TMatmulHardsigmoid(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulHardsigmoid, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.hardsigmoid(torch.matmul(m1, m2.t()))
+        return F.hardsigmoid(torch.matmul(m1, m2.t()))
+
 
 class MatmulElu(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulElu, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.elu(torch.matmul(m1, m2))
+        return F.elu(torch.matmul(m1, m2))
+
 
 class TMatmulElu(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulElu, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.elu(torch.matmul(m1, m2.t()))
+        return F.elu(torch.matmul(m1, m2.t()))
+
 
 class MatmulPow(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulPow, self).__init__()
 
     def forward(self, m1, m2):
-        return  torch.pow(torch.matmul(m1, m2), 2.0)
+        return torch.pow(torch.matmul(m1, m2), 2.0)
+
 
 class TMatmulPow(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulPow, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.elu(torch.matmul(m1, m2.t()), 2.0)
+        return F.elu(torch.matmul(m1, m2.t()), 2.0)
+
 
 class MatmulLeakyrelu(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulLeakyrelu, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.leaky_relu(torch.matmul(m1, m2), 0.01)
+        return F.leaky_relu(torch.matmul(m1, m2), 0.01)
+
 
 class TMatmulLeakyrelu(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulLeakyrelu, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.leaky_relu(torch.matmul(m1, m2.t()), 0.01)
+        return F.leaky_relu(torch.matmul(m1, m2.t()), 0.01)
+
 
 class MatmulRelu6(torch.nn.Module):
     def __init__(self) -> None:
         super(MatmulRelu6, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.relu6(torch.matmul(m1, m2))
+        return F.relu6(torch.matmul(m1, m2))
+
 
 class TMatmulRelu6(torch.nn.Module):
     def __init__(self) -> None:
         super(TMatmulRelu6, self).__init__()
 
     def forward(self, m1, m2):
-        return  F.relu6(torch.matmul(m1, m2.t()))
+        return F.relu6(torch.matmul(m1, m2.t()))
+
 
 class TransMatmul(torch.nn.Module):
     def __init__(self):
@@ -498,6 +542,7 @@ class Conv2dSigmoidBinaryMul(torch.nn.Module):
         ret = torch.sigmoid(self.conv(x))
         return ret * a
 
+
 class Conv2dSigmoidBinaryMulAdd(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dSigmoidBinaryMulAdd, self).__init__()
@@ -507,6 +552,7 @@ class Conv2dSigmoidBinaryMulAdd(torch.nn.Module):
         ret = torch.sigmoid(self.conv(x))
         return x + ret * a
 
+
 class Conv2dSigmoidBinaryMulAddRelu(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dSigmoidBinaryMulAddRelu, self).__init__()
@@ -515,6 +561,7 @@ class Conv2dSigmoidBinaryMulAddRelu(torch.nn.Module):
     def forward(self, x, a):
         ret = torch.sigmoid(self.conv(x))
         return torch.relu(ret * a + x)
+
 
 class Conv2dSqrt(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
@@ -676,6 +723,7 @@ class Conv2dElu(torch.nn.Module):
     def forward(self, x, a):
         return self.activation(self.conv(x))
 
+
 class Conv2dMishYolo(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
         super(Conv2dMishYolo, self).__init__()
@@ -684,6 +732,7 @@ class Conv2dMishYolo(torch.nn.Module):
 
     def forward(self, x, a):
         return self.activation(self.conv(x))
+
 
 class Conv2dMishAddYolo(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs) -> None:
@@ -703,13 +752,15 @@ class Conv2dBinaryMul(torch.nn.Module):
     def forward(self, x, a):
         return torch.mul(self.conv(x), x)
 
+
 class Conv2dBinaryMulScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryMulScalar, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return torch.mul(self.conv(x), 3.)
+        return torch.mul(self.conv(x), 3.0)
+
 
 class Conv2dBinaryMulAdd(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -728,13 +779,15 @@ class Conv2dBinaryDiv(torch.nn.Module):
     def forward(self, x, a):
         return torch.div(self.conv(x), a)
 
+
 class Conv2dBinaryDivScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryDivScalar, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return torch.div(self.conv(x), 3.)
+        return torch.div(self.conv(x), 3.0)
+
 
 class Conv2dBinarySub(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -744,13 +797,15 @@ class Conv2dBinarySub(torch.nn.Module):
     def forward(self, x, a):
         return self.conv(x) - a
 
+
 class Conv2dBinarySubScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinarySubScalar, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return self.conv(x) - 3.
+        return self.conv(x) - 3.0
+
 
 class Conv2dBinaryEqual(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -760,13 +815,15 @@ class Conv2dBinaryEqual(torch.nn.Module):
     def forward(self, x, a):
         return torch.eq(self.conv(x), a)
 
+
 class Conv2dBinaryEqualScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryEqualScalar, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return torch.eq(self.conv(x), 3.)
+        return torch.eq(self.conv(x), 3.0)
+
 
 class Conv2dBinaryNotEqual(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -776,13 +833,15 @@ class Conv2dBinaryNotEqual(torch.nn.Module):
     def forward(self, x, a):
         return torch.ne(self.conv(x), a)
 
+
 class Conv2dBinaryNotEqualScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryNotEqualScalar, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return torch.ne(self.conv(x), 3.)
+        return torch.ne(self.conv(x), 3.0)
+
 
 class Conv2dBinaryMin(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -792,13 +851,15 @@ class Conv2dBinaryMin(torch.nn.Module):
     def forward(self, x, a):
         return torch.min(self.conv(x), a)
 
+
 class Conv2dBinaryMinScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryMinScalar, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return torch.min(self.conv(x), torch.tensor(3.))
+        return torch.min(self.conv(x), torch.tensor(3.0))
+
 
 class Conv2dBinaryMax(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -808,13 +869,15 @@ class Conv2dBinaryMax(torch.nn.Module):
     def forward(self, x, a):
         return torch.max(self.conv(x), a)
 
+
 class Conv2dBinaryMaxScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryMaxScalar, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return torch.max(self.conv(x), torch.tensor(3.))
+        return torch.max(self.conv(x), torch.tensor(3.0))
+
 
 class Conv2dBinaryGE(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -824,13 +887,15 @@ class Conv2dBinaryGE(torch.nn.Module):
     def forward(self, x, a):
         return torch.ge(self.conv(x), a)
 
+
 class Conv2dBinaryGEScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryGEScalar, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return torch.ge(self.conv(x), 3.)
+        return torch.ge(self.conv(x), 3.0)
+
 
 class Conv2dBinaryGT(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -840,13 +905,15 @@ class Conv2dBinaryGT(torch.nn.Module):
     def forward(self, x, a):
         return torch.gt(self.conv(x), a)
 
+
 class Conv2dBinaryGTScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryGTScalar, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return torch.gt(self.conv(x), 3.)
+        return torch.gt(self.conv(x), 3.0)
+
 
 class Conv2dBinaryLE(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -856,13 +923,15 @@ class Conv2dBinaryLE(torch.nn.Module):
     def forward(self, x, a):
         return torch.le(self.conv(x), a)
 
+
 class Conv2dBinaryLEScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryLEScalar, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return torch.le(self.conv(x), 3.)
+        return torch.le(self.conv(x), 3.0)
+
 
 class Conv2dBinaryLT(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -872,13 +941,14 @@ class Conv2dBinaryLT(torch.nn.Module):
     def forward(self, x, a):
         return torch.lt(self.conv(x), a)
 
+
 class Conv2dBinaryLTScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dBinaryLTScalar, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        return torch.lt(self.conv(x), 3.)
+        return torch.lt(self.conv(x), 3.0)
 
 
 class PadConv2d(torch.nn.Module):
@@ -895,9 +965,7 @@ class PadConv2d(torch.nn.Module):
 class PermuteContiguous(torch.nn.Module):
     def __init__(self) -> None:
         super(PermuteContiguous, self).__init__()
-        self.block = nn.Sequential(
-            nn.Conv2d(2, 2, (1, 1))
-        )
+        self.block = nn.Sequential(nn.Conv2d(2, 2, (1, 1)))
 
     def forward(self, x):
         x = self.block(x)
@@ -961,6 +1029,7 @@ class LinearSigmoid(torch.nn.Module):
         x = self.sigmoid(self.linear(x))
         return x
 
+
 class LinearSqrt(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearSqrt, self).__init__()
@@ -969,6 +1038,7 @@ class LinearSqrt(torch.nn.Module):
     def forward(self, x):
         x = torch.sqrt(self.linear(x))
         return x
+
 
 class LinearSquare(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -979,6 +1049,7 @@ class LinearSquare(torch.nn.Module):
         x = torch.square(self.linear(x))
         return x
 
+
 class LinearAbs(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearAbs, self).__init__()
@@ -987,6 +1058,7 @@ class LinearAbs(torch.nn.Module):
     def forward(self, x):
         x = torch.abs(self.linear(x))
         return x
+
 
 class LinearExp(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -997,6 +1069,7 @@ class LinearExp(torch.nn.Module):
         x = torch.exp(self.linear(x))
         return x
 
+
 class LinearLog(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearLog, self).__init__()
@@ -1005,6 +1078,7 @@ class LinearLog(torch.nn.Module):
     def forward(self, x):
         x = torch.log(self.linear(x))
         return x
+
 
 class LinearRound(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -1015,6 +1089,7 @@ class LinearRound(torch.nn.Module):
         x = torch.round(self.linear(x))
         return x
 
+
 class LinearSilu(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearSilu, self).__init__()
@@ -1023,6 +1098,7 @@ class LinearSilu(torch.nn.Module):
     def forward(self, x):
         x = F.silu(self.linear(x))
         return x
+
 
 class LinearLogSigmoid(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -1033,6 +1109,7 @@ class LinearLogSigmoid(torch.nn.Module):
         x = F.logsigmoid(self.linear(x))
         return x
 
+
 class LinearHardswish(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearHardswish, self).__init__()
@@ -1041,6 +1118,7 @@ class LinearHardswish(torch.nn.Module):
     def forward(self, x):
         x = F.hardswish(self.linear(x))
         return x
+
 
 class LinearMish(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -1052,6 +1130,7 @@ class LinearMish(torch.nn.Module):
         x = self.activation(self.linear(x))
         return x
 
+
 class LinearHardSigmoid(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearHardSigmoid, self).__init__()
@@ -1060,6 +1139,7 @@ class LinearHardSigmoid(torch.nn.Module):
     def forward(self, x):
         x = F.hardsigmoid(self.linear(x))
         return x
+
 
 class LinearTanh(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -1070,6 +1150,7 @@ class LinearTanh(torch.nn.Module):
         x = torch.tanh(self.linear(x))
         return x
 
+
 class LinearLeakyRelu(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearLeakyRelu, self).__init__()
@@ -1079,6 +1160,7 @@ class LinearLeakyRelu(torch.nn.Module):
         x = F.leaky_relu(self.linear(x), 0.01)
         return x
 
+
 class LinearPow(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearPow, self).__init__()
@@ -1087,6 +1169,7 @@ class LinearPow(torch.nn.Module):
     def forward(self, x):
         x = torch.pow(self.linear(x), 2)
         return x
+
 
 class LinearHardtanh(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -1098,6 +1181,7 @@ class LinearHardtanh(torch.nn.Module):
         x = self.activation(self.linear(x))
         return x
 
+
 class LinearElu(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearElu, self).__init__()
@@ -1107,6 +1191,7 @@ class LinearElu(torch.nn.Module):
         x = F.elu(self.linear(x), 1.2)
         return x
 
+
 class LinearBinaryMul(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearBinaryMul, self).__init__()
@@ -1114,6 +1199,7 @@ class LinearBinaryMul(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.mul(self.linear(x), a)
+
 
 class LinearBinaryMulScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -1123,6 +1209,7 @@ class LinearBinaryMulScalar(torch.nn.Module):
     def forward(self, x, a):
         return torch.mul(self.linear(x), 3.0)
 
+
 class LinearBinaryDiv(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearBinaryDiv, self).__init__()
@@ -1130,6 +1217,7 @@ class LinearBinaryDiv(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.div(self.linear(x), a)
+
 
 class LinearBinaryDivScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -1139,6 +1227,7 @@ class LinearBinaryDivScalar(torch.nn.Module):
     def forward(self, x, a):
         return torch.div(self.linear(x), 3.0)
 
+
 class LinearBinarySub(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearBinarySub, self).__init__()
@@ -1146,6 +1235,7 @@ class LinearBinarySub(torch.nn.Module):
 
     def forward(self, x, a):
         return self.linear(x) - a
+
 
 class LinearBinarySubScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -1155,6 +1245,7 @@ class LinearBinarySubScalar(torch.nn.Module):
     def forward(self, x, a):
         return self.linear(x) - 3.0
 
+
 class LinearBinaryAdd(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearBinaryAdd, self).__init__()
@@ -1162,6 +1253,7 @@ class LinearBinaryAdd(torch.nn.Module):
 
     def forward(self, x, a):
         return self.linear(x) + a
+
 
 class LinearBinaryAddScalar(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -1171,6 +1263,7 @@ class LinearBinaryAddScalar(torch.nn.Module):
     def forward(self, x, a):
         return self.linear(x) + 3.0
 
+
 class LinearBinaryEqual(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearBinaryEqual, self).__init__()
@@ -1178,6 +1271,7 @@ class LinearBinaryEqual(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.eq(self.linear(x), a)
+
 
 class LinearBinaryNotEqual(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -1187,6 +1281,7 @@ class LinearBinaryNotEqual(torch.nn.Module):
     def forward(self, x, a):
         return torch.ne(self.linear(x), a)
 
+
 class LinearBinaryMin(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearBinaryMin, self).__init__()
@@ -1194,6 +1289,7 @@ class LinearBinaryMin(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.min(self.linear(x), a)
+
 
 class LinearBinaryMax(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -1203,6 +1299,7 @@ class LinearBinaryMax(torch.nn.Module):
     def forward(self, x, a):
         return torch.max(self.linear(x), a)
 
+
 class LinearBinaryGE(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearBinaryGE, self).__init__()
@@ -1210,6 +1307,7 @@ class LinearBinaryGE(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.ge(self.linear(x), a)
+
 
 class LinearBinaryGT(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -1219,6 +1317,7 @@ class LinearBinaryGT(torch.nn.Module):
     def forward(self, x, a):
         return torch.gt(self.linear(x), a)
 
+
 class LinearBinaryLE(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearBinaryLE, self).__init__()
@@ -1226,6 +1325,7 @@ class LinearBinaryLE(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.le(self.linear(x), a)
+
 
 class LinearBinaryLT(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -1235,8 +1335,8 @@ class LinearBinaryLT(torch.nn.Module):
     def forward(self, x, a):
         return torch.lt(self.linear(x), a)
 
-class TestNNMethod(TestCase):
 
+class TestNNMethod(TestCase):
     def matmul_fusion(self, model, t_model, m1, m2):
         raw = model(m1, m2)
         raw_t = t_model(m1, m2)
@@ -1275,7 +1375,7 @@ class TestNNMethod(TestCase):
             print("real: ", real.cpu())
         self.assertEqual(raw, real.to(cpu_device))
         del modelJit
-    
+
     def test_matmul_sqrt_fusion(self, dtype=torch.float):
         m1 = torch.randn([4, 2], device=cpu_device)
         m2 = torch.randn([2, 2], device=cpu_device)
@@ -1291,7 +1391,6 @@ class TestNNMethod(TestCase):
         t_model = TMatmulSquare()
         self.matmul_fusion(model, t_model, m1, m2)
 
-
     def test_matmul_abs_fusion(self, dtype=torch.float):
         m1 = torch.randn([4, 2], device=cpu_device)
         m2 = torch.randn([2, 2], device=cpu_device)
@@ -1299,7 +1398,6 @@ class TestNNMethod(TestCase):
         model = MatmulAbs()
         t_model = TMatmulAbs()
         self.matmul_fusion(model, t_model, m1, m2)
-
 
     def test_matmul_exp_fusion(self, dtype=torch.float):
         m1 = torch.randn([4, 2], device=cpu_device)
@@ -1324,7 +1422,7 @@ class TestNNMethod(TestCase):
         model = MatmulRound()
         t_model = TMatmulRound()
         self.matmul_fusion(model, t_model, m1, m2)
-        
+
     # result incorrect
     def test_matmul_silu_fusion(self, dtype=torch.float):
         m1 = torch.randn([4, 2], device=cpu_device)
@@ -1389,7 +1487,7 @@ class TestNNMethod(TestCase):
 
         model = MatmulLeakyrelu()
         t_model = TMatmulLeakyrelu()
-        self.matmul_fusion(model, t_model, m1, m2)  
+        self.matmul_fusion(model, t_model, m1, m2)
 
     def test_matmul_pow_fusion(self, dtype=torch.float):
         m1 = torch.randn([4, 2], device=cpu_device)
@@ -1407,7 +1505,7 @@ class TestNNMethod(TestCase):
         t_model = TMatmulElu()
         self.matmul_fusion(model, t_model, m1, m2)
 
-    # op different 
+    # op different
     def test_matmul_hardtanh_fusion(self, dtype=torch.float):
         m1 = torch.randn([4, 2], device=cpu_device)
         m2 = torch.randn([2, 2], device=cpu_device)
@@ -1479,7 +1577,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(raw1, real1.to(cpu_device))
         self.assertEqual(raw2, real2.to(cpu_device))
         del modelJit
-    
+
     def test_trans_baddbmm_scale_fusion(self, dtype=torch.float):
         m1 = torch.randn((2, 2, 3), device=cpu_device)
         m2 = torch.randn((2, 2, 3), device=cpu_device)
@@ -1503,12 +1601,13 @@ class TestNNMethod(TestCase):
         self.assertEqual(raw2, real2.to(cpu_device))
         del modelJit
 
-
     def test_mul_add(self, dtype=torch.float):
         def model_check(model):
             m1 = torch.randn((4, 64, 256, 256), device=cpu_device)
             m2 = torch.randn((4, 63, 1, 1), device=cpu_device)
-            add1 = torch.randn((4, 63, 1, 1), device=cpu_device).to(memory_format=torch.contiguous_format)
+            add1 = torch.randn((4, 63, 1, 1), device=cpu_device).to(
+                memory_format=torch.contiguous_format
+            )
             add2 = add1.clone()
 
             model1 = copy.deepcopy(model)
@@ -1530,12 +1629,23 @@ class TestNNMethod(TestCase):
 
                 with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16):
                     autocast_arg1 = modelJit(m1_dpcpp, m2_dpcpp, add1_dpcpp)
-                    self.assertEqual(raw, autocast_arg1.to(device=cpu_device, dtype=torch.float), atol=1e-5, rtol=1e-5)
+                    self.assertEqual(
+                        raw,
+                        autocast_arg1.to(device=cpu_device, dtype=torch.float),
+                        atol=1e-5,
+                        rtol=1e-5,
+                    )
                 with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
                     autocast_arg1 = modelJit(m1_dpcpp, m2_dpcpp, add1_dpcpp)
-                    self.assertEqual(raw, autocast_arg1.to(device=cpu_device, dtype=torch.float), atol=1e-5, rtol=1e-5)
+                    self.assertEqual(
+                        raw,
+                        autocast_arg1.to(device=cpu_device, dtype=torch.float),
+                        atol=1e-5,
+                        rtol=1e-5,
+                    )
 
             del modelJit
+
         model_check(MulAdd())
         model_check(MulAddScalar())
         model_check(MulScalarAdd())
@@ -1723,7 +1833,6 @@ class TestNNMethod(TestCase):
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
         self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
-
     def test_conv_sigmoid_binary_mul_add_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 3, 3], device=cpu_device)
@@ -1788,7 +1897,9 @@ class TestNNMethod(TestCase):
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
         self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_conv_mish_yolo_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
@@ -1805,7 +1916,9 @@ class TestNNMethod(TestCase):
         y, y_script = _conv_fusion(x, a1, model1, print_graph)
         self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_conv_mish_add_yolo_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
@@ -2115,10 +2228,10 @@ class TestNNMethod(TestCase):
         a1.fill_(3)
         a3.fill_(3)
 
-        #torch.div(conv(x), x)
+        # torch.div(conv(x), x)
         model = Conv2dBinaryDiv(2, 2, kernel_size=1, stride=1, bias=True)
         model1 = copy.deepcopy(model)
-        #torch.div(conv(x), 3)
+        # torch.div(conv(x), 3)
         model_scalar = Conv2dBinaryDivScalar(2, 2, kernel_size=1, stride=1, bias=True)
         model_scalar1 = copy.deepcopy(model_scalar)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
@@ -2163,7 +2276,9 @@ class TestNNMethod(TestCase):
 
         model = Conv2dBinaryNotEqual(2, 2, kernel_size=3, stride=1, bias=True)
         model1 = copy.deepcopy(model)
-        model_scalar = Conv2dBinaryNotEqualScalar(2, 2, kernel_size=3, stride=1, bias=True)
+        model_scalar = Conv2dBinaryNotEqualScalar(
+            2, 2, kernel_size=3, stride=1, bias=True
+        )
         model_scalar1 = copy.deepcopy(model_scalar)
         y, y_script = conv2d_fusion(x, a1, model, print_graph)
         self.assertEqual(y, y_script.bool())
@@ -2343,12 +2458,12 @@ class TestNNMethod(TestCase):
             activation=torch.quantization.observer.MinMaxObserver.with_args(
                 qscheme=torch.per_tensor_symmetric,
                 reduce_range=False,
-                dtype=torch.quint8
+                dtype=torch.quint8,
             ),
-            weight=torch.quantization.default_weight_observer
+            weight=torch.quantization.default_weight_observer,
         )
 
-        modelJit = prepare_jit(modelJit, {'': qconfig_u8}, True)
+        modelJit = prepare_jit(modelJit, {"": qconfig_u8}, True)
 
         # do calibration
         for i in range(1):
@@ -2384,12 +2499,12 @@ class TestNNMethod(TestCase):
             activation=torch.quantization.observer.MinMaxObserver.with_args(
                 qscheme=torch.per_tensor_symmetric,
                 reduce_range=False,
-                dtype=torch.quint8
+                dtype=torch.quint8,
             ),
-            weight=torch.quantization.default_weight_observer
+            weight=torch.quantization.default_weight_observer,
         )
 
-        modelJit = prepare_jit(modelJit, {'': qconfig_u8}, True)
+        modelJit = prepare_jit(modelJit, {"": qconfig_u8}, True)
         modelJit = modelJit.to("xpu")
 
         # do calibration
@@ -2402,7 +2517,6 @@ class TestNNMethod(TestCase):
 
         print("start inference ...")
         for i in range(5):
-
             output = modelJit(input_xpu)
             torch.xpu.synchronize()
         self.assertEqual(output.cpu(), output_cpu)
@@ -2419,7 +2533,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2438,7 +2552,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2457,13 +2571,13 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device), atol=1e-3, rtol=1.3e-6)
         del modelJit
-    
+
     def test_linear_sum_fusion(self, dtype=torch.float):
         x = torch.randn([1, 384, 1024], device=cpu_device)
         model = LinearSum(1024, 1024)
@@ -2476,7 +2590,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x.clone().to("xpu")))
             y_dpcpp = modelJit(x_dpcpp)
             print("fusion:", y_dpcpp.cpu())
@@ -2495,7 +2609,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2514,7 +2628,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2533,7 +2647,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2552,7 +2666,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2571,7 +2685,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2590,7 +2704,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2609,7 +2723,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2628,7 +2742,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2647,7 +2761,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2666,7 +2780,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2686,7 +2800,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             print("jit model input: ", x.cpu())
             y_dpcpp = modelJit(x)
@@ -2706,7 +2820,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2725,7 +2839,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2744,7 +2858,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
@@ -2763,12 +2877,11 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
-
 
     def test_linear_elu_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
@@ -2782,7 +2895,7 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.inlined_graph)
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
@@ -2802,16 +2915,15 @@ class TestNNMethod(TestCase):
 
         with torch.no_grad():
             for i in range(3):
-                if print_graph and i==2:
+                if print_graph and i == 2:
                     print(modelJit.graph_for(x))
             y_dpcpp = modelJit(x)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
 
-
     def test_linear_binary_mul_fusion(self):
-        dtypes = [torch.float, torch.bfloat16] 
+        dtypes = [torch.float, torch.bfloat16]
         for dtype in dtypes:
             x = torch.randn([2, 4], device=cpu_device).to(dtype)
             a = torch.randn([2, 4], device=cpu_device)
@@ -2828,7 +2940,7 @@ class TestNNMethod(TestCase):
             modelJit = torch.jit.script(model)
             modelJit_scalar = torch.jit.script(model_scalar)
 
-            with torch.no_grad(): 
+            with torch.no_grad():
                 for i in range(2):
                     modelJit(x, a)
                     modelJit_scalar(x, a)
@@ -2859,7 +2971,7 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.script(model)
         modelJit_scalar = torch.jit.script(model_scalar)
 
-        with torch.no_grad(): 
+        with torch.no_grad():
             for i in range(2):
                 modelJit(x, a)
                 modelJit_scalar(x, a)
@@ -2889,7 +3001,7 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.script(model)
         modelJit_scalar = torch.jit.script(model_scalar)
 
-        with torch.no_grad(): 
+        with torch.no_grad():
             for i in range(2):
                 modelJit(x, a)
                 modelJit_scalar(x, a)
@@ -2920,7 +3032,7 @@ class TestNNMethod(TestCase):
         modelJit = torch.jit.script(model)
         modelJit_scalar = torch.jit.script(model_scalar)
 
-        with torch.no_grad(): 
+        with torch.no_grad():
             for i in range(2):
                 modelJit(x, a)
                 modelJit_scalar(x, a)
@@ -2934,7 +3046,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_scalar, y_dpcpp_scalar.to(cpu_device))
         del modelJit
 
-    # @pytest.mark.skip("oneDNN not implement yet") 
+    # @pytest.mark.skip("oneDNN not implement yet")
     # def test_linear_binary_eq_fusion(self, dtype=torch.float):
     #     x = torch.randn([2, 4], device=cpu_device)
     #     a = torch.randn([2, 4], device=cpu_device)
@@ -2955,8 +3067,7 @@ class TestNNMethod(TestCase):
     #     self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
     #     del modelJit
 
-
-    # @pytest.mark.skip("oneDNN not implement yet") 
+    # @pytest.mark.skip("oneDNN not implement yet")
     # def test_linear_binary_ne_fusion(self, dtype=torch.float):
     #     x = torch.randn([2, 4], device=cpu_device)
     #     a = torch.randn([2, 4], device=cpu_device)
@@ -2976,7 +3087,6 @@ class TestNNMethod(TestCase):
     #         print("fusion:", y_dpcpp.cpu())
     #     self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
     #     del modelJit
-
 
     def test_linear_binary_max_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
@@ -2998,7 +3108,6 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
 
-
     def test_linear_binary_min_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
         a = torch.randn([2, 4], device=cpu_device)
@@ -3019,7 +3128,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
 
-    # @pytest.mark.skip("oneDNN not implement yet") 
+    # @pytest.mark.skip("oneDNN not implement yet")
     # def test_linear_binary_ge_fusion(self, dtype=torch.float):
     #     x = torch.randn([2, 4], device=cpu_device)
     #     a = torch.randn([2, 4], device=cpu_device)
@@ -3040,7 +3149,7 @@ class TestNNMethod(TestCase):
     #     self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
     #     del modelJit
 
-    # @pytest.mark.skip("oneDNN not implement yet") 
+    # @pytest.mark.skip("oneDNN not implement yet")
     # def test_linear_binary_gt_fusion(self, dtype=torch.float):
     #     x = torch.randn([2, 4], device=cpu_device)
     #     a = torch.randn([2, 4], device=cpu_device)
@@ -3061,7 +3170,7 @@ class TestNNMethod(TestCase):
     #     self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
     #     del modelJit
 
-    # @pytest.mark.skip("oneDNN not implement yet") 
+    # @pytest.mark.skip("oneDNN not implement yet")
     # def test_linear_binary_le_fusion(self, dtype=torch.float):
     #     x = torch.randn([2, 4], device=cpu_device)
     #     a = torch.randn([2, 4], device=cpu_device)
@@ -3082,7 +3191,7 @@ class TestNNMethod(TestCase):
     #     self.assertEqual(y, y_dpcpp.to(cpu_device).bool())
     #     del modelJit
 
-    # @pytest.mark.skip("oneDNN not implement yet") 
+    # @pytest.mark.skip("oneDNN not implement yet")
     # def test_linear_binary_lt_fusion(self, dtype=torch.float):
     #     x = torch.randn([2, 4], device=cpu_device)
     #     a = torch.randn([2, 4], device=cpu_device)

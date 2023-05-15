@@ -1,6 +1,6 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 import numpy as np
 
@@ -12,19 +12,19 @@ dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     def test_index_select(self, dtype=torch.float):
-
         dim_size = 10
         dims = 3
 
         def _test_index_select(input, indcies):
-
             def _test(input, indcies, dim):
                 y_cpu = torch.index_select(input, dim, indices)
                 y_dpcpp = torch.index_select(
-                    input.to(dpcpp_device), dim, indcies.to(dpcpp_device))
+                    input.to(dpcpp_device), dim, indcies.to(dpcpp_device)
+                )
                 print(y_dpcpp.size())
                 print(y_dpcpp.cpu())
                 self.assertEqual(y_cpu, y_dpcpp.cpu())
+
             _test(input, indcies, 0)
             _test(input, indcies, 1)
             _test(input, indcies, 2)
@@ -54,13 +54,15 @@ class TestTorchMethod(TestCase):
 
     def test_index_select_out_non_contiguous(self, dtype=torch.float):
         # Transformer case
-        src_xpu = torch.rand((400*202,), device=torch.device('xpu'))
-        src_xpu = src_xpu.as_strided((400,1), (202,1))
+        src_xpu = torch.rand((400 * 202,), device=torch.device("xpu"))
+        src_xpu = src_xpu.as_strided((400, 1), (202, 1))
         src_cpu = src_xpu.cpu()
-        dst_xpu = torch.rand((400*202,), device=torch.device('xpu'))
-        dst_xpu = dst_xpu.as_strided((400,1), (202,1))
+        dst_xpu = torch.rand((400 * 202,), device=torch.device("xpu"))
+        dst_xpu = dst_xpu.as_strided((400, 1), (202, 1))
         dst_cpu = dst_xpu.cpu()
-        idx_xpu = torch.randint(0, 400, (400,), dtype=torch.long, device=torch.device('xpu'))
+        idx_xpu = torch.randint(
+            0, 400, (400,), dtype=torch.long, device=torch.device("xpu")
+        )
         idx_cpu = idx_xpu.cpu()
         torch.index_select(src_cpu, dim=0, index=idx_cpu, out=dst_cpu)
         torch.index_select(src_xpu, dim=0, index=idx_xpu, out=dst_xpu)
@@ -68,13 +70,16 @@ class TestTorchMethod(TestCase):
 
     def test_index_select_out_single_batch(self, dtype=torch.float):
         # Transformer case
-        src_xpu = torch.rand(1, 333, dtype=torch.float, device=torch.device('xpu'))
+        src_xpu = torch.rand(1, 333, dtype=torch.float, device=torch.device("xpu"))
         src_cpu = src_xpu.cpu()
-        idx_xpu = torch.tensor((0, 0, 0, 0), dtype=torch.long, device=torch.device('xpu'))
+        idx_xpu = torch.tensor(
+            (0, 0, 0, 0), dtype=torch.long, device=torch.device("xpu")
+        )
         idx_cpu = idx_xpu.cpu()
         dst_xpu = src_xpu.index_select(0, idx_xpu)
         dst_cpu = src_cpu.index_select(0, idx_cpu)
         self.assertEqual(dst_cpu, dst_xpu.cpu())
+
 
 # indcies transposed
 # test_index_select(x, torch.transpose(indices, 0, 1))

@@ -1,9 +1,10 @@
 import torch
-import intel_extension_for_pytorch # noqa
-from torch.testing._internal.common_utils import (TestCase)
+import intel_extension_for_pytorch  # noqa
+from torch.testing._internal.common_utils import TestCase
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+
 
 class ForeachBinaryScalarListTest:
     def __init__(self, func):
@@ -24,8 +25,8 @@ class TestTorchMethod(TestCase):
         scalarlist = torch.randn(250)
 
         test = ForeachBinaryScalarListTest(torch._foreach_add)
-        cpu = test(x1, scalarlist, 'cpu')
-        xpu = test(x1, scalarlist, 'xpu')
+        cpu = test(x1, scalarlist, "cpu")
+        xpu = test(x1, scalarlist, "xpu")
         self.result_compare(cpu, xpu)
 
     def test_foreach_mul_scalarlist(self, dtype=torch.float):
@@ -33,8 +34,8 @@ class TestTorchMethod(TestCase):
         scalarlist = torch.randn(250)
 
         test = ForeachBinaryScalarListTest(torch._foreach_mul)
-        cpu = test(x1, scalarlist, 'cpu')
-        xpu = test(x1, scalarlist, 'xpu')
+        cpu = test(x1, scalarlist, "cpu")
+        xpu = test(x1, scalarlist, "xpu")
         self.result_compare(cpu, xpu)
 
     def test_foreach_sub_scalarlist(self, dtype=torch.float):
@@ -42,8 +43,8 @@ class TestTorchMethod(TestCase):
         scalarlist = torch.randn(250)
 
         test = ForeachBinaryScalarListTest(torch._foreach_sub)
-        cpu = test(x1, scalarlist, 'cpu')
-        xpu = test(x1, scalarlist, 'xpu')
+        cpu = test(x1, scalarlist, "cpu")
+        xpu = test(x1, scalarlist, "xpu")
         self.result_compare(cpu, xpu)
 
     def test_foreach_div_scalarlist(self, dtype=torch.float):
@@ -51,8 +52,8 @@ class TestTorchMethod(TestCase):
         scalarlist = torch.randn(250)
 
         test = ForeachBinaryScalarListTest(torch._foreach_div)
-        cpu = test(x1, scalarlist, 'cpu')
-        xpu = test(x1, scalarlist, 'xpu')
+        cpu = test(x1, scalarlist, "cpu")
+        xpu = test(x1, scalarlist, "xpu")
         self.result_compare(cpu, xpu)
 
     def result_compare(self, x1, x2):

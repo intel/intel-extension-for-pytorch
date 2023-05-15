@@ -2,7 +2,7 @@
 from typing import List, Union
 
 import torch
-from torch import nn, Tensor # noqa F401
+from torch import Tensor
 from torch.nn.modules.utils import _pair
 from torch.jit.annotations import BroadcastingList2
 
@@ -19,7 +19,7 @@ def _cat(tensors: List[Tensor], dim: int = 0) -> Tensor:
 
 
 def _convert_boxes_to_roi_format(boxes: List[Tensor]) -> Tensor:
-    concat_boxes = _cat([b for b in boxes], dim=0) # noqa C416
+    concat_boxes = _cat(list(boxes), dim=0)
     temp = []
     for i, b in enumerate(boxes):
         temp.append(torch.full_like(b[:, :1], i))
@@ -31,12 +31,18 @@ def _convert_boxes_to_roi_format(boxes: List[Tensor]) -> Tensor:
 def _check_roi_boxes_shape(boxes: Union[Tensor, List[Tensor]]):
     if isinstance(boxes, (list, tuple)):
         for _tensor in boxes:
-            assert _tensor.size(1) == 4, \
-                'The shape of the tensor in the boxes list is not correct as List[Tensor[L, 4]]'
+            assert (
+                _tensor.size(1) == 4
+            ), "The shape of the tensor in the boxes list is not correct as List[Tensor[L, 4]]"
     elif isinstance(boxes, torch.Tensor):
-        assert boxes.size(1) == 5, 'The boxes tensor shape is not correct as Tensor[K, 5]'
+        assert (
+            boxes.size(1) == 5
+        ), "The boxes tensor shape is not correct as Tensor[K, 5]"
     else:
-        assert False, 'boxes is expected to be a Tensor[L, 5] or a List[Tensor[K, 4]]' # noqa B011
+        assert_status = False
+        assert (
+            status
+        ), "boxes is expected to be a Tensor[L, 5] or a List[Tensor[K, 4]]"
     return
 
 
@@ -49,20 +55,20 @@ def roi_align(
     aligned: bool = False,
 ) -> Tensor:
     """
-    Performs Region of Interest (RoI) Align operator with average pooling, 
-    as described in Mask R-CNN. It is optimized with parallelization and 
+    Performs Region of Interest (RoI) Align operator with average pooling,
+    as described in Mask R-CNN. It is optimized with parallelization and
     channels last support on the basis of the torchvision's roi_align.
 
-    The semantics of Intel® Extension for PyTorch* roi_align is exactly the 
-    same as that of torchvision. We override roi_align in the torchvision 
-    with Intel® Extension for PyTorch* roi_align via ATen op registration. 
-    It is activated when Intel® Extension for PyTorch* is imported from 
-    the Python frontend or when it is linked by a C++ program. It is 
+    The semantics of Intel® Extension for PyTorch* roi_align is exactly the
+    same as that of torchvision. We override roi_align in the torchvision
+    with Intel® Extension for PyTorch* roi_align via ATen op registration.
+    It is activated when Intel® Extension for PyTorch* is imported from
+    the Python frontend or when it is linked by a C++ program. It is
     fully transparent to users.
 
-    In certain cases, if you are using a self-implemented roi_align class 
-    or function that behave exactly the same as the ones in torchvision, 
-    please import the optimized one in Intel® Extension for PyTorch* 
+    In certain cases, if you are using a self-implemented roi_align class
+    or function that behave exactly the same as the ones in torchvision,
+    please import the optimized one in Intel® Extension for PyTorch*
     as the following examples to get performance boost on Intel platforms.
 
     .. highlight:: python
@@ -109,6 +115,12 @@ def roi_align(
     output_size = _pair(output_size)
     if not isinstance(rois, torch.Tensor):
         rois = _convert_boxes_to_roi_format(rois)
-    return torch.ops.torch_ipex.ROIAlign_forward(input, rois, spatial_scale,
-                                                 output_size[0], output_size[1],
-                                                 sampling_ratio, aligned)
+    return torch.ops.torch_ipex.ROIAlign_forward(
+        input,
+        rois,
+        spatial_scale,
+        output_size[0],
+        output_size[1],
+        sampling_ratio,
+        aligned,
+    )

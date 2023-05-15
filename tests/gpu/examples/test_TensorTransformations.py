@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 cpu_device = torch.device("cpu")
@@ -29,7 +29,9 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.cpu())
 
     def test_roll(self, dtype=torch.float):
-        x_cpu = torch.arange(1024*128*128, dtype=dtype, device=cpu_device).view(1024, 128, 128)
+        x_cpu = torch.arange(1024 * 128 * 128, dtype=dtype, device=cpu_device).view(
+            1024, 128, 128
+        )
         x_dpcpp = x_cpu.to(dpcpp_device)
         # test 1
         y_cpu = x_cpu.roll(1, 0)

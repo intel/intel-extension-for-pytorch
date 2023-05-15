@@ -1,8 +1,7 @@
-
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 import pytest
 
@@ -11,7 +10,9 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="ipex build w/o oneMKL support")
+    @pytest.mark.skipif(
+        not torch.xpu.has_onemkl(), reason="ipex build w/o oneMKL support"
+    )
     def test_slogdet(self, dtype=torch.float):
         A = torch.randn(3, 3)
         A_xpu = A.to("xpu")

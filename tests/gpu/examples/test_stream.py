@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 class TestStream(TestCase):
@@ -15,9 +15,9 @@ class TestStream(TestCase):
         a_xpu = a.to("xpu")
         x = torch.tanh(a_xpu)
         with torch.xpu.stream(stream2):
-            ''' barrier1 = stream1.record_event()
-                stream2.wait_event(barrier1)
-            '''
+            """barrier1 = stream1.record_event()
+            stream2.wait_event(barrier1)
+            """
             stream2.wait_stream(stream1)
             b_xpu = b.to("xpu")
             x_xpu = b_xpu + x

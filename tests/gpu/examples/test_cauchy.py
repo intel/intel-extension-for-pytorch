@@ -4,7 +4,7 @@ import torch
 from torch.distributions import Cauchy
 from torch.testing._internal.common_utils import TestCase
 import pytest
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 cpu_device = torch.device("cpu")

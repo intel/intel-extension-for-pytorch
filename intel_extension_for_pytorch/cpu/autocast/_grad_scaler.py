@@ -2,15 +2,16 @@
 
 import torch
 from collections import defaultdict, abc
-import warnings # noqa F401
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 import intel_extension_for_pytorch._C as core
+
 
 class _MultiDeviceReplicator(object):
     """
     Lazily serves copies of a tensor to requested devices.  Copies are cached per-device.
     """
+
     def __init__(self, master_tensor: torch.Tensor) -> None:
         self.master = master_tensor
         self._per_device_tensors: Dict[torch.device, torch.Tensor] = {}
@@ -92,12 +93,15 @@ class GradScaler(object):
         enabled (bool, optional, default=True):  If ``False``, disables gradient scaling. :meth:`step` simply
             invokes the underlying ``optimizer.step()``, and other methods become no-ops.
     """
-    def __init__(self,
-                 init_scale=2.**16,
-                 growth_factor=2.0,
-                 backoff_factor=0.5,
-                 growth_interval=2000,
-                 enabled=True):
+
+    def __init__(
+        self,
+        init_scale=2.0**16,
+        growth_factor=2.0,
+        backoff_factor=0.5,
+        growth_interval=2000,
+        enabled=True,
+    ):
         self._enabled = enabled
 
         if self._enabled:
@@ -115,16 +119,26 @@ class GradScaler(object):
             self._growth_tracker = None
             self._per_optimizer_states = defaultdict(_refresh_per_optimizer_state)
 
-    def _check_scale_growth_tracker(self, funcname) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _check_scale_growth_tracker(
+        self, funcname
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         fix = "This may indicate your script did not use scaler.scale(loss or outputs) earlier in the iteration."
-        assert self._scale is not None, "Attempted {} but _scale is None.  ".format(funcname) + fix
-        assert self._growth_tracker is not None, "Attempted {} but _growth_tracker is None.  ".format(funcname) + fix
+        assert self._scale is not None, (
+            "Attempted {} but _scale is None.  ".format(funcname) + fix
+        )
+        assert self._growth_tracker is not None, (
+            "Attempted {} but _growth_tracker is None.  ".format(funcname) + fix
+        )
         return (self._scale, self._growth_tracker)
 
     def _lazy_init_scale_growth_tracker(self, dev):
         assert self._growth_tracker is None, "_growth_tracker initialized before _scale"
-        self._scale = torch.full((1,), self._init_scale, dtype=torch.float32, device=dev)
-        self._growth_tracker = torch.full((1,), self._init_growth_tracker, dtype=torch.int32, device=dev)
+        self._scale = torch.full(
+            (1,), self._init_scale, dtype=torch.float32, device=dev
+        )
+        self._growth_tracker = torch.full(
+            (1,), self._init_growth_tracker, dtype=torch.int32, device=dev
+        )
 
     def scale(self, outputs):
         """
@@ -145,7 +159,9 @@ class GradScaler(object):
             return outputs * self._scale.to(device=outputs.device, non_blocking=True)
 
         # Invoke the more complex machinery only if we're treating multiple outputs.
-        stash: List[_MultiDeviceReplicator] = []  # holds a reference that can be overwritten by apply_scale
+        stash: List[
+            _MultiDeviceReplicator
+        ] = []  # holds a reference that can be overwritten by apply_scale
 
         def apply_scale(val):
             if isinstance(val, torch.Tensor):
@@ -178,7 +194,7 @@ class GradScaler(object):
         # Google says mypy struggles with defaultdicts type annotations.
         per_device_and_dtype_grads = defaultdict(lambda: defaultdict(list))  # type: ignore[var-annotated]
         # sync grad to master weight
-        if hasattr(optimizer, 'sync_grad'):
+        if hasattr(optimizer, "sync_grad"):
             optimizer.sync_grad()
         with torch.no_grad():
             for group in optimizer.param_groups:
@@ -199,13 +215,17 @@ class GradScaler(object):
                         to_unscale = param.grad
 
                     # TODO: is there a way to split by device and dtype without appending in the inner loop?
-                    per_device_and_dtype_grads[to_unscale.device][to_unscale.dtype].append(to_unscale)
+                    per_device_and_dtype_grads[to_unscale.device][
+                        to_unscale.dtype
+                    ].append(to_unscale)
 
             for device, per_dtype_grads in per_device_and_dtype_grads.items():
                 for grads in per_dtype_grads.values():
-                    core._amp_foreach_non_finite_check_and_unscale_(grads,
-                                                                    per_device_found_inf.get(device),
-                                                                    per_device_inv_scale.get(device))
+                    core._amp_foreach_non_finite_check_and_unscale_(
+                        grads,
+                        per_device_found_inf.get(device),
+                        per_device_inv_scale.get(device),
+                    )
 
         return per_device_found_inf._per_device_tensors
 
@@ -240,22 +260,28 @@ class GradScaler(object):
         optimizer_state = self._per_optimizer_states[id(optimizer)]
 
         if optimizer_state["stage"] is OptState.UNSCALED:
-            raise RuntimeError("unscale_() has already been called on this optimizer since the last update().")
+            raise RuntimeError(
+                "unscale_() has already been called on this optimizer since the last update()."
+            )
         elif optimizer_state["stage"] is OptState.STEPPED:
             raise RuntimeError("unscale_() is being called after step().")
 
         # FP32 division can be imprecise for certain compile options, so we carry out the reciprocal in FP64.
         assert self._scale is not None
         inv_scale = self._scale.double().reciprocal().float()
-        found_inf = torch.full((1,), 0.0, dtype=torch.float32, device=self._scale.device)
+        found_inf = torch.full(
+            (1,), 0.0, dtype=torch.float32, device=self._scale.device
+        )
 
-        optimizer_state["found_inf_per_device"] = self._unscale_grads_(optimizer, inv_scale, found_inf, False)
+        optimizer_state["found_inf_per_device"] = self._unscale_grads_(
+            optimizer, inv_scale, found_inf, False
+        )
         optimizer_state["stage"] = OptState.UNSCALED
 
     def _maybe_opt_step(self, optimizer, optimizer_state, *args, **kwargs):
         retval = None
         if not sum(v.item() for v in optimizer_state["found_inf_per_device"].values()):
-            if hasattr(optimizer, 'step_sync_weight'):
+            if hasattr(optimizer, "step_sync_weight"):
                 retval = optimizer.step_sync_weight(*args, **kwargs)
             else:
                 retval = optimizer.step(*args, **kwargs)
@@ -277,22 +303,29 @@ class GradScaler(object):
         .. warning::
             Closure use is not currently supported.
         """
-        if (not self._enabled):
+        if not self._enabled:
             return optimizer.step(*args, **kwargs)
 
         if "closure" in kwargs:
-            raise RuntimeError("Closure use is not currently supported if GradScaler is enabled.")
+            raise RuntimeError(
+                "Closure use is not currently supported if GradScaler is enabled."
+            )
 
         self._check_scale_growth_tracker("step")
 
         optimizer_state = self._per_optimizer_states[id(optimizer)]
 
         if optimizer_state["stage"] is OptState.STEPPED:
-            raise RuntimeError("step() has already been called since the last update().")
+            raise RuntimeError(
+                "step() has already been called since the last update()."
+            )
 
         retval = None
 
-        if (hasattr(optimizer, "_step_supports_amp_scaling") and optimizer._step_supports_amp_scaling):
+        if (
+            hasattr(optimizer, "_step_supports_amp_scaling")
+            and optimizer._step_supports_amp_scaling
+        ):
             # This optimizer has customized scale-handling logic, so we can call optimizer.step() directly.
             # The contract with custom optimizers is that their step() should accept an additional,
             # optional grad_scaler kwarg.  We append self to the kwargs so the custom optimizer has full information:
@@ -304,7 +337,9 @@ class GradScaler(object):
         if optimizer_state["stage"] is OptState.READY:
             self.unscale_(optimizer)
 
-        assert len(optimizer_state["found_inf_per_device"]) > 0, "No inf checks were recorded for this optimizer."
+        assert (
+            len(optimizer_state["found_inf_per_device"]) > 0
+        ), "No inf checks were recorded for this optimizer."
 
         retval = self._maybe_opt_step(optimizer, optimizer_state, *args, **kwargs)
 
@@ -346,9 +381,11 @@ class GradScaler(object):
         else:
             # Consume shared inf/nan data collected from optimizers to update the scale.
             # If all found_inf tensors are on the same device as self._scale, this operation is asynchronous.
-            found_infs = [found_inf.to(device=_scale.device, non_blocking=True)
-                          for state in self._per_optimizer_states.values()
-                          for found_inf in state["found_inf_per_device"].values()]
+            found_infs = [
+                found_inf.to(device=_scale.device, non_blocking=True)
+                for state in self._per_optimizer_states.values()
+                for found_inf in state["found_inf_per_device"].values()
+            ]
 
             assert len(found_infs) > 0, "No inf checks were recorded prior to update."
 
@@ -357,12 +394,14 @@ class GradScaler(object):
                 for i in range(1, len(found_infs)):
                     found_inf_combined += found_infs[i]
 
-            core._amp_update_scale_(_scale,
-                                    _growth_tracker,
-                                    found_inf_combined,
-                                    self._growth_factor,
-                                    self._backoff_factor,
-                                    self._growth_interval)
+            core._amp_update_scale_(
+                _scale,
+                _growth_tracker,
+                found_inf_combined,
+                self._growth_factor,
+                self._backoff_factor,
+                self._growth_interval,
+            )
 
         # To prepare for next iteration, clear the data collected from optimizers this iteration.
         self._per_optimizer_states = defaultdict(_refresh_per_optimizer_state)
@@ -417,7 +456,11 @@ class GradScaler(object):
 
     def _get_growth_tracker(self):
         if self._enabled:
-            return self._init_growth_tracker if self._growth_tracker is None else self._growth_tracker.item()
+            return (
+                self._init_growth_tracker
+                if self._growth_tracker is None
+                else self._growth_tracker.item()
+            )
         else:
             return 0
 
@@ -440,24 +483,32 @@ class GradScaler(object):
            If you wish to checkpoint the scaler's state after a particular iteration, :meth:`state_dict`
            should be called after :meth:`update`.
         """
-        return {"scale": self.get_scale(),
+        return (
+            {
+                "scale": self.get_scale(),
                 "growth_factor": self._growth_factor,
                 "backoff_factor": self._backoff_factor,
                 "growth_interval": self._growth_interval,
-                "_growth_tracker": self._get_growth_tracker()} if self._enabled else {}
+                "_growth_tracker": self._get_growth_tracker(),
+            }
+            if self._enabled
+            else {}
+        )
 
     def __getstate__(self):
         state = self.__dict__.copy()
         if self._enabled:
-            assert len(self._per_optimizer_states) == 0, "A GradScaler instance may only be pickled at the beginning "\
-                                                         "of an iteration, or at the end after scaler.update()."
+            assert len(self._per_optimizer_states) == 0, (
+                "A GradScaler instance may only be pickled at the beginning "
+                "of an iteration, or at the end after scaler.update()."
+            )
             # Pickling _scale and _growth_tracker Tensors directly triggers
             # "warnings.warn("pickle support for Storage will be removed in 1.5..."
             # so instead, we set the unpickled instance up to reinitialize them lazily.
-            state['_init_scale'] = self.get_scale()
-            state['_init_growth_tracker'] = self._get_growth_tracker()
-            state['_scale'] = None
-            state['_growth_tracker'] = None
+            state["_init_scale"] = self.get_scale()
+            state["_init_growth_tracker"] = self._get_growth_tracker()
+            state["_scale"] = None
+            state["_growth_tracker"] = None
         return state
 
     def __setstate__(self, state):
@@ -466,15 +517,19 @@ class GradScaler(object):
     def _check_inf_per_device(self, optimizer):
         _scale, _ = self._check_scale_growth_tracker("_check_inf_per_device")
 
-        dummy_inv_scale = torch.full((1,), 1.0, dtype=torch.float32, device=_scale.device)
+        dummy_inv_scale = torch.full(
+            (1,), 1.0, dtype=torch.float32, device=_scale.device
+        )
         found_inf = torch.full((1,), 0.0, dtype=torch.float32, device=_scale.device)
 
-        self._per_optimizer_states[id(optimizer)]["found_inf_per_device"] = \
-            self._unscale_grads_(optimizer, dummy_inv_scale, found_inf, True)
+        self._per_optimizer_states[id(optimizer)][
+            "found_inf_per_device"
+        ] = self._unscale_grads_(optimizer, dummy_inv_scale, found_inf, True)
 
         return self._per_optimizer_states[id(optimizer)]["found_inf_per_device"]
 
     def _found_inf_per_device(self, optimizer):
         return self._per_optimizer_states[id(optimizer)]["found_inf_per_device"]
+
 
 torch.cpu.amp.GradScaler = GradScaler

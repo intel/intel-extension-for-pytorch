@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -9,17 +9,23 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_SplitSGD(self):
-        device = 'xpu'
+        device = "xpu"
         dtype_bf16 = torch.bfloat16
         dtype_fp32 = torch.float32
 
         # input and target
-        input_cpu = torch.randn(1, 3, 224, 224, device='cpu', dtype=torch.float32, requires_grad=True)
-        target_cpu = torch.randn(1, 64, 112, 112, device='cpu', dtype=torch.float32)
+        input_cpu = torch.randn(
+            1, 3, 224, 224, device="cpu", dtype=torch.float32, requires_grad=True
+        )
+        target_cpu = torch.randn(1, 64, 112, 112, device="cpu", dtype=torch.float32)
 
         # model
-        m_cpu1 = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-        m_cpu2 = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+        m_cpu1 = torch.nn.Conv2d(
+            3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False
+        )
+        m_cpu2 = torch.nn.Conv2d(
+            3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False
+        )
         m_cpu2.weight.data = m_cpu1.weight.data.clone()
 
         # criterion fucntion
@@ -42,8 +48,12 @@ class TestNNMethod(TestCase):
         c_dpcpp_fp32 = c.to(device)
 
         # optim
-        optim_dpcpp_bf16 = torch.xpu.optim.SplitSGD(m_dpcpp_bf16.parameters(), lr=0.1, momentum=0, weight_decay=0)
-        optim_dpcpp_fp32 = torch.optim.SGD(m_dpcpp_fp32.parameters(), lr=0.1, momentum=0, weight_decay=0)
+        optim_dpcpp_bf16 = torch.xpu.optim.SplitSGD(
+            m_dpcpp_bf16.parameters(), lr=0.1, momentum=0, weight_decay=0
+        )
+        optim_dpcpp_fp32 = torch.optim.SGD(
+            m_dpcpp_fp32.parameters(), lr=0.1, momentum=0, weight_decay=0
+        )
 
         # forward
         output_dpcpp_bf16 = m_dpcpp_bf16(input_dpcpp_bf16)
@@ -63,4 +73,9 @@ class TestNNMethod(TestCase):
         optim_dpcpp_bf16.step()
         optim_dpcpp_fp32.step()
 
-        self.assertEqual(m_dpcpp_bf16.weight.cpu().float(), m_dpcpp_fp32.weight.cpu(), atol=1e-3, rtol=1.3e-06)
+        self.assertEqual(
+            m_dpcpp_bf16.weight.cpu().float(),
+            m_dpcpp_fp32.weight.cpu(),
+            atol=1e-3,
+            rtol=1.3e-06,
+        )

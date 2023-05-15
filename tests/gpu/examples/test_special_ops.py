@@ -6,7 +6,9 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_erfcx(self, dtype=torch.float):
         dtypes = [torch.float32, torch.float64, torch.bfloat16]
         device = "xpu"
@@ -38,7 +40,9 @@ class TestTorchMethod(TestCase):
             t = torch.tensor([min, max, eps, tiny], dtype=dtype, device=device)
             check_equal(t, torch.special.erfcx, special.erfcx)
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_ndtri_entr(self, dtype=torch.float):
         dtypes = [torch.float32, torch.float64, torch.bfloat16]
         device = "xpu"
@@ -89,7 +93,6 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
 
-
     def test_bessel_y0(self, dtype=torch.float):
         input0 = torch.randn(8192, 8192, device="cpu")
         input0_xpu = input0.clone().to("xpu")
@@ -130,7 +133,10 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_2d_block_array(), reason="Randomly failed on ATSM only, will be fixed soon.")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_2d_block_array(),
+        reason="Randomly failed on ATSM only, will be fixed soon.",
+    )
     def test_modified_bessel_k0(self, dtype=torch.float):
         input0 = torch.randn(8192, 8192, device="cpu")
         input0_xpu = input0.clone().to("xpu")
@@ -170,8 +176,10 @@ class TestTorchMethod(TestCase):
         result_xpu = torch.special.scaled_modified_bessel_k1(input0_xpu)
 
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
-    
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_log_ndtr(self, dtype=torch.float):
         input0 = torch.randn(8192, 8192, device="cpu")
         input0_xpu = input0.clone().to("xpu")
@@ -264,7 +272,9 @@ class TestTorchMethod(TestCase):
         input0 = torch.randn(8192, 8192, device="cpu")
         input0_xpu = input0.to("xpu")
         result_cpu = torch.special.shifted_chebyshev_polynomial_t(input0, input0)
-        result_xpu = torch.special.shifted_chebyshev_polynomial_t(input0_xpu, input0_xpu)
+        result_xpu = torch.special.shifted_chebyshev_polynomial_t(
+            input0_xpu, input0_xpu
+        )
         result_xpu = result_xpu.to("cpu")
 
         self.assertTrue(result_xpu.equal(result_cpu))
@@ -273,7 +283,9 @@ class TestTorchMethod(TestCase):
         input0 = torch.randn(8192, 8192, device="cpu")
         input0_xpu = input0.to("xpu")
         result_cpu = torch.special.shifted_chebyshev_polynomial_u(input0, input0)
-        result_xpu = torch.special.shifted_chebyshev_polynomial_u(input0_xpu, input0_xpu)
+        result_xpu = torch.special.shifted_chebyshev_polynomial_u(
+            input0_xpu, input0_xpu
+        )
         result_xpu = result_xpu.to("cpu")
 
         self.assertTrue(result_xpu.equal(result_cpu))
@@ -282,7 +294,9 @@ class TestTorchMethod(TestCase):
         input0 = torch.randn(8192, 8192, device="cpu")
         input0_xpu = input0.to("xpu")
         result_cpu = torch.special.shifted_chebyshev_polynomial_v(input0, input0)
-        result_xpu = torch.special.shifted_chebyshev_polynomial_v(input0_xpu, input0_xpu)
+        result_xpu = torch.special.shifted_chebyshev_polynomial_v(
+            input0_xpu, input0_xpu
+        )
         result_xpu = result_xpu.to("cpu")
 
         self.assertTrue(result_xpu.equal(result_cpu))
@@ -291,7 +305,9 @@ class TestTorchMethod(TestCase):
         input0 = torch.randn(8192, 8192, device="cpu")
         input0_xpu = input0.to("xpu")
         result_cpu = torch.special.shifted_chebyshev_polynomial_w(input0, input0)
-        result_xpu = torch.special.shifted_chebyshev_polynomial_w(input0_xpu, input0_xpu)
+        result_xpu = torch.special.shifted_chebyshev_polynomial_w(
+            input0_xpu, input0_xpu
+        )
         result_xpu = result_xpu.to("cpu")
 
         self.assertTrue(result_xpu.equal(result_cpu))

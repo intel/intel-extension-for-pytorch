@@ -1,11 +1,11 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 import pytest
 
-cpu_device = torch.device('cpu')
+cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 
@@ -14,7 +14,9 @@ class TestTorchMethod(TestCase):
     def test_cholesky_inverse(self, dtype=torch.float):
         a = torch.randn(3, 3).to(cpu_device)
 
-        a = torch.mm(a, a.t()) + 1e-05 * torch.eye(3)  # make symmetric positive definite
+        a = torch.mm(a, a.t()) + 1e-05 * torch.eye(
+            3
+        )  # make symmetric positive definite
         u = torch.cholesky(a)
         print("a", a)
 
@@ -32,11 +34,19 @@ class TestTorchMethod(TestCase):
 
     @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_geqrf(self, dtype=torch.float):
-        A = torch.tensor([[6.80, -2.11, 5.66, 5.97, 8.23],
-                          [-6.05, -3.30, 5.36, -4.44, 1.08],
-                          [-0.45, 2.58, -2.70, 0.27, 9.04],
-                          [8.32, 2.71, 4.35, -7.17, 2.14],
-                          [-9.67, -5.14, -7.26, 6.08, -6.87]]).t().to(cpu_device)
+        A = (
+            torch.tensor(
+                [
+                    [6.80, -2.11, 5.66, 5.97, 8.23],
+                    [-6.05, -3.30, 5.36, -4.44, 1.08],
+                    [-0.45, 2.58, -2.70, 0.27, 9.04],
+                    [8.32, 2.71, 4.35, -7.17, 2.14],
+                    [-9.67, -5.14, -7.26, 6.08, -6.87],
+                ]
+            )
+            .t()
+            .to(cpu_device)
+        )
 
         print("A ", A.to(cpu_device))
 
@@ -44,11 +54,19 @@ class TestTorchMethod(TestCase):
         print("a ", a.to(cpu_device))
         print("tau", tau.to(cpu_device))
 
-        A = torch.tensor([[6.80, -2.11, 5.66, 5.97, 8.23],
-                          [-6.05, -3.30, 5.36, -4.44, 1.08],
-                          [-0.45, 2.58, -2.70, 0.27, 9.04],
-                          [8.32, 2.71, 4.35, -7.17, 2.14],
-                          [-9.67, -5.14, -7.26, 6.08, -6.87]]).t().to(dpcpp_device)
+        A = (
+            torch.tensor(
+                [
+                    [6.80, -2.11, 5.66, 5.97, 8.23],
+                    [-6.05, -3.30, 5.36, -4.44, 1.08],
+                    [-0.45, 2.58, -2.70, 0.27, 9.04],
+                    [8.32, 2.71, 4.35, -7.17, 2.14],
+                    [-9.67, -5.14, -7.26, 6.08, -6.87],
+                ]
+            )
+            .t()
+            .to(dpcpp_device)
+        )
 
         print("A DPCPP", A.to(cpu_device))
 
@@ -61,8 +79,8 @@ class TestTorchMethod(TestCase):
 
     @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_ger(self, dtype=torch.float):
-        v1 = torch.arange(1., 5., device=cpu_device)
-        v2 = torch.arange(1., 4., device=cpu_device)
+        v1 = torch.arange(1.0, 5.0, device=cpu_device)
+        v2 = torch.arange(1.0, 4.0, device=cpu_device)
 
         A12 = torch.ger(v1, v2)
         print("cpu v1 ", v1.to(cpu_device))
@@ -74,8 +92,8 @@ class TestTorchMethod(TestCase):
         print("cpu v2 ", v1.to(cpu_device))
         print("cpu A21 ", A21.to(cpu_device))
 
-        v1 = torch.arange(1., 5., device=dpcpp_device)
-        v2 = torch.arange(1., 4., device=dpcpp_device)
+        v1 = torch.arange(1.0, 5.0, device=dpcpp_device)
+        v2 = torch.arange(1.0, 4.0, device=dpcpp_device)
 
         A12_dpcpp = torch.ger(v1, v2)
         print("dpcpp v1 ", v1.to(cpu_device))

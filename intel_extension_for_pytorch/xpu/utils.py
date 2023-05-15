@@ -4,10 +4,10 @@ from .. import _C
 from enum import Enum
 import warnings
 from .. import frontend
-import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch  # noqa F401
 
 
-def from_usm(src, dtype, shape, stride = None, device_id: int = -1) -> torch.Tensor:
+def from_usm(src, dtype, shape, stride=None, device_id: int = -1) -> torch.Tensor:
     """from_usm(src, dtype, shape, stride=None, device_d=-1) -> Tensor
 
     Converts a tensor allocated in USM(United Shared Memory) into a ``torch.Tensor``.
@@ -54,20 +54,40 @@ def to_channels_last_1d(t):
     if isinstance(t, torch.nn.Module):
         for m in t.modules():
             for param in m.parameters():
-                if isinstance(m, (torch.nn.Conv1d, torch.nn.BatchNorm1d, torch.nn.MaxPool1d)):
+                if isinstance(
+                    m, (torch.nn.Conv1d, torch.nn.BatchNorm1d, torch.nn.MaxPool1d)
+                ):
                     if 3 == param.data.dim():
                         if 1 == param.data.size(0):
-                            param.data = param.data.transpose(1, -1).contiguous().transpose(1, -1)
+                            param.data = (
+                                param.data.transpose(1, -1)
+                                .contiguous()
+                                .transpose(1, -1)
+                            )
                         elif 1 == param.data.size(1):
                             param.data = param.data.as_strided(
-                                param.data.size(), (param.data.size(1) * param.data.size(-1), 1, param.data.size(1)))
+                                param.data.size(),
+                                (
+                                    param.data.size(1) * param.data.size(-1),
+                                    1,
+                                    param.data.size(1),
+                                ),
+                            )
                         else:
                             param.data = param.data.view(
-                                param.data.size(0), param.data.size(1), 1, param.data.size(2))
+                                param.data.size(0),
+                                param.data.size(1),
+                                1,
+                                param.data.size(2),
+                            )
                             param.data = param.data.to(
-                                memory_format=torch.channels_last)
+                                memory_format=torch.channels_last
+                            )
                             param.data = param.data.view(
-                                param.data.size(0), param.data.size(1), param.data.size(3))
+                                param.data.size(0),
+                                param.data.size(1),
+                                param.data.size(3),
+                            )
         return t
 
     if 3 == t.dim():
@@ -116,7 +136,7 @@ def has_2d_block_array(device: int = -1) -> bool:
 
 
 # Basic OnOff
-class OnOff():
+class OnOff:
     def __init__(self, checker, enable, disable):
         self._init_status = checker()
         self._enabled = True
@@ -225,12 +245,23 @@ class onemkl_verbose(object):
         return False
 
 
-def optimize(model, dtype=None, optimizer=None, level="O1",
-             inplace=False, conv_bn_folding=None, linear_bn_folding=None,
-             weights_prepack=None, replace_dropout_with_identity=None,
-             optimize_lstm=None, split_master_weight_for_bf16=None,
-             fuse_update_step=None, auto_kernel_selection=None,
-             sample_input=None, graph_mode=None):
+def optimize(
+    model,
+    dtype=None,
+    optimizer=None,
+    level="O1",
+    inplace=False,
+    conv_bn_folding=None,
+    linear_bn_folding=None,
+    weights_prepack=None,
+    replace_dropout_with_identity=None,
+    optimize_lstm=None,
+    split_master_weight_for_bf16=None,
+    fuse_update_step=None,
+    auto_kernel_selection=None,
+    sample_input=None,
+    graph_mode=None,
+):
     r"""
     torch.xpu.optimize is an alternative of optimize API in Intel® Extension for
     PyTorch*, to provide identical usage for XPU device only. The motivation of
@@ -256,12 +287,23 @@ def optimize(model, dtype=None, optimizer=None, level="O1",
         >>> optimized_model, optimized_optimizer = torch.xpu.optimize(model, dtype=torch.bfloat16, optimizer=optimizer)
         >>> # running training step.
     """
-    return frontend.optimize(model, dtype, optimizer, level,
-                             inplace, conv_bn_folding, linear_bn_folding,
-                             weights_prepack, replace_dropout_with_identity,
-                             optimize_lstm, split_master_weight_for_bf16,
-                             fuse_update_step, auto_kernel_selection,
-                             sample_input, graph_mode)
+    return frontend.optimize(
+        model,
+        dtype,
+        optimizer,
+        level,
+        inplace,
+        conv_bn_folding,
+        linear_bn_folding,
+        weights_prepack,
+        replace_dropout_with_identity,
+        optimize_lstm,
+        split_master_weight_for_bf16,
+        fuse_update_step,
+        auto_kernel_selection,
+        sample_input,
+        graph_mode,
+    )
 
 
 class FP32MathMode(EnumBase):
@@ -275,7 +317,9 @@ def get_fp32_math_mode():
 
 
 def set_fp32_math_mode(mode):
-    st = FP32MathMode.set_value(intel_extension_for_pytorch._C._set_fp32_math_mode, mode)
+    st = FP32MathMode.set_value(
+        intel_extension_for_pytorch._C._set_fp32_math_mode, mode
+    )
     assert bool(st), "WARNING: Failed to set FP32 math mode!"
 
 
@@ -334,11 +378,14 @@ def disable_tile_as_device():
 #       They are instable, and may be removed without notice!
 ################################################################
 
+
 def has_jit_quantization_save():
     return _C._is_jit_quantization_save_enabled()
 
+
 def has_xetla():
     return _C._is_xetla_enabled()
+
 
 # oneDNN Layout
 def using_onednn_layout():
@@ -359,16 +406,18 @@ def disable_onednn_layout():
 
 class onednn_layout(OnOff):
     def __init__(self):
-        super().__init__(using_onednn_layout, enable_onednn_layout, disable_onednn_layout)
+        super().__init__(
+            using_onednn_layout, enable_onednn_layout, disable_onednn_layout
+        )
 
 
 # For several primitive implementations, force to set compute engine
 class XPUComputeEng(EnumBase):
-    RECOMMEND   = intel_extension_for_pytorch._C.XPUComputeEng.RECOMMEND
-    BASIC       = intel_extension_for_pytorch._C.XPUComputeEng.BASIC
-    ONEDNN      = intel_extension_for_pytorch._C.XPUComputeEng.ONEDNN
-    ONEMKL      = intel_extension_for_pytorch._C.XPUComputeEng.ONEMKL
-    XETLA       = intel_extension_for_pytorch._C.XPUComputeEng.XETLA
+    RECOMMEND = intel_extension_for_pytorch._C.XPUComputeEng.RECOMMEND
+    BASIC = intel_extension_for_pytorch._C.XPUComputeEng.BASIC
+    ONEDNN = intel_extension_for_pytorch._C.XPUComputeEng.ONEDNN
+    ONEMKL = intel_extension_for_pytorch._C.XPUComputeEng.ONEMKL
+    XETLA = intel_extension_for_pytorch._C.XPUComputeEng.XETLA
 
 
 def get_compute_eng():

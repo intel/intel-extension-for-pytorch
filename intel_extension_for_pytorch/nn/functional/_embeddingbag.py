@@ -1,7 +1,7 @@
 import torch
-import intel_extension_for_pytorch._C as core # noqa F401
 import warnings
 from typing import Optional, Tuple
+
 Tensor = torch.Tensor
 
 
@@ -10,7 +10,7 @@ def _embedding_bag_fast_path_sum(
     mode: int = 0,
     scale_grad_by_freq: bool = False,
     per_sample_weights: Optional[Tensor] = None,
-    padding_idx: Optional[int] = None
+    padding_idx: Optional[int] = None,
 ) -> bool:
     if mode != 0 or scale_grad_by_freq:
         return False
@@ -33,20 +33,31 @@ def _embeddingbag(
     sparse: bool = False,
     per_sample_weights: Optional[Tensor] = None,
     include_last_offset: bool = False,
-    padding_idx: Optional[int] = None
+    padding_idx: Optional[int] = None,
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     if _embedding_bag_fast_path_sum(
         weights, mode, scale_grad_by_freq, per_sample_weights, padding_idx
-    ) and weights.device == torch.device('cpu'):
-        ret = torch.ops.torch_ipex.embedding_bag(weights, indices, offsets, sparse, include_last_offset)
+    ) and weights.device == torch.device("cpu"):
+        ret = torch.ops.torch_ipex.embedding_bag(
+            weights, indices, offsets, sparse, include_last_offset
+        )
         # torch.embedding_bag expected 4 Tensor returned
         # here we only return 1 tensor since the other three tensors are not needed in our fast path
         ret = (ret, torch.empty(0), torch.empty(0), torch.empty(0))
     else:
-        if weights.device == torch.device('cpu'):
-            warnings.warn('Fallback to torch.embedding bag')
-        ret = torch_embedding_bag(weights, indices, offsets, scale_grad_by_freq, mode, sparse,
-                                  per_sample_weights, include_last_offset, padding_idx)
+        if weights.device == torch.device("cpu"):
+            warnings.warn("Fallback to torch.embedding bag")
+        ret = torch_embedding_bag(
+            weights,
+            indices,
+            offsets,
+            scale_grad_by_freq,
+            mode,
+            sparse,
+            per_sample_weights,
+            include_last_offset,
+            padding_idx,
+        )
     return ret
 
 

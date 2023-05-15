@@ -6,19 +6,22 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_scatter(self, dtype=torch.float):
-
         x_cpu = torch.rand(2, 5)
         x_dpcpp = x_cpu.to("xpu")
 
-        y_cpu = torch.zeros(3, 5).scatter_(0, torch.tensor(
-            [[0, 1, 2, 0, 0], [2, 0, 0, 1, 2]]), x_cpu)
+        y_cpu = torch.zeros(3, 5).scatter_(
+            0, torch.tensor([[0, 1, 2, 0, 0], [2, 0, 0, 1, 2]]), x_cpu
+        )
 
         # print("y_cpu", y_cpu)
 
-        y_dpcpp = torch.zeros(3, 5, device="xpu").scatter_(0, torch.tensor(
-            [[0, 1, 2, 0, 0], [2, 0, 0, 1, 2]], device="xpu"), x_dpcpp)
+        y_dpcpp = torch.zeros(3, 5, device="xpu").scatter_(
+            0, torch.tensor([[0, 1, 2, 0, 0], [2, 0, 0, 1, 2]], device="xpu"), x_dpcpp
+        )
 
         # print("y_dpcpp", y_dpcpp.cpu())
 
@@ -27,17 +30,20 @@ class TestTorchMethod(TestCase):
         # print("z_cpu", z_cpu)
 
         z_dpcpp = torch.zeros(2, 4, device="xpu").scatter_(
-            1, torch.tensor([[2], [3]], device="xpu"), 1.23)
+            1, torch.tensor([[2], [3]], device="xpu"), 1.23
+        )
 
         # print("z_dpcpp", z_dpcpp.cpu())
 
-        w1_cpu = torch.zeros(3, 5).scatter(0, torch.tensor(
-            [[0, 1, 2, 0, 0], [2, 0, 0, 1, 2]]), x_cpu)
+        w1_cpu = torch.zeros(3, 5).scatter(
+            0, torch.tensor([[0, 1, 2, 0, 0], [2, 0, 0, 1, 2]]), x_cpu
+        )
 
         # print("w1_cpu", w1_cpu)
 
-        w1_dpcpp = torch.zeros(3, 5, device="xpu").scatter(0, torch.tensor(
-            [[0, 1, 2, 0, 0], [2, 0, 0, 1, 2]], device="xpu"), x_dpcpp)
+        w1_dpcpp = torch.zeros(3, 5, device="xpu").scatter(
+            0, torch.tensor([[0, 1, 2, 0, 0], [2, 0, 0, 1, 2]], device="xpu"), x_dpcpp
+        )
 
         # print("w1_dpcpp", w1_dpcpp)
 
@@ -46,7 +52,8 @@ class TestTorchMethod(TestCase):
         # print("w2_cpu", w2_cpu)
 
         w2_dpcpp = torch.zeros(2, 4, device="xpu").scatter(
-            1, torch.tensor([[2], [3]], device="xpu"), 1.23)
+            1, torch.tensor([[2], [3]], device="xpu"), 1.23
+        )
 
         # print("w2_dpcpp", w2_dpcpp)
 
@@ -55,7 +62,9 @@ class TestTorchMethod(TestCase):
         self.assertEqual(w1_cpu, w1_dpcpp.cpu())
         self.assertEqual(w2_cpu, w2_dpcpp.cpu())
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_scatter_out(self, dtype=torch.float):
         size = 10
         src = torch.randint(0, size, (1, size), dtype=dtype)

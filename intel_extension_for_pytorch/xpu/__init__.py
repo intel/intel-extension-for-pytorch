@@ -2,6 +2,7 @@ r"""
 This package is lazily initialized, so you can always import it.
 """
 
+from torch.storage import _LegacyStorage
 import sys
 import warnings
 from typing import List, Optional, Tuple, Union, Dict
@@ -28,7 +29,7 @@ from .overrides import (
     override_assert_equal,
     override_get_stream,
     override_recursive_to,
-    )
+)
 
 from .generator import Generator
 
@@ -38,7 +39,8 @@ from intel_extension_for_pytorch._version import (
     __ipex_gitrev__,
     __torch_gitrev__,
     __gpu_onednn_gitrev__,
-    __build_type__) # noqa B950
+    __build_type__,
+)
 
 default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
@@ -47,6 +49,7 @@ _device_t = Union[_device, str, int]
 def is_initialized():
     r"""Returns whether XPU state has been initialized."""
     from .lazy_init import _initialized
+
     return _initialized
 
 
@@ -65,7 +68,7 @@ def init():
 # this API can be used before forking proces.
 def device_count() -> int:
     r"""Returns the number of XPUs device available."""
-    if hasattr(intel_extension_for_pytorch._C, '_getDeviceCount'):
+    if hasattr(intel_extension_for_pytorch._C, "_getDeviceCount"):
         if is_initialized():
             return intel_extension_for_pytorch._C._getDeviceCount()
         else:
@@ -86,7 +89,7 @@ def is_available() -> bool:
 def getDeviceIdListForCard(card_id=-1) -> list:
     r"""Returns the device list of card_id.
     By default, return device list of the card which contains max number of devices."""
-    if hasattr(intel_extension_for_pytorch._C, '_getDeviceIdListForCard'):
+    if hasattr(intel_extension_for_pytorch._C, "_getDeviceIdListForCard"):
         if is_initialized():
             return intel_extension_for_pytorch._C._getDeviceIdListForCard(card_id)
         else:
@@ -177,9 +180,11 @@ def get_device_capability(device: Optional[_device_t] = None) -> Dict[str, Any]:
         Dict[str, Any]: the xpu capability dictionary of the device
     """
     prop = get_device_properties(device)
-    return {"max_work_group_size": prop.max_work_group_size,
-            "max_num_sub_groups": prop.max_num_sub_groups,
-            "sub_group_sizes": prop.sub_group_sizes}
+    return {
+        "max_work_group_size": prop.max_work_group_size,
+        "max_num_sub_groups": prop.max_num_sub_groups,
+        "sub_group_sizes": prop.sub_group_sizes,
+    }
 
 
 def get_device_properties(device: _device_t):
@@ -231,9 +236,9 @@ class StreamContext(object):
             ``None``.
     .. note:: Streams are per-device.
     """
-    cur_stream: Optional['Stream']
+    cur_stream: Optional["Stream"]
 
-    def __init__(self, stream: Optional['Stream']):
+    def __init__(self, stream: Optional["Stream"]):
         self.stream = stream
         self.idx = _get_device_index(None, True)
         if not torch.jit.is_scripting():
@@ -272,7 +277,7 @@ class StreamContext(object):
         set_stream(self.src_prev_stream)
 
 
-def stream(stream: Optional['Stream']) -> StreamContext:
+def stream(stream: Optional["Stream"]) -> StreamContext:
     r"""Wrapper around the Context-manager StreamContext that
     selects a given stream.
 
@@ -311,11 +316,12 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
             (default).
     """
     _lazy_init()
-    return Stream(_cdata=intel_extension_for_pytorch._C._getCurrentStream(
-        _get_device_index(device, optional=True)))
+    return Stream(
+        _cdata=intel_extension_for_pytorch._C._getCurrentStream(
+            _get_device_index(device, optional=True)
+        )
+    )
 
-
-from torch.storage import _LegacyStorage
 
 @staticmethod  # type: ignore[misc]
 def _lazy_new(cls, *args, **kwargs):
@@ -335,81 +341,95 @@ class _XPUBase(object):
         # or on typing_extensions module on Python >= 3.6
         with device(self.get_device()):  # type: ignore[attr-defined]
             return super(_XPUBase, self).type(*args, **kwargs)  # type: ignore[misc]
+
     __new__ = _lazy_new
 
 
 class _XPULegacyStorage(_LegacyStorage):
     @classmethod
     def from_buffer(cls, *args, **kwargs):
-        raise RuntimeError('from_buffer: Not available for XPU storage')
+        raise RuntimeError("from_buffer: Not available for XPU storage")
 
     @classmethod
     def _new_with_weak_ptr(cls, *args, **kwargs):
-        raise RuntimeError('_new_with_weak_ptr: Not available for XPU storage')
+        raise RuntimeError("_new_with_weak_ptr: Not available for XPU storage")
 
     @classmethod
     def _new_shared_filename(cls, manager, obj, size, *, device=None, dtype=None):
-        raise RuntimeError('_new_shared_filename: Not available for XPU storage')
+        raise RuntimeError("_new_shared_filename: Not available for XPU storage")
+
 
 class ByteStorage(_XPULegacyStorage):
     @classproperty
     def dtype(self):
         return torch.uint8
 
+
 class DoubleStorage(_XPULegacyStorage):
     @classproperty
     def dtype(self):
         return torch.double
+
 
 class FloatStorage(_XPULegacyStorage):
     @classproperty
     def dtype(self):
         return torch.float
 
+
 class HalfStorage(_XPULegacyStorage):
     @classproperty
     def dtype(self):
         return torch.half
+
 
 class LongStorage(_XPULegacyStorage):
     @classproperty
     def dtype(self):
         return torch.long
 
+
 class IntStorage(_XPULegacyStorage):
     @classproperty
     def dtype(self):
         return torch.int
+
 
 class ShortStorage(_XPULegacyStorage):
     @classproperty
     def dtype(self):
         return torch.short
 
+
 class CharStorage(_XPULegacyStorage):
     @classproperty
     def dtype(self):
         return torch.int8
+
 
 class BoolStorage(_XPULegacyStorage):
     @classproperty
     def dtype(self):
         return torch.bool
 
+
 class BFloat16Storage(_XPULegacyStorage):
     @classproperty
     def dtype(self):
         return torch.bfloat16
+
 
 class ComplexDoubleStorage(_XPULegacyStorage):
     @classproperty
     def dtype(self):
         return torch.cdouble
 
+
 class ComplexFloatStorage(_XPULegacyStorage):
     @classproperty
     def dtype(self):
         return torch.cfloat
+
 
 del _LegacyStorage
 del _XPULegacyStorage
@@ -429,24 +449,28 @@ torch._storage_classes.add(ComplexFloatStorage)
 
 
 def _xpu_tag(obj):
-    if obj.device.type == 'xpu':
-        return 'xpu:' + str(obj.device.index)
+    if obj.device.type == "xpu":
+        return "xpu:" + str(obj.device.index)
 
 
 def validate_xpu_device(location):
     device = _get_device_index(location, True)
     if not torch.xpu.is_available():
-        raise RuntimeError('Attempting to deserialize object on a xpu '
-                           'device but torch.xpu.is_available() is False. '
-                           'If you are running on a CPU-only machine, '
-                           'please use torch.load with map_location=torch.device(\'cpu\') '
-                           'to map your storages to the CPU.')
+        raise RuntimeError(
+            "Attempting to deserialize object on a xpu "
+            "device but torch.xpu.is_available() is False. "
+            "If you are running on a CPU-only machine, "
+            "please use torch.load with map_location=torch.device('cpu') "
+            "to map your storages to the CPU."
+        )
     device_count = torch.xpu.device_count()
     if device >= device_count:
-        raise RuntimeError('Attempting to deserialize object on xpu device '
-                           f'{device} but torch.xpu.device_count() is {device_count}. Please use '
-                           'torch.load with map_location to map your storages '
-                           'to an existing device.')
+        raise RuntimeError(
+            "Attempting to deserialize object on xpu device "
+            f"{device} but torch.xpu.device_count() is {device_count}. Please use "
+            "torch.load with map_location to map your storages "
+            "to an existing device."
+        )
     return device
 
 
@@ -467,7 +491,7 @@ def _xpu(self, device=None, non_blocking=False, **kwargs):
         **kwargs: For compatibility, may contain the key ``async`` in place of
             the ``non_blocking`` argument.
     """
-    non_blocking = torch._utils._get_async_or_non_blocking('xpu', non_blocking, kwargs)
+    non_blocking = torch._utils._get_async_or_non_blocking("xpu", non_blocking, kwargs)
     # if self.is_xpu:
     #     if device is None:
     #         device = torch.xpu.current_device()
@@ -492,7 +516,7 @@ def _xpu(self, device=None, non_blocking=False, **kwargs):
 
 
 def _xpu_deserialize(obj, location):
-    if location.startswith('xpu'):
+    if location.startswith("xpu"):
         device_id = validate_xpu_device(location)
         if getattr(obj, "_torch_load_uninitialized", False):
             with torch.xpu.device(device):
@@ -502,16 +526,17 @@ def _xpu_deserialize(obj, location):
 
 
 def get_device_type() -> str:
-    return 'xpu'
+    return "xpu"
+
 
 _StorageBase.xpu = _xpu
 
 serialization.register_package(30, _xpu_tag, _xpu_deserialize)
 
-torch._register_device_module('xpu', current_module)
+torch._register_device_module("xpu", current_module)
 
 # post initial
-if hasattr(intel_extension_for_pytorch._C, '_postInitExtension'):
+if hasattr(intel_extension_for_pytorch._C, "_postInitExtension"):
     intel_extension_for_pytorch._C._postInitExtension()
 
 # class FloatTensor:
@@ -531,5 +556,5 @@ if intel_extension_for_pytorch._C._has_xpu():
             override_tensor_totype()
 
             exec_path = sys.argv[0].split("/")
-            if (len(exec_path) > 0 and "pytest" in exec_path):
+            if len(exec_path) > 0 and "pytest" in exec_path:
                 override_assert_equal()

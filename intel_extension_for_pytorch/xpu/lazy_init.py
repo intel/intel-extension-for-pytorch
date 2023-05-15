@@ -50,7 +50,7 @@ class DeferredXPUCallError(Exception):
 
 def _lazy_init():
     global _initialized, _queued_calls
-    if is_initialized() or hasattr(_tls, 'is_initializing'):
+    if is_initialized() or hasattr(_tls, "is_initializing"):
         return
     with _initialization_lock:
         # This test was was protected via GIL. Double-check whether XPU has
@@ -65,8 +65,9 @@ def _lazy_init():
         if _is_in_bad_fork():
             raise RuntimeError(
                 "Cannot re-initialize XPU in forked subprocess. To use XPU with "
-                "multiprocessing, you must use the 'spawn' start method")
-        if not hasattr(_C, '_getDeviceCount'):
+                "multiprocessing, you must use the 'spawn' start method"
+            )
+        if not hasattr(_C, "_getDeviceCount"):
             raise AssertionError("IPEX not compiled with XPU enabled")
         # This function detects bad fork processing and throws if there's a device
         # initialization error, no XPUs are found or any other error occurs
@@ -85,11 +86,13 @@ def _lazy_init():
                 try:
                     queued_call()
                 except Exception as e:
-                    msg = (f"XPU call failed lazily at initialization with error: {str(e)}\n\n"
-                           f"XPU call was originally invoked at:\n\n{orig_traceback}")
+                    msg = (
+                        f"XPU call failed lazily at initialization with error: {str(e)}\n\n"
+                        f"XPU call was originally invoked at:\n\n{orig_traceback}"
+                    )
                     raise DeferredXPUCallError(msg) from e
         finally:
-            delattr(_tls, 'is_initializing')
+            delattr(_tls, "is_initializing")
         _initialized = True
 
 

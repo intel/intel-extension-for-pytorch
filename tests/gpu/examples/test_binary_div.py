@@ -5,11 +5,21 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(),
-                        reason="doesn't enable channels last 1d or channels last does not support onednn block format")
+    @pytest.mark.skipif(
+        not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(),
+        reason="doesn't enable channels last 1d or channels last does not support onednn block format",
+    )
     def test_binary_div_channels_last_1d(self, dtype=torch.float):
-        shapes = [(1, 2, 4), (2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
-                  (4, 1, 1), (1, 4, 4), (1, 4, 1)]
+        shapes = [
+            (1, 2, 4),
+            (2, 2, 3),
+            (4, 4, 4),
+            (4, 4, 1),
+            (4, 1, 4),
+            (4, 1, 1),
+            (1, 4, 4),
+            (1, 4, 1),
+        ]
         for shape in shapes:
             N, C, W = shape[0], shape[1], shape[2]
             a_cpu = torch.randn(N, C, W)
@@ -136,10 +146,23 @@ class TestTorchMethod(TestCase):
                 self.assertEqual(a_xpu.is_contiguous(), True)
                 self.assertEqual(torch.xpu.is_contiguous_channels_last_1d(a_xpu), False)
 
-    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(
+        torch.xpu.using_onednn_layout(),
+        reason="channels last does not support onednn block format",
+    )
     def test_binary_div_channels_last(self, dtype=torch.float):
-        shapes = [(1, 2, 3, 4), (2, 2, 3, 3), (4, 4, 4, 4), (4, 4, 1, 1), (4, 1, 4, 4),
-                  (4, 1, 4, 1), (4, 1, 1, 4), (1, 4, 1, 4), (1, 4, 4, 1), (4, 1, 1, 1)]
+        shapes = [
+            (1, 2, 3, 4),
+            (2, 2, 3, 3),
+            (4, 4, 4, 4),
+            (4, 4, 1, 1),
+            (4, 1, 4, 4),
+            (4, 1, 4, 1),
+            (4, 1, 1, 4),
+            (1, 4, 1, 4),
+            (1, 4, 4, 1),
+            (4, 1, 1, 1),
+        ]
         for shape in shapes:
             N, C, H, W = shape[0], shape[1], shape[2], shape[3]
             a_cpu = torch.randn(N, C, H, W)
@@ -152,10 +175,14 @@ class TestTorchMethod(TestCase):
             self.assertEqual(a_cpu, a_xpu.cpu())
             if 1 == C or (1 == H and 1 == W):
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), True
+                )
             else:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), False)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), False
+                )
 
             a_cpu = torch.randn(N, C, H, W)
             b_cpu = torch.randn(N, C, H, W)
@@ -167,10 +194,14 @@ class TestTorchMethod(TestCase):
             self.assertEqual(a_cpu, a_xpu.cpu())
             if 1 == C or (1 == H and 1 == W):
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), True
+                )
             else:
                 self.assertEqual(a_xpu.is_contiguous(), False)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), True
+                )
 
             a_cpu = torch.randn(N, C, H, W)
             b_cpu = torch.randn(N, C, H, W)
@@ -182,10 +213,14 @@ class TestTorchMethod(TestCase):
             self.assertEqual(a_cpu, a_xpu.cpu())
             if 1 == C or (1 == H and 1 == W):
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), True
+                )
             else:
                 self.assertEqual(a_xpu.is_contiguous(), False)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), True
+                )
 
             a_cpu = torch.randn(N, C, H, W)
             b_cpu = torch.randn(N, C, H, W)
@@ -197,10 +232,14 @@ class TestTorchMethod(TestCase):
             self.assertEqual(a_cpu, a_xpu.cpu())
             if 1 == C or (1 == H and 1 == W):
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), True
+                )
             else:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), False)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), False
+                )
 
             a_cpu = torch.randn(N, C, H, W)
             b_cpu = torch.randn(N, C, H, W)
@@ -211,10 +250,14 @@ class TestTorchMethod(TestCase):
             self.assertEqual(y_cpu, y_xpu.cpu())
             if 1 == C or (1 == H and 1 == W):
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), True
+                )
             else:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), False)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), False
+                )
 
             a_cpu = torch.randn(N, C, H, W)
             b_cpu = torch.randn(N, C, H, W)
@@ -225,10 +268,14 @@ class TestTorchMethod(TestCase):
             self.assertEqual(y_cpu, y_xpu.cpu())
             if 1 == C or (1 == H and 1 == W):
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), True
+                )
             else:
                 self.assertEqual(a_xpu.is_contiguous(), False)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), True
+                )
 
             a_cpu = torch.randn(N, C, H, W)
             b_cpu = torch.randn(N, C, H, W)
@@ -239,10 +286,14 @@ class TestTorchMethod(TestCase):
             self.assertEqual(y_cpu, y_xpu.cpu())
             if 1 == C or (1 == H and 1 == W):
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), True
+                )
             else:
                 self.assertEqual(a_xpu.is_contiguous(), False)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), True
+                )
 
             a_cpu = torch.randn(N, C, H, W)
             b_cpu = torch.randn(N, C, H, W)
@@ -253,12 +304,18 @@ class TestTorchMethod(TestCase):
             self.assertEqual(y_cpu, y_xpu.cpu())
             if 1 == C or (1 == H and 1 == W):
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), True)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), True
+                )
             else:
                 self.assertEqual(a_xpu.is_contiguous(), True)
-                self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last), False)
+                self.assertEqual(
+                    a_xpu.is_contiguous(memory_format=torch.channels_last), False
+                )
 
-    @pytest.mark.skipif(not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device")
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_div_rounding_mode(self, dtype=torch.float):
         a_cpu = torch.randn([100, 100])
         a_xpu = a_cpu.to("xpu")

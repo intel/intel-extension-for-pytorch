@@ -1,7 +1,4 @@
 import torch
-import functools # noqa F401
-import warnings # noqa F401
-import numpy as np # noqa F401
 import intel_extension_for_pytorch as ipex
 from .cpupool import CPUPool
 

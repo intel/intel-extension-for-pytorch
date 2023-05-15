@@ -1,10 +1,23 @@
 import torch
 from torch.testing import make_tensor
 from torch.testing._internal.common_utils import TestCase, run_tests
-from torch.testing._internal.common_device_type import instantiate_device_type_tests, onlyCUDA, dtypes, skipMeta, onlyNativeDeviceTypes
+from torch.testing._internal.common_device_type import (
+    instantiate_device_type_tests,
+    onlyCUDA,
+    dtypes,
+    skipMeta,
+    onlyNativeDeviceTypes,
+)
 from torch.testing._internal.common_dtype import all_types_and_complex_and
 from torch.utils.dlpack import from_dlpack, to_dlpack
-from common.pytorch_test_base import TestCase, dtypesIfXPU, TEST_XPU, TEST_MULTIGPU, largeTensorTest
+from common.pytorch_test_base import (
+    TestCase,
+    dtypesIfXPU,
+    TEST_XPU,
+    TEST_MULTIGPU,
+    largeTensorTest,
+)
+
 
 class TestTorchDlPack(TestCase):
     exact_dtype = True
@@ -99,9 +112,7 @@ class TestTorchDlPack(TestCase):
     @skipMeta
     @onlyCUDA
     def test_dlpack_default_stream(self, device):
-
         class DLPackTensor:
-
             def __init__(self, tensor):
                 self.tensor = tensor
 
@@ -115,6 +126,7 @@ class TestTorchDlPack(TestCase):
                     assert stream == 0
                 capsule = self.tensor.__dlpack__(stream)
                 return capsule
+
         with torch.xpu.stream(torch.xpu.default_stream()):
             x = DLPackTensor(make_tensor((5,), dtype=torch.float32, device=device))
             from_dlpack(x)
@@ -136,21 +148,21 @@ class TestTorchDlPack(TestCase):
     @skipMeta
     def test_dlpack_export_requires_grad(self):
         x = torch.zeros(10, dtype=torch.float32, requires_grad=True)
-        with self.assertRaisesRegex(RuntimeError, 'require gradient'):
+        with self.assertRaisesRegex(RuntimeError, "require gradient"):
             x.__dlpack__()
 
     @skipMeta
     def test_dlpack_export_is_conj(self):
         x = torch.tensor([-1 + 1j, -2 + 2j, 3 - 3j])
         y = torch.conj(x)
-        with self.assertRaisesRegex(RuntimeError, 'conjugate bit'):
+        with self.assertRaisesRegex(RuntimeError, "conjugate bit"):
             y.__dlpack__()
 
     @skipMeta
     def test_dlpack_export_non_strided(self):
         x = torch.sparse_coo_tensor([[0]], [1], size=(1,))
         y = torch.conj(x)
-        with self.assertRaisesRegex(RuntimeError, 'strided'):
+        with self.assertRaisesRegex(RuntimeError, "strided"):
             y.__dlpack__()
 
     @skipMeta
@@ -162,6 +174,8 @@ class TestTorchDlPack(TestCase):
         z = from_dlpack(y)
         self.assertEqual(z.shape, (1,))
         self.assertEqual(z.stride(), (1,))
+
+
 instantiate_device_type_tests(TestTorchDlPack, globals())
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_tests()

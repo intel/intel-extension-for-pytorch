@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 
 cpu_device = torch.device("cpu")
@@ -16,8 +16,7 @@ class TestNNMethod(TestCase):
         x_dpcpp = x_cpu.to("xpu")
         grad_dpcpp = grad_cpu.to("xpu")
 
-        max_pool = nn.MaxPool3d(kernel_size=3, stride=1,
-                                padding=1, return_indices=True)
+        max_pool = nn.MaxPool3d(kernel_size=3, stride=1, padding=1, return_indices=True)
 
         x_cpu.requires_grad_(True)
         y_cpu = max_pool(x_cpu)
@@ -38,8 +37,7 @@ class TestNNMethod(TestCase):
         x_cpu = torch.randn([1, 4, 4, 3, 3], device=cpu_device, dtype=dtype)
         x_dpcpp = x_cpu.to("xpu").to(memory_format=torch.channels_last_3d)
 
-        max_pool = nn.MaxPool3d(kernel_size=3, stride=1,
-                                padding=1, return_indices=True)
+        max_pool = nn.MaxPool3d(kernel_size=3, stride=1, padding=1, return_indices=True)
 
         y_cpu = max_pool(x_cpu)
         print("y_cpu", y_cpu[0])
@@ -55,8 +53,7 @@ class TestNNMethod(TestCase):
         x_dpcpp = x_cpu.to("xpu").to(memory_format=torch.channels_last_3d)
         grad_dpcpp = grad_cpu.to("xpu")
 
-        max_pool = nn.MaxPool3d(kernel_size=3, stride=1,
-                                padding=1, return_indices=True)
+        max_pool = nn.MaxPool3d(kernel_size=3, stride=1, padding=1, return_indices=True)
 
         x_cpu.requires_grad_(True)
         y_cpu = max_pool(x_cpu)
@@ -77,8 +74,7 @@ class TestNNMethod(TestCase):
         x = torch.randn([20, 30, 40, 50])
         grad = torch.randn([20, 30, 40, 50])
         mem_format = torch.channels_last
-        m = nn.MaxPool3d(kernel_size=3, stride=1,
-                         padding=1, return_indices=True)
+        m = nn.MaxPool3d(kernel_size=3, stride=1, padding=1, return_indices=True)
 
         # 4D contiguous input
         # CPU
@@ -138,8 +134,7 @@ class TestNNMethod(TestCase):
         x = torch.randn([10, 20, 30, 40, 50])
         grad = torch.randn([10, 20, 30, 40, 50])
         mem_format = torch.channels_last_3d
-        m = nn.MaxPool3d(kernel_size=3, stride=1,
-                         padding=1, return_indices=True)
+        m = nn.MaxPool3d(kernel_size=3, stride=1, padding=1, return_indices=True)
 
         # 5D contiguous input
         # CPU
