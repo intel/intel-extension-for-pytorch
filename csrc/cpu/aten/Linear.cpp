@@ -1,3 +1,4 @@
+#include <ATen/native/quantized/PackedParams.h>
 #include <torch/all.h>
 
 #include "Eltwise.h"
@@ -328,6 +329,25 @@ at::Tensor linear_eltwise_forward_meta(
   return output;
 }
 
+at::Tensor woq_linear_kernel(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const at::Tensor& bias) {
+  TORCH_CHECK(
+      weight.is_quantized(),
+      "Weight only quantized linear: weight should be quantized!");
+  auto w = weight.dequantize();
+  return at::linear(self, w, bias);
+}
+
+at::Tensor woq_linear_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context) {
+  return reinterpret_cast<IpexWoqLinearOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run(input);
+}
+
 } // namespace cpu
 } // namespace torch_ipex
 
@@ -407,6 +427,11 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "ipex_linear",
       c10::DispatchKey::Meta,
       torch_ipex::cpu::linear_forward_meta);
+  m.def("ipex_woq_linear(Tensor input, Tensor W_prepack) -> Tensor");
+  m.impl(
+      "ipex_woq_linear",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::woq_linear_forward);
   // fuse eltwise
   m.def(
       "ipex_linear_eltwise(Tensor input, Tensor weight, Tensor? bias, int eltwise, "

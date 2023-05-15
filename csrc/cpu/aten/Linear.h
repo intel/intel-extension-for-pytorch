@@ -75,5 +75,10 @@ at::Tensor ipex_linear_eltwise(
     const at::Tensor& op_context,
     const c10::optional<int64_t> out_features);
 
+at::Tensor woq_linear_kernel(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const at::Tensor& bias);
+
 } // namespace cpu
 } // namespace torch_ipex

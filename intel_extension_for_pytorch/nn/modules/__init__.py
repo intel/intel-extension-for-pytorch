@@ -3,3 +3,4 @@ from . import _roi_align
 from .merged_embeddingbag import MergedEmbeddingBagWithSGD
 from .merged_embeddingbag import MergedEmbeddingBag
 from .linear_fuse_eltwise import IPEXLinearEltwise
+from .weight_only_quantization import IpexWoqLinear

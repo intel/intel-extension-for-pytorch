@@ -4,6 +4,7 @@
 #include "ConvTransposePacked.h"
 #include "LinearMKLPacked.h"
 #include "LinearPacked.h"
+#include "LinearWoqPacked.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -331,6 +332,48 @@ detail::ContextConvTranspose& IpexConvTransposeOpContext::get_context() {
 
 void IpexConvTransposeOpContext::load_from_ctx(
     c10::intrusive_ptr<ConvTransposeOpContext> other) {
+  load_from_ctx_template(this, other);
+}
+
+// For weight-only quantization
+c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
+    at::Tensor&& weight,
+    c10::optional<at::Tensor>&& bias,
+    c10::optional<int64_t> batch_size) {
+  auto op_context =
+      torch_ipex::cpu::detail::woq_linear::create(weight, bias, batch_size);
+  return c10::make_intrusive<IpexWoqLinearOpContext>(
+      batch_size, std::move(op_context));
+}
+
+at::Tensor IpexWoqLinearOpContext::get_data_handle() {
+  at::Tensor ptr = at::empty(1, at::kLong);
+  ptr[0] = reinterpret_cast<int64_t>(this);
+  return ptr;
+}
+
+at::Tensor IpexWoqLinearOpContext::run(const at::Tensor& input) {
+  return torch_ipex::cpu::detail::woq_linear::run(op_context_, input);
+}
+
+at::Tensor IpexWoqLinearOpContext::to_public(const at::Tensor& tensor) {
+  return op_context_.at_weight_.clone();
+}
+
+at::Tensor IpexWoqLinearOpContext::get_at_packed_weight() {
+  return op_context_.at_weight_;
+}
+
+detail::ContextLinearWoq& IpexWoqLinearOpContext::get_context() {
+  return op_context_;
+}
+
+at::Tensor IpexWoqLinearOpContext::pack(const at::Tensor& tensor) {
+  return torch_ipex::cpu::detail::woq_linear::pack(op_context_, tensor);
+}
+
+void IpexWoqLinearOpContext::load_from_ctx(
+    c10::intrusive_ptr<WoqLinearOpContext> other) {
   load_from_ctx_template(this, other);
 }
 
