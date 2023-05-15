@@ -68,6 +68,21 @@ void store_args(
 }
 } // namespace
 
+namespace foreach_internal {
+template <typename T>
+struct minimum {
+  T operator()(const T& a, const T& b) {
+    return (std::isnan(a) || a < b) ? a : b;
+  }
+};
+template <typename T>
+struct maximum {
+  T operator()(const T& a, const T& b) {
+    return (std::isnan(a) || a > b) ? a : b;
+  }
+};
+} // namespace foreach_internal
+
 template <typename T, int depth, int r_args_depth, int res_arg_index>
 struct UnaryOpFunctor {
   using opmath_t = at::opmath_type<T>;

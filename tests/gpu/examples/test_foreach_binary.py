@@ -47,6 +47,12 @@ class TestForeachBinary(TestCase):
             torch._foreach_minimum_((x1_xpu,), (x2_xpu,)),
         )
 
+        self.assertEqual(torch._foreach_minimum((x1_cpu, ), 3), torch._foreach_minimum((x1_xpu, ), 3))
+        self.assertEqual(torch._foreach_minimum_((x1_cpu, ), 3), torch._foreach_minimum_((x1_xpu, ), 3))
+
+        self.assertEqual(torch._foreach_minimum((x1_cpu, ), (3, )), torch._foreach_minimum((x1_xpu, ), (3, )))
+        self.assertEqual(torch._foreach_minimum_((x1_cpu, ), (3, )), torch._foreach_minimum_((x1_xpu, ), (3, )))
+
 
 if __name__ == "__main__":
     with torch.autograd.profiler_legacy.profile(
