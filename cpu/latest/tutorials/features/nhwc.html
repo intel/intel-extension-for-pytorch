@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Channels Last &mdash; intel_extension_for_pytorch 2.0.0+cpu documentation</title>
+  <title>Channels Last &mdash; intel_extension_for_pytorch 2.0.100+cpu documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
@@ -32,7 +32,7 @@
             <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
           </a>
               <div class="version">
-                <a href="../../../../">2.0.0+cpu ▼</a>
+                <a href="../../../../">2.0.100+cpu ▼</a>
                 <p>Click link above to switch version</p>
               </div>
 <div role="search">
@@ -140,7 +140,7 @@
 <p>Look at the following image of illustrating NCHW and NHWC when N=1. Actually when N=1, NHWC has the same format with BMP file image.
 <img alt="fig-1-memory-layout" src="../../_images/figure1_memory_layout.png" /></p>
 <p>PyTorch refers to NCHW as <code class="docutils literal notranslate"><span class="pre">torch.contiguous_format</span></code> (the default memory format) and to NHWC as <code class="docutils literal notranslate"><span class="pre">torch.channels_last</span></code>, which is a new feature as of the 1.5 release.</p>
-<p>TensorFlow uses NHWC as the default memory format because NHWC has a performance advantage over NCHW. On CPU platforms, we propose to optimize Channels Last memory path for ihe following reasons:</p>
+<p>TensorFlow uses NHWC as the default memory format because NHWC has a performance advantage over NCHW. On CPU platforms, we propose to optimize Channels Last memory path for the following reasons:</p>
 <ul class="simple">
 <li><p><strong>Performance</strong> - NHWC performance is not as good as blocked memory format (nChw16c), but it is close, and much better performance than NCHW.</p></li>
 <li><p><strong>User Experience</strong> - Operator coverage of NHWC would be higher than blocked memory format (<code class="docutils literal notranslate"><span class="pre">to_mkldnn()</span></code> method), so user experience is better. To be specific, it is difficult to enable operators that manipulates <code class="docutils literal notranslate"><span class="pre">dim</span></code> on blocked format such as <code class="docutils literal notranslate"><span class="pre">sum(dim=?)</span></code>. You would need to convert tensor from blocked memory format back to NHWC using <code class="docutils literal notranslate"><span class="pre">to_dense()</span></code>, before feeding it into <code class="docutils literal notranslate"><span class="pre">sum()</span></code>. This is naturally supported on Channels Last memory format already.</p></li>
@@ -200,7 +200,7 @@
 <section id="pytorch-strided-layout">
 <h2>PyTorch Strided Layout<a class="headerlink" href="#pytorch-strided-layout" title="Permalink to this heading"></a></h2>
 <p>Before moving on, I feel it is necessary to explain how PyTorch organizes tensors in memory - the <strong>layout</strong>. Here we only focus on <strong>dense</strong> tensors, skip ‘coo’ layout of <strong>sparse</strong> tensor.</p>
-<p>The question itself can be reinterpreted as for a tensor of size &lt;N, C, H, W&gt;, how does PyTorch accesses the element with index &lt;n, c, h, w&gt; from memory, the answer is <strong>stride</strong>:</p>
+<p>The question itself can be reinterpreted as for a tensor of size &lt;N, C, H, W&gt;, how does PyTorch access the element with index &lt;n, c, h, w&gt; from memory, the answer is <strong>stride</strong>:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">tensor</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">N</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">W</span><span class="o">&gt;</span>
 <span class="n">index</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">n</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="o">&gt;</span>
 <span class="n">strides</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">CHW</span><span class="p">,</span> <span class="n">HW</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="mi">1</span><span class="o">&gt;</span>
@@ -275,7 +275,7 @@
 </section>
 <section id="c-register-onednn-kernel-on-channels-last">
 <h3>c. Register oneDNN Kernel on Channels Last<a class="headerlink" href="#c-register-onednn-kernel-on-channels-last" title="Permalink to this heading"></a></h3>
-<p>Registering a oneDNN kernel under Channels Last memory format on CPU is no different from <a class="reference external" href="https://github.com/pytorch/pytorch/pull/23861">cuDNN</a>: Only very few upper level changes are needed, such as accommodate ‘contiguous()’ to ‘contiguous(suggested_memory_format)’. The automatic reorder of oneDNN weight shall been hidden in ideep.</p>
+<p>Registering a oneDNN kernel under Channels Last memory format on CPU is no different from <a class="reference external" href="https://github.com/pytorch/pytorch/pull/23861">cuDNN</a>: Only very few upper level changes are needed, such as accommodate ‘contiguous()’ to ‘contiguous(suggested_memory_format)’. The automatic reorder of oneDNN weight shall have been hidden in ideep.</p>
 </section>
 </section>
 <section id="onednn-nhwc-apis">

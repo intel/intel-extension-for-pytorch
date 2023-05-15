@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TorchServe with Intel® Extension for PyTorch* &mdash; intel_extension_for_pytorch 2.0.0+cpu documentation</title>
+  <title>TorchServe with Intel® Extension for PyTorch* &mdash; intel_extension_for_pytorch 2.0.100+cpu documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
@@ -32,7 +32,7 @@
             <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
           </a>
               <div class="version">
-                <a href="../../../../">2.0.0+cpu ▼</a>
+                <a href="../../../../">2.0.100+cpu ▼</a>
                 <p>Click link above to switch version</p>
               </div>
 <div role="search">
@@ -168,7 +168,7 @@ Here we show how to use TorchServe with Intel® Extension for PyTorch*.</p>
 <p>Below is an example of passing multiple args to <code class="docutils literal notranslate"><span class="pre">cpu_launcher_args</span></code>.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipex_enable</span><span class="o">=</span><span class="n">true</span>
 <span class="n">cpu_launcher_enable</span><span class="o">=</span><span class="n">true</span>
-<span class="n">cpu_launcher_args</span><span class="o">=--</span><span class="n">use_logical_core</span> <span class="o">--</span><span class="n">disable_numactl</span> 
+<span class="n">cpu_launcher_args</span><span class="o">=--</span><span class="n">use_logical_core</span> <span class="o">--</span><span class="n">disable_numactl</span>
 </pre></div>
 </div>
 <p>Below are some useful <code class="docutils literal notranslate"><span class="pre">cpu_launcher_args</span></code> to note. Italic values are default if applicable.</p>
@@ -192,7 +192,7 @@ Here we show how to use TorchServe with Intel® Extension for PyTorch*.</p>
 <p>Refer to <a class="reference internal" href="launch_script.html"><span class="doc">Launch Script Usage Guide</span></a> for a full list of tunable configuration of launcher. And refer to <a class="reference internal" href="tuning_guide.html"><span class="doc">Performance Tuning Guide</span></a> for more details.</p>
 <section id="launcher-core-pinning-to-boost-performance-of-torchserve-multi-worker-inference">
 <h3>Launcher Core Pinning to Boost Performance of TorchServe Multi Worker Inference<a class="headerlink" href="#launcher-core-pinning-to-boost-performance-of-torchserve-multi-worker-inference" title="Permalink to this heading"></a></h3>
-<p>When running <a class="reference external" href="https://pytorch.org/serve/management_api.html#scale-workers">multi-worker inference</a> with Torchserve, launcher pin cores to workers to boost performance. Internally, launcher equally divides the number of cores by the number of workers such that each worker is pinned to assigned cores. Doing so avoids core overlap among workers which can signficantly boost performance for TorchServe multi-worker inference. For example, assume running 4 workers on a machine with Intel(R) Xeon(R) Platinum 8180 CPU, 2 sockets, 28 cores per socket, 2 threads per core. Launcher will bind worker 0 to cores 0-13, worker 1 to cores 14-27, worker 2 to cores 28-41, and worker 3 to cores 42-55.</p>
+<p>When running <a class="reference external" href="https://pytorch.org/serve/management_api.html#scale-workers">multi-worker inference</a> with Torchserve (Required torchserve&gt;=0.6.1), launcher pin cores to workers to boost performance. Internally, launcher equally divides the number of cores by the number of workers such that each worker is pinned to assigned cores. Doing so avoids core overlap among workers which can signficantly boost performance for TorchServe multi-worker inference. For example, assume running 4 workers on a machine with Intel(R) Xeon(R) Platinum 8180 CPU, 2 sockets, 28 cores per socket, 2 threads per core. Launcher will bind worker 0 to cores 0-13, worker 1 to cores 14-27, worker 2 to cores 28-41, and worker 3 to cores 42-55.</p>
 <p>CPU usage is shown below. 4 main worker threads were launched, each launching 14 threads affinitized to the assigned physical cores.
 <img alt="26" src="https://user-images.githubusercontent.com/93151422/170373651-fd8a0363-febf-4528-bbae-e1ddef119358.gif" /></p>
 <section id="scaling-workers">
@@ -274,11 +274,11 @@ Here we show how to use TorchServe with Intel® Extension for PyTorch*.</p>
 
 <span class="c1"># prepare and calibrate</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">prepare</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">qconfig</span><span class="p">,</span> <span class="n">example_inputs</span><span class="o">=</span><span class="n">dummy_tensor</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
- 
+
 <span class="n">n_iter</span> <span class="o">=</span> <span class="mi">100</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_iter</span><span class="p">):</span>
     <span class="n">model</span><span class="p">(</span><span class="n">dummy_tensor</span><span class="p">)</span>
- 
+
 <span class="c1"># convert and deploy</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 

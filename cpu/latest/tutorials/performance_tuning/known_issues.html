@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Known Issues &mdash; intel_extension_for_pytorch 2.0.0+cpu documentation</title>
+  <title>Known Issues &mdash; intel_extension_for_pytorch 2.0.100+cpu documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
@@ -32,7 +32,7 @@
             <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
           </a>
               <div class="version">
-                <a href="../../../../">2.0.0+cpu ▼</a>
+                <a href="../../../../">2.0.100+cpu ▼</a>
                 <p>Click link above to switch version</p>
               </div>
 <div role="search">
@@ -102,9 +102,16 @@
 <h1>Known Issues<a class="headerlink" href="#known-issues" title="Permalink to this heading"></a></h1>
 <section id="usage">
 <h2>Usage<a class="headerlink" href="#usage" title="Permalink to this heading"></a></h2>
-<ul>
+<ul class="simple">
 <li><p>There might be Python packages having PyTorch as their hard dependency. If you installed <code class="docutils literal notranslate"><span class="pre">+cpu</span></code> version of PyTorch, installation of these packages might replace the <code class="docutils literal notranslate"><span class="pre">+cpu</span></code> version with the default version released on Pypi.org. If anything goes wrong, please reinstall the <code class="docutils literal notranslate"><span class="pre">+cpu</span></code> version back.</p></li>
 <li><p>If you found the workload runs with Intel® Extension for PyTorch* occupies a remarkably large amount of memory, you can try to reduce the occupied memory size by setting the <code class="docutils literal notranslate"><span class="pre">--weights_prepack</span></code> parameter of the <code class="docutils literal notranslate"><span class="pre">ipex.optimize()</span></code> function to <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+<li><p>If running DDP with launch script, explicit configuration of the <code class="docutils literal notranslate"><span class="pre">nprocs_per_node</span></code> argument won’t take effect. Please replace line 155 of the <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch/cpu/launch/launcher_distributed.py</span></code> file to the following code snippet.</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">nprocs_per_node</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">nprocs_per_node</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">([</span><span class="n">c</span><span class="o">.</span><span class="n">node</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cpuinfo</span><span class="o">.</span><span class="n">pool_all</span><span class="p">]))</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes_list</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes_list</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul>
 <li><p>If inference is done with a custom function, <code class="docutils literal notranslate"><span class="pre">conv+bn</span></code> folding feature of the <code class="docutils literal notranslate"><span class="pre">ipex.optimize()</span></code> function doesn’t work.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">intel_pytorch_extension</span> <span class="k">as</span> <span class="nn">ipex</span>

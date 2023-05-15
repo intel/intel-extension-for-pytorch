@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Examples &mdash; intel_extension_for_pytorch 2.0.0+cpu documentation</title>
+  <title>Examples &mdash; intel_extension_for_pytorch 2.0.100+cpu documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -32,7 +32,7 @@
             <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
           </a>
               <div class="version">
-                <a href="../../../">2.0.0+cpu ▼</a>
+                <a href="../../../">2.0.100+cpu ▼</a>
                 <p>Click link above to switch version</p>
               </div>
 <div role="search">
@@ -669,9 +669,10 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
   <span class="n">batch_size</span><span class="o">=</span><span class="mi">128</span>
 <span class="p">)</span>
 
-<span class="k">for</span> <span class="n">batch_idx</span><span class="p">,</span> <span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">calibration_data_loader</span><span class="p">):</span>
-  <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;calibrated on batch </span><span class="si">{</span><span class="n">batch_idx</span><span class="si">}</span><span class="s1"> out of </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">calibration_data_loader</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
-  <span class="n">prepared_model</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+  <span class="k">for</span> <span class="n">batch_idx</span><span class="p">,</span> <span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">calibration_data_loader</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;calibrated on batch </span><span class="si">{</span><span class="n">batch_idx</span><span class="si">}</span><span class="s1"> out of </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">calibration_data_loader</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">prepared_model</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
 <span class="c1">##############################</span>
 
 <span class="n">converted_model</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">prepared_model</span><span class="p">)</span>
@@ -851,7 +852,7 @@ $ ldd example-app
 </section>
 <section id="model-zoo">
 <h2>Model Zoo<a class="headerlink" href="#model-zoo" title="Permalink to this heading"></a></h2>
-<p>Use cases that had already been optimized by Intel engineers are available at <a class="reference external" href="https://github.com/IntelAI/models/tree/pytorch-r2.0-models">Model Zoo for Intel® Architecture</a>. A bunch of PyTorch use cases for benchmarking are also available on the <a class="reference external" href="https://github.com/IntelAI/models/tree/pytorch-r2.0-models/benchmarks#pytorch-use-cases">GitHub page</a>. You can get performance benefits out-of-box by simply running scipts in the Model Zoo.</p>
+<p>Use cases that had already been optimized by Intel engineers are available at <a class="reference external" href="https://github.com/IntelAI/models/tree/pytorch-r2.0.100-models">Model Zoo for Intel® Architecture</a>. A bunch of PyTorch use cases for benchmarking are also available on the <a class="reference external" href="https://github.com/IntelAI/models/tree/pytorch-r2.0.100-models/benchmarks#pytorch-use-cases">GitHub page</a>. You can get performance benefits out-of-box by simply running scipts in the Model Zoo.</p>
 </section>
 </section>
 

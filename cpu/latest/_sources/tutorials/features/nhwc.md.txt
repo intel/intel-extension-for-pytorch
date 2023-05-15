@@ -12,7 +12,7 @@ Look at the following image of illustrating NCHW and NHWC when N=1. Actually whe
 
 PyTorch refers to NCHW as `torch.contiguous_format` (the default memory format) and to NHWC as `torch.channels_last`, which is a new feature as of the 1.5 release.
 
-TensorFlow uses NHWC as the default memory format because NHWC has a performance advantage over NCHW. On CPU platforms, we propose to optimize Channels Last memory path for ihe following reasons:
+TensorFlow uses NHWC as the default memory format because NHWC has a performance advantage over NCHW. On CPU platforms, we propose to optimize Channels Last memory path for the following reasons:
 * **Performance** - NHWC performance is not as good as blocked memory format (nChw16c), but it is close, and much better performance than NCHW.
 * **User Experience** - Operator coverage of NHWC would be higher than blocked memory format (`to_mkldnn()` method), so user experience is better. To be specific, it is difficult to enable operators that manipulates `dim` on blocked format such as `sum(dim=?)`. You would need to convert tensor from blocked memory format back to NHWC using `to_dense()`, before feeding it into `sum()`. This is naturally supported on Channels Last memory format already.
 * **Upstream** - Will be easier since CPU doesn't hold secret ingredient and both inference and training will be covered.
@@ -74,7 +74,7 @@ Better to explain the concepts here with a diagram, the **dotted lines** indicat
 
 Before moving on, I feel it is necessary to explain how PyTorch organizes tensors in memory - the **layout**. Here we only focus on **dense** tensors, skip 'coo' layout of **sparse** tensor.
 
-The question itself can be reinterpreted as for a tensor of size <N, C, H, W>, how does PyTorch accesses the element with index <n, c, h, w> from memory, the answer is **stride**:
+The question itself can be reinterpreted as for a tensor of size <N, C, H, W>, how does PyTorch access the element with index <n, c, h, w> from memory, the answer is **stride**:
 ```
 tensor: <N, C, H, W>
 index: <n, c, h, w>
@@ -146,7 +146,7 @@ The general guideline has been listed under reference [Writing-memory-format-awa
 
 ### c. Register oneDNN Kernel on Channels Last
 
-Registering a oneDNN kernel under Channels Last memory format on CPU is no different from [cuDNN](https://github.com/pytorch/pytorch/pull/23861): Only very few upper level changes are needed, such as accommodate 'contiguous()' to 'contiguous(suggested_memory_format)'. The automatic reorder of oneDNN weight shall been hidden in ideep.
+Registering a oneDNN kernel under Channels Last memory format on CPU is no different from [cuDNN](https://github.com/pytorch/pytorch/pull/23861): Only very few upper level changes are needed, such as accommodate 'contiguous()' to 'contiguous(suggested_memory_format)'. The automatic reorder of oneDNN weight shall have been hidden in ideep.
 
 ## oneDNN NHWC APIs
 

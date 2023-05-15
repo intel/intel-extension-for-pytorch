@@ -1,6 +1,23 @@
 Releases
 =============
 
+## 2.0.100
+
+### Highlights
+
+- Enhanced the functionality of Intel® Extension for PyTorch as a backend of `torch.compile`: [#1568](https://github.com/intel/intel-extension-for-pytorch/commit/881c6fe0e6f8ab84a564b02216ddb96a3589363e) [#1585](https://github.com/intel/intel-extension-for-pytorch/commit/f5ce6193496ae68a57d688a3b3bbff541755e4ce) [#1590](https://github.com/intel/intel-extension-for-pytorch/commit/d8723df73358ae495ae5f62b5cdc90ae08920d27)
+- Fixed the Stable Diffusion fine-tuning accuracy issue [#1587](https://github.com/intel/intel-extension-for-pytorch/commit/bc76ab133b7330852931db9cda8dca7c69a0b594) [#1594](https://github.com/intel/intel-extension-for-pytorch/commit/b2983b4d35fc0ea7f5bdaf37f6e269256f8c36c4)
+- Fixed the ISA check on old hypervisor based VM [#1513](https://github.com/intel/intel-extension-for-pytorch/commit/a34eab577c4efa1c336b1f91768075bb490c1f14)
+- Addressed the excessive memory usage in weight prepack [#1593](https://github.com/intel/intel-extension-for-pytorch/commit/ee7dc343790d1d63bab1caf71e57dd3f7affdce9)
+- Fixed the weight prepack of convolution when `padding_mode` is not `'zeros'` [#1580](https://github.com/intel/intel-extension-for-pytorch/commit/02449ccb3a6b475643116532a4cffbe1f974c1d9)
+- Optimized the INT8 LSTM performance [#1566](https://github.com/intel/intel-extension-for-pytorch/commit/fed42b17391fed477ae8adec83d920f8f8fb1a80)
+- Fixed TransNetV2 calibration failure [#1564](https://github.com/intel/intel-extension-for-pytorch/commit/046f7dfbaa212389ac58ae219597c16403e66bad)
+- Fixed BF16 RNN-T inference when `AVX512_CORE_VNNI` ISA is used [#1592](https://github.com/intel/intel-extension-for-pytorch/commit/023c104ab5953cf63b84efeb5176007d876015a2)
+- Fixed the ROIAlign operator [#1589](https://github.com/intel/intel-extension-for-pytorch/commit/6beb3d4661f09f55d031628ebe9fa6d63f04cab1)
+- Enabled execution on designated numa nodes with launch script [#1517](https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/commit/2ab3693d50d6edd4bfae766f75dc273396a79488)
+
+**Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v2.0.0+cpu...v2.0.100+cpu
+
 ## 2.0.0
 
 We are pleased to announce the release of Intel® Extension for PyTorch\* 2.0.0-cpu which accompanies PyTorch 2.0. This release mainly brings in our latest optimization on NLP (BERT), support of PyTorch 2.0's hero API –- torch.compile as one of its backend, together with a set of bug fixing and small optimization.

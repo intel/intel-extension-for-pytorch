@@ -7,6 +7,13 @@ Known Issues
 
 - If you found the workload runs with Intel® Extension for PyTorch\* occupies a remarkably large amount of memory, you can try to reduce the occupied memory size by setting the `--weights_prepack` parameter of the `ipex.optimize()` function to `False`.
 
+- If running DDP with launch script, explicit configuration of the `nprocs_per_node` argument won't take effect. Please replace line 155 of the `intel_extension_for_pytorch/cpu/launch/launcher_distributed.py` file to the following code snippet.
+
+```
+        if args.nprocs_per_node == 0:
+            args.nprocs_per_node = len(set([c.node for c in self.cpuinfo.pool_all])) if len(nodes_list) == 0 else len(nodes_list)
+```
+
 - If inference is done with a custom function, `conv+bn` folding feature of the `ipex.optimize()` function doesn't work.
 
   ```
@@ -54,13 +61,13 @@ Known Issues
 - When working with an NLP model inference with dynamic input data length appling with TorchScript (either `torch.jit.trace` or `torch.jit.script`), performance with Intel® Extension for PyTorch\* is possible to be less than that without Intel® Extension for PyTorch\*. In this case, adding the workarounds below would help solve this issue.
   - Python interface
     ```python
-	torch._C._jit_set_texpr_fuser_enabled(False)
-	```
+    torch._C._jit_set_texpr_fuser_enabled(False)
+    ```
   - C++ interface
     ```c++
     #include <torch/csrc/jit/passes/tensorexpr_fuser.h>
-	torch::jit::setTensorExprFuserEnabled(false);
-	```
+    torch::jit::setTensorExprFuserEnabled(false);
+    ```
 
 ## INT8
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Features &mdash; intel_extension_for_pytorch 2.0.0+cpu documentation</title>
+  <title>Features &mdash; intel_extension_for_pytorch 2.0.100+cpu documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -33,7 +33,7 @@
             <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
           </a>
               <div class="version">
-                <a href="../../../">2.0.0+cpu ▼</a>
+                <a href="../../../">2.0.100+cpu ▼</a>
                 <p>Click link above to switch version</p>
               </div>
 <div role="search">
@@ -257,7 +257,7 @@ and feature 2 is “Like play football” which is represented by [-0.1, 0.3, 0.
 <p>The optimized path is:</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">EmbLists</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Modulist</span><span class="p">(</span><span class="n">emb1</span><span class="p">,</span> <span class="n">emb2</span><span class="p">,</span> <span class="n">emb3</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">emb_m</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">merged_emb</span> <span class="o">=</span> <span class="n">MergedEmbeddingBagWithSGD</span><span class="o">.</span><span class="n">from_embeddingbag_list</span><span class="p">(</span><span class="n">EmbLists</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">outputs</span> <span class="o">=</span> <span class="n">MergedEmbeddingBagWithSGD</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outputs</span> <span class="o">=</span> <span class="n">MergedEmbeddingBagWithSGD</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Computation benefits from the optimized path:</p>
@@ -270,7 +270,7 @@ large enough.</p>
 </div></blockquote>
 <p>A <cite>linearize_indices_and_offsets</cite> step is introduced to merge indices/offsets together. Consider that <cite>EmbeddingBag</cite>
 objects are usually the first layer of a model, the <cite>linearize_indices_and_offsets</cite> step can be considered as “data
-prepocess” and can be done offline. See usage of the <cite>linearize_indices_and_offsets</cite> in <cite>MergedEmbeddingBagWithSGD</cite>.</p>
+preprocess” and can be done offline. See usage of the <cite>linearize_indices_and_offsets</cite> in <cite>MergedEmbeddingBagWithSGD</cite>.</p>
 <p>Now <cite>MergedEmbeddingBagWithSGD</cite> is the only option running with an optimizer. We plan to add more optimizer support
 in the future. Visit <cite>MergedEmbeddingBagWithSGD</cite> for introduction of <cite>MergedEmbeddingBagWith[Optimizer]</cite>.</p>
 </dd></dl>
@@ -315,11 +315,11 @@ it by 1 thread (otherwise we will have write conflict or overhead to solve the c
 write conflict can be simply addressed by merging multiple tables together.</p>
 <p>3). Weights update is fused with backward together. We can immediately update the weight right after we get
 gradients from the backward step and thus the memory access pattern becomes more friendly. Data access will
-happens on cache more than on memory.</p>
+happen on cache more than on memory.</p>
 </div></blockquote>
 </dd></dl>
 
-<p><strong>Auto kernel selection</strong> is a feature that enables users to tune for better performance with GEMM operations. It is provided as parameter –auto_kernel_selection, with boolean value, of the ipex.optimize() function. By default, the GEMM kernel is computed with oneMKL primitives. However, under certain circumstances oneDNN primitives run faster. Users are able to set –auto_kernel_selection to True to run GEMM kernels with oneDNN primitives.” -&gt; “We aims to provide good default performance by leveraging the best of math libraries and enabled weights_prepack, and it has been verified with broad set of models. If you would like to try other alternatives, you can use auto_kernel_selection toggle in ipex.optimize to switch, and you can diesable weights_preack in ipex.optimize if you are concerning the memory footprint more than performance gain. However in majority cases, keeping default is what we recommend.</p>
+<p><strong>Auto kernel selection</strong> is a feature that enables users to tune for better performance with GEMM operations. It is provided as parameter –auto_kernel_selection, with boolean value, of the ipex.optimize() function. By default, the GEMM kernel is computed with oneMKL primitives. However, under certain circumstances oneDNN primitives run faster. Users are able to set –auto_kernel_selection to True to run GEMM kernels with oneDNN primitives.” -&gt; “We aim to provide good default performance by leveraging the best of math libraries and enabled weights_prepack, and it has been verified with broad set of models. If you would like to try other alternatives, you can use auto_kernel_selection toggle in ipex.optimize to switch, and you can disable weights_preack in ipex.optimize if you are concerning the memory footprint more than performance gain. However in majority cases, keeping default is what we recommend.</p>
 </section>
 <section id="optimizer-optimization">
 <h2>Optimizer Optimization<a class="headerlink" href="#optimizer-optimization" title="Permalink to this heading"></a></h2>
