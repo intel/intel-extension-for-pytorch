@@ -219,30 +219,34 @@ void coalesce_values_kernel(
 }
 } // namespace impl
 
-// Tensor _sparse_coo_tensor_with_dims_and_tensors(
-//     int64_t sparse_dim,
-//     int64_t dense_dim,
-//     IntArrayRef size,
-//     const Tensor& indices,
-//     const Tensor& values,
-//     c10::optional<at::ScalarType> dtype,
-//     c10::optional<at::Layout> layout,
-//     c10::optional<at::Device> device,
-//     c10::optional<bool> pin_memory) {
-//   TensorOptions options =
-//       TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
-//           pin_memory);
-//   return at::native::new_with_dims_and_tensor_sparse(
-//       sparse_dim,
-//       dense_dim,
-//       size,
-//       indices,
-//       values,
-//       options.dtype().toScalarType(),
-//       options.layout(),
-//       options.device(),
-//       options.pinned_memory());
-// }
+Tensor _sparse_coo_tensor_with_dims_and_tensors(
+    int64_t sparse_dim,
+    int64_t dense_dim,
+    IntArrayRef size,
+    const Tensor& indices,
+    const Tensor& values,
+    c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Layout> layout,
+    c10::optional<at::Device> device,
+    c10::optional<bool> pin_memory) {
+  SparseTensor self = new_sparse(dtype, layout, device, pin_memory);
+  at::sparse::get_sparse_impl(self)->resize_(sparse_dim, dense_dim, size);
+  // NOTE: There is no guarantee that `indices` and `values` don't contain
+  // AutogradMeta. However, we want to maintain the invariant that `indices_`
+  // and `values_` of a sparse tensor don't contain AutogradMeta, and to achieve
+  // that we shallow-copy `indices` and `values` here.
+  auto indices_shallow_copy =
+      at::Tensor(indices.unsafeGetTensorImpl()->shallow_copy_and_detach(
+          /*version_counter=*/indices.unsafeGetTensorImpl()->version_counter(),
+          /*allow_tensor_metadata_change=*/true));
+  auto values_shallow_copy =
+      at::Tensor(values.unsafeGetTensorImpl()->shallow_copy_and_detach(
+          /*version_counter=*/values.unsafeGetTensorImpl()->version_counter(),
+          /*allow_tensor_metadata_change=*/true));
+  at::sparse::alias_into_sparse(
+      self, indices_shallow_copy, values_shallow_copy);
+  return self;
+}
 
 Tensor empty(
     IntArrayRef size,
