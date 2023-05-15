@@ -2,10 +2,12 @@
 #include <ATen/WrapDimUtils.h>
 #include <ATen/core/DimVector.h>
 #include <ATen/native/SpectralOpsUtils.h>
+#include <core/Allocator.h>
 #include <core/detail/ListUtils.h>
 #include <core/detail/OffsetCalculator.h>
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
+#include <tensor/Tensor.h>
 #include <utils/LRUCache.h>
 #include "Resize.h"
 #include "comm/ATDispatch.h"
@@ -329,6 +331,9 @@ class dft_desc_t {
       std::shared_ptr<dft_config_t> configs)
       : desc_(dimensions), configs_(configs) {
     configs_->commit_values(desc_);
+    desc_.set_value(
+        oneapi::mkl::dft::config_param::WORKSPACE,
+        oneapi::mkl::dft::config_value::WORKSPACE_EXTERNAL);
     desc_.commit(q);
   }
 
@@ -454,6 +459,18 @@ void _mkl_dft(
   create_key(key, queue_id, dev_id, prec, signal_type, *desc_config);
   auto desc = fetch_or_create_m<dft_desc_handle<prec, signal_type>>(
       key, dpcpp_queue, mkl_signal_sizes, desc_config);
+
+  // Obtain the size of workspace required after commit.
+  size_t workspaceSizeBytes = 0;
+  desc->raw().get_value(
+      oneapi::mkl::dft::config_param::WORKSPACE_BYTES, &workspaceSizeBytes);
+
+  // Allocate USM workspace and provide it to the descriptor.
+  Tensor workspaceBuf = at::AtenIpexTypeXPU::empty(
+      {workspaceSizeBytes / sizeof(double)},
+      input.options().dtype(at::kDouble),
+      c10::nullopt);
+  desc->raw().set_workspace((double*)workspaceBuf.data_ptr());
 
   auto in_data = (scalar_t*)input.data_ptr();
   auto out_data = (scalar_t*)output.data_ptr();

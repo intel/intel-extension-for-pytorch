@@ -120,15 +120,25 @@ int run_dft(sycl::device& dev) {
 
   desc.commit(dpcpp_queue);
 
+  // Obtain the size of workspace required after commit.
+  size_t workspaceSizeBytes = 0;
+  desc.get_value(
+      oneapi::mkl::dft::config_param::WORKSPACE_BYTES, &workspaceSizeBytes);
+
+  // Allocate USM buffer workspace and provide it to the descriptor.
+  double* workspaceBuf = sycl::malloc_shared<double>(
+      workspaceSizeBytes / sizeof(double), dpcpp_queue);
+  desc.set_workspace(workspaceBuf);
+
   if (!inverse) {
     oneapi::mkl::dft::compute_forward(desc, in_data, out_data);
   } else {
     oneapi::mkl::dft::compute_backward(desc, in_data, out_data);
   }
-  dpcpp_queue.wait();
 
   free(in_data, dpcpp_queue.get_context());
   free(out_data, dpcpp_queue.get_context());
+  free(workspaceBuf, dpcpp_queue.get_context());
   return SUCCESS;
 }
 

@@ -1493,14 +1493,17 @@ inline void dpcpp_reduce_kernel(
     }
   }
 
-  at::DataPtr buffer;
-  at::DataPtr semaphores;
+  Tensor buffer;
+  Tensor semaphores;
   if (config.should_global_reduce()) {
     auto allocator = getDeviceAllocator();
-    buffer = allocator->allocate(config.global_memory_size());
-    semaphores = allocator->allocate(config.semaphore_size());
+    buffer = at::empty(
+        config.global_memory_size(),
+        at::TensorOptions().dtype(kChar).device(kXPU));
+    semaphores = at::empty(
+        config.semaphore_size(), at::TensorOptions().dtype(kChar).device(kXPU));
     at::detail::Array<char*, 1> data;
-    data[0] = (char*)semaphores.get();
+    data[0] = (char*)semaphores.data_ptr();
     auto fn = []() -> char { return 0; };
     int vec_size = at::native::Memory::can_vectorize_up_to_loop<decltype(fn)>(
         dpcppGetDeviceIdOfCurrentQueue(), data);
@@ -1520,8 +1523,8 @@ inline void dpcpp_reduce_kernel(
       out_data,
       out_data_extra,
       acc_data,
-      buffer.get(),
-      (int*)semaphores.get(),
+      buffer.defined() ? (void*)buffer.data_ptr() : nullptr,
+      buffer.defined() ? (int*)semaphores.data_ptr() : nullptr,
       ident,
       noutputs,
       base_idx);
