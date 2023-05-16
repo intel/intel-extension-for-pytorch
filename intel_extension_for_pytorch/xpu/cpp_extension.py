@@ -195,7 +195,9 @@ class DpcppBuildExtension(build_ext, object):
         super(DpcppBuildExtension, self).__init__(*args, **kwargs)
         self.no_python_abi_suffix = kwargs.get("no_python_abi_suffix", False)
 
-        self.use_ninja = kwargs.get("use_ninja", True)
+        # When use_ninja is enabled, the linker seems g++, which will leads to the sycl kernel can not be launched. So
+        # we change default value to False and raise an error if use_ninja is available.
+        self.use_ninja = kwargs.get('use_ninja', False)
         if self.use_ninja:
             # Test if we can use ninja. Fallback otherwise.
             msg = (
@@ -204,6 +206,9 @@ class DpcppBuildExtension(build_ext, object):
             )
             if not is_ninja_available():
                 warnings.warn(msg.format("we could not find ninja."))
+                self.use_ninja = False
+            else:
+                warnings.warn(msg.format('we have not ninja path.'))
                 self.use_ninja = False
 
     def finalize_options(self) -> None:
@@ -279,14 +284,14 @@ class DpcppBuildExtension(build_ext, object):
                     _cxxbin = get_dpcpp_complier()
                     self.compiler.set_executable("compiler_so", _cxxbin)
                     if isinstance(cflags, dict):
-                        cflags = cflags["cxx"]
+                        cflags = cflags['cxx'] + COMMON_DPCPP_FLAGS
                     else:
                         cflags = unix_dpcpp_flags(cflags)
                 elif _is_c_file(src):
                     _ccbin = get_icx_complier()
                     self.compiler.set_executable("compiler_so", _ccbin)
                     if isinstance(cflags, dict):
-                        cflags = cflags["cxx"]
+                        cflags = cflags['cxx'] + COMMON_DPCPP_FLAGS
                     else:
                         cflags = unix_dpcpp_flags(cflags)
                 elif isinstance(cflags, dict):
@@ -310,15 +315,12 @@ class DpcppBuildExtension(build_ext, object):
             cmd_line = []
 
             library_dirs_args = []
-            library_dirs_args += [f"-L{x}" for x in library_dirs]
 
             runtime_library_dirs_args = []
             runtime_library_dirs_args += [f"-L{x}" for x in runtime_library_dirs]
 
             libraries_args = []
-            libraries_args += [f"-l{x}" for x in libraries]
-
-            common_args = ["-shared"]
+            common_args = ['-shared', '-fsycl']
 
             """
             link command formats:
@@ -781,6 +783,12 @@ def include_paths() -> List[str]:
 
 
 def library_paths() -> List[str]:
+    r"""
+    Get the lib paths include PyTorch lib, IPEX lib and oneDNN lib.
+    
+    Returns:
+        A list of lib path strings.
+    """
     paths = []
     paths += get_pytorch_lib_dir()
     paths += get_one_api_help().get_library_dirs()
@@ -804,17 +812,15 @@ def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
         python_path = os.path.dirname(sys.executable)
         python_lib_path = os.path.join(python_path, "libs")
 
-        extra_ldflags.append("c10.lib")
-        extra_ldflags.append("torch.lib")
-        extra_ldflags.append(f"/LIBPATH:{TORCH_LIB_PATH}")
+        extra_ldflags.append('c10.lib')
+        extra_ldflags.append('torch.lib')
         if not is_standalone:
             extra_ldflags.append("torch_python.lib")
             extra_ldflags.append(f"/LIBPATH:{python_lib_path}")
 
     else:
-        extra_ldflags.append(f"-L{TORCH_LIB_PATH}")
-        extra_ldflags.append("-lc10")
-        extra_ldflags.append("-ltorch")
+        extra_ldflags.append('-lc10')
+        extra_ldflags.append('-ltorch')
         if not is_standalone:
             extra_ldflags.append("-ltorch_python")
 
@@ -837,8 +843,7 @@ def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
     oneapi_link_args += ["-ldnnl"]
 
     # Append IPEX link parameters.
-    oneapi_link_args += [f"-L{x}" for x in get_one_api_help().get_default_lib_dir()]
-    oneapi_link_args += ["-lintel-ext-pt-gpu"]
+    oneapi_link_args += ['-lintel-ext-pt-gpu']
 
     extra_ldflags += oneapi_link_args
 
