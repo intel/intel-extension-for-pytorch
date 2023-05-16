@@ -424,7 +424,7 @@ supported:
   - nan_to_num.out
   - nanmedian
   - nanmedian.dim_values
-  # - narrow_copy
+  - narrow_copy
   - native_batch_norm
   - native_batch_norm.out
   - native_batch_norm_backward

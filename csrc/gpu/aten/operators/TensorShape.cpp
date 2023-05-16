@@ -20,13 +20,13 @@ Tensor view(const Tensor& self, IntArrayRef size) {
   return at::native::view(self, size);
 }
 
-// Tensor narrow_copy(
-//     const Tensor& self,
-//     int64_t dim,
-//     int64_t start,
-//     int64_t length) {
-//   return at::native::narrow_copy_dense(self, dim, start, length);
-// }
+Tensor narrow_copy(
+    const Tensor& self,
+    int64_t dim,
+    int64_t start,
+    int64_t length) {
+  return at::native::narrow_copy_dense_symint(self, dim, start, length);
+}
 
 Tensor unfold(
     const Tensor& self,
