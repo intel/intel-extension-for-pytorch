@@ -41,7 +41,7 @@ supported:
   - view
   - empty_quantized
   - transpose_
-  # - as_strided_
+  - as_strided_
   - _reshape_alias
   - sigmoid
   - sigmoid_
