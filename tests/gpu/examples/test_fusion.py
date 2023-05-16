@@ -458,6 +458,19 @@ class TransMatmulAddAdd(torch.nn.Module):
     def forward(self, m1, m2, add1, add2):
         return torch.add(torch.matmul(m1, m2.t()), add1, alpha=2.0) + add2
 
+class TransMatmulDivScalar(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TransMatmulDivScalar, self).__init__()
+
+    def forward(self, m1, m2):
+        return torch.div(torch.matmul(m1, m2.t()), 3.0)
+
+class TransMatmulDivTensor(torch.nn.Module):
+    def __init__(self) -> None:
+        super(TransMatmulDivTensor, self).__init__()
+    
+    def forward(self, m1, m2, div):
+        return torch.div(torch.matmul(m1, m2.t()), div)
 
 class TransMatmulAdd(torch.nn.Module):
     def __init__(self):
@@ -1692,6 +1705,30 @@ class TestNNMethod(TestCase):
             print("real:", real.to(cpu_device))
         self.assertEqual(raw, real.to(cpu_device))
         del modelJit
+
+    def test_trans_matmul_div(self, dtype=torch.float):
+        m1 = torch.randn((4, 2), device=cpu_device)
+        m2 = torch.randn((4, 2), device=cpu_device)
+        div = torch.randn((4, 4), device=cpu_device)
+
+        model_scalar = TransMatmulDivScalar()
+        model_tensor = TransMatmulDivTensor()
+        raw = model_scalar(m1, m2)
+        raw_tensor = model_tensor(m1, m2, div)
+        print("raw: ", raw)
+
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+        div_dpcpp = div.to(dpcpp_device)
+        modelJit_scalar = torch.jit.script(model_scalar)
+        modelJit_tensor = torch.jit.script(model_tensor)
+        with torch.no_grad():
+            real_scalar = modelJit_scalar(m1_dpcpp, m2_dpcpp)
+            real_tensor = modelJit_tensor(m1_dpcpp, m2_dpcpp, div_dpcpp)
+        self.assertEqual(raw, real_scalar.to(cpu_device))
+        self.assertEqual(raw_tensor, real_tensor.to(cpu_device))
+        del modelJit_scalar
+        del modelJit_tensor
 
     def test_trans_3d_matmul_add_add(self, dtype=torch.float):
         m1 = torch.randn((4, 3, 2), device=cpu_device)

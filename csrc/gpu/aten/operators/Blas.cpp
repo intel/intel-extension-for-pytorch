@@ -920,7 +920,7 @@ at::Tensor t_matmul_add_add(
 }
 
 // res = (m1 * m2.transpose()) / oscale
-at::Tensor trans_matmul_div(
+at::Tensor trans_matmul_div_scalar(
     const at::Tensor& tensor2,
     int64_t dim1,
     int64_t dim2,
@@ -935,6 +935,22 @@ at::Tensor trans_matmul_div(
       /* alpha */ 1.f / oscale.to<float>(),
       /* beta */ 0.f,
       attr.kind_with_linear);
+  bool is_fused;
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
+}
+
+at::Tensor trans_matmul_div_tensor(
+    const at::Tensor& tensor2,
+    int64_t dim1,
+    int64_t dim2,
+    const at::Tensor& tensor1,
+    const at::Tensor& div) {
+  RECORD_FUNCTION(
+      "trans_matmul_div", std::vector<c10::IValue>({tensor1, tensor2, div}));
+  Attr attr;
+  attr.append_post_binary(attr.kind_with_binary_div, div);
   bool is_fused;
   Tensor result;
   return matmul_fusion_variants(
@@ -1149,7 +1165,8 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("t_matmul_add", t_matmul_add);
   IPEX_OP_REGISTER("t_matmul_add_gelu", t_matmul_add_gelu);
   IPEX_OP_REGISTER("t_matmul_add_add", t_matmul_add_add);
-  IPEX_OP_REGISTER("trans_matmul_div", trans_matmul_div);
+  IPEX_OP_REGISTER("trans_matmul_div", trans_matmul_div_scalar);
+  IPEX_OP_REGISTER("trans_matmul_div.Tensor", trans_matmul_div_tensor)
   IPEX_OP_REGISTER("trans_matmul_div_add", trans_matmul_div_add);
   IPEX_OP_REGISTER_MATMUL(sqrt);
   IPEX_OP_REGISTER_MATMUL(abs);
