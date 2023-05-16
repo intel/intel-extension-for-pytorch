@@ -467,7 +467,9 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
             else:
                 self.sgd_args.bf16_trail.append(torch.empty(0, dtype=torch.bfloat16))
 
-    def init_sgd_args(self, lr, weight_decay, bf16_trail=[]):
+    def init_sgd_args(self, lr, weight_decay, bf16_trail=None):
+        if bf16_trail is None:
+            bf16_trail = []
         if lr < 0.0:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if weight_decay < 0.0:

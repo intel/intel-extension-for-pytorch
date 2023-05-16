@@ -20,7 +20,7 @@ def _cat(tensors: List[Tensor], dim: int = 0) -> Tensor:
 
 
 def _convert_boxes_to_roi_format(boxes: List[Tensor]) -> Tensor:
-    concat_boxes = _cat([b for b in boxes], dim=0)
+    concat_boxes = _cat(list(b for b in boxes), dim=0)
     temp = []
     for i, b in enumerate(boxes):
         temp.append(torch.full_like(b[:, :1], i))

@@ -132,7 +132,7 @@ class TuneStrategy(object):
         for objective, val in zip(self.usr_objectives, self.best_tune_result):
             click.secho("{objective['name']}: {val}", fg="blue")
 
-        curr_tune_cfg_val = [_ for _ in curr_tune_cfg.values()]
+        curr_tune_cfg_val = list(_ for _ in curr_tune_cfg.values())
         self.tune_result_record.writerow(curr_tune_cfg_val + curr_tune_result)
 
     def _stop(self, trials_count):

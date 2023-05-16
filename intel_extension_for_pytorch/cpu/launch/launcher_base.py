@@ -132,7 +132,7 @@ class Launcher:
         category,
         supported,
         fn,
-        skip_list=[],
+        skip_list=None,
         extra_warning_msg_with_default_choice="",
     ):
         """
@@ -158,6 +158,8 @@ class Launcher:
             extra_warning_msg_with_default_choice: a warning message that will be prompted if designated choices
             are not available and fallen back to the default choice.
         """
+        if skip_list is None:
+            skip_list = []
         name_local = name_input.lower()
         if name_local not in supported:
             name_local = supported[0]
@@ -235,13 +237,15 @@ class Launcher:
         return name_local
 
     def set_memory_allocator(
-        self, memory_allocator="auto", benchmark=False, skip_list=[]
+        self, memory_allocator="auto", benchmark=False, skip_list=None
     ):
         """
         Enable TCMalloc/JeMalloc with LD_PRELOAD and set configuration for JeMalloc.
         By default, PTMalloc will be used for PyTorch, but TCMalloc and JeMalloc can get better
         memory resue and reduce page fault to improve performance.
         """
+        if skip_list is None:
+            skip_list = []
         ma_lib_name = {
             "jemalloc": ["jemalloc", "conda install -c conda-forge jemalloc"],
             "tcmalloc": ["tcmalloc", "conda install -c conda-forge gperftools"],

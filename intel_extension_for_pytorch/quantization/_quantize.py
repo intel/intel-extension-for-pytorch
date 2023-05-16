@@ -5,7 +5,9 @@ import warnings
 
 import torch
 from torch.ao.quantization import PlaceholderObserver, QConfig, QConfigMapping
-from torch.ao.quantization.quantization_mappings import get_default_dynamic_quant_module_mappings
+from torch.ao.quantization.quantization_mappings import (
+    get_default_dynamic_quant_module_mappings,
+)
 import torch.fx.experimental.optimization as optimization
 from torch.ao.nn.quantized.modules.utils import _quantize_weight
 import torch.ao.nn.quantized.dynamic as nnqd
@@ -282,24 +284,29 @@ def convert(model, inplace=False):
             ), "The model's copy is failed, please try set inplace to True to do the convert"
 
     # For weight only quantization. Activation's observer is also PlaceholderObserver.
-    if isinstance(convert_model.q_config.activation(), PlaceholderObserver) and \
-            not convert_model.q_config.activation().is_dynamic:
+    if (
+        isinstance(convert_model.q_config.activation(), PlaceholderObserver)
+        and not convert_model.q_config.activation().is_dynamic
+    ):
         qconfig_spec = {
-            torch.nn.Linear : convert_model.q_config,
-            torch.nn.LSTM : convert_model.q_config,
-            torch.nn.GRU : convert_model.q_config,
-            torch.nn.LSTMCell : convert_model.q_config,
-            torch.nn.RNNCell : convert_model.q_config,
-            torch.nn.GRUCell : convert_model.q_config,
+            torch.nn.Linear: convert_model.q_config,
+            torch.nn.LSTM: convert_model.q_config,
+            torch.nn.GRU: convert_model.q_config,
+            torch.nn.LSTMCell: convert_model.q_config,
+            torch.nn.RNNCell: convert_model.q_config,
+            torch.nn.GRUCell: convert_model.q_config,
         }
         module_mappings = get_default_dynamic_quant_module_mappings().copy()
-        module_mappings[torch.nn.Linear] = nn.modules.weight_only_quantization.IpexWoqLinear
+        module_mappings[
+            torch.nn.Linear
+        ] = nn.modules.weight_only_quantization.IpexWoqLinear
         converted_model = torch.quantization.quantize_dynamic(
             convert_model,
             qconfig_spec=qconfig_spec,
             dtype=torch.qint8,
-            mapping = module_mappings,
-            inplace=False)
+            mapping=module_mappings,
+            inplace=False,
+        )
         return converted_model
 
     # If the module's activation's qconfig is PlaceholderObserver,

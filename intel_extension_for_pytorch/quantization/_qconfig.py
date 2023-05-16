@@ -73,7 +73,14 @@ def get_smooth_quant_qconfig_mapping(
     )
     return QConfigMapping().set_global(qconfig)
 
+
 # For weight-only quantization
-_weight_only_quant_qconfig = QConfig(activation=PlaceholderObserver.with_args(dtype=torch.float, is_dynamic=False),
-                                     weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_affine))
-weight_only_quant_qconfig_mapping = QConfigMapping().set_global(_weight_only_quant_qconfig)
+_weight_only_quant_qconfig = QConfig(
+    activation=PlaceholderObserver.with_args(dtype=torch.float, is_dynamic=False),
+    weight=PerChannelMinMaxObserver.with_args(
+        dtype=torch.qint8, qscheme=torch.per_channel_affine
+    ),
+)
+weight_only_quant_qconfig_mapping = QConfigMapping().set_global(
+    _weight_only_quant_qconfig
+)

@@ -9,8 +9,8 @@ def autotune(
     prepared_model,
     calib_dataloader,
     eval_func,
-    sampling_sizes=[100],
-    accuracy_criterion={"relative": 0.01},
+    sampling_sizes=None,
+    accuracy_criterion=None,
     tuning_time=0,
 ):
     r"""
@@ -31,6 +31,10 @@ def autotune(
     Returns:
         FP32 tuned model (torch.nn.Module)
     """
+    if sampling_sizes is None:
+        sampling_sizes = [100]
+    if accuracy_criterion is None:
+        accuracy_criterion = {"relative": 0.01}
     neural_compressor_version = "2.1"
     try:
         import neural_compressor

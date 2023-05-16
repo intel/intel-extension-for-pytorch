@@ -14,7 +14,7 @@ import glob
 import ctypes
 import platform
 
-from .utils._proxy_module import *
+from .utils import _proxy_module
 from . import cpu
 from . import xpu
 from . import quantization

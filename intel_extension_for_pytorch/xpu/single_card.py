@@ -2,8 +2,8 @@ import os
 import tempfile
 import torch
 import torch.distributed as dist
-import intel_extension_for_pytorch
-import oneccl_bindings_for_pytorch
+import intel_extension_for_pytorch  # noqa F401
+import oneccl_bindings_for_pytorch  # noqa F401
 
 
 class single_card_dist:

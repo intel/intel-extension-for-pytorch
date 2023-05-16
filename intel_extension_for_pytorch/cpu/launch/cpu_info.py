@@ -65,7 +65,9 @@ class CoreInfo:
     - [bool] is a performance core
     """
 
-    def __init__(self, lscpu_txt="", headers={}):
+    def __init__(self, lscpu_txt="", headers=None):
+        if headers is None:
+            headers = {}
         self.cpu = -1
         self.core = -1
         self.socket = -1
@@ -248,10 +250,15 @@ class CPUPoolList:
         use_logical_cores=False,
         use_e_cores=False,
         skip_cross_node_cores=False,
-        nodes_list=[],
-        cores_list=[],
+        nodes_list=None,
+        cores_list=None,
         return_mode="auto",
     ):
+        if nodes_list is None:
+            nodes_list = []
+        if cores_list is None:
+            cores_list = []
+
         # Generate an aggregated CPU pool
         if len(cores_list) > 0:
             cores_available = [c.cpu for c in self.pool_all]

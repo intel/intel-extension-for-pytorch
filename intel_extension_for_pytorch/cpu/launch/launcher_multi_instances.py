@@ -102,10 +102,12 @@ class MultiInstancesLauncher(Launcher):
             pass
         return is_available
 
-    def set_multi_task_manager(self, multi_task_manager="auto", skip_list=[]):
+    def set_multi_task_manager(self, multi_task_manager="auto", skip_list=None):
         """
         Set multi-task manager
         """
+        if skip_list is None:
+            skip_list = []
         tm_bin_name = {
             "numactl": ["numactl", ""],
             "taskset": ["taskset", ""],
