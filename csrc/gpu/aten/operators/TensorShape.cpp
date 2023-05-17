@@ -59,15 +59,6 @@ Tensor as_strided(
   return at::native::as_strided_qtensorimpl(self, size, stride, storage_offset);
 }
 
-const Tensor& as_strided_(
-    const Tensor& self,
-    IntArrayRef size,
-    IntArrayRef stride,
-    optional<int64_t> storage_offset_) {
-  auto storage_offset = storage_offset_.value_or(self.storage_offset());
-  at::native::setStrided(self, size, stride, storage_offset);
-}
-
 Tensor& transpose_(Tensor& self, int64_t dim0, int64_t dim1) {
   return at::native::transpose_(self, dim0, dim1);
 }
