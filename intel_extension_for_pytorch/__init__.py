@@ -90,7 +90,7 @@ if sys.platform == "win32":
 
     kernel32.SetErrorMode(prev_error_mode)
 
-from .utils._trap_module import *
+from .utils._proxy_module import *
 from . import cpu
 from . import xpu
 from . import launcher

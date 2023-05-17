@@ -23,6 +23,7 @@ from .amp import *
 from .utils import *
 from .random import *
 from .memory import *
+from ..utils.channels_last_1d import is_contiguous_channels_last_1d, to_channels_last_1d
 
 from .overrides import (
     override_tensor_totype,

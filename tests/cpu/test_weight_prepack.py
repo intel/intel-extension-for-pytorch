@@ -4,7 +4,7 @@ import copy
 import os
 import time
 import sys
-from intel_extension_for_pytorch.cpu.utils.channels_last_1d import (
+from intel_extension_for_pytorch.utils.channels_last_1d import (
     to_channels_last_1d,
     is_contiguous_channels_last_1d,
 )

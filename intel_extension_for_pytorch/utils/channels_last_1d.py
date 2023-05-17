@@ -13,7 +13,11 @@ import torch
 def tensor_to_channels_last_1d(t):
     assert t.dim() == 3
 
-    if 1 == t.size(1):
+    if 1 == t.size(0) and 1 != t.size(1):
+        # handle for tensor shape like (1, x, y), x != 1
+        t = t.transpose(1, -1).contiguous().transpose(1, -1)
+    elif 1 == t.size(1):
+        # handle for tensor shape like (x, 1, y), include x == 1
         t = t.as_strided(t.size(), (t.size(1) * t.size(-1), 1, t.size(1)))
     else:
         t = t.view(t.size(0), t.size(1), 1, t.size(2))
@@ -22,17 +26,13 @@ def tensor_to_channels_last_1d(t):
     return t
 
 
-# Port from
-# https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/blob/920c7163c81d6c5098ba79ed482d57b1ded8521d/intel_extension_for_pytorch/xpu/utils.py#L6 # noqa B950
-
-
 def to_channels_last_1d(t):
+    scope = (torch.nn.Conv1d, torch.nn.BatchNorm1d, torch.nn.MaxPool1d)
     if isinstance(t, torch.nn.Module):
         for m in t.modules():
             for param in m.parameters():
-                if isinstance(m, (torch.nn.Conv1d)):
-                    if 3 == param.data.dim():
-                        param.data = tensor_to_channels_last_1d(param.data)
+                if isinstance(m, scope) and 3 == param.data.dim():
+                    param.data = tensor_to_channels_last_1d(param.data)
         return t
 
     if 3 == t.dim():
@@ -40,8 +40,6 @@ def to_channels_last_1d(t):
     return t
 
 
-# Port from
-# https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/blob/920c7163c81d6c5098ba79ed482d57b1ded8521d/intel_extension_for_pytorch/xpu/utils.py#L38 # noqa B950
 def is_contiguous_channels_last_1d(input):
     if 3 != input.dim():
         return False

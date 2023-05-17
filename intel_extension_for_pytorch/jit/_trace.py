@@ -1,9 +1,12 @@
 import torch
 from functools import wraps
 
-# Wrap torch.jit.trace to disable autocast cache when using torch.jit.trace
+# For CPU, wrap torch.jit.trace to disable autocast cache when using torch.jit.trace
 # within the scope of torch.cpu.amp.autocast.
 # See https://github.com/pytorch/pytorch/pull/63552 for more information.
+
+# For XPU, wrap torch.jit.trace to disable the check trace to avoid the double floating
+# computing for the xpu platform which unsupports 2d block
 
 
 def need_to_disable_check_trace_for_XPU(*args, **kwargs):

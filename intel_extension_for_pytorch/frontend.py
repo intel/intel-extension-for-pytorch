@@ -14,7 +14,7 @@ from .optim._optimizer_utils import (
     IPEX_FUSED_OPTIMIZER_LIST_XPU,
 )
 import intel_extension_for_pytorch._C as core
-from .cpu.utils.channels_last_1d import to_channels_last_1d
+from .utils.channels_last_1d import to_channels_last_1d
 from .cpu.utils.linear_bn_folding import linear_bn_fuse
 from enum import IntEnum
 from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl
