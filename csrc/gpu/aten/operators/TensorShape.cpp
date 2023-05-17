@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/native/Resize.h>
 #include "comm/RegistrationDeclarations.h"
 
 namespace at {
