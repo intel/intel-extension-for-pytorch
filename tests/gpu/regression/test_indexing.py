@@ -61,9 +61,9 @@ class TestTorchMethod(TestCase):
         vertices_cpu = torch.randn([16367, 1, 3])
         vertices_xpu = vertices_cpu.to("xpu")
 
-        vert_filter_cpu_rand=torch.rand([16367]) < 0.8
-        vert_filter_xpu_rand=vert_filter_cpu_rand.to("xpu")
+        vert_filter_cpu_rand = torch.rand([16367]) < 0.8
+        vert_filter_xpu_rand = vert_filter_cpu_rand.to("xpu")
 
-        result_cpu=vertices_cpu[vert_filter_cpu_rand]
-        result_xpu=vertices_xpu[vert_filter_xpu_rand]
+        result_cpu = vertices_cpu[vert_filter_cpu_rand]
+        result_xpu = vertices_xpu[vert_filter_xpu_rand]
         self.assertEqual(result_cpu, result_xpu.cpu())

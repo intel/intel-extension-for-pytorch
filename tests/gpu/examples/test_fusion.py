@@ -468,7 +468,7 @@ class TransMatmulDivScalar(torch.nn.Module):
 class TransMatmulDivTensor(torch.nn.Module):
     def __init__(self) -> None:
         super(TransMatmulDivTensor, self).__init__()
-    
+
     def forward(self, m1, m2, div):
         return torch.div(torch.matmul(m1, m2.t()), div)
 

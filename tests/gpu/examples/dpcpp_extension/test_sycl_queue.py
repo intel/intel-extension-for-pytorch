@@ -1,5 +1,5 @@
 import torch
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch  # noqa
 from torch.xpu.cpp_extension import load
 import os
 

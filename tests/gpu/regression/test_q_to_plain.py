@@ -7,7 +7,6 @@ from torch.quantization.quantize_jit import (
     convert_jit,
     prepare_jit,
 )
-import pytest
 import time
 
 

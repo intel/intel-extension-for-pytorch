@@ -19,7 +19,7 @@ class TestNNMethod(TestCase):
 
         conv1 = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=True)
         max_pool = nn.MaxPool2d(kernel_size=(2, 3), stride=(2, 1),
-                                padding=1, dilation=(1,  2), return_indices=True)
+                                padding=1, dilation=(1, 2), return_indices=True)
 
         x_cpu.requires_grad_(True)
         y_cpu1 = conv1(x_cpu)

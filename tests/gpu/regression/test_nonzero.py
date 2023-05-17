@@ -2,8 +2,6 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa F401
 
-import pytest
-
 
 class TestTorchMethod(TestCase):
     def test_nonzero_memory_leak(self):

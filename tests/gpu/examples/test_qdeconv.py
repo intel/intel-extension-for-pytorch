@@ -1,5 +1,4 @@
 import torch
-from torch.nn.modules.utils import _pair
 import pytest
 import intel_extension_for_pytorch as ipex  # noqa
 import numpy as np

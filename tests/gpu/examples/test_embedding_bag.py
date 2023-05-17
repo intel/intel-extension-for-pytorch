@@ -26,7 +26,7 @@ class TestTorchMethod(TestCase):
                             padding_idx=padding_idx,
                         )
                         input = torch.Tensor([9, 29, 49, 39, 19, 29, 19, 9, 0]).long()
-                        if include_last_offset == False:
+                        if not include_last_offset:
                             offsets = torch.Tensor([0, 1, 2, 4, 7]).long()
                         else:
                             offsets = torch.Tensor([0, 1, 2, 4, 7, 9]).long()
@@ -53,7 +53,7 @@ class TestTorchMethod(TestCase):
                             output, output_xpu.cpu().float(), atol=1e-5, rtol=1e-5
                         )
                         # FIXME: Skip max + padding_idx case. No backend implementation.
-                        if not (mode == "max" and padding_idx != None):
+                        if not (mode == "max" and padding_idx is not None):
                             self.assertEqual(
                                 grad_weight_cpu,
                                 grad_weight_xpu.cpu().float(),

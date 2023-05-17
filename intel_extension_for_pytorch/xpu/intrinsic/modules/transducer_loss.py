@@ -1,5 +1,5 @@
 import torch
-import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch as ipex  # noqa
 
 
 class TransducerLoss(torch.nn.Module):
@@ -15,15 +15,15 @@ class TransducerLoss(torch.nn.Module):
         packed_input (bool, optional): whether to pack the output in a compact form with don't-care 
         data being removed. (default: False)
     """
+
     def __init__(self, fuse_softmax_backward=False, opt=1, packed_input=False):
-        super(TransducerLoss, self).__init__() 
+        super(TransducerLoss, self).__init__()
         self.fuse_softmax_backward = fuse_softmax_backward
         self.opt = opt
         self.packed_input = packed_input
         self.dummy_batch_offset = torch.empty(0)
 
-
-    def forward(self, x, label, f_len, y_len, blank_idx, batch_offset=None, max_f_len=None, 
+    def forward(self, x, label, f_len, y_len, blank_idx, batch_offset=None, max_f_len=None,
                 debug_list=None):
         """Forward operation of transducer joint
 
@@ -51,22 +51,24 @@ class TransducerLoss(torch.nn.Module):
         if self.packed_input:
             if batch_offset is None or max_f_len is None:
                 raise Exception("Please specify batch_offset and max_f_len when packing is \
-                                    enabled") 
+                                    enabled")
             my_batch_offset = batch_offset
             my_max_f_len = max_f_len
         else:
             my_batch_offset = self.dummy_batch_offset
             my_max_f_len = x.size(1)
         x = torch.nn.functional.log_softmax(x, dim=-1)
-        return TransducerLossFunc.apply(x, label, f_len, y_len, my_batch_offset, my_max_f_len, 
-                                            blank_idx, self.fuse_softmax_backward, debug_list, 
-                                            self.opt, self.packed_input)
+        return TransducerLossFunc.apply(x, label, f_len, y_len, my_batch_offset, my_max_f_len,
+                                        blank_idx, self.fuse_softmax_backward, debug_list,
+                                        self.opt, self.packed_input)
+
 
 class TransducerLossFunc(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x, label, f_len, y_len, batch_offset, max_f_len, blank_idx, 
+    def forward(ctx, x, label, f_len, y_len, batch_offset, max_f_len, blank_idx,
                 fuse_softmax_backward, debug_list, opt, packed_input):
-        alpha, beta, loss = torch.ops.torch_ipex.transducer_loss_forward(x, label, f_len, y_len, batch_offset, max_f_len, blank_idx, opt, packed_input)
+        alpha, beta, loss = torch.ops.torch_ipex.transducer_loss_forward(
+            x, label, f_len, y_len, batch_offset, max_f_len, blank_idx, opt, packed_input)
         if debug_list == []:
             debug_list += [alpha, beta]
         ctx.save_for_backward(x, alpha, beta, f_len, y_len, label, batch_offset)
@@ -80,5 +82,7 @@ class TransducerLossFunc(torch.autograd.Function):
     @staticmethod
     def backward(ctx, loss_grad):
         x, alpha, beta, f_len, y_len, label, batch_offset = ctx.saved_tensors
-        x_grad = torch.ops.torch_ipex.transducer_loss_backward( x, loss_grad, alpha, beta, f_len, y_len, label, batch_offset, ctx.max_f_len, ctx.blank_idx, ctx.opt, ctx.fuse_softmax_backward, ctx.packed_input)
+        x_grad = torch.ops.torch_ipex.transducer_loss_backward(
+            x, loss_grad, alpha, beta, f_len, y_len, label, batch_offset, ctx.max_f_len,
+            ctx.blank_idx, ctx.opt, ctx.fuse_softmax_backward, ctx.packed_input)
         return x_grad, None, None, None, None, None, None, None, None, None, None

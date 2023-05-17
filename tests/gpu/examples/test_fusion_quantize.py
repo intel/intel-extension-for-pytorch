@@ -10,7 +10,7 @@ from torch.quantization.quantize_jit import (
     convert_jit,
     prepare_jit,
 )
-import pytest
+
 
 checking_atol = 3e-2
 checking_rtol = 3e-2

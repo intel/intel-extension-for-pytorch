@@ -104,8 +104,8 @@ class TestTorchMethod(TestCase):
         output_plain, output_plain_xpu, output_block, output_block_xpu = invoke_unary(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu, param
         )
-        torch.xpu.is_onednn_layout(output_plain_xpu) == False
-        torch.xpu.is_onednn_layout(output_block_xpu) == True
+        self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
+        self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), True)
         self.assertEqual(output_plain, output_block)
         self.assertEqual(output_plain, output_plain_xpu.cpu())
         self.assertEqual(output_plain, output_block_xpu.cpu())
@@ -116,8 +116,8 @@ class TestTorchMethod(TestCase):
         output_plain, output_plain_xpu, output_block, output_block_xpu = invoke_unary(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu, param
         )
-        torch.xpu.is_onednn_layout(output_plain_xpu) == False
-        torch.xpu.is_onednn_layout(output_block_xpu) == True
+        self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
+        self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), True)
         self.assertEqual(output_plain, output_block)
         self.assertEqual(output_plain, output_plain_xpu.cpu())
         self.assertEqual(output_plain, output_block_xpu.cpu())
@@ -131,8 +131,8 @@ class TestTorchMethod(TestCase):
         output_plain, output_plain_xpu, output_block, output_block_xpu = invoke_unary(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu, param
         )
-        torch.xpu.is_onednn_layout(output_plain_xpu) == False
-        torch.xpu.is_onednn_layout(output_block_xpu) == True
+        self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
+        self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), True)
         self.assertEqual(output_plain, output_block)
         self.assertEqual(output_plain, output_plain_xpu.cpu())
         self.assertEqual(output_plain, output_block_xpu.cpu())
@@ -154,9 +154,9 @@ class TestTorchMethod(TestCase):
             ) = invoke_unary(
                 fn, input_plain, input_plain_xpu, input_block, input_block_xpu, param
             )
-            torch.xpu.is_onednn_layout(output_plain_xpu) == False
+            self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
             if not fn == torch.round:
-                assert torch.xpu.is_onednn_layout(output_block_xpu) == True
+                self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), True)
             self.assertEqual(output_plain, output_block)
             self.assertEqual(output_plain, output_plain_xpu.cpu())
             self.assertEqual(output_plain, output_block_xpu.cpu())
@@ -168,12 +168,12 @@ class TestTorchMethod(TestCase):
         input_plain_xpu = input_plain_xpu.transpose(0, 1)
         input_block = input_block.transpose(0, 1)
         input_block_xpu = input_block_xpu.transpose(0, 1)
-        assert input_block_xpu.is_contiguous() == False
+        self.assertEqual(input_block_xpu.is_contiguous(), False)
         output_plain, output_plain_xpu, output_block, output_block_xpu = invoke_unary(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu, param
         )
-        torch.xpu.is_onednn_layout(output_plain_xpu) == False
-        torch.xpu.is_onednn_layout(output_block_xpu) == False
+        self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
+        self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), False)
         self.assertEqual(output_plain, output_block)
         self.assertEqual(output_plain, output_plain_xpu.cpu())
         self.assertEqual(output_plain, output_block_xpu.cpu())
@@ -250,7 +250,7 @@ class TestTorchMethod(TestCase):
         loss.backward()
         inputs_gxpu_plain = inputs.grad
 
-        torch.xpu.is_onednn_layout(inputs_gxpu_plain) == False
+        self.assertEqual(torch.xpu.is_onednn_layout(inputs_gxpu_plain), False)
         self.assertEqual(inputs_gcpu, inputs_gxpu_plain.cpu())
         if to_channels_last:
             self.assertTrue(
@@ -264,7 +264,7 @@ class TestTorchMethod(TestCase):
             outputs = fn(to_block_dpcpp(inputs))
             outputs.mean().backward()
             inputs_gxpu_block = inputs.grad
-            torch.xpu.is_onednn_layout(inputs_gxpu_block) == True
+            self.assertEqual(torch.xpu.is_onednn_layout(inputs_gxpu_block), True)
         self.assertEqual(inputs_gcpu, inputs_gxpu_block.cpu())
 
     def test_relu_bwd(self):
@@ -311,8 +311,8 @@ class TestNNMethod(TestCase):
         ) = invoke_unary_nn(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu
         )
-        torch.xpu.is_onednn_layout(output_plain_xpu) == False
-        torch.xpu.is_onednn_layout(output_block_xpu) == True
+        self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
+        self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), True)
         self.assertEqual(output_plain, output_block)
         self.assertEqual(output_plain, output_plain_xpu.cpu())
         self.assertEqual(output_plain, output_block_xpu.cpu())
@@ -328,8 +328,8 @@ class TestNNMethod(TestCase):
         ) = invoke_unary_nn(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu
         )
-        torch.xpu.is_onednn_layout(output_plain_xpu) == False
-        torch.xpu.is_onednn_layout(output_block_xpu) == True
+        self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
+        self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), True)
         self.assertEqual(output_plain, output_block)
         self.assertEqual(output_plain, output_plain_xpu.cpu())
         self.assertEqual(output_plain, output_block_xpu.cpu())
@@ -348,8 +348,8 @@ class TestNNMethod(TestCase):
         ) = invoke_unary_nn(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu
         )
-        torch.xpu.is_onednn_layout(output_plain_xpu) == False
-        torch.xpu.is_onednn_layout(output_block_xpu) == True
+        self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
+        self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), True)
         self.assertEqual(output_plain, output_block)
         self.assertEqual(output_plain, output_plain_xpu.cpu())
         self.assertEqual(output_plain, output_block_xpu.cpu())

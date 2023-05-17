@@ -23,7 +23,6 @@ change. This file contains two types of randomized tests:
 """
 import math
 from collections import namedtuple
-from random import shuffle
 
 import torch
 from torch.autograd import gradcheck, Variable
@@ -51,7 +50,6 @@ load_tests = load_tests
 
 TEST_NUMPY = True
 try:
-    import numpy as np
     import scipy.special
     import scipy.stats
 except ImportError:
@@ -442,7 +440,7 @@ class TestDistributions(TestCase):
         self.assertEqual(Dirichlet(alpha_1d).sample().size(), (4,))
         self.assertEqual(Dirichlet(alpha_1d).sample((1,)).size(), (1, 4))
 
-    def test_dirichlet_shape(self):
+    def test_dirichlet_shape2(self):
         dist = Dirichlet(torch.tensor([[0.6, 0.3], [1.6, 1.3], [2.6, 2.3]]).to("xpu"))
         self.assertEqual(dist._batch_shape, torch.Size((3,)))
         self.assertEqual(dist._event_shape, torch.Size((2,)))

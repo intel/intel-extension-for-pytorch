@@ -10,10 +10,8 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_random_norm(self, dtype=torch.float):
-        x_cpu = torch.tensor([i for i in range(1000)], device=cpu_device, dtype=dtype)
-        x_dpcpp = torch.tensor(
-            [i for i in range(1000)], device=dpcpp_device, dtype=dtype
-        )
+        x_cpu = torch.tensor(list(range(1000)), device=cpu_device, dtype=dtype)
+        x_dpcpp = torch.tensor(list(range(1000)), device=dpcpp_device, dtype=dtype)
 
         print("normal_ cpu", x_cpu.normal_(2.0, 0.5))
         print("normal_ dpcpp", x_dpcpp.normal_(2.0, 0.5).cpu())

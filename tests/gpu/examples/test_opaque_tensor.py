@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import pytest
 import intel_extension_for_pytorch  # noqa
 from torch.testing._internal.common_utils import TestCase
 

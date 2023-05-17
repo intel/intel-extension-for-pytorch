@@ -5,7 +5,6 @@ from torch.testing._internal.common_utils import TestCase
 import contextlib
 from torch import nn
 import numpy as np
-from torch.testing._internal.common_utils import TEST_WITH_CROSSREF
 
 
 class TestTorchMethod(TestCase):

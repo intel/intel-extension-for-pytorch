@@ -10,7 +10,6 @@ import intel_extension_for_pytorch  # noqa
     PR: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/pull/668/commits
 """
 
-import pytest
 
 dpcpp_device = torch.device("xpu")
 cpu_device = torch.device("cpu")

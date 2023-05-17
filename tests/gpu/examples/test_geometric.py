@@ -2,10 +2,9 @@ import torch
 from torch._six import inf
 from torch.distributions import Geometric
 from torch.testing._internal.common_utils import TestCase
-from torch.testing._internal.common_dtype import get_all_fp_dtypes, get_all_int_dtypes
 from torch.testing._internal.common_device_type import dtypes
 
-import pytest
+
 import intel_extension_for_pytorch  # noqa
 import numpy as np
 

@@ -786,7 +786,7 @@ def include_paths() -> List[str]:
 def library_paths() -> List[str]:
     r"""
     Get the lib paths include PyTorch lib, IPEX lib and oneDNN lib.
-    
+
     Returns:
         A list of lib path strings.
     """

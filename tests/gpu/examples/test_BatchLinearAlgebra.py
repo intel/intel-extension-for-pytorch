@@ -8,7 +8,7 @@ from functools import partial
 import intel_extension_for_pytorch  # noqa
 from torch.testing import make_tensor
 import pytest
-import numpy as np
+
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")

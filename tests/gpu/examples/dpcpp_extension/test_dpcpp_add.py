@@ -14,7 +14,7 @@ class TestDPCPPExtensionMethod(TestCase):
         a = torch.rand(2, 3).to(dpcpp_device)
         b = torch.rand(2, 3).to(dpcpp_device)
         c = torch.empty_like(a)
-        d= a + b
+        d = a + b
         mod_test_add_ninja.add(a, b, c)
         self.assertEqual(d.to(cpu_device), c.to(cpu_device))
 
@@ -23,6 +23,6 @@ class TestDPCPPExtensionMethod(TestCase):
         a = torch.rand(2, 3).to(dpcpp_device)
         b = torch.rand(2, 3).to(dpcpp_device)
         c = torch.empty_like(a)
-        d= a + b
+        d = a + b
         mod_test_add_non_ninja.add(a, b, c)
         self.assertEqual(d.to(cpu_device), c.to(cpu_device))

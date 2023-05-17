@@ -17,13 +17,15 @@ def check_flake8_errors(base_dir, filepath):
                     flak8_cmd.append(os.path.join(root, file))
     elif os.path.isfile(filepath):
         flak8_cmd.append(filepath)
+    else:
+        raise FileNotFoundError(f"Can not found {filepath}")
     ret = subprocess.call(flak8_cmd, cwd=base_dir)
     return ret
 
 
 if __name__ == "__main__":
     base_dir = os.path.abspath(
-        os.path.dirname(os.path.join(os.path.abspath(__file__), "../../../"))
+        os.path.dirname(os.path.join(os.path.abspath(__file__), "../../../../"))
     )
     setupfile = os.path.join(base_dir, "setup.py")
     base_pydir = os.path.join(base_dir, "intel_extension_for_pytorch")

@@ -226,17 +226,17 @@ class TestTorchMethod(TestCase):
                 adam_epsilon = 1e-6
                 amsgrad = False
                 optimizer_xpu_no_fuse = torch.optim.Adam(model_xpu_no_fuse.parameters(),
-                                                          lr=lr,
-                                                          betas=(beta1, beta2),
-                                                          eps=adam_epsilon,
-                                                          weight_decay=weight_decay,
-                                                          amsgrad=amsgrad)
+                                                         lr=lr,
+                                                         betas=(beta1, beta2),
+                                                         eps=adam_epsilon,
+                                                         weight_decay=weight_decay,
+                                                         amsgrad=amsgrad)
                 optimizer_xpu = torch.optim.Adam(model_xpu.parameters(),
-                                                  lr=lr,
-                                                  betas=(beta1, beta2),
-                                                  eps=adam_epsilon,
-                                                  weight_decay=weight_decay,
-                                                  amsgrad=amsgrad)
+                                                 lr=lr,
+                                                 betas=(beta1, beta2),
+                                                 eps=adam_epsilon,
+                                                 weight_decay=weight_decay,
+                                                 amsgrad=amsgrad)
                 model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
             elif optimizer_string.lower() == 'lars':
                 momentum = 0.9
@@ -260,15 +260,15 @@ class TestTorchMethod(TestCase):
                 # index 0 is non fuse optimizer, index 1 fuse optimizer
                 # non-fusion
                 model_xpu_no_fuse, optimizer_xpu_no_fuse = torch.xpu.optimize(model=model_xpu_no_fuse,
-                                                                            dtype=dtype, 
-                                                                            optimizer=model_optimzier_item[0],
-                                                                            fuse_update_step=False)
+                                                                              dtype=dtype, 
+                                                                              optimizer=model_optimzier_item[0],
+                                                                              fuse_update_step=False)
 
                 # fusion
                 model_xpu, optimizer_xpu = torch.xpu.optimize(model=model_xpu, 
-                                                            dtype=dtype, 
-                                                            optimizer=model_optimzier_item[1],
-                                                            fuse_update_step=True)
+                                                              dtype=dtype, 
+                                                              optimizer=model_optimzier_item[1],
+                                                              fuse_update_step=True)
                 model_and_optimzier_list.append([model_xpu_no_fuse, model_xpu, optimizer_xpu_no_fuse, optimizer_xpu])
             return model_and_optimzier_list
 
@@ -371,27 +371,27 @@ class TestTorchMethod(TestCase):
                                 for layer2 in model_xpu_no_fuse.modules():
                                     if (isinstance(layer1, nn.BatchNorm2d) and isinstance(layer2, nn.BatchNorm2d)):
                                         self.assertEqual(layer1.weight.cpu(),
-                                                        layer2.weight.cpu(),
-                                                        atol=checking_atol,
-                                                        rtol=checking_rtol)
+                                                         layer2.weight.cpu(),
+                                                         atol=checking_atol,
+                                                         rtol=checking_rtol)
                                         self.assertEqual(layer1.bias.cpu(),
-                                                        layer2.bias.cpu(),
-                                                        atol=checking_atol,
-                                                        rtol=checking_rtol)
+                                                         layer2.bias.cpu(),
+                                                         atol=checking_atol,
+                                                         rtol=checking_rtol)
                                     if (isinstance(layer1, nn.Conv2d) and isinstance(layer2, nn.Conv2d)):
                                         self.assertEqual(layer1.weight.cpu(),
-                                                        layer2.weight.cpu(),
-                                                        atol=checking_atol,
-                                                        rtol=checking_rtol)
+                                                         layer2.weight.cpu(),
+                                                         atol=checking_atol,
+                                                         rtol=checking_rtol)
                                     if (isinstance(layer1, nn.Linear) and isinstance(layer2, nn.Linear)):
                                         self.assertEqual(layer1.weight.cpu(),
-                                                        layer2.weight.cpu(),
-                                                        atol=checking_atol,
-                                                        rtol=checking_rtol)
+                                                         layer2.weight.cpu(),
+                                                         atol=checking_atol,
+                                                         rtol=checking_rtol)
                                         self.assertEqual(layer1.bias.cpu(),
-                                                        layer2.bias.cpu(),
-                                                        atol=checking_atol,
-                                                        rtol=checking_rtol)
+                                                         layer2.bias.cpu(),
+                                                         atol=checking_atol,
+                                                         rtol=checking_rtol)
 
     def test_xpu_auto_channels_last(self):
         def check_layout_for_module(module):

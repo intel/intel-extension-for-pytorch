@@ -3,8 +3,7 @@ import torch
 from torch import nn
 from torch.autograd import Function
 from torch.nn.modules.utils import _pair
-from torch.autograd.function import once_differentiable
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch  # noqa
 from torch.testing._internal.common_utils import TestCase
 
 import torchvision

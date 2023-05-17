@@ -5,7 +5,6 @@ from torch.testing._internal.common_utils import TestCase
 import math
 import numpy as np
 import intel_extension_for_pytorch  # noqa
-import pytest
 
 
 def bilinear_interpolate(data, y, x, snap_border=False):
