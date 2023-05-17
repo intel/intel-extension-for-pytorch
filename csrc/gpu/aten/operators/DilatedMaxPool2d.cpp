@@ -3,7 +3,9 @@
 #include <ATen/native/Pool.h>
 
 #include <oneDNN/oneDNN.h>
+#include "BatchKernel.h"
 #include "comm/ATDispatch.h"
+#include "comm/Atomics.h"
 #include "comm/ParamUtils.h"
 #include "comm/RegistrationDeclarations.h"
 
@@ -44,6 +46,150 @@ std::vector<int64_t> pool_output_sizes(
 
   return output_size;
 }
+
+template <typename scalar_t, bool is_channels_last>
+void max_pool2d_out_frame(
+    scalar_t* output,
+    int64_t* indices,
+    scalar_t* input,
+    int numBatch,
+    int numPlane,
+    int inputSizeH,
+    int inputSizeW,
+    int outputSizeH,
+    int outputSizeW,
+    int kH,
+    int kW,
+    int dH,
+    int dW,
+    int padH,
+    int padW,
+    int dilationH,
+    int dilationW) {
+  auto& queue = dpcppGetCurrentQueue();
+  int outputSize = numBatch * numPlane * outputSizeH * outputSizeW;
+  int stride = numPlane * outputSizeH * outputSizeW;
+  BatchKernelConfig cfg = {
+      1, outputSize, 1, 1, true, BatchKernelConfig::Policy::pAdaptive};
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
+      auto desc = cfg.get_item_desc(item);
+
+      do {
+        if (desc.glb_problem < cfg.problem_) {
+          int outputIndex = desc.glb_problem;
+          int batch = outputIndex / stride;
+          int plane, outputH, outputW;
+          int64_t load_offset, store_offset;
+          if constexpr (is_channels_last) {
+            plane = outputIndex % numPlane;
+            outputH = outputIndex / numPlane / outputSizeW % outputSizeH;
+            outputW = outputIndex / numPlane % outputSizeW;
+            store_offset = batch * outputSizeH * outputSizeW * numPlane +
+                plane + outputH * outputSizeW * numPlane + outputW * numPlane;
+          } else {
+            plane = (outputIndex / outputSizeH / outputSizeW) % numPlane;
+            outputH = outputIndex / outputSizeW % outputSizeH;
+            outputW = outputIndex % outputSizeW;
+            store_offset = batch * numPlane * outputSizeH * outputSizeW +
+                plane * outputSizeH * outputSizeW + outputH * outputSizeW +
+                outputW;
+          }
+          scalar_t maxVal = std::numeric_limits<scalar_t>::lowest();
+          int maxIndex = -1;
+          int StartH = outputH * dH - padH;
+          int StartW = outputW * dW - padW;
+          int EndH =
+              Numerics<int>::min(StartH + (kH - 1) * dilationH + 1, inputSizeH);
+          int EndW =
+              Numerics<int>::min(StartW + (kW - 1) * dilationW + 1, inputSizeW);
+          while (StartH < 0)
+            StartH += dilationH;
+          while (StartW < 0)
+            StartW += dilationW;
+#pragma unroll
+          for (int h = StartH; h < EndH; h += dilationH) {
+#pragma unroll
+            for (int w = StartW; w < EndW; w += dilationW) {
+              if constexpr (is_channels_last) {
+                load_offset = batch * inputSizeH * inputSizeW * numPlane +
+                    plane + h * inputSizeW * numPlane + w * numPlane;
+              } else {
+                load_offset = batch * numPlane * inputSizeH * inputSizeW +
+                    plane * inputSizeH * inputSizeW + h * inputSizeW + w;
+              }
+              scalar_t val = input[load_offset];
+              if (val > maxVal) {
+                maxIndex = h * inputSizeW + w;
+                maxVal = val;
+              }
+            }
+          }
+          indices[store_offset] = maxIndex;
+          output[store_offset] = maxVal;
+        }
+      } while (cfg.next(item, desc));
+    };
+    cgh.parallel_for(
+        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
+  };
+  DPCPP_Q_SUBMIT(queue, cgf);
+}
+
+template <typename scalar_t, bool is_channels_last>
+void max_pool2d_backward_out_frame(
+    scalar_t* gradInput,
+    scalar_t* gradOutput,
+    int64_t* indices,
+    int numBatch,
+    int numPlane,
+    int gradInputSizeH,
+    int gradInputSizeW,
+    int gradOutputSizeH,
+    int gradOutputSizeW) {
+  auto& queue = dpcppGetCurrentQueue();
+  int64_t gradOutputSize =
+      numBatch * numPlane * gradOutputSizeH * gradOutputSizeW;
+  auto out_cf_c_stride = gradOutputSizeH * gradOutputSizeW;
+  auto in_cf_c_stride = gradInputSizeH * gradInputSizeW;
+  auto out_n_stride = numPlane * out_cf_c_stride;
+  auto in_n_stride = numPlane * in_cf_c_stride;
+  BatchKernelConfig cfg = {
+      1, gradOutputSize, 1, 1, true, BatchKernelConfig::Policy::pAdaptive};
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
+      auto desc = cfg.get_item_desc(item);
+
+      do {
+        if (desc.glb_problem < cfg.problem_) {
+          int batch = desc.glb_problem / out_n_stride;
+          int outputIndex = desc.glb_problem;
+          if constexpr (is_channels_last) {
+            int plane = outputIndex % numPlane;
+            int64_t index = indices[outputIndex];
+            int64_t gI_offset = batch * in_n_stride + plane + index * numPlane;
+            atomicAdd(
+                (dpcpp_global_ptr_pt<scalar_t>)&gradInput[gI_offset],
+                gradOutput[outputIndex]);
+          } else {
+            int plane = outputIndex / out_cf_c_stride % numPlane;
+            int64_t index = indices[outputIndex];
+            int inputW = index % gradInputSizeW;
+            int inputH = index / gradInputSizeW;
+            int64_t gI_offset =
+                batch * in_n_stride + plane * in_cf_c_stride + index;
+            atomicAdd(
+                (dpcpp_global_ptr_pt<scalar_t>)&gradInput[gI_offset],
+                gradOutput[outputIndex]);
+          }
+        }
+      } while (cfg.next(item, desc));
+    };
+    cgh.parallel_for(
+        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
+  };
+  DPCPP_Q_SUBMIT(queue, cgf);
+} // namespace impl
 
 void max_pool2d_with_indices_out_template(
     Tensor& output,
@@ -202,28 +348,84 @@ void max_pool2d_with_indices_out_template(
     indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
   }
 
-  // per oneDNN definition, no dilation means dilation ratio is 0.
-  // Since dilation is already designed in the output size, no dilation
-  // is used in ::xpu::oneDNN::pooling
-  dilation_vec = {0, 0};
+  if (!DPCPPTensorContext::is_plain(input)) {
+    // per oneDNN definition, no dilation means dilation ratio is 0.
+    // Since dilation is already designed in the output size, no dilation
+    // is used in ::xpu::oneDNN::pooling
+    dilation_vec = {0, 0};
 
-  ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
-      output,
-      indices,
-      input_,
-      nbatch,
-      nInputPlane,
-      0,
-      inputHeight,
-      inputWidth,
-      0,
-      outputHeight,
-      outputWidth,
-      stride_vec,
-      kernel_size_vec,
-      dilation_vec,
-      padding_vec_l,
-      padding_vec_r);
+    ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
+        output,
+        indices,
+        input_,
+        nbatch,
+        nInputPlane,
+        0,
+        inputHeight,
+        inputWidth,
+        0,
+        outputHeight,
+        outputWidth,
+        stride_vec,
+        kernel_size_vec,
+        dilation_vec,
+        padding_vec_l,
+        padding_vec_r);
+  } else {
+    if (is_smf_channels_last(input_)) {
+      IPEX_DISPATCH_FLOATING_TYPES_AND2(
+          at::ScalarType::BFloat16,
+          at::ScalarType::Half,
+          input.scalar_type(),
+          "max_pool2d_out_frame",
+          [&] {
+            max_pool2d_out_frame<scalar_t, true>(
+                output.data_ptr<scalar_t>(),
+                indices.data_ptr<int64_t>(),
+                input_.data_ptr<scalar_t>(),
+                nbatch,
+                nInputPlane,
+                inputHeight,
+                inputWidth,
+                outputHeight,
+                outputWidth,
+                kH,
+                kW,
+                dH,
+                dW,
+                padH,
+                padW,
+                dilationH,
+                dilationW);
+          });
+    } else {
+      IPEX_DISPATCH_FLOATING_TYPES_AND2(
+          at::ScalarType::BFloat16,
+          at::ScalarType::Half,
+          input.scalar_type(),
+          "max_pool2d_out_frame",
+          [&] {
+            max_pool2d_out_frame<scalar_t, false>(
+                output.data_ptr<scalar_t>(),
+                indices.data_ptr<int64_t>(),
+                input_.data_ptr<scalar_t>(),
+                nbatch,
+                nInputPlane,
+                inputHeight,
+                inputWidth,
+                outputHeight,
+                outputWidth,
+                kH,
+                kW,
+                dH,
+                dW,
+                padH,
+                padW,
+                dilationH,
+                dilationW);
+          });
+    }
+  }
 }
 
 Tensor& max_pool2d_with_indices_backward_out_template(
@@ -362,29 +564,63 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       outputWidth,
       memory_format);
 
-  // per oneDNN definition, no dilation means dilation ratio is 0.
-  // Since dilation is already designed in the output size, no dilation
-  // is used in ::xpu::oneDNN::pooling
-  dilation_vec = {0, 0};
-  ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
-      gradInput,
-      gradOutput,
-      input,
-      indices,
-      nbatch,
-      nInputPlane,
-      0,
-      inputHeight,
-      inputWidth,
-      0,
-      outputHeight,
-      outputWidth,
-      stride_vec,
-      kernel_size_vec,
-      dilation_vec,
-      padding_vec_l,
-      padding_vec_r);
-
+  if (!DPCPPTensorContext::is_plain(input)) {
+    // per oneDNN definition, no dilation means dilation ratio is 0.
+    // Since dilation is already designed in the output size, no dilation
+    // is used in ::xpu::oneDNN::pooling
+    dilation_vec = {0, 0};
+    ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
+        gradInput,
+        gradOutput,
+        input,
+        indices,
+        nbatch,
+        nInputPlane,
+        0,
+        inputHeight,
+        inputWidth,
+        0,
+        outputHeight,
+        outputWidth,
+        stride_vec,
+        kernel_size_vec,
+        dilation_vec,
+        padding_vec_l,
+        padding_vec_r);
+  } else {
+    auto gradOutput_ = gradOutput.contiguous(memory_format);
+    gradInput.zero_();
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        gradOutput.scalar_type(),
+        "max_pool2d_backward_out_frame",
+        [&] {
+          if (is_smf_channels_last(input)) {
+            max_pool2d_backward_out_frame<scalar_t, true>(
+                gradInput.data_ptr<scalar_t>(),
+                gradOutput_.data_ptr<scalar_t>(),
+                indices.data_ptr<int64_t>(),
+                nbatch,
+                nInputPlane,
+                inputHeight,
+                inputWidth,
+                outputHeight,
+                outputWidth);
+          } else {
+            max_pool2d_backward_out_frame<scalar_t, false>(
+                gradInput.data_ptr<scalar_t>(),
+                gradOutput_.data_ptr<scalar_t>(),
+                indices.data_ptr<int64_t>(),
+                nbatch,
+                nInputPlane,
+                inputHeight,
+                inputWidth,
+                outputHeight,
+                outputWidth);
+          }
+        });
+  }
   return gradInput;
 }
 

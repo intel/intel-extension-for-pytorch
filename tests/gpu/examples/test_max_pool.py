@@ -12,18 +12,20 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_max_pool(self, dtype=torch.float):
-        x_cpu = torch.ones([2, 2, 3, 3], device=cpu_device, dtype=dtype)
-        grad_cpu = torch.ones([2, 2, 3, 3], device=cpu_device, dtype=dtype)
+        x_cpu = torch.randn([16, 2, 32, 32], device='cpu', dtype=dtype)
+        grad_cpu = torch.randn([16, 2, 17, 30], device='cpu', dtype=dtype)
         x_dpcpp = x_cpu.to("xpu")
         grad_dpcpp = grad_cpu.to("xpu")
 
         conv1 = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=True)
-        max_pool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1, return_indices=True)
+        max_pool = nn.MaxPool2d(kernel_size=(2, 3), stride=(2, 1),
+                                padding=1, dilation=(1,  2), return_indices=True)
 
         x_cpu.requires_grad_(True)
         y_cpu1 = conv1(x_cpu)
         y_cpu = max_pool(y_cpu1)
         print("y_cpu", y_cpu[0])
+        print("y_cpu_idx", y_cpu[1])
         output_cpu = y_cpu[0].backward(grad_cpu)
         print("x_cpu.grad", x_cpu.grad)
 
@@ -34,9 +36,11 @@ class TestNNMethod(TestCase):
         y_dpcpp1 = conv1(x_dpcpp)
         y_dpcpp = max_pool(y_dpcpp1)
         print("y_dpcpp", y_dpcpp[0].to("cpu"))
+        print("y_dpcpp_idx", y_dpcpp[1].to("cpu"))
         output_dpcpp = y_dpcpp[0].backward(grad_dpcpp)
         print("x_dpcpp.grad", x_dpcpp.grad.to("cpu"))
         self.assertEqual(y_cpu[0], y_dpcpp[0].cpu())
+        self.assertEqual(y_cpu[1], y_dpcpp[1].cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     @pytest.mark.skipif(
