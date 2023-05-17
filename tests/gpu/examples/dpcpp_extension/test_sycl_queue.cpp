@@ -16,6 +16,10 @@ bool isSYCLQueueOpaquePointer(void* q_ptr) {
   auto src = at::ones({2, 2}, at::device(at::kXPU).dtype(at::kInt));
   auto dst = at::empty({2, 2}, at::dtype(at::kInt));
 
+  // This code is used to test compiler linker.
+  auto cgf = [&](sycl::handler& cgh) { cgh.single_task([=]() {}); };
+  sycl_queue.submit(cgf);
+
   sycl_queue.memcpy(dst.data_ptr(), src.data_ptr(), src.nbytes()).wait();
   auto dst_accessor = dst.accessor<int32_t, 2>();
 
@@ -39,7 +43,7 @@ bool isSYCLQueuePointer(py::object obj) {
   return false;
 }
 
-PYBIND11_MODULE(check_syclqueue, m) {
+PYBIND11_MODULE(mod_test_sycl_queue, m) {
   m.def(
       "is_sycl_queue_pointer", &isSYCLQueuePointer, "check sycl queue pointer");
 }

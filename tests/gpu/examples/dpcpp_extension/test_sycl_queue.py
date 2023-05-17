@@ -7,21 +7,20 @@ dnnl_path = os.getenv("DNNLROOT")
 
 if dnnl_path is not None:
     module = load(
-        name="check_syclqueue",
+        name="mod_test_sycl_queue",
         sources=["test_sycl_queue.cpp"],
         extra_cflags=["-O2"],
         verbose=True,
     )
 
-    import check_syclqueue
+    import mod_test_sycl_queue
     from torch.testing._internal.common_utils import TestCase
-    import pytest
 
     class TestTorchMethod(TestCase):
         def test_sycl_queue(self):
             s = torch.xpu.current_stream()
             q_ptr = s.sycl_queue
-            self.assertTrue(check_syclqueue.is_sycl_queue_pointer(q_ptr))
+            self.assertTrue(mod_test_sycl_queue.is_sycl_queue_pointer(q_ptr))
 
 else:
     print(

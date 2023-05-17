@@ -31,6 +31,7 @@ EXEC_EXT = ".exe" if IS_WINDOWS else ""
 CLIB_PREFIX = "" if IS_WINDOWS else "lib"
 CLIB_EXT = ".dll" if IS_WINDOWS else ".so"
 SHARED_FLAG = "/DLL" if IS_WINDOWS else "-shared"
+SYCL_FLAG = "-fsycl"
 
 MINIMUM_GCC_VERSION = (5, 0, 0)
 MINIMUM_MSVC_VERSION = (19, 0, 24215)
@@ -320,7 +321,7 @@ class DpcppBuildExtension(build_ext, object):
             runtime_library_dirs_args += [f"-L{x}" for x in runtime_library_dirs]
 
             libraries_args = []
-            common_args = ['-shared', '-fsycl']
+            common_args = [SHARED_FLAG] + [SYCL_FLAG]
 
             """
             link command formats:
@@ -798,10 +799,10 @@ def library_paths() -> List[str]:
 
 def _prepare_compile_flags(extra_compile_args):
     if isinstance(extra_compile_args, List):
-        extra_compile_args.append("-fsycl")
+        extra_compile_args.append(SYCL_FLAG)
     elif isinstance(extra_compile_args, dict):
         cl_flags = extra_compile_args.get("cxx", [])
-        cl_flags.append("-fsycl")
+        cl_flags.append(SYCL_FLAG)
         extra_compile_args["cxx"] = cl_flags
 
     return extra_compile_args
@@ -1036,7 +1037,7 @@ def _write_ninja_file_to_build_library(
         return target
 
     objects = [object_file_path(src) for src in sources]
-    ldflags = ([] if is_standalone else [SHARED_FLAG]) + extra_ldflags
+    ldflags = ([] if is_standalone else [SHARED_FLAG]) + [SYCL_FLAG] + extra_ldflags
 
     # The darwin linker needs explicit consent to ignore unresolved symbols.
     if IS_MACOS:
