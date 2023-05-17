@@ -180,13 +180,15 @@ std::vector<Tensor> _foreach_sub(TensorList tensors, const Scalar& scalar) {
     return at::native::foreach_tensor_sub_scalar_kernel_slow(tensors, scalar);
   }
 
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+  return IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       kBool,
       kHalf,
       kBFloat16,
       tensors[0].scalar_type(),
       "foreach_binary_op_scalar",
-      [&]() { foreach_binary_op<scalar_t, std::minus>(tensors, scalar); });
+      [&]() {
+        return foreach_binary_op<scalar_t, std::minus>(tensors, scalar);
+      });
 }
 
 FOREACH_BINARY_OP_SCALAR(
