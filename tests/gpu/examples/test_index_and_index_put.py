@@ -119,4 +119,3 @@ class TestTorchMethod(TestCase):
         b = torch.randn([5, 0], dtype=dtype, device=torch.device("xpu"))
         a[:5, :] = a[:5, :] * 2 + b
         torch.use_deterministic_algorithms(False)
-
