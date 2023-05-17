@@ -64,7 +64,6 @@ supported:
   - _reshape_alias  # newly added
   - _segment_reduce_backward
   - _sample_dirichlet
-  # - _scaled_dot_product_attention_forward
   - _softmax.out
   - _softmax_backward_data.out
   - _linalg_svd.U
