@@ -649,7 +649,6 @@ supported:
   - upsample_nearest2d.out
   - upsample_nearest2d_backward.grad_input
   - upsample_nearest3d.out
-  - upsample_nearest3d.vec
   - upsample_nearest3d_backward.grad_input
   - upsample_trilinear3d.out
   - upsample_trilinear3d_backward.grad_input
@@ -658,7 +657,6 @@ supported:
   - _upsample_nearest_exact2d.out
   - _upsample_nearest_exact2d_backward.grad_input
   - _upsample_nearest_exact3d.out
-  - _upsample_nearest_exact3d.vec
   - _upsample_nearest_exact3d_backward.grad_input
   - var.correction
   - var_mean.correction
