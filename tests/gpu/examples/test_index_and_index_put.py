@@ -112,3 +112,11 @@ class TestTorchMethod(TestCase):
         torch.ops.aten._index_put_impl_(a_cpu, idx_cpu, values_cpu, True)
         self.assertEqual(a_cpu, a.cpu())
         torch.use_deterministic_algorithms(False)
+
+    def test_index_put_with_zero_shape_dim(self, dtype=torch.bfloat16):
+        torch.use_deterministic_algorithms(True)
+        a = torch.randn([10, 0], dtype=dtype, device=torch.device("xpu"))
+        b = torch.randn([5, 0], dtype=dtype, device=torch.device("xpu"))
+        a[:5, :] = a[:5, :] * 2 + b
+        torch.use_deterministic_algorithms(False)
+

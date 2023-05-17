@@ -750,6 +750,9 @@ void index_put_deterministic_kernel(
     int64_t stride_before,
     int64_t outer_dim,
     bool accumulate) {
+  if (outer_dim * stride == 0 || numel == 0) {
+    return;
+  }
   int64_t v_stride_before = numel * stride;
   BatchKernelConfig cfg = {
       /* num of indices      */ numel,
