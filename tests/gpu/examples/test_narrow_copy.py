@@ -1,5 +1,5 @@
 import torch
-import intel_extension_for_pytorch # noqa
+import intel_extension_for_pytorch  # noqa
 
 from torch.testing._internal.common_utils import TestCase
 
@@ -11,8 +11,6 @@ class TestTorchMethod(TestCase):
 
         input0 = torch.randn(8192, 8192, device="xpu")
         input0_cpu = input0.to("cpu")
-        result_functional = torch.square(input0)
-        result_out = torch.empty(8192, 8192, device="xpu")
         dim = 0
         start = 4
         end = 4096
