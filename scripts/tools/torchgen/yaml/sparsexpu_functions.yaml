@@ -22,3 +22,4 @@ supported:
   - add_.Tensor
   - add.out
   - _to_dense
+  - narrow_copy
