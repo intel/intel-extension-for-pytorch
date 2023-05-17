@@ -56,3 +56,14 @@ class TestTorchMethod(TestCase):
         out_cpu = table[rel_position_index.view(-1)]
         out_xpu = table_xpu[rel_position_index.view(-1)]
         self.assertEqual(out_cpu, out_xpu.cpu())
+
+    def test_index_small_shape(self, dtype=torch.float):
+        vertices_cpu = torch.randn([16367, 1, 3])
+        vertices_xpu = vertices_cpu.to("xpu")
+
+        vert_filter_cpu_rand=torch.rand([16367]) < 0.8
+        vert_filter_xpu_rand=vert_filter_cpu_rand.to("xpu")
+
+        result_cpu=vertices_cpu[vert_filter_cpu_rand]
+        result_xpu=vertices_xpu[vert_filter_xpu_rand]
+        self.assertEqual(result_cpu, result_xpu.cpu())

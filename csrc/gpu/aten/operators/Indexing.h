@@ -686,7 +686,7 @@ void dpcpp_index_kernel(
   // While the satified case is input[:,idx1,idx2], indices_sizes=[1,sz,sz]
   bool small_index = non_index_size.size() != 0 && iter.tensor(1).dim() == 3;
   auto indices_sizes = iter.tensor(2).sizes();
-  for (size_t i = 1; i < num_indices; ++i) {
+  for (size_t i = 1; i < iter.tensor(2).dim(); ++i) {
     if (indices_sizes[i - 1] > indices_sizes[i]) {
       small_index = false;
       break;
