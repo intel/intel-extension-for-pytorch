@@ -21,7 +21,6 @@ supported:
   - int_repr
   - leaky_relu
   - leaky_relu_
-  - max_pool2d_with_indices
   - q_per_channel_axis
   - q_per_channel_scales
   - q_per_channel_zero_points

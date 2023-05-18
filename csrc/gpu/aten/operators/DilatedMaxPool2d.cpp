@@ -651,28 +651,6 @@ std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
   return std::tuple<Tensor&, Tensor&>(output, indices);
 }
 
-std::tuple<Tensor, Tensor> max_pool2d_with_indices(
-    const Tensor& input,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    IntArrayRef dilation,
-    bool ceil_mode) {
-  Tensor output, indices;
-  output = at::empty({0}, input.options());
-  indices = at::empty({0}, input.options().dtype(kLong));
-
-  return at::AtenIpexTypeXPU::max_pool2d_with_indices_out(
-      input,
-      kernel_size,
-      stride,
-      padding,
-      dilation,
-      ceil_mode,
-      output,
-      indices);
-}
-
 Tensor& max_pool2d_with_indices_backward_out(
     const Tensor& grad_output_,
     const Tensor& self_,
@@ -719,79 +697,5 @@ Tensor& max_pool2d_with_indices_backward_out(
   return grad_input;
 }
 
-Tensor max_pool2d_with_indices_backward(
-    const Tensor& grad_output_,
-    const Tensor& self_,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    IntArrayRef dilation,
-    bool ceil_mode,
-    const Tensor& indices_) {
-  /* PyTorch support two cases of MaxPool2d:
-     1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
-     This case does not support channel last format. For a 3-dim tensor,
-     the PyTorch suggest_memory_format can only be Contiguous or
-     ChannelsLast1D (nwc), the ChannelsLast1D (nwc) does not match the sementics
-     of Input (C, H, W) case. Then the suggest_memory_format can only be
-     Contiguous.
-     2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
-     This case supports Contiguous and ChannelsLast2D memory_format. */
-  Tensor self, grad_output, indices, grad_input;
-  if (self_.ndimension() == 3) {
-    self = self_.contiguous();
-    grad_output = grad_output_.contiguous();
-    indices = indices_.contiguous();
-    grad_input = at::empty_like(self);
-  } else {
-    auto smf = self_.suggest_memory_format();
-    self = contiguous_if_needed(self_, smf);
-    grad_output = contiguous_if_needed(grad_output_, smf);
-    indices = contiguous_if_needed(indices_, smf);
-    grad_input = at::empty_like(self, smf);
-  }
-  impl::max_pool2d_with_indices_backward_out_template(
-      grad_input,
-      grad_output,
-      self,
-      indices,
-      kernel_size,
-      stride,
-      padding,
-      dilation,
-      ceil_mode);
-  return grad_input;
-}
-
 } // namespace AtenIpexTypeXPU
-
-namespace AtenIpexTypeQuantizedXPU {
-
-std::tuple<Tensor, Tensor> max_pool2d_with_indices(
-    const Tensor& input,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    IntArrayRef dilation,
-    bool ceil_mode) {
-  Tensor output, indices;
-  output = at::_empty_affine_quantized(
-      {0},
-      input.options(),
-      input.q_scale(),
-      input.q_zero_point(),
-      MemoryFormat::Contiguous); // Relu fusion?
-  indices = at::empty({0}, input.options().dtype(kLong));
-
-  return at::AtenIpexTypeXPU::max_pool2d_with_indices_out(
-      input,
-      kernel_size,
-      stride,
-      padding,
-      dilation,
-      ceil_mode,
-      output,
-      indices);
-}
-} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at
