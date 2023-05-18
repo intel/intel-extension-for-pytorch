@@ -13,8 +13,8 @@ class TestNNMethod(TestCase):
         x1 = torch.randn(5, 5)
         x1_dpcpp = x1.to("xpu")
 
-        y1 = torch.stft(x1, 1, hop_length=1)
-        y1_dpcpp = torch.stft(x1_dpcpp, 1, hop_length=1)
+        y1 = torch.stft(x1, 1, hop_length=1, return_complex=True)
+        y1_dpcpp = torch.stft(x1_dpcpp, 1, hop_length=1, return_complex=True)
         self.assertEqual(y1, y1_dpcpp.cpu())
 
         x2 = torch.randn(5, 6, 7)

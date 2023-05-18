@@ -192,7 +192,7 @@ class TestDistributions(TestCase):
 
     def test_log_normal(self):
         torch.set_default_dtype(torch.double)
-        for device in torch.testing.get_all_device_types():
+        for device in torch.testing._internal.common_device_type.get_all_device_types():
             a = torch.tensor([10], dtype=torch.float, device=device).log_normal_()
             self.assertEqual(a.dtype, torch.float)
             self.assertEqual(a.size(), torch.Size([1]))

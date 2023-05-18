@@ -15,9 +15,9 @@ class TestNNMethod(TestCase):
                 abcd = [a, b, c, d]
                 random.shuffle(abcd)
                 x_cpu = torch.randn(abcd).to(dtype)
-                x_cpu = torch.testing.make_non_contiguous(x_cpu)
+                x_cpu = torch.testing._internal.common_utils.noncontiguous_like(x_cpu)
                 x_xpu = x_cpu.clone().xpu()
-                x_xpu = torch.testing.make_non_contiguous(x_xpu)
+                x_xpu = torch.testing._internal.common_utils.noncontiguous_like(x_xpu)
                 dim = random.randint(0, 3)
                 descending = b % 2 == 0
                 x_cpu = torch.sort(x_cpu, dim=dim, descending=descending)[0]
