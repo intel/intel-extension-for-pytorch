@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/Tensor.h>
+#include <dyndisp/DispatchStub.h>
 #include <torch/csrc/autograd/custom_function.h>
 #include <vector>
 
@@ -75,10 +76,61 @@ at::Tensor ipex_linear_eltwise(
     const at::Tensor& op_context,
     const c10::optional<int64_t> out_features);
 
+at::Tensor woq_linear_pack_weight(
+    const at::Tensor& weight,
+    const at::Tensor& zero_points,
+    const at::Tensor& scale);
+
+at::Tensor woq_linear_unpack_weight(const at::Tensor& weight);
+
+void woq_linear_kernel_output(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const at::Tensor& zero_points_float,
+    const at::Tensor& scales_float,
+    const at::Tensor& bias,
+    at::Tensor& output);
+
 at::Tensor woq_linear_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
+    const at::Tensor& zero_points_float,
+    const at::Tensor& scales_float,
     const at::Tensor& bias);
 
+namespace {
+void woq_gemm_kernel_impl(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const at::Tensor& zero_points_float,
+    const at::Tensor& scales_float,
+    const at::Tensor& bias,
+    at::Tensor& output);
+
+at::Tensor woq_linear_packB_impl(
+    const at::Tensor& weight,
+    const at::Tensor& zero_points,
+    const at::Tensor& scales);
+
+at::Tensor woq_linear_unpackB_impl(const at::Tensor& weight);
+
+} // namespace
+
+using woq_gemm_kernel_fn = void (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    at::Tensor&);
+
+using woq_linear_packB_fn =
+    at::Tensor (*)(const at::Tensor&, const at::Tensor&, const at::Tensor&);
+
+using woq_linear_unpackB_fn = at::Tensor (*)(const at::Tensor&);
+
+DECLARE_DISPATCH(woq_gemm_kernel_fn, woq_gemm_kernel_stub);
+DECLARE_DISPATCH(woq_linear_packB_fn, woq_linear_packB_stub);
+DECLARE_DISPATCH(woq_linear_unpackB_fn, woq_linear_unpackB_stub);
 } // namespace cpu
 } // namespace torch_ipex

@@ -10,6 +10,7 @@
 #include "ContextLinear.h"
 #include "ContextLinearMKL.h"
 #include "ContextLinearWoq.h"
+#include "assert.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -376,12 +377,18 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
 class IpexWoqLinearOpContext final : public WoqLinearOpContext {
  private:
   detail::ContextLinearWoq op_context_;
+  at::Tensor zero_points_float_;
+  at::Tensor scales_float_;
 
  public:
   IpexWoqLinearOpContext(
       c10::optional<int64_t> batch_size,
-      detail::ContextLinearWoq&& op_context)
-      : op_context_(std::move(op_context)) {
+      detail::ContextLinearWoq&& op_context,
+      at::Tensor&& zero_point_float,
+      at::Tensor&& scales_float)
+      : op_context_(std::move(op_context)),
+        zero_points_float_(std::move(zero_point_float)),
+        scales_float_(std::move(scales_float)) {
     batch_size_ = batch_size;
   }
 

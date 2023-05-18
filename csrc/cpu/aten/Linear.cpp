@@ -329,20 +329,55 @@ at::Tensor linear_eltwise_forward_meta(
   return output;
 }
 
+DEFINE_DISPATCH(woq_linear_packB_stub);
+at::Tensor woq_linear_pack_weight(
+    const at::Tensor& weight,
+    const at::Tensor& zero_points,
+    const at::Tensor& scales) {
+  return woq_linear_packB_stub(kCPU, weight, zero_points, scales);
+}
+
+DEFINE_DISPATCH(woq_linear_unpackB_stub);
+at::Tensor woq_linear_unpack_weight(const at::Tensor& weight) {
+  return woq_linear_unpackB_stub(kCPU, weight);
+}
+
+DEFINE_DISPATCH(woq_gemm_kernel_stub);
+void woq_linear_kernel_output(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const at::Tensor& zero_points_float,
+    const at::Tensor& scales_float,
+    const at::Tensor& bias,
+    at::Tensor& output) {
+  woq_gemm_kernel_stub(
+      kCPU, self, weight, zero_points_float, scales_float, bias, output);
+}
+
 at::Tensor woq_linear_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
+    const at::Tensor& zero_points_float,
+    const at::Tensor& scales_float,
     const at::Tensor& bias) {
   TORCH_CHECK(
       weight.is_quantized(),
       "Weight only quantized linear: weight should be quantized!");
-  auto w = weight.dequantize();
   if (self.scalar_type() != c10::ScalarType::Float) {
+    auto w = weight.dequantize();
     auto x = self.to(c10::ScalarType::Float);
     auto out = at::linear(x, w, bias);
     return out.to(self.scalar_type());
+  } else {
+    auto input_size = self.sizes();
+    std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
+    output_size.push_back(weight.size(0));
+    auto output = at::empty(output_size, self.options());
+    output.set_requires_grad(self.requires_grad());
+    woq_linear_kernel_output(
+        self, weight, zero_points_float, scales_float, bias, output);
+    return output;
   }
-  return at::linear(self, w, bias);
 }
 
 at::Tensor woq_linear_forward(

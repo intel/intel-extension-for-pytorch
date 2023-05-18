@@ -18,8 +18,8 @@ from test_autocast import get_rand_seed
 
 import intel_extension_for_pytorch as ipex
 from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
-
-import intel_extension_for_pytorch as ipex
+from torch.ao.nn.quantized.modules.utils import _quantize_weight
+from intel_extension_for_pytorch.quantization import prepare, convert
 
 class TestDefaultRecipe(JitLlgaTestCase):
     def test_quantized_op_int8_int8(self):
@@ -366,24 +366,52 @@ class TestDefaultRecipe(JitLlgaTestCase):
         with self.assertRaises(AssertionError):
             prepared_model = ipex.quantization.prepare(m, qconfig_mapping)
 
-    def test_weight_only_quantization_path(self):
+    def test_weight_only_quantization(self):
         class M(nn.Module):
-            def __init__(self, use_bias):
+            def __init__(self, input_channel, output_channel, has_bias):
                 super(M, self).__init__()
-                self.linear = torch.nn.Linear(4, 4, use_bias)
+                self.linear = torch.nn.Linear(input_channel, output_channel, has_bias)
 
             def forward(self, x):
                 return self.linear(x)
 
-        for use_bias in [True, False]:
-            m = M(use_bias).eval()
-            x = torch.rand(4, 4)
+        def test(feature, has_bias):
+            model = M(feature[1], feature[2], has_bias)
+            m = model.eval()
+            data = torch.rand(feature[0], feature[1])
+            weight = model.linear.weight
+            weight_observer = (
+                ipex.quantization.weight_only_quant_qconfig_mapping.global_qconfig.weight()
+            )
+            weight_observer(weight)
+            weight_int8 = _quantize_weight(weight, weight_observer)
+            weight_fp32 = weight_int8.dequantize()
+            if has_bias:
+                bias = model.linear.bias
+                output1 = torch.matmul(data, weight_fp32.T) + bias
+            else:
+                output1 = torch.matmul(data, weight_fp32.T)
+
             qconfig = ipex.quantization.weight_only_quant_qconfig_mapping
-            prepared_model = ipex.quantization.prepare(m, qconfig, example_inputs=x, inplace=False)
-            woq_model = ipex.quantization.convert(prepared_model)
-            woq_model(x)
-            woq_linear_class = ipex.nn.modules.weight_only_quantization.IpexWoqLinear
-            assert isinstance(woq_model.linear, woq_linear_class)
+            prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
+            with torch.no_grad():
+                woq_model = convert(prepared_model)
+                woq_linear_class = ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                assert isinstance(woq_model.linear, woq_linear_class)
+        
+                output2 = woq_model(data)
+                torch.testing.assert_close(output1, output2, rtol=1e-04, atol=1e-05)
+
+        case_list = [
+            [3, 31, 31],
+            [4, 4096, 4096],
+            [9, 4095, 4095],
+            [196, 4095, 16383],
+        ]
+        for case in case_list:
+            test(case, True)
+            test(case, False)
+
 
     def test_weight_only_quantization_autocast(self):
         class M(nn.Module):
@@ -405,5 +433,52 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 woq_linear_class = ipex.nn.modules.weight_only_quantization.IpexWoqLinear
                 assert isinstance(woq_model.linear, woq_linear_class)
 
-if __name__ == '__main__':
-    run_tests() 
+    def test_weight_only_quantization_jit_save_load(self):
+        class M(nn.Module):
+            def __init__(self, input_channel, output_channel, has_bias):
+                super(M, self).__init__()
+                self.linear = torch.nn.Linear(input_channel, output_channel, has_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        def test(feature, has_bias):
+            model = M(feature[1], feature[2], has_bias)
+            m = model.eval()
+            example_inputs = torch.rand(feature[0], feature[1])
+
+            qconfig = ipex.quantization.weight_only_quant_qconfig_mapping
+            prepared_model = prepare(
+                m, qconfig, example_inputs=example_inputs, inplace=False
+            )
+            with torch.no_grad():
+                converted_model = convert(prepared_model)
+
+                with tempfile.NamedTemporaryFile() as fp:
+                    # save
+                    with torch.no_grad():
+                        traced_model = torch.jit.trace(converted_model, example_inputs)
+                        traced_model = torch.jit.freeze(traced_model)
+                        traced_model.save(fp.name)
+
+                    # load
+                    loaded_model = torch.jit.load(fp.name)
+
+                    # Compare results of original model and loaded model
+                    output_ref = traced_model(example_inputs)
+                    output = loaded_model(example_inputs)
+                    torch.testing.assert_close(output_ref, output)
+
+        case_list = [
+            [3, 31, 31],
+            [4, 4096, 4096],
+            [9, 4095, 4095],
+            [196, 4095, 16383],
+        ]
+        for case in case_list:
+            test(case, True)
+            test(case, False)
+
+
+if __name__ == "__main__":
+    run_tests()
