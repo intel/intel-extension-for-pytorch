@@ -286,37 +286,6 @@ Tensor& avg_pool2d_out(
   return output;
 }
 
-Tensor avg_pool2d(
-    const Tensor& input,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    bool ceil_mode,
-    bool count_include_pad,
-    c10::optional<int64_t> divisor_override) {
-  Tensor output;
-  if (input.is_quantized()) {
-    output = at::_empty_affine_quantized(
-        {0},
-        input.options(),
-        input.q_scale(),
-        input.q_zero_point(),
-        MemoryFormat::Contiguous);
-  } else {
-    output = at::empty({0}, input.options());
-  }
-
-  return at::AtenIpexTypeXPU::avg_pool2d_out(
-      input,
-      kernel_size,
-      stride,
-      padding,
-      ceil_mode,
-      count_include_pad,
-      divisor_override,
-      output);
-}
-
 Tensor& avg_pool2d_backward_out(
     const Tensor& grad_output_,
     const Tensor& self_,
@@ -362,79 +331,9 @@ Tensor& avg_pool2d_backward_out(
       count_include_pad);
   return grad_input;
 }
-
-Tensor avg_pool2d_backward(
-    const Tensor& grad_output_,
-    const Tensor& self_,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    bool ceil_mode,
-    bool count_include_pad,
-    c10::optional<int64_t> divisor_override) {
-  TORCH_CHECK(
-      !divisor_override.has_value(),
-      "dpcpp_avg_pool2d operator does not support divisor");
-
-  /* PyTorch support two cases of AvgPool2d:
-     1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
-     This case does not support channel last format. For a 3-dim tensor,
-     the suggest_memory_format can only be Contiguous or ChannelsLast1D
-     (nwc), the ChannelsLast1D (nwc) does not match the sementics of Input (C,
-     H, W) case. Then the suggest_memory_format can only be Contiguous.
-     2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
-     This case supports Contiguous and ChannelsLast2D memory_format. */
-  Tensor self, grad_output, grad_input;
-  if (self_.ndimension() == 3) {
-    self = self_.contiguous();
-    grad_output = grad_output_.contiguous();
-    grad_input = at::empty_like(self);
-  } else {
-    auto smf = self_.suggest_memory_format();
-    self = contiguous_if_needed(self_, smf);
-    grad_output = contiguous_if_needed(grad_output_, smf);
-    grad_input = at::empty_like(self, smf);
-  }
-
-  impl::avg_pool2d_backward_out_template(
-      grad_input,
-      grad_output,
-      self,
-      kernel_size,
-      stride,
-      padding,
-      ceil_mode,
-      count_include_pad);
-  return grad_input;
-}
-
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
-
-Tensor& avg_pool2d_out(
-    const Tensor& input,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    bool ceil_mode,
-    bool count_include_pad,
-    c10::optional<int64_t> divisor_override,
-    Tensor& output) {
-  TORCH_CHECK(
-      !divisor_override.has_value(),
-      "dpcpp_avg_pool2d operator does not support divisor");
-  at::AtenIpexTypeXPU::impl::avg_pool2d_out_template(
-      output,
-      input,
-      kernel_size,
-      stride,
-      padding,
-      ceil_mode,
-      count_include_pad);
-  return output;
-}
-
 Tensor avg_pool2d(
     const Tensor& input,
     IntArrayRef kernel_size,

@@ -320,26 +320,6 @@ Tensor& avg_pool3d_out(
   return out;
 }
 
-Tensor avg_pool3d(
-    const Tensor& self,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    bool ceil_mode,
-    bool count_include_pad,
-    c10::optional<int64_t> divisor_override) {
-  Tensor output = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::avg_pool3d_out(
-      self,
-      kernel_size,
-      stride,
-      padding,
-      ceil_mode,
-      count_include_pad,
-      divisor_override,
-      output);
-}
-
 Tensor& avg_pool3d_backward_out(
     const Tensor& grad_output_,
     const Tensor& self_,
@@ -381,47 +361,5 @@ Tensor& avg_pool3d_backward_out(
       count_include_pad);
   return grad_input;
 }
-
-Tensor avg_pool3d_backward(
-    const Tensor& grad_output_,
-    const Tensor& self_,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    bool ceil_mode,
-    bool count_include_pad,
-    c10::optional<int64_t> divisor_override) {
-  TORCH_CHECK(
-      !divisor_override.has_value(),
-      "dpcpp_avg_pool3d operator does not support divisor");
-
-  Tensor self, grad_output, grad_input;
-  if (self_.ndimension() == 4) {
-    // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
-    // cannot give channels last for 4D tensor from frontend user perspective
-    // the 2nd dim is outputDepth, not channel dim
-    self = self_.contiguous();
-    grad_output = grad_output_.contiguous();
-    grad_input = at::empty_like(self);
-  } else {
-    // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
-    // smf supports ChannelsLast3D and Contiguous cases.
-    auto smf = self_.suggest_memory_format();
-    self = self_.contiguous(smf);
-    grad_output = grad_output_.contiguous(smf);
-    grad_input = at::empty_like(self, smf);
-  }
-  impl::avg_pool3d_backward_out_template(
-      grad_input,
-      grad_output,
-      self,
-      kernel_size,
-      stride,
-      padding,
-      ceil_mode,
-      count_include_pad);
-  return grad_input;
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at
