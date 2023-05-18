@@ -845,34 +845,6 @@ std::tuple<Tensor&, Tensor&> nll_loss_forward_out(
   return std::tuple<Tensor&, Tensor&>(output, total_weight);
 }
 
-std::tuple<at::Tensor, at::Tensor> nll_loss_forward(
-    const Tensor& self,
-    const Tensor& target,
-    const optional<Tensor>& weight,
-    int64_t reduction,
-    int64_t ignore_index) {
-  auto output = at::empty({}, self.options());
-  auto total_weight = at::empty({}, self.options());
-
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "ClassNLLCriterion_updateOutput",
-      [&]() {
-        impl::ClassNLLCriterion_updateOutput<scalar_t>(
-            self,
-            target,
-            output,
-            weight,
-            total_weight,
-            reduction,
-            ignore_index);
-      });
-
-  return std::tuple<Tensor&, Tensor&>(output, total_weight);
-}
-
 Tensor& nll_loss_backward_out(
     const Tensor& grad_output,
     const Tensor& self,
@@ -882,34 +854,6 @@ Tensor& nll_loss_backward_out(
     int64_t ignore_index,
     const Tensor& total_weight,
     Tensor& grad_input) {
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "ClassNLLCriterion_updateGradInput",
-      [&]() {
-        impl::ClassNLLCriterion_updateGradInput<scalar_t>(
-            self,
-            target,
-            grad_output,
-            grad_input,
-            reduction,
-            weight,
-            total_weight,
-            ignore_index);
-      });
-  return grad_input;
-}
-
-Tensor nll_loss_backward(
-    const Tensor& grad_output,
-    const Tensor& self,
-    const Tensor& target,
-    const optional<Tensor>& weight,
-    int64_t reduction,
-    int64_t ignore_index,
-    const Tensor& total_weight) {
-  auto grad_input = at::empty_like(self, c10::MemoryFormat::Contiguous);
-
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),

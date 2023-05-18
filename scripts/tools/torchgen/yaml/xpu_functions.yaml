@@ -431,9 +431,7 @@ supported:
   - nll_loss2d_backward.grad_input
   - nll_loss2d_forward
   - nll_loss2d_forward.output
-  - nll_loss_backward
   - nll_loss_backward.grad_input
-  - nll_loss_forward
   - nll_loss_forward.output
   - nonzero
   - nonzero.out
