@@ -465,8 +465,8 @@ supported:
   - pow.Tensor_Scalar_out
   - pow.Tensor_Tensor
   - pow.Tensor_Tensor_out
-  - prelu
-  # - prelu_backward
+  - _prelu_kernel
+  - _prelu_kernel_backward
   - prod
   - prod.dim_int
   - prod.int_out

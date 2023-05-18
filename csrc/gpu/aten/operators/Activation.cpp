@@ -172,177 +172,29 @@ inline void _rrelu_with_noise_train(
   }
 }
 
-inline void launch_prelu_kernel_share_weights(
-    TensorIteratorBase& iter,
-    const TensorBase& weight) {
+inline void _prelu_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      iter.input_dtype(),
-      "prelu",
-      [&] {
-        const auto* weight_data = weight.data_ptr<scalar_t>();
+      kBFloat16, kHalf, iter.dtype(), "prelu_dpcpp", [&] {
         dpcpp_kernel_for_tensor_iter(
-            iter, [weight_data](scalar_t input_val) -> scalar_t {
-              return (input_val > 0) ? input_val : *weight_data * input_val;
+            iter, [=](scalar_t input, scalar_t weight) -> scalar_t {
+              return (input > 0) ? input : weight * input;
             });
       });
 }
 
-inline void launch_prelu_kernel_multi_weights(
-    const TensorBase& result,
-    const TensorBase& input,
-    const TensorBase& weight) {
-  auto& sycl_queue = dpcppGetCurrentQueue();
-  int64_t input_ndim = input.dim();
-  TORCH_CHECK(input_ndim > 0, "Not allow zero-dim input tensor.");
-
-  int64_t channel_size = 1; // channel_size default to 1
-  int64_t input_stride0 = 1, input_stride1 = 1;
-
-  if (input_ndim > 1) {
-    channel_size = input.size(1); // channel is the 2nd dim of input
-    auto strides = input.strides();
-    input_stride0 = strides[0];
-    input_stride1 = strides[1];
-  }
-  const int64_t weight_num = weight.numel();
-  TORCH_CHECK(
-      channel_size == weight_num,
-      "Mismatch of parameter numbers and input channel size. Found parameter numbers = ",
-      weight_num,
-      " and channel size = ",
-      channel_size,
-      ".");
-
-  // config to run cuda kernel
-  int64_t input_numel = input.numel();
-  auto group_size = std::min(
-      static_cast<int64_t>(
-          dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue())),
-      input_numel);
-  auto num_groups = (input_numel + group_size - 1) / group_size;
+inline void _prelu_kernel_backward_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      input.scalar_type(),
-      "prelu",
-      [&] {
-        auto result_data = result.data_ptr<scalar_t>();
-        auto input_data = input.data_ptr<scalar_t>();
-        auto weight_data = weight.data_ptr<scalar_t>();
-
-        auto cgf = DPCPP_Q_CGF(cgh) {
-          auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-            int64_t linearId = item.get_group(0) * item.get_local_range(0) +
-                item.get_local_id(0);
-            if (linearId >= input_numel)
-              return;
-            // multiply values at each channel with weight[channel_index]
-            int64_t channel = (linearId % input_stride0) / input_stride1;
-            scalar_t input_data_val = input_data[linearId];
-            result_data[linearId] = (input_data_val > 0)
-                ? input_data_val
-                : weight_data[channel] * input_data_val;
-          };
-          cgh.parallel_for(
-              sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
-        };
-        DPCPP_Q_SUBMIT(sycl_queue, cgf);
-      });
-}
-
-inline void launch_prelu_backward_kernel_share_weights(
-    TensorIteratorBase& iter,
-    const TensorBase& weight) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      iter.input_dtype(),
-      "prelu_backward",
-      [&] {
-        const auto* weight_data = weight.data_ptr<scalar_t>();
+      kBFloat16, kHalf, iter.dtype(), "prelu_backward_dpcpp", [&] {
         dpcpp_kernel_multiple_outputs_for_tensor_iter(
             iter,
             [=](scalar_t input,
-                scalar_t grad_out) -> std::tuple<scalar_t, bool> {
-              scalar_t input_grad =
-                  input > 0 ? grad_out : (*weight_data) * grad_out;
-              scalar_t weight_grad_collector =
-                  input > 0 ? scalar_t(0) : input * grad_out;
-              return {input_grad, weight_grad_collector};
+                scalar_t weight,
+                scalar_t grad) -> std::tuple<scalar_t, scalar_t> {
+              auto mask = input > 0;
+              auto grad_input = mask ? grad : weight * grad;
+              auto grad_weight = mask ? scalar_t{0} : input * grad;
+              return {grad_input, grad_weight};
             });
-      });
-}
-
-inline void launch_prelu_backward_kernel_multi_weights(
-    const TensorBase& input,
-    const TensorBase& weight,
-    const TensorBase& grad_out,
-    const TensorBase& input_grad,
-    const TensorBase& weight_grad_collector) {
-  auto& sycl_queue = dpcppGetCurrentQueue();
-  int64_t input_ndim = input.dim();
-  TORCH_CHECK(input_ndim > 0, "Not allow zero-dim input tensor.");
-
-  int64_t channel_size = 1; // channel_size default to 1
-  int64_t input_stride0 = 1, input_stride1 = 1;
-
-  if (input_ndim > 1) {
-    channel_size = input.size(1); // channel is the 2nd dim of input
-    auto strides = input.strides();
-    input_stride0 = strides[0];
-    input_stride1 = strides[1];
-  }
-  const int64_t weight_num = weight.numel();
-  TORCH_CHECK(
-      channel_size == weight_num,
-      "Mismatch of parameter numbers and input channel size. Found parameter numbers = ",
-      weight_num,
-      " and channel size = ",
-      channel_size,
-      ".");
-
-  // config to run cuda kernel
-  int64_t input_numel = input.numel();
-  auto group_size = std::min(
-      static_cast<int64_t>(
-          dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue())),
-      input_numel);
-  auto num_groups = (input_numel + group_size - 1) / group_size;
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      input.scalar_type(),
-      "prelu_backward",
-      [&] {
-        auto input_data = input.data_ptr<scalar_t>();
-        auto weight_data = weight.data_ptr<scalar_t>();
-        auto grad_out_data = grad_out.data_ptr<scalar_t>();
-        auto input_grad_data = input_grad.data_ptr<scalar_t>();
-        auto weight_grad_collector_data =
-            weight_grad_collector.data_ptr<scalar_t>();
-
-        auto cgf = DPCPP_Q_CGF(cgh) {
-          auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-            int64_t linearId = item.get_group(0) * item.get_local_range(0) +
-                item.get_local_id(0);
-            if (linearId >= input_numel)
-              return;
-            int64_t channel = (linearId % input_stride0) / input_stride1;
-            scalar_t input_data_val = input_data[linearId];
-            scalar_t grad_out_data_val = grad_out_data[linearId];
-            input_grad_data[linearId] = (input_data_val > 0)
-                ? grad_out_data_val
-                : weight_data[channel] * grad_out_data_val;
-            weight_grad_collector_data[linearId] = (input_data_val > 0)
-                ? scalar_t(0)
-                : input_data_val * grad_out_data_val;
-          };
-          cgh.parallel_for(
-              sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
-        };
-        DPCPP_Q_SUBMIT(sycl_queue, cgf);
       });
 }
 
@@ -609,75 +461,33 @@ Tensor rrelu_with_noise_backward(
   }
 }
 
-Tensor prelu(const Tensor& self, const Tensor& weight_) {
-  auto input = self.contiguous();
-  auto weight = weight_.contiguous();
-
-  TORCH_CHECK(input.is_contiguous());
-  TORCH_CHECK(weight.is_contiguous());
-
-  int64_t weight_num = weight.numel();
-  int64_t weight_dim = weight.dim();
-  Tensor result = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-
-  TORCH_CHECK(
-      weight_dim == 0 || weight_dim == 1,
-      "prelu: Expected `weight` to be a scalar or 1D tensor, but got ndim = ",
-      weight_dim);
-
-  // case1: shared weight for all channels
-  if (weight_num == 1) {
-    auto iter = TensorIterator::unary_op(result, input);
-    impl::launch_prelu_kernel_share_weights(iter, weight);
-  } else { // case2: multiple weights, one for each channel
-    impl::launch_prelu_kernel_multi_weights(result, input, weight);
-  }
+Tensor _prelu_kernel(const Tensor& self, const Tensor& weight) {
+  // Weight broadcasts over self and they have the same dtype
+  auto result = at::empty_like(self);
+  auto iter = TensorIteratorConfig()
+                  .add_output(result)
+                  .add_input(self)
+                  .add_input(weight)
+                  .build();
+  impl::_prelu_kernel_dpcpp(iter);
   return result;
 }
 
-std::tuple<Tensor, Tensor> prelu_backward(
-    const Tensor& grad_out_,
+std::tuple<Tensor, Tensor> _prelu_kernel_backward(
+    const Tensor& grad_out,
     const Tensor& self,
-    const Tensor& weight_) {
-  auto input = self.contiguous();
-  auto grad_out = grad_out_.contiguous();
-  auto weight = weight_.contiguous();
-
-  TORCH_CHECK(input.is_contiguous());
-  TORCH_CHECK(grad_out.is_contiguous());
-  TORCH_CHECK(weight.is_contiguous());
-
-  int64_t weight_num = weight.numel();
-  auto dims = input.dim();
-  Tensor input_grad = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-  Tensor weight_grad = at::empty_like(weight, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-  Tensor weight_grad_collector =
-      at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-
-  // case1: shared parameter for all channels
-  if (weight_num == 1) {
-    at::TensorIterator iter = TensorIteratorConfig()
-                                  .add_output(input_grad)
-                                  .add_output(weight_grad_collector)
-                                  .add_input(input)
-                                  .add_input(grad_out)
-                                  .build();
-
-    impl::launch_prelu_backward_kernel_share_weights(iter, weight);
-    weight_grad.fill_(weight_grad_collector.sum());
-  } else { // case2: multiple parameters, one for each channel
-    impl::launch_prelu_backward_kernel_multi_weights(
-        input, weight, grad_out, input_grad, weight_grad_collector);
-    // update weight_grad
-    std::vector<int64_t> reduce_dims;
-    reduce_dims.push_back(0);
-    if (dims > 2) {
-      for (int64_t i = 2; i < dims; i++)
-        reduce_dims.push_back(i);
-    }
-    weight_grad = weight_grad_collector.sum(reduce_dims);
-  }
-  return std::tuple<Tensor, Tensor>{input_grad, weight_grad};
+    const Tensor& weight) {
+  Tensor grad_self = at::empty({0}, self.options());
+  Tensor grad_weight = at::empty({0}, weight.options());
+  auto iter = TensorIteratorConfig()
+                  .add_output(grad_self)
+                  .add_output(grad_weight)
+                  .add_input(self)
+                  .add_input(weight)
+                  .add_input(grad_out)
+                  .build();
+  impl::_prelu_kernel_backward_dpcpp(iter);
+  return {grad_self, grad_weight};
 }
 
 Tensor& hardshrink_out(
