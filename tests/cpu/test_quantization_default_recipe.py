@@ -385,6 +385,25 @@ class TestDefaultRecipe(JitLlgaTestCase):
             woq_linear_class = ipex.nn.modules.weight_only_quantization.IpexWoqLinear
             assert isinstance(woq_model.linear, woq_linear_class)
 
+    def test_weight_only_quantization_autocast(self):
+        class M(nn.Module):
+            def __init__(self, use_bias):
+                super(M, self).__init__()
+                self.linear = torch.nn.Linear(4, 4, use_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        with torch.autocast(device_type='cpu', enabled=True, dtype= torch.bfloat16):
+            for use_bias in [True, False]:
+                m = M(use_bias).eval()
+                x = torch.rand(4, 4)
+                qconfig = ipex.quantization.weight_only_quant_qconfig_mapping
+                prepared_model = ipex.quantization.prepare(m, qconfig, example_inputs=x, inplace=False)
+                woq_model = ipex.quantization.convert(prepared_model)
+                woq_model(x)
+                woq_linear_class = ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                assert isinstance(woq_model.linear, woq_linear_class)
 
 if __name__ == '__main__':
     run_tests() 

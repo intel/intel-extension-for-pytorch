@@ -337,6 +337,11 @@ at::Tensor woq_linear_kernel(
       weight.is_quantized(),
       "Weight only quantized linear: weight should be quantized!");
   auto w = weight.dequantize();
+  if (self.scalar_type() != c10::ScalarType::Float) {
+    auto x = self.to(c10::ScalarType::Float);
+    auto out = at::linear(x, w, bias);
+    return out.to(self.scalar_type());
+  }
   return at::linear(self, w, bias);
 }
 
@@ -407,6 +412,17 @@ at::Tensor ipex_linear_eltwise(
       out_features);
 }
 
+at::Tensor woq_linear_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::ipex_woq_linear", "")
+                       .typed<decltype(woq_linear_forward)>();
+  auto target_type = get_autocast_dtype();
+  return op.call(cpu_cached_cast(target_type, input), op_context);
+}
+
 } // namespace autocast
 } // namespace torch_ipex
 
@@ -432,6 +448,10 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "ipex_woq_linear",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::woq_linear_forward);
+  m.impl(
+      "ipex_woq_linear",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::woq_linear_forward);
   // fuse eltwise
   m.def(
       "ipex_linear_eltwise(Tensor input, Tensor weight, Tensor? bias, int eltwise, "
