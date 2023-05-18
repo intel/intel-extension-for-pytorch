@@ -2663,42 +2663,6 @@ std::tuple<Tensor&, Tensor&, Tensor&> _linalg_svd_out(
   return std::tuple<Tensor&, Tensor&, Tensor&>(U, S, Vh);
 }
 
-std::tuple<Tensor, Tensor> _symeig_helper(
-    const Tensor& self,
-    bool eigenvectors,
-    bool upper) {
-  auto infos_tensor = at::zeros(
-      native::batchCount(self),
-      self.options().dtype(kInt).device(DeviceType::CPU));
-  std::vector<int32_t> infos(native::batchCount(self), 0);
-
-  auto self_sizes = self.sizes().vec();
-  self_sizes.pop_back();
-  auto eigvals = at::empty(self_sizes, self.options());
-
-  if (self.numel() == 0) {
-    return std::tuple<Tensor, Tensor>(
-        eigvals, at::empty_like(self, MemoryFormat::Contiguous));
-  }
-
-  auto self_working_copy = native::cloneBatchedColumnMajor(self);
-
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "symeig", [&] {
-    impl::apply_symeig<scalar_t>(
-        self_working_copy, eigvals, eigenvectors, upper, infos);
-  });
-
-  std::copy(
-      infos.begin(), infos.end(), infos_tensor.template data_ptr<int32_t>());
-  at::_linalg_check_errors(infos_tensor, "symeig", self.dim() == 2);
-
-  if (eigenvectors) {
-    return std::tuple<Tensor, Tensor>(eigvals, self_working_copy);
-  } else {
-    return std::tuple<Tensor, Tensor>(eigvals, at::empty({0}, self.options()));
-  }
-}
-
 std::tuple<Tensor, Tensor> _triangular_solve_helper(
     Tensor& result,
     Tensor& clone_input,
