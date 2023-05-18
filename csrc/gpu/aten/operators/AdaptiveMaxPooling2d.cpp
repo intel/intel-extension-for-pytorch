@@ -184,16 +184,6 @@ std::tuple<Tensor&, Tensor&> adaptive_max_pool2d_out(
   return std::tuple<Tensor&, Tensor&>(out, indices);
 }
 
-std::tuple<Tensor, Tensor> adaptive_max_pool2d(
-    const Tensor& self,
-    IntArrayRef output_size) {
-  Tensor output = at::empty({0}, self.options());
-  Tensor indices = at::empty({0}, self.options().dtype(kLong));
-  TORCH_INTERNAL_ASSERT(output_size.size() == 2);
-  return at::AtenIpexTypeXPU::adaptive_max_pool2d_out(
-      self, output_size, output, indices);
-}
-
 Tensor& adaptive_max_pool2d_backward_out(
     const Tensor& grad_output_,
     const Tensor& self_,
@@ -225,43 +215,6 @@ Tensor& adaptive_max_pool2d_backward_out(
       at::ScalarType::BFloat16,
       grad_output.scalar_type(),
       "adaptive_max_pool2d_backward_out",
-      [&]() {
-        impl::adaptive_max_pool2d_backward_out_template(
-            grad_input, grad_output, self, indices);
-      });
-  return grad_input;
-}
-
-Tensor adaptive_max_pool2d_backward(
-    const Tensor& grad_output_,
-    const Tensor& self_,
-    const Tensor& indices_) {
-  /* PyTorch support two cases of AdaptiveMaxPool2d:
-     1. 3D: Input (C, H, W),  Output (C, H0, W0)
-     This case does not support channel last format. For a 3-dim tensor,
-     the PyTorch suggest_memory_format can only be Contiguous or
-     ChannelsLast1D (nwc), the ChannelsLast1D (nwc) does not match the sementics
-     of Input (C, H, W) case. Then the suggest_memory_format can only be
-     Contiguous.
-     2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0)
-     This case supports Contiguous and ChannelsLast2D memory_format. */
-  Tensor self, grad_output, indices, grad_input;
-  if (self_.ndimension() == 3) {
-    self = self_.contiguous();
-    grad_output = grad_output_.contiguous();
-    indices = indices_.contiguous();
-    grad_input = at::empty_like(self);
-  } else {
-    auto smf = self_.suggest_memory_format();
-    self = contiguous_if_needed(self_, smf);
-    grad_output = contiguous_if_needed(grad_output_, smf);
-    indices = contiguous_if_needed(indices_, smf);
-    grad_input = at::empty_like(self, smf);
-  }
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16,
-      grad_output.scalar_type(),
-      "adaptive_max_pool2d_backward",
       [&]() {
         impl::adaptive_max_pool2d_backward_out_template(
             grad_input, grad_output, self, indices);

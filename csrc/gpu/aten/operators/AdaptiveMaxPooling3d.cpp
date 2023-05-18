@@ -197,16 +197,6 @@ std::tuple<Tensor&, Tensor&> adaptive_max_pool3d_out(
   return std::tuple<Tensor&, Tensor&>(out, indices);
 }
 
-std::tuple<Tensor, Tensor> adaptive_max_pool3d(
-    const Tensor& self,
-    IntArrayRef output_size) {
-  Tensor output = at::empty({0}, self.options());
-  Tensor indices = at::empty({0}, self.options().dtype(kLong));
-  at::AtenIpexTypeXPU::adaptive_max_pool3d_out(
-      self, output_size, output, indices);
-  return std::tuple<Tensor, Tensor>(output, indices);
-}
-
 Tensor& adaptive_max_pool3d_backward_out(
     const Tensor& grad_output_,
     const Tensor& self_,
@@ -234,40 +224,6 @@ Tensor& adaptive_max_pool3d_backward_out(
       at::ScalarType::BFloat16,
       grad_output.scalar_type(),
       "adaptive_max_pool3d_backward_out",
-      [&]() {
-        impl::adaptive_max_pool3d_backward_out_template(
-            grad_input, grad_output, self, indices);
-      });
-  return grad_input;
-}
-
-Tensor adaptive_max_pool3d_backward(
-    const Tensor& grad_output_,
-    const Tensor& self_,
-    const Tensor& indices_) {
-  Tensor self, grad_output, indices, grad_input;
-  if (self_.ndimension() == 4) {
-    // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
-    // cannot give channels last for 4D tensor from frontend user perspective
-    // the 2nd dim is outputDepth, not channel dim
-    self = self_.contiguous();
-    grad_output = grad_output_.contiguous();
-    indices = indices_.contiguous();
-    grad_input = at::empty_like(self);
-  } else {
-    // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
-    // smf supports ChannelsLast3D and Contiguous cases.
-    auto smf = self_.suggest_memory_format();
-    self = contiguous_if_needed(self_, smf);
-    grad_output = contiguous_if_needed(grad_output_, smf);
-    indices = contiguous_if_needed(indices_, smf);
-    grad_input = at::empty_like(self, smf);
-  }
-
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16,
-      grad_output.scalar_type(),
-      "adaptive_max_pool3d_backward",
       [&]() {
         impl::adaptive_max_pool3d_backward_out_template(
             grad_input, grad_output, self, indices);

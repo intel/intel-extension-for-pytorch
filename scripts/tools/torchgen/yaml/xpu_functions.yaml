@@ -4,8 +4,6 @@ class_name: AtenIpexTypeXPU
 use_out_as_primary: true
 device_guard: true
 supported:
-  - _adaptive_avg_pool2d
-  - _adaptive_avg_pool2d_backward
   - _aminmax
   - _aminmax.dim
   - _amp_foreach_non_finite_check_and_unscale_
@@ -78,18 +76,16 @@ supported:
   - abs.out
   - acos.out
   - acosh.out
+  - _adaptive_avg_pool2d
+  - _adaptive_avg_pool2d_backward
   - adaptive_avg_pool2d.out
   - _adaptive_avg_pool3d
   - adaptive_avg_pool3d.out
   - _adaptive_avg_pool3d_backward
   - adaptive_avg_pool3d_backward.grad_input
-  - adaptive_max_pool2d
   - adaptive_max_pool2d.out
-  - adaptive_max_pool2d_backward
   - adaptive_max_pool2d_backward.grad_input
-  - adaptive_max_pool3d
   - adaptive_max_pool3d.out
-  - adaptive_max_pool3d_backward
   - adaptive_max_pool3d_backward.grad_input
   - add.Scalar
   - add.Tensor
