@@ -318,11 +318,10 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
             (default).
     """
     _lazy_init()
-    return Stream(
-        _cdata=intel_extension_for_pytorch._C._getCurrentStream(
-            _get_device_index(device, optional=True)
-        )
-    )
+    streamdata = intel_extension_for_pytorch._C._getCurrentStream(
+        _get_device_index(device, optional=True))
+    return Stream(stream_id=streamdata[0], device_index=streamdata[1], device_type=streamdata[2])
+
 
 
 @staticmethod  # type: ignore[misc]
