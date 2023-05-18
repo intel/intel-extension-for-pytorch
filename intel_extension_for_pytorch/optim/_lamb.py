@@ -70,19 +70,17 @@ class Lamb(torch.optim.Optimizer):
                     params_with_grad.append(p)
                     if grad.is_sparse:
                         raise RuntimeError("Lamb does not support sparse gradients")
-                    if grad.device != torch.device("cpu"):
-                        raise RuntimeError("Lamb supports only CPU device")
+
                     grads.append(grad)
 
                     state = self.state[p]
                     # Lazy state initialization
                     if len(state) == 0:
-                        state["step"] = 0
-                        buffer_dtype = (
-                            p.dtype if p.dtype is torch.float64 else torch.float
-                        )
-                        state["exp_avg"] = torch.zeros(p.shape, dtype=buffer_dtype)
-                        state["exp_avg_sq"] = torch.zeros(p.shape, dtype=buffer_dtype)
+                        state['step'] = 0
+                        buffer_dtype = p.dtype if p.dtype is torch.float64 else torch.float
+                        select_device = 'cpu' if p.device.type == 'cpu' else 'xpu'
+                        state['exp_avg'] = torch.zeros(p.shape, dtype=buffer_dtype, device=select_device)
+                        state['exp_avg_sq'] = torch.zeros(p.shape, dtype=buffer_dtype, device=select_device)
 
                     exp_avgs.append(state["exp_avg"])
                     exp_avg_sqs.append(state["exp_avg_sq"])

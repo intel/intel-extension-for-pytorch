@@ -5,6 +5,7 @@ from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 import pytest  # noqa
 import os
+from intel_extension_for_pytorch.optim._lamb import Lamb
 import itertools
 
 device = "xpu"
@@ -20,7 +21,7 @@ TEST_MODULE_CONVERT_LIST = [
 ]
 
 # TODO: for now, only support SGD and AdamW
-SUPPORTED_FUSION_OPTIMIZER = ['Adam', 'SGD', 'AdamW', 'Lars']
+SUPPORTED_FUSION_OPTIMIZER = ['Adam', 'SGD', 'AdamW', 'Lars', 'Lamb']
 
 
 class InferenceModel(nn.Module):
@@ -214,6 +215,18 @@ class TestTorchMethod(TestCase):
                                                   eps=adam_epsilon,
                                                   weight_decay=weight_decay,
                                                   amsgrad=amsgrad)
+                model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
+            elif optimizer_string.lower() == 'lamb':
+                beta1 = 0.9
+                beta2 = 0.999
+                lamb_epsilon = 1e-6
+                optimizer_xpu_no_fuse = Lamb(model_xpu_no_fuse.parameters(),
+                                                 lr=lr, betas=(beta1, beta2),
+                                                 eps=lamb_epsilon)
+                optimizer_xpu = Lamb(model_xpu.parameters(),
+                                                 lr=lr,
+                                                 betas=(beta1, beta2),
+                                                 eps=lamb_epsilon)
                 model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
             elif optimizer_string.lower() == 'sgd':
                 for momentum_value in [0, 0.9]:

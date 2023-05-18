@@ -548,7 +548,9 @@ def _lamb_impl(
     weight_decay: float,
     eps: float,
 ):
+
     r"""Functional API that performs Lamb algorithm computation."""
+    
     for i, param in enumerate(params):
         grad = grads[i]
         exp_avg = exp_avgs[i]
@@ -606,8 +608,6 @@ def lamb_step(self, closure=None):
                 params_with_grad.append(p)
                 if grad.is_sparse:
                     raise RuntimeError("Lamb does not support sparse gradients")
-                if grad.device != torch.device("cpu"):
-                    raise RuntimeError("Lamb supports only CPU device")
                 grads.append(grad)
 
                 state = self.state[p]
@@ -615,8 +615,9 @@ def lamb_step(self, closure=None):
                 if len(state) == 0:
                     state["step"] = 0
                     buffer_dtype = p.dtype if p.dtype is torch.float64 else torch.float
-                    state["exp_avg"] = torch.zeros(p.shape, dtype=buffer_dtype)
-                    state["exp_avg_sq"] = torch.zeros(p.shape, dtype=buffer_dtype)
+                    buffer_device = p.device if p.device.type == 'cpu' else 'xpu'
+                    state['exp_avg'] = torch.zeros(p.shape, dtype=buffer_dtype, device=buffer_device)
+                    state['exp_avg_sq'] = torch.zeros(p.shape, dtype=buffer_dtype, device=buffer_device)
 
                 exp_avgs.append(state["exp_avg"])
                 exp_avg_sqs.append(state["exp_avg_sq"])

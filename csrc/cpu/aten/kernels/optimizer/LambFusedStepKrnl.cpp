@@ -3,6 +3,7 @@
 
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
+#include "csrc/utils/CustomOperatorRegistration.h"
 namespace torch_ipex {
 namespace cpu {
 
