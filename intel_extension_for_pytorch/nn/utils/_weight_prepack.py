@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import copy
 import logging
 import os
+import pkg_resources
 
 from intel_extension_for_pytorch import optim, frontend
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _using_dnnl
@@ -17,31 +18,15 @@ def may_import_deepspeed_modules():
         # import deepspeed in a global space will raise circular import error
         # intel-extension-for-deepspeed imports both IPEX and deepspeed
         from deepspeed.module_inject.layers import LinearAllreduce, LinearLayer
-
         return LinearAllreduce, LinearLayer
     except ImportError:
         return None
-
-
-if may_import_deepspeed_modules() is not None:
-    # register ds comm as the kernel of aten.all_reduce
-    # to align the _IPEX_LinearAllreduce with LinearAllreduce
-    import torch.distributed as dist
-    import torch.distributed.distributed_c10d as c10d
+installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
+if "deepspeed" in installed_pkg:
     from deepspeed import comm
 
     def _all_reduce(self, reduceOp, tag, ranks, group_size):
-        prefer_deepspeed_comm = os.environ.get("PREFER_DEEPSPEED_COMM")
-        if prefer_deepspeed_comm:
-            comm.all_reduce(self, async_op=False)
-        else:
-            reduceOp = reduceOp.upper()
-            op = dist.ReduceOp.RedOpType.__members__.get(reduceOp)
-            if op is None:
-                raise ValueError(f"Invalid reduce operation {reduceOp}")
-            group = c10d._find_or_create_pg_by_ranks_and_tag(tag, ranks, group_size)
-            assert group is not None
-            comm.all_reduce(self, group=group, op=op, async_op=False)
+        comm.all_reduce(self, async_op=False)
         return self
 
     ds_comm = torch.library.Library("deepspeed_comm", "DEF")
