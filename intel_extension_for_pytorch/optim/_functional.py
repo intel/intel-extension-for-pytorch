@@ -548,8 +548,8 @@ def _lamb_impl(
     weight_decay: float,
     eps: float,
 ):
-
     r"""Functional API that performs Lamb algorithm computation."""
+
     for i, param in enumerate(params):
         grad = grads[i]
         exp_avg = exp_avgs[i]

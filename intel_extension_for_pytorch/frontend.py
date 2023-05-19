@@ -363,7 +363,7 @@ def optimize(
         weights_prepack (bool): Whether to perform weight prepack for convolution
             and linear to avoid oneDNN weights reorder. The default value is
             ``None``. Explicitly setting this knob overwrites the configuration
-            set by ``level`` knob. For now, XPU doesn't support weights prepack.
+            set by ``level`` knob. Weight prepack works for CPU only.
         replace_dropout_with_identity (bool): Whether to replace ``nn.Dropout``
             with ``nn.Identity``. If replaced, the ``aten::dropout`` won't be
             included in the JIT graph. This may provide more fusion opportunites
@@ -388,14 +388,14 @@ def optimize(
             input data will impact the block format of packed weight. If not feed a sample
             input, Intel® Extension for PyTorch* will pack the weight per some predefined heuristics.
             If feed a sample input with real input shape, Intel® Extension for PyTorch* can get
-            best block format.
+            best block format. Sample input works for CPU only.
         auto_kernel_selection (bool) [experimental]: Different backends may have
             different performances with different dtypes/shapes. Default value
             is False. Intel® Extension for PyTorch* will try to optimize the
             kernel selection for better performance if this knob is set to
             ``True``. You might get better performance at the cost of extra memory usage.
             The default value is ``None``. Explicitly setting this knob overwrites the
-            configuration set by ``level`` knob.
+            configuration set by ``level`` knob. Auto kernel selection works for CPU only.
         graph_mode: (bool) [experimental]: It will automatically apply a combination of methods
             to generate graph or multiple subgraphs if True. The default value is ``False``.
 
