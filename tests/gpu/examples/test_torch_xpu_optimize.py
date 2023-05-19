@@ -220,13 +220,8 @@ class TestTorchMethod(TestCase):
                 beta1 = 0.9
                 beta2 = 0.999
                 lamb_epsilon = 1e-6
-                optimizer_xpu_no_fuse = Lamb(model_xpu_no_fuse.parameters(),
-                                                 lr=lr, betas=(beta1, beta2),
-                                                 eps=lamb_epsilon)
-                optimizer_xpu = Lamb(model_xpu.parameters(),
-                                                 lr=lr,
-                                                 betas=(beta1, beta2),
-                                                 eps=lamb_epsilon)
+                optimizer_xpu_no_fuse = Lamb(model_xpu_no_fuse.parameters(), lr=lr, betas=(beta1, beta2), eps=lamb_epsilon)
+                optimizer_xpu = Lamb(model_xpu.parameters(), lr=lr, betas=(beta1, beta2), eps=lamb_epsilon)
                 model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
             elif optimizer_string.lower() == 'sgd':
                 for momentum_value in [0, 0.9]:
