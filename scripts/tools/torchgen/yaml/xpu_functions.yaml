@@ -340,8 +340,6 @@ supported:
   - lerp.Tensor_out
   - lerp_.Scalar
   - lerp_.Tensor
-  - lgamma
-  - lgamma_
   - lgamma.out
   - linspace.out
   - log.out

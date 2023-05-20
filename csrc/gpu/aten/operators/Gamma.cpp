@@ -96,15 +96,6 @@ static inline void lgamma_check(const Tensor& self) {
       "Only support floating data type for now.");
 }
 
-Tensor lgamma(const Tensor& self) {
-  Tensor out = at::empty_like(self);
-  return at::AtenIpexTypeXPU::lgamma_out(self, out);
-}
-
-Tensor& lgamma_(Tensor& self) {
-  return at::AtenIpexTypeXPU::lgamma_out(self, self);
-}
-
 Tensor& lgamma_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
