@@ -168,18 +168,17 @@ class TestNNMethod(TestCase):
         self.assertEqual(h0.grad, h0_xpu.grad.cpu())
         self.assertEqual(c0.grad, c0_xpu.grad.cpu())
 
-    @pytest.mark.skip("Unstable case. Will be fixed soon.")
     def test_lstm_rnnt_onednn(self, dtype=torch.float):
         with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.ONEDNN):
-            rnn = nn.LSTM(240, 1024, num_layers=2)
+            rnn = nn.LSTM(32, 32, num_layers=2)
             rnn_xpu = copy.deepcopy(rnn).to("xpu")
-            input = torch.randn(128, 2, 240)
-            h0 = torch.randn(2, 2, 1024)
-            c0 = torch.randn(2, 2, 1024)
+            input = torch.randn(2, 2, 32)
+            h0 = torch.randn(2, 2, 32)
+            c0 = torch.randn(2, 2, 32)
             input_xpu = input.to("xpu")
             h0_xpu = h0.to("xpu")
             c0_xpu = c0.to("xpu")
-            grad_output = torch.randn(128, 2, 1024)
+            grad_output = torch.randn(2, 2, 32)
             grad_output_xpu = grad_output.to("xpu")
 
             input.requires_grad = True

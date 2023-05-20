@@ -334,7 +334,7 @@ lstm_backward(
     const Tensor& wgh_h,
     const Tensor& bia,
     Tensor workspace_arr,
-    const Tensor& diff_dst,
+    const Tensor& diff_dst_ori,
     const Tensor& diff_hy_ori,
     const Tensor& diff_cy_ori,
     int layer_num,
@@ -353,17 +353,17 @@ lstm_backward(
   int32_t num_directions = bidirectional ? 2 : 1;
   int32_t num_gate = 4;
 
-  Tensor diff_hy, diff_cy;
-  if (diff_hy_ori.defined()) {
-    diff_hy = diff_hy_ori;
-  } else {
-    diff_hy = at::zeros_like(hy);
-  }
-  if (diff_cy_ori.defined()) {
-    diff_cy = diff_cy_ori;
-  } else {
-    diff_cy = at::zeros_like(cy);
-  }
+  // In backward propagation, onednn RNN needs all diff_* tensors are in f32
+  // refer to https://oneapi-src.github.io/oneDNN/dev_guide_rnn.html
+  Tensor diff_dst = src.dtype() == at::ScalarType::BFloat16
+      ? diff_dst_ori.to(at::ScalarType::Float)
+      : diff_dst_ori;
+  Tensor diff_hy = src.dtype() == at::ScalarType::BFloat16
+      ? diff_hy_ori.to(at::ScalarType::Float)
+      : diff_hy_ori;
+  Tensor diff_cy = src.dtype() == at::ScalarType::BFloat16
+      ? diff_cy_ori.to(at::ScalarType::Float)
+      : diff_cy_ori;
 
   Tensor layer_x = at::empty_like(src);
   layer_x.copy_(src);
@@ -374,11 +374,11 @@ lstm_backward(
   Tensor diff_layer_y = at::empty_like(diff_dst);
   diff_layer_y.copy_(diff_dst);
 
-  auto diff_hx = at::zeros_like(hx);
-  auto diff_cx = at::zeros_like(cx);
-  auto diff_wgh_i = at::zeros_like(wgh_i);
-  auto diff_wgh_h = at::zeros_like(wgh_h);
-  auto diff_bia = at::zeros_like(bia);
+  auto diff_hx = at::zeros_like(hx, diff_dst.dtype());
+  auto diff_cx = at::zeros_like(cx, diff_dst.dtype());
+  auto diff_wgh_i = at::zeros_like(wgh_i, diff_dst.dtype());
+  auto diff_wgh_h = at::zeros_like(wgh_h, diff_dst.dtype());
+  auto diff_bia = at::zeros_like(bia, diff_dst.dtype());
 
   auto src_data_t = xpu::oneDNN::get_onednn_dtype(src);
   auto iter_c_data_t = xpu::oneDNN::get_onednn_dtype(src);
@@ -389,7 +389,7 @@ lstm_backward(
   auto diff_data_t = xpu::oneDNN::get_onednn_dtype(diff_dst);
   if (bia_.scalar_type() == ScalarType::BFloat16) {
     bia_ = bia_.to(at::kFloat);
-    cx_ = cx_.to(at::kFloat);
+    cx_ = cx_.to(at::kFloat); // onednn needs the cell state datatype is f32
     diff_layer_y = diff_layer_y.to(at::kFloat);
     bia_data_t = memory::data_type::f32;
     iter_c_data_t = memory::data_type::f32;
@@ -434,7 +434,7 @@ lstm_backward(
   memory::dims dst_iter_c_tz = {
       1, num_directions, mini_batch, hidden_sz}; // ldnc  cy, dst cell state
 
-  auto diff_src = at::zeros_like(src);
+  auto diff_src = at::zeros_like(src, diff_dst.dtype());
   int i = layer_num;
   auto diff_layer_x = at::zeros(
       {i == 0 ? src_layer_0_tz : src_layer_tz}, diff_layer_y.options());
@@ -826,6 +826,15 @@ lstm_backward(
         {{DNNL_ARG_FROM, diff_bia_m}, {DNNL_ARG_TO, diff_bia_usr_m}});
   }
   diff_src = diff_layer_x;
+
+  if (src.scalar_type() == ScalarType::BFloat16) {
+    diff_src = diff_src.to(at::kBFloat16);
+    diff_hx = diff_hx.to(at::kBFloat16);
+    diff_cx = diff_cx.to(at::kBFloat16);
+    diff_wgh_i = diff_wgh_i.to(at::kBFloat16);
+    diff_wgh_h = diff_wgh_h.to(at::kBFloat16);
+    diff_bia = diff_bia.to(at::kBFloat16);
+  }
 
   return std::tuple<
       at::Tensor,
