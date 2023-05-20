@@ -17,7 +17,7 @@ at::Tensor permute_contiguous(
     at::MemoryFormat dim_contiguous) {
   Tensor result;
   // plain format tensor will go through naitve permute contiguous pass
-  if (DPCPPTensorContext::get_tensor_ctx(self).is_plain()) {
+  if (!xpu::oneDNN::is_onednn_layout(self)) {
     result = at::native::permute(self, dims).contiguous(dim_contiguous);
     return result;
   }

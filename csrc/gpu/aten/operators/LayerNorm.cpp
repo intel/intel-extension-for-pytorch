@@ -710,8 +710,8 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
   Tensor output = at::empty(input.sizes(), input.options());
   Tensor mean, rstd;
   if (input.numel() != 0) {
-    auto ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
-    bool apply_onednn = (!ctx.is_plain() && input.dim() > 1);
+    bool apply_onednn =
+        (xpu::oneDNN::is_onednn_layout(input) && input.dim() > 1);
     if (apply_onednn) {
       Tensor input_ = xpu::oneDNN::contiguous_if_needed(input);
       Tensor weight_ = xpu::oneDNN::contiguous_if_needed(weight);
@@ -767,8 +767,8 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
   }
   if (input.numel() != 0 && grad_output.numel() != 0) {
     if (M > 0 && N > 0) {
-      auto ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
-      bool apply_onednn = (!ctx.is_plain() && input.dim() > 1);
+      bool apply_onednn =
+          (xpu::oneDNN::is_onednn_layout(input) && input.dim() > 1);
       if (apply_onednn) {
         Tensor grad_output_ = xpu::oneDNN::contiguous_if_needed(grad_output);
         Tensor input_ = xpu::oneDNN::contiguous_if_needed(input);

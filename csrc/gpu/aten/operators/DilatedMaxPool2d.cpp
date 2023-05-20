@@ -348,7 +348,7 @@ void max_pool2d_with_indices_out_template(
     indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
   }
 
-  if (!DPCPPTensorContext::is_plain(input)) {
+  if (xpu::oneDNN::is_onednn_layout(input)) {
     // per oneDNN definition, no dilation means dilation ratio is 0.
     // Since dilation is already designed in the output size, no dilation
     // is used in ::xpu::oneDNN::pooling
@@ -564,7 +564,7 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       outputWidth,
       memory_format);
 
-  if (!DPCPPTensorContext::is_plain(input)) {
+  if (xpu::oneDNN::is_onednn_layout(input)) {
     // per oneDNN definition, no dilation means dilation ratio is 0.
     // Since dilation is already designed in the output size, no dilation
     // is used in ::xpu::oneDNN::pooling

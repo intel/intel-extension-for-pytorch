@@ -144,8 +144,8 @@ Tensor add(const Tensor& _self, const Tensor& _other, const Scalar& alpha) {
   if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
       _self.sizes() == _other.sizes() && !is_wrapped_number(_self) &&
       !is_wrapped_number(_other) &&
-      (!DPCPPTensorContext::is_plain(_self) ||
-       !DPCPPTensorContext::is_plain(_other))) {
+      (xpu::oneDNN::is_onednn_layout(_self) ||
+       xpu::oneDNN::is_onednn_layout(_other))) {
     xpu::oneDNN::sum(
         result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
     return result;

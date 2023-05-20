@@ -117,8 +117,7 @@ std::vector<int64_t> dim_expand(
 
 bool check_opaque(std::vector<Tensor> tensor_list) {
   for (auto& tensor : tensor_list) {
-    auto ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(tensor);
-    if (!ctx.is_plain())
+    if (xpu::oneDNN::is_onednn_layout(tensor))
       return true;
   }
   return false;

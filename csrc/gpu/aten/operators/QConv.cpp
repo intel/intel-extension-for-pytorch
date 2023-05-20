@@ -76,10 +76,8 @@ struct QuantizeConvConverter {
   at::Tensor call(const at::Tensor& input, Func func) {
     // make sure input/weight/output are contiguous or ChannelsLast congituous
     at::MemoryFormat mfmt = get_tensor_format_for_conv(input, weight_);
-    auto input_ctx = DPCPPTensorContext::get_tensor_ctx(input);
-    auto weight_ctx = DPCPPTensorContext::get_tensor_ctx(weight_);
-    Tensor input_ = input_ctx.is_plain() ? input.contiguous(mfmt) : input;
-    weight_ = weight_ctx.is_plain() ? weight_.contiguous(mfmt) : weight_;
+    Tensor input_ = is_onednn_layout(input) ? input.contiguous(mfmt) : input;
+    weight_ = is_onednn_layout(weight_) ? weight_.contiguous(mfmt) : weight_;
     at::Tensor output_ = quantizedEmptyTensorFromInput(input_);
 
     Attr att = func();
@@ -113,10 +111,8 @@ struct QuantizeConvConverter {
   at::Tensor call(const at::Tensor& input, at::Tensor& output, Func func) {
     // make sure input/weight are contiguous or ChannelsLast congituous
     at::MemoryFormat mfmt = get_tensor_format_for_conv(input, weight_);
-    auto input_ctx = DPCPPTensorContext::get_tensor_ctx(input);
-    auto weight_ctx = DPCPPTensorContext::get_tensor_ctx(weight_);
-    Tensor input_ = input_ctx.is_plain() ? input.contiguous(mfmt) : input;
-    weight_ = weight_ctx.is_plain() ? weight_.contiguous(mfmt) : weight_;
+    Tensor input_ = is_onednn_layout(input) ? input.contiguous(mfmt) : input;
+    weight_ = is_onednn_layout(weight_) ? weight_.contiguous(mfmt) : weight_;
     Tensor output_ = output.is_contiguous(mfmt)
         ? output
         : quantizedEmptyTensorFromInput(input_);
