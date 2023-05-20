@@ -638,7 +638,8 @@ std::tuple<Tensor, Tensor> _weight_norm_interface(
       dim == 0 || dim == v.dim() - 1,
       "fused kernels can only be applied for first or last dim");
 
-  at::ScalarType scalar_acc_t = g.scalar_type() == at::ScalarType::Half
+  at::ScalarType scalar_acc_t = (g.scalar_type() == at::ScalarType::Half ||
+                                 g.scalar_type() == at::ScalarType::BFloat16)
       ? at::ScalarType::Float
       : g.scalar_type();
   auto norms = at::empty(
@@ -698,6 +699,12 @@ std::tuple<Tensor, Tensor> _weight_norm_interface_backward(
   auto grad_v = at::empty_like(saved_v, c10::get_contiguous_memory_format());
   auto grad_g = at::empty_like(saved_g, c10::get_contiguous_memory_format());
 
+  at::ScalarType scalar_acc_t =
+      (saved_g.scalar_type() == at::ScalarType::Half ||
+       saved_g.scalar_type() == at::ScalarType::BFloat16)
+      ? at::ScalarType::Float
+      : saved_g.scalar_type();
+
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -733,8 +740,10 @@ std::tuple<Tensor, Tensor> _weight_norm_interface_backward(
         if (BatchKernelConfig::Policy::pSegment ==
             BatchKernelConfig::suggest_policy(
                 batch, problem, stride, problem_along_x)) {
-          auto reduce =
-              at::empty_like(saved_g, c10::get_contiguous_memory_format());
+          auto reduce = at::empty(
+              saved_g.sizes(),
+              saved_g.options().dtype(scalar_acc_t),
+              c10::get_contiguous_memory_format());
           auto rinfo =
               getTensorInfo<AccumulateType<scalar_t>::type, int64_t>(reduce);
           rinfo.collapseDims();

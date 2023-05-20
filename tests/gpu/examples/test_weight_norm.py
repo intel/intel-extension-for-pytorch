@@ -171,3 +171,18 @@ class TestNNMethod(TestCase):
         self.assertEqual(n, n_xpu.cpu(), atol=1e-1, rtol=1e-5)
         self.assertEqual(v.grad, v_xpu.grad.cpu(), atol=1e-3, rtol=1e-5)
         self.assertEqual(g.grad, g_xpu.grad.cpu(), atol=1e-3, rtol=1e-5)
+
+    def test_weight_norm_differnt_type(self):
+        v = torch.randn(8193, 8193).requires_grad_(True)
+        g = torch.randn(8193).to(torch.float).requires_grad_(True)
+        gw = torch.randn(8193, 8193)
+        w, n = torch._weight_norm_interface(v, g, dim=0)
+        w.backward(gw)
+        v_xpu = v.detach().clone().to("xpu").requires_grad_(True)
+        g_xpu = g.detach().clone().to("xpu").requires_grad_(True)
+        w_xpu, n_xpu = torch._weight_norm_interface(v_xpu, g_xpu, dim=0)
+        w_xpu.backward(gw.to("xpu"))
+        self.assertEqual(w, w_xpu.cpu(), atol=1e-3, rtol=1e-5)
+        self.assertEqual(n, n_xpu.cpu(), atol=1e-1, rtol=1e-5)
+        self.assertEqual(v.grad, v_xpu.grad.cpu(), atol=1e-3, rtol=1e-5)
+        self.assertEqual(g.grad, g_xpu.grad.cpu(), atol=1e-3, rtol=1e-5)
