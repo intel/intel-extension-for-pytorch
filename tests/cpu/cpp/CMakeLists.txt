@@ -9,7 +9,7 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../../../cmake/Modules)
 
 # specify the C++ standard
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 # relocatable binary with automatically rpath of depend libraries
 set(CMAKE_INSTALL_RPATH $ORIGIN)
