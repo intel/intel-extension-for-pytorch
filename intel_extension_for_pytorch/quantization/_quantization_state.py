@@ -408,6 +408,19 @@ class AutoQuantizationState(torch.nn.Module):
                 ch_axis = 0
                 if type(op) in [torch.nn.ConvTranspose2d, torch.nn.ConvTranspose3d]:
                     ch_axis = 1
+                # Update weight of nn.Linear for SmoothQuant
+                wei_key = str(self.idx) + "_0"
+                if wei_key in self.idx_to_smooth_quant_scaling_factor:
+                    wei_scaling_factors = self.idx_to_smooth_quant_scaling_factor[
+                        wei_key
+                    ]
+                    if wei_scaling_factors is not None:
+                        w_dtype = weight.dtype
+                        if w_dtype != torch.float32:
+                            weight = weight.to(torch.float32)
+                        weight = torch.mul(weight, wei_scaling_factors)
+                        if w_dtype != torch.float32:
+                            weight = weight.to(w_dtype)
                 if (
                     torch.is_autocast_cpu_enabled()
                     and core.get_autocast_dtype() == torch.bfloat16
@@ -425,14 +438,6 @@ class AutoQuantizationState(torch.nn.Module):
                     arg = arg.dequantize()
                     arg = arg.to(dtype=torch.bfloat16)
                 else:
-                    # Update weight of nn.Linear for SmoothQuant
-                    wei_key = str(self.idx) + "_0"
-                    if wei_key in self.idx_to_smooth_quant_scaling_factor:
-                        wei_scaling_factors = self.idx_to_smooth_quant_scaling_factor[
-                            wei_key
-                        ]
-                        if wei_scaling_factors is not None:
-                            weight = torch.mul(weight, wei_scaling_factors)
                     if scale.numel() > 1:
                         arg = torch.quantize_per_channel(
                             weight, scale, zp, ch_axis, dtype

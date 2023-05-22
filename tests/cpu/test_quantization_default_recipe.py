@@ -206,52 +206,54 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 x = self.relu(x)
                 return x
 
-        # Use SmoothQuant to quantize the model
-        m = Mod().eval()
-        alpha = 0.5
-        qconfig_mapping = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=alpha)
-        prepared_model = ipex.quantization.prepare(
-            copy.deepcopy(m), qconfig_mapping, example_inputs=x, inplace=False)
-        prepared_model(x)
-        converted_model = ipex.quantization.convert(prepared_model)
-        with torch.no_grad():
-            traced_model = torch.jit.trace(converted_model, x)
-            traced_model = torch.jit.freeze(traced_model)
-        # Check graph
-        # Do not run traced_model to fuse by LLGA because `mul`
-        # may be fused to LLGA fusion group and cannot be found by the following code
-        graph = traced_model.graph_for(x)
-        found_mul = False
-        for node in graph.nodes():
-            if node.kind() == "aten::mul":
-                found_mul = True
-        assert found_mul, 'Failed to find the inserted `mul` before Linear for SmoothQuant'
-        result_sq = traced_model(x)
-        
-        # Check correctness with reference quantized model
-        # Calculate and apply scaling factors manually to model and use default static quant
-        x_max_per_ic = torch.max(x, 0)[0]
-        w_max_per_ic = torch.max(w, 0)[0]
-        act_scaling_factors = torch.pow(w_max_per_ic, 1 - alpha) / torch.pow(x_max_per_ic, alpha)
-        wei_scaling_factors = torch.pow(x_max_per_ic, alpha) / torch.pow(w_max_per_ic, 1 - alpha)
-        new_x = torch.mul(x, act_scaling_factors)
-        new_w = torch.mul(w, wei_scaling_factors)
-        m2 = copy.deepcopy(m)
-        m2.dense.weight = nn.Parameter(new_w)
-        # SmoothQuant uses MinMaxObserver for activation not histogram observer
-        w_observer = PerChannelMinMaxObserver.with_args(
-            dtype=torch.qint8, qscheme=torch.per_channel_symmetric)
-        static_qconfig = QConfig(activation=MinMaxObserver.with_args(reduce_range=False),
-                                 weight=w_observer)
-        qconfig_mapping = QConfigMapping().set_global(static_qconfig)
-        prepared_model = ipex.quantization.prepare(m2, qconfig_mapping, example_inputs=new_x, inplace=False)
-        prepared_model(new_x)
-        converted_model = ipex.quantization.convert(prepared_model)
-        with torch.no_grad():
-            traced_model = torch.jit.trace(converted_model, new_x)
-            traced_model = torch.jit.freeze(traced_model)
-        result_ref = traced_model(new_x)
-        assert torch.allclose(result_sq, result_ref)
+        for bf16_mixed in [False, True]:
+            with torch.no_grad(), torch.autocast(device_type='cpu', enabled=bf16_mixed, dtype=torch.bfloat16):
+                m = Mod().eval()
+                alpha = 0.5
+                qconfig_mapping = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=alpha)
+                prepared_model = ipex.quantization.prepare(
+                    copy.deepcopy(m), qconfig_mapping, example_inputs=x, inplace=False)
+                prepared_model(x)
+                converted_model = ipex.quantization.convert(prepared_model)
+                traced_model = torch.jit.trace(converted_model, x)
+                traced_model = torch.jit.freeze(traced_model)
+                # Check graph
+                # Do not run traced_model to fuse by LLGA because `mul`
+                # may be fused to LLGA fusion group and cannot be found by the following code
+                graph = traced_model.graph_for(x)
+                found_mul = False
+                for node in graph.nodes():
+                    if node.kind() == "aten::mul":
+                        found_mul = True
+                assert found_mul, 'Failed to find the inserted `mul` before Linear for SmoothQuant'
+                traced_model(x)
+                result_sq = traced_model(x)
+
+                # Check correctness with reference quantized model
+                # Calculate and apply scaling factors manually to model and use default static quant
+                x_max_per_ic = torch.max(x, 0)[0]
+                w_max_per_ic = torch.max(w, 0)[0]
+                act_scaling_factors = torch.pow(w_max_per_ic, 1 - alpha) / torch.pow(x_max_per_ic, alpha)
+                wei_scaling_factors = torch.pow(x_max_per_ic, alpha) / torch.pow(w_max_per_ic, 1 - alpha)
+                new_x = torch.mul(x, act_scaling_factors)
+                new_w = torch.mul(w, wei_scaling_factors)
+                m2 = copy.deepcopy(m)
+                m2.dense.weight = nn.Parameter(new_w)
+                # SmoothQuant uses MinMaxObserver for activation not histogram observer
+                w_observer = PerChannelMinMaxObserver.with_args(
+                    dtype=torch.qint8, qscheme=torch.per_channel_symmetric)
+                static_qconfig = QConfig(activation=MinMaxObserver.with_args(reduce_range=False),
+                                        weight=w_observer)
+                qconfig_mapping = QConfigMapping().set_global(static_qconfig)
+                prepared_model2 = ipex.quantization.prepare(m2, qconfig_mapping, example_inputs=new_x, inplace=False)
+                prepared_model2(new_x)
+                converted_model2 = ipex.quantization.convert(prepared_model2)
+                traced_model2 = torch.jit.trace(converted_model2, new_x)
+                traced_model2 = torch.jit.freeze(traced_model2)
+                traced_model2(new_x)
+                traced_model2(new_x)
+                result_ref = traced_model2(new_x)
+                assert torch.allclose(result_sq, result_ref)
 
     def test_smooth_quant_save_load_qconf_summary(self):
         class Mod(nn.Module):
