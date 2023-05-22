@@ -52,6 +52,37 @@ FusionInfo getIpexFusionInfo(
 
 } // namespace
 
+auto pad_filter =
+    [](const torch::jit::Match& match,
+       const std::unordered_map<std::string, torch::jit::Value*>& vmap) {
+      auto padding_mod = match.values_map.at(vmap.at("padding_mod"));
+      if (padding_mod->node()->kind() == torch::jit::prim::Constant) {
+        auto padding_mod_value = torch::jit::toIValue(padding_mod).value();
+        if (padding_mod_value == "reflect" ||
+            padding_mod_value == "replicate") {
+          return true;
+        } else {
+          return false;
+        }
+      }
+      return false;
+    };
+
+auto pad_circular_filter =
+    [](const torch::jit::Match& match,
+       const std::unordered_map<std::string, torch::jit::Value*>& vmap) {
+      auto padding_mod = match.values_map.at(vmap.at("padding_mod"));
+      if (padding_mod->node()->kind() == torch::jit::prim::Constant) {
+        auto padding_mod_value = torch::jit::toIValue(padding_mod).value();
+        if (padding_mod_value == "circular") {
+          return true;
+        } else {
+          return false;
+        }
+      }
+      return false;
+    };
+
 void IpexQuantFusion(std::shared_ptr<torch::jit::Graph>& graph) {
   std::vector<FusionInfo> patterns;
   auto adaptive_avg_pool2d_patten = getIpexFusionInfo(
@@ -64,8 +95,24 @@ void IpexQuantFusion(std::shared_ptr<torch::jit::Graph>& graph) {
       "aten::flatten",
       {"%start_dim, %end_dim"},
       {"%start_dim, %end_dim"});
+  auto pad_patten = getIpexFusionInfo(
+      "aten::pad",
+      "aten::pad",
+      {"%padding, %padding_mod, %padding_value"},
+      {"%padding, %padding_mod, %padding_value"});
+  pad_patten.filters.push_back(pad_filter);
+  auto pad_circurar_patten = getIpexFusionInfo(
+      "aten::pad",
+      "ipex::qpad_circular",
+      {"%padding, %padding_mod, %padding_value"},
+      {"%padding"});
+  pad_circurar_patten.filters.push_back(pad_circular_filter);
+
   patterns.emplace_back(adaptive_avg_pool2d_patten);
   patterns.emplace_back(flatten_patten);
+  patterns.emplace_back(pad_patten);
+  patterns.emplace_back(pad_circurar_patten);
+
   for (const auto& info : patterns) {
     torch::jit::SubgraphRewriter rewriter;
     rewriter.RegisterRewritePattern(info.pattern, info.replacement);

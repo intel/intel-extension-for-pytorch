@@ -127,7 +127,7 @@ class TestIpexOps(JitLlgaTestCase):
                 self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
                 self.checkPatterns(graph, patterns)
 
-    
+
     # single none gemm ops will not be quantized if pre and post don't has
     # quantizable op.
     def test_flatten_fp32(self):
@@ -181,7 +181,7 @@ class TestIpexOps(JitLlgaTestCase):
                 super(M, self).__init__()
                 self.f = ipex.nn.functional.interaction
 
-            def forward(self, x1, x2, x3): 
+            def forward(self, x1, x2, x3):
                 x = self.f(x1.relu(), x2.relu(), x3.relu())
                 return x
 
@@ -197,7 +197,7 @@ class TestIpexOps(JitLlgaTestCase):
             def __init__(self):
                 super(M, self).__init__()
 
-            def forward(self, x1, x2): 
+            def forward(self, x1, x2):
                 out = torch.add(torch.dequantize(x1), torch.dequantize(x2))
                 return torch.quantize_per_tensor(out, 0.1, 10, torch.quint8)
 
@@ -251,8 +251,8 @@ class TestIpexOps(JitLlgaTestCase):
             # dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1
             if dropout > 0 and num_layers == 1:
                 continue
-            num_directions = 2 if bidirectional else 1                
-            
+            num_directions = 2 if bidirectional else 1
+
             if batch_first:
                 x = torch.randn(batch_size, seq_len, input_size)
             else:
@@ -305,8 +305,29 @@ class TestIpexOps(JitLlgaTestCase):
         hid = (h0, h0)
 
         graph = self.checkQuantizeTrace(model, [seq, hid], atol=3e-2, rtol=1e-1)
-        self.assertGraphContainsExactly(graph, 'ipex::quantized_lstm', 1)        
-        self.assertGraphContainsExactly(graph, 'aten::lstm', 0)        
+        self.assertGraphContainsExactly(graph, 'ipex::quantized_lstm', 1)
+        self.assertGraphContainsExactly(graph, 'aten::lstm', 0)
+
+    def test_conv2d_with_padding(self):
+        class M(nn.Module):
+            def __init__(self, padding_mode):
+                super(M, self).__init__()
+                self.conv = nn.Conv2d(3, 3, 2, padding=1, bias=True, padding_mode=padding_mode)
+
+            def forward(self, x):
+                x = self.conv(x)
+                return x
+
+        x = torch.rand(1, 3, 14, 14)
+        patterns = [
+            ["aten::dequantize", "aten::_convolution"],
+        ]
+        for padding_mode in ["circular", "replicate", "reflect"]:
+            m = M(padding_mode=padding_mode).eval()
+            graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+            self.checkPatterns(graph, patterns)
+
 
 class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
     def test_inplace_preapre(self):
@@ -575,7 +596,7 @@ class TestDynamicQuantization(JitLlgaTestCase):
         for qconfig in dynamic_qconfig:
             graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=qconfig)
             FileCheck().check_not("aten:linear").check("quantized::linear_dynamic").run(graph)
-    
+
     def test_linear_dynamic_bf16(self):
         class M(nn.Module):
             def __init__(self):
@@ -590,7 +611,7 @@ class TestDynamicQuantization(JitLlgaTestCase):
         m = M().eval()
         graph, _, _ = self.prepareModel(m, [x], qconfig=dynamic_qconfig[0], int8_bf16=True)
         FileCheck().check_not("aten:linear").check("quantized::linear_dynamic").run(graph)
-       
+
     def test_lstm_dynamic(self):
         class M(nn.Module):
             def __init__(self):
@@ -599,7 +620,7 @@ class TestDynamicQuantization(JitLlgaTestCase):
 
             def forward(self, x, hx, cx):
                 x, h_xs = self.lstm(x, (hx, cx))
-                return x, h_xs 
+                return x, h_xs
 
         m = M().eval()
         x = torch.randn(5, 3, 10)

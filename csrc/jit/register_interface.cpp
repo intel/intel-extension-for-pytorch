@@ -37,6 +37,7 @@ bool canFuseNode(const Node* node) {
       node->kind() == Symbol::aten("layer_norm") ||
       node->kind() == Symbol::aten("masked_fill") ||
       node->kind() == Symbol::aten("masked_fill_") ||
+      node->kind() == Symbol::aten("pad") ||
       node->kind() ==
           Symbol::fromQualString("torch_ipex::convolution_forward") ||
       node->kind() == Symbol::fromQualString("torch_ipex::ipex_linear") ||

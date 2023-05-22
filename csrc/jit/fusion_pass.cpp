@@ -8,6 +8,7 @@
 #include "passes/graph_rewrite.h"
 #include "passes/graph_rewrite_helper.h"
 #include "passes/prepack_folding.h"
+#include "passes/qpadding.h"
 #include "passes/remove_redundant_aliases.h"
 
 #include <c10/util/hash.h>
@@ -254,6 +255,7 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
 
   if (isQuantized(graph) || fuser::onednn::is_llga_fp32_bf16_enabled()) {
     RemoveRedundantAliases(graph);
+    QPaddingConversion(graph);
     fuser::onednn::fuseGraph(graph);
   }
   GRAPH_DUMP(

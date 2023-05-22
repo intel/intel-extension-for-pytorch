@@ -18,6 +18,7 @@
 #include "cpu/kernels/MaxPool2D.h"
 #include "cpu/kernels/Mha.h"
 #include "cpu/kernels/OpContext.h"
+#include "cpu/kernels/QCircularPad.h"
 #include "cpu/kernels/RNN.h"
 #include "cpu/kernels/Shuffle.h"
 #include "cpu/kernels/Softmax.h"
@@ -1507,6 +1508,19 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 4, 6))).toIntVector(),
                 (std::move(peek(stack, 5, 6))).toBool());
             drop(stack, 6);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex::qpad_circular(Tensor input, int[] padding) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = qpad_circular(
+                (std::move(peek(stack, 0, 2))).toTensor(),
+                (std::move(peek(stack, 1, 2))).toIntVector());
+            drop(stack, 2);
             torch::jit::pack(stack, std::move(result));
             return 0;
           };
