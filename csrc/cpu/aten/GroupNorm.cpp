@@ -136,6 +136,13 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_group_norm_backward(
   TORCH_CHECK(
       X.suggest_memory_format() == dY.suggest_memory_format(),
       "Expected memory formats of X and dY are same.");
+  TORCH_CHECK(
+      X.scalar_type() == dY.scalar_type(),
+      "Expected scalar type of X and dY are same.");
+  bool mixed_type = at::native::is_mixed_type(dY, mean, rstd, gamma);
+  if (mixed_type) {
+    at::native::check_mixed_data_type(dY, mean, rstd, gamma);
+  }
   at::Tensor dX;
   at::Tensor dgamma;
   at::Tensor dbeta;
