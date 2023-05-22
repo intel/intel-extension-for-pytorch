@@ -1,5 +1,5 @@
 import torch
-from torch._six import inf
+from torch import inf
 from torch.distributions import Geometric
 from torch.testing._internal.common_utils import TestCase
 from torch.testing._internal.common_device_type import dtypes
