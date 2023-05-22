@@ -66,13 +66,9 @@ Please add memory_check.display_mem("xpu:0") at below check point:
 4. After optimize, if has
 
 ```console
-memory_check_flag = False
 try:
     import memory_check
-    memory_check_flag = True
+    memory_check.display_mem("xpu:0")
 except:
     pass
-
-if memory_check_flag:
-    memory_check.display_mem("xpu:0")
 ```
