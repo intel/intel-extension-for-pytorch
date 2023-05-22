@@ -109,6 +109,23 @@ python -m pip install torch==1.13.0a0+git6c9b55e torchvision==0.14.1a0 intel_ext
 
 **Note:** If you need TorchAudio, please follow the [instructions](https://github.com/pytorch/audio/tree/v0.13.0#from-source) to compile it from source. According to torchaudio-pytorch dependency table, torchaudio 0.13.0 is recommended.
 
+## Install via conda packages
+
+Prebuilt conda packages availability matrix for Python versions:
+
+| Extension Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 | Python 3.10 |
+| :--: | :--: | :--: | :--: | :--: | :--: |
+| 1.13.120+xpu |  | ✔️ | ✔️ | ✔️ | ✔️ |
+
+---
+
+Prebuilt conda packages are stored in Intel channel on Anaconda: [intel-extension-for-pytorch](https://anaconda.org/intel/intel-extension-for-pytorch/files) and [pytorch](https://anaconda.org/intel/pytorch/files).
+
+```bash
+# Install command
+conda install intel-extension-for-pytorch=1.13.120 pytorch=1.13.0 -c intel -c main
+```
+
 ## Install via compiling from source
 
 ### Configure the AOT (Optional)
