@@ -398,18 +398,6 @@ std::tuple<Tensor&, Tensor&> fractional_max_pool2d_out(
   return std::tuple<Tensor&, Tensor&>(output, indices);
 }
 
-std::tuple<Tensor, Tensor> fractional_max_pool2d(
-    const Tensor& self,
-    IntArrayRef kernel_size,
-    IntArrayRef output_size,
-    const Tensor& random_samples) {
-  Tensor output = at::empty({0}, self.options());
-  Tensor indices = at::empty({0}, self.options().dtype(kLong));
-  impl::fractional_max_pool2d_out_template(
-      output, indices, self, kernel_size, output_size, random_samples);
-  return std::tuple<Tensor, Tensor>(output, indices);
-}
-
 Tensor& fractional_max_pool2d_backward_out(
     const Tensor& grad_output,
     const Tensor& self,
@@ -417,18 +405,6 @@ Tensor& fractional_max_pool2d_backward_out(
     IntArrayRef output_size,
     const Tensor& indices,
     Tensor& grad_input) {
-  impl::fractional_max_pool2d_backward_out_template(
-      grad_input, grad_output, self, kernel_size, output_size, indices);
-  return grad_input;
-}
-
-Tensor fractional_max_pool2d_backward(
-    const Tensor& grad_output,
-    const Tensor& self,
-    IntArrayRef kernel_size,
-    IntArrayRef output_size,
-    const Tensor& indices) {
-  Tensor grad_input = at::empty({0}, self.options());
   impl::fractional_max_pool2d_backward_out_template(
       grad_input, grad_output, self, kernel_size, output_size, indices);
   return grad_input;

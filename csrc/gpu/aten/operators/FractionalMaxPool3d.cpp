@@ -531,19 +531,6 @@ std::tuple<Tensor&, Tensor&> fractional_max_pool3d_out(
   return std::tuple<Tensor&, Tensor&>(output, indices);
 }
 
-std::tuple<Tensor, Tensor> fractional_max_pool3d(
-    const Tensor& self,
-    IntArrayRef kernel_size,
-    IntArrayRef output_size,
-    const Tensor& random_samples) {
-  Tensor output = at::empty({0}, self.options());
-  Tensor indices = at::empty({0}, self.options().dtype(kLong));
-  impl::fractional_max_pool3d_out_template(
-      output, indices, self, kernel_size, output_size, random_samples);
-  Tensor indices_ = indices.contiguous();
-  return std::tuple<Tensor, Tensor>(output, indices_);
-}
-
 Tensor& fractional_max_pool3d_backward_out(
     const Tensor& grad_output,
     const Tensor& self,
