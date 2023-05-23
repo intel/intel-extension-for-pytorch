@@ -3,7 +3,7 @@ from torch import nn
 import torch.ao.nn.quantized as nnq
 from torch.ao.nn.quantized.modules.utils import _quantize_weight
 import torch.ao.nn.intrinsic as nni
-from ...quantization._qconfig import weight_only_quant_qconfig_mapping
+from ...quantization._qconfig import get_weight_only_quant_qconfig_mapping
 
 
 class IpexWoqLinear(nnq.Linear):
@@ -36,7 +36,10 @@ class IpexWoqLinear(nnq.Linear):
     _version = 4
 
     def __init__(self, in_features, out_features, bias_=True, dtype=torch.qint8):
-        super().__init__(in_features, out_features, bias_, dtype=dtype)
+        # nnq.Linear does not support quint4x2 so we set qint8 here as a hack
+        # This dtype is used for weight prepacking and we do not rely on the prepacking
+        # of nnq.Linear. So, it won't affect our implementation here.
+        super().__init__(in_features, out_features, bias_, dtype=torch.qint8)
         weight = torch.rand(out_features, in_features)
         qweight = torch.quantize_per_channel(
             weight, torch.ones(out_features), torch.zeros(out_features), 0, dtype
@@ -51,12 +54,12 @@ class IpexWoqLinear(nnq.Linear):
 
     def forward(self, x):
         # Note that we can handle self.bias == None case.
-        if self._packed_params.dtype == torch.qint8:
+        if self._packed_params.dtype in [torch.qint8, torch.quint4x2]:
             Y = torch.ops.torch_ipex.ipex_woq_linear(
                 x, self._op_context.get_data_handle()
             )
         else:
-            raise RuntimeError("Unsupported dtype on dynamic quantized linear!")
+            raise RuntimeError("Unsupported dtype of wegiht only quantized linear!")
         return Y.to(x.dtype)
 
     def _get_name(self):
@@ -66,7 +69,7 @@ class IpexWoqLinear(nnq.Linear):
         extra_repr_str = "in_features={}, out_features={}, dtype={}".format(
             self.in_features, self.out_features, self._packed_params.dtype
         )
-        if self._packed_params.dtype == torch.qint8:
+        if self._packed_params.dtype in [torch.qint8, torch.quint4x2]:
             extra_repr_str += ", qscheme={}".format(self.weight_qscheme)
         return extra_repr_str
 
@@ -125,14 +128,14 @@ class IpexWoqLinear(nnq.Linear):
         if mod.qconfig is not None and mod.qconfig.weight is not None:
             weight_observer = mod.qconfig.weight()
         else:
-            weight_observer = weight_only_quant_qconfig_mapping.global_qconfig.weight()
+            weight_observer = get_weight_only_quant_qconfig_mapping().global_qconfig.weight()
         dtype = weight_observer.dtype
-        assert dtype in [torch.qint8], (
+        assert dtype in [torch.qint8, torch.quint4x2], (
             "The only supported dtypes for "
-            "dynamic quantized linear are qint8 and float16 got: {}".format(dtype)
+            "weight-only quantized linear are qint8 and quint4x2 got: {}".format(dtype)
         )
         weight_observer(mod.weight)
-        if dtype == torch.qint8:
+        if dtype in [torch.qint8, torch.quint4x2]:
             qweight = _quantize_weight(mod.weight.float(), weight_observer)
         else:
             raise RuntimeError(

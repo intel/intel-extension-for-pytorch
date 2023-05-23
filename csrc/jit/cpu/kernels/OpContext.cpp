@@ -340,6 +340,17 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
     c10::optional<int64_t> batch_size) {
+  // TODO Will support optimized impl
+  if (weight.scalar_type() == c10::ScalarType::QUInt4x2) {
+    at::Tensor scales, zero_points;
+    auto op_context = torch_ipex::cpu::detail::woq_linear::create(
+        weight, zero_points, scales, bias, batch_size);
+    return c10::make_intrusive<IpexWoqLinearOpContext>(
+        batch_size,
+        std::move(op_context),
+        std::move(zero_points),
+        std::move(scales));
+  }
   auto N = weight.size(0);
   const auto qtype = weight.qscheme();
 

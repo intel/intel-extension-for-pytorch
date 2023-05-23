@@ -383,7 +383,7 @@ class TestDefaultRecipe(JitLlgaTestCase):
             data = torch.rand(feature[0], feature[1])
             weight = model.linear.weight
             weight_observer = (
-                ipex.quantization.weight_only_quant_qconfig_mapping.global_qconfig.weight()
+                ipex.quantization.get_weight_only_quant_qconfig_mapping().global_qconfig.weight()
             )
             weight_observer(weight)
             weight_int8 = _quantize_weight(weight, weight_observer)
@@ -394,7 +394,7 @@ class TestDefaultRecipe(JitLlgaTestCase):
             else:
                 output1 = torch.matmul(data, weight_fp32.T)
 
-            qconfig = ipex.quantization.weight_only_quant_qconfig_mapping
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
             with torch.no_grad():
                 woq_model = convert(prepared_model)
@@ -414,7 +414,6 @@ class TestDefaultRecipe(JitLlgaTestCase):
             test(case, True)
             test(case, False)
 
-
     def test_weight_only_quantization_autocast(self):
         class M(nn.Module):
             def __init__(self, use_bias):
@@ -425,10 +424,13 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 return self.linear(x)
 
         with torch.autocast(device_type='cpu', enabled=True, dtype= torch.bfloat16):
-            for use_bias in [True, False]:
+            use_bias_list = [True, False]
+            w_dtype_list = [torch.qint8, torch.quint4x2]
+            cases = itertools.product(use_bias_list, w_dtype_list)
+            for use_bias, w_dtype in cases:
                 m = M(use_bias).eval()
                 x = torch.rand(4, 4)
-                qconfig = ipex.quantization.weight_only_quant_qconfig_mapping
+                qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(weight_dtype=w_dtype)
                 prepared_model = ipex.quantization.prepare(m, qconfig, example_inputs=x, inplace=False)
                 woq_model = ipex.quantization.convert(prepared_model)
                 woq_model(x)
@@ -449,7 +451,7 @@ class TestDefaultRecipe(JitLlgaTestCase):
             m = model.eval()
             example_inputs = torch.rand(feature[0], feature[1])
 
-            qconfig = ipex.quantization.weight_only_quant_qconfig_mapping
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
             prepared_model = prepare(
                 m, qconfig, example_inputs=example_inputs, inplace=False
             )
@@ -481,6 +483,24 @@ class TestDefaultRecipe(JitLlgaTestCase):
             test(case, True)
             test(case, False)
 
+    def test_weight_only_quantization_quint4x2_weight(self):
+        class M(nn.Module):
+            def __init__(self, use_bias):
+                super(M, self).__init__()
+                self.linear = torch.nn.Linear(4, 4, use_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        for use_bias in [True, False]:
+            m = M(use_bias).eval()
+            x = torch.rand(4, 4)
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(weight_dtype=torch.quint4x2)
+            prepared_model = ipex.quantization.prepare(m, qconfig, example_inputs=x, inplace=False)
+            woq_model = ipex.quantization.convert(prepared_model)
+            woq_model(x)
+            woq_linear_class = ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+            assert isinstance(woq_model.linear, woq_linear_class)
 
 if __name__ == "__main__":
     run_tests()

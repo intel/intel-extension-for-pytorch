@@ -363,7 +363,9 @@ at::Tensor woq_linear_kernel(
   TORCH_CHECK(
       weight.is_quantized(),
       "Weight only quantized linear: weight should be quantized!");
-  if (self.scalar_type() != c10::ScalarType::Float) {
+  // TODO Will support optimized impl
+  if (self.scalar_type() != c10::ScalarType::Float ||
+      weight.scalar_type() == c10::ScalarType::QUInt4x2) {
     auto w = weight.dequantize();
     auto x = self.to(c10::ScalarType::Float);
     auto out = at::linear(x, w, bias);

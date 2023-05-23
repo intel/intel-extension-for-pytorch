@@ -75,12 +75,20 @@ def get_smooth_quant_qconfig_mapping(
 
 
 # For weight-only quantization
-_weight_only_quant_qconfig = QConfig(
-    activation=PlaceholderObserver.with_args(dtype=torch.float, is_dynamic=False),
-    weight=PerChannelMinMaxObserver.with_args(
-        dtype=torch.qint8, qscheme=torch.per_channel_affine
-    ),
-)
-weight_only_quant_qconfig_mapping = QConfigMapping().set_global(
-    _weight_only_quant_qconfig
-)
+def get_weight_only_quant_qconfig_mapping(weight_dtype: torch.dtype=torch.qint8):
+    dtype_to_qscheme = {
+        torch.qint8: torch.per_channel_affine,
+        # It is required to use per_channel_affine_float_qparams for quint4x2 by PyTorch
+        torch.quint4x2: torch.per_channel_affine_float_qparams,
+    }
+    weight_qscheme = dtype_to_qscheme[weight_dtype]
+    _weight_only_quant_qconfig = QConfig(
+        activation=PlaceholderObserver.with_args(dtype=torch.float, is_dynamic=False),
+        weight=PerChannelMinMaxObserver.with_args(
+            dtype=weight_dtype, qscheme=weight_qscheme
+        ),
+    )
+    weight_only_quant_qconfig_mapping = QConfigMapping().set_global(
+        _weight_only_quant_qconfig
+    )
+    return weight_only_quant_qconfig_mapping

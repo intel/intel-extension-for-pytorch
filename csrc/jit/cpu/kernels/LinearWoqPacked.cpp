@@ -36,6 +36,13 @@ ContextLinearWoq create(
     at::Tensor& scales,
     const c10::optional<at::Tensor>& bias,
     const c10::optional<int64_t> batch_size) {
+  // TODO Will support optimized impl
+  if (weight.scalar_type() == c10::ScalarType::QUInt4x2) {
+    return ContextLinearWoq{
+        std::move(weight),
+        bias.has_value() ? c10::make_optional(*bias) : c10::nullopt,
+    };
+  }
   auto packed_weight = woq_linear_pack_weight(weight, zero_points, scales);
   return ContextLinearWoq{
       std::move(packed_weight),
