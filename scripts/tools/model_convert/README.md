@@ -18,13 +18,18 @@ $ python setup.py install
 
 Try following commands step by step to be familar to this tool, you will see that after import model_convert, you can run code successfully on XPU device or you will get warning if one API is not supported by XPU backend.
 
-
-```console
+Run on CUDA device:
+```python
 import torch
 torch.cuda.device_count()
 torch.cuda.get_device_capability()
 torch.ones(3, 4).to('cuda')
 torch.ones(3, 4, device=torch.device("cuda"))
+```
+Run on XPU device:
+```python
+import torch
+import intel_extension_for_pytorch
 import model_convert
 torch.cuda.device_count()
 torch.cuda.get_device_capability()
@@ -41,7 +46,6 @@ check [Not Support List](./model_convert/yaml/api_unsupported_by_xpu.yaml) for u
 
 
 ### Run Unit Test
-
 
 ```console
 $ cd tests
