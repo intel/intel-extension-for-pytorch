@@ -348,7 +348,9 @@ void max_pool2d_with_indices_out_template(
     indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
   }
 
-  if (xpu::oneDNN::is_onednn_layout(input)) {
+  auto compute_eng = Settings::I().get_compute_eng();
+  if (xpu::oneDNN::is_onednn_layout(input) ||
+      compute_eng == xpu::COMPUTE_ENG::ONEDNN || input.is_quantized()) {
     // per oneDNN definition, no dilation means dilation ratio is 0.
     // Since dilation is already designed in the output size, no dilation
     // is used in ::xpu::oneDNN::pooling
@@ -564,7 +566,9 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       outputWidth,
       memory_format);
 
-  if (xpu::oneDNN::is_onednn_layout(input)) {
+  auto compute_eng = Settings::I().get_compute_eng();
+  if (xpu::oneDNN::is_onednn_layout(input) ||
+      compute_eng == xpu::COMPUTE_ENG::ONEDNN || input.is_quantized()) {
     // per oneDNN definition, no dilation means dilation ratio is 0.
     // Since dilation is already designed in the output size, no dilation
     // is used in ::xpu::oneDNN::pooling
