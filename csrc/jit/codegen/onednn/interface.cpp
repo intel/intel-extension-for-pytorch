@@ -10,6 +10,7 @@
 #include "prepare_binary.h"
 #include "prepare_dequant.h"
 #include "prepare_silu.h"
+#include "process_cast.h"
 #include "quantization_patterns.h"
 #include "remove_mutation.h"
 
@@ -63,11 +64,10 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
     DecomposeOps(g);
     GRAPH_DUMP("After DecomposeOps. Before PrepareBinaryForLLGA", g);
     PrepareBinaryForLLGA(g);
-    GRAPH_DUMP("After DecomposeOps. Before PrepareSiluForLLGA", g);
+    GRAPH_DUMP("After PrepareBinaryForLLGA. Before PrepareSiluForLLGA", g);
     PrepareSiluForLLGA(g);
-    GRAPH_DUMP("After PrepareSiluForLLGA. Before PrepareBinaryForLLGA", g);
     GRAPH_DUMP(
-        "After PrepareBinaryForLLGA. Before EliminateCommonSubexpression", g);
+        "After PrepareSiluForLLGA. Before EliminateCommonSubexpression", g);
     EliminateCommonSubexpression(g);
     GRAPH_DUMP(
         "After EliminateCommonSubexpression. Before SaveDequantInformation", g);
@@ -79,7 +79,9 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
     GRAPH_DUMP("After PrepareDequantForLLGA. Before LiftUpQuant", g);
     // LiftUpQuant must be place before DeferSizeCheck
     LiftUpQuant(g);
-    GRAPH_DUMP("After LiftUpQuant. Before DeferSizeCheck", g);
+    GRAPH_DUMP("After LiftUpQuant. Before ProcessCast", g);
+    ProcessCast(g);
+    GRAPH_DUMP("After ProcessCast. Before DeferSizeCheck", g);
     DeferSizeCheck(g);
     GRAPH_DUMP("After DeferSizeCheck. Before CreateLlgaSubgraphs", g);
     // CreateLlgaSubgraphs must be placed after all the preparation passes above
@@ -87,9 +89,7 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
     GRAPH_DUMP("After CreateLlgaSubgraphs. Before PropagateLayout", g);
     // PropagateLayout must be placed after CreateLlgaSubgraphs
     PropagateLayout(g);
-    GRAPH_DUMP(
-        "After PropagateLayout. Before prepareFusionGroupAndGuardOutputs", g);
-
+    GRAPH_DUMP("After PropagateLayout. Before RevertPrepareBinaryForLLGA", g);
     // Add shape guard for profiling mode and wipe the tensor type information
     // from the IR
     prepareFusionGroupAndGuardOutputs(g->block());

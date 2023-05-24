@@ -20,6 +20,18 @@ bool isViewOp(Node* n) {
   }
 }
 
+bool isBinaryOp(torch::jit::Node* n) {
+  switch (n->kind()) {
+    case aten::add:
+    case aten::div:
+    case aten::mul:
+    case aten::max:
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool isEltwiseOp(Node* n) {
   if (n->kind() == Symbol::aten("relu") ||
       n->kind() == Symbol::aten("sigmoid") ||
@@ -94,6 +106,101 @@ bool isScaleSupported(Value* scale) {
        (scale_value->isTensor() &&
         (scale_value.value().toTensor().scalar_type() ==
          at::ScalarType::Float))));
+}
+
+bool compareConstValue(torch::jit::Value* v, double d) {
+  auto ival = toIValue(v);
+  return ival.has_value() &&
+      ((ival->isInt() && ival->toInt() == static_cast<int>(d)) ||
+       (ival->isDouble() && ival->toDouble() == d));
+}
+
+// Mark original dtype of a node before type-promotion, so that if the node
+// would not be lowered to LLGA, then the change can be reverted.
+void mark_original_output_dtype(torch::jit::Node* node) {
+  auto outputDtype = node->output()->type()->expect<TensorType>()->scalarType();
+  if (outputDtype.has_value()) {
+    switch (outputDtype.value()) {
+      case at::ScalarType::Float:
+        node->i_(Symbol::attr("was_float"), true);
+        break;
+      case at::ScalarType::BFloat16:
+        node->i_(Symbol::attr("was_bfloat16"), true);
+        break;
+      case at::kInt:
+        node->i_(Symbol::attr("was_int"), true);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+void convertInputTo0DTensor(
+    torch::jit::Node* node,
+    int input_index,
+    at::ScalarType dtype) {
+  mark_original_output_dtype(node);
+  auto scalar = node->input(input_index);
+  WithInsertPoint guard(node);
+  auto g = node->owningGraph();
+  // 42 : Scalar  -->  tensor(42.0) : Float([])
+  auto scalar_tensor = g->insert(aten::as_tensor, {scalar}, {{"dtype", dtype}});
+  auto target_type =
+      TensorTypePtr(TensorType::create(dtype, at::kCPU, {}, false));
+  scalar_tensor->setType(target_type);
+  node->replaceInput(input_index, scalar_tensor);
+  // Add a mark here and convert tensor back to scalar later on for unfused
+  // add/div and some other binary ops
+  node->i_(Symbol::attr("scalar"), true);
+}
+
+void modifyDtypeOfNode(torch::jit::Node* node, at::ScalarType dtype) {
+  auto existingDtype =
+      node->output()->type()->expect<TensorType>()->scalarType();
+  if (existingDtype.has_value()) {
+    switch (existingDtype.value()) {
+      case at::ScalarType::Float:
+      case at::ScalarType::BFloat16:
+      case at::kInt:
+        node->output()->setType(
+            node->output()->type()->expect<TensorType>()->withScalarType(
+                dtype));
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+void insertTypeCast(
+    torch::jit::Node* node,
+    int input_index,
+    at::ScalarType dtype) {
+  WithInsertPoint guard(node);
+  auto g = node->owningGraph();
+  auto to_node_output =
+      g->insert(aten::to, {node->input(input_index)}, {{"dtype", dtype}});
+  to_node_output->setType(node->input(input_index)
+                              ->type()
+                              ->expect<TensorType>()
+                              ->withScalarType(dtype));
+  node->replaceInput(input_index, to_node_output);
+}
+
+void mayModifyOutputDtype(torch::jit::Node* node) {
+  if (node->output()->type()->isSubtypeOf(TensorType::get())) {
+    if (node->hasAttributeS("was_float")) {
+      modifyDtypeOfNode(node, at::ScalarType::Float);
+      node->removeAttributeS("was_float");
+    } else if (node->hasAttributeS("was_bfloat16")) {
+      modifyDtypeOfNode(node, at::ScalarType::BFloat16);
+      node->removeAttributeS("was_bfloat16");
+    } else if (node->hasAttributeS("was_int")) {
+      modifyDtypeOfNode(node, at::ScalarType::Int);
+      node->removeAttributeS("was_int");
+    }
+  }
 }
 
 } // namespace utils

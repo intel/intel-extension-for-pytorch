@@ -2,6 +2,7 @@
 
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
+#include <ATen/core/symbol.h>
 #include <ATen/quantized/QTensorImpl.h>
 #include <oneapi/dnnl/dnnl_graph.hpp>
 #include <torch/csrc/jit/ir/ir.h>
@@ -58,13 +59,26 @@ struct LlgaTensorDesc {
       if (tt->scalarType())
         dtype_ = getLlgaDataType(tt->scalarType().value());
 
-      // The profiling info of some graph inputs is missing, so we cannnot use
-      // numel() to check if a tensor is a scalar tensor.
+      // Use numel() if IValue can be used.
+      // Otherwise, check if scalar attribute exists.
       auto user_nodes = v->uses();
-      if (user_nodes.size() == 1) {
-        if (user_nodes[0].user->hasAttributeS("scalar") &&
-            (user_nodes[0].offset == 1)) {
+      if (toIValue(v).has_value()) {
+        auto v_tensor = toIValue(v).value().toTensor();
+        if ((v_tensor.numel() == 1) && (v_tensor.sizes().size() == 0)) {
           is_scalar_tensor_ = true;
+        }
+      } else if (user_nodes.size() != 0) {
+        for (auto user : user_nodes) {
+          if (user.user->hasAttributeS("scalar") &&
+              ((user.offset == 1) ||
+               ((user.offset == 2) &&
+                (user.user->kind() ==
+                 c10::Symbol::fromQualString("aten::where"))))) {
+            // either a binary op, whose second input was a scalar,
+            // or aten::where, whose third input was scalar
+            is_scalar_tensor_ = true;
+            break;
+          }
         }
       }
 
@@ -220,6 +234,7 @@ struct LlgaTensorDesc {
   bool is_dimensionality_unknown() const {
     return sizes_.size() == 0;
   }
+
   size_t tid_;
   std::vector<int64_t> sizes_;
   std::vector<int64_t> strides_;

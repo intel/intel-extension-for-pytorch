@@ -176,6 +176,20 @@ class TestOp(JitLlgaTestCase):
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
+    @llga_fp32_bf16_test_env
+    def test_softmax_different_output_dtype(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x):
+                return torch.nn.functional.softmax(x, dim=3, dtype=torch.bfloat16)
+
+        m = M()
+        x = torch.rand(8, 12, 12, 12)
+        graph, _ = self.checkTrace(m, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+
     def _gen_binary_inputs(self, gen_permute=True):
         for xshape, yshape in [
             [[1, 32, 28, 28], [1, 32, 28, 28]],
@@ -449,6 +463,7 @@ class TestOp(JitLlgaTestCase):
         graph, scripted = self.checkScript(m, [x, y, z])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
 
+
 class TestFusionPattern(JitLlgaTestCase):
     @llga_fp32_bf16_test_env
     def test_conv2d_eltwise(self):
@@ -480,6 +495,33 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::' + eltwise_fn_name])
                 # test if relu is fused into the fusion group
                 self.assertFused(graph, ['aten::' + eltwise])
+
+    @unittest.skip("Accuracy issue for conv+relu+TypeCast and conv+bn+relu+TypeCast")
+    @llga_fp32_bf16_test_env
+    def test_type_promotion(self):
+        class M(nn.Module):
+            def __init__(self, ):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 1)
+                self.bn1 = nn.BatchNorm2d(32)
+                self.conv2 = nn.Conv2d(32, 32, 1, dtype=torch.bfloat16)
+                self.bn2 = nn.BatchNorm2d(32, dtype=torch.bfloat16)
+
+            def forward(self, x, y):
+                y = self.conv2(y)
+                y = self.bn2(y)
+                y = torch.nn.functional.relu(y)
+                x = self.conv1(x)
+                x = self.bn1(x)
+                x = torch.nn.functional.relu(x)
+                z = y + x
+                return z
+
+        m = M()
+        x = torch.randn(3, 32, 32, 32)
+        y = torch.randn(3, 32, 32, 32, dtype=torch.bfloat16)
+        graph, _ = self.checkTrace(m, [x, y])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
 
     @llga_fp32_bf16_test_env
     def test_conv2d_clamp(self):
@@ -614,6 +656,26 @@ class TestFusionPattern(JitLlgaTestCase):
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
             self.assertFused(graph, ['aten::batch_norm', 'aten::' + eltwise])
 
+    @llga_fp32_bf16_test_env
+    def test_remove_redundant_to(self):
+        class M(nn.Module):
+            def __init__(self, ):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 1)
+                self.bn1 = nn.BatchNorm2d(32)
+
+            def forward(self, x):
+                x = self.conv1(x)
+                x = x.to(torch.float32)
+                x = self.bn1(x)
+                x = nn.functional.relu(x)
+                return x
+
+        m = M()
+        x = torch.randn(3, 32, 32, 32)
+        graph, _ = self.checkTrace(m, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+            
     @llga_fp32_bf16_test_env
     def test_avg_pool2d_add(self):
         class M(nn.Module):

@@ -192,6 +192,8 @@ class TestIpexOps(JitLlgaTestCase):
         graph = self.checkQuantizeTrace(m, inputs, atol=1e-2, qconfig=static_qconfig[1])
         self.assertGraphContainsExactly(graph, 'ipex::qinteraction', 1)
 
+    # Besides its primary objective, this UT also implicitly tests if mayRevertDtypeAttributeInsertion
+    # in csrc/jit/codegen/onednn/prepare_binary.cpp works well.
     def test_add_int8(self):
         class M(nn.Module):
             def __init__(self):
