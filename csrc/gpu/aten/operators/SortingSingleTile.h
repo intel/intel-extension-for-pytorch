@@ -301,6 +301,93 @@ void radix_sort_upsweep_process(
 }
 
 template <int32_t SUBGROUP_SIZE, int32_t WORKS_PER_ITEM>
+inline void ConsumePartialTile(
+    int32_t* count,
+    sycl::nd_item<1>& item,
+    int32_t wg_offset,
+    int32_t tile_num,
+    int32_t running_prefix,
+    int32_t* slm) {
+  // running_prefix for next round
+  // 1. load
+  int32_t partial_output[WORKS_PER_ITEM];
+  auto wi_id = item.get_local_id(0);
+  auto d_local = count + wg_offset;
+#pragma unroll
+  for (int ITEM = 0; ITEM < WORKS_PER_ITEM; ITEM++) {
+    if ((wi_id * WORKS_PER_ITEM) + ITEM < tile_num) {
+      partial_output[ITEM] = d_local[(wi_id * WORKS_PER_ITEM) + ITEM];
+    } else {
+      partial_output[ITEM] = *d_local;
+    }
+  }
+
+  item.barrier(dpcpp_local_fence);
+
+  // 2.1 thread reduce
+  int32_t thread_partial = partial_output[0];
+#pragma unroll
+  for (int i = 1; i < WORKS_PER_ITEM; ++i) {
+    thread_partial = thread_partial + partial_output[i];
+  }
+
+  // 2.2 scan
+  int32_t subgroup_inclusive_sum, subgroup_exclusive_sum;
+  auto sg = item.get_sub_group();
+  const int32_t subgroup_local_id = wi_id % SUBGROUP_SIZE;
+  const int32_t subgroup_id = wi_id / SUBGROUP_SIZE;
+  const int SUBGROUP_SCAN_STEPS = Log2<SUBGROUP_SIZE>::VALUE;
+  subgroup_scan<int32_t, SUBGROUP_SCAN_STEPS>(
+      sg,
+      subgroup_local_id,
+      thread_partial,
+      &subgroup_inclusive_sum,
+      &subgroup_exclusive_sum);
+
+  if (subgroup_local_id == (SUBGROUP_SIZE - 1))
+    slm[subgroup_id] = subgroup_inclusive_sum;
+  item.barrier(dpcpp_local_fence);
+
+  int32_t block_all_sum = 0, warp_prefix_sum;
+  const int32_t NUM_SUBGROUPS = item.get_local_range(0) / SUBGROUP_SIZE;
+#pragma unroll
+  for (int i = 0; i < NUM_SUBGROUPS; ++i) {
+    if (subgroup_id == i)
+      warp_prefix_sum = block_all_sum;
+    block_all_sum += slm[i]; // 0
+  }
+
+  subgroup_exclusive_sum += warp_prefix_sum;
+  // running_prefix is a global value to record before work group sum
+  // only work item 0 compute prefix
+  subgroup_exclusive_sum += running_prefix;
+
+  if (wi_id == 0)
+    running_prefix += block_all_sum;
+  // finish exclusion scan
+
+  // 2.3 reduce value split into each item by one thread
+  int32_t inclusive = partial_output[0];
+  inclusive = subgroup_exclusive_sum + inclusive;
+  partial_output[0] = subgroup_exclusive_sum;
+  int32_t exclusive = inclusive;
+#pragma unroll
+  for (int i = 1; i < WORKS_PER_ITEM; ++i) {
+    inclusive = exclusive + partial_output[i];
+    partial_output[i] = exclusive;
+    exclusive = inclusive;
+  }
+
+  // 3 store, register back to global memory
+#pragma unroll
+  for (int ITEM = 0; ITEM < WORKS_PER_ITEM; ITEM++) {
+    if (wi_id * WORKS_PER_ITEM + ITEM < tile_num) {
+      d_local[(wi_id * WORKS_PER_ITEM) + ITEM] = partial_output[ITEM];
+    }
+  }
+}
+
+template <int32_t SUBGROUP_SIZE, int32_t WORKS_PER_ITEM>
 inline void ConsumeTile(
     int32_t* count,
     sycl::nd_item<1>& item,
@@ -405,6 +492,16 @@ void RadixSortScanBins(
             running_prefix,
             (int32_t*)slm.get_pointer().get());
         wg_offset += TILE_ITEMS;
+      }
+
+      if (wg_offset < num_counts) {
+        ConsumePartialTile<SUBGROUP_SIZE, WORKS_PER_ITEM>(
+            count,
+            item,
+            wg_offset,
+            num_counts - wg_offset,
+            running_prefix,
+            (int32_t*)slm.get_pointer().get());
       }
     };
 
@@ -832,7 +929,8 @@ template <
     typename KeyType,
     typename ValueType,
     bool IS_DESCENDING,
-    int32_t SUBGROUP_SIZE>
+    int32_t SUBGROUP_SIZE,
+    int32_t GROUP_THREADS>
 void radix_sort_iteration_impl(
     const int32_t sort_sz,
     const int32_t current_bit,
@@ -847,7 +945,7 @@ void radix_sort_iteration_impl(
       KeyType,
       ValueType,
       SUBGROUP_SIZE,
-      512,
+      GROUP_THREADS,
       4,
       IS_DESCENDING>(keys_in, count, sort_sz, current_bit, num_bits);
   RadixSortScanBins<SUBGROUP_SIZE, 4>(count, count_sz);
@@ -855,7 +953,7 @@ void radix_sort_iteration_impl(
       KeyType,
       ValueType,
       SUBGROUP_SIZE,
-      512,
+      GROUP_THREADS,
       4,
       IS_DESCENDING>(
       keys_in,
@@ -880,30 +978,40 @@ void radix_sort_iteration(
     int32_t* count,
     const int32_t count_sz) {
   auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
-  switch (dev_prop->subgroup_sizes[0] * 2) {
-    case 32:
-      radix_sort_iteration_impl<KeyType, ValueType, IS_DESCENDING, 32>(
-          sort_sz,
-          current_bit,
-          num_bits,
-          keys_in,
-          values_in,
-          keys_out,
-          values_out,
-          count,
-          count_sz);
-      break;
-    default:
-      radix_sort_iteration_impl<KeyType, ValueType, IS_DESCENDING, 16>(
-          sort_sz,
-          current_bit,
-          num_bits,
-          keys_in,
-          values_in,
-          keys_out,
-          values_out,
-          count,
-          count_sz);
+
+#define DISPATCH_RADIX_SORT_IMPI(SG_SIZE, WG_SIZE) \
+  radix_sort_iteration_impl<                       \
+      KeyType,                                     \
+      ValueType,                                   \
+      IS_DESCENDING,                               \
+      SG_SIZE,                                     \
+      WG_SIZE>(                                    \
+      sort_sz,                                     \
+      current_bit,                                 \
+      num_bits,                                    \
+      keys_in,                                     \
+      values_in,                                   \
+      keys_out,                                    \
+      values_out,                                  \
+      count,                                       \
+      count_sz);
+
+  if (dpcppMaxWorkGroupSize() < 512) {
+    switch (dev_prop->subgroup_sizes[0] * 2) {
+      case 32:
+        DISPATCH_RADIX_SORT_IMPI(32, 256)
+        break;
+      default:
+        DISPATCH_RADIX_SORT_IMPI(16, 256)
+    }
+  } else {
+    switch (dev_prop->subgroup_sizes[0] * 2) {
+      case 32:
+        DISPATCH_RADIX_SORT_IMPI(32, 512)
+        break;
+      default:
+        DISPATCH_RADIX_SORT_IMPI(16, 512)
+    }
   }
 }
 
@@ -914,7 +1022,7 @@ void radix_sort_single_tile(KeyType* key, ValueType* val, const int sort_sz) {
   const int32_t radix_iters = (sizeof(KeyType) * 8) / radix_bits;
 
   const int32_t radix_states = 1 << radix_bits;
-  int64_t wg_size = 512;
+  const int32_t wg_size = dpcppMaxWorkGroupSize() < 512 ? 256 : 512;
   const auto target_global_size = dpcppMaxWorkItemsPerTile();
   const int max_work_group_num = target_global_size / wg_size;
   const int64_t count_sz = max_work_group_num * radix_states;
