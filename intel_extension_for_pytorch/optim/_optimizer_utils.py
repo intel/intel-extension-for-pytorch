@@ -5,8 +5,9 @@ import warnings
 from copy import deepcopy
 from itertools import chain
 from collections import defaultdict
-from ._functional import sgd_step, adagrad_step, lamb_step, adam_step, adamw_step
+from ._functional import sgd_step, adagrad_step, lamb_step, adam_step, adamw_step, lars_step
 from ._lamb import Lamb
+from .lars import Lars
 from ..nn import utils
 
 IPEX_FUSED_OPTIMIZER_LIST_CPU = [
@@ -19,6 +20,8 @@ IPEX_FUSED_OPTIMIZER_LIST_CPU = [
 IPEX_FUSED_OPTIMIZER_LIST_XPU = [
     torch.optim.SGD,
     torch.optim.AdamW,
+    torch.optim.Adam,
+    Lamb,
 ]
 
 OPTIMIZER_FUSED_STEP_MAPPING_CPU = {
@@ -28,10 +31,12 @@ OPTIMIZER_FUSED_STEP_MAPPING_CPU = {
     Lamb: lamb_step,
 }
 
-# TODO: For align frontend and pass build, the xpu code is temp commented
 OPTIMIZER_FUSED_STEP_MAPPING_XPU = {
     torch.optim.SGD: sgd_step,
     torch.optim.AdamW: adamw_step,
+    torch.optim.Adam: adam_step,
+    Lamb: lamb_step,
+    Lars: lars_step,
 }
 
 
@@ -396,7 +401,7 @@ def optimizer_fusion(optimizer, master_weight_split, device_type):
     r"""
     Patch "step" method to choose IPEX optimized fused update kernel.
     """
-    setattr(optimizer, "fused", True)
+
     if not hasattr(optimizer, "params_attr"):
         setattr(optimizer, "params_attr", {})
     try:
@@ -414,6 +419,7 @@ def optimizer_fusion(optimizer, master_weight_split, device_type):
         if not hasattr(optimizer, "_original_step"):
             setattr(optimizer, "_original_step", optimizer.step)
         setattr(optimizer, "step", types.MethodType(step, optimizer))
+        setattr(optimizer, "fused", True)
     except KeyError:
         warnings.warn(
             "Does not suport fused step for "

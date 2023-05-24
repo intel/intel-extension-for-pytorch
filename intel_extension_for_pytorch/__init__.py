@@ -40,6 +40,10 @@ from ._version import (
 )
 
 
+# Path to folder containing CMake definitions for torch ipex package
+cmake_prefix_path = os.path.join(os.path.dirname(__file__), "share", "cmake")
+
+
 torch_version = ""
 ipex_version = ""
 matches = re.match(r"(\d+\.\d+).*", torch.__version__)

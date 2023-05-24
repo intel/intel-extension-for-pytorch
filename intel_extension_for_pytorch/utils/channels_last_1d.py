@@ -1,6 +1,5 @@
 import torch
 
-
 # This is a work-around to convert 3d tensor to channels last format.
 # Theoretically, transpose(permute/view)-contiguous(to)-transpose(permute/view)
 # can convert 3d tensor to channels last. However, this formula cannot convert all
@@ -9,10 +8,16 @@ import torch
 # channels last chain is based on suggest_memory_format.
 # We test several inputs, find that most of shapes can be converted to channels last,
 # except for N1W format. It needs use as_strided to convert to channels last.
+
+
 def tensor_to_channels_last_1d(t):
     assert t.dim() == 3
 
-    if 1 == t.size(1):
+    if 1 == t.size(0) and 1 != t.size(1):
+        # handle for tensor shape like (1, x, y), x != 1
+        t = t.transpose(1, -1).contiguous().transpose(1, -1)
+    elif 1 == t.size(1):
+        # handle for tensor shape like (x, 1, y), include x == 1
         t = t.as_strided(t.size(), (t.size(1) * t.size(-1), 1, t.size(1)))
     else:
         t = t.view(t.size(0), t.size(1), 1, t.size(2))
@@ -21,22 +26,13 @@ def tensor_to_channels_last_1d(t):
     return t
 
 
-# Port from https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/blob/\
-#           920c7163c81d6c5098ba79ed482d57b1ded8521d/intel_extension_for_pytorch/xpu/utils.py#L6
 def to_channels_last_1d(t):
-    cpu_scope = torch.nn.Conv1d
-    xpu_scope = (torch.nn.Conv1d, torch.nn.BatchNorm1d, torch.nn.MaxPool1d)
+    scope = (torch.nn.Conv1d)
     if isinstance(t, torch.nn.Module):
         for m in t.modules():
             for param in m.parameters():
-                if (
-                    param.device.type == "cpu"
-                    and isinstance(m, cpu_scope)
-                    or param.device.type == "xpu"
-                    and isinstance(m, xpu_scope)
-                ):
-                    if 3 == param.data.dim():
-                        param.data = tensor_to_channels_last_1d(param.data)
+                if isinstance(m, scope) and 3 == param.data.dim():
+                    param.data = tensor_to_channels_last_1d(param.data)
         return t
 
     if 3 == t.dim():
@@ -44,8 +40,6 @@ def to_channels_last_1d(t):
     return t
 
 
-# Port from https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/blob/\
-#           920c7163c81d6c5098ba79ed482d57b1ded8521d/intel_extension_for_pytorch/xpu/utils.py#L38
 def is_contiguous_channels_last_1d(input):
     if 3 != input.dim():
         return False

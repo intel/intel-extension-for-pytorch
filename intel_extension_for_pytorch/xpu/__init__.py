@@ -19,9 +19,15 @@ from .amp import *
 from .utils import *
 from .random import *
 from .memory import *
-from .overrides import set_default_tensor_type as set_default_tensor_type
-from .overrides import enable_cl_to as enable_cl_to
-from .overrides import override_tensor_totype, override_assert_equal
+from ..utils.channels_last_1d import is_contiguous_channels_last_1d, to_channels_last_1d
+
+from .overrides import (
+    override_tensor_totype,
+    override_assert_equal,
+    override_get_stream,
+    override_recursive_to,
+)
+
 from .generator import Generator
 
 from torch._utils import _get_device_index
@@ -544,9 +550,12 @@ if hasattr(intel_extension_for_pytorch._C, "_postInitExtension"):
 #         return torch.tensor(e, device='xpu', dtype=torch.float64)
 
 if intel_extension_for_pytorch._C._has_xpu():
-    if is_available() and not has_fp64_dtype():
-        override_tensor_totype()
+    if is_available():
+        override_get_stream()
+        override_recursive_to()
+        if not has_fp64_dtype():
+            override_tensor_totype()
 
-        exec_path = sys.argv[0].split("/")
-        if len(exec_path) > 0 and "pytest" in exec_path:
-            override_assert_equal()
+            exec_path = sys.argv[0].split("/")
+            if (len(exec_path) > 0 and "pytest" in exec_path):
+                override_assert_equal()
