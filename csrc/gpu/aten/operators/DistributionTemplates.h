@@ -223,17 +223,15 @@ void distribution_unary_elementwise_kernel(
     out_offset_calc_t out_calc) {
   int group_size = item.get_local_range(0);
   int global_size = item.get_global_range(0);
-  int idx = item.get_group(0) * group_size + item.get_local_id(0);
+  int global_idx = item.get_group(0) * group_size + item.get_local_id(0);
 
   auto seeds = philox_unpack(philox_args);
   randStatePhilox4_32_10_t state;
-  rand_init(std::get<0>(seeds), idx, std::get<1>(seeds), &state);
+  rand_init(std::get<0>(seeds), global_idx, std::get<1>(seeds), &state);
 
-  int global_idx;
-  for (int i = 0; i < numel; i += global_size) {
-    global_idx = i + idx;
-    auto in_offsets = inp_calc.get(global_idx);
-    auto out_offsets = out_calc.get(global_idx);
+  for (int i = global_idx; i < numel; i += global_size) {
+    auto in_offsets = inp_calc.get(i);
+    auto out_offsets = out_calc.get(i);
     f(state, output_data[out_offsets[0]], input_data[in_offsets[0]]);
   }
 }
@@ -327,7 +325,7 @@ void distribution_binary_elementwise_kernel(
     out_offset_calc_t out_calc) {
   int group_size = item.get_local_range(0);
   int global_size = item.get_global_range(0);
-  int idx = item.get_group(0) * group_size + item.get_local_id(0);
+  int global_idx = item.get_group(0) * group_size + item.get_local_id(0);
 
   auto seeds = philox_unpack(philox_args);
 
@@ -335,14 +333,11 @@ void distribution_binary_elementwise_kernel(
   using input_t_2 = typename function_traits<func_t>::template arg<2>::type;
 
   randStatePhilox4_32_10_t state;
-  rand_init(std::get<0>(seeds), idx, std::get<1>(seeds), &state);
+  rand_init(std::get<0>(seeds), global_idx, std::get<1>(seeds), &state);
 
-  int global_idx;
-#pragma unroll
-  for (int i = 0; i < numel; i += global_size) {
-    global_idx = i + idx;
-    auto in_offsets = inp_calc.get(global_idx);
-    auto out_offsets = out_calc.get(global_idx);
+  for (int i = global_idx; i < numel; i += global_size) {
+    auto in_offsets = inp_calc.get(i);
+    auto out_offsets = out_calc.get(i);
     output_data[out_offsets[0]] =
         f(state, input_data_1[in_offsets[0]], input_data_2[in_offsets[1]]);
   }
