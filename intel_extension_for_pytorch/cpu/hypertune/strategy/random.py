@@ -12,7 +12,7 @@ class RandomTuneStrategy(TuneStrategy):
                 *(self.hyperparam2searchspace[hp] for hp in self.hyperparams)
             )
         )
-        self.total_idx = set(list(range(len(self.combinations))))
+        self.total_idx = set(list(i for i in range(len(self.combinations))))
         self.record_idx = set()
 
     def next_tune_cfg(self):

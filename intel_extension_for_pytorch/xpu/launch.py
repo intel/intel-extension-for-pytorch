@@ -116,6 +116,7 @@ def init_parser(parser):
     # positional
     parser.add_argument(
         "--convert-fp64-to-fp32",
+        "--convert_fp64_to_fp32",
         action="store_true",
         dest="convert_fp64_to_fp32",
         help="To automatically convert torch.float64(double) dtype to torch.float32",

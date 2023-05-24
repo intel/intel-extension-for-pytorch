@@ -1,5 +1,5 @@
-# reference:
-# https://github.com/intel/neural-compressor/blob/15477100cef756e430c8ef8ef79729f0c80c8ce6/neural_compressor/strategy/strategy.py
+# reference: https://github.com/intel/neural-compressor/blob/\
+# 15477100cef756e430c8ef8ef79729f0c80c8ce6/neural_compressor/strategy/strategy.py
 import os
 from abc import abstractmethod
 import csv
@@ -29,7 +29,7 @@ class TuneStrategy(object):
 
         self.max_trials = conf.execution_conf.tuning.max_trials
 
-        # hyperparams
+        # hyperparams #
         self.hyperparam2searchspace = OrderedDict()
         for k in self.conf.hyperparams:
             for hp in self.conf.hyperparams[k]["hp"]:
@@ -37,12 +37,12 @@ class TuneStrategy(object):
         self.hyperparams = list(self.hyperparam2searchspace.keys())
         tune_launcher = "launcher" in self.conf.hyperparams
 
-        # objective
+        # objective #
         self.multiobjective = MultiObjective(
             self.program, self.program_args, tune_launcher
         )
 
-        # output
+        # output #
         output_name = "record.csv"
         log_name = os.path.join(self.conf.output_dir, output_name)
         csvfile = open(log_name, "w", newline="")
@@ -67,12 +67,10 @@ class TuneStrategy(object):
             trials_count += 1
 
             click.secho("\nTune ", fg="green", nl=False)
-            click.secho(f"{trials_count}", fg="blue", nl=False)
+            click.secho("{trials_count}", fg="blue", nl=False)
 
-            click.secho(
-                "\nCurrent configuration is: ", fg="green", nl=False
-            )
-            click.secho(f"{tune_cfg}", fg="blue")
+            click.secho("\nCurrent configuration is: ", fg="green", nl=False)
+            click.secho("{tune_cfg}", fg="blue")
 
             curr_tune_result = self.multiobjective.evaluate(tune_cfg)
 
@@ -127,14 +125,14 @@ class TuneStrategy(object):
 
     def _record_tune_result(self, curr_tune_result, curr_tune_cfg):
         for objective, val in zip(self.usr_objectives, curr_tune_result):
-            click.secho(f"{objective['name']}: {val}", fg="blue")
+            click.secho("{objective['name']}: {val}", fg="blue")
 
         click.secho("Best configuration is: ", fg="green", nl=False)
-        click.secho(f"{self.best_tune_cfg}", fg="blue")
+        click.secho("{self.best_tune_cfg}", fg="blue")
         for objective, val in zip(self.usr_objectives, self.best_tune_result):
-            click.secho(f"{objective['name']}: {val}", fg="blue")
+            click.secho("{objective['name']}: {val}", fg="blue")
 
-        curr_tune_cfg_val = [list(curr_tune_cfg.values())]
+        curr_tune_cfg_val = list(_ for _ in curr_tune_cfg.values())
         self.tune_result_record.writerow(curr_tune_cfg_val + curr_tune_result)
 
     def _stop(self, trials_count):
@@ -163,6 +161,6 @@ class TuneStrategy(object):
 
     def _print_best_result(self):
         click.secho("Best configuration found is: ", fg="green", nl=False)
-        click.secho(f"{self.best_tune_cfg}", fg="blue")
+        click.secho("{self.best_tune_cfg}", fg="blue")
         for objective, val in zip(self.usr_objectives, self.best_tune_result):
-            click.secho(f"{objective['name']}: {val}", fg="blue")
+            click.secho("{objective['name']}: {val}", fg="blue")

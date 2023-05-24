@@ -136,6 +136,7 @@ def _exec(args):
 def add_auto_ipex_params(parser, auto_ipex_default_enabled=False):
     group = parser.add_argument_group("Code_Free Parameters")
     group.add_argument(
+        "--auto-ipex",
         "--auto_ipex",
         action="store_true",
         default=auto_ipex_default_enabled,
@@ -150,12 +151,14 @@ def add_auto_ipex_params(parser, auto_ipex_default_enabled=False):
         help="The data type to run inference. float32 or bfloat16 is allowed.",
     )
     group.add_argument(
+        "--auto-ipex-verbose",
         "--auto_ipex_verbose",
         action="store_true",
         default=False,
         help="This flag is only used for debug and UT of auto ipex.",
     )
     group.add_argument(
+        "--disable-ipex-graph-mode",
         "--disable_ipex_graph_mode",
         action="store_true",
         default=False,

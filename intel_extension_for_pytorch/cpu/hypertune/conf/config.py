@@ -7,15 +7,15 @@ import yaml
 from schema import Schema, And, Use, Optional, Or, Hook
 from .dotdict import DotDict
 from ..strategy import STRATEGIES
-from intel_extension_for_pytorch.cpu.launch import CPUinfo
+from intel_extension_for_pytorch.cpu.launch import CPUPoolList
 
-# tuning
+# ### tuning ####
 tuning_default = {"strategy": "grid", "max_trials": 100}
 
 
 def _valid_strategy(data):
     data = data.lower()
-    assert data in STRATEGIES, "Tuning strategy {} is NOT supported".format(data)
+    assert data in STRATEGIES, f"Tuning strategy {data} is NOT supported"
     return data
 
 
@@ -26,11 +26,11 @@ tuning_schema = Schema(
     }
 )
 
-# output_dir
+# ### output_dir ###
 output_dir_default = os.getcwd() + "/"
 output_dir_schema = Schema(str)
 
-# objective
+# ### objective ###
 objective_schema = Schema(
     {
         "name": str,
@@ -39,40 +39,44 @@ objective_schema = Schema(
     }
 )
 
-# hyperparams
-# launcher
+# ### hyperparams ###
+# ### launcher ###
 
 # default values if not tuning
 launcher_hyperparam_default_val = {
     "ncore_per_instance": [-1],
+    "ncores_per_instance": [-1],
     "ninstances": [-1],
     "use_all_nodes": [True],
     "use_logical_core": [False],
+    "use_logical_cores": [False],
     "disable_numactl": [False],
     "disable_iomp": [False],
     "malloc": ["tc"],
 }
 
 # default search spaces if not user-specified
-cpuinfo = CPUinfo()
-is_hyperthreading_enabled = (
-    cpuinfo.logical_core_nums() == cpuinfo.physical_core_nums() * 2
-)
+cpuinfo = CPUPoolList().pool_all
+is_hyperthreading_enabled = len([c for c in cpuinfo if not c.is_physical_core]) > 0
 
 launcher_hyperparam_default_search_space = {
     "hp": [
         "ncore_per_instance",
+        "ncores_per_instance",
         "ninstances",
         "use_all_nodes",
         "use_logical_core",
+        "use_logical_cores",
         "disable_numactl",
         "disable_iomp",
         "malloc",
     ],
     "ncore_per_instance": "all_logical_cores",
+    "ncores_per_instance": "all_logical_cores",
     "ninstances": "all_logical_cores",
     "use_all_nodes": [True, False],
     "use_logical_core": [True, False],
+    "use_logical_cores": [True, False],
     "disable_numactl": [True, False],
     "disable_iomp": [True, False],
     "malloc": ["pt", "tc", "je"],
@@ -87,9 +91,9 @@ def _valid_launcher_schema(key, scope, error):
 def input_str_to_list_int(data):
     if isinstance(data, str):
         if data == "all_physical_cores":
-            return [core_id + 1 for core_id in cpuinfo.get_all_physical_cores()]
+            return [c.cpu + 1 for c in cpuinfo if c.is_physical_core]
         elif data == "all_logical_cores":
-            return [core_id + 1 for core_id in cpuinfo.get_all_logical_cores()]
+            return [c.cpu + 1 for c in cpuinfo]
 
     assert isinstance(data, list)
     return data
@@ -104,6 +108,12 @@ launcher_schema = Schema(
             Use(input_str_to_list_int),
             lambda s: all(isinstance(i, int) for i in s),
         ),
+        Hook("ncores_per_instance", handler=_valid_launcher_schema): object,
+        Optional("ncores_per_instance", default="all_logical_cores"): And(
+            Or(str, list),
+            Use(input_str_to_list_int),
+            lambda s: all(isinstance(i, int) for i in s),
+        ),
         Hook("ninstances", handler=_valid_launcher_schema): object,
         Optional("ninstances", default="all_logical_cores"): And(
             Or(str, list),
@@ -112,16 +122,18 @@ launcher_schema = Schema(
         ),
         Optional(
             "use_all_nodes",
-            default=[True, False] if cpuinfo.node_nums() > 1 else [True],
-        ): And(
-            list, lambda s: all(isinstance(i, bool) for i in s)
-        ),
+            default=[True, False]
+            if len(set([c.node for c in cpuinfo])) > 1
+            else [True],
+        ): And(list, lambda s: all(isinstance(i, bool) for i in s)),
         Optional(
             "use_logical_core",
             default=[True, False] if is_hyperthreading_enabled else [False],
-        ): And(
-            list, lambda s: all(isinstance(i, bool) for i in s)
-        ),
+        ): And(list, lambda s: all(isinstance(i, bool) for i in s)),
+        Optional(
+            "use_logical_cores",
+            default=[True, False] if is_hyperthreading_enabled else [False],
+        ): And(list, lambda s: all(isinstance(i, bool) for i in s)),
         Optional("disable_numactl", default=[True, False]): And(
             list, lambda s: all(isinstance(i, bool) for i in s)
         ),
@@ -153,11 +165,11 @@ schema = Schema(
 )
 
 
-# reference:
-# https://github.com/intel/neural-compressor/blob/15477100cef756e430c8ef8ef79729f0c80c8ce6/neural_compressor/conf/config.py
+# reference: https://github.com/intel/neural-compressor/blob/15477100cef756\
+#            e430c8ef8ef79729f0c80c8ce6/neural_compressor/conf/config.py
 class Conf(object):
     def __init__(self, conf_fpath, program_fpath, program_args):
-        assert Path(conf_fpath).exists(), "{} does not exist".format(conf_fpath)
+        assert Path(conf_fpath).exists(), f"{conf_fpath} does not exist"
         self.execution_conf = DotDict(
             schema.validate(
                 self._convert_conf(
@@ -166,7 +178,7 @@ class Conf(object):
             )
         )
 
-        assert Path(program_fpath).exists(), "{} does not exist".format(program_fpath)
+        assert Path(program_fpath).exists(), f"{program_fpath} does not exist"
         self.program = program_fpath
         self.program_args = program_args
         self.usr_objectives = self._extract_usr_objectives(self.program)
@@ -178,6 +190,7 @@ class Conf(object):
                 conf = yaml.safe_load(content)
                 validated_conf = schema.validate(conf)
             return validated_conf
+
         except BaseException:
             raise RuntimeError(
                 "The yaml file format is not correct. Please refer to document."
@@ -206,6 +219,7 @@ class Conf(object):
                     # case 2: not tune {launcher}
                     else:
                         del dst["hyperparams"][tune_x]
+
             elif k == "output_dir":
                 if src[k] != dst[k]:
                     path = os.path.dirname(
@@ -214,13 +228,14 @@ class Conf(object):
                     if not os.path.exists(path):
                         os.makedirs(path)
                     dst[k] = path
+
             else:
                 dst[k] = src[k]
         return dst
 
     def _extract_usr_objectives(self, program_fpath):
         # e.g. [{'name': 'latency', 'higher_is_better': False, 'target_val': 0},
-        # {'name': 'throughput', 'higher_is_better':True, 'target_val': 100}]
+        #       {'name': 'throughput', 'higher_is_better':True, 'target_val': 100}]
 
         HYPERTUNE_TOKEN = "@hypertune"
 
@@ -233,9 +248,7 @@ class Conf(object):
                 objective = objective_schema.validate(objective)
             except BaseException:
                 raise RuntimeError(
-                    "Parsing @hypertune failed for line {} of {} file".format(
-                        line, program_fpath
-                    )
+                    f"Parsing @hypertune failed for line {line} of {program_fpath} file"
                 )
             return objective
 

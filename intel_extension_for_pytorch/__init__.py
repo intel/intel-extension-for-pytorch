@@ -93,7 +93,6 @@ if sys.platform == "win32":
 from .utils._proxy_module import *
 from . import cpu
 from . import xpu
-from . import launcher
 from . import quantization
 from . import nn
 from . import jit
