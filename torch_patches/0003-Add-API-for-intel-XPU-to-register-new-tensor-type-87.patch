@@ -1,7 +1,7 @@
 From 7999687b0906cd7518ace477f660c2041436e295 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Fri, 21 Apr 2023 11:43:48 +0800
-Subject: [PATCH 3/9] Add API for intel XPU to register new tensor type (#87)
+Subject: [PATCH 03/10] Add API for intel XPU to register new tensor type (#87)
  (#118)
 
 Co-authored-by: majing <jing1.ma@intel.com>

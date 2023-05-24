@@ -1,7 +1,7 @@
 From 727002bb34cfbbf84a1819fbad6136c92cc1326e Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Fri, 21 Apr 2023 12:01:23 +0800
-Subject: [PATCH 4/9] support type(torch.xpu.IntTensor) (#103) (#119)
+Subject: [PATCH 04/10] support type(torch.xpu.IntTensor) (#103) (#119)
 
 * support type(torch.xpu.IntTensor) (#103)
 

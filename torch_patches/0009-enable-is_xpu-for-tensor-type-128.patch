@@ -1,7 +1,7 @@
 From bf6b8223b557a1b4d6962453ac20936c4bf83a9f Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Fri, 12 May 2023 09:24:07 +0800
-Subject: [PATCH 9/9] enable is_xpu for tensor type (#128)
+Subject: [PATCH 09/10] enable is_xpu for tensor type (#128)
 
 ---
  test/test_torch.py                  | 11 +++++++++++

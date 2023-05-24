@@ -1,7 +1,7 @@
 From b53f0dfa108650b6f56ef89250d066105384b347 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Fri, 21 Apr 2023 11:35:16 +0800
-Subject: [PATCH 1/9] Add DLPack oneAPI support for the XPU device for
+Subject: [PATCH 01/10] Add DLPack oneAPI support for the XPU device for
  experimental. (#116)
 
 Co-authored-by: johnlu <chengjun.lu@intel.com>

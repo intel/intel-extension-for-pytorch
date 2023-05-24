@@ -1,7 +1,7 @@
 From 8a0179e8198066e71e583eaea2ada07e2b374549 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Fri, 21 Apr 2023 14:33:30 +0800
-Subject: [PATCH 7/9] Add xpu legacy profiler (#30) (#123)
+Subject: [PATCH 07/10] Add xpu legacy profiler (#30) (#123)
 
 Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
 Co-authored-by: johnlu <chengjun.lu@intel.com>

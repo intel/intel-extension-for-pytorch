@@ -1,7 +1,7 @@
 From 9a28c523e4747f2bd5feb4b73071dea6463dbc9a Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Fri, 21 Apr 2023 14:41:17 +0800
-Subject: [PATCH 8/9] Export function symbols to enable Windows build of
+Subject: [PATCH 08/10] Export function symbols to enable Windows build of
  Intel Extension for PyTorch (#113) (#124)
 
 * update 1.13.1
