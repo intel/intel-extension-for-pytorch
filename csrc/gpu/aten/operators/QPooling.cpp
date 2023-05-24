@@ -6,6 +6,7 @@
 #include <runtime/Utils.h>
 
 #include "comm/ParamUtils.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
@@ -21,11 +22,12 @@ at::Tensor quantized_max_pool2d(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-  auto output_and_indices = at::max_pool2d_with_indices(
-      qx, kernel_size, stride, padding, dilation, ceil_mode);
-  auto output = std::get<0>(output_and_indices);
+  auto output = at::empty({0}, qx.options());
+  auto indices = at::empty({0}, qx.options().dtype(kLong));
+  auto output_and_indices = at::AtenIpexTypeXPU::max_pool2d_with_indices_out(
+      qx, kernel_size, stride, padding, dilation, ceil_mode, output, indices);
 
-  return output;
+  return std::get<0>(output_and_indices);
 }
 
 } // namespace AtenIpexTypeQuantizedXPU
