@@ -17,13 +17,13 @@ namespace onednn {
 using namespace torch::jit;
 using opkind = dnnl::graph::op::kind;
 
-void fixConvOptionalBias(Node* node) {
-  if (!node->input(2)->mustNotBeNone()) {
+void fixOptionalInput(Node* node, int index) {
+  if (!node->input(index)->mustNotBeNone()) {
     // Replace non-existent optional bias with const None
     auto g = node->owningGraph();
     auto n = g->createNone();
     auto v = n->insertBefore(node)->output();
-    node->replaceInput(2, v);
+    node->replaceInput(index, v);
   }
 }
 
@@ -63,10 +63,12 @@ std::vector<int64_t> IntTensorToVector(const at::Tensor& tensor) {
 Operator makeWildcardOp(Node* node) {
   auto o = Operator(node, opkind::Wildcard);
   // wildcard op contains only topology info
-  for (size_t i = 0; i < node->inputs().size(); i++)
+  for (size_t i = 0; i < node->inputs().size(); i++) {
     o.setInput(i);
-  for (size_t i = 0; i < node->outputs().size(); i++)
+  }
+  for (size_t i = 0; i < node->outputs().size(); i++) {
     o.setOutput(i);
+  }
   return o;
 }
 
@@ -185,7 +187,7 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
   // Calling node->kind() only once so that the compiler would create a
   // jump-table
   if (nodeKind == Symbol::aten("conv2d")) {
-    fixConvOptionalBias(node);
+    fixOptionalInput(node, 2);
     return Operator(node, opkind::Convolution)
         .setInput(0, 1, 2)
         .setOutput(0)
@@ -225,7 +227,7 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
   } else if (
       (nodeKind == Symbol::aten("conv_transpose2d")) ||
       (nodeKind == Symbol::aten("conv_transpose3d"))) {
-    fixConvOptionalBias(node);
+    fixOptionalInput(node, 2);
     return Operator(node, opkind::ConvTranspose)
         .setInput(0, 1, 2)
         .setOutput(0)
@@ -255,6 +257,23 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
         .setOutput(0)
         .setAttr(dnnl::graph::op::attr::epsilon, Operator::Float, 4)
         .setAttr(dnnl::graph::op::attr::keep_stats, false);
+  } else if (nodeKind == Symbol::aten("mean")) {
+    REQ(node->input(1)->mustNotBeNone());
+    auto numInputs = node->inputs().size();
+    bool keep_dims = false;
+    if (numInputs == 3) {
+      keep_dims = toIValue(node->namedInput("keepdim"))->toBool();
+    }
+    std::vector<int64_t> dims{};
+    auto ivalue_dim = toIValue(node->namedInput("dim"));
+    if (ivalue_dim.has_value()) {
+      dims = ivalue_dim->toIntVector();
+    }
+    return Operator(node, opkind::ReduceMean)
+        .setInput(0)
+        .setOutput(0)
+        .setAttr(dnnl::graph::op::attr::axes, dims)
+        .setAttr(dnnl::graph::op::attr::keep_dims, keep_dims);
   } else if (nodeKind == Symbol::aten("add")) {
     return makeBinaryOp(node, opkind::Add);
   } else if (nodeKind == Symbol::aten("mul")) {
@@ -280,6 +299,27 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     return makeEltwiseOp(node, opkind::Exp);
   } else if (nodeKind == Symbol::aten("sqrt")) {
     return makeEltwiseOp(node, opkind::Sqrt);
+  } else if (nodeKind == Symbol::aten("rsqrt")) {
+    return Operator(node, opkind::Pow)
+        .setInput(0)
+        .setOutput(0)
+        .setAttr(dnnl::graph::op::attr::beta, static_cast<float>(-0.5));
+  } else if (nodeKind == Symbol::aten("pow")) {
+    auto beta = toIValue(node->input(1));
+    REQ(beta.has_value() && (beta->isDouble() || beta->isInt()));
+    float beta_value = 0.0;
+    if (beta->isDouble()) {
+      beta_value = beta->toDouble();
+    } else {
+      beta_value = beta->toInt();
+    }
+    return Operator(node, opkind::Pow)
+        .setInput(0)
+        .setOutput(0)
+        .setAttr(dnnl::graph::op::attr::beta, beta_value);
+  } else if (nodeKind == Symbol::aten("max")) {
+    REQ(node->inputs().size() == 2);
+    return makeBinaryOp(node, opkind::Maximum);
   } else if (nodeKind == Symbol::aten("abs")) {
     return makeEltwiseOp(node, opkind::Abs);
   } else if (nodeKind == Symbol::aten("square")) {
@@ -327,8 +367,6 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
         .setOutput(0)
         .setAttr(dnnl::graph::op::attr::axis, axis);
   } else if (nodeKind == Symbol::aten("cat")) {
-    return makeWildcardOp(node); // TODO: remove once Concat is supported
-
     auto o = Operator(node, opkind::Concat);
     REQ(node->input(0)->node()->kind() == prim::ListConstruct);
     REQ(node->input(0)->uses().size() == 1);
@@ -486,6 +524,8 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     auto outputStrides = typeOfOutput->strides().concrete_sizes();
     REQ(inputStrides != outputStrides);
     return Operator(node, opkind::Reorder).setInput(0).setOutput(0);
+  } else if (nodeKind == Symbol::aten("where")) {
+    return Operator(node, opkind::Select).setInput(0, 1, 2).setOutput(0);
   }
 
   GRAPH_DEBUG("Making ", nodeKind.toQualString(), " a wildcard");

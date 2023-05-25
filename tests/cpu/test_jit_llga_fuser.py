@@ -351,6 +351,42 @@ class TestOp(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul'])
 
     @llga_fp32_bf16_test_env
+    def test_bmm_mean(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                z = x.matmul(y)
+                z = torch.mean(z, dim=0, keepdim=True)
+                return z
+
+        x = torch.randn(128, 16, 384, 64)
+        y = torch.randn(128, 16, 64, 384)
+        m = M()
+
+        graph, _ = self.checkTrace(m, [x, y])
+        # single op partitions
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+
+    @llga_fp32_bf16_test_env
+    def test_max(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                return torch.max(x, y)
+
+        x = torch.randn(1, 3, 32, 32)
+        y = torch.randn(1, 3, 32, 32)
+        m = M()
+
+        graph, _ = self.checkTrace(m, [x, y])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+
+
+    @llga_fp32_bf16_test_env
     def test_bmm_div(self):
         class M(nn.Module):
             def __init__(self):
