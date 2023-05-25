@@ -329,10 +329,11 @@ void ctc_loss_backward_log_beta_kernel(
   auto work_group_size = dpcppMaxWorkItemsPerEU(dev_id);
 
   sycl::range<2> global_range(1, 1), local_range(1, 1);
-  std::tie(global_range, local_range) =
-      get_work_range(work_group_size, 2 * __max_input_length + 1, __batch_size);
+  std::tie(global_range, local_range) = get_work_range(
+      work_group_size, 2 * __max_target_length + 1, __batch_size);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
+    dpcpp_local_acc_t<scalar_t> shared_local_buff(work_group_size, cgh);
     auto log_beta_data = log_beta.data_ptr<scalar_t>();
     auto log_probs_data = log_probs.data_ptr<scalar_t>();
     auto input_lengths_data = input_lengths.data_ptr<int64_t>();
@@ -352,6 +353,7 @@ void ctc_loss_backward_log_beta_kernel(
       // bookkeeping
       int64_t b = item_id.get_local_id(0) +
           item_id.get_group(0) * item_id.get_local_range(0);
+      size_t batch_slm_off = item_id.get_local_id(0) * intra_batch_size;
       // This is a workaround for unknown compute cpp issue.
       int64_t max_input_length = __max_input_length;
       int64_t max_target_length = __max_target_length;
@@ -406,8 +408,12 @@ void ctc_loss_backward_log_beta_kernel(
                (2 * max_target_length % intra_batch_size);
            block_s >= 0;
            block_s -= intra_batch_size) {
+        // sync on block_s segement
+        item_id.barrier(dpcpp_global_fence);
+
         int64_t s = intra_batch_id + block_s;
         int64_t current_target_prime;
+        scalar_t result_t_s = neginf;
         bool have_three;
         if (b < batch_size && s < 2 * target_length + 1 && target_length > 0) {
           current_target_prime = get_target_prime(
@@ -426,29 +432,43 @@ void ctc_loss_backward_log_beta_kernel(
         }
         // now go backward in t. Note that we need to skip the last timestep
         // that we did above.
+
+        auto lidx = intra_batch_id;
+        auto slm_lidx = batch_slm_off + lidx;
+        shared_local_buff[slm_lidx] = log_beta_ptr
+            [lb_batch_offset + lb_input_stride * (input_length - 1) +
+             lb_target_stride * s]; // t = input_length -1
+
         for (int64_t t = max_input_length - 2; t >= 0; t--) {
-          item_id.barrier(dpcpp_global_fence);
+          item_id.barrier(dpcpp_local_fence);
           if ((b < batch_size) && (t < input_length - 1) &&
               (s < 2 * target_length + 1)) {
-            scalar_t lb1 = log_beta_ptr
-                [lb_batch_offset + lb_input_stride * (t + 1) +
-                 lb_target_stride * s];
+            scalar_t lb1 = shared_local_buff[slm_lidx];
             scalar_t lbmax = lb1;
             scalar_t lb2, lb3;
 
             if (s < 2 * target_length) {
-              lb2 = log_beta_ptr
-                  [lb_batch_offset + lb_input_stride * (t + 1) +
-                   lb_target_stride * (s + 1)];
+              if (lidx < intra_batch_size - 1) {
+                lb2 = shared_local_buff[slm_lidx + 1];
+              } else {
+                lb2 = log_beta_ptr
+                    [lb_batch_offset + lb_input_stride * (t + 1) +
+                     lb_target_stride * (s + 1)];
+              }
+
               if (lb2 > lbmax)
                 lbmax = lb2;
             } else {
               lb2 = neginf;
             }
             if (have_three) {
-              lb3 = log_beta_ptr
-                  [lb_batch_offset + lb_input_stride * (t + 1) +
-                   lb_target_stride * (s + 2)];
+              if (lidx < intra_batch_size - 2) {
+                lb3 = shared_local_buff[slm_lidx + 2];
+              } else {
+                lb3 = log_beta_ptr
+                    [lb_batch_offset + lb_input_stride * (t + 1) +
+                     lb_target_stride * (s + 2)];
+              }
               if (lb3 > lbmax)
                 lbmax = lb3;
             } else {
@@ -466,6 +486,7 @@ void ctc_loss_backward_log_beta_kernel(
                               log_probs_ptr
                                   [lp_batch_offset + t * lp_input_stride +
                                    lp_char_stride * current_target_prime]);
+            result_t_s = lb;
 
             log_beta_ptr
                 [lb_batch_offset + lb_input_stride * t + lb_target_stride * s] =
@@ -478,6 +499,8 @@ void ctc_loss_backward_log_beta_kernel(
                 [lb_batch_offset + lb_input_stride * t + lb_target_stride * s] =
                     neginf;
           }
+          item_id.barrier(dpcpp_local_fence);
+          shared_local_buff[slm_lidx] = result_t_s;
         }
       }
     };
