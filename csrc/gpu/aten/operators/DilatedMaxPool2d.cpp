@@ -675,13 +675,13 @@ Tensor& max_pool2d_with_indices_backward_out(
     self = self_.contiguous();
     grad_output = grad_output_.contiguous();
     indices = indices_.contiguous();
-    grad_input.resize_as_(self);
+    grad_input.zero_();
   } else {
     auto smf = self_.suggest_memory_format();
     self = contiguous_if_needed(self_, smf);
     grad_output = contiguous_if_needed(grad_output_, smf);
     indices = contiguous_if_needed(indices_, smf);
-    grad_input.resize_as_(self, smf);
+    grad_input.zero_();
   }
 
   impl::max_pool2d_with_indices_backward_out_template(
