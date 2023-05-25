@@ -1231,6 +1231,18 @@ class AddMulDiv(nn.Module):
     def forward(self, input):
         return torch.div(torch.mul(input, torch.add(input, 3)), 6)
 
+class Python_GELU_Tanh_v1(nn.Module):
+    def __init__(self):
+        super(Python_GELU_Tanh_v1, self).__init__()
+    def forward(self, input):
+        return 0.5 * input * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (input + 0.044715 * torch.pow(input, 3.0))))
+
+class Python_GELU_Tanh_v2(nn.Module):
+    def __init__(self):
+        super(Python_GELU_Tanh_v2, self).__init__()
+    def forward(self, input):
+        return input * 0.5 * (1.0 + torch.tanh(0.79788456 * input * (1 + 0.044715 * input * input)))
+
 class Tester(TestCase):
     @contextlib.contextmanager
     def _texpr_enable(self, strategy):
@@ -4116,6 +4128,38 @@ class Tester(TestCase):
             tresult = traced_model(input)
             result = model(input)
             self.assertEqual(tresult, result)
+
+    def test_replace_PythonGELU_with_AtenGELU(self):
+        for i in range(5):
+            model_v1 = Python_GELU_Tanh_v1().eval()
+            input = torch.randn((1+i)*16, 16, 1024)
+            self._test_output(
+                model_v1,
+                input,
+                kind_in_graph="aten::gelu",
+                kind_not_in_graph="aten::tanh_")
+
+            self._test_output_bf16(
+                model_v1,
+                input.to(torch.bfloat16),
+                kind_in_graph="aten::gelu",
+                kind_not_in_graph="aten::tanh_",
+                prec=0.02)
+
+            model_v2 = Python_GELU_Tanh_v2().eval()
+            input = torch.randn((1+i)*16, 16, 1024)
+            self._test_output(
+                model_v2,
+                input,
+                kind_in_graph="aten::gelu",
+                kind_not_in_graph="aten::tanh_")
+
+            self._test_output_bf16(
+                model_v2,
+                input.to(torch.bfloat16),
+                kind_in_graph="aten::gelu",
+                kind_not_in_graph="aten::tanh_",
+                prec=0.02)
 
 if __name__ == '__main__':
     torch.manual_seed(2020)

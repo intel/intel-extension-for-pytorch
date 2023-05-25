@@ -83,6 +83,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // ipex einsum
   graph_rewrite::FusedEinsumPost(graph);
 
+  // replace python GELU to Aten GELU which are equally in math for more post-op
+  // fusions
+  graph_rewrite::FusePythonGELUWithAten(graph);
+
   // Fuse the scores calculation(dim + matmul + (add)? + softmax) for
   // Multi-Head-Attention
   // Note that we make scalar div or mul after matmul first

@@ -1074,6 +1074,139 @@ void FuseLinearSwishCustomized(std::shared_ptr<Graph>& graph) {
   ls_fusion.runOnGraph(graph);
 }
 
+void FusePythonGELUWithAten(std::shared_ptr<Graph>& graph) {
+  // from transformers common defined python gelu
+  // ref:
+  // https://github.com/huggingface/transformers/blob/main/src/transformers/activations.py#L56
+  std::string PythonGELUTanh_v1 = R"(
+      graph(%x, %const_value1, %const_value2, %const_value3, %const_value4, %const_value5, %const_value6):
+        %res_tmp1 = aten::mul(%x, %const_value1)
+        %res_tmp2 = aten::pow(%x, %const_value2)
+        %res_tmp2_ = aten::mul(%res_tmp2, %const_value3)
+        %res_tmp3 = aten::add(%x, %res_tmp2_, %const_value4)
+        %res_tmp4 = aten::mul(%res_tmp3, %const_value5)
+        %res_tmp5 = aten::tanh(%res_tmp4)
+        %res_tmp6 = aten::add(%res_tmp5, %const_value6, %const_value4)
+        %res = aten::mul(%res_tmp1, %res_tmp6)
+        return (%res) )";
+
+  // from transformers defined python gelu in bloom model
+  // ref:
+  // https://github.com/huggingface/transformers/blob/main/src/transformers/models/bloom/modeling_bloom.py#L158
+  std::string PythonGELUTanh_v2 = R"(
+      graph(%x, %const_value1, %const_value2, %const_value3, %const_value4, %const_value5):
+        %res_tmp1 = aten::mul(%x, %const_value1)
+        %res_tmp2 = aten::mul(%x, %const_value2)
+        %res_tmp3 = aten::mul(%x, %const_value3)
+        %res_tmp3_ = aten::mul(%res_tmp3, %x)
+        %res_tmp4 = aten::add(%res_tmp3_, %const_value4, %const_value4)
+        %res_tmp5 = aten::mul(%res_tmp2, %res_tmp4)
+        %res_tmp6 = aten::tanh(%res_tmp5)
+        %res_tmp7 = aten::add(%res_tmp6, %const_value5, %const_value4)
+        %res = aten::mul(%res_tmp1, %res_tmp7)
+        return (%res) )";
+
+  std::string AtenGELUTanh_argv1 = R"(
+      graph(%x, %const_value1, %const_value2, %const_value3, %const_value4, %const_value5, %const_value6):
+        %tanh_ : str = prim::Constant[value="tanh"]()
+        %res = aten::gelu(%x, %tanh_)
+        return (%res) )";
+
+  std::string AtenGELUTanh_argv2 = R"(
+      graph(%x, %const_value1, %const_value2, %const_value3, %const_value4, %const_value5):
+        %tanh_ : str = prim::Constant[value="tanh"]()
+        %res = aten::gelu(%x, %tanh_)
+        return (%res) )";
+  auto filter_v1 = [](const Match& match,
+                      const std::unordered_map<std::string, Value*>& vmap) {
+    const auto& match_vmap = match.values_map;
+    auto const_value1 = toIValue(
+        graph_rewrite_helper::getValue("const_value1", match_vmap, vmap));
+    if (!const_value1.has_value() ||
+        const_value1->toScalar().to<float>() != 0.5) {
+      return false;
+    }
+    auto const_value2 = toIValue(
+        graph_rewrite_helper::getValue("const_value2", match_vmap, vmap));
+    if (!const_value2.has_value() ||
+        const_value2->toScalar().to<float>() != 3.0) {
+      return false;
+    }
+    auto const_value3 = toIValue(
+        graph_rewrite_helper::getValue("const_value3", match_vmap, vmap));
+    if (!const_value3.has_value() ||
+        std::fabs(const_value3->toScalar().to<float>() - 0.044715) >
+            0.0000001) {
+      return false;
+    }
+    auto const_value4 = toIValue(
+        graph_rewrite_helper::getValue("const_value4", match_vmap, vmap));
+    if (!const_value4.has_value() || const_value4->toInt() != 1) {
+      return false;
+    }
+    auto const_value5 = toIValue(
+        graph_rewrite_helper::getValue("const_value5", match_vmap, vmap));
+    if (!const_value5.has_value() ||
+        std::fabs(const_value5->toScalar().to<float>() - 0.79788456) >
+            0.0000001) {
+      return false;
+    }
+    auto const_value6 = toIValue(
+        graph_rewrite_helper::getValue("const_value6", match_vmap, vmap));
+    if (!const_value6.has_value() ||
+        const_value6->toScalar().to<float>() != 1.0) {
+      return false;
+    }
+    return true;
+  };
+
+  auto filter_v2 = [](const Match& match,
+                      const std::unordered_map<std::string, Value*>& vmap) {
+    const auto& match_vmap = match.values_map;
+    auto const_value1 = toIValue(
+        graph_rewrite_helper::getValue("const_value1", match_vmap, vmap));
+    if (!const_value1.has_value() ||
+        const_value1->toScalar().to<float>() != 0.5) {
+      return false;
+    }
+    auto const_value2 = toIValue(
+        graph_rewrite_helper::getValue("const_value2", match_vmap, vmap));
+    if (!const_value2.has_value() ||
+        std::fabs(const_value2->toScalar().to<float>() - 0.79788456) >
+            0.0000001) {
+      return false;
+    }
+    auto const_value3 = toIValue(
+        graph_rewrite_helper::getValue("const_value3", match_vmap, vmap));
+    if (!const_value3.has_value() ||
+        std::fabs(const_value3->toScalar().to<float>() - 0.044715) >
+            0.0000001) {
+      return false;
+    }
+    auto const_value4 = toIValue(
+        graph_rewrite_helper::getValue("const_value4", match_vmap, vmap));
+    if (!const_value4.has_value() || const_value4->toInt() != 1) {
+      return false;
+    }
+    auto const_value5 = toIValue(
+        graph_rewrite_helper::getValue("const_value5", match_vmap, vmap));
+    if (!const_value5.has_value() ||
+        const_value5->toScalar().to<float>() != 1.0) {
+      return false;
+    }
+    return true;
+  };
+
+  SubgraphRewriter SingleGeluTanh_v1;
+  SingleGeluTanh_v1.RegisterRewritePattern(
+      PythonGELUTanh_v1, AtenGELUTanh_argv1);
+  SingleGeluTanh_v1.runOnGraph(graph, filter_v1);
+  SubgraphRewriter SingleGeluTanh_v2;
+  SingleGeluTanh_v2.RegisterRewritePattern(
+      PythonGELUTanh_v2, AtenGELUTanh_argv2);
+  SingleGeluTanh_v2.runOnGraph(graph, filter_v2);
+}
+
 // This path will be removed after pytorch offical path is optimized well.
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
   std::string max_pool2d = R"(

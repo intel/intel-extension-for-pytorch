@@ -48,7 +48,6 @@ void insertPrePackedConvOp(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseConvWithEltwiseAdd(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseConvAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseBottleneck(std::shared_ptr<torch::jit::Graph>& graph);
-
 void RecordAtenLinearNodes(
     std::shared_ptr<torch::jit::Graph>& graph,
     std::unordered_set<torch::jit::Node*>& aten_linear,
@@ -72,6 +71,7 @@ void fuseConvTransposeAdd(std::shared_ptr<torch::jit::Graph>& graph);
 void FusedEinsumPost(std::shared_ptr<torch::jit::Graph>& graph);
 
 void FusedTransFreeMha(std::shared_ptr<torch::jit::Graph>& graph);
+void FusePythonGELUWithAten(std::shared_ptr<torch::jit::Graph>& graph);
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch_ipex
