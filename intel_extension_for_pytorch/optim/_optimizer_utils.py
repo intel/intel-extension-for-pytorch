@@ -5,7 +5,14 @@ import warnings
 from copy import deepcopy
 from itertools import chain
 from collections import defaultdict
-from ._functional import sgd_step, adagrad_step, lamb_step, adam_step, adamw_step, lars_step
+from ._functional import (
+    sgd_step,
+    adagrad_step,
+    lamb_step,
+    adam_step,
+    adamw_step,
+    lars_step,
+)
 from ._lamb import Lamb
 from .lars import Lars
 from ..nn import utils

@@ -75,7 +75,7 @@ def get_smooth_quant_qconfig_mapping(
 
 
 # For weight-only quantization
-def get_weight_only_quant_qconfig_mapping(weight_dtype: torch.dtype=torch.qint8):
+def get_weight_only_quant_qconfig_mapping(weight_dtype: torch.dtype = torch.qint8):
     dtype_to_qscheme = {
         torch.qint8: torch.per_channel_affine,
         # It is required to use per_channel_affine_float_qparams for quint4x2 by PyTorch

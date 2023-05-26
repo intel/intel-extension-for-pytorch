@@ -18,9 +18,12 @@ def may_import_deepspeed_modules():
         # import deepspeed in a global space will raise circular import error
         # intel-extension-for-deepspeed imports both IPEX and deepspeed
         from deepspeed.module_inject.layers import LinearAllreduce, LinearLayer
+
         return LinearAllreduce, LinearLayer
     except ImportError:
         return None
+
+
 installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
 if "deepspeed" in installed_pkg:
     from deepspeed import comm

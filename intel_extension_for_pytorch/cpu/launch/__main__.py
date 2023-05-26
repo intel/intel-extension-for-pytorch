@@ -1,6 +1,7 @@
 import argparse
 from .launch import init_parser, run_main_with_args, ArgumentTypesDefaultsHelpFormatter
 
+
 def main():
     description = """
 This is a script for launching PyTorch training and inference on Intel Xeon CPU with optimal configurations. \
@@ -23,11 +24,13 @@ This is a script for launching PyTorch training and inference on Intel Xeon CPU 
 ###########################################################################
 """
 
-    parser = argparse.ArgumentParser(description=description, formatter_class=ArgumentTypesDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=description, formatter_class=ArgumentTypesDefaultsHelpFormatter
+    )
     parser = init_parser(parser)
     args = parser.parse_args()
     run_main_with_args(args)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

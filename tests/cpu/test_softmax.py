@@ -2,41 +2,49 @@ import torch
 import torch.nn as nn
 import intel_extension_for_pytorch as ipex
 from torch.testing._internal.jit_utils import JitTestCase
-import intel_extension_for_pytorch as ipex
 from intel_extension_for_pytorch.quantization import prepare, convert
 from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, QConfig
 import unittest
-IPEX_SOFTMAX = 'ipex::softmax'
-IPEX_SOFTMAX_ = 'ipex::softmax_'
-ATEN_SOFTMAX = 'aten::softmax'
+
+IPEX_SOFTMAX = "ipex::softmax"
+IPEX_SOFTMAX_ = "ipex::softmax_"
+ATEN_SOFTMAX = "aten::softmax"
+
 
 class softmax_with_multiuse_input(torch.nn.Module):
     def __init__(self):
         super().__init__()
+
     def forward(self, x):
         x1 = nn.Softmax(dim=-1)(x)
-        x2 = x + x1 
+        x2 = x + x1
         return x1, x2
+
 
 class softmax_with_alias_input(torch.nn.Module):
     def __init__(self):
         super().__init__()
+
     def forward(self, x):
         x1 = x
         x2 = nn.Softmax(dim=-1)(x)
         return x1, x2
 
+
 class inplace_softmax(torch.nn.Module):
     def __init__(self):
         super().__init__()
+
     def forward(self, x):
         x1 = x + 1
         x2 = nn.Softmax(dim=-1)(x1)
         return x2
 
+
 class inplace_softmax_with_blocks(torch.nn.Module):
     def __init__(self):
         super().__init__()
+
     def forward(self, x, flag):
         if flag:
             x1 = x + 1
@@ -45,54 +53,63 @@ class inplace_softmax_with_blocks(torch.nn.Module):
         x2 = torch.softmax(x1, dim=-1)
         return x2
 
+
 class softmax_MHA(torch.nn.Module):
     def __init__(self):
         super().__init__()
+
     def forward(self, x):
         attention_scores = torch.matmul(x, x.transpose(-1, -2))
         attention_scores = attention_scores / 64
         attention_scores = nn.Softmax(dim=-1)(attention_scores)
         return attention_scores
 
+
 class inplace_softmax_with_TE_group(torch.nn.Module):
     def __init__(self):
         super().__init__()
+
     def forward(self, x):
         x1 = x + 1
         x2 = x + 2
         x3 = x + 3
         x4 = x + 4
         x5 = x + 5
-        y1 = (x1 / x2).softmax(dim = -1)
-        y2 = ((x4 - x3) / x5).softmax(dim = -1)
+        y1 = (x1 / x2).softmax(dim=-1)
+        y2 = ((x4 - x3) / x5).softmax(dim=-1)
         return y1, y2
+
 
 class softmax_dtype(torch.nn.Module):
     def __init__(self):
         super().__init__()
+
     def forward(self, x):
         return torch.nn.functional.softmax(x, dtype=x.dtype, dim=1)
+
 
 class inplace_softmax_dtype(torch.nn.Module):
     def __init__(self):
         super().__init__()
+
     def forward(self, x):
         x1 = x + 1
         return torch.nn.functional.softmax(x1, dtype=x.dtype, dim=1)
 
+
 class SoftmaxTester(JitTestCase):
     def test_softmax(self):
         for dtype in ["fp32", "bf16"]:
-            test1 = torch.tensor([[2.0,2.0],[2.0,2.0]])
-            test2 = torch.tensor([[2.0,2.0],[2.0,2.0]])
-            test3 = torch.tensor([[1.0,1.0],[1.0,1.0]])
-            test4 = torch.tensor([[1.0,1.0],[1.0,1.0]]).transpose(1,0)
-            test5 = torch.tensor([[2.0,2.0],[2.0,2.0]]).transpose(1,0)
-            test6 = torch.rand(1,16,64,64)
-            test7 = torch.tensor([[1.0,1.0],[1.0,1.0]])
-            test8 = torch.rand(2,3)
+            test1 = torch.tensor([[2.0, 2.0], [2.0, 2.0]])
+            test2 = torch.tensor([[2.0, 2.0], [2.0, 2.0]])
+            test3 = torch.tensor([[1.0, 1.0], [1.0, 1.0]])
+            test4 = torch.tensor([[1.0, 1.0], [1.0, 1.0]]).transpose(1, 0)
+            test5 = torch.tensor([[2.0, 2.0], [2.0, 2.0]]).transpose(1, 0)
+            test6 = torch.rand(1, 16, 64, 64)
+            test7 = torch.tensor([[1.0, 1.0], [1.0, 1.0]])
+            test8 = torch.rand(2, 3)
             test9 = test8 - 1
-            test10 = torch.tensor([[1.0,1.0],[1.0,1.0]])
+            test10 = torch.tensor([[1.0, 1.0], [1.0, 1.0]])
 
             if dtype == "bf16":
                 test1 = test1.bfloat16()
@@ -138,9 +155,18 @@ class SoftmaxTester(JitTestCase):
                 res10 = model10(test10)
 
             # int8 case, testing inplac with llga fusion group
-            qconfig = QConfig(activation=MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8), weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
+            qconfig = QConfig(
+                activation=MinMaxObserver.with_args(
+                    qscheme=torch.per_tensor_affine, dtype=torch.quint8
+                ),
+                weight=PerChannelMinMaxObserver.with_args(
+                    dtype=torch.qint8, qscheme=torch.per_channel_symmetric
+                ),
+            )
             ipex.nn.utils._model_convert.replace_dropout_with_identity(model6)
-            prepared_model = prepare(model6, qconfig, example_inputs=test6, inplace=False)
+            prepared_model = prepare(
+                model6, qconfig, example_inputs=test6, inplace=False
+            )
             prepared_model(test6)
             converted_model = convert(prepared_model)
             converted_model = torch.jit.trace(converted_model, test6)
@@ -195,5 +221,5 @@ class SoftmaxTester(JitTestCase):
             self.assertEqual(res10[1], res10_traced[1], 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test = unittest.main()

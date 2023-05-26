@@ -608,8 +608,12 @@ def lamb_step(self, closure=None):
                 if len(state) == 0:
                     state["step"] = 0
                     buffer_dtype = p.dtype if p.dtype is torch.float64 else torch.float
-                    state['exp_avg'] = torch.zeros(p.shape, dtype=buffer_dtype, device=p.device)
-                    state['exp_avg_sq'] = torch.zeros(p.shape, dtype=buffer_dtype, device=p.device)
+                    state["exp_avg"] = torch.zeros(
+                        p.shape, dtype=buffer_dtype, device=p.device
+                    )
+                    state["exp_avg_sq"] = torch.zeros(
+                        p.shape, dtype=buffer_dtype, device=p.device
+                    )
 
                 exp_avgs.append(state["exp_avg"])
                 exp_avg_sqs.append(state["exp_avg_sq"])
@@ -1130,42 +1134,47 @@ def lars_step(self, closure=None):
             loss = closure()
 
     for group in self.param_groups:
-
         params_with_grad = []
         params2 = []
         d_p_list = []
         momentum_buffer_list = []
 
-        for _, p in enumerate(group['params']):
-            grad = get_bf16_grad(p, self.params_attr) if is_master_weight(p, self.params_attr) else p.grad
+        for _, p in enumerate(group["params"]):
+            grad = (
+                get_bf16_grad(p, self.params_attr)
+                if is_master_weight(p, self.params_attr)
+                else p.grad
+            )
             if grad is not None:
                 params_with_grad.append(p)
                 d_p_list.append(grad)
 
             state = self.state[p]
-            if 'momentum_buffer' not in state:
+            if "momentum_buffer" not in state:
                 momentum_buffer_list.append(None)
             else:
-                momentum_buffer_list.append(state['momentum_buffer'])
+                momentum_buffer_list.append(state["momentum_buffer"])
 
             # get bf16 parameter from params_attr
             param2 = get_param2(p, self.params_attr)
             params2.append(param2)
 
         for i, param in enumerate(params_with_grad):
-            momentum_buffer_list[i] = torch.ops.torch_ipex.lars_fused_step(param,
-                                                                           params2[i],
-                                                                           d_p_list[i],
-                                                                           momentum_buffer_list[i],
-                                                                           group['weight_decay'],
-                                                                           group['momentum'],
-                                                                           group['eeta'],
-                                                                           group['lr'],
-                                                                           group['epsilon'])
+            momentum_buffer_list[i] = torch.ops.torch_ipex.lars_fused_step(
+                param,
+                params2[i],
+                d_p_list[i],
+                momentum_buffer_list[i],
+                group["weight_decay"],
+                group["momentum"],
+                group["eeta"],
+                group["lr"],
+                group["epsilon"],
+            )
 
         # update momentum_buffers in state
         for p, momentum_buffer in zip(params_with_grad, momentum_buffer_list):
             state = self.state[p]
-            state['momentum_buffer'] = momentum_buffer
+            state["momentum_buffer"] = momentum_buffer
 
     return loss

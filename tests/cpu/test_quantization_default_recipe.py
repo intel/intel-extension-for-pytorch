@@ -1,11 +1,7 @@
-import sys
-import os
-import unittest
 import itertools
 import tempfile
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.testing import FileCheck
 from torch.ao.quantization import (
     MinMaxObserver,
@@ -14,12 +10,12 @@ from torch.ao.quantization import (
     QConfigMapping,
 )
 import copy
-from test_autocast import get_rand_seed
 
 import intel_extension_for_pytorch as ipex
 from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
 from torch.ao.nn.quantized.modules.utils import _quantize_weight
 from intel_extension_for_pytorch.quantization import prepare, convert
+
 
 class TestDefaultRecipe(JitLlgaTestCase):
     def test_quantized_op_int8_int8(self):
@@ -39,12 +35,17 @@ class TestDefaultRecipe(JitLlgaTestCase):
 
         m = M()
         x = torch.rand(1, 2, 14, 14)
-       
+
         graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
         patterns = [
-                ["aten::dequantize", "aten::dequantize", "aten::_convolution", "aten::quantize_per_tensor"],
-                ["aten::dequantize", "aten::max_pool2d", "aten::quantize_per_tensor"],
-            ]
+            [
+                "aten::dequantize",
+                "aten::dequantize",
+                "aten::_convolution",
+                "aten::quantize_per_tensor",
+            ],
+            ["aten::dequantize", "aten::max_pool2d", "aten::quantize_per_tensor"],
+        ]
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
         self.checkPatterns(graph, patterns)
 
@@ -63,7 +64,9 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 return x
 
         class conv_swish(nn.Module):
-            def __init__(self, ):
+            def __init__(
+                self,
+            ):
                 super(conv_swish, self).__init__()
                 self.conv = torch.nn.Conv2d(2, 2, 1)
 
@@ -74,7 +77,9 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 return z
 
         class conv_eltwise(nn.Module):
-            def __init__(self, ):
+            def __init__(
+                self,
+            ):
                 super(conv_eltwise, self).__init__()
                 self.conv = torch.nn.Conv2d(2, 2, 1)
 
@@ -83,12 +88,29 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 x = x.relu_()
                 return x
 
-        # TODO: test more quantized modules(especially for fused module). 
+        # TODO: test more quantized modules(especially for fused module).
         quantized_modules = [conv_swish(), conv_eltwise()]
         patterns = [
-                [["aten::dequantize", "aten::dequantize", "aten::_convolution", "aten::sigmoid", "aten::mul", "aten::quantize_per_tensor"]],
-                [["aten::dequantize", "aten::dequantize", "aten::_convolution", "aten::relu", "aten::quantize_per_tensor"]],
-            ]
+            [
+                [
+                    "aten::dequantize",
+                    "aten::dequantize",
+                    "aten::_convolution",
+                    "aten::sigmoid",
+                    "aten::mul",
+                    "aten::quantize_per_tensor",
+                ]
+            ],
+            [
+                [
+                    "aten::dequantize",
+                    "aten::dequantize",
+                    "aten::_convolution",
+                    "aten::relu",
+                    "aten::quantize_per_tensor",
+                ]
+            ],
+        ]
         for quantized_modules, pattern in zip(quantized_modules, patterns):
             m = M(quantized_modules).eval()
 
@@ -117,9 +139,14 @@ class TestDefaultRecipe(JitLlgaTestCase):
         qconfig_mapping = ipex.quantization.default_static_qconfig_mapping
         graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=qconfig_mapping)
         patterns = [
-                ["aten::dequantize", "aten::dequantize", "aten::_convolution", "aten::quantize_per_tensor"],
-                ["aten::dequantize", "aten::max_pool2d", "aten::quantize_per_tensor"],
-            ]
+            [
+                "aten::dequantize",
+                "aten::dequantize",
+                "aten::_convolution",
+                "aten::quantize_per_tensor",
+            ],
+            ["aten::dequantize", "aten::max_pool2d", "aten::quantize_per_tensor"],
+        ]
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
         self.checkPatterns(graph, patterns)
 
@@ -141,7 +168,7 @@ class TestDefaultRecipe(JitLlgaTestCase):
         qconfig_mapping = ipex.quantization.default_dynamic_qconfig_mapping
         prepared_model = ipex.quantization.prepare(m, qconfig_mapping, x)
         converted_model = ipex.quantization.convert(prepared_model)
-        assert hasattr(converted_model, 'linear')
+        assert hasattr(converted_model, "linear")
         assert isinstance(converted_model.linear, nn.quantized.dynamic.Linear)
 
     def test_check_model_obsever_has_run(self):
@@ -165,8 +192,9 @@ class TestDefaultRecipe(JitLlgaTestCase):
                     x = b(x)
                 return x
 
-        check_model_obsever_has_run = \
+        check_model_obsever_has_run = (
             ipex.quantization._utils.check_model_obsever_has_run
+        )
         m = Mod().eval()
         x = torch.rand(4, 4)
         qconfig_mapping = ipex.quantization.default_static_qconfig_mapping
@@ -207,12 +235,17 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 return x
 
         for bf16_mixed in [False, True]:
-            with torch.no_grad(), torch.autocast(device_type='cpu', enabled=bf16_mixed, dtype=torch.bfloat16):
+            with torch.no_grad(), torch.autocast(
+                device_type="cpu", enabled=bf16_mixed, dtype=torch.bfloat16
+            ):
                 m = Mod().eval()
                 alpha = 0.5
-                qconfig_mapping = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=alpha)
+                qconfig_mapping = ipex.quantization.get_smooth_quant_qconfig_mapping(
+                    alpha=alpha
+                )
                 prepared_model = ipex.quantization.prepare(
-                    copy.deepcopy(m), qconfig_mapping, example_inputs=x, inplace=False)
+                    copy.deepcopy(m), qconfig_mapping, example_inputs=x, inplace=False
+                )
                 prepared_model(x)
                 converted_model = ipex.quantization.convert(prepared_model)
                 traced_model = torch.jit.trace(converted_model, x)
@@ -225,7 +258,9 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 for node in graph.nodes():
                     if node.kind() == "aten::mul":
                         found_mul = True
-                assert found_mul, 'Failed to find the inserted `mul` before Linear for SmoothQuant'
+                assert (
+                    found_mul
+                ), "Failed to find the inserted `mul` before Linear for SmoothQuant"
                 traced_model(x)
                 result_sq = traced_model(x)
 
@@ -233,19 +268,28 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 # Calculate and apply scaling factors manually to model and use default static quant
                 x_max_per_ic = torch.max(x, 0)[0]
                 w_max_per_ic = torch.max(w, 0)[0]
-                act_scaling_factors = torch.pow(w_max_per_ic, 1 - alpha) / torch.pow(x_max_per_ic, alpha)
-                wei_scaling_factors = torch.pow(x_max_per_ic, alpha) / torch.pow(w_max_per_ic, 1 - alpha)
+                act_scaling_factors = torch.pow(w_max_per_ic, 1 - alpha) / torch.pow(
+                    x_max_per_ic, alpha
+                )
+                wei_scaling_factors = torch.pow(x_max_per_ic, alpha) / torch.pow(
+                    w_max_per_ic, 1 - alpha
+                )
                 new_x = torch.mul(x, act_scaling_factors)
                 new_w = torch.mul(w, wei_scaling_factors)
                 m2 = copy.deepcopy(m)
                 m2.dense.weight = nn.Parameter(new_w)
                 # SmoothQuant uses MinMaxObserver for activation not histogram observer
                 w_observer = PerChannelMinMaxObserver.with_args(
-                    dtype=torch.qint8, qscheme=torch.per_channel_symmetric)
-                static_qconfig = QConfig(activation=MinMaxObserver.with_args(reduce_range=False),
-                                        weight=w_observer)
+                    dtype=torch.qint8, qscheme=torch.per_channel_symmetric
+                )
+                static_qconfig = QConfig(
+                    activation=MinMaxObserver.with_args(reduce_range=False),
+                    weight=w_observer,
+                )
                 qconfig_mapping = QConfigMapping().set_global(static_qconfig)
-                prepared_model2 = ipex.quantization.prepare(m2, qconfig_mapping, example_inputs=new_x, inplace=False)
+                prepared_model2 = ipex.quantization.prepare(
+                    m2, qconfig_mapping, example_inputs=new_x, inplace=False
+                )
                 prepared_model2(new_x)
                 converted_model2 = ipex.quantization.convert(prepared_model2)
                 traced_model2 = torch.jit.trace(converted_model2, new_x)
@@ -268,33 +312,44 @@ class TestDefaultRecipe(JitLlgaTestCase):
         m = Mod().eval()
         x = torch.rand(1, 4)
         calib_dataset = [torch.rand(1, 4) for _ in range(5)]
-        per_channel_observer = torch.ao.quantization.MovingAveragePerChannelMinMaxObserver
+        per_channel_observer = (
+            torch.ao.quantization.MovingAveragePerChannelMinMaxObserver
+        )
         custom_config = {
-            'alpha' : 0.75,
-            'act_observer' : torch.ao.quantization.MinMaxObserver(),
-            'act_ic_observer' : per_channel_observer(ch_axis=-1),
-            'wei_observer' : per_channel_observer(dtype=torch.qint8, qscheme=torch.per_channel_symmetric),
-            'wei_ic_observer' : per_channel_observer(ch_axis=1),
+            "alpha": 0.75,
+            "act_observer": torch.ao.quantization.MinMaxObserver(),
+            "act_ic_observer": per_channel_observer(ch_axis=-1),
+            "wei_observer": per_channel_observer(
+                dtype=torch.qint8, qscheme=torch.per_channel_symmetric
+            ),
+            "wei_ic_observer": per_channel_observer(ch_axis=1),
         }
         for use_custom_config in [False, True]:
             kwargs = custom_config if use_custom_config else {}
-            qconfig_mapping = ipex.quantization.get_smooth_quant_qconfig_mapping(**kwargs)
+            qconfig_mapping = ipex.quantization.get_smooth_quant_qconfig_mapping(
+                **kwargs
+            )
             prepared_model = ipex.quantization.prepare(
-                m, qconfig_mapping, example_inputs=x, inplace=False)
+                m, qconfig_mapping, example_inputs=x, inplace=False
+            )
 
             # Save observer info for comparison
             if use_custom_config:
                 observer_info = {
-                    **prepared_model._fqn_to_auto_quant_state_map[' '].tensor_id_to_observer,
-                    **prepared_model._fqn_to_auto_quant_state_map[' '].weight_tensor_id_to_observer
+                    **prepared_model._fqn_to_auto_quant_state_map[
+                        " "
+                    ].tensor_id_to_observer,
+                    **prepared_model._fqn_to_auto_quant_state_map[
+                        " "
+                    ].weight_tensor_id_to_observer,
                 }
                 observer_info_dict = {}
                 for key, obs in observer_info.items():
                     observer_info_dict[key] = {
-                        'smooth_quant_enabled' : obs.smooth_quant_enabled,
-                        'alpha' : obs.alpha,
-                        'ic_obs' : type(obs.ic_obs),
-                        'act_obs' : type(obs.act_obs)
+                        "smooth_quant_enabled": obs.smooth_quant_enabled,
+                        "alpha": obs.alpha,
+                        "ic_obs": type(obs.ic_obs),
+                        "act_obs": type(obs.act_obs),
                     }
 
             for data in calib_dataset:
@@ -310,22 +365,28 @@ class TestDefaultRecipe(JitLlgaTestCase):
                     q_model = torch.jit.freeze(q_model)
                 out_ref = q_model(x)
 
-                prepared_model_2 = ipex.quantization.prepare(m, qconfig_mapping, example_inputs=x, inplace=False)
+                prepared_model_2 = ipex.quantization.prepare(
+                    m, qconfig_mapping, example_inputs=x, inplace=False
+                )
                 prepared_model_2.load_qconf_summary(qconf_summary=qconf_filename)
 
                 # Save observer info for comparison
                 if use_custom_config:
                     observer_info_2 = {
-                        **prepared_model_2._fqn_to_auto_quant_state_map[' '].tensor_id_to_observer,
-                        **prepared_model_2._fqn_to_auto_quant_state_map[' '].weight_tensor_id_to_observer
+                        **prepared_model_2._fqn_to_auto_quant_state_map[
+                            " "
+                        ].tensor_id_to_observer,
+                        **prepared_model_2._fqn_to_auto_quant_state_map[
+                            " "
+                        ].weight_tensor_id_to_observer,
                     }
                     observer_info_dict_2 = {}
                     for key, obs in observer_info_2.items():
                         observer_info_dict_2[key] = {
-                            'smooth_quant_enabled' : obs.smooth_quant_enabled,
-                            'alpha' : obs.alpha,
-                            'ic_obs' : type(obs.ic_obs),
-                            'act_obs' : type(obs.act_obs)
+                            "smooth_quant_enabled": obs.smooth_quant_enabled,
+                            "alpha": obs.alpha,
+                            "ic_obs": type(obs.ic_obs),
+                            "act_obs": type(obs.act_obs),
                         }
 
                 q_model_2 = ipex.quantization.convert(prepared_model_2)
@@ -339,8 +400,9 @@ class TestDefaultRecipe(JitLlgaTestCase):
 
             # Check observers
             if use_custom_config:
-                assert observer_info_dict == observer_info_dict_2, \
-                    "Error: SmoothQuant observer info lost after saving/loading qconf JSON"
+                assert (
+                    observer_info_dict == observer_info_dict_2
+                ), "Error: SmoothQuant observer info lost after saving/loading qconf JSON"
 
     def test_none_example_input_for_quantization(self):
         class M(nn.Module):
@@ -360,7 +422,7 @@ class TestDefaultRecipe(JitLlgaTestCase):
         qconfig_mapping = ipex.quantization.default_dynamic_qconfig_mapping
         prepared_model = ipex.quantization.prepare(m, qconfig_mapping)
         converted_model = ipex.quantization.convert(prepared_model)
-        assert hasattr(converted_model, 'linear')
+        assert hasattr(converted_model, "linear")
         assert isinstance(converted_model.linear, nn.quantized.dynamic.Linear)
 
         # Static quant
@@ -398,9 +460,11 @@ class TestDefaultRecipe(JitLlgaTestCase):
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
             with torch.no_grad():
                 woq_model = convert(prepared_model)
-                woq_linear_class = ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                woq_linear_class = (
+                    ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                )
                 assert isinstance(woq_model.linear, woq_linear_class)
-        
+
                 output2 = woq_model(data)
                 torch.testing.assert_close(output1, output2, rtol=1e-04, atol=1e-05)
 
@@ -423,18 +487,24 @@ class TestDefaultRecipe(JitLlgaTestCase):
             def forward(self, x):
                 return self.linear(x)
 
-        with torch.autocast(device_type='cpu', enabled=True, dtype= torch.bfloat16):
+        with torch.autocast(device_type="cpu", enabled=True, dtype=torch.bfloat16):
             use_bias_list = [True, False]
             w_dtype_list = [torch.qint8, torch.quint4x2]
             cases = itertools.product(use_bias_list, w_dtype_list)
             for use_bias, w_dtype in cases:
                 m = M(use_bias).eval()
                 x = torch.rand(4, 4)
-                qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(weight_dtype=w_dtype)
-                prepared_model = ipex.quantization.prepare(m, qconfig, example_inputs=x, inplace=False)
+                qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                    weight_dtype=w_dtype
+                )
+                prepared_model = ipex.quantization.prepare(
+                    m, qconfig, example_inputs=x, inplace=False
+                )
                 woq_model = ipex.quantization.convert(prepared_model)
                 woq_model(x)
-                woq_linear_class = ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                woq_linear_class = (
+                    ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                )
                 assert isinstance(woq_model.linear, woq_linear_class)
 
     def test_weight_only_quantization_jit_save_load(self):
@@ -495,12 +565,17 @@ class TestDefaultRecipe(JitLlgaTestCase):
         for use_bias in [True, False]:
             m = M(use_bias).eval()
             x = torch.rand(4, 4)
-            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(weight_dtype=torch.quint4x2)
-            prepared_model = ipex.quantization.prepare(m, qconfig, example_inputs=x, inplace=False)
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=torch.quint4x2
+            )
+            prepared_model = ipex.quantization.prepare(
+                m, qconfig, example_inputs=x, inplace=False
+            )
             woq_model = ipex.quantization.convert(prepared_model)
             woq_model(x)
             woq_linear_class = ipex.nn.modules.weight_only_quantization.IpexWoqLinear
             assert isinstance(woq_model.linear, woq_linear_class)
+
 
 if __name__ == "__main__":
     run_tests()

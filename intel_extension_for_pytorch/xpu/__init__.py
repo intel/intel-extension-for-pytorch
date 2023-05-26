@@ -557,5 +557,5 @@ if intel_extension_for_pytorch._C._has_xpu():
             override_tensor_totype()
 
             exec_path = sys.argv[0].split("/")
-            if (len(exec_path) > 0 and "pytest" in exec_path):
+            if len(exec_path) > 0 and "pytest" in exec_path:
                 override_assert_equal()

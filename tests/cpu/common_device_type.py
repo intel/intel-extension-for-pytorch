@@ -1,4 +1,4 @@
-'''
+"""
 From PyTorch:
 
 Copyright (c) 2016-     Facebook, Inc            (Adam Paszke)
@@ -42,7 +42,7 @@ indicate their copyright solely in the commit message of the change when it is
 committed.
 
 All rights reserved.
-'''
+"""
 
 import inspect
 import threading
@@ -51,8 +51,7 @@ import unittest
 import torch
 import intel_extension_for_pytorch as ipex
 import copy
-from common_utils import TestCase, TEST_WITH_ROCM, TEST_MKL, \
-    skipCUDANonDefaultStreamIf
+from common_utils import TestCase, TEST_WITH_ROCM, TEST_MKL, skipCUDANonDefaultStreamIf
 
 # Note: Generic Device-Type Testing
 #
@@ -170,7 +169,7 @@ device_type_test_bases = []
 
 
 class DeviceTypeTestBase(TestCase):
-    device_type = 'generic_device_type'
+    device_type = "generic_device_type"
 
     # Precision is a thread-local setting since it may be overriden per test
     _tls = threading.local()
@@ -203,12 +202,12 @@ class DeviceTypeTestBase(TestCase):
     # Prefers device-specific dtype specifications over generic ones.
     @classmethod
     def _get_dtypes(cls, test):
-        if not hasattr(test, 'dtypes'):
+        if not hasattr(test, "dtypes"):
             return None
-        return test.dtypes.get(cls.device_type, test.dtypes.get('all', None))
+        return test.dtypes.get(cls.device_type, test.dtypes.get("all", None))
 
     def _get_precision_override(self, test, dtype):
-        if not hasattr(test, 'precision_overrides'):
+        if not hasattr(test, "precision_overrides"):
             return self.precision
         return test.precision_overrides.get(dtype, self.precision)
 
@@ -219,23 +218,35 @@ class DeviceTypeTestBase(TestCase):
 
         dtypes = cls._get_dtypes(test)
         if dtypes is None:  # Test has no dtype variants
-            assert not hasattr(cls, test_name), "Redefinition of test {0}".format(test_name)
+            assert not hasattr(cls, test_name), "Redefinition of test {0}".format(
+                test_name
+            )
 
             @wraps(test)
             def instantiated_test(self, test=test):
-                device_arg = cls.get_primary_device() if not hasattr(test, 'num_required_devices') else cls.get_all_devices()
+                device_arg = (
+                    cls.get_primary_device()
+                    if not hasattr(test, "num_required_devices")
+                    else cls.get_all_devices()
+                )
                 return test(self, device_arg)
 
             setattr(cls, test_name, instantiated_test)
         else:  # Test has dtype variants
             for dtype in dtypes:
-                dtype_str = str(dtype).split('.')[1]
+                dtype_str = str(dtype).split(".")[1]
                 dtype_test_name = test_name + "_" + dtype_str
-                assert not hasattr(cls, dtype_test_name), "Redefinition of test {0}".format(dtype_test_name)
+                assert not hasattr(
+                    cls, dtype_test_name
+                ), "Redefinition of test {0}".format(dtype_test_name)
 
                 @wraps(test)
                 def instantiated_test(self, test=test, dtype=dtype):
-                    device_arg = cls.get_primary_device() if not hasattr(test, 'num_required_devices') else cls.get_all_devices()
+                    device_arg = (
+                        cls.get_primary_device()
+                        if not hasattr(test, "num_required_devices")
+                        else cls.get_all_devices()
+                    )
                     # Sets precision and runs test
                     # Note: precision is reset after the test is run
                     guard_precision = self.precision
@@ -251,7 +262,8 @@ class DeviceTypeTestBase(TestCase):
 
 
 class CPUTestBase(DeviceTypeTestBase):
-    device_type = 'cpu'
+    device_type = "cpu"
+
 
 class DPCPPTestBase(DeviceTypeTestBase):
     device_type = ipex.DEVICE
@@ -268,12 +280,16 @@ class DPCPPTestBase(DeviceTypeTestBase):
     # Prefers device-specific dtype specifications over generic ones.
     @classmethod
     def _get_dtypes(cls, test):
-        if not hasattr(test, 'dtypes'):
+        if not hasattr(test, "dtypes"):
             return None
-        dtypes_vec = test.dtypes.get(cls.device_type, test.dtypes.get('all', None))
+        dtypes_vec = test.dtypes.get(cls.device_type, test.dtypes.get("all", None))
         try:
-            dtypes_res = [item for item in dtypes_vec if (item != torch.float16 and item != torch.half)]
-        except: # dtypes_vec == None
+            dtypes_res = [
+                item
+                for item in dtypes_vec
+                if (item != torch.float16 and item != torch.half)
+            ]
+        except BaseException:  # dtypes_vec == None
             dtypes_res = []
         return dtypes_res
 
@@ -281,8 +297,9 @@ class DPCPPTestBase(DeviceTypeTestBase):
     def setUpClass(cls):
         cls.primary_device = ipex.DEVICE
 
+
 class CUDATestBase(DeviceTypeTestBase):
-    device_type = 'cuda'
+    device_type = "cuda"
     _do_cuda_memory_leak_check = True
     _do_cuda_non_default_stream = True
 
@@ -295,12 +312,16 @@ class CUDATestBase(DeviceTypeTestBase):
 
     @classmethod
     def get_all_devices(cls):
-        primary_device_idx = int(cls.get_primary_device().split(':')[1])
+        primary_device_idx = int(cls.get_primary_device().split(":")[1])
         num_devices = torch.cuda.device_count()
 
         prim_device = cls.get_primary_device()
-        cuda_str = 'cuda:{0}'
-        non_primary_devices = [cuda_str.format(idx) for idx in range(num_devices) if idx != primary_device_idx]
+        cuda_str = "cuda:{0}"
+        non_primary_devices = [
+            cuda_str.format(idx)
+            for idx in range(num_devices)
+            if idx != primary_device_idx
+        ]
         return [prim_device] + non_primary_devices
 
     @classmethod
@@ -314,11 +335,8 @@ class CUDATestBase(DeviceTypeTestBase):
         cls.cudnn_version = None if cls.no_cudnn else torch.backends.cudnn.version()
 
         # Acquires the current device as the primary (test) device
-        cls.primary_device = 'cuda:{0}'.format(torch.cuda.current_device())
+        cls.primary_device = "cuda:{0}".format(torch.cuda.current_device())
 
-
-import os
-from runpy import run_path
 
 # Adds available device-type-specific test base classes
 device_type_test_bases.append(DPCPPTestBase)
@@ -344,7 +362,7 @@ def instantiate_device_type_tests(generic_test_class, scope, except_for=None):
 
     # Acquires members names
     generic_members = set(dir(generic_test_class)) - set(dir(empty_class))
-    generic_tests = [x for x in generic_members if x.startswith('test')]
+    generic_tests = [x for x in generic_members if x.startswith("test")]
 
     # Creates device-specific test cases
     for base in device_type_test_bases:
@@ -360,18 +378,22 @@ def instantiate_device_type_tests(generic_test_class, scope, except_for=None):
                 # Requires tests be a function for Python2 compat
                 # (In Python2 tests are type checked methods wrapping functions)
                 test = getattr(generic_test_class, name)
-                if hasattr(test, '__func__'):
+                if hasattr(test, "__func__"):
                     test = test.__func__
-                assert inspect.isfunction(test), "Couldn't extract function from '{0}'".format(name)
+                assert inspect.isfunction(
+                    test
+                ), "Couldn't extract function from '{0}'".format(name)
 
                 # Instantiates the device-specific tests
                 device_type_test_class.instantiate_test(name, copy.deepcopy(test))
             else:  # Ports non-test member
-                assert not hasattr(device_type_test_class, name), "Redefinition of non-test member {0}".format(name)
+                assert not hasattr(
+                    device_type_test_class, name
+                ), "Redefinition of non-test member {0}".format(name)
 
                 # Unwraps to functions (when available) for Python2 compat
                 nontest = getattr(generic_test_class, name)
-                if hasattr(nontest, '__func__'):
+                if hasattr(nontest, "__func__"):
                     nontest = nontest.__func__
 
                 setattr(device_type_test_class, name, nontest)
@@ -393,52 +415,56 @@ def instantiate_device_type_tests(generic_test_class, scope, except_for=None):
 #       probably define a new decorator instead (see below).
 #   (3) Prefer the existing decorators to defining the 'device_type' kwarg.
 class skipIf(object):
-
     def __init__(self, dep, reason, device_type=None):
         self.dep = dep
         self.reason = reason
         self.device_type = device_type
 
     def __call__(self, fn):
-
         @wraps(fn)
         def dep_fn(slf, device, *args, **kwargs):
             if self.device_type is None or self.device_type == slf.device_type:
-                if (isinstance(self.dep, str) and getattr(slf, self.dep, True)) or (isinstance(self.dep, bool) and self.dep):
+                if (isinstance(self.dep, str) and getattr(slf, self.dep, True)) or (
+                    isinstance(self.dep, bool) and self.dep
+                ):
                     raise unittest.SkipTest(self.reason)
 
             return fn(slf, device, *args, **kwargs)
+
         return dep_fn
+
 
 # Skips a test on CPU if the condition is true.
 class skipCPUIf(skipIf):
-
     def __init__(self, dep, reason):
-        super(skipCPUIf, self).__init__(dep, reason, device_type='cpu')
+        super(skipCPUIf, self).__init__(dep, reason, device_type="cpu")
 
 
 # Skips a test on CUDA if the condition is true.
 class skipCUDAIf(skipIf):
-
     def __init__(self, dep, reason):
-        super(skipCUDAIf, self).__init__(dep, reason, device_type='cuda')
+        super(skipCUDAIf, self).__init__(dep, reason, device_type="cuda")
 
 
 # Only runs on cuda, and only run when there is enough GPU RAM
 def largeCUDATensorTest(size):
     if isinstance(size, str):
         assert size.endswith("GB") or size.endswith("gb"), "only bytes or GB supported"
-        size = 1024 ** 3 * int(size[:-2])
-    valid = torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory >= size
-    return unittest.skipIf(not valid, "No CUDA or Has CUDA but GPU RAM is not large enough")
+        size = 1024**3 * int(size[:-2])
+    valid = (
+        torch.cuda.is_available()
+        and torch.cuda.get_device_properties(0).total_memory >= size
+    )
+    return unittest.skipIf(
+        not valid, "No CUDA or Has CUDA but GPU RAM is not large enough"
+    )
+
 
 class onlyOn(object):
-
     def __init__(self, device_type):
         self.device_type = device_type
 
     def __call__(self, fn):
-
         @wraps(fn)
         def only_fn(slf, device, *args, **kwargs):
             if self.device_type != slf.device_type:
@@ -455,18 +481,21 @@ class onlyOn(object):
 # Skips the test if the number of available devices of the variant's device
 # type is less than the 'num_required_devices' arg.
 class deviceCountAtLeast(object):
-
     def __init__(self, num_required_devices):
         self.num_required_devices = num_required_devices
 
     def __call__(self, fn):
-        assert not hasattr(fn, 'num_required_devices'), "deviceCountAtLeast redefinition for {0}".format(fn.__name__)
+        assert not hasattr(
+            fn, "num_required_devices"
+        ), "deviceCountAtLeast redefinition for {0}".format(fn.__name__)
         fn.num_required_devices = self.num_required_devices
 
         @wraps(fn)
         def multi_fn(slf, devices, *args, **kwargs):
             if len(devices) < self.num_required_devices:
-                reason = "fewer than {0} devices detected".format(self.num_required_devices)
+                reason = "fewer than {0} devices detected".format(
+                    self.num_required_devices
+                )
                 raise unittest.SkipTest(reason)
 
             return fn(slf, devices, *args, **kwargs)
@@ -492,11 +521,14 @@ class deviceCountAtLeast(object):
 # explicitly and computed using self.precision (e.g.
 # self.precision *2, max(1, self.precision)).
 class precisionOverride(object):
-
     def __init__(self, d):
-        assert isinstance(d, dict), "precisionOverride not given a dtype : precision dict!"
+        assert isinstance(
+            d, dict
+        ), "precisionOverride not given a dtype : precision dict!"
         for dtype, prec in d.items():
-            assert isinstance(dtype, torch.dtype), "precisionOverride given unknown dtype {0}".format(dtype)
+            assert isinstance(
+                dtype, torch.dtype
+            ), "precisionOverride given unknown dtype {0}".format(dtype)
 
         self.d = d
 
@@ -512,18 +544,21 @@ class precisionOverride(object):
 #       or dtypesIfCUDA.
 #   (3) Prefer the existing decorators to defining the 'device_type' kwarg.
 class dtypes(object):
-
     # Note: *args, **kwargs for Python2 compat.
     # Python 3 allows (self, *args, device_type='all').
     def __init__(self, *args, **kwargs):
         assert args is not None and len(args) != 0, "No dtypes given"
-        assert all(isinstance(arg, torch.dtype) for arg in args), "Unknown dtype in {0}".format(str(args))
+        assert all(
+            isinstance(arg, torch.dtype) for arg in args
+        ), "Unknown dtype in {0}".format(str(args))
         self.args = args
-        self.device_type = kwargs.get('device_type', 'all')
+        self.device_type = kwargs.get("device_type", "all")
 
     def __call__(self, fn):
-        d = getattr(fn, 'dtypes', {})
-        assert self.device_type not in d, "dtypes redefinition for {0}".format(self.device_type)
+        d = getattr(fn, "dtypes", {})
+        assert self.device_type not in d, "dtypes redefinition for {0}".format(
+            self.device_type
+        )
         d[self.device_type] = self.args
         fn.dtypes = d
         return fn
@@ -531,24 +566,22 @@ class dtypes(object):
 
 # Overrides specified dtypes on the CPU.
 class dtypesIfCPU(dtypes):
-
     def __init__(self, *args):
-        super(dtypesIfCPU, self).__init__(*args, device_type='cpu')
+        super(dtypesIfCPU, self).__init__(*args, device_type="cpu")
 
 
 # Overrides specified dtypes on CUDA.
 class dtypesIfCUDA(dtypes):
-
     def __init__(self, *args):
-        super(dtypesIfCUDA, self).__init__(*args, device_type='cuda')
+        super(dtypesIfCUDA, self).__init__(*args, device_type="cuda")
 
 
 def onlyCPU(fn):
-    return onlyOn('cpu')(fn)
+    return onlyOn("cpu")(fn)
 
 
 def onlyCUDA(fn):
-    return onlyOn('cuda')(fn)
+    return onlyOn("cuda")(fn)
 
 
 # Skips a test on CPU if LAPACK is not available.
@@ -563,34 +596,44 @@ def skipCPUIfNoMkl(fn):
 
 # Skips a test on CUDA if MAGMA is not available.
 def skipCUDAIfNoMagma(fn):
-    return skipCUDAIf('no_magma', "no MAGMA library detected")(skipCUDANonDefaultStreamIf(True)(fn))
+    return skipCUDAIf("no_magma", "no MAGMA library detected")(
+        skipCUDANonDefaultStreamIf(True)(fn)
+    )
 
 
 # Skips a test on CUDA when using ROCm.
 def skipCUDAIfRocm(fn):
-    return skipCUDAIf(TEST_WITH_ROCM, "test doesn't currently work on the ROCm stack")(fn)
+    return skipCUDAIf(TEST_WITH_ROCM, "test doesn't currently work on the ROCm stack")(
+        fn
+    )
+
 
 # Skips a test on CUDA when not using ROCm.
 def skipCUDAIfNotRocm(fn):
-    return skipCUDAIf(not TEST_WITH_ROCM, "test doesn't currently work on the CUDA stack")(fn)
+    return skipCUDAIf(
+        not TEST_WITH_ROCM, "test doesn't currently work on the CUDA stack"
+    )(fn)
+
 
 # Skips a test on CUDA if cuDNN is unavailable or its version is lower than requested.
 def skipCUDAIfCudnnVersionLessThan(version=0):
-
     def dec_fn(fn):
         @wraps(fn)
         def wrap_fn(self, device, *args, **kwargs):
-            if self.device_type == 'cuda':
+            if self.device_type == "cuda":
                 if self.no_cudnn:
                     reason = "cuDNN not available"
                     raise unittest.SkipTest(reason)
                 if self.cudnn_version is None or self.cudnn_version < version:
-                    reason = "cuDNN version {0} is available but {1} required".format(self.cudnn_version, version)
+                    reason = "cuDNN version {0} is available but {1} required".format(
+                        self.cudnn_version, version
+                    )
                     raise unittest.SkipTest(reason)
 
             return fn(self, device, *args, **kwargs)
 
         return wrap_fn
+
     return dec_fn
 
 

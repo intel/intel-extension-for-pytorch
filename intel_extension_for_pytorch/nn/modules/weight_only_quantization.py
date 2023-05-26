@@ -1,5 +1,4 @@
 import torch
-from torch import nn
 import torch.ao.nn.quantized as nnq
 from torch.ao.nn.quantized.modules.utils import _quantize_weight
 import torch.ao.nn.intrinsic as nni
@@ -128,7 +127,9 @@ class IpexWoqLinear(nnq.Linear):
         if mod.qconfig is not None and mod.qconfig.weight is not None:
             weight_observer = mod.qconfig.weight()
         else:
-            weight_observer = get_weight_only_quant_qconfig_mapping().global_qconfig.weight()
+            weight_observer = (
+                get_weight_only_quant_qconfig_mapping().global_qconfig.weight()
+            )
         dtype = weight_observer.dtype
         assert dtype in [torch.qint8, torch.quint4x2], (
             "The only supported dtypes for "

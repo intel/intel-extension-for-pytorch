@@ -381,7 +381,7 @@ def init_parser(parser):
     )
 
     launcher_distributed = DistributedTrainingLauncher()
-    launcher_multi_instances = MultiInstancesLauncher()  
+    launcher_multi_instances = MultiInstancesLauncher()
     launcher_multi_instances.add_common_params(parser)
     launcher_multi_instances.add_params(parser)
     launcher_distributed.add_params(parser)

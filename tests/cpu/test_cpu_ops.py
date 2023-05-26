@@ -1,4 +1,5 @@
-import unittest, copy
+import unittest
+import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,15 +12,16 @@ from copy import deepcopy
 
 try:
     import torchvision
+
     HAS_TORCHVISION = True
 except ImportError:
     HAS_TORCHVISION = False
 skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
 
-bn_m = {1 : nn.BatchNorm1d, 2 : nn.BatchNorm2d, 3 : nn.BatchNorm3d}
+bn_m = {1: nn.BatchNorm1d, 2: nn.BatchNorm2d, 3: nn.BatchNorm3d}
+
 
 class CPUOPsTester(TestCase):
-
     # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_channelshuffle(self):
         channel_shuffle = torch.nn.ChannelShuffle(20)
@@ -35,8 +37,9 @@ class CPUOPsTester(TestCase):
 
     # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_pixel_shuffle_unshuffle(self):
-        def _test_pixel_shuffle_unshuffle_helper(num_input_dims, valid_channels_dim=True,
-                                                 upscale_factor=None):
+        def _test_pixel_shuffle_unshuffle_helper(
+            num_input_dims, valid_channels_dim=True, upscale_factor=None
+        ):
             # Function to imperatively ensure pixels are shuffled to the correct locations.
             # Used to validate the batch operations in pixel_shuffle.
             def _verify_pixel_shuffle(input, output, upscale_factor):
@@ -45,12 +48,23 @@ class CPUOPsTester(TestCase):
                         for w in range(output.size(-1)):
                             height_idx = h // upscale_factor
                             weight_idx = w // upscale_factor
-                            channel_idx = (upscale_factor * (h % upscale_factor)) + (w % upscale_factor) + \
-                                          (c * upscale_factor ** 2)
-                            self.assertEqual(output[..., c, h, w], input[..., channel_idx, height_idx, weight_idx])
-            upscale_factor = random.randint(2, 5) if upscale_factor is None else upscale_factor
+                            channel_idx = (
+                                (upscale_factor * (h % upscale_factor))
+                                + (w % upscale_factor)
+                                + (c * upscale_factor**2)
+                            )
+                            self.assertEqual(
+                                output[..., c, h, w],
+                                input[..., channel_idx, height_idx, weight_idx],
+                            )
+
+            upscale_factor = (
+                random.randint(2, 5) if upscale_factor is None else upscale_factor
+            )
             # If valid_channels_dim=False, add 1 to make channels dim indivisible by upscale_factor ** 2.
-            channels = random.randint(1, 4) * upscale_factor ** 2 + (0 if valid_channels_dim else 1)
+            channels = random.randint(1, 4) * upscale_factor**2 + (
+                0 if valid_channels_dim else 1
+            )
             height = random.randint(5, 10)
             width = random.randint(5, 10)
             if num_input_dims == 1:
@@ -59,7 +73,9 @@ class CPUOPsTester(TestCase):
                 input = torch.rand(height, width, requires_grad=True)
             else:
                 batch_sizes = [random.randint(1, 3) for _ in range(num_input_dims - 3)]
-                input = torch.rand(*batch_sizes, channels, height, width, requires_grad=True)
+                input = torch.rand(
+                    *batch_sizes, channels, height, width, requires_grad=True
+                )
             ps = nn.PixelShuffle(upscale_factor)
             pus = nn.PixelUnshuffle(downscale_factor=upscale_factor)
             if num_input_dims >= 3 and valid_channels_dim and upscale_factor > 0:
@@ -73,21 +89,33 @@ class CPUOPsTester(TestCase):
             else:
                 self.assertRaises(RuntimeError, lambda: ps(input))
 
-        def _test_pixel_unshuffle_error_case_helper(num_input_dims, valid_height_dim=True, valid_width_dim=True,
-                                                    downscale_factor=None):
-            downscale_factor = random.randint(2, 5) if downscale_factor is None else downscale_factor
+        def _test_pixel_unshuffle_error_case_helper(
+            num_input_dims,
+            valid_height_dim=True,
+            valid_width_dim=True,
+            downscale_factor=None,
+        ):
+            downscale_factor = (
+                random.randint(2, 5) if downscale_factor is None else downscale_factor
+            )
             channels = random.randint(1, 4)
             # If valid_height_dim=False, add 1 to make height dim indivisible by downscale_factor.
-            height = random.randint(3, 5) * abs(downscale_factor) + (0 if valid_height_dim else 1)
+            height = random.randint(3, 5) * abs(downscale_factor) + (
+                0 if valid_height_dim else 1
+            )
             # If valid_width_dim=False, add 1 to make width dim indivisible by downscale_factor.
-            width = random.randint(3, 5) * abs(downscale_factor) + (0 if valid_width_dim else 1)
+            width = random.randint(3, 5) * abs(downscale_factor) + (
+                0 if valid_width_dim else 1
+            )
             if num_input_dims == 1:
                 input = torch.rand(channels, requires_grad=True)
             elif num_input_dims == 2:
                 input = torch.rand(height, width, requires_grad=True)
             else:
                 batch_sizes = [random.randint(1, 3) for _ in range(num_input_dims - 3)]
-                input = torch.rand(*batch_sizes, channels, height, width, requires_grad=True)
+                input = torch.rand(
+                    *batch_sizes, channels, height, width, requires_grad=True
+                )
             pus = nn.PixelUnshuffle(downscale_factor)
             self.assertRaises(RuntimeError, lambda: pus(input))
 
@@ -96,14 +124,28 @@ class CPUOPsTester(TestCase):
             # For 3D - 5D, this is a success case for pixel_shuffle + pixel_unshuffle.
             _test_pixel_shuffle_unshuffle_helper(num_input_dims=num_input_dims)
             # Error cases for pixel_shuffle.
-            _test_pixel_shuffle_unshuffle_helper(num_input_dims=num_input_dims, valid_channels_dim=False)
-            _test_pixel_shuffle_unshuffle_helper(num_input_dims=num_input_dims, upscale_factor=0)
-            _test_pixel_shuffle_unshuffle_helper(num_input_dims=num_input_dims, upscale_factor=-2)
+            _test_pixel_shuffle_unshuffle_helper(
+                num_input_dims=num_input_dims, valid_channels_dim=False
+            )
+            _test_pixel_shuffle_unshuffle_helper(
+                num_input_dims=num_input_dims, upscale_factor=0
+            )
+            _test_pixel_shuffle_unshuffle_helper(
+                num_input_dims=num_input_dims, upscale_factor=-2
+            )
             # Error cases for pixel_unshuffle.
-            _test_pixel_unshuffle_error_case_helper(num_input_dims=num_input_dims, valid_height_dim=False)
-            _test_pixel_unshuffle_error_case_helper(num_input_dims=num_input_dims, valid_width_dim=False)
-            _test_pixel_unshuffle_error_case_helper(num_input_dims=num_input_dims, downscale_factor=0)
-            _test_pixel_unshuffle_error_case_helper(num_input_dims=num_input_dims, downscale_factor=-2)
+            _test_pixel_unshuffle_error_case_helper(
+                num_input_dims=num_input_dims, valid_height_dim=False
+            )
+            _test_pixel_unshuffle_error_case_helper(
+                num_input_dims=num_input_dims, valid_width_dim=False
+            )
+            _test_pixel_unshuffle_error_case_helper(
+                num_input_dims=num_input_dims, downscale_factor=0
+            )
+            _test_pixel_unshuffle_error_case_helper(
+                num_input_dims=num_input_dims, downscale_factor=-2
+            )
 
         def test_pixel_shuffle_unshuffle_1D():
             _test_pixel_shuffle_unshuffle_for_input_dims(num_input_dims=1)
@@ -128,9 +170,9 @@ class CPUOPsTester(TestCase):
 
     # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_pixel_shuffle_nhwc_cpu(self):
-        input = torch.randn(3, 18, 4, 4, device='cpu')
+        input = torch.randn(3, 18, 4, 4, device="cpu")
         input = input.contiguous(memory_format=torch.channels_last).requires_grad_()
-        grad = torch.randn(3, 18, 4, 4, device='cpu')
+        grad = torch.randn(3, 18, 4, 4, device="cpu")
         ps = torch.nn.PixelShuffle(3)
         pus = torch.nn.PixelUnshuffle(3)
 
@@ -162,8 +204,15 @@ class CPUOPsTester(TestCase):
             y1.mean().backward()
 
             # test channels last
-            suggest_memory_format = torch.channels_last if dim == 2 else torch.channels_last_3d
-            x2 = x.clone().detach().to(memory_format=suggest_memory_format).requires_grad_()
+            suggest_memory_format = (
+                torch.channels_last if dim == 2 else torch.channels_last_3d
+            )
+            x2 = (
+                x.clone()
+                .detach()
+                .to(memory_format=suggest_memory_format)
+                .requires_grad_()
+            )
 
             y2 = m(x2)
             y2.mean().backward()
@@ -190,13 +239,23 @@ class CPUOPsTester(TestCase):
                     self.assertTrue(y4.dtype == datatype)
                     self.assertTrue(x4.grad.dtype == datatype)
 
-                    x5 = x.clone().detach().to(datatype).to(memory_format=suggest_memory_format).requires_grad_()
+                    x5 = (
+                        x.clone()
+                        .detach()
+                        .to(datatype)
+                        .to(memory_format=suggest_memory_format)
+                        .requires_grad_()
+                    )
                     y5 = m(x5)
                     y5.mean().backward()
                     self.assertTrue(y5.dtype == datatype)
                     self.assertTrue(x5.grad.dtype == datatype)
-                    self.assertTrue(y5.is_contiguous(memory_format=suggest_memory_format))
-                    self.assertTrue(x5.grad.is_contiguous(memory_format=suggest_memory_format))
+                    self.assertTrue(
+                        y5.is_contiguous(memory_format=suggest_memory_format)
+                    )
+                    self.assertTrue(
+                        x5.grad.is_contiguous(memory_format=suggest_memory_format)
+                    )
 
             # test non-contiguous inputs
             x6 = torch.transpose(x.clone().detach(), 2, 3).requires_grad_()
@@ -206,11 +265,11 @@ class CPUOPsTester(TestCase):
             y_ref = m(x_ref)
             y_ref.mean().backward()
             self.assertEqual(y6, y_ref)
-            self.assertEqual(x6.grad, x_ref.grad) 
+            self.assertEqual(x6.grad, x_ref.grad)
 
     # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_adaptive_avg_pool2d(self):
-        m = nn.AdaptiveAvgPool2d((5,7))
+        m = nn.AdaptiveAvgPool2d((5, 7))
         x = torch.randn(3, 64, 8, 9)
         x1 = x.clone().detach().requires_grad_()
         y1 = m(x1)
@@ -243,13 +302,21 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
 
-                x5 = x.clone().detach().to(datatype).to(memory_format=torch.channels_last).requires_grad_()
+                x5 = (
+                    x.clone()
+                    .detach()
+                    .to(datatype)
+                    .to(memory_format=torch.channels_last)
+                    .requires_grad_()
+                )
                 y5 = m(x5)
                 y5.mean().backward()
                 self.assertTrue(y5.dtype == datatype)
                 self.assertTrue(x5.grad.dtype == datatype)
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last))
-                self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last))
+                self.assertTrue(
+                    x5.grad.is_contiguous(memory_format=torch.channels_last)
+                )
 
     # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_copy(self):
@@ -305,24 +372,32 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
 
-                x5 = x.clone().detach().to(datatype).to(memory_format=torch.channels_last).requires_grad_()
+                x5 = (
+                    x.clone()
+                    .detach()
+                    .to(datatype)
+                    .to(memory_format=torch.channels_last)
+                    .requires_grad_()
+                )
                 y5 = m(x5)
                 y5.mean().backward()
                 self.assertTrue(y5.dtype == datatype)
                 self.assertTrue(x5.grad.dtype == datatype)
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last))
-                self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last))
+                self.assertTrue(
+                    x5.grad.is_contiguous(memory_format=torch.channels_last)
+                )
 
     # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_upsample_nearest1d(self):
         x = torch.randn(2, 2, 4)
         x1 = x.clone().detach().requires_grad_()
-        y1 = F.interpolate(x1, scale_factor = 2, mode='nearest')
+        y1 = F.interpolate(x1, scale_factor=2, mode="nearest")
         y1.mean().backward()
 
         # test bfloat16
         x3 = x.clone().detach().bfloat16().requires_grad_()
-        y3 = F.interpolate(x3, scale_factor = 2, mode='nearest')
+        y3 = F.interpolate(x3, scale_factor=2, mode="nearest")
         y3.mean().backward()
         self.assertTrue(y3.dtype == torch.bfloat16)
         self.assertEqual(y1, y3, prec=0.01)
@@ -333,7 +408,7 @@ class CPUOPsTester(TestCase):
         with torch.cpu.amp.autocast():
             for datatype in (torch.bfloat16, torch.float32):
                 x4 = x.clone().detach().to(datatype).requires_grad_()
-                y4 = F.interpolate(x4, scale_factor = 2, mode='nearest')
+                y4 = F.interpolate(x4, scale_factor=2, mode="nearest")
                 y4.mean().backward()
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
@@ -342,12 +417,12 @@ class CPUOPsTester(TestCase):
     def test_upsample_nearest2d(self):
         x = torch.randn(2, 2, 4, 4)
         x1 = x.clone().detach().requires_grad_()
-        y1 = F.interpolate(x1, scale_factor = 2, mode='nearest')
+        y1 = F.interpolate(x1, scale_factor=2, mode="nearest")
         y1.mean().backward()
 
         # test channels last
         x2 = x.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
-        y2 = F.interpolate(x2, scale_factor = 2, mode='nearest')
+        y2 = F.interpolate(x2, scale_factor=2, mode="nearest")
         y2.mean().backward()
         self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
         self.assertEqual(y1, y2)
@@ -356,7 +431,7 @@ class CPUOPsTester(TestCase):
 
         # test bfloat16
         x3 = x.clone().detach().bfloat16().requires_grad_()
-        y3 = F.interpolate(x3, scale_factor = 2, mode='nearest')
+        y3 = F.interpolate(x3, scale_factor=2, mode="nearest")
         y3.mean().backward()
         self.assertTrue(y3.dtype == torch.bfloat16)
         self.assertEqual(y1, y3, prec=0.01)
@@ -367,29 +442,37 @@ class CPUOPsTester(TestCase):
         with torch.cpu.amp.autocast():
             for datatype in (torch.bfloat16, torch.float32):
                 x4 = x.clone().detach().to(datatype).requires_grad_()
-                y4 = F.interpolate(x4, scale_factor = 2, mode='nearest')
+                y4 = F.interpolate(x4, scale_factor=2, mode="nearest")
                 y4.mean().backward()
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
 
-                x5 = x.clone().detach().to(datatype).to(memory_format=torch.channels_last).requires_grad_()
-                y5 = F.interpolate(x5, scale_factor = 2, mode='nearest')
+                x5 = (
+                    x.clone()
+                    .detach()
+                    .to(datatype)
+                    .to(memory_format=torch.channels_last)
+                    .requires_grad_()
+                )
+                y5 = F.interpolate(x5, scale_factor=2, mode="nearest")
                 y5.mean().backward()
                 self.assertTrue(y5.dtype == datatype)
                 self.assertTrue(x5.grad.dtype == datatype)
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last))
-                self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last))
+                self.assertTrue(
+                    x5.grad.is_contiguous(memory_format=torch.channels_last)
+                )
 
     # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_upsample_nearest3d(self):
         x = torch.randn(2, 2, 2, 4, 4)
         x1 = x.clone().detach().requires_grad_()
-        y1 = F.interpolate(x1, scale_factor = 2, mode='nearest')
+        y1 = F.interpolate(x1, scale_factor=2, mode="nearest")
         y1.mean().backward()
 
         # test bfloat16
         x3 = x.clone().detach().bfloat16().requires_grad_()
-        y3 = F.interpolate(x3, scale_factor = 2, mode='nearest')
+        y3 = F.interpolate(x3, scale_factor=2, mode="nearest")
         y3.mean().backward()
         self.assertTrue(y3.dtype == torch.bfloat16)
         self.assertEqual(y1, y3, prec=0.01)
@@ -400,29 +483,37 @@ class CPUOPsTester(TestCase):
         with torch.cpu.amp.autocast():
             for datatype in (torch.bfloat16, torch.float32):
                 x4 = x.clone().detach().to(datatype).requires_grad_()
-                y4 = F.interpolate(x4, scale_factor = 2, mode='nearest')
+                y4 = F.interpolate(x4, scale_factor=2, mode="nearest")
                 y4.mean().backward()
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
 
-                x5 = x.clone().detach().to(datatype).to(memory_format=torch.channels_last_3d).requires_grad_()
-                y5 = F.interpolate(x5, scale_factor = 2, mode='nearest')
+                x5 = (
+                    x.clone()
+                    .detach()
+                    .to(datatype)
+                    .to(memory_format=torch.channels_last_3d)
+                    .requires_grad_()
+                )
+                y5 = F.interpolate(x5, scale_factor=2, mode="nearest")
                 y5.mean().backward()
                 self.assertTrue(y5.dtype == datatype)
                 self.assertTrue(x5.grad.dtype == datatype)
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last_3d))
-                self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last_3d))
+                self.assertTrue(
+                    x5.grad.is_contiguous(memory_format=torch.channels_last_3d)
+                )
 
     # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_upsample_linear1d(self):
         x = torch.randn(2, 2, 4)
         x1 = x.clone().detach().requires_grad_()
-        y1 = F.interpolate(x1, scale_factor = 2, mode='linear')
+        y1 = F.interpolate(x1, scale_factor=2, mode="linear")
         y1.mean().backward()
 
         # test bfloat16
         x3 = x.clone().detach().bfloat16().requires_grad_()
-        y3 = F.interpolate(x3, scale_factor = 2, mode='linear')
+        y3 = F.interpolate(x3, scale_factor=2, mode="linear")
         y3.mean().backward()
         self.assertTrue(y3.dtype == torch.bfloat16)
         self.assertEqual(y1, y3, prec=0.01)
@@ -433,7 +524,7 @@ class CPUOPsTester(TestCase):
         with torch.cpu.amp.autocast():
             for datatype in (torch.bfloat16, torch.float32):
                 x4 = x.clone().detach().to(datatype).requires_grad_()
-                y4 = F.interpolate(x4, scale_factor = 2, mode='linear')
+                y4 = F.interpolate(x4, scale_factor=2, mode="linear")
                 y4.mean().backward()
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
@@ -442,12 +533,12 @@ class CPUOPsTester(TestCase):
     def test_upsample_bilinear2d(self):
         x = torch.randn(2, 2, 4, 4)
         x1 = x.clone().detach().requires_grad_()
-        y1 = F.interpolate(x1, scale_factor = 2, mode='bilinear')
+        y1 = F.interpolate(x1, scale_factor=2, mode="bilinear")
         y1.mean().backward()
 
         # test channels last
         x2 = x.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
-        y2 = F.interpolate(x2, scale_factor = 2, mode='bilinear')
+        y2 = F.interpolate(x2, scale_factor=2, mode="bilinear")
         y2.mean().backward()
         self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
         self.assertEqual(y1, y2)
@@ -456,7 +547,7 @@ class CPUOPsTester(TestCase):
 
         # test bfloat16
         x3 = x.clone().detach().bfloat16().requires_grad_()
-        y3 = F.interpolate(x3, scale_factor = 2, mode='bilinear')
+        y3 = F.interpolate(x3, scale_factor=2, mode="bilinear")
         y3.mean().backward()
         self.assertTrue(y3.dtype == torch.bfloat16)
         self.assertEqual(y1, y3, prec=0.01)
@@ -467,29 +558,37 @@ class CPUOPsTester(TestCase):
         with torch.cpu.amp.autocast():
             for datatype in (torch.bfloat16, torch.float32):
                 x4 = x.clone().detach().to(datatype).requires_grad_()
-                y4 = F.interpolate(x4, scale_factor = 2, mode='bilinear')
+                y4 = F.interpolate(x4, scale_factor=2, mode="bilinear")
                 y4.mean().backward()
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
 
-                x5 = x.clone().detach().to(datatype).to(memory_format=torch.channels_last).requires_grad_()
-                y5 = F.interpolate(x5, scale_factor = 2, mode='bilinear')
+                x5 = (
+                    x.clone()
+                    .detach()
+                    .to(datatype)
+                    .to(memory_format=torch.channels_last)
+                    .requires_grad_()
+                )
+                y5 = F.interpolate(x5, scale_factor=2, mode="bilinear")
                 y5.mean().backward()
                 self.assertTrue(y5.dtype == datatype)
                 self.assertTrue(x5.grad.dtype == datatype)
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last))
-                self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last))
+                self.assertTrue(
+                    x5.grad.is_contiguous(memory_format=torch.channels_last)
+                )
 
     # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_upsample_trilinear3d(self):
         x = torch.randn(2, 2, 2, 4, 4)
         x1 = x.clone().detach().requires_grad_()
-        y1 = F.interpolate(x1, scale_factor = 2, mode='trilinear')
+        y1 = F.interpolate(x1, scale_factor=2, mode="trilinear")
         y1.mean().backward()
 
         # test bfloat16
         x3 = x.clone().detach().bfloat16().requires_grad_()
-        y3 = F.interpolate(x3, scale_factor = 2, mode='trilinear')
+        y3 = F.interpolate(x3, scale_factor=2, mode="trilinear")
         y3.mean().backward()
         self.assertTrue(y3.dtype == torch.bfloat16)
         self.assertEqual(y1, y3, prec=0.02)
@@ -500,18 +599,26 @@ class CPUOPsTester(TestCase):
         with torch.cpu.amp.autocast():
             for datatype in (torch.bfloat16, torch.float32):
                 x4 = x.clone().detach().to(datatype).requires_grad_()
-                y4 = F.interpolate(x4, scale_factor = 2, mode='trilinear')
+                y4 = F.interpolate(x4, scale_factor=2, mode="trilinear")
                 y4.mean().backward()
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
 
-                x5 = x.clone().detach().to(datatype).to(memory_format=torch.channels_last_3d).requires_grad_()
-                y5 = F.interpolate(x5, scale_factor = 2, mode='trilinear')
+                x5 = (
+                    x.clone()
+                    .detach()
+                    .to(datatype)
+                    .to(memory_format=torch.channels_last_3d)
+                    .requires_grad_()
+                )
+                y5 = F.interpolate(x5, scale_factor=2, mode="trilinear")
                 y5.mean().backward()
                 self.assertTrue(y5.dtype == datatype)
                 self.assertTrue(x5.grad.dtype == datatype)
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last_3d))
-                self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last_3d))
+                self.assertTrue(
+                    x5.grad.is_contiguous(memory_format=torch.channels_last_3d)
+                )
 
     def test_GroupNorm_memory_format(self):
         def helper(input_format, grad_format, B=2, C=4, W=4, H=4):
@@ -519,7 +626,12 @@ class CPUOPsTester(TestCase):
             net = copy.deepcopy(net_orig)
             x_orig = torch.rand(B, C, W, H, requires_grad=True)
             grad_orig = torch.rand(B, C, W, H)
-            x = x_orig.clone().detach().to(memory_format=input_format).requires_grad_(True)
+            x = (
+                x_orig.clone()
+                .detach()
+                .to(memory_format=input_format)
+                .requires_grad_(True)
+            )
             grad = grad_orig.detach().to(memory_format=grad_format)
             y = net(x)
             y.backward(grad)
@@ -528,6 +640,7 @@ class CPUOPsTester(TestCase):
 
             self.assertEqual(y, y_orig)
             self.assertEqual(x.grad, x_orig.grad)
+
         for input_format in [torch.contiguous_format, torch.channels_last]:
             for grad_format in [torch.contiguous_format, torch.channels_last]:
                 helper(input_format, grad_format)
@@ -536,7 +649,11 @@ class CPUOPsTester(TestCase):
         def helper(size, groups, memory_format):
             channels = size[1]
             input = torch.randn(size, dtype=torch.bfloat16).cpu()
-            input_bf1 = input.contiguous(memory_format=memory_format).detach().requires_grad_(True)
+            input_bf1 = (
+                input.contiguous(memory_format=memory_format)
+                .detach()
+                .requires_grad_(True)
+            )
             input_bf2 = input_bf1.clone().detach().requires_grad_(True)
             input_f = input_bf1.float().detach().requires_grad_(True)
             m_bf = nn.GroupNorm(groups, channels).cpu().bfloat16()
@@ -551,7 +668,11 @@ class CPUOPsTester(TestCase):
             torch.testing.assert_close(out, out2, atol=5e-3, rtol=5e-3)
             torch.testing.assert_close(out2.float(), out3, atol=5e-3, rtol=5e-3)
             grad_out = torch.randn(out2.shape, dtype=torch.bfloat16).cpu()
-            grad_out_bf1 = grad_out.contiguous(memory_format=memory_format).detach().requires_grad_(True)
+            grad_out_bf1 = (
+                grad_out.contiguous(memory_format=memory_format)
+                .detach()
+                .requires_grad_(True)
+            )
             grad_out_bf2 = grad_out_bf1.clone().detach().requires_grad_(True)
             grad_out_f = grad_out_bf2.clone().float().detach().requires_grad_(True)
             # bfloat16 input grad and float parameters
@@ -560,13 +681,25 @@ class CPUOPsTester(TestCase):
             out3.backward(grad_out_f, retain_graph=True)
             # bfloat16 input grad and bfloat16 parameters
             out.backward(grad_out_bf1, retain_graph=True)
-            torch.testing.assert_close(m_f.weight.grad, m_f2.weight.grad, atol=1e-5, rtol=1e-5)
-            torch.testing.assert_close(input_bf2.grad.float(), input_f.grad, atol=5e-5, rtol=5e-3)
-            torch.testing.assert_close(m_f.bias.grad, m_f2.bias.grad, atol=1e-5, rtol=1e-5)
+            torch.testing.assert_close(
+                m_f.weight.grad, m_f2.weight.grad, atol=1e-5, rtol=1e-5
+            )
+            torch.testing.assert_close(
+                input_bf2.grad.float(), input_f.grad, atol=5e-5, rtol=5e-3
+            )
+            torch.testing.assert_close(
+                m_f.bias.grad, m_f2.bias.grad, atol=1e-5, rtol=1e-5
+            )
             # full bf16 has lower precision compared with mixed bf16 and fp32 .
-            torch.testing.assert_close(m_bf.weight.grad.float(), m_f.weight.grad, atol=1e-3, rtol=1e-1)
-            torch.testing.assert_close(m_bf.bias.grad.float(), m_f.bias.grad, atol=1e-3, rtol=1e-2)
-            torch.testing.assert_close(input_bf1.grad, input_bf2.grad, atol=1e-2, rtol=1e-2)
+            torch.testing.assert_close(
+                m_bf.weight.grad.float(), m_f.weight.grad, atol=1e-3, rtol=1e-1
+            )
+            torch.testing.assert_close(
+                m_bf.bias.grad.float(), m_f.bias.grad, atol=1e-3, rtol=1e-2
+            )
+            torch.testing.assert_close(
+                input_bf1.grad, input_bf2.grad, atol=1e-2, rtol=1e-2
+            )
 
         helper((1, 8, 4, 3), 2, torch.contiguous_format)
         helper((1, 8, 4, 3), 2, torch.channels_last)
@@ -608,8 +741,15 @@ class CPUOPsTester(TestCase):
             gn.weight.data.uniform_()
             gn.bias.data.uniform_()
 
-            ref_input = input.detach().clone().contiguous(memory_format=torch.contiguous_format).requires_grad_(True)
-            ref_grad = grad.detach().clone().contiguous(memory_format=torch.contiguous_format)
+            ref_input = (
+                input.detach()
+                .clone()
+                .contiguous(memory_format=torch.contiguous_format)
+                .requires_grad_(True)
+            )
+            ref_grad = (
+                grad.detach().clone().contiguous(memory_format=torch.contiguous_format)
+            )
             if dtype == torch.bfloat16 and is_mixed:
                 ref_gn = nn.GroupNorm(groups, channels).to(torch.float)
             else:
@@ -622,12 +762,18 @@ class CPUOPsTester(TestCase):
             ref_out.backward(ref_grad)
 
             self.assertTrue(out.is_contiguous(memory_format=memory_format))
-            self.assertTrue(ref_out.is_contiguous(memory_format=torch.contiguous_format))
+            self.assertTrue(
+                ref_out.is_contiguous(memory_format=torch.contiguous_format)
+            )
             torch.testing.assert_close(out, ref_out)
             # training: parameters in bfloat16 is not recommended
             # if (dtype != torch.bfloat16) or is_mixed:
-            torch.testing.assert_close(gn.weight.grad, ref_gn.weight.grad, atol=5e-4, rtol=5e-4)
-            torch.testing.assert_close(gn.bias.grad, ref_gn.bias.grad, atol=5e-4, rtol=5e-4)
+            torch.testing.assert_close(
+                gn.weight.grad, ref_gn.weight.grad, atol=5e-4, rtol=5e-4
+            )
+            torch.testing.assert_close(
+                gn.bias.grad, ref_gn.bias.grad, atol=5e-4, rtol=5e-4
+            )
             torch.testing.assert_close(input.grad, ref_input.grad, atol=5e-4, rtol=8e-3)
 
         for dtype in [torch.bfloat16, torch.float, torch.double]:
@@ -638,9 +784,20 @@ class CPUOPsTester(TestCase):
                 helper(self, (4, 40, 40, 40), 2, torch.channels_last, dtype, is_mixed)
                 helper(self, (2, 30, 50, 50), 3, torch.channels_last, dtype, is_mixed)
                 helper(self, (2, 60, 50, 50), 3, torch.channels_last, dtype, is_mixed)
-                helper(self, (2, 9, 7, 11, 15), 3, torch.channels_last_3d, dtype, is_mixed)
-                helper(self, (2, 9, 7, 200, 15), 3, torch.channels_last_3d, dtype, is_mixed)
-                helper(self, (2, 60, 7, 200, 15), 3, torch.channels_last_3d, dtype, is_mixed)
+                helper(
+                    self, (2, 9, 7, 11, 15), 3, torch.channels_last_3d, dtype, is_mixed
+                )
+                helper(
+                    self, (2, 9, 7, 200, 15), 3, torch.channels_last_3d, dtype, is_mixed
+                )
+                helper(
+                    self,
+                    (2, 60, 7, 200, 15),
+                    3,
+                    torch.channels_last_3d,
+                    dtype,
+                    is_mixed,
+                )
 
     def test_groupnorm_nwc(self):
         size = (4, 20, 20)
@@ -698,7 +855,12 @@ class CPUOPsTester(TestCase):
             y1.backward(y1.data)
 
             # test channels last
-            x2 = x.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+            x2 = (
+                x.clone()
+                .detach()
+                .to(memory_format=torch.channels_last)
+                .requires_grad_()
+            )
             y2 = m(x2)
             y2.backward(y2.data)
             self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
@@ -728,17 +890,35 @@ class CPUOPsTester(TestCase):
                     y4.backward(y4.data)
                     self.assertEqual(x3.grad, x4.grad)
                     self.assertTrue(x4.grad.dtype == dtype)
-                    self.assertTrue(x4.grad.is_contiguous(memory_format=torch.channels_last))
+                    self.assertTrue(
+                        x4.grad.is_contiguous(memory_format=torch.channels_last)
+                    )
 
         helper(self, nn.AvgPool2d((3, 2), stride=(2, 1)), torch.randn(20, 16, 50, 32))
         helper(self, nn.AvgPool2d((3, 2), stride=(2, 1)), torch.randn(10, 8, 25, 16))
-        helper(self, nn.AvgPool2d((3, 2), stride=(2, 1), count_include_pad=False), torch.randn(20, 16, 50, 32))
-        helper(self, nn.AvgPool2d((3, 2), stride=(2, 1), count_include_pad=True, divisor_override=100), torch.randn(20, 16, 50, 32))
-        helper(self, nn.AvgPool2d((3, 2), stride=(2, 1), count_include_pad=True, divisor_override=100), torch.randn(10, 8, 25, 16))
+        helper(
+            self,
+            nn.AvgPool2d((3, 2), stride=(2, 1), count_include_pad=False),
+            torch.randn(20, 16, 50, 32),
+        )
+        helper(
+            self,
+            nn.AvgPool2d(
+                (3, 2), stride=(2, 1), count_include_pad=True, divisor_override=100
+            ),
+            torch.randn(20, 16, 50, 32),
+        )
+        helper(
+            self,
+            nn.AvgPool2d(
+                (3, 2), stride=(2, 1), count_include_pad=True, divisor_override=100
+            ),
+            torch.randn(10, 8, 25, 16),
+        )
 
     # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_adaptive_max_pool2d(self):
-        m = nn.AdaptiveMaxPool2d((5,7))
+        m = nn.AdaptiveMaxPool2d((5, 7))
         x = torch.randn(3, 64, 8, 9)
         x1 = x.clone().detach().requires_grad_()
         y1 = m(x1)
@@ -771,23 +951,44 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
 
-                x5 = x.clone().detach().to(datatype).to(memory_format=torch.channels_last).requires_grad_()
+                x5 = (
+                    x.clone()
+                    .detach()
+                    .to(datatype)
+                    .to(memory_format=torch.channels_last)
+                    .requires_grad_()
+                )
                 y5 = m(x5)
                 y5.mean().backward()
                 self.assertTrue(y5.dtype == datatype)
                 self.assertTrue(x5.grad.dtype == datatype)
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last))
-                self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last))
+                self.assertTrue(
+                    x5.grad.is_contiguous(memory_format=torch.channels_last)
+                )
 
     def test_avg_pool3d_ndhwc(self):
-        def helper(n, c, d, h, w, kernel_size, dtype, contig,
-                   count_include_pad=True, divisor_override=None):
-            input = torch.randint(1, 10, (n, c, d, h, w), device='cpu', dtype=dtype)
+        def helper(
+            n,
+            c,
+            d,
+            h,
+            w,
+            kernel_size,
+            dtype,
+            contig,
+            count_include_pad=True,
+            divisor_override=None,
+        ):
+            input = torch.randint(1, 10, (n, c, d, h, w), device="cpu", dtype=dtype)
             input = input.contiguous(memory_format=torch.channels_last_3d)
             if not contig:
                 input = input[:, ::2, :, :, :]
-            pool = torch.nn.AvgPool3d(kernel_size=kernel_size, count_include_pad=count_include_pad,
-                                      divisor_override=divisor_override)
+            pool = torch.nn.AvgPool3d(
+                kernel_size=kernel_size,
+                count_include_pad=count_include_pad,
+                divisor_override=divisor_override,
+            )
             ref_input = input.detach().clone().contiguous()
             if dtype != torch.int64:
                 input = input.requires_grad_()
@@ -808,16 +1009,48 @@ class CPUOPsTester(TestCase):
         for dtype in [torch.int64, torch.float32, torch.double]:
             for contig in [True, False]:
                 for count_include_pad in [True, False]:
-                    helper(4, 8, 10, 10, 10, (3, 2, 3), dtype, contig, count_include_pad=count_include_pad)
-                    helper(4, 8, 18, 9, 14, (2, 3, 2), dtype, contig, count_include_pad=count_include_pad)
-                    helper(4, 8, 7, 8, 9, (2, 2, 2), dtype, contig,
-                           count_include_pad=count_include_pad, divisor_override=100)
+                    helper(
+                        4,
+                        8,
+                        10,
+                        10,
+                        10,
+                        (3, 2, 3),
+                        dtype,
+                        contig,
+                        count_include_pad=count_include_pad,
+                    )
+                    helper(
+                        4,
+                        8,
+                        18,
+                        9,
+                        14,
+                        (2, 3, 2),
+                        dtype,
+                        contig,
+                        count_include_pad=count_include_pad,
+                    )
+                    helper(
+                        4,
+                        8,
+                        7,
+                        8,
+                        9,
+                        (2, 2, 2),
+                        dtype,
+                        contig,
+                        count_include_pad=count_include_pad,
+                        divisor_override=100,
+                    )
 
     def test_avg_pool(self):
         def helper(input, kernel_size):
             if input.ndim == 4:
                 pool = torch.nn.AvgPool3d(kernel_size=kernel_size)
-                input = input.contiguous(memory_format=torch.channels_last).requires_grad_()
+                input = input.contiguous(
+                    memory_format=torch.channels_last
+                ).requires_grad_()
                 self.assertRaises(RuntimeError, lambda: pool(input))
                 ref_input = input.detach().clone().contiguous().requires_grad_(True)
                 ref_out = pool(ref_input)
@@ -857,7 +1090,12 @@ class CPUOPsTester(TestCase):
         x = torch.randn(1, 64, 100, 13, 24, requires_grad=True)
         for dtype in [torch.float32, torch.double, torch.bfloat16]:
             y1 = torch.mean(x, dim=(3, 4), keepdim=False, dtype=dtype)
-            x2 = x.clone().detach().to(memory_format=torch.channels_last_3d).requires_grad_()
+            x2 = (
+                x.clone()
+                .detach()
+                .to(memory_format=torch.channels_last_3d)
+                .requires_grad_()
+            )
             y2 = torch.mean(x2, dim=(3, 4), keepdim=False, dtype=dtype)
             self.assertEqual(y1, y2)
 
@@ -867,7 +1105,14 @@ class CPUOPsTester(TestCase):
             y2 = torch.sum(x2, dim=dim, keepdim=keepdim, dtype=dtype)
             self.assertEqual(y1, y2, prec=2e-4)
 
-        dtypes = [torch.float32, torch.double, torch.bfloat16, torch.float16, torch.complex64, torch.complex128]
+        dtypes = [
+            torch.float32,
+            torch.double,
+            torch.bfloat16,
+            torch.float16,
+            torch.complex64,
+            torch.complex128,
+        ]
         x1 = torch.randn((1, 128, 56, 56)).to(memory_format=torch.channels_last)
         x1 = x1.reshape([1, 2, 64, 56, 56])
         x2 = x1.detach().clone().contiguous()
@@ -879,9 +1124,19 @@ class CPUOPsTester(TestCase):
         x8 = x7.detach().clone().contiguous()
         x9 = torch.randn((1, 10, 256, 256)).to(memory_format=torch.channels_last)
         x10 = x9.detach().clone().contiguous()
-        x11 = torch.randn((224, 1, 224)).unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
+        x11 = (
+            torch.randn((224, 1, 224))
+            .unsqueeze(0)
+            .to(memory_format=torch.channels_last)
+            .squeeze(0)
+        )
         x12 = x11.detach().clone().contiguous()
-        x13 = torch.randn((3, 1, 224)).unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
+        x13 = (
+            torch.randn((3, 1, 224))
+            .unsqueeze(0)
+            .to(memory_format=torch.channels_last)
+            .squeeze(0)
+        )
         x14 = x13.detach().clone().contiguous()
         for dtype in dtypes:
             for dim in [(1), (-1, -2)]:
@@ -910,7 +1165,13 @@ class CPUOPsTester(TestCase):
         x5 = torch.rand(789, 357).to(torch.float16)
         x6 = x5.detach().clone().transpose(0, 1)
         y5 = torch.arange(0, 0.5, 0.5).to(torch.float16).add(x5.unsqueeze(-1)).sum(-1)
-        y6 = torch.arange(0, 0.5, 0.5).to(torch.float16).add(x6.unsqueeze(-1)).sum(-1).transpose(0, 1)
+        y6 = (
+            torch.arange(0, 0.5, 0.5)
+            .to(torch.float16)
+            .add(x6.unsqueeze(-1))
+            .sum(-1)
+            .transpose(0, 1)
+        )
         self.assertEqual(y5, y6)
 
     def test_matmul(self):
@@ -937,13 +1198,25 @@ class CPUOPsTester(TestCase):
 
         helper(torch.randn(2, 3), torch.randn(3, 4), torch.zeros(2, 4), torch.mm)
         helper(torch.randn(2, 3), torch.randn(3, 4), torch.zeros(2, 4), torch.matmul)
-        helper(torch.randn(10, 3, 4), torch.randn(10, 4, 5), torch.zeros(10, 3, 5), torch.bmm)
-        helper(torch.randn(10, 3, 4, 5), torch.randn(10, 3, 5, 5), torch.zeros(10, 3, 4, 5), torch.matmul)
+        helper(
+            torch.randn(10, 3, 4),
+            torch.randn(10, 4, 5),
+            torch.zeros(10, 3, 5),
+            torch.bmm,
+        )
+        helper(
+            torch.randn(10, 3, 4, 5),
+            torch.randn(10, 3, 5, 5),
+            torch.zeros(10, 3, 4, 5),
+            torch.matmul,
+        )
         helper(torch.randn(1), torch.randn(1), torch.zeros(1), torch.matmul)
         helper(torch.randn(2, 3), torch.randn(3), torch.zeros(2, 3), torch.matmul)
         helper(torch.randn(2, 3, 4), torch.randn(4), torch.zeros(2, 3, 4), torch.matmul)
         helper(torch.randn(3), torch.randn(3, 1), torch.zeros(3), torch.matmul)
-        helper(torch.randn(2, 3), torch.randn(1, 3, 3), torch.zeros(1, 2, 3), torch.matmul)
+        helper(
+            torch.randn(2, 3), torch.randn(1, 3, 3), torch.zeros(1, 2, 3), torch.matmul
+        )
         helper(torch.randn(3), torch.randn(1, 3, 3), torch.zeros(1, 3), torch.matmul)
 
         def f(x, y, z):
@@ -953,7 +1226,9 @@ class CPUOPsTester(TestCase):
         y = torch.randn(3, 5)
         z = torch.randn(5, 5)
         ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.BF32, device="cpu")
-        result_forward_mode = autogradF.hessian(f, (x, y, z), outer_jacobian_strategy="forward-mode", vectorize=True)
+        result_forward_mode = autogradF.hessian(
+            f, (x, y, z), outer_jacobian_strategy="forward-mode", vectorize=True
+        )
         ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.FP32, device="cpu")
 
     def test_index_select(self):
@@ -961,7 +1236,14 @@ class CPUOPsTester(TestCase):
             indices = torch.tensor([1], dtype=index_datatype)
 
             # test floating types
-            for datatype in [torch.float32, torch.bfloat16, torch.double, torch.float16, torch.complex64, torch.complex128]:
+            for datatype in [
+                torch.float32,
+                torch.bfloat16,
+                torch.double,
+                torch.float16,
+                torch.complex64,
+                torch.complex128,
+            ]:
                 for dim in [0, 1]:
                     x1_1 = torch.randn((10, 2), dtype=datatype)
                     y1_1 = x1_1.index_select(dim, indices)
@@ -989,7 +1271,13 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y1_6.dtype == datatype)
 
             # test integer types
-            for datatype in [torch.int32, torch.int64, torch.int16, torch.int8, torch.uint8]:
+            for datatype in [
+                torch.int32,
+                torch.int64,
+                torch.int16,
+                torch.int8,
+                torch.uint8,
+            ]:
                 for dim in [0, 1]:
                     x2_1 = torch.randint(10, (10, 10), dtype=datatype)
                     y2_1 = x2_1.index_select(dim, indices)
@@ -1066,7 +1354,7 @@ class CPUOPsTester(TestCase):
                 input4.append(x1)
             for i in range(10):
                 input4.append(x4)
-            y4 = torch.cat(input4, 0)  
+            y4 = torch.cat(input4, 0)
             self.assertTrue(y4.size() == torch.Size([60, 2]))
             self.assertTrue(y4.dtype == datatype)
 
@@ -1104,5 +1392,5 @@ class CPUOPsTester(TestCase):
             self.assertTrue(y7.dtype == datatype)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test = unittest.main()

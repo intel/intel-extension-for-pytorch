@@ -812,25 +812,39 @@ class IPEXCPPLibBuild(build_clib, object):
 def get_src_lib_and_dst():
     ret = []
     generated_cpp_files = glob.glob(
-        os.path.join(get_package_base_dir(), PACKAGE_NAME, 'lib', '**/*.so'),
-        recursive=True)
-    generated_cpp_files.extend(glob.glob(
-        os.path.join(get_package_base_dir(), PACKAGE_NAME, 'bin', '**/*.dll'),
-        recursive=True))
-    generated_cpp_files.extend(glob.glob(
-        os.path.join(get_package_base_dir(), PACKAGE_NAME, 'lib', '**/*.lib'),
-        recursive=True))
-    generated_cpp_files.extend(glob.glob(
-        os.path.join(get_package_base_dir(), PACKAGE_NAME, 'include', '**/*.h'),
-        recursive=True))
-    generated_cpp_files.extend(glob.glob(
-        os.path.join(get_package_base_dir(), PACKAGE_NAME, 'share', '**/*.cmake'),
-        recursive=True))
+        os.path.join(get_package_base_dir(), PACKAGE_NAME, "lib", "**/*.so"),
+        recursive=True,
+    )
+    generated_cpp_files.extend(
+        glob.glob(
+            os.path.join(get_package_base_dir(), PACKAGE_NAME, "bin", "**/*.dll"),
+            recursive=True,
+        )
+    )
+    generated_cpp_files.extend(
+        glob.glob(
+            os.path.join(get_package_base_dir(), PACKAGE_NAME, "lib", "**/*.lib"),
+            recursive=True,
+        )
+    )
+    generated_cpp_files.extend(
+        glob.glob(
+            os.path.join(get_package_base_dir(), PACKAGE_NAME, "include", "**/*.h"),
+            recursive=True,
+        )
+    )
+    generated_cpp_files.extend(
+        glob.glob(
+            os.path.join(get_package_base_dir(), PACKAGE_NAME, "share", "**/*.cmake"),
+            recursive=True,
+        )
+    )
     for src in generated_cpp_files:
         dst = os.path.join(
             get_project_dir(),
             PACKAGE_NAME,
-            os.path.relpath(src, os.path.join(get_package_base_dir(), PACKAGE_NAME)))
+            os.path.relpath(src, os.path.join(get_package_base_dir(), PACKAGE_NAME)),
+        )
         dst_path = Path(dst)
         if not dst_path.parent.exists():
             Path(dst_path.parent).mkdir(parents=True, exist_ok=True)
