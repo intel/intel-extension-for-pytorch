@@ -5,6 +5,11 @@
 
 namespace torch_ipex {
 namespace autocast {
+
+void check_foreach_api_restrictions(at::TensorList tensors) {
+  TORCH_CHECK(!tensors.empty(), "Tensor list must have at least one tensor.");
+}
+
 // Follow the implements of PyTorch.
 // Multiplies each tensor in scaled_grads by inv_scale in-place.
 // If any element of any tensor in scaled_grads is inf or NaN, sets found_inf
@@ -38,7 +43,7 @@ void _amp_foreach_non_finite_check_and_unscale_cpu_(
       "found_inf must be a float tensor.");
 
   // Ensures client code (GradScaler) filtered scaled_grads by dtype.
-  at::native::check_foreach_api_restrictions(scaled_grads);
+  check_foreach_api_restrictions(scaled_grads);
   auto expected_device = scaled_grads[0].device();
   for (const at::Tensor& t : scaled_grads) {
     TORCH_CHECK(t.is_cpu(), "one of scaled_grads was not a CPU tensor.");

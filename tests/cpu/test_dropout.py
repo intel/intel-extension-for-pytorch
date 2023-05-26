@@ -1,18 +1,13 @@
-import math
-import random
 import unittest
-from functools import reduce
-import warnings
 
 import torch
 import torch.nn as nn
-from torch.fx import GraphModule
-import copy
 
 import intel_extension_for_pytorch as ipex
 
 from common_utils import TestCase
 from torch.testing import FileCheck
+
 
 class Net(nn.Module):
     def __init__(self):
@@ -21,6 +16,7 @@ class Net(nn.Module):
 
     def forward(self, x):
         return self.dropout(x)
+
 
 class DropoutTester(TestCase):
     def test_remove_dropout_jit(self):
@@ -38,12 +34,12 @@ class DropoutTester(TestCase):
         optimized_model = ipex.optimize(model)
         x = torch.randn(2, 3)
         named_children = dict(optimized_model.named_children())
-        self.assertTrue(isinstance(named_children['dropout'], torch.nn.Identity))
+        self.assertTrue(isinstance(named_children["dropout"], torch.nn.Identity))
 
         optimized_model = ipex.optimize(model, replace_dropout_with_identity=False)
         named_children = dict(optimized_model.named_children())
-        self.assertTrue(isinstance(named_children['dropout'], torch.nn.Dropout))
+        self.assertTrue(isinstance(named_children["dropout"], torch.nn.Dropout))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test = unittest.main()

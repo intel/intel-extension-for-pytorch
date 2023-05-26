@@ -1,8 +1,8 @@
 import unittest
 
 import torch
-import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
+
 
 class M(torch.nn.Module):
     def __init__(self):
@@ -13,16 +13,19 @@ class M(torch.nn.Module):
         x = self.layer_norm(x)
         return x
 
+
 class LayerNormTester(TestCase):
     def test_layer_norm(self):
         # autocast inference path. layer_norm is fallthrough.
         for dim in [2, 3, 4, 5, 6, 7]:
             for full_bf16 in [False, True]:
                 model = M().eval()
-                if full_bf16: #support full bf16 mode for layer_norm
+                if full_bf16:  # support full bf16 mode for layer_norm
                     model = model.bfloat16()
                 with torch.cpu.amp.autocast(), torch.no_grad():
-                    input_size = [3,]
+                    input_size = [
+                        3,
+                    ]
                     for _ in range(dim - 1):
                         input_size.append(10)
                     x = torch.randn(input_size)
@@ -43,5 +46,6 @@ class LayerNormTester(TestCase):
                         self.assertEqual(y2_fp32.dtype, torch.float32)
                         self.assertEqual(y1_fp32, y2_fp32)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test = unittest.main()

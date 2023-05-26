@@ -3,14 +3,12 @@ import torch
 import unittest
 from common_utils import TestCase
 from torch.nn import InstanceNorm2d, InstanceNorm3d, BatchNorm2d, BatchNorm3d
-import intel_extension_for_pytorch as ipex
-import random
 
-bn_m = {2 : BatchNorm2d, 3 : BatchNorm3d}
-inst_m ={2 : InstanceNorm2d, 3 : InstanceNorm3d}
+bn_m = {2: BatchNorm2d, 3: BatchNorm3d}
+inst_m = {2: InstanceNorm2d, 3: InstanceNorm3d}
+
 
 class InstanceNormTester(TestCase):
-
     def test_instance_norm(self):
         for dim in [2, 3]:
             batch = 10
@@ -103,7 +101,12 @@ class InstanceNormTester(TestCase):
                 self.assertEqual(x.grad, x1.grad)
 
                 # test channels last
-                x2 = input.clone().detach().to(memory_format=memory_format).requires_grad_()
+                x2 = (
+                    input.clone()
+                    .detach()
+                    .to(memory_format=memory_format)
+                    .requires_grad_()
+                )
                 y2 = m(x2)
                 self.assertTrue(y2.dtype == torch.bfloat16)
                 self.assertTrue(y2.is_contiguous(memory_format=memory_format))
@@ -115,5 +118,5 @@ class InstanceNormTester(TestCase):
                 self.assertEqual(x2.grad, x1.grad)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test = unittest.main()

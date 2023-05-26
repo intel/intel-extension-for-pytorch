@@ -7,11 +7,11 @@
 
 #include <libxsmm.h>
 #include <libxsmm_intrinsics_x86.h>
-//#ifdef TORCH_API_INCLUDE_EXTENSION_H
-//#include <torch/extension.h>
-//#else
-// include <pytorch_extension_wrapper.h>
-//#endif
+// #ifdef TORCH_API_INCLUDE_EXTENSION_H
+// #include <torch/extension.h>
+// #else
+//  include <pytorch_extension_wrapper.h>
+// #endif
 #include <string>
 #include <unordered_map>
 
@@ -164,6 +164,37 @@ inline void debug_print_eqn_tree(libxsmm_blasint eqn_no) {
   }
 }
 
+inline int xsmm_get_vnni_block_size(libxsmm_datatype dtype) {
+  int bs = libxsmm_cpuid_dot_pack_factor(dtype);
+  if (bs <= 0) {
+    throw std::invalid_argument("Unsupported datatype");
+  }
+  return bs;
+}
+inline libxsmm_datatype convert_dtype_pt2xsmm(at::ScalarType dtype) {
+  static const std::map<at::ScalarType, libxsmm_datatype> pt2xsmmDtypes = {
+      {at::kDouble, LIBXSMM_DATATYPE_F64},
+      {at::kFloat, LIBXSMM_DATATYPE_F32},
+      {at::kHalf, LIBXSMM_DATATYPE_F16},
+      {at::kBFloat16, LIBXSMM_DATATYPE_BF16},
+      {at::kByte, LIBXSMM_DATATYPE_I8},
+      {at::kChar, LIBXSMM_DATATYPE_I8},
+      {at::kShort, LIBXSMM_DATATYPE_I16},
+      {at::kInt, LIBXSMM_DATATYPE_I32},
+      {at::kLong, LIBXSMM_DATATYPE_I64}};
+
+  return pt2xsmmDtypes.at(dtype);
+}
+inline int get_vnni_block_size(at::ScalarType dtype) {
+  auto xsmm_dtype = convert_dtype_pt2xsmm(dtype);
+  return xsmm_get_vnni_block_size(xsmm_dtype);
+}
+
+template <typename T>
+inline int get_vnni_block_size() {
+  auto xsmm_dtype = XsmmDtype<T>();
+  return xsmm_get_vnni_block_size(xsmm_dtype);
+}
 inline int meqn_push_arg(
     const libxsmm_blasint idx,
     const libxsmm_blasint m,
@@ -1116,31 +1147,43 @@ template <typename Tin, typename Tout>
 class ScaleAddTPP {
  public:
   ScaleAddTPP() {}
-  ScaleAddTPP(int N)
-      : N(N),
+  ScaleAddTPP(int N) : ScaleAddTPP(1, N) {}
+  ScaleAddTPP(int rows, int cols) : ScaleAddTPP(rows, cols, cols, cols) {}
+  ScaleAddTPP(int rows, int cols, int ldi, int ldo)
+      : rows(rows),
+        cols(cols),
+        ldi(ldi),
+        ldo(ldo),
         kernel(
+            rows,
+            cols,
             1,
-            N,
-            N,
-            N,
+            ldi,
+            ldo,
+            XsmmDtype<float>(),
             XsmmDtype<Tin>(),
             XsmmDtype<Tout>(),
             LIBXSMM_DATATYPE_F32,
             LIBXSMM_MELTW_FLAG_BINARY_BCAST_SCALAR_IN_0,
             LIBXSMM_MELTW_TYPE_BINARY_MULADD) {}
   void operator()(Tin* in, Tout* out, float scale) {
-    Tin alpha = scale;
+    float alpha = scale;
     kernel((void*)&alpha, (void*)in, (void*)out);
   }
   void ref(Tin* in, Tout* out, float scale) {
-    Tin alpha = scale;
-    for (int i = 0; i < N; i++) {
-      out[i] += (float)in[i] * (float)alpha;
+    float alpha = scale;
+    for (int i = 0; i < rows; i++) {
+      for (int j = 0; j < cols; j++) {
+        out[i * ldo + j] += (float)in[i * ldi + j] * (float)alpha;
+      }
     }
   }
 
  private:
-  int N = 0;
+  int rows = 0;
+  int cols = 0;
+  int ldi;
+  int ldo;
   BinaryTPP kernel;
 };
 
@@ -1745,13 +1788,18 @@ template <typename Tin, typename Tout = Tin>
 class GeluFwdTPP {
  public:
   GeluFwdTPP() {}
-  GeluFwdTPP(int N)
-      : N(N),
+  GeluFwdTPP(int N) : GeluFwdTPP(1, N) {}
+  GeluFwdTPP(int M, int N) : GeluFwdTPP(M, N, N, N) {}
+  GeluFwdTPP(int M, int N, int ldi, int ldo)
+      : M(M),
+        N(N),
+        ldi(ldi),
+        ldo(ldo),
         kernel(
-            1,
+            M,
             N,
-            N,
-            N,
+            ldi,
+            ldo,
             XsmmDtype<Tin>(),
             XsmmDtype<Tout>(),
             LIBXSMM_DATATYPE_F32,
@@ -1762,31 +1810,38 @@ class GeluFwdTPP {
   }
   void ref(Tin* in, Tout* out) {
 #ifdef __AVX512F__
-    int i;
-    for (i = 0; i < ALIGNDOWN(N, 16); i += 16) {
-      auto vin = _mm512_loadu_ps_auto(&in[i]);
-      // auto vout = LIBXSMM_INTRINSICS_MM512_TANH_PS_GELU_FWD(vin);
-      auto vout = LIBXSMM_INTRINSICS_MM512_GELU_FWD_PS_MINIMAX3(vin);
-      _mm512_storeu_ps_auto(&out[i], vout);
-    }
-    if (i < N) {
-      int rem = N - i;
-      __mmask16 mask = (1 << rem) - 1;
-      auto vin = _mm512_maskz_loadu_ps_auto(mask, &in[i]);
-      // auto vout = LIBXSMM_INTRINSICS_MM512_TANH_PS_GELU_FWD(vin);
-      auto vout = LIBXSMM_INTRINSICS_MM512_GELU_FWD_PS_MINIMAX3(vin);
-      _mm512_mask_storeu_ps_auto(&out[i], mask, vout);
+    for (int j = 0; j < M; j++) {
+      int i;
+      for (i = 0; i < ALIGNDOWN(N, 16); i += 16) {
+        auto vin = _mm512_loadu_ps_auto(&in[j * ldi + i]);
+        // auto vout = LIBXSMM_INTRINSICS_MM512_TANH_PS_GELU_FWD(vin);
+        auto vout = LIBXSMM_INTRINSICS_MM512_GELU_FWD_PS_MINIMAX3(vin);
+        _mm512_storeu_ps_auto(&out[j * ldo + i], vout);
+      }
+      if (i < N) {
+        int rem = N - i;
+        __mmask16 mask = (1 << rem) - 1;
+        auto vin = _mm512_maskz_loadu_ps_auto(mask, &in[j * ldi + i]);
+        // auto vout = LIBXSMM_INTRINSICS_MM512_TANH_PS_GELU_FWD(vin);
+        auto vout = LIBXSMM_INTRINSICS_MM512_GELU_FWD_PS_MINIMAX3(vin);
+        _mm512_mask_storeu_ps_auto(&out[j * ldo + i], mask, vout);
+      }
     }
 #else
-    for (int i = 0; i < N; i++) {
-      float x = in[i];
-      out[i] = (erff(x / sqrtf(2.0)) + 1.0) * 0.5 * x;
+    for (int j = 0; j < M; j++) {
+      for (int i = 0; i < N; i++) {
+        float x = in[j * ldi + i];
+        out[j * ldo + i] = (erff(x / sqrtf(2.0)) + 1.0) * 0.5 * x;
+      }
     }
 #endif
   }
 
  private:
+  int M = 0;
   int N = 0;
+  int ldi = 0;
+  int ldo = 0;
   UnaryTPP kernel;
 };
 
@@ -2940,7 +2995,7 @@ class VarSoftMaxFwdTPP {
       }
     }
 #else
-    //#warning "Not using AVX512 path for VarSoftMax"
+    // #warning "Not using AVX512 path for VarSoftMax"
     for (s2 = 0; s2 < S2; s2++) {
       float tmp[S1][S3];
       float max =
@@ -3978,8 +4033,8 @@ class SplitSGDTPP : public BaseTPP {
     auto out_hi = (libxsmm_bfloat16*)hi;
     auto out_lo = (libxsmm_bfloat16*)lo;
     for (int i = 0; i < N; i++) {
-      union libxsmm_bfloat16_hp bf16_hp;
-      union libxsmm_bfloat16_hp bf16_wt;
+      union libxsmm_bfloat16_f32 bf16_hp;
+      union libxsmm_bfloat16_f32 bf16_wt;
       bf16_wt.i[0] = 0;
       bf16_wt.i[1] = dwt[i];
       bf16_hp.i[0] = out_lo[i];
@@ -4057,7 +4112,9 @@ class EmbBagFwdTPP {
             XsmmDtype<Tin>(),
             XsmmDtype<Tout>(),
             LIBXSMM_DATATYPE_F32,
-            (libxsmm_meltw_unary_flags)(sizeof(Tind) == 8 ? LIBXSMM_MELTW_FLAG_UNARY_IDX_SIZE_8BYTES : LIBXSMM_MELTW_FLAG_UNARY_IDX_SIZE_4BYTES),
+            (libxsmm_meltw_unary_flags)(sizeof(Tind) == 8
+                                            ? LIBXSMM_MELTW_FLAG_UNARY_IDX_SIZE_8BYTES
+                                            : LIBXSMM_MELTW_FLAG_UNARY_IDX_SIZE_4BYTES),
             LIBXSMM_MELTW_TYPE_UNARY_REDUCE_COLS_IDX_OP_ADD) {}
   void operator()(Tout* output, Tin* weight, Tind* input, int N) {
     unsigned long long _N = N;
@@ -4429,7 +4486,7 @@ class FusedSplitAdamWTPP {
     float beta2_1 = 1.0f - beta2;
 #ifndef __AVX512F__
     for (long i = 0; i < sz; i++) {
-      union libxsmm_bfloat16_hp data_hp;
+      union libxsmm_bfloat16_f32 data_hp;
       float avg_i = exp_avg[i];
       float avg_sq_i = exp_avg_sq[i];
       float grad_i = grad[i];

@@ -2,6 +2,7 @@
 import re
 
 import torch
+import warnings
 
 try:
     import torchvision
@@ -14,20 +15,33 @@ import glob
 import ctypes
 import platform
 
-from .utils import _proxy_module
 from . import cpu
 from . import xpu
 from . import quantization
 from . import nn
 from . import jit
 from . import optim
+from . import fx
+from . import _meta_registrations
 
-from .frontend import optimize, compile, enable_onednn_fusion
+try:
+    from .cpu import tpp
+except BaseException:
+    warnings.warn(
+        "Please install transformers repo when you want to use fast_bert API."
+    )
+
+from .frontend import optimize
+from .cpu.transformers import _optimize_transformers
 from .frontend import enable_auto_channels_last, disable_auto_channels_last
-from .frontend import set_fp32_math_mode, get_fp32_math_mode, FP32MathMode, fast_bert
-from .frontend import _set_compiler_backend, _get_compiler_backend
+from .frontend import set_fp32_math_mode, get_fp32_math_mode, FP32MathMode
 from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl
 from .cpu.utils.verbose import verbose
+from .cpu.tpp.fused_bert import fast_bert
+from ._inductor.compiler import _set_compiler_backend, _get_compiler_backend, compile
+from ._inductor.dynamo_backends import *
+from .cpu.onednn_fusion import enable_onednn_fusion
+from ._init_on_device import _IPEXOnDevice
 
 from . import _C
 from ._version import (

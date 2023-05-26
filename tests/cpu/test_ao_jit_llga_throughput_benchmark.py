@@ -1,13 +1,9 @@
-from functools import wraps
-
 import torch
 from torch.utils import ThroughputBenchmark
 from torch.testing import assert_allclose
-from torch.testing._internal.common_utils import run_tests, TestCase
 
 import intel_extension_for_pytorch as ipex
-import intel_extension_for_pytorch._C as core
-from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
+from test_ao_jit_llga_utils import JitLlgaTestCase
 
 
 class LinearEltwise(torch.nn.Module):
@@ -23,8 +19,12 @@ class LinearEltwise(torch.nn.Module):
         x = self.linear2(x)
         return x
 
+
 def freeze(model):
-    return torch.jit._recursive.wrap_cpp_module(torch._C._freeze_module(model._c, preserveParameters=True))
+    return torch.jit._recursive.wrap_cpp_module(
+        torch._C._freeze_module(model._c, preserveParameters=True)
+    )
+
 
 class TestThroughputBenchmark(JitLlgaTestCase):
     def test_linear_eltwise(self):
@@ -50,12 +50,11 @@ class TestThroughputBenchmark(JitLlgaTestCase):
             assert_allclose(bench_result, module_result, atol=1e-1, rtol=1e-2)
 
             stats = bench.benchmark(
-                num_calling_threads=4,
-                num_warmup_iters=100,
-                num_iters=1000
+                num_calling_threads=4, num_warmup_iters=100, num_iters=1000
             )
 
             print(stats)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

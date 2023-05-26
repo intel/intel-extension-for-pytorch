@@ -134,378 +134,130 @@ struct CPU_WrapFunction_<
   }
 };
 
-#define TUPLE_TWO_TENSORS std::tuple<Tensor, Tensor>
-#define TUPLE_THREE_TENSORS std::tuple<Tensor, Tensor, Tensor>
-#define ADD_NS(RAW_OP) at::RAW_OP
+#define ATEN_FN2(op_name, overload) at::_ops::op_name##_##overload::call
+#define ATEN_FN(op_name) at::_ops::op_name::call
 
 // BF16_CAST_POLICY: cast policy for BF16
 // FP16_CAST_POLICY: cast policy for FP16
-#define MAKE_REGISTER_FUNC_TWO_POLICIES(                 \
-    FUNC, NAME, SIG, BF16_CAST_POLICY, FP16_CAST_POLICY) \
-  m.impl(                                                \
-      TORCH_SELECTIVE_NAME("aten::" NAME),               \
-      &CPU_WrapFunction<                                 \
-          DtypeCastPolicy::BF16_CAST_POLICY,             \
-          DtypeCastPolicy::FP16_CAST_POLICY,             \
-          SIG,                                           \
-          SIG,                                           \
-          &FUNC>::type::call);
+#define MAKE_REGISTER_FUNC_TWO_POLICIES(     \
+    OP, BF16_CAST_POLICY, FP16_CAST_POLICY)  \
+  m.impl(                                    \
+      TORCH_SELECTIVE_NAME("aten::" #OP),    \
+      &CPU_WrapFunction<                     \
+          DtypeCastPolicy::BF16_CAST_POLICY, \
+          DtypeCastPolicy::FP16_CAST_POLICY, \
+          decltype(ATEN_FN(OP)),             \
+          decltype(ATEN_FN(OP)),             \
+          &ATEN_FN(OP)>::type::call);
+
+#define MAKE_REGISTER_FUNC2_TWO_POLICIES(               \
+    OP, OVERLOAD, BF16_CAST_POLICY, FP16_CAST_POLICY)   \
+  m.impl(                                               \
+      TORCH_SELECTIVE_NAME("aten::" #OP "." #OVERLOAD), \
+      &CPU_WrapFunction<                                \
+          DtypeCastPolicy::BF16_CAST_POLICY,            \
+          DtypeCastPolicy::FP16_CAST_POLICY,            \
+          decltype(ATEN_FN2(OP, OVERLOAD)),             \
+          decltype(ATEN_FN2(OP, OVERLOAD)),             \
+          &ATEN_FN2(OP, OVERLOAD)>::type::call);
 
 IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
   // low precision policy for bf16 and fp32 cast policy for fp16
+  MAKE_REGISTER_FUNC_TWO_POLICIES(conv1d, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(conv2d, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(conv3d, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(bmm, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(mm, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(baddbmm, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(addmm, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(addbmm, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(linear, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(
+      _convolution, deprecated, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(matmul, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(conv_tbc, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(conv_transpose1d, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(
+      conv_transpose2d, input, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(
+      conv_transpose3d, input, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(group_norm, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(conv1d),
-      "conv1d",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const c10::optional<Tensor>&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          int64_t),
-      user_defined_dtype,
-      fp32)
+      _native_multi_head_attention, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(conv2d),
-      "conv2d",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const c10::optional<Tensor>&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          int64_t),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(conv3d),
-      "conv3d",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const c10::optional<Tensor>&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          int64_t),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(bmm),
-      "bmm",
-      Tensor(const Tensor&, const Tensor&),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(mm),
-      "mm",
-      Tensor(const Tensor&, const Tensor&),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(baddbmm),
-      "baddbmm",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const Tensor&,
-          const Scalar&,
-          const Scalar&),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(addmm),
-      "addmm",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const Tensor&,
-          const Scalar&,
-          const Scalar&),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(addbmm),
-      "addbmm",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const Tensor&,
-          const Scalar&,
-          const Scalar&),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(linear),
-      "linear",
-      Tensor(const Tensor&, const Tensor&, const c10::optional<Tensor>&),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(_convolution),
-      "_convolution.deprecated",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const c10::optional<Tensor>&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          bool,
-          IntArrayRef,
-          int64_t,
-          bool,
-          bool,
-          bool),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(matmul),
-      "matmul",
-      Tensor(const Tensor&, const Tensor&),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(conv_tbc),
-      "conv_tbc",
-      Tensor(const Tensor&, const Tensor&, const Tensor&, int64_t),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(conv_transpose1d),
-      "conv_transpose1d",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const c10::optional<Tensor>&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          int64_t,
-          IntArrayRef),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(conv_transpose2d),
-      "conv_transpose2d.input",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const c10::optional<Tensor>&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          int64_t,
-          IntArrayRef),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(conv_transpose3d),
-      "conv_transpose3d.input",
-      Tensor(
-          const Tensor&,
-          const Tensor&,
-          const c10::optional<Tensor>&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          int64_t,
-          IntArrayRef),
-      user_defined_dtype,
-      fp32)
+      _transform_bias_rescale_qkv, user_defined_dtype, fp32)
 
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(group_norm),
-      "group_norm",
-      Tensor(
-          const Tensor&,
-          int64_t,
-          const c10::optional<Tensor>&,
-          const c10::optional<Tensor>&,
-          double,
-          bool),
-      user_defined_dtype,
-      fp32)
-
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(_native_multi_head_attention),
-      "_native_multi_head_attention",
-      TUPLE_TWO_TENSORS(
-          const Tensor&,
-          const Tensor&,
-          const Tensor&,
-          int64_t,
-          int64_t,
-          const Tensor&,
-          const Tensor&,
-          const Tensor&,
-          const Tensor&,
-          const c10::optional<Tensor>&,
-          bool,
-          bool,
-          c10::optional<int64_t>),
-      user_defined_dtype,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(_transform_bias_rescale_qkv),
-      "_transform_bias_rescale_qkv",
-      TUPLE_THREE_TENSORS(const Tensor&, const Tensor&, int64_t),
-      user_defined_dtype,
-      fp32)
   // fp32 and fp32 cast policies
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(avg_pool3d),
-      "avg_pool3d",
-      Tensor(
-          const Tensor&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          bool,
-          bool,
-          c10::optional<int64_t>),
-      fp32,
-      fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(avg_pool3d, fp32, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(adaptive_avg_pool3d, fp32, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(_adaptive_avg_pool3d, fp32, fp32)
+
   // fallthrough and fp32 cast policies
+  MAKE_REGISTER_FUNC_TWO_POLICIES(batch_norm, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(avg_pool1d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(avg_pool2d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(max_pool1d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(max_pool2d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(max_pool3d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(layer_norm, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(bernoulli, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(bernoulli, p, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(dropout, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(topk, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(cumsum, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(cumsum, dimname, fallthrough, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(relu), "relu", Tensor(const Tensor&), fallthrough, fp32)
+      scaled_dot_product_attention, fallthrough, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(mish), "mish", Tensor(const Tensor&), fallthrough, fp32)
+      _scaled_dot_product_attention, fallthrough, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(batch_norm),
-      "batch_norm",
-      Tensor(
-          const Tensor&,
-          const c10::optional<Tensor>&,
-          const c10::optional<Tensor>&,
-          const c10::optional<Tensor>&,
-          const c10::optional<Tensor>&,
-          bool,
-          double,
-          double,
-          bool),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(avg_pool1d),
-      "avg_pool1d",
-      Tensor(const Tensor&, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(avg_pool2d),
-      "avg_pool2d",
-      Tensor(
-          const Tensor&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          bool,
-          bool,
-          c10::optional<int64_t>),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(max_pool1d),
-      "max_pool1d",
-      Tensor(
-          const Tensor&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          bool),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(max_pool2d),
-      "max_pool2d",
-      Tensor(
-          const Tensor&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          bool),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(max_pool3d),
-      "max_pool3d",
-      Tensor(
-          const Tensor&,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          IntArrayRef,
-          bool),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(layer_norm),
-      "layer_norm",
-      Tensor(
-          const Tensor&,
-          IntArrayRef,
-          const c10::optional<Tensor>&,
-          const c10::optional<Tensor>&,
-          double,
-          bool),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(bernoulli),
-      "bernoulli",
-      Tensor(const Tensor&, c10::optional<at::Generator>),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(bernoulli),
-      "bernoulli.p",
-      Tensor(const Tensor&, double, c10::optional<at::Generator>),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(dropout),
-      "dropout",
-      Tensor(const Tensor&, double, bool),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(gelu),
-      "gelu",
-      Tensor(const Tensor&, c10::string_view),
-      fallthrough,
-      fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(tanh), "tanh", Tensor(const Tensor&), fallthrough, fp32)
+      _scaled_dot_product_attention_math, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(addcdiv, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(addcmul, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(softmax, int, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(softmax, Dimname, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(log_softmax, int, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(log_softmax, Dimname, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_linear1d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_bilinear2d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(_upsample_bilinear2d_aa, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_bicubic2d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(_upsample_bicubic2d_aa, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_trilinear3d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_nearest1d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(_upsample_nearest_exact1d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_nearest2d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(_upsample_nearest_exact2d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_nearest3d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(_upsample_nearest_exact3d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_linear1d, vec, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_bilinear2d, vec, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(
+      _upsample_bilinear2d_aa, vec, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_trilinear3d, vec, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_bicubic2d, vec, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(
+      _upsample_bicubic2d_aa, vec, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_nearest1d, vec, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(
+      _upsample_nearest_exact1d, vec, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_nearest2d, vec, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(
+      _upsample_nearest_exact2d, vec, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_nearest3d, vec, fallthrough, fp32)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(
+      _upsample_nearest_exact3d, vec, fallthrough, fp32)
+
+  MAKE_REGISTER_FUNC_TWO_POLICIES(adaptive_avg_pool1d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(adaptive_avg_pool2d, fallthrough, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(_adaptive_avg_pool2d, fallthrough, fp32)
 
   // promote cast policies
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(cat),
-      "cat",
-      Tensor(const at::ITensorListRef&, int64_t),
-      promote,
-      promote)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(stack), "stack", Tensor(TensorList, int64_t), promote, promote)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(index_copy),
-      "index_copy",
-      Tensor(const Tensor&, int64_t, const Tensor&, const Tensor&),
-      promote,
-      promote)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      ADD_NS(index_copy),
-      "index_copy.dimname",
-      Tensor(const Tensor&, at::Dimname, const Tensor&, const Tensor&),
-      promote,
-      promote)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(cat, promote, promote)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(stack, promote, promote)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(index_copy, promote, promote)
+  MAKE_REGISTER_FUNC2_TWO_POLICIES(index_copy, dimname, promote, promote)
 }
-#undef TUPLE_TWO_TENSORS
-#undef TUPLE_THREE_TENSORS
 
 } // namespace autocast
 } // namespace torch_ipex

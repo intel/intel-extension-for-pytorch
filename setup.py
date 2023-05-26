@@ -314,15 +314,12 @@ def get_submodule_commit(base_dir, submodule_dir):
 
 
 def get_build_version(ipex_git_sha):
-    pkg_type = "xpu" if _check_env_flag("BUILD_WITH_XPU") else "cpu"
     ipex_version = os.getenv("IPEX_VERSION", get_version_num())
     if _check_env_flag("IPEX_VERSIONED_BUILD", default="1"):
         try:
             ipex_version += "+git" + ipex_git_sha[:7]
         except Exception:
             pass
-    else:
-        ipex_version += "+" + pkg_type
     return ipex_version
 
 
@@ -716,23 +713,23 @@ class IPEXCPPLibBuild(build_clib, object):
                 cmake_exec, project_root_dir, cmake_args_cpu, ipex_cpu_build_dir, my_env
             )
 
-            # Generate cmake for the CPP UT
-            build_option_cpp_test = {
-                **build_option_common,
-                "PROJECT_DIR": project_root_dir,
-                "PYTORCH_INSTALL_DIR": pytorch_install_dir,
-                "CPP_TEST_BUILD_DIR": get_cpp_test_build_dir(),
-            }
+            ## Generate cmake for the CPP UT
+            #build_option_cpp_test = {
+            #    **build_option_common,
+            #    "PROJECT_DIR": project_root_dir,
+            #    "PYTORCH_INSTALL_DIR": pytorch_install_dir,
+            #    "CPP_TEST_BUILD_DIR": get_cpp_test_build_dir(),
+            #}
 
-            cmake_args_cpp_test = []
-            define_build_options(cmake_args_cpp_test, **build_option_cpp_test)
-            _gen_build_cfg_from_cmake(
-                cmake_exec,
-                get_cpp_test_dir(),
-                cmake_args_cpp_test,
-                get_cpp_test_build_dir(),
-                my_env,
-            )
+            #cmake_args_cpp_test = []
+            #define_build_options(cmake_args_cpp_test, **build_option_cpp_test)
+            #_gen_build_cfg_from_cmake(
+            #    cmake_exec,
+            #    get_cpp_test_dir(),
+            #    cmake_args_cpp_test,
+            #    get_cpp_test_build_dir(),
+            #    my_env,
+            #)
 
         if _get_build_target() in ["develop", "python"]:
             # Generate cmake for common python module:
@@ -780,8 +777,8 @@ class IPEXCPPLibBuild(build_clib, object):
             # Build CPU module:
             _build_project(build_args, ipex_cpu_build_dir, my_env, use_ninja)
 
-            # Build the CPP UT
-            _build_project(build_args, get_cpp_test_build_dir(), my_env, use_ninja)
+            ## Build the CPP UT
+            #_build_project(build_args, get_cpp_test_build_dir(), my_env, use_ninja)
 
         if _get_build_target() in ["develop", "python"]:
             # Build common python module:
@@ -812,25 +809,39 @@ class IPEXCPPLibBuild(build_clib, object):
 def get_src_lib_and_dst():
     ret = []
     generated_cpp_files = glob.glob(
-        os.path.join(get_package_base_dir(), PACKAGE_NAME, 'lib', '**/*.so'),
-        recursive=True)
-    generated_cpp_files.extend(glob.glob(
-        os.path.join(get_package_base_dir(), PACKAGE_NAME, 'bin', '**/*.dll'),
-        recursive=True))
-    generated_cpp_files.extend(glob.glob(
-        os.path.join(get_package_base_dir(), PACKAGE_NAME, 'lib', '**/*.lib'),
-        recursive=True))
-    generated_cpp_files.extend(glob.glob(
-        os.path.join(get_package_base_dir(), PACKAGE_NAME, 'include', '**/*.h'),
-        recursive=True))
-    generated_cpp_files.extend(glob.glob(
-        os.path.join(get_package_base_dir(), PACKAGE_NAME, 'share', '**/*.cmake'),
-        recursive=True))
+        os.path.join(get_package_base_dir(), PACKAGE_NAME, "lib", "**/*.so"),
+        recursive=True,
+    )
+    generated_cpp_files.extend(
+        glob.glob(
+            os.path.join(get_package_base_dir(), PACKAGE_NAME, "bin", "**/*.dll"),
+            recursive=True,
+        )
+    )
+    generated_cpp_files.extend(
+        glob.glob(
+            os.path.join(get_package_base_dir(), PACKAGE_NAME, "lib", "**/*.lib"),
+            recursive=True,
+        )
+    )
+    generated_cpp_files.extend(
+        glob.glob(
+            os.path.join(get_package_base_dir(), PACKAGE_NAME, "include", "**/*.h"),
+            recursive=True,
+        )
+    )
+    generated_cpp_files.extend(
+        glob.glob(
+            os.path.join(get_package_base_dir(), PACKAGE_NAME, "share", "**/*.cmake"),
+            recursive=True,
+        )
+    )
     for src in generated_cpp_files:
         dst = os.path.join(
             get_project_dir(),
             PACKAGE_NAME,
-            os.path.relpath(src, os.path.join(get_package_base_dir(), PACKAGE_NAME)))
+            os.path.relpath(src, os.path.join(get_package_base_dir(), PACKAGE_NAME)),
+        )
         dst_path = Path(dst)
         if not dst_path.parent.exists():
             Path(dst_path.parent).mkdir(parents=True, exist_ok=True)

@@ -1,9 +1,9 @@
 import unittest
 import torch
-import torch.nn as nn
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 import itertools
+
 
 class TestInteractionCases(TestCase):
     def test_interaction(self):
@@ -17,7 +17,7 @@ class TestInteractionCases(TestCase):
             T = torch.cat([x] + ly, dim=1).view((batch_size, -1, d))
             Z = torch.bmm(T, torch.transpose(T, 1, 2))
             _, ni, nj = Z.shape
-            offset =  0
+            offset = 0
             li = torch.tensor([i for i in range(ni) for j in range(i + offset)])
             lj = torch.tensor([j for i in range(nj) for j in range(i + offset)])
             Zflat = Z[:, li, lj]
@@ -28,12 +28,24 @@ class TestInteractionCases(TestCase):
         dtypes = [torch.float32, torch.bfloat16]
         feature_sizes = [127, 128]
         for dtype, feature_size in itertools.product(dtypes, feature_sizes):
-            x1 = torch.randn([2048, feature_size]).to(dtype).clone().detach().requires_grad_()
+            x1 = (
+                torch.randn([2048, feature_size])
+                .to(dtype)
+                .clone()
+                .detach()
+                .requires_grad_()
+            )
             x2 = x1.clone().detach().requires_grad_()
             ly1 = []
             ly2 = []
             for i in range(0, 26):
-                V = torch.randn([2048, feature_size]).to(dtype).clone().detach().requires_grad_()
+                V = (
+                    torch.randn([2048, feature_size])
+                    .to(dtype)
+                    .clone()
+                    .detach()
+                    .requires_grad_()
+                )
                 ly1.append(V)
                 ly2.append(V.clone().detach().requires_grad_())
 
@@ -47,7 +59,10 @@ class TestInteractionCases(TestCase):
             B.sum().backward()
             torch.testing.assert_allclose(x1.grad, x2.grad, rtol=0.005, atol=0.1)
             for i in range(0, 26):
-                torch.testing.assert_allclose(ly1[i].grad, ly2[i].grad, rtol=0.005, atol=0.1)
+                torch.testing.assert_allclose(
+                    ly1[i].grad, ly2[i].grad, rtol=0.005, atol=0.1
+                )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test = unittest.main()

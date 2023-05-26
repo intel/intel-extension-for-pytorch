@@ -1,15 +1,19 @@
 import torch
-import intel_extension_for_pytorch as ipex
 import time
 import math
 
 a = torch.ones(256 * 1024 * 1024 // 4, dtype=torch.float)
 b = torch.ones(256 * 1024 * 1024 // 4, dtype=torch.float)
+
+
 def flush():
     global a, b
     a += b
 
-def non_fused_sgd(param, grad, momentum_buf, momentum, lr, weight_decay, dampening, nesterov):
+
+def non_fused_sgd(
+    param, grad, momentum_buf, momentum, lr, weight_decay, dampening, nesterov
+):
     if weight_decay != 0:
         grad = grad.add(param, alpha=weight_decay)
 
@@ -27,19 +31,25 @@ def non_fused_sgd(param, grad, momentum_buf, momentum, lr, weight_decay, dampeni
             grad = buf
     param.add_(grad, alpha=-lr)
 
-def non_fused_lamb(param, exp_avg, exp_avg_sq, grad, step, beta1, beta2, lr, weight_decay, eps):
-    bias_correction1 = 1 - beta1 ** step
-    bias_correction2 = 1 - beta2 ** step
+
+def non_fused_lamb(
+    param, exp_avg, exp_avg_sq, grad, step, beta1, beta2, lr, weight_decay, eps
+):
+    bias_correction1 = 1 - beta1**step
+    bias_correction2 = 1 - beta2**step
     # Decay the first and second moment running average coefficient
     exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
     exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
-    adam_step = (exp_avg / bias_correction1) / ((exp_avg_sq / bias_correction2).sqrt() + eps)
+    adam_step = (exp_avg / bias_correction1) / (
+        (exp_avg_sq / bias_correction2).sqrt() + eps
+    )
     if weight_decay != 0:
         adam_step.add_(param, alpha=weight_decay)
     weight_norm = param.norm(p=2)
     rtw_norm = adam_step.norm(p=2)
     true_ratio = weight_norm / rtw_norm
     param.add_(adam_step, alpha=-lr * true_ratio)
+
 
 def non_fused_adagrad(param, grad, state_sum, step, lr, weight_decay, lr_decay, eps):
     if weight_decay != 0:
@@ -49,9 +59,23 @@ def non_fused_adagrad(param, grad, state_sum, step, lr, weight_decay, lr_decay, 
     std = state_sum.sqrt().add_(eps)
     param.addcdiv_(grad, std, value=-clr)
 
-def non_fused_adam(param, exp_avg, exp_avg_sq, max_exp_avg_sq, grad, amsgrad, step, beta1, beta2, lr, weight_decay, eps):
-    bias_correction1 = 1 - beta1 ** step
-    bias_correction2 = 1 - beta2 ** step
+
+def non_fused_adam(
+    param,
+    exp_avg,
+    exp_avg_sq,
+    max_exp_avg_sq,
+    grad,
+    amsgrad,
+    step,
+    beta1,
+    beta2,
+    lr,
+    weight_decay,
+    eps,
+):
+    bias_correction1 = 1 - beta1**step
+    bias_correction2 = 1 - beta2**step
 
     if weight_decay != 0:
         grad = grad.add(param, alpha=weight_decay)
@@ -69,6 +93,7 @@ def non_fused_adam(param, exp_avg, exp_avg_sq, max_exp_avg_sq, grad, amsgrad, st
     step_size = lr / bias_correction1
     param.addcdiv_(exp_avg, denom, value=-step_size)
 
+
 def run_bench(bench_name, func, *params):
     for _ in range(1000):
         flush()
@@ -82,8 +107,9 @@ def run_bench(bench_name, func, *params):
         flush_time += time.time() - flush_start
         func(*params)
     end = time.time()
-    avg_elapsed = (end - start - flush_time)
+    avg_elapsed = end - start - flush_time
     print("Took {} ms on average to run {} update".format(avg_elapsed, bench_name))
+
 
 def sgd_bench():
     print("Running benchmark for SGD update step")
@@ -96,17 +122,53 @@ def sgd_bench():
     dampening = 0.5
     nesterov = True
 
-    for param_size in [1024, 512*1024, 8*1024*1024]:
+    for param_size in [1024, 512 * 1024, 8 * 1024 * 1024]:
         param = torch.randn(param_size)
         grad = torch.randn(param_size)
         momentum_buf = torch.randn(param_size)
         dummy_trail = torch.Tensor()
         trail = torch.randn(param_size).bfloat16()
-  
+
         print("For parameter size", param_size)
-        run_bench("fused sgd", fused, param, grad, momentum_buf, dummy_trail, momentum, learning_rate, weight_decay, dampening, nesterov)
-        run_bench("fused split sgd", fused, param.bfloat16(), grad.bfloat16(), momentum_buf, trail, momentum, learning_rate, weight_decay, dampening, nesterov)
-        run_bench("non fused sgd", non_fused, param, grad, momentum_buf, momentum, learning_rate, weight_decay, dampening, nesterov)
+        run_bench(
+            "fused sgd",
+            fused,
+            param,
+            grad,
+            momentum_buf,
+            dummy_trail,
+            momentum,
+            learning_rate,
+            weight_decay,
+            dampening,
+            nesterov,
+        )
+        run_bench(
+            "fused split sgd",
+            fused,
+            param.bfloat16(),
+            grad.bfloat16(),
+            momentum_buf,
+            trail,
+            momentum,
+            learning_rate,
+            weight_decay,
+            dampening,
+            nesterov,
+        )
+        run_bench(
+            "non fused sgd",
+            non_fused,
+            param,
+            grad,
+            momentum_buf,
+            momentum,
+            learning_rate,
+            weight_decay,
+            dampening,
+            nesterov,
+        )
+
 
 def lamb_bench():
     print("Running benchmark for Lamb update step")
@@ -120,7 +182,7 @@ def lamb_bench():
     weight_decay = 0.3
     eps = 0.001
 
-    for param_size in [1024, 512*1024, 8*1024*1024]:
+    for param_size in [1024, 512 * 1024, 8 * 1024 * 1024]:
         param = torch.randn(param_size)
         grad = torch.randn(param_size)
         exp_avg = torch.randn(param_size).abs()
@@ -129,9 +191,51 @@ def lamb_bench():
         trail = torch.randn(param_size).bfloat16()
 
         print("For parameter size", param_size)
-        run_bench("fused lamb", fused, param, exp_avg, exp_avg_sq, grad, dummy_trail, step, beta1, beta2, learning_rate, weight_decay, eps)
-        run_bench("fused split lamb", fused, param.bfloat16(), exp_avg, exp_avg_sq, grad.bfloat16(), trail, step, beta1, beta2, learning_rate, weight_decay, eps)
-        run_bench("non fused lamb", non_fused, param, exp_avg, exp_avg_sq, grad, step, beta1, beta2, learning_rate, weight_decay, eps)
+        run_bench(
+            "fused lamb",
+            fused,
+            param,
+            exp_avg,
+            exp_avg_sq,
+            grad,
+            dummy_trail,
+            step,
+            beta1,
+            beta2,
+            learning_rate,
+            weight_decay,
+            eps,
+        )
+        run_bench(
+            "fused split lamb",
+            fused,
+            param.bfloat16(),
+            exp_avg,
+            exp_avg_sq,
+            grad.bfloat16(),
+            trail,
+            step,
+            beta1,
+            beta2,
+            learning_rate,
+            weight_decay,
+            eps,
+        )
+        run_bench(
+            "non fused lamb",
+            non_fused,
+            param,
+            exp_avg,
+            exp_avg_sq,
+            grad,
+            step,
+            beta1,
+            beta2,
+            learning_rate,
+            weight_decay,
+            eps,
+        )
+
 
 def adagrad_bench():
     print("Running benchmark for Adagrad update step")
@@ -144,17 +248,53 @@ def adagrad_bench():
     lr_decay = 0.01
     eps = 0.001
 
-    for param_size in [1024, 512*1024, 8*1024*1024]:
+    for param_size in [1024, 512 * 1024, 8 * 1024 * 1024]:
         param = torch.randn(param_size)
         grad = torch.randn(param_size)
         state_sum = torch.randn(param_size)
         dummy_trail = torch.Tensor()
         trail = torch.randn(param_size).bfloat16()
-  
+
         print("For parameter size", param_size)
-        run_bench("fused adagrad", fused, param, grad, state_sum, dummy_trail, step, learning_rate, weight_decay, lr_decay, eps)
-        run_bench("fused split adagrad", fused, param.bfloat16(), grad.bfloat16(), state_sum, trail, step, learning_rate, weight_decay, lr_decay, eps)
-        run_bench("non fused adagrad", non_fused, param, grad, state_sum, step, learning_rate, weight_decay, lr_decay, eps)
+        run_bench(
+            "fused adagrad",
+            fused,
+            param,
+            grad,
+            state_sum,
+            dummy_trail,
+            step,
+            learning_rate,
+            weight_decay,
+            lr_decay,
+            eps,
+        )
+        run_bench(
+            "fused split adagrad",
+            fused,
+            param.bfloat16(),
+            grad.bfloat16(),
+            state_sum,
+            trail,
+            step,
+            learning_rate,
+            weight_decay,
+            lr_decay,
+            eps,
+        )
+        run_bench(
+            "non fused adagrad",
+            non_fused,
+            param,
+            grad,
+            state_sum,
+            step,
+            learning_rate,
+            weight_decay,
+            lr_decay,
+            eps,
+        )
+
 
 def adam_bench():
     print("Running benchmark for Adam update step")
@@ -169,7 +309,7 @@ def adam_bench():
     eps = 0.001
     amsgrad = True
 
-    for param_size in [1024, 512*1024, 8*1024*1024]:
+    for param_size in [1024, 512 * 1024, 8 * 1024 * 1024]:
         param = torch.randn(param_size)
         grad = torch.randn(param_size)
         exp_avg = torch.randn(param_size).abs()
@@ -179,25 +319,78 @@ def adam_bench():
         trail = torch.randn(param_size).bfloat16()
 
         print("For parameter size", param_size)
-        run_bench("fused Adam", fused, param, exp_avg, exp_avg_sq, max_exp_avg_sq, grad, dummy_trail, amsgrad, step, beta1, beta2, learning_rate, weight_decay, eps)
-        run_bench("fused split Adam", fused, param.bfloat16(), exp_avg, exp_avg_sq, max_exp_avg_sq, grad.bfloat16(), trail, amsgrad, step, beta1, beta2, learning_rate, weight_decay, eps)
-        run_bench("non fused Adam", non_fused, param, exp_avg, exp_avg_sq, max_exp_avg_sq, grad, amsgrad, step, beta1, beta2, learning_rate, weight_decay, eps)
+        run_bench(
+            "fused Adam",
+            fused,
+            param,
+            exp_avg,
+            exp_avg_sq,
+            max_exp_avg_sq,
+            grad,
+            dummy_trail,
+            amsgrad,
+            step,
+            beta1,
+            beta2,
+            learning_rate,
+            weight_decay,
+            eps,
+        )
+        run_bench(
+            "fused split Adam",
+            fused,
+            param.bfloat16(),
+            exp_avg,
+            exp_avg_sq,
+            max_exp_avg_sq,
+            grad.bfloat16(),
+            trail,
+            amsgrad,
+            step,
+            beta1,
+            beta2,
+            learning_rate,
+            weight_decay,
+            eps,
+        )
+        run_bench(
+            "non fused Adam",
+            non_fused,
+            param,
+            exp_avg,
+            exp_avg_sq,
+            max_exp_avg_sq,
+            grad,
+            amsgrad,
+            step,
+            beta1,
+            beta2,
+            learning_rate,
+            weight_decay,
+            eps,
+        )
+
 
 def run():
     import argparse
-    parser = argparse.ArgumentParser(
-        description="benchmark for ipex optimizer"
-    )
+
+    parser = argparse.ArgumentParser(description="benchmark for ipex optimizer")
     benchs = {
-        'sgd':sgd_bench,
-        'lamb':lamb_bench,
-        'adagrad':adagrad_bench,
-        'adam':adam_bench
+        "sgd": sgd_bench,
+        "lamb": lamb_bench,
+        "adagrad": adagrad_bench,
+        "adam": adam_bench,
     }
-    parser.add_argument("--optimizer", type=str, choices=["sgd", "lamb", "adagrad", "adam"], default="sgd")
+    parser.add_argument(
+        "--optimizer",
+        type=str,
+        choices=["sgd", "lamb", "adagrad", "adam"],
+        default="sgd",
+    )
     args = parser.parse_args()
     bench = benchs[args.optimizer]
     bench()
+
 
 if __name__ == "__main__":
     run()

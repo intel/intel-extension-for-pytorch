@@ -1,3 +1,5 @@
+from collections import namedtuple
+from enum import IntEnum
 import torch
 from torch.ao.quantization import (
     PlaceholderObserver,
@@ -75,18 +77,28 @@ def get_smooth_quant_qconfig_mapping(
 
 
 # For weight-only quantization
-def get_weight_only_quant_qconfig_mapping(weight_dtype: torch.dtype=torch.qint8):
+class WoqLowpMode(IntEnum):
+    NONE = 0
+    FP16 = 1
+    BF16 = 2
+
+QConfigWoq = namedtuple('QConfigWoq', [*QConfig._fields, 'lowp_mode'])
+def get_weight_only_quant_qconfig_mapping(
+        *,
+        weight_dtype: torch.dtype = torch.qint8,
+        lowp_mode: int = WoqLowpMode.NONE):
     dtype_to_qscheme = {
         torch.qint8: torch.per_channel_affine,
         # It is required to use per_channel_affine_float_qparams for quint4x2 by PyTorch
         torch.quint4x2: torch.per_channel_affine_float_qparams,
     }
     weight_qscheme = dtype_to_qscheme[weight_dtype]
-    _weight_only_quant_qconfig = QConfig(
+    _weight_only_quant_qconfig = QConfigWoq(
         activation=PlaceholderObserver.with_args(dtype=torch.float, is_dynamic=False),
         weight=PerChannelMinMaxObserver.with_args(
             dtype=weight_dtype, qscheme=weight_qscheme
         ),
+        lowp_mode=lowp_mode,
     )
     weight_only_quant_qconfig_mapping = QConfigMapping().set_global(
         _weight_only_quant_qconfig

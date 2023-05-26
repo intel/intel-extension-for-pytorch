@@ -268,24 +268,12 @@ def process_deprecated_params(args, logger):
             "Arguments --enable_tcmalloc, --enable_jemalloc and --use_default_allocator \
                 are deprecated by --memory-allocator."
         )
-        if (
-            (args.enable_tcmalloc and args.enable_jemalloc)
-            or (args.enable_tcmalloc and args.use_default_allocator)
-            or (args.enable_jemalloc and args.use_default_allocator)
-            or (
-                args.enable_tcmalloc
-                and args.enable_jemalloc
-                and args.use_default_allocator
-            )
-        ):
-            args.memory_allocator = "auto"
-        else:
-            if args.enable_tcmalloc:
-                args.memory_allocator = "tcmalloc"
-            if args.enable_jemalloc:
-                args.memory_allocator = "jemalloc"
-            if args.use_default_allocator:
-                args.memory_allocator = "default"
+        if args.use_default_allocator:
+            args.memory_allocator = "default"
+        if args.enable_jemalloc:
+            args.memory_allocator = "jemalloc"
+        if args.enable_tcmalloc:
+            args.memory_allocator = "tcmalloc"
     if args.disable_numactl:
         logger.warning(
             "Argument --disable_numactl is deprecated by --multi-task-manager."
@@ -381,7 +369,7 @@ def init_parser(parser):
     )
 
     launcher_distributed = DistributedTrainingLauncher()
-    launcher_multi_instances = MultiInstancesLauncher()  
+    launcher_multi_instances = MultiInstancesLauncher()
     launcher_multi_instances.add_common_params(parser)
     launcher_multi_instances.add_params(parser)
     launcher_distributed.add_params(parser)

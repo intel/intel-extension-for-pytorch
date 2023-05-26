@@ -164,23 +164,6 @@ at::Tensor embedding_bag(
       weight, indices, offsets, sparse, include_last_offset);
 }
 
-at::Tensor embedding_bag_meta(
-    const at::Tensor& weight,
-    const at::Tensor& indices,
-    const at::Tensor& offsets,
-    bool sparse,
-    bool include_last_offset) {
-  auto num_bags = offsets.sym_size(0);
-  if (indices.dim() == 2) {
-    num_bags = indices.sym_size(0);
-  }
-  c10::SymDimVector output_size(2);
-  output_size[0] = num_bags;
-  output_size[1] = weight.sym_size(1);
-  auto output = at::empty_symint(output_size, weight.options());
-  return output;
-}
-
 } // namespace torch_ipex
 
 namespace {
@@ -189,8 +172,6 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "embedding_bag(Tensor weight, Tensor indices, Tensor "
       "offsets, bool sparse, bool include_last_offset) -> Tensor");
   m.impl("embedding_bag", c10::DispatchKey::CPU, torch_ipex::embedding_bag);
-  m.impl(
-      "embedding_bag", c10::DispatchKey::Meta, torch_ipex::embedding_bag_meta);
   m.impl(
       "embedding_bag",
       c10::DispatchKey::AutocastCPU,

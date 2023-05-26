@@ -206,7 +206,7 @@ class SeenQOpInfo:
     output_tensor_infos: List[QTensorInfo]
     # Some operator only support INT8->INT8, if post operator is non-quantized op,
     # the output_tensor_infos's inf dtype always same as orig dtype, we can set the output_tensor_infos's
-    # inf dtype to int8, and do a check whether add fake quant after output accoreding to the inf dtype,
+    # inf dtype to int8, and do a check whether add fake quant after output according to the inf dtype,
     # but if the post operator is quantized op, we will add two fake quant if we only check the inf dtype.
     # so we introduce insert_fake_quant_after_output to fix this issue: if insert_fake_quant_after_output is true,
     # and the the inf dtype is int8, we will add fake quant after the output, otherwise, we will not insert fake quant
@@ -267,6 +267,20 @@ def get_weight_arg_idx(op: str) -> Optional[int]:
     if op in conv_linear_ops:
         return 1
     return None
+
+
+def set_tensor_info_dtype(tensor_info: QTensorInfo, observer):
+    """
+    This function is expected to be called on the prepare step which is tensor_info's
+    inf_dtype is not same as observe's dtype when user load a changed configure json file.
+    """
+    quantized_dtype = [torch.quint8, torch.qint8]
+    if (
+        tensor_info.inf_dtype in quantized_dtype
+        and tensor_info.inf_dtype != tensor_info.orig_dtype
+        and tensor_info.inf_dtype != observer.dtype
+    ):
+        tensor_info.inf_dtype = observer.dtype
 
 
 def iterate_and_apply(

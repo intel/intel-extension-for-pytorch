@@ -1,8 +1,8 @@
 import unittest
 import torch
 from torch import nn
-import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
+
 
 class RMSNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-6):
@@ -15,11 +15,14 @@ class RMSNorm(nn.Module):
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
         return self.weight * hidden_states
 
+
 class RMSNormTester(TestCase):
     def test_RMSNorm(self):
-        for dim in [2,3,4,5]:
+        for dim in [2, 3, 4, 5]:
             with torch.cpu.amp.autocast(), torch.no_grad():
-                input_size = [3,]
+                input_size = [
+                    3,
+                ]
                 for _ in range(dim - 1):
                     input_size.append(10)
                 x = torch.randn(input_size)
@@ -32,7 +35,10 @@ class RMSNormTester(TestCase):
                 self.assertEqual(y1_fp32.dtype, torch.float32)
                 self.assertEqual(y2_fp32.dtype, torch.float32)
                 self.assertEqual(y1_fp32, y2_fp32)
-                self.assertTrue(any(n.kind() == "ipex::RMSNorm" for n in rmsnorm_graph.nodes()))
+                self.assertTrue(
+                    any(n.kind() == "ipex::RMSNorm" for n in rmsnorm_graph.nodes())
+                )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test = unittest.main()

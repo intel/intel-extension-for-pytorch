@@ -12,6 +12,7 @@ from .lazy_init import _lazy_init, _lazy_call
 from torch import device as _device
 from torch._utils import classproperty
 
+from ._proxy_module import *
 from .streams import Stream, Event
 from .intrinsic import *
 from .cpp_extension import *
@@ -557,5 +558,5 @@ if intel_extension_for_pytorch._C._has_xpu():
             override_tensor_totype()
 
             exec_path = sys.argv[0].split("/")
-            if (len(exec_path) > 0 and "pytest" in exec_path):
+            if len(exec_path) > 0 and "pytest" in exec_path:
                 override_assert_equal()

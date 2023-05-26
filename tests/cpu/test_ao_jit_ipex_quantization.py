@@ -1,41 +1,69 @@
 import sys
 import os
-import unittest
 import itertools
 import tempfile
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn.utils.rnn import pack_padded_sequence,pad_packed_sequence
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch.testing import FileCheck
 import copy
 import json
 from test_autocast import get_rand_seed
 
 import intel_extension_for_pytorch as ipex
-from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_fp32_bf16_test_env
-from torch.testing._internal.common_utils import TEST_SCIPY, TemporaryFileName
+from test_ao_jit_llga_utils import (
+    JitLlgaTestCase,
+    LLGA_FUSION_GROUP,
+    llga_fp32_bf16_test_env,
+)
 from torch.testing._internal.jit_utils import freeze_rng_state
 
-import intel_extension_for_pytorch as ipex
-from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserver, \
-        QConfig, PlaceholderObserver
+from torch.ao.quantization import (
+    MinMaxObserver,
+    PerChannelMinMaxObserver,
+    HistogramObserver,
+    QConfig,
+    PlaceholderObserver,
+)
+from torch.testing._internal.common_utils import run_tests
 
-default_weight_observer = PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric)
+default_weight_observer = PerChannelMinMaxObserver.with_args(
+    dtype=torch.qint8, qscheme=torch.per_channel_symmetric
+)
 
 static_qconfig = [
-    QConfig(activation = MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8),
-            weight = default_weight_observer),
-    QConfig(activation = MinMaxObserver.with_args(qscheme=torch.per_tensor_symmetric, dtype=torch.qint8),
-            weight = default_weight_observer),
-    QConfig(activation = HistogramObserver.with_args(qscheme=torch.per_tensor_symmetric, dtype=torch.qint8, reduce_range=True),
-            weight = default_weight_observer),
-    ipex.quantization.default_static_qconfig]
+    QConfig(
+        activation=MinMaxObserver.with_args(
+            qscheme=torch.per_tensor_affine, dtype=torch.quint8
+        ),
+        weight=default_weight_observer,
+    ),
+    QConfig(
+        activation=MinMaxObserver.with_args(
+            qscheme=torch.per_tensor_symmetric, dtype=torch.qint8
+        ),
+        weight=default_weight_observer,
+    ),
+    QConfig(
+        activation=HistogramObserver.with_args(
+            qscheme=torch.per_tensor_symmetric, dtype=torch.qint8, reduce_range=True
+        ),
+        weight=default_weight_observer,
+    ),
+    ipex.quantization.default_static_qconfig,
+]
 
 dynamic_qconfig = [
-    QConfig(activation = PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),
-            weight = MinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_tensor_symmetric)),
-    ipex.quantization.default_dynamic_qconfig]
+    QConfig(
+        activation=PlaceholderObserver.with_args(
+            dtype=torch.float, compute_dtype=torch.quint8
+        ),
+        weight=MinMaxObserver.with_args(
+            dtype=torch.qint8, qscheme=torch.per_tensor_symmetric
+        ),
+    ),
+    ipex.quantization.default_dynamic_qconfig,
+]
 
 
 class TestIpexOps(JitLlgaTestCase):
@@ -44,7 +72,7 @@ class TestIpexOps(JitLlgaTestCase):
             def __init__(self):
                 super(M, self).__init__()
                 self.conv = nn.Conv2d(3, 3, 2, padding=1, bias=True)
-                self.adaptive_avg_pool2d = nn.AdaptiveAvgPool2d((5,7))
+                self.adaptive_avg_pool2d = nn.AdaptiveAvgPool2d((5, 7))
 
             def forward(self, x):
                 x = self.conv(x)
@@ -67,7 +95,7 @@ class TestIpexOps(JitLlgaTestCase):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.adaptive_avg_pool2d = nn.AdaptiveAvgPool2d((5,7))
+                self.adaptive_avg_pool2d = nn.AdaptiveAvgPool2d((5, 7))
 
             def forward(self, x):
                 x = self.adaptive_avg_pool2d(x)
@@ -78,10 +106,9 @@ class TestIpexOps(JitLlgaTestCase):
         for qconfig in static_qconfig:
             graph = self.checkQuantizeTrace(m, [x], qconfig=qconfig)
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
-            FileCheck().check_not("aten::quantize_per_tensor") \
-                .check_not("at::dequantize") \
-                .check("aten::adaptive_avg_pool2d") \
-                .run(graph)
+            FileCheck().check_not("aten::quantize_per_tensor").check_not(
+                "at::dequantize"
+            ).check("aten::adaptive_avg_pool2d").run(graph)
 
     def test_flatten_int8(self):
         class M(nn.Module):
@@ -127,7 +154,6 @@ class TestIpexOps(JitLlgaTestCase):
                 self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
                 self.checkPatterns(graph, patterns)
 
-
     # single none gemm ops will not be quantized if pre and post don't has
     # quantizable op.
     def test_flatten_fp32(self):
@@ -145,35 +171,38 @@ class TestIpexOps(JitLlgaTestCase):
         for qconfig in static_qconfig:
             graph = self.checkQuantizeTrace(m, [x], qconfig=qconfig)
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
-            FileCheck().check_not("aten::quantize_per_tensor") \
-                .check_not("at::dequantize") \
-                .check("aten::flatten") \
-                .run(graph)
+            FileCheck().check_not("aten::quantize_per_tensor").check_not(
+                "at::dequantize"
+            ).check("aten::flatten").run(graph)
 
     def test_embeddingbag_int8(self):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.m = nn.EmbeddingBag(10, 3, mode='sum', sparse=True)
+                self.m = nn.EmbeddingBag(10, 3, mode="sum", sparse=True)
 
             def forward(self, input, offset):
                 x = self.m(input, offset)
                 return x
 
         # This will call in F.embeddingbag
-        m = nn.EmbeddingBag(10, 3, mode='sum', sparse=True)
-        input = torch.LongTensor([1,2,4,5,4,3,2,9])
-        offsets = torch.LongTensor([0,1,2,3,4,5,6,7])
+        m = nn.EmbeddingBag(10, 3, mode="sum", sparse=True)
+        input = torch.LongTensor([1, 2, 4, 5, 4, 3, 2, 9])
+        offsets = torch.LongTensor([0, 1, 2, 3, 4, 5, 6, 7])
 
-        graph = self.checkQuantizeTrace(m, [input, offsets], atol=1e-2, qconfig=static_qconfig[1])
-        self.assertGraphContainsExactly(graph, 'ipex::qembedding_bag', 1)
+        graph = self.checkQuantizeTrace(
+            m, [input, offsets], atol=1e-2, qconfig=static_qconfig[1]
+        )
+        self.assertGraphContainsExactly(graph, "ipex::qembedding_bag", 1)
         # test nn.EmbeddingBag
         m = M().eval()
-        input = torch.LongTensor([1,2,4,5,4,3,2,9])
-        offsets = torch.LongTensor([0,1,2,3,4,5,6,7])
+        input = torch.LongTensor([1, 2, 4, 5, 4, 3, 2, 9])
+        offsets = torch.LongTensor([0, 1, 2, 3, 4, 5, 6, 7])
 
-        graph = self.checkQuantizeTrace(m, [input, offsets], atol=1e-2, qconfig=static_qconfig[1])
-        self.assertGraphContainsExactly(graph, 'ipex::qembedding_bag', 1)
+        graph = self.checkQuantizeTrace(
+            m, [input, offsets], atol=1e-2, qconfig=static_qconfig[1]
+        )
+        self.assertGraphContainsExactly(graph, "ipex::qembedding_bag", 1)
 
     def test_interaction_int8(self):
         class M(nn.Module):
@@ -190,7 +219,7 @@ class TestIpexOps(JitLlgaTestCase):
         for i in range(0, 3):
             inputs.append(torch.randn([128, 128]) * 0.1)
         graph = self.checkQuantizeTrace(m, inputs, atol=1e-2, qconfig=static_qconfig[1])
-        self.assertGraphContainsExactly(graph, 'ipex::qinteraction', 1)
+        self.assertGraphContainsExactly(graph, "ipex::qinteraction", 1)
 
     # Besides its primary objective, this UT also implicitly tests if mayRevertDtypeAttributeInsertion
     # in csrc/jit/codegen/onednn/prepare_binary.cpp works well.
@@ -204,7 +233,10 @@ class TestIpexOps(JitLlgaTestCase):
                 return torch.quantize_per_tensor(out, 0.1, 10, torch.quint8)
 
         m = M().eval()
-        inputs = [torch.quantize_per_tensor(torch.randn(12, 12), 0.1, 10, torch.quint8), torch.quantize_per_tensor(torch.randn(12, 12), 0.1, 10, torch.quint8)]
+        inputs = [
+            torch.quantize_per_tensor(torch.randn(12, 12), 0.1, 10, torch.quint8),
+            torch.quantize_per_tensor(torch.randn(12, 12), 0.1, 10, torch.quint8),
+        ]
         with torch.no_grad():
             traced_model = torch.jit.trace(m, inputs)
             traced_model = torch.jit.freeze(traced_model)
@@ -215,16 +247,33 @@ class TestIpexOps(JitLlgaTestCase):
             out = traced_model(*inputs)
 
         self.assertEqual(ori_out, out)
-        self.assertGraphContainsExactly(graph, 'quantized::add', 1)
+        self.assertGraphContainsExactly(graph, "quantized::add", 1)
 
     # This test case will be enabled after LSTM int8->fp32 works
     def test_lstm(self):
         class M(nn.Module):
-            def __init__(self, input_size, hidden_size, num_layers, bidirectional=False, bias=False, dropout=0, batch_first=False):
+            def __init__(
+                self,
+                input_size,
+                hidden_size,
+                num_layers,
+                bidirectional=False,
+                bias=False,
+                dropout=0,
+                batch_first=False,
+            ):
                 super(M, self).__init__()
-                self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
+                self.lstm = nn.LSTM(
+                    input_size=input_size,
+                    hidden_size=hidden_size,
+                    num_layers=num_layers,
+                    bidirectional=bidirectional,
+                    bias=bias,
+                    dropout=dropout,
+                    batch_first=batch_first,
+                )
 
-            def forward(self, x, h = None):
+            def forward(self, x, h=None):
                 x, h = self.lstm(x, h)
                 return x, h
 
@@ -239,17 +288,29 @@ class TestIpexOps(JitLlgaTestCase):
                 "batch_first": [False, True],
                 "dropout": [0, 0.4, 1],
                 "batch_size": [1, 2],
-                "seq_len": [48]
+                "seq_len": [48],
             }
             params_list = []
             for key, value in params_dict.items():
                 params_list.append(value)
             return params_list
+
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         params_list = _lstm_params_list()
-        for input_size, hidden_size, num_layers, bidirectional, bias, empty_state, batch_first, dropout, batch_size, seq_len in itertools.product(*params_list):
+        for (
+            input_size,
+            hidden_size,
+            num_layers,
+            bidirectional,
+            bias,
+            empty_state,
+            batch_first,
+            dropout,
+            batch_size,
+            seq_len,
+        ) in itertools.product(*params_list):
             # dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1
             if dropout > 0 and num_layers == 1:
                 continue
@@ -259,15 +320,31 @@ class TestIpexOps(JitLlgaTestCase):
                 x = torch.randn(batch_size, seq_len, input_size)
             else:
                 x = torch.randn(seq_len, batch_size, input_size)
-            m = M(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
+            m = M(
+                input_size=input_size,
+                hidden_size=hidden_size,
+                num_layers=num_layers,
+                bidirectional=bidirectional,
+                bias=bias,
+                dropout=dropout,
+                batch_first=batch_first,
+            )
             graph = self.checkQuantizeTrace(m, [x], atol=3e-2, rtol=1e-1)
-            self.assertGraphContainsExactly(graph, 'ipex::quantized_lstm', 1)
+            self.assertGraphContainsExactly(graph, "ipex::quantized_lstm", 1)
 
     def test_lstm_PackedSequence(self):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.lstm = nn.LSTM(input_size=288, hidden_size=1024, num_layers=6, batch_first=True, bidirectional=True, bias=True, dropout=0.2)
+                self.lstm = nn.LSTM(
+                    input_size=288,
+                    hidden_size=1024,
+                    num_layers=6,
+                    batch_first=True,
+                    bidirectional=True,
+                    bias=True,
+                    dropout=0.2,
+                )
 
             def forward(self, input, hid, mask=None):
                 if mask is not None:
@@ -287,7 +364,7 @@ class TestIpexOps(JitLlgaTestCase):
         mask = torch.ones(size=(1, 211), dtype=torch.uint8)
 
         graph = self.checkQuantizeTrace(model, [seq, hid, mask])
-        self.assertGraphContainsExactly(graph, 'aten::lstm', 1)
+        self.assertGraphContainsExactly(graph, "aten::lstm", 1)
 
     def test_linear_lstm(self):
         class M(nn.Module):
@@ -307,14 +384,16 @@ class TestIpexOps(JitLlgaTestCase):
         hid = (h0, h0)
 
         graph = self.checkQuantizeTrace(model, [seq, hid], atol=3e-2, rtol=1e-1)
-        self.assertGraphContainsExactly(graph, 'ipex::quantized_lstm', 1)
-        self.assertGraphContainsExactly(graph, 'aten::lstm', 0)
+        self.assertGraphContainsExactly(graph, "ipex::quantized_lstm", 1)
+        self.assertGraphContainsExactly(graph, "aten::lstm", 0)
 
     def test_conv2d_with_padding(self):
         class M(nn.Module):
             def __init__(self, padding_mode):
                 super(M, self).__init__()
-                self.conv = nn.Conv2d(3, 3, 2, padding=1, bias=True, padding_mode=padding_mode)
+                self.conv = nn.Conv2d(
+                    3, 3, 2, padding=1, bias=True, padding_mode=padding_mode
+                )
 
             def forward(self, x):
                 x = self.conv(x)
@@ -336,48 +415,66 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.linear = nn.Linear(128,1)
+                self.linear = nn.Linear(128, 1)
 
             def forward(self, x):
                 x = self.linear(x)
                 return x
 
-        x = torch.rand(1,128)
+        x = torch.rand(1, 128)
         for inplace in [False, True]:
             m = M()
-            prepared_model = ipex.quantization.prepare(m, static_qconfig[0], example_inputs=x, inplace=inplace)
+            prepared_model = ipex.quantization.prepare(
+                m, static_qconfig[0], example_inputs=x, inplace=inplace
+            )
             if inplace:
-                self.assertEqual(m.linear.weight.data_ptr(), prepared_model.linear.weight.data_ptr())
+                self.assertEqual(
+                    m.linear.weight.data_ptr(), prepared_model.linear.weight.data_ptr()
+                )
             else:
-                self.assertNotEqual(m.linear.weight.data_ptr(), prepared_model.linear.weight.data_ptr())
+                self.assertNotEqual(
+                    m.linear.weight.data_ptr(), prepared_model.linear.weight.data_ptr()
+                )
 
     def test_inplace_convert(self):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.linear = nn.Linear(128,1)
+                self.linear = nn.Linear(128, 1)
 
             def forward(self, x):
                 x = self.linear(x)
                 return x
 
         m = M()
-        x = torch.rand(1,128)
+        x = torch.rand(1, 128)
         for int8_bf16 in [False]:
             m_ = copy.deepcopy(m)
             for inplace in [False, True]:
                 orgin_model_weight_dtype = m_.linear.weight.dtype
                 orgin_model_bias_dtype = m_.linear.bias.dtype
-                _, _, ori_model = self.prepareModel(m_, x, qconfig=static_qconfig[1], int8_bf16=int8_bf16,
-                        prepare_inplace=True, convert_inplace=inplace)
+                _, _, ori_model = self.prepareModel(
+                    m_,
+                    x,
+                    qconfig=static_qconfig[1],
+                    int8_bf16=int8_bf16,
+                    prepare_inplace=True,
+                    convert_inplace=inplace,
+                )
                 if inplace and int8_bf16:
-                    if m_.linear.weight.dtype == orgin_model_weight_dtype or m_.linear.bias.dtype == orgin_model_bias_dtype:
+                    if (
+                        m_.linear.weight.dtype == orgin_model_weight_dtype
+                        or m_.linear.bias.dtype == orgin_model_bias_dtype
+                    ):
                         print("model should have changed")
-                        assert(0)
+                        assert 0
                 else:
-                    if m_.linear.weight.dtype != orgin_model_weight_dtype or m_.linear.bias.dtype != orgin_model_bias_dtype:
+                    if (
+                        m_.linear.weight.dtype != orgin_model_weight_dtype
+                        or m_.linear.bias.dtype != orgin_model_bias_dtype
+                    ):
                         print("model should not change")
-                        assert(0)
+                        assert 0
 
     def test_qconf_summary_save_load(self):
         class M(nn.Module):
@@ -396,7 +493,9 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
 
         m = M()
         x = torch.rand(1, 3, 2, 2)
-        prepared_model = ipex.quantization.prepare(m, static_qconfig[0], example_inputs=x, inplace=False)
+        prepared_model = ipex.quantization.prepare(
+            m, static_qconfig[0], example_inputs=x, inplace=False
+        )
         prepared_model(x)
         with tempfile.TemporaryDirectory() as tmp:
             # case1: save qconf and load qconf.
@@ -406,7 +505,9 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
             traced_model_ref = torch.jit.trace(convert_model, x).eval()
             traced_model_ref = torch.jit.freeze(traced_model_ref)
             # load the saved qconf
-            prepared_model = ipex.quantization.prepare(m, static_qconfig[0], example_inputs=x, inplace=False)
+            prepared_model = ipex.quantization.prepare(
+                m, static_qconfig[0], example_inputs=x, inplace=False
+            )
             prepared_model.load_qconf_summary(path)
             convert_model = ipex.quantization.convert(prepared_model)
             traced_model = torch.jit.trace(convert_model, x).eval()
@@ -418,7 +519,9 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
             # save and load qconf again to make sure we didn't lost something
             path2 = os.path.join(tmp, "configure_new.json")
             prepared_model.save_qconf_summary(path2)
-            prepared_model = ipex.quantization.prepare(m, static_qconfig[0], example_inputs=x, inplace=False)
+            prepared_model = ipex.quantization.prepare(
+                m, static_qconfig[0], example_inputs=x, inplace=False
+            )
             prepared_model.load_qconf_summary(path2)
             convert_model = ipex.quantization.convert(prepared_model)
             traced_model = torch.jit.trace(convert_model, x).eval()
@@ -427,16 +530,18 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
                 y_after = traced_model(x)
             self.assertEqual(y_before, y_after)
             # make sure the new saved json is same as old one.
-            with open(path, 'r') as f:
+            with open(path, "r") as f:
                 old_json = json.load(f)
-            with open(path2, 'r') as f:
+            with open(path2, "r") as f:
                 new_json = json.load(f)
             self.assertTrue(old_json == new_json)
 
             # case2: load qconf and re-do calibration, make sure the scales/zps is updated.
             x_new = torch.rand(1, 3, 2, 2) * 10
             # do ref quantization
-            prepared_model= ipex.quantization.prepare(m, static_qconfig[0], example_inputs=x_new, inplace=False)
+            prepared_model = ipex.quantization.prepare(
+                m, static_qconfig[0], example_inputs=x_new, inplace=False
+            )
             prepared_model(x_new)
             ref_path = os.path.join(tmp, "configure_ref.json")
             prepared_model.save_qconf_summary(ref_path)
@@ -444,7 +549,9 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
             traced_model_ref = torch.jit.trace(convert_model, x_new).eval()
             traced_model_ref = torch.jit.freeze(traced_model_ref)
             # load qconf, and re-do calibration
-            prepared_model = ipex.quantization.prepare(m, static_qconfig[0], example_inputs=x_new, inplace=False)
+            prepared_model = ipex.quantization.prepare(
+                m, static_qconfig[0], example_inputs=x_new, inplace=False
+            )
             prepared_model.load_qconf_summary(path2)
             prepared_model(x_new)
             new_path = os.path.join(tmp, "configure_new.json")
@@ -456,29 +563,89 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
                 y_new = traced_model_new(x_new)
             self.assertEqual(y_ref, y_new)
             # make sure the new saved json is same as ref one.
-            with open(ref_path, 'r') as f:
+            with open(ref_path, "r") as f:
                 old_json = json.load(f)
-            with open(new_path, 'r') as f:
+            with open(new_path, "r") as f:
                 new_json = json.load(f)
             self.assertTrue(old_json == new_json)
+
+    def test_observer_dtype_update(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = nn.Linear(4, 4)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        m = M()
+        x = torch.rand(4, 4)
+        prepared_model = ipex.quantization.prepare(
+            m, static_qconfig[0], example_inputs=x, inplace=False
+        )
+        prepared_model(x)
+        with tempfile.TemporaryDirectory() as tmp:
+            ref_path = os.path.join(tmp, "configure.json")
+            prepared_model.save_qconf_summary(ref_path)
+            with open(ref_path, "r") as f:
+                old_json = json.load(f)
+                # change observe's dtype.
+                old_json[" "]["q_op_infos"]["0"]["activation_observer"][
+                    "dtype"
+                ] = "torch.qint8"
+                old_json[" "]["q_op_infos"]["0"]["activation_observer"][
+                    "quant_min"
+                ] = -128
+                old_json[" "]["q_op_infos"]["0"]["activation_observer"][
+                    "quant_max"
+                ] = 127
+                new_path = os.path.join(tmp, "configure_new.json")
+                with open(new_path, "w") as fp:
+                    json.dump(old_json, fp, indent=4)
+                prepared_model.load_qconf_summary(new_path)
+                prepared_model(x)
+                convert_model = ipex.quantization.convert(prepared_model)
+                traced_model = torch.jit.trace(convert_model, x).eval()
+                traced_model = torch.jit.freeze(traced_model)
+                for _ in range(2):
+                    y_new = traced_model(x)
+
+                ref_qconfig = QConfig(
+                    activation=MinMaxObserver.with_args(
+                        qscheme=torch.per_tensor_affine, dtype=torch.qint8
+                    ),
+                    weight=default_weight_observer,
+                )
+                prepared_model = ipex.quantization.prepare(
+                    m, ref_qconfig, example_inputs=x, inplace=False
+                )
+                prepared_model(x)
+                convert_model = ipex.quantization.convert(prepared_model)
+                traced_model = torch.jit.trace(convert_model, x).eval()
+                traced_model = torch.jit.freeze(traced_model)
+                for _ in range(2):
+                    y_ref = traced_model(x)
+                self.assertEqual(y_ref, y_new)
 
     def test_subclass_format(self):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.linear = nn.Linear(128,1)
+                self.linear = nn.Linear(128, 1)
 
             def forward(self, x):
                 x = self.linear(x)
                 return x.sum()
 
-        x = torch.rand(1,128)
-        prepared_model = ipex.quantization.prepare(M().eval(), static_qconfig[0], example_inputs=x)
+        x = torch.rand(1, 128)
+        prepared_model = ipex.quantization.prepare(
+            M().eval(), static_qconfig[0], example_inputs=x
+        )
         out = prepared_model(x)
-        print(out.__format__('.4f'))
+        print(out.__format__(".4f"))
         converted_model = ipex.quantization.convert(prepared_model)
         out = converted_model(x)
-        print(out.__format__('.4f'))
+        print(out.__format__(".4f"))
 
 
 class TestRemoveMutate(JitLlgaTestCase):
@@ -535,7 +702,7 @@ class TestRemoveMutate(JitLlgaTestCase):
         y = torch.tensor([2, 4])
         graph, traced_model, _ = self.prepareModel(m, [x, y])
         FileCheck().check_not("aten::zero_").check_not("aten::fill_").run(graph)
-        self.assertEqual(traced_model(x,y), m(x,y))
+        self.assertEqual(traced_model(x, y), m(x, y))
 
         class M2(nn.Module):
             def __init__(self):
@@ -569,6 +736,7 @@ class TestRemoveMutate(JitLlgaTestCase):
         FileCheck().check_not("aten::zero_").check_not("aten::fill_").run(graph)
         self.assertEqual(traced_model(x), m(x))
 
+
 class TestDynamicQuantization(JitLlgaTestCase):
     def test_linear_dynamic(self):
         class SubModule(nn.Module):
@@ -597,7 +765,9 @@ class TestDynamicQuantization(JitLlgaTestCase):
         x = torch.randn(3, 3)
         for qconfig in dynamic_qconfig:
             graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=qconfig)
-            FileCheck().check_not("aten:linear").check("quantized::linear_dynamic").run(graph)
+            FileCheck().check_not("aten:linear").check("quantized::linear_dynamic").run(
+                graph
+            )
 
     def test_linear_dynamic_bf16(self):
         class M(nn.Module):
@@ -611,14 +781,18 @@ class TestDynamicQuantization(JitLlgaTestCase):
 
         x = torch.randn(3, 3)
         m = M().eval()
-        graph, _, _ = self.prepareModel(m, [x], qconfig=dynamic_qconfig[0], int8_bf16=True)
-        FileCheck().check_not("aten:linear").check("quantized::linear_dynamic").run(graph)
+        graph, _, _ = self.prepareModel(
+            m, [x], qconfig=dynamic_qconfig[0], int8_bf16=True
+        )
+        FileCheck().check_not("aten:linear").check("quantized::linear_dynamic").run(
+            graph
+        )
 
     def test_lstm_dynamic(self):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.lstm =  torch.nn.LSTM(10, 20, 2)
+                self.lstm = torch.nn.LSTM(10, 20, 2)
 
             def forward(self, x, hx, cx):
                 x, h_xs = self.lstm(x, (hx, cx))
@@ -633,5 +807,89 @@ class TestDynamicQuantization(JitLlgaTestCase):
             FileCheck().check_not("aten:lstm").check("aten::quantized_lstm").run(graph)
 
 
-if __name__ == '__main__':
+class TestDictInput(JitLlgaTestCase):
+    def test_only_dict_input(self):
+        class SubModule(nn.Module):
+            def __init__(self):
+                super(SubModule, self).__init__()
+                self.linear = nn.Linear(3, 3)
+
+            def forward(self, x):
+                x = self.linear(x)
+                return x
+
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear1 = nn.Sequential(nn.Linear(3, 3))
+                self.linear2 = SubModule()
+                self.linear3 = nn.Linear(3, 3)
+
+            def forward(self, x1, x2, x3):
+                x1 = self.linear1(x1)
+                x2 = self.linear2(x2)
+                x3 = self.linear3(x3)
+                return x1 + x2 + x3
+
+        int8_bf16_list = [True, False]
+        for qconfig, int8_bf16 in itertools.product(static_qconfig, int8_bf16_list):
+            # Step1: Test model with tuple(x1, x2, x3) input.
+            m = M().eval()
+            m2 = copy.deepcopy(m).eval()
+            x1 = torch.randn(3, 3)
+            x2 = torch.randn(3, 3)
+            x3 = torch.randn(3, 3)
+            graph = self.checkQuantizeTrace(
+                m, [x1, x2, x3], atol=2e-1, qconfig=qconfig, int8_bf16=int8_bf16
+            )
+            FileCheck().check("aten::linear").run(graph)
+            patterns = [
+                [
+                    "aten::dequantize",
+                    "aten::linear",
+                ],
+                [
+                    "aten::dequantize",
+                    "aten::linear",
+                    "aten::add",
+                ],
+                [
+                    "aten::dequantize",
+                    "aten::linear",
+                    "aten::add",
+                ],
+            ]
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+            self.checkPatterns(graph, patterns)
+
+            # Step2: Test model with Dict{"x1": x1, "x2": x2, "x3": x3} input.
+            graph = self.checkQuantizeTrace(
+                m2,
+                atol=2e-1,
+                qconfig=qconfig,
+                int8_bf16=int8_bf16,
+                x_kwarg={"x1": x1, "x2": x2, "x3": x3},
+            )
+            FileCheck().check("aten::linear").run(graph)
+            patterns = [
+                [
+                    "aten::dequantize",
+                    "aten::linear",
+                ],
+                [
+                    "aten::dequantize",
+                    "aten::linear",
+                    "aten::add",
+                ],
+                [
+                    "aten::dequantize",
+                    "aten::linear",
+                    "aten::add",
+                ],
+            ]
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+            self.checkPatterns(graph, patterns)
+
+
+if __name__ == "__main__":
     run_tests()

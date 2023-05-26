@@ -149,6 +149,7 @@ class CPUFeature {
   bool isa_level_avx512_bf16();
 
   bool isa_level_amx();
+  bool isa_level_avx512_fp16();
 };
 } // namespace cpu
 } // namespace torch_ipex

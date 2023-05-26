@@ -176,6 +176,26 @@ For example, if you wanted to run the test `MayContainAlias`, which is part of t
 ./build/bin/test_jit --gtest_filter=ContainerAliasingTest.MayContainAlias
 ```
 
+## Code Style
+### Python Code
+We can find python code style utils in `scripts/tools/setup` folder. Please install the related dependency python modules:
+```bash
+pip install -r scripts/tools/setup/requirements-flake8.txt
+```
+Please run flake8.py to auto-format python code and check the python code style. The script will return results, please manual modify code follow the output information, and until it shows pass:
+```bash
+python scripts/tools/setup/flake8.py
+Pass!
+```
+
+### C++ Code
+Please install clang-format-12 via package tools in Linux OS. Such as in Ubuntu:
+```bash
+sudo apt-get install clang-format-12
+```
+It will auto called by cmake build system. Please check the cmake file, it is `cmake/ClangFormat.cmake`.
+
+
 ## Writing documentation
 
 So you want to write some documentation and don't know where to start?

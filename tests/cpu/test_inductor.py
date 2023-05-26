@@ -6,6 +6,7 @@ from torch.testing._internal.common_utils import TestCase
 
 # TODO(jgong5): import and pass all inductor tests from stock pytorch
 
+
 def check_model(
     self: TestCase,
     model,
@@ -23,13 +24,16 @@ def check_model(
     check_gradient=False,
 ):
     """Copied and revised from test/inductor/test_torchinductor.py"""
+
     def compute_grads(args, kwrags, results, grads):
         def gather_leaf_tensors(args, kwargs):
             args, _ = tree_flatten(args)
             kwargs, _ = tree_flatten(kwargs)
             args = args + kwargs
             leaf_tensors = [
-                arg for arg in args if isinstance(arg, torch.Tensor) and arg.requires_grad
+                arg
+                for arg in args
+                if isinstance(arg, torch.Tensor) and arg.requires_grad
             ]
             return leaf_tensors
 
@@ -193,7 +197,6 @@ def check_model(
 
 
 class TestIpexInductor(TestCase):
-
     common = check_model
 
     def setUp(self):
@@ -207,6 +210,7 @@ class TestIpexInductor(TestCase):
 
     def test_custom_lowering(self):
         """mm lowering overrides"""
+
         def fn(x: torch.Tensor, y: torch.Tensor):
             return torch.matmul(torch.softmax(x / 10 + 10, -1), y)
 
@@ -237,16 +241,18 @@ class TestIpexInductor(TestCase):
 
             def a_loader(idx, reduction_idx):
                 m, _ = idx
-                k, = reduction_idx
+                (k,) = reduction_idx
                 return _a_loader([m, k])
 
             def b_loader(idx, reduction_idx):
                 _, n = idx
-                k, = reduction_idx
+                (k,) = reduction_idx
                 return _b_loader([k, n])
 
             def fn(idx, reduction_idx):
-                return ops.mul(a_loader(idx, reduction_idx), b_loader(idx, reduction_idx))
+                return ops.mul(
+                    a_loader(idx, reduction_idx), b_loader(idx, reduction_idx)
+                )
 
             result = Reduction.create(
                 device=a.get_device(),
@@ -270,5 +276,5 @@ class TestIpexInductor(TestCase):
         self.common(fn, (x, y))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test = unittest.main()

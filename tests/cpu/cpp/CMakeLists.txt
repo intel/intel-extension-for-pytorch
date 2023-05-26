@@ -46,6 +46,7 @@ add_subdirectory(${THIRD_PARTY_ROOT}/googletest ${CPP_TEST_BUILD_DIR}/third_part
 # Add the Test Files
 set(IPEX_CPP_TEST_SOURCES test_runtime_api.cpp test_dyndisp_and_isa_api.cpp)
 
+
 add_executable(${CPU_CPP_TEST_NAME} ${IPEX_CPP_TEST_SOURCES})
 
 set(BUILD_STATIC_ONEMKL ON)

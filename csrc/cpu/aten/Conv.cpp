@@ -506,53 +506,6 @@ at::Tensor convolution_forward(
       weight_channels_last);
 }
 
-at::Tensor convolution_forward_meta(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context,
-    c10::optional<at::IntArrayRef> kernel_size,
-    c10::optional<at::IntArrayRef> padding,
-    c10::optional<at::IntArrayRef> stride,
-    c10::optional<at::IntArrayRef> dilation,
-    c10::optional<bool> weight_channels_last) {
-  TORCH_CHECK(
-      kernel_size.has_value() && padding.has_value() && stride.has_value() &&
-          dilation.has_value() && weight_channels_last.has_value(),
-      "kernel_size, padding, stride, dilation and weight_channels_last must have value for convolution_forward_meta");
-  auto input_size = input.sym_sizes();
-  c10::SymDimVector output_sizes = calc_conv_output_size(
-      input_size,
-      kernel_size.value(),
-      padding.value(),
-      stride.value(),
-      dilation.value());
-  auto output = at::empty_symint(output_sizes, input.options());
-
-  bool use_channels_last =
-      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
-      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d ||
-      weight_channels_last.value();
-
-  auto memory_format = at::MemoryFormat::Contiguous;
-  if (use_channels_last) {
-    if (input.dim() == 4) {
-      memory_format = at::MemoryFormat::ChannelsLast;
-    } else if (input.dim() == 5) {
-      memory_format = at::MemoryFormat::ChannelsLast3d;
-    }
-  }
-
-  if (!is_channels_last_1d(output)) {
-    output = output.contiguous(memory_format);
-    if (input.dim() == 3) {
-      output = to_channels_last_1d(output);
-    }
-  }
-
-  return output;
-}
-
 } // namespace cpu
 } // namespace torch_ipex
 
@@ -609,10 +562,6 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "convolution_forward",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::convolution_forward_impl);
-  m.impl(
-      "convolution_forward",
-      c10::DispatchKey::Meta,
-      torch_ipex::cpu::convolution_forward_meta);
   // bw
   m.def(
       "convolution_backward(Tensor input, Tensor grad_output, bool[3] out_mask, "

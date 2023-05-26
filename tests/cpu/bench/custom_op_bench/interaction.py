@@ -3,12 +3,14 @@ import intel_extension_for_pytorch as ipex
 from torch.utils import ThroughputBenchmark
 import argparse
 
+
 class Interaction(torch.nn.Module):
     def __init__(self):
         super(Interaction, self).__init__()
 
     def forward(self, x):
         return ipex.nn.functional.interaction(*x)
+
 
 def inference_benchmark(num_instance, interact_module, dtype):
     inputs = []
@@ -25,8 +27,10 @@ def inference_benchmark(num_instance, interact_module, dtype):
         )
     print(stats)
 
+
 def training_benchmark(interact_module, dtype):
     import time
+
     inputs = []
     for i in range(0, 27):
         inputs.append(torch.randn([4096, 128]).to(dtype).requires_grad_())
@@ -40,15 +44,12 @@ def training_benchmark(interact_module, dtype):
         y = interact_module.forward(inputs).sum()
         y.backward()
     endT = time.time()
-    avg_elapsed = (endT - startT)
+    avg_elapsed = endT - startT
     print("Took {} ms on average to run {} FW+BW".format(avg_elapsed, "interaction"))
 
 
-
 def run():
-    parser = argparse.ArgumentParser(
-        description="benchmark for ipex interaction"
-    )
+    parser = argparse.ArgumentParser(description="benchmark for ipex interaction")
     parser.add_argument("--num-instance", type=int, default=1)
     parser.add_argument("--bf16", action="store_true", default=False)
     parser.add_argument("--inference", action="store_true", default=False)
@@ -59,6 +60,7 @@ def run():
         inference_benchmark(args.num_instance, interact_module, dtype)
     else:
         training_benchmark(interact_module, dtype)
+
 
 if __name__ == "__main__":
     run()

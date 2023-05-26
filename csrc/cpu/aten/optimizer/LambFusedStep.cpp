@@ -2,6 +2,7 @@
 
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
+#include "csrc/utils/CustomOperatorRegistration.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -90,13 +91,11 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(
 
 namespace {
 
-TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      "lamb_fused_step(Tensor(a!) param, Tensor(b!) exp_avg, Tensor(c!) "
-      "exp_avg_sq, Tensor grad, Tensor trail, int step, float beta1, float "
-      "beta2, float lr, float weight_decay, float eps) -> (Tensor(a!), "
-      "Tensor(b!), Tensor(c!))",
-      torch_ipex::cpu::lamb_fused_step);
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "lamb_fused_step",
+      torch_ipex::cpu::lamb_fused_step,
+      at::DispatchKey::CPU);
 }
 
 } // namespace

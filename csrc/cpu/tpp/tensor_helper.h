@@ -6,23 +6,24 @@
 namespace torch_ipex {
 namespace tpp {
 
+template <typename T>
 inline at::Tensor wt_tensor_n2v(
     long Nk,
     long Hk,
     long Nc,
     long Hc,
     at::Tensor& input) {
+  const int BS = get_vnni_block_size<T>();
 #if 0
-  PCL_ASSERT(Hc % 2 == 0, "Uneven number for Hc\n");
-  return input.view({Nk, Nc, Hc/2, 2, Hk}).permute({0, 1, 2, 4, 3}).contiguous();
+  AT_ASSERT(Hc % BS == 0, "Uneven number for Hc\n");
+  return input.view({Nk, Nc, Hc/BS, BS, Hk}).permute({0, 1, 2, 4, 3}).contiguous();
 #else
-  auto Hcp2 = (Hc + 1) / 2;
-  auto output = input.new_empty({Nk, Nc, Hcp2, Hk, 2});
-  DECL_VLA_PTR_PT(bfloat16, out, [Hcp2 * Hk * 2], output);
-  DECL_VLA_PTR_PT(bfloat16, in, [Hc * Hk], input);
+  auto Hcp2 = (Hc + BS - 1) / BS;
+  auto output = input.new_empty({Nk, Nc, Hcp2, Hk, BS});
+  auto out = GetVLAPtr<T>(output, {Hcp2 * Hk * BS});
+  auto in = GetVLAPtr<T>(input, {Hc * Hk});
   auto n2v_tpp = SCOPEIT(
-      XformExtTPP<bfloat16>(Hc, Hk, Hcp2 * 2, Hk, XformTPP::XFORM_N2V_TPP),
-      VNNI);
+      XformExtTPP<T>(Hc, Hk, Hcp2 * BS, Hk, XformTPP::XFORM_N2V_TPP), VNNI);
   RECORD_FUNCTION("parallel_for", std::vector<c10::IValue>());
 #pragma omp parallel for
   for (int n = 0; n < Nk * Nc; n++) {
@@ -157,11 +158,15 @@ inline at::Tensor wt_tensor_for_fwd(
     long Hc,
     at::Tensor& input) {
   RECORD_SCOPE(w_vnni, {input});
-  if (input.dtype() == at::kBFloat16) {
+  if (input.dtype() != at::kFloat) {
     if (input.dim() == 5) {
       return input;
     } else {
-      return wt_tensor_n2v(Nk, Hk, Nc, Hc, input);
+      if (input.dtype() == at::kBFloat16) {
+        return wt_tensor_n2v<bfloat16>(Nk, Hk, Nc, Hc, input);
+      }else {
+        AT_ASSERT(false, "Unsupported datatype!");
+      }
     }
   } else {
     return input;

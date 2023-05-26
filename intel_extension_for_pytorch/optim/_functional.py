@@ -5,16 +5,19 @@ from typing import List, Optional
 
 
 def is_master_weight(param, params_attr):
+    if len(params_attr) == 0 or param not in params_attr:
+        return False
+    _param = params_attr[param].parameter
     return (
         param.dtype == torch.float
-        and param in params_attr
-        and "bf16_param" in params_attr[param]
+        and _param is not None
+        and _param.dtype == torch.bfloat16
     )
 
 
 def get_bf16_grad(param, params_attr):
     assert is_master_weight(param, params_attr)
-    return params_attr[param]["bf16_param"].grad
+    return params_attr[param].parameter.grad
 
 
 def get_param2(param, params_attr):
@@ -23,12 +26,11 @@ def get_param2(param, params_attr):
     # For master weight split case, param2 is the trail part of fp32 weight
     param2 = torch.Tensor()
     if param in params_attr:
-        if "trail" in params_attr[param]:
+        if params_attr[param].parameter_trail is not None:
             assert param.dtype is torch.bfloat16
-            param2 = params_attr[param]["trail"]
-        if "bf16_param" in params_attr[param]:
-            assert param.dtype is torch.float
-            param2 = params_attr[param]["bf16_param"]
+            param2 = params_attr[param].parameter_trail
+        elif is_master_weight(param, params_attr):
+            param2 = params_attr[param].parameter
     return param2
 
 
@@ -342,6 +344,44 @@ def _single_tensor_sgd(
             )
 
 
+def _single_tensor_lars(
+    params: List[Tensor],
+    params2: List[Tensor],
+    grads: List[Tensor],
+    momentum_buffer_list: List[Optional[Tensor]],
+    *,
+    eeta: float,
+    eps: float,
+    weight_decay: float,
+    momentum: float,
+    lr: float,
+    dampening: float,
+    nesterov: bool,
+    maximize: bool,
+    has_sparse_grad: bool,
+    fused: bool
+):
+    if maximize:
+        lr = -lr
+
+    for i, param in enumerate(params):
+        # if not grads[i].is_sparse:
+        momentum_buffer_list[i] = torch.ops.torch_ipex.lars_fused_step(
+            param,
+            grads[i],
+            momentum_buffer_list[i],
+            params2[i],
+            momentum,
+            lr,
+            eeta,
+            eps,
+            weight_decay,
+            dampening,
+            nesterov,
+        )
+        # continue
+
+
 # keep this function here if enable fused_foreach_sgd_later
 def _multi_tensor_sgd(
     params: List[Tensor],
@@ -493,6 +533,141 @@ def sgd_step(self, closure=None):
     return loss
 
 
+def lars(
+    params: List[Tensor],
+    params2: List[Tensor],
+    d_p_list: List[Tensor],
+    momentum_buffer_list: List[Optional[Tensor]],
+    # kwonly args with defaults are not supported by functions compiled with torchscript issue #70627
+    # setting this as kwarg for now as functional API is compiled by torch/distributed/optim
+    has_sparse_grad: bool = None,
+    foreach: bool = None,
+    *,
+    eeta: float,
+    eps: float,
+    weight_decay: float,
+    momentum: float,
+    lr: float,
+    dampening: float,
+    nesterov: bool,
+    maximize: bool,
+    fused: bool
+):
+    r"""Functional API that performs LARS algorithm computation.
+    dampening = 0
+    nesterov = False
+    maximize = False
+    """
+
+    if foreach is None:
+        # Placeholder for more complex foreach logic to be added when value is not set
+        foreach = False
+
+    if foreach and torch.jit.is_scripting():
+        raise RuntimeError("torch.jit.script not supported with foreach optimizers")
+
+    func = _single_tensor_lars
+
+    func(
+        params,
+        params2,
+        d_p_list,
+        momentum_buffer_list,
+        eeta=eeta,
+        eps=eps,
+        weight_decay=weight_decay,
+        momentum=momentum,
+        lr=lr,
+        dampening=dampening,
+        nesterov=nesterov,
+        has_sparse_grad=has_sparse_grad,
+        maximize=maximize,
+        fused=fused,
+    )
+
+
+@torch.no_grad()
+def lars_step(self, closure=None):
+    """Performs a single optimization step.
+    Args:
+        closure (callable, optional): A closure that reevaluates the model
+            and returns the loss.
+    """
+    loss = None
+    if closure is not None:
+        with torch.enable_grad():
+            loss = closure()
+
+    for group in self.param_groups:
+        params_with_grad = []
+        params2 = []
+        d_p_list = []
+        momentum_buffer_list = []
+        has_sparse_grad = False
+
+        for p in group["params"]:
+            grad = (
+                get_bf16_grad(p, self.params_attr)
+                if is_master_weight(p, self.params_attr)
+                else p.grad
+            )
+            if grad is not None:
+                params_with_grad.append(p)
+                d_p_list.append(grad)
+                if grad.is_sparse:
+                    has_sparse_grad = True
+
+                state = self.state[p]
+                if "momentum_buffer" not in state:
+                    momentum_buffer_list.append(None)
+                else:
+                    momentum_buffer_list.append(state["momentum_buffer"])
+
+                param2 = get_param2(p, self.params_attr)
+                params2.append(param2)
+        if group["lars"]:
+            lars(
+                params_with_grad,
+                params2,
+                d_p_list,
+                momentum_buffer_list,
+                eeta=group["eeta"],
+                eps=group["epsilon"],
+                weight_decay=group["weight_decay"],
+                momentum=group["momentum"],
+                lr=group["lr"],
+                dampening=0,
+                nesterov=0,
+                maximize=0,
+                has_sparse_grad=has_sparse_grad,
+                foreach=None,
+                fused=self.fused,
+            )
+        else:
+            sgd(
+                params_with_grad,
+                params2,
+                d_p_list,
+                momentum_buffer_list,
+                weight_decay=group["weight_decay"],
+                momentum=group["momentum"],
+                lr=group["lr"],
+                dampening=0,
+                nesterov=0,
+                maximize=0,
+                has_sparse_grad=has_sparse_grad,
+                foreach=None,
+                fused=self.fused,
+            )
+
+        # update momentum_buffers in state
+        for p, momentum_buffer in zip(params_with_grad, momentum_buffer_list):
+            state = self.state[p]
+            state["momentum_buffer"] = momentum_buffer
+
+    return loss
+
+
 def _lamb_fused_impl(
     params: List[Tensor],
     grads: List[Tensor],
@@ -608,8 +783,12 @@ def lamb_step(self, closure=None):
                 if len(state) == 0:
                     state["step"] = 0
                     buffer_dtype = p.dtype if p.dtype is torch.float64 else torch.float
-                    state['exp_avg'] = torch.zeros(p.shape, dtype=buffer_dtype, device=p.device)
-                    state['exp_avg_sq'] = torch.zeros(p.shape, dtype=buffer_dtype, device=p.device)
+                    state["exp_avg"] = torch.zeros(
+                        p.shape, dtype=buffer_dtype, device=p.device
+                    )
+                    state["exp_avg_sq"] = torch.zeros(
+                        p.shape, dtype=buffer_dtype, device=p.device
+                    )
 
                 exp_avgs.append(state["exp_avg"])
                 exp_avg_sqs.append(state["exp_avg_sq"])
@@ -1113,59 +1292,5 @@ def adamw_step(self, closure=None):
             maximize=group["maximize"],
             foreach=group["foreach"],
         )
-
-    return loss
-
-
-@torch.no_grad()
-def lars_step(self, closure=None):
-    """Performs a single optimization step.
-    Args:
-        closure (callable, optional): A closure that reevaluates the model
-            and returns the loss.
-    """
-    loss = None
-    if closure is not None:
-        with torch.enable_grad():
-            loss = closure()
-
-    for group in self.param_groups:
-
-        params_with_grad = []
-        params2 = []
-        d_p_list = []
-        momentum_buffer_list = []
-
-        for _, p in enumerate(group['params']):
-            grad = get_bf16_grad(p, self.params_attr) if is_master_weight(p, self.params_attr) else p.grad
-            if grad is not None:
-                params_with_grad.append(p)
-                d_p_list.append(grad)
-
-            state = self.state[p]
-            if 'momentum_buffer' not in state:
-                momentum_buffer_list.append(None)
-            else:
-                momentum_buffer_list.append(state['momentum_buffer'])
-
-            # get bf16 parameter from params_attr
-            param2 = get_param2(p, self.params_attr)
-            params2.append(param2)
-
-        for i, param in enumerate(params_with_grad):
-            momentum_buffer_list[i] = torch.ops.torch_ipex.lars_fused_step(param,
-                                                                           params2[i],
-                                                                           d_p_list[i],
-                                                                           momentum_buffer_list[i],
-                                                                           group['weight_decay'],
-                                                                           group['momentum'],
-                                                                           group['eeta'],
-                                                                           group['lr'],
-                                                                           group['epsilon'])
-
-        # update momentum_buffers in state
-        for p, momentum_buffer in zip(params_with_grad, momentum_buffer_list):
-            state = self.state[p]
-            state['momentum_buffer'] = momentum_buffer
 
     return loss

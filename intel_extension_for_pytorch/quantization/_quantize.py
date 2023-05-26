@@ -11,20 +11,25 @@ from torch.ao.quantization.quantization_mappings import (
 import torch.fx.experimental.optimization as optimization
 from torch.ao.nn.quantized.modules.utils import _quantize_weight
 import torch.ao.nn.quantized.dynamic as nnqd
-from torch.ao.quantization.quantization_mappings import (
-    get_default_dynamic_quant_module_mappings,
-)
-
 import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.cpu.utils.linear_bn_folding import linear_bn_fuse
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     may_import_deepspeed_modules,
+    _all_reduce_and_bias_add,
 )
 from ._quantize_utils import auto_prepare, auto_convert, copy_prepared_model
 from .. import nn
+from typing import Dict
 
 
-def prepare(model, configure, example_inputs=None, inplace=False, bn_folding=True):
+def prepare(
+    model,
+    configure,
+    example_inputs=None,
+    inplace=False,
+    bn_folding=True,
+    example_kwarg_inputs=None,
+):
     r"""
     Prepare an FP32 torch.nn.Module model to do calibration or to convert to quantized model.
 
@@ -32,10 +37,14 @@ def prepare(model, configure, example_inputs=None, inplace=False, bn_folding=Tru
         model (torch.nn.Module): The FP32 model to be prepared.
         configure (torch.quantization.qconfig.QConfig): The observer settings about activation and weight.
         example_inputs (tuple or torch.Tensor): A tuple of example inputs that
-            will be passed to the function while running to init quantization state.
+            will be passed to the function while running to init quantization state. Only one of this
+            argument or ``example_kwarg_inputs`` should be specified.
         inplace: (bool): It will change the given model in-place if True. The default value is ``False``.
         bn_folding: (bool): whether to perform ``conv_bn`` and ``linear_bn`` folding.
-        The default value is ``True``.
+            The default value is ``True``.
+        example_kwarg_inputs (dict):  A dict of example inputs that will be passed to the function while
+            running to init quantization state. Only one of this argument or ``example_inputs`` should be
+            specified.
 
     Returns:
         torch.nn.Module
@@ -56,9 +65,10 @@ def prepare(model, configure, example_inputs=None, inplace=False, bn_folding=Tru
     if isinstance(configure, QConfigMapping):
         configure = configure.global_qconfig
     if not isinstance(configure.activation(), PlaceholderObserver):
-        assert (
-            example_inputs is not None
-        ), "IPEX quantization.prepare: example inputs cannot be None for static quantization"
+        assert example_inputs is not None or example_kwarg_inputs is not None, (
+            "IPEX quantization.prepare: example_inputs and example_kwarg_inputs cannot be none at same time "
+            "for static quantization."
+        )
     # auto model channels_last memory format conversion
     from ..frontend import (
         auto_channels_last,
@@ -85,12 +95,33 @@ def prepare(model, configure, example_inputs=None, inplace=False, bn_folding=Tru
 
     # replace dropout with identity to enable more fusion pattern.
     nn.utils._model_convert.replace_dropout_with_identity(prepare_model)
+    assert (
+        example_inputs is None or example_kwarg_inputs is None
+    ), "IPEX quantization.prepare: example_inputs and example_kwarg_inputs cannot be set at same time."
     # Special case for common case of passing a single Tensor
     if isinstance(example_inputs, (torch.Tensor, dict)):
         example_inputs = (example_inputs,)
     elif not isinstance(example_inputs, tuple) and example_inputs is not None:
         example_inputs = tuple(example_inputs)
-    return auto_prepare(prepare_model, configure, example_inputs)
+    if example_kwarg_inputs is not None:
+        assert isinstance(
+            example_kwarg_inputs, Dict
+        ), "IPEX quantization.prepare: example_kwarg_inputs must be type of Dict."
+    return auto_prepare(prepare_model, configure, example_inputs, example_kwarg_inputs)
+
+
+def _may_insert_deepspeed_modules(
+    torch_modules, q_linear_layer_module, q_linear_all_reduce_module
+):
+    deepspeed_modules = may_import_deepspeed_modules()
+    if deepspeed_modules is not None:
+        LinearAllreduce, LinearLayer = deepspeed_modules
+        deepspeed_modules = {
+            LinearLayer: q_linear_layer_module,
+            LinearAllreduce: q_linear_all_reduce_module,
+        }
+        torch_modules.update(deepspeed_modules)
+    return torch_modules
 
 
 @functools.lru_cache(None)
@@ -117,15 +148,20 @@ def IPEX_DYNAMIC_QUANTIZATION_MODULE_CPU():
     torch_modules = {
         torch.nn.Linear: DynamicQuantizedLinearLayer,
     }
+    torch_modules = _may_insert_deepspeed_modules(
+        torch_modules, DynamicQuantizedLinearLayer, DynamicQuantizedLinearAllreduce
+    )
+    return torch_modules
 
-    deepspeed_modules = may_import_deepspeed_modules()
-    if deepspeed_modules is not None:
-        LinearAllreduce, LinearLayer = deepspeed_modules
-        deepspeed_modules = {
-            LinearLayer: DynamicQuantizedLinearLayer,
-            LinearAllreduce: DynamicQuantizedLinearAllreduce,
-        }
-        torch_modules.update(deepspeed_modules)
+
+@functools.lru_cache(None)
+def IPEX_WEIGHT_ONLY_QUANTIZATION_MODULE_CPU():
+    torch_modules = {}
+    torch_modules = _may_insert_deepspeed_modules(
+        torch_modules,
+        nn.modules.weight_only_quantization.IpexWoqLinear,
+        nn.modules.weight_only_quantization.IpexWoqLinearAllreduce,
+    )
     return torch_modules
 
 
@@ -167,7 +203,7 @@ class DynamicQuantizedLinearLayer(_IPEXDynamicQuantizedLinear):
 
     @classmethod
     @functools.lru_cache(None)
-    def _float_module(self):
+    def _float_module(cls):
         _FLOAT_MODULE = [torch.nn.Linear]
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
@@ -195,7 +231,7 @@ class DynamicQuantizedLinearAllreduce(_IPEXDynamicQuantizedLinear):
 
     @classmethod
     @functools.lru_cache(None)
-    def _float_module(self):
+    def _float_module(cls):
         deepspeed_modules = may_import_deepspeed_modules()
         assert (
             deepspeed_modules is not None
@@ -237,21 +273,25 @@ class DynamicQuantizedLinearAllreduce(_IPEXDynamicQuantizedLinear):
             raise RuntimeError("Unsupported dtype on dynamic quantized linear!")
         output = Y.to(x.dtype)
 
-        if self.mp_group is not None:
-            torch.ops.deepspeed_comm.all_reduce(
-                output,
-                "sum",
-                "",
-                list(torch.arange(int(os.environ["WORLD_SIZE"]))),
-                int(os.environ["WORLD_SIZE"]),
-            )
-
-        if self.original_bias is not None:
-            output += self.original_bias
-        return output
+        return _all_reduce_and_bias_add(self.mp_group, self.original_bias, output)
 
     def __repr__(self):
         return "DynamicQuantizedLinearAllreduce()"
+
+
+def may_quantize_deepspeed_modules(
+    IPEX_QUANTIZATION_MODULE, q_config, module_mappings, qconfig_spec
+):
+    deepspeed_modules = may_import_deepspeed_modules()
+    if deepspeed_modules is not None:
+        LinearAllreduce, LinearLayer = deepspeed_modules
+        module_mappings.update(IPEX_QUANTIZATION_MODULE)
+        deepspeed_qconfig_spec = {
+            LinearLayer: q_config,
+            LinearAllreduce: q_config,
+        }
+        qconfig_spec.update(deepspeed_qconfig_spec)
+    return module_mappings, qconfig_spec
 
 
 def convert(model, inplace=False):
@@ -300,12 +340,20 @@ def convert(model, inplace=False):
         module_mappings[
             torch.nn.Linear
         ] = nn.modules.weight_only_quantization.IpexWoqLinear
+
+        module_mappings, qconfig_spec = may_quantize_deepspeed_modules(
+            IPEX_WEIGHT_ONLY_QUANTIZATION_MODULE_CPU(),
+            convert_model.q_config,
+            module_mappings,
+            qconfig_spec,
+        )
+
         converted_model = torch.quantization.quantize_dynamic(
             convert_model,
             qconfig_spec=qconfig_spec,
             dtype=torch.qint8,
             mapping=module_mappings,
-            inplace=False,
+            inplace=inplace,
         )
         return converted_model
 
@@ -322,15 +370,12 @@ def convert(model, inplace=False):
             torch.nn.GRUCell: convert_model.q_config,
         }
 
-        deepspeed_modules = may_import_deepspeed_modules()
-        if deepspeed_modules is not None:
-            LinearAllreduce, LinearLayer = deepspeed_modules
-            module_mappings.update(IPEX_DYNAMIC_QUANTIZATION_MODULE_CPU())
-            deepspeed_qconfig_spec = {
-                LinearLayer: convert_model.q_config,
-                LinearAllreduce: convert_model.q_config,
-            }
-            qconfig_spec.update(deepspeed_qconfig_spec)
+        module_mappings, qconfig_spec = may_quantize_deepspeed_modules(
+            IPEX_DYNAMIC_QUANTIZATION_MODULE_CPU(),
+            convert_model.q_config,
+            module_mappings,
+            qconfig_spec,
+        )
 
         return torch.quantization.quantize_dynamic(
             convert_model,
@@ -343,9 +388,9 @@ def convert(model, inplace=False):
     # which will reduce the dtype conversion.
     # TODO: check whether can be removed or not?
     if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
-        convert_model = nn.utils._model_convert.convert_module_data_type(
+        convert_model = nn.utils._model_convert.convert_model_data_type(
             convert_model, torch.bfloat16
-        )
+        )[1]
 
     convert_model = auto_convert(convert_model)
     return convert_model

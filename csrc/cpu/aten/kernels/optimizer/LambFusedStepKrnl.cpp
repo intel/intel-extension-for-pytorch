@@ -1,6 +1,6 @@
 #include <aten/optimizer/optimizer.h>
 #include "vec/vec.h"
-
+#include <immintrin.h>
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
 namespace torch_ipex {

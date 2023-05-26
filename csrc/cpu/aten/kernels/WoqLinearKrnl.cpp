@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Tensor.h>
 #include <aten/Linear.h>
+#include <aten/utils/woq.h>
 #include <emmintrin.h>
 #include <libxsmm.h>
 #include <cstdio>
@@ -8,79 +9,185 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
-#include "assert.h"
+#include "mkl.h"
 
 namespace torch_ipex {
 namespace cpu {
 namespace {
 
+void print_matrix(float* A, int m, int n, int ld) {
+  for (int i = 0; i < m; i++) {
+    float* A_ = A + i * ld;
+    for (int j = 0; j < n; j++) {
+      std::cout << std::setprecision(23) << A_[j] << " ";
+    }
+    std::cout << std::endl;
+  }
+}
+
+void print_matrix(const uint8_t* A, int m, int n, int ld) {
+  for (int j = 0; j < n; j++) {
+    for (int i = 0; i < m; i++) {
+      const uint8_t* A_ = A + i * ld;
+      uint8_t tmp = (A_[j] << 4) | ((A_[j] & 0xF0) >> 4);
+      printf("%02X ", tmp);
+    }
+    printf("\n");
+  }
+}
+
+// TODO implement optimized kernels for fused op
+// then the following part will be discarded
+using PostopFunc = std::function<at::Tensor&(at::Tensor&)>;
+using PostopFuncGetter = std::function<PostopFunc(
+    const torch::List<c10::optional<at::Scalar>>&,
+    const c10::optional<c10::string_view>&)>;
+
+static PostopFuncGetter postop_func_none =
+    [](const torch::List<c10::optional<at::Scalar>>&,
+       const c10::optional<c10::string_view>&) {
+      return [](at::Tensor& t) -> at::Tensor& { return t; };
+    };
+
+static PostopFuncGetter postop_func_relu =
+    [](const torch::List<c10::optional<at::Scalar>>&,
+       const c10::optional<c10::string_view>&) { return at::relu_; };
+
+static PostopFuncGetter postop_func_gelu =
+    [](const torch::List<c10::optional<at::Scalar>>&,
+       const c10::optional<c10::string_view>& algorithm) {
+      assert(
+          algorithm.has_value() &&
+          (algorithm == "none" || algorithm == "tanh"));
+      return [=](at::Tensor& t) -> at::Tensor& {
+        return at::gelu_(t, algorithm.value());
+      };
+    };
+
+static std::map<c10::string_view, PostopFuncGetter> postop_func_map = {
+    {"none", postop_func_none},
+    {"relu", postop_func_relu},
+    {"gelu", postop_func_gelu}};
+
 #if defined(CPU_CAPABILITY_AVX512)
 #include <immintrin.h>
-#define INDEX(x, y, ld) ((x) * (ld) + (y))
-#define ADDRESS(p, x, y, ld) ((p) + (x) * (ld) + (y))
-// A class for forced loop unrolling at compile time
-// These macro utils and the small gemm intrinsics kernels are implemented
-// based on the initial code by pujiang.he@intel.com.
-template <int i>
-struct compile_time_for {
-  template <typename Lambda, typename... Args>
-  inline static void op(const Lambda& function, Args... args) {
-    compile_time_for<i - 1>::op(function, args...);
-    function(std::integral_constant<int, i - 1>{}, args...);
-  }
-};
-template <>
-struct compile_time_for<1> {
-  template <typename Lambda, typename... Args>
-  inline static void op(const Lambda& function, Args... args) {
-    function(std::integral_constant<int, 0>{}, args...);
-  }
-};
-template <>
-struct compile_time_for<0> {
-  // 0 loops, do nothing
-  template <typename Lambda, typename... Args>
-  inline static void op(const Lambda& function, Args... args) {}
-};
-// Get mask for last column
-template <int EXPANDED_N, int col>
-constexpr inline unsigned short get_mask(unsigned short mask) {
-  // Not last column, return 0xffffff indicating load/store all 16 floats
-  if constexpr (col < EXPANDED_N / 16 - 1)
-    return (unsigned short)0xffff;
-  else
-    return mask;
+
+inline __m256i cvt_fp32_to_bf16(const __m512 src) {
+#if (defined CPU_CAPABILITY_AVX512_BF16)
+  return reinterpret_cast<__m256i>(_mm512_cvtneps_pbh(src));
+#else
+  __m512i value = _mm512_castps_si512(src);
+  __m512i nan = _mm512_set1_epi32(0xffff);
+  auto mask_value = _mm512_cmp_ps_mask(src, src, _CMP_ORD_Q);
+  __m512i ones = _mm512_set1_epi32(0x1);
+  __m512i vec_bias = _mm512_set1_epi32(0x7fff);
+  // uint32_t lsb = (input >> 16) & 1;
+  auto t_value = _mm512_and_si512(_mm512_srli_epi32(value, 16), ones);
+  // uint32_t rounding_bias = 0x7fff + lsb;
+  t_value = _mm512_add_epi32(t_value, vec_bias);
+  // input += rounding_bias;
+  t_value = _mm512_add_epi32(t_value, value);
+  // input = input >> 16;
+  t_value = _mm512_srli_epi32(t_value, 16);
+  // Check NaN before converting back to bf16
+  t_value = _mm512_mask_blend_epi32(mask_value, nan, t_value);
+  return _mm512_cvtusepi32_epi16(t_value);
+#endif
 }
 
-template <int EXPANDED_N>
-constexpr inline unsigned short get_mask(int col, unsigned short mask) {
-  // Not last column, return 0xffffff indicating load/store all 16 floats
-  if (col < EXPANDED_N / 16 - 1)
-    return (unsigned short)0xffff;
-  else
-    return mask;
-}
-class IdentityOP {
- public:
-  __m512 operator()(__m512& v, __mmask16 mask, int row, int col) const {
-    return v;
+inline void cvt_fp32_to_bf16(
+    BFloat16* dst,
+    const float* src,
+    int m,
+    int n,
+    int ld_dst,
+    int ld_src) {
+  for (int i = 0; i < m; i++) {
+    const float* src0 = src + i * ld_src;
+    BFloat16* dst0 = dst + i * ld_dst;
+    int j;
+    for (j = 0; j < n - 15; j += 16) {
+      auto f32 = _mm512_loadu_ps(src0 + j);
+      _mm256_storeu_si256((__m256i*)(dst0 + j), cvt_fp32_to_bf16(f32));
+    }
+    if (j < n) {
+      auto mask = (1 << (n - j)) - 1;
+      auto f32 = _mm512_maskz_loadu_ps(mask, src0 + j);
+      _mm256_mask_storeu_epi16(dst0 + j, mask, cvt_fp32_to_bf16(f32));
+    }
   }
-};
+}
 
+inline __m512 cvt_bf16_to_fp32(const __m256i src) {
+  auto y = _mm512_cvtepu16_epi32(src);
+  return _mm512_castsi512_ps(_mm512_bslli_epi128(y, 2));
+}
+
+inline void cvt_bf16_to_fp32(
+    float* dst,
+    const at::BFloat16* src,
+    int m,
+    int n,
+    int ld_dst,
+    int ld_src) {
+  for (int i = 0; i < m; i++) {
+    float* dst0 = dst + i * ld_dst;
+    const BFloat16* src0 = src + i * ld_src;
+    int j = 0;
+    for (; j < n - 15; j += 16) {
+      auto f32 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(src0 + j)));
+      _mm512_storeu_ps(dst0 + j, f32);
+    }
+    if (j < n) {
+      auto mask = (1 << (n - j)) - 1;
+      auto f32 = cvt_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, src0 + j));
+      _mm512_mask_storeu_ps(dst0 + j, mask, f32);
+    }
+  }
+}
+
+void print_m512(__m512 reg) {
+  float temp[16];
+  _mm512_store_ps(temp, reg);
+  for (int i = 0; i < 16; ++i) {
+    printf("%.2f ", temp[i]);
+  }
+  printf("\n");
+}
+
+void print_m512i(__m512i reg) {
+  int temp[16];
+  _mm512_store_epi32(temp, reg);
+  for (int i = 0; i < 16; ++i) {
+    printf("%08X ", temp[i]);
+  }
+  printf("\n");
+}
+
+void print_m128i(__m128i* reg) {
+  uint8_t temp[32];
+  _mm_store_si128((__m128i*)temp, *reg);
+  for (int i = 0; i < 32; ++i) {
+    std::bitset<8> b(temp[i]);
+    std::cout << b << " ";
+  }
+  std::cout << std::endl;
+}
 // This function is for the case of very small M.
 // LINES should be  smaller than 4.
 // N must be smaller than 64 and must be multiple of 16.
 // PREFETCH_K_DIST means prefetch distance in K.
 // ACC means accumulate to C or not.
-// actualN , rowOff and postop are not used in current code version.
+// actualN , rowOff are not used in current code version.
 template <
     int LINES,
     int N,
     int PREFETCH_K_DIST,
     bool ACC,
-    typename Lambda = IdentityOP>
+    bool bias_add = false>
 void small_gemm_smallm(
     const float* A,
     const int8_t* B,
@@ -90,10 +197,10 @@ void small_gemm_smallm(
     int ldc,
     int actualN,
     int K,
-    float* zero_point,
     float* scale,
-    int rowOff = 0,
-    const Lambda& postop = IdentityOP()) {
+    float* zero_point,
+    float* bias = NULL,
+    int rowOff = 0) {
   constexpr const int COLS = N / 16;
 
   __m512 va;
@@ -158,11 +265,11 @@ void small_gemm_smallm(
   auto store = [&](auto i) {
     constexpr const int line = i / COLS;
     constexpr const int col = i % COLS;
-    if constexpr (std::is_same<Lambda, IdentityOP>::value) {
+    if constexpr (bias_add) {
+      __m512 bias_ = _mm512_loadu_ps(bias + col * 16);
+      vc[i] = _mm512_add_ps(vc[i], bias_);
       _mm512_storeu_ps(ADDRESS(C, line, col * 16, ldc), vc[i]);
     } else {
-      // Apply post op
-      vc[i] = postop(vc[i], 0xffff, rowOff + line, col * 16);
       _mm512_storeu_ps(ADDRESS(C, line, col * 16, ldc), vc[i]);
     }
   };
@@ -170,11 +277,161 @@ void small_gemm_smallm(
   compile_time_for<LINES * COLS>::op(store);
 }
 
+// bf16 * int8 -> fp32
+template <
+    int LINES,
+    int N,
+    int PREFETCH_K_DIST,
+    bool ACC,
+    bool bias_add = false>
+void small_gemm_smallm(
+    const BFloat16* A,
+    const int8_t* B,
+    float* C,
+    int lda,
+    int ldb,
+    int ldc,
+    int actualN,
+    int K,
+    float* scale,
+    float* zero_point,
+    float* bias = NULL,
+    int rowOff = 0) {
+  constexpr const int COLS = N / 16;
+
+  __m512 va;
+  __m512 vb[COLS];
+  __m512 vc[LINES * COLS];
+  __m512 float_scale[COLS];
+  __m512 float_zero_point[COLS];
+
+  // Load scale
+  auto load_scale = [&](auto i) {
+    float_scale[i] = _mm512_loadu_ps(scale + 16 * i);
+  };
+  compile_time_for<COLS>::op(load_scale);
+
+  // Load zero point
+  auto load_zp = [&](auto i) {
+    float_zero_point[i] = _mm512_loadu_ps(zero_point + 16 * i);
+  };
+  compile_time_for<COLS>::op(load_zp);
+
+  // Load from C or set to 0
+  if constexpr (ACC) {
+    auto loadc = [&](auto i) {
+      constexpr const int row = i / COLS;
+      constexpr const int col = i % COLS;
+      vc[i] = _mm512_loadu_ps(ADDRESS(C, row, col * 16, ldc));
+    };
+    compile_time_for<LINES * COLS>::op(loadc);
+  } else {
+    auto set0 = [&](auto i) { vc[i] = _mm512_setzero_ps(); };
+    compile_time_for<LINES * COLS>::op(set0);
+  }
+
+  auto compute = [&](auto i, int k) {
+    constexpr const int row = i / COLS;
+    constexpr const int col = i % COLS;
+
+    if constexpr (col == 0) {
+      float aa = *ADDRESS(A, row, k, lda); // convert from bf16 to fp32
+      va = _mm512_set1_ps(aa);
+    }
+
+    if constexpr (row == 0) {
+      const __m128i b_ =
+          _mm_loadu_si128((const __m128i*)ADDRESS(B, k, col * 16, ldb));
+      _mm_prefetch(ADDRESS(B, k + PREFETCH_K_DIST, col * 16, ldb), _MM_HINT_T0);
+      vb[col] = _mm512_cvtepi32_ps(_mm512_cvtepi8_epi32(b_));
+      vb[col] = _mm512_sub_ps(vb[col], float_zero_point[col]);
+      vb[col] = _mm512_mul_ps(vb[col], float_scale[col]);
+    }
+
+    constexpr const int idx = INDEX(row, col, COLS);
+    vc[idx] = _mm512_fmadd_ps(va, vb[col], vc[idx]);
+  };
+
+// Accumulate along k
+#pragma unroll(4)
+  for (int k = 0; k < K; ++k) {
+    compile_time_for<LINES * COLS>::op(compute, k);
+  }
+
+  // Store to C
+  auto store = [&](auto i) {
+    constexpr const int line = i / COLS;
+    constexpr const int col = i % COLS;
+    if constexpr (bias_add) {
+      __m512 bias_ = _mm512_loadu_ps(bias + col * 16);
+      vc[i] = _mm512_add_ps(vc[i], bias_);
+      _mm512_storeu_ps(ADDRESS(C, line, col * 16, ldc), vc[i]);
+    } else {
+      _mm512_storeu_ps(ADDRESS(C, line, col * 16, ldc), vc[i]);
+    }
+  };
+
+  compile_time_for<LINES * COLS>::op(store);
+}
+
+static inline __m128i bytesFromNibbles(const uint8_t* rsi) {
+  __m128i tmp = _mm_loadu_si64((const __m128i*)rsi);
+  __m128i bytes = _mm_cvtepu8_epi16(tmp);
+  const __m128i lowMask = _mm_set1_epi8(0xF);
+  __m128i high = _mm_andnot_si128(lowMask, bytes);
+  __m128i low = _mm_and_si128(lowMask, bytes);
+  high = _mm_slli_epi16(high, 4);
+  bytes = _mm_or_si128(low, high);
+  return bytes;
+}
+
+// fp32 * int4 -> fp32
+template <
+    int LINES,
+    int N,
+    int PREFETCH_K_DIST,
+    bool ACC,
+    bool bias_add = false>
+void small_gemm_smallm(
+    const float* A,
+    const uint8_t* B,
+    float* C,
+    int lda,
+    int ldb,
+    int ldc,
+    int actualN,
+    int K,
+    float* scale,
+    float* zero_point,
+    float* bias = NULL,
+    int rowOff = 0) {}
+
+// bf16 * int4 -> fp32
+template <
+    int LINES,
+    int N,
+    int PREFETCH_K_DIST,
+    bool ACC,
+    bool bias_add = false>
+void small_gemm_smallm(
+    const BFloat16* A,
+    const uint8_t* B,
+    float* C,
+    int lda,
+    int ldb,
+    int ldc,
+    int actualN,
+    int K,
+    float* scale,
+    float* zero_point,
+    float* bias = NULL,
+    int rowOff = 0) {}
+
 inline void dequant_(
     int8_t* B,
     float* b,
-    __m512 float_zero_point,
-    __m512 float_scale) {
+    __m512 float_scale,
+    __m512 float_zero_point) {
   const __m128i b_ = _mm_loadu_si128((const __m128i*)B);
   __m512 vb;
   vb = _mm512_cvtepi32_ps(_mm512_cvtepi8_epi32(b_));
@@ -186,8 +443,8 @@ inline void dequant_(
 inline void dequant_(
     int8_t* B,
     float* b,
-    __m512 float_zero_point,
     __m512 float_scale,
+    __m512 float_zero_point,
     unsigned short mask) {
   const __m128i b_ = _mm_maskz_loadu_epi8(mask, (const __m128i*)B);
   __m512 vb;
@@ -197,13 +454,66 @@ inline void dequant_(
   _mm512_mask_storeu_ps(b, mask, vb);
 }
 
+inline void dequant_(
+    uint8_t* B,
+    float* b,
+    __m512 float_scale,
+    __m512 float_zero_point) {
+  __m128i b_ = bytesFromNibbles(B); // 32 int4 -> 32 int8
+  __m512 vb;
+  vb = _mm512_mul_ps(
+      _mm512_sub_ps(
+          _mm512_cvtepi32_ps(_mm512_cvtepu8_epi32(b_)), float_zero_point),
+      float_scale);
+  _mm512_storeu_ps(b, vb);
+}
+
+inline void dequant_to_bf16_(
+    uint8_t* B,
+    BFloat16* b,
+    __m512 float_scale,
+    __m512 float_zero_point) {
+  __m128i b_ = bytesFromNibbles(B); // 32 int4 -> 32 int8
+  __m512 vb;
+  vb = _mm512_mul_ps(
+      _mm512_sub_ps(
+          _mm512_cvtepi32_ps(_mm512_cvtepu8_epi32(b_)), float_zero_point),
+      float_scale);
+  _mm256_storeu_si256((__m256i*)b, cvt_fp32_to_bf16(vb));
+}
+
+inline void dequant_to_bf16_(
+    int8_t* B,
+    BFloat16* b,
+    __m512 float_scale,
+    __m512 float_zero_point) {
+  const __m128i b_ = _mm_loadu_si128((const __m128i*)B);
+  __m512 vb;
+  vb = _mm512_cvtepi32_ps(_mm512_cvtepi8_epi32(b_));
+  vb = _mm512_sub_ps(vb, float_zero_point);
+  vb = _mm512_mul_ps(vb, float_scale);
+  _mm256_storeu_si256((__m256i*)b, cvt_fp32_to_bf16(vb));
+}
+
+inline void dequant_to_bf16_(
+    int8_t* B,
+    BFloat16* b,
+    __m512 float_scale,
+    __m512 float_zero_point,
+    unsigned short mask) {
+  const __m128i b_ = _mm_maskz_loadu_epi8(mask, (const __m128i*)B);
+  __m512 vb;
+  vb = _mm512_cvtepi32_ps(_mm512_cvtepi8_epi32(b_));
+  vb = _mm512_maskz_sub_ps(mask, vb, float_zero_point);
+  vb = _mm512_maskz_mul_ps(mask, vb, float_scale);
+  _mm256_mask_storeu_epi16(b, mask, cvt_fp32_to_bf16(vb));
+}
+
 // per channel
 // B is packed and not transposed, shape:[BLOCK_K x BLOCK_N]
 template <int BLOCK_K, int BLOCK_N>
-void dequant(int8_t* B, float* b, float* zero_point, float* scale) {
+void dequant(int8_t* B, float* b, float* scale, float* zero_point) {
   const int COLS = BLOCK_N / 16;
-  __m512 float_scale = _mm512_loadu_ps(scale);
-  __m512 float_zero_point = _mm512_loadu_ps(zero_point);
   for (int k = 0; k < BLOCK_K; k++) {
     int8_t* src = B;
     float* dst = b;
@@ -211,7 +521,7 @@ void dequant(int8_t* B, float* b, float* zero_point, float* scale) {
     for (idx = 0, j = 0; j < COLS * 16; j += 16) {
       __m512 float_scale = _mm512_loadu_ps(scale + j);
       __m512 float_zero_point = _mm512_loadu_ps(zero_point + j);
-      dequant_(src, dst, float_zero_point, float_scale);
+      dequant_(src, dst, float_scale, float_zero_point);
       src += 16;
       dst += 16;
     }
@@ -221,22 +531,22 @@ void dequant(int8_t* B, float* b, float* zero_point, float* scale) {
       mask = (1 << res) - 1;
       __m512 float_scale = _mm512_maskz_loadu_ps(mask, scale + j);
       __m512 float_zero_point = _mm512_maskz_loadu_ps(mask, zero_point + j);
-      dequant_(src, dst, float_zero_point, float_scale, mask);
+      dequant_(src, dst, float_scale, float_zero_point, mask);
     }
     B += BLOCK_N;
     b += BLOCK_N;
   }
 }
 
-// per channel
+// per channel dequant to fp32
 // handle edge cases
 void dequant(
     int8_t* B,
     float* b,
     int K,
     int N,
-    float* zero_point,
-    float* scale) {
+    float* scale,
+    float* zero_point) {
   const int COLS = N / 16;
   for (int k = 0; k < K; k++) {
     int8_t* src = B;
@@ -245,7 +555,7 @@ void dequant(
     for (j = 0; j < COLS * 16; j += 16) {
       __m512 float_scale = _mm512_loadu_ps(scale + j);
       __m512 float_zero_point = _mm512_loadu_ps(zero_point + j);
-      dequant_(src, dst, float_zero_point, float_scale);
+      dequant_(src, dst, float_scale, float_zero_point);
       src += 16;
       dst += 16;
     }
@@ -255,7 +565,41 @@ void dequant(
       mask = (1 << res) - 1;
       __m512 float_scale = _mm512_maskz_loadu_ps(mask, scale + j);
       __m512 float_zero_point = _mm512_maskz_loadu_ps(mask, zero_point + j);
-      dequant_(src, dst, float_zero_point, float_scale, mask);
+      dequant_(src, dst, float_scale, float_zero_point, mask);
+    }
+    B += N;
+    b += N;
+  }
+}
+
+// per channel dequant to bf16
+// handle edge cases
+void dequant(
+    int8_t* B,
+    BFloat16* b,
+    int K,
+    int N,
+    float* scale,
+    float* zero_point) {
+  const int COLS = N / 16;
+  for (int k = 0; k < K; k++) {
+    int8_t* src = B;
+    BFloat16* dst = b;
+    int j = 0;
+    for (; j < COLS * 16; j += 16) {
+      __m512 float_scale = _mm512_loadu_ps(scale + j);
+      __m512 float_zero_point = _mm512_loadu_ps(zero_point + j);
+      dequant_to_bf16_(src, dst, float_scale, float_zero_point);
+      src += 16;
+      dst += 16;
+    }
+    if (j < N) {
+      const int res = N - j;
+      unsigned short mask = 0xffff;
+      mask = (1 << res) - 1;
+      __m512 float_scale = _mm512_maskz_loadu_ps(mask, scale + j);
+      __m512 float_zero_point = _mm512_maskz_loadu_ps(mask, zero_point + j);
+      dequant_to_bf16_(src, dst, float_scale, float_zero_point, mask);
     }
     B += N;
     b += N;
@@ -265,7 +609,7 @@ void dequant(
 // per tensor
 // B is packed and not transposed, shape:[BLOCK_K x BLOCK_N]
 template <int BLOCK_K, int BLOCK_N>
-void dequant(int8_t* B, float* b, float zero_point, float scale) {
+void dequant(int8_t* B, float* b, float scale, float zero_point) {
   __m512 float_scale = _mm512_set1_ps(scale);
   __m512 float_zero_point = _mm512_set1_ps(zero_point);
   int COLS = BLOCK_N / 16;
@@ -274,7 +618,7 @@ void dequant(int8_t* B, float* b, float zero_point, float scale) {
     float* dst = b;
     int j;
     for (j = 0; j < COLS * 16; j += 16) {
-      dequant_(src, dst, float_zero_point, float_scale);
+      dequant_(src, dst, float_scale, float_zero_point);
       src += 16;
       dst += 16;
     }
@@ -282,7 +626,7 @@ void dequant(int8_t* B, float* b, float zero_point, float scale) {
       const int res = BLOCK_N - j;
       unsigned short mask = 0xffff;
       mask = (1 << res) - 1;
-      dequant_(src, dst, float_zero_point, float_scale, mask);
+      dequant_(src, dst, float_scale, float_zero_point, mask);
     }
     B += BLOCK_N;
     b += BLOCK_N;
@@ -291,7 +635,7 @@ void dequant(int8_t* B, float* b, float zero_point, float scale) {
 
 // per tensor
 // handle edge cases
-void dequant(int8_t* B, float* b, int K, int N, float zero_point, float scale) {
+void dequant(int8_t* B, float* b, int K, int N, float scale, float zero_point) {
   __m512 float_scale = _mm512_set1_ps(scale);
   __m512 float_zero_point = _mm512_set1_ps(zero_point);
   int COLS = N / 16;
@@ -300,7 +644,7 @@ void dequant(int8_t* B, float* b, int K, int N, float zero_point, float scale) {
     float* dst = b;
     int j;
     for (j = 0; j < COLS * 16; j += 16) {
-      dequant_(src, dst, float_zero_point, float_scale);
+      dequant_(src, dst, float_scale, float_zero_point);
       src += 16;
       dst += 16;
     }
@@ -308,12 +652,36 @@ void dequant(int8_t* B, float* b, int K, int N, float zero_point, float scale) {
       const int res = N - j;
       unsigned short mask = 0xffff;
       mask = (1 << res) - 1;
-      dequant_(src, dst, float_zero_point, float_scale, mask);
+      dequant_(src, dst, float_scale, float_zero_point, mask);
     }
     B += N;
     b += N;
   }
 }
+
+// per channel dequantize for int4
+// B is packed and not transposed, shape:[BLOCK_K x BLOCK_N]
+template <int BLOCK_K, int BLOCK_N>
+void dequant(uint8_t* B, float* b, float* scale, float* zero_point) {}
+
+// per channel dequantize for int4
+// handle edge cases
+void dequant(
+    uint8_t* B,
+    float* b,
+    int K,
+    int N,
+    float* scale,
+    float* zero_point) {}
+
+// dequant uint4 weight to bf16
+void dequant(
+    uint8_t* B,
+    BFloat16* b,
+    int K,
+    int N,
+    float* scale,
+    float* zero_point) {}
 
 void add_bias(float* C, float* bias, int M, int N, int ldc) {
   int COLS = N / 16;
@@ -347,7 +715,7 @@ void add_bias(float* C, float* bias, int M, int N, int ldc) {
 
 // per channel
 template <int BLOCK_N, int BLOCK_K>
-void dequant(int8_t* B, float* b, float* zero_point, float* scale) {
+void dequant(int8_t* B, float* b, float* scale, float* zero_point) {
   AT_ASSERTM(false, "Unable to support AVX512!");
 }
 
@@ -356,18 +724,76 @@ void dequant(
     float* b,
     int K,
     int N,
-    float* zero_point,
-    float* scale) {
+    float* scale,
+    float* zero_point) {
+  AT_ASSERTM(false, "Unable to support AVX512!");
+}
+
+void dequant(
+    int8_t* B,
+    BFloat16* b,
+    int K,
+    int N,
+    float* scale,
+    float* zero_point) {
   AT_ASSERTM(false, "Unable to support AVX512!");
 }
 
 // per tensor
 template <int BLOCK_N, int BLOCK_K>
-void dequant(int8_t* B, float* b, float zero_point, float scale) {
+void dequant(int8_t* B, float* b, float scale, float zero_point) {
   AT_ASSERTM(false, "Unable to support AVX512!");
 }
 
-void dequant(int8_t* B, float* b, int K, int N, float zero_point, float scale) {
+void dequant(int8_t* B, float* b, int K, int N, float scale, float zero_point) {
+  AT_ASSERTM(false, "Unable to support AVX512!");
+}
+
+// per channel dequantize for int4
+// B is packed and not transposed, shape:[BLOCK_K x BLOCK_N]
+template <int BLOCK_K, int BLOCK_N>
+void dequant(uint8_t* B, float* b, float* scale, float* zero_point) {
+  AT_ASSERTM(false, "Unable to support AVX512!");
+}
+
+// per channel dequantize for int4
+// handle edge cases
+void dequant(
+    uint8_t* B,
+    float* b,
+    int K,
+    int N,
+    float* scale,
+    float* zero_point) {
+  AT_ASSERTM(false, "Unable to support AVX512!");
+}
+
+// dequant uint4 weight to bf16
+void dequant(
+    uint8_t* B,
+    BFloat16* b,
+    int K,
+    int N,
+    float* scale,
+    float* zero_point) {
+  AT_ASSERTM(false, "Unable to support AVX512!");
+}
+
+void convert_bf16_to_fp32(
+    const BFloat16* src,
+    float* dst,
+    int M,
+    int K,
+    int ld_src) {
+  AT_ASSERTM(false, "Unable to support AVX512!");
+}
+
+void convert_fp32_to_bf16(
+    const float* src,
+    BFloat16* dst,
+    int M,
+    int N,
+    int ld) {
   AT_ASSERTM(false, "Unable to support AVX512!");
 }
 
@@ -375,19 +801,12 @@ void add_bias(float* C, float* bias, int M, int N, int ldc) {
   AT_ASSERTM(false, "Unable to support AVX512!");
 }
 
-class IdentityOP {
- public:
-  int operator()(int col) const {
-    AT_ASSERTM(false, "Unable to support AVX512!");
-  }
-};
-
 template <
     int LINES,
     int N,
     int PREFETCH_K_DIST,
     bool ACC,
-    typename Lambda = IdentityOP>
+    bool bias_add = false>
 void small_gemm_smallm(
     const float* A,
     const int8_t* B,
@@ -397,99 +816,72 @@ void small_gemm_smallm(
     int ldc,
     int actualN,
     int K,
-    float* zero_point,
     float* scale,
-    int rowOff = 0,
-    const Lambda& postop = IdentityOP()) {
+    float* zero_point,
+    float* bias,
+    int rowOff = 0) {
+  AT_ASSERTM(false, "Unable to support AVX512!");
+}
+
+// bf16 * int8 -> bf16
+template <
+    int LINES,
+    int N,
+    int PREFETCH_K_DIST,
+    bool ACC,
+    bool bias_add = false>
+void small_gemm_smallm(
+    const BFloat16* A,
+    const int8_t* B,
+    float* C,
+    int lda,
+    int ldb,
+    int ldc,
+    int actualN,
+    int K,
+    float* scale,
+    float* zero_point,
+    float* bias = NULL,
+    int rowOff = 0) {
+  AT_ASSERTM(false, "Unable to support AVX512!");
+}
+
+inline void cvt_fp32_to_bf16(
+    BFloat16* dst,
+    const float* src,
+    int m,
+    int n,
+    int ld_dst,
+    int ld_src) {
+  AT_ASSERTM(false, "Unable to support AVX512!");
+}
+
+inline void cvt_bf16_to_fp32(
+    float* dst,
+    const at::BFloat16* src,
+    int m,
+    int n,
+    int ld_dst,
+    int ld_src) {
   AT_ASSERTM(false, "Unable to support AVX512!");
 }
 #endif
 
-const int BLOCK_N = 64, BLOCK_K = 64, PREFETCH_K = 64;
-
-struct DotMicroKernelKey {
-  bool trans_a;
-  bool trans_b;
-  int lda;
-  int ldb;
-  int ldc;
-
-  DotMicroKernelKey(bool trans_a, bool trans_b, int lda, int ldb, int ldc)
-      : trans_a(trans_a), trans_b(trans_b), lda(lda), ldb(ldb), ldc(ldc) {}
-
-  bool operator==(const DotMicroKernelKey& other) const {
-    return trans_a == other.trans_a && trans_b == other.trans_b &&
-        lda == other.lda && ldb == other.ldb && ldc == other.ldc;
+static void print_mat(uint8_t* src, int size) {
+  std::cout << "B mat:" << std::endl;
+  for (int i = 0; i < size; i++) {
+    std::cout << (int)src[i] << " ";
   }
-};
-
-template <int BLOCK_M, int BLOCK_N, int BLOCK_K>
-class DotMicroKernel {
- public:
-  DotMicroKernel(bool trans_a, bool trans_b, int lda, int ldb, int ldc) {
-    libxsmm_gemm_shape brshape = libxsmm_create_gemm_shape(
-        BLOCK_M,
-        BLOCK_N,
-        BLOCK_K,
-        lda,
-        ldb,
-        ldc,
-        /*type A*/ LIBXSMM_DATATYPE_F32,
-        /*type B*/ LIBXSMM_DATATYPE_F32,
-        /*type C*/ LIBXSMM_DATATYPE_F32,
-        /*acctype*/ LIBXSMM_DATATYPE_F32);
-    libxsmm_bitfield brflags =
-        (trans_a ? LIBXSMM_GEMM_FLAG_TRANS_A : LIBXSMM_GEMM_FLAG_NONE) |
-        (trans_b ? LIBXSMM_GEMM_FLAG_TRANS_B : LIBXSMM_GEMM_FLAG_NONE);
-    libxsmm_gemm_batch_reduce_config brconfig;
-    memset(&brconfig, 0, sizeof(libxsmm_gemm_batch_reduce_config));
-    brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_NONE;
-
-    kernel_func_ = libxsmm_dispatch_brgemm_v2(
-        brshape, brflags, /*prefetch_flags=*/0, brconfig);
-    memset(&gemm_param_, 0, sizeof(libxsmm_gemm_param));
+  std::cout << std::endl;
+  std::cout << "mat:" << std::endl;
+  for (int i = 0; i < size; i++) {
+    std::bitset<8> b(src[i]);
+    std::cout << b << " ";
   }
-
-  void operator()(void* A, void* B, void* C) {
-    gemm_param_.a.primary = (void*)A;
-    gemm_param_.b.primary = (void*)B;
-    gemm_param_.c.primary = (void*)C;
-    kernel_func_(&gemm_param_);
-  }
-
- private:
-  libxsmm_gemmfunction kernel_func_;
-  libxsmm_gemm_param gemm_param_;
-};
-
-template <int BLOCK_M, int BLOCK_N, int BLOCK_K>
-using DotMicroKernelRef =
-    std::shared_ptr<DotMicroKernel<BLOCK_M, BLOCK_N, BLOCK_K>>;
-
-template <int BLOCK_M, int BLOCK_N, int BLOCK_K>
-DotMicroKernelRef<BLOCK_M, BLOCK_N, BLOCK_K> create_or_get_dot_microkernel(
-    bool trans_a,
-    bool trans_b,
-    int lda,
-    int ldb,
-    int ldc) {
-  thread_local std::unordered_map<
-      DotMicroKernelKey,
-      DotMicroKernelRef<BLOCK_M, BLOCK_N, BLOCK_K>>
-      cache;
-  DotMicroKernelKey key(trans_a, trans_b, lda, ldb, ldc);
-  auto search = cache.find(key);
-  if (search != cache.end()) {
-    return search->second;
-  } else {
-    cache.insert(
-        {key,
-         std::make_shared<DotMicroKernel<BLOCK_M, BLOCK_N, BLOCK_K>>(
-             trans_a, trans_b, lda, ldb, ldc)}); //
-    return cache[key];
-  }
+  std::cout << std::endl;
 }
 
+// fp32 * fp32 -> fp32
 template <int BLOCK_M, int BLOCK_N, int BLOCK_K>
 void dot_tile_update(
     float* A,
@@ -537,9 +929,10 @@ void dot_update(
       &LDC);
 }
 
-void zero_fill(float* C, int M, int N, int stride) {
+template <typename T>
+void zero_fill(T* C, int M, int N, int stride) {
   for (int m = 0; m < M; m++) {
-    memset(C + m * stride, 0, sizeof(float) * N);
+    memset(C + m * stride, 0, sizeof(T) * N);
   }
 }
 
@@ -574,6 +967,42 @@ void pack(
   }
 }
 
+inline uint8_t extract_element(const uint8_t* src, int c, int r, int K) {
+  int offset_int4 = r * K + c;
+  int offset_int8 = offset_int4 / 2;
+  if (offset_int4 % 2 == 0) {
+    uint8_t elem = src[offset_int8] & 0xf;
+    return elem;
+  } else {
+    uint8_t elem = src[offset_int8] >> 4;
+    return elem;
+  }
+}
+
+inline void insert_element(uint8_t* dst, int c, int r, int rows, uint8_t elem) {
+  int offset_int4 = c * rows + r;
+  int offset_int8 = offset_int4 / 2;
+  if (offset_int4 % 2 == 0) { // in last 4 bits
+    dst[offset_int8] &= 0xf0;
+    dst[offset_int8] |= elem;
+
+  } else { // in first 4 bits
+    elem = elem << 4;
+    dst[offset_int8] &= 0xf;
+    dst[offset_int8] |= elem;
+  }
+}
+
+// TODO: optimize with vectorized transposition
+// pack int4 weight
+void pack(
+    const uint8_t* B,
+    uint8_t* packed_B,
+    int K,
+    int N,
+    int ldb,
+    bool trans_B) {}
+
 // TODO: optimize with vectorized transposition
 void unpack(
     const int8_t* packed_B,
@@ -605,6 +1034,16 @@ void unpack(
   }
 }
 
+// TODO: rewrite this
+// unpack uint4 weight
+void unpack(
+    const uint8_t* packed_B,
+    uint8_t* unpacked_B,
+    int K,
+    int N,
+    int ldb,
+    bool trans_B) {}
+
 // dequant per channel
 template <bool has_bias, int BLOCK_M>
 void woq_gemm_intrinsic(
@@ -617,8 +1056,8 @@ void woq_gemm_intrinsic(
     int lda,
     int ldb,
     int ldc,
-    float* zero_point,
     float* scale,
+    float* zero_point,
     float* bias = NULL) {
 #define PTR_OFFSET(base, offset0, offset1, stride0) \
   (base) + (offset0) * (stride0) + (offset1)
@@ -634,9 +1073,9 @@ void woq_gemm_intrinsic(
       int nb_start = nb * BLOCK_N;
       int n_bs = std::min(BLOCK_N, N - nb_start);
       float* C_offset = PTR_OFFSET(C, mb_start, nb_start, ldc);
-      zero_fill(C_offset, m_bs, n_bs, ldc);
       float* bi_offset =
           (float*)aligned_alloc(64, BLOCK_K * BLOCK_N * sizeof(float));
+      zero_fill(C_offset, m_bs, n_bs, ldc);
       for (int kb = 0; kb < KB; kb++) {
         int kb_start = kb * BLOCK_K;
         int k_bs = std::min(BLOCK_K, K - kb_start);
@@ -651,17 +1090,17 @@ void woq_gemm_intrinsic(
               n_bs,
               ldc,
               BLOCK_N,
-              BLOCK_K,
-              zero_point + nb_start,
-              scale + nb_start);
+              k_bs,
+              scale + nb_start,
+              zero_point + nb_start);
         } else { // edge case
           dequant(
               B_offset,
               bi_offset,
               k_bs,
               n_bs,
-              zero_point + nb_start,
-              scale + nb_start);
+              scale + nb_start,
+              zero_point + nb_start);
           dot_update( // libxsmm is col major
               bi_offset,
               A_offset,
@@ -685,11 +1124,117 @@ void woq_gemm_intrinsic(
 }
 
 // dequant per channel
-// for small M
-template <bool has_bias>
-void woq_gemm_brgemm(
-    float* A,
+template <bool has_bias, int BLOCK_M>
+void woq_gemm_intrinsic(
+    BFloat16* A,
     int8_t* B,
+    BFloat16* C,
+    int M,
+    int N,
+    int K,
+    int lda,
+    int ldb,
+    int ldc,
+    float* scale,
+    float* zero_point,
+    float* bias = NULL) {
+#define PTR_OFFSET(base, offset0, offset1, stride0) \
+  (base) + (offset0) * (stride0) + (offset1)
+
+  const int MB = (M + BLOCK_M - 1) / BLOCK_M, NB = (N + BLOCK_N - 1) / BLOCK_N,
+            KB = (K + BLOCK_K - 1) / BLOCK_K;
+
+#pragma omp parallel for collapse(2)
+  for (int mb = 0; mb < MB; mb++) {
+    for (int nb = 0; nb < NB; nb++) {
+      int mb_start = mb * BLOCK_M;
+      int m_bs = std::min(BLOCK_M, M - mb_start);
+      int nb_start = nb * BLOCK_N;
+      int n_bs = std::min(BLOCK_N, N - nb_start);
+      BFloat16* C_offset = PTR_OFFSET(C, mb_start, nb_start, ldc);
+      float* bi_offset =
+          (float*)aligned_alloc(64, BLOCK_K * BLOCK_N * sizeof(float));
+      float* ci_offset = (float*)aligned_alloc(64, m_bs * n_bs * sizeof(float));
+      zero_fill(ci_offset, m_bs, n_bs, n_bs);
+      if (m_bs == BLOCK_M && n_bs == BLOCK_N) {
+        for (int kb = 0; kb < KB; kb++) {
+          int kb_start = kb * BLOCK_K;
+          int k_bs = std::min(BLOCK_K, K - kb_start);
+          BFloat16* A_offset = PTR_OFFSET(A, mb_start, kb_start, lda);
+          int8_t* B_offset = B + nb_start * K + kb_start * n_bs;
+          if (kb != KB - 1) {
+            small_gemm_smallm<BLOCK_M, BLOCK_N, PREFETCH_K, true>(
+                A_offset,
+                B_offset,
+                ci_offset,
+                lda,
+                n_bs,
+                n_bs,
+                BLOCK_N,
+                k_bs,
+                scale + nb_start,
+                zero_point + nb_start);
+          } else { // last block in K, add bias
+            small_gemm_smallm<BLOCK_M, BLOCK_N, PREFETCH_K, true, has_bias>(
+                A_offset,
+                B_offset,
+                ci_offset,
+                lda,
+                n_bs,
+                n_bs,
+                BLOCK_N,
+                k_bs,
+                scale + nb_start,
+                zero_point + nb_start,
+                bias + nb_start);
+          }
+        }
+      } else { // edge case
+        float* ai_offset =
+            (float*)aligned_alloc(64, m_bs * BLOCK_K * sizeof(float));
+        for (int kb = 0; kb < KB; kb++) {
+          int kb_start = kb * BLOCK_K;
+          int k_bs = std::min(BLOCK_K, K - kb_start);
+          BFloat16* A_offset = PTR_OFFSET(A, mb_start, kb_start, lda);
+          int8_t* B_offset = B + nb_start * K + kb_start * n_bs;
+          cvt_bf16_to_fp32(ai_offset, A_offset, m_bs, k_bs, k_bs, lda);
+          dequant(
+              B_offset,
+              bi_offset,
+              k_bs,
+              n_bs,
+              scale + nb_start,
+              zero_point + nb_start);
+          dot_update( // libxsmm is col major
+              bi_offset,
+              ai_offset,
+              ci_offset,
+              n_bs,
+              m_bs,
+              k_bs,
+              false,
+              false,
+              n_bs,
+              k_bs,
+              n_bs);
+        }
+        if constexpr (has_bias) {
+          add_bias(ci_offset, bias + nb_start, m_bs, n_bs, n_bs);
+        }
+        free(ai_offset);
+      }
+      cvt_fp32_to_bf16(C_offset, ci_offset, m_bs, n_bs, ldc, n_bs);
+      free(ci_offset);
+      free(bi_offset);
+    }
+  }
+}
+
+// dequant per channel
+template <bool has_bias, int BLOCK_M>
+void woq_gemm_intrinsic(
+    float* A,
+    uint8_t* B,
     float* C,
     int M,
     int N,
@@ -697,53 +1242,177 @@ void woq_gemm_brgemm(
     int lda,
     int ldb,
     int ldc,
-    float* zero_point,
     float* scale,
+    float* zero_point,
     float* bias = NULL) {
 #define PTR_OFFSET(base, offset0, offset1, stride0) \
   (base) + (offset0) * (stride0) + (offset1)
 
-  const int NB = (N + BLOCK_N - 1) / BLOCK_N, KB = (K + BLOCK_K - 1) / BLOCK_K;
+  const int MB = (M + BLOCK_M - 1) / BLOCK_M, NB = (N + BLOCK_N - 1) / BLOCK_N,
+            KB = (K + BLOCK_K - 1) / BLOCK_K;
 
-#pragma omp parallel for collapse(1)
-  for (int nb = 0; nb < NB; nb++) {
-    int mb_start = 0;
-    int m_bs = M;
-    int nb_start = nb * BLOCK_N;
-    int n_bs = std::min(BLOCK_N, N - nb_start);
-    float* C_offset = PTR_OFFSET(C, mb_start, nb_start, ldc);
-    zero_fill(C_offset, m_bs, n_bs, ldc);
-    float* bi_offset =
-        (float*)aligned_alloc(64, BLOCK_K * BLOCK_N * sizeof(float));
-    for (int kb = 0; kb < KB; kb++) {
-      int kb_start = kb * BLOCK_K;
-      int k_bs = std::min(BLOCK_K, K - kb_start);
-      float* A_offset = PTR_OFFSET(A, mb_start, kb_start, lda);
-      int8_t* B_offset = B + nb_start * K + kb_start * n_bs;
-      dequant(
-          B_offset,
-          bi_offset,
-          k_bs,
-          n_bs,
-          zero_point + nb_start,
-          scale + nb_start);
-      dot_update( // libxsmm is col major
-          bi_offset,
-          A_offset,
-          C_offset,
-          n_bs,
-          m_bs,
-          k_bs,
-          false,
-          false,
-          n_bs,
-          lda,
-          ldc);
+#pragma omp parallel for collapse(2)
+  for (int mb = 0; mb < MB; mb++) {
+    for (int nb = 0; nb < NB; nb++) {
+      int mb_start = mb * BLOCK_M;
+      int m_bs = std::min(BLOCK_M, M - mb_start);
+      int nb_start = nb * BLOCK_N;
+      int n_bs = std::min(BLOCK_N, N - nb_start);
+      float* C_offset = PTR_OFFSET(C, mb_start, nb_start, ldc);
+      float* bi_offset =
+          (float*)aligned_alloc(64, BLOCK_K * BLOCK_N * sizeof(float));
+      zero_fill(C_offset, m_bs, n_bs, ldc);
+      for (int kb = 0; kb < KB; kb++) {
+        int kb_start = kb * BLOCK_K;
+        int k_bs = std::min(BLOCK_K, K - kb_start);
+        float* A_offset = PTR_OFFSET(A, mb_start, kb_start, lda);
+        uint8_t* B_offset = B + nb_start / 2 * K + kb_start * n_bs / 2;
+        if (m_bs == BLOCK_M && n_bs == BLOCK_N) {
+          small_gemm_smallm<BLOCK_M, BLOCK_N, PREFETCH_K, true>(
+              A_offset,
+              B_offset,
+              C_offset,
+              lda,
+              n_bs,
+              ldc,
+              BLOCK_N,
+              k_bs,
+              scale + nb_start,
+              zero_point + nb_start);
+        } else { // edge case
+          dequant(
+              B_offset,
+              bi_offset,
+              k_bs,
+              n_bs,
+              scale + nb_start,
+              zero_point + nb_start);
+          dot_update( // libxsmm is col major
+              bi_offset,
+              A_offset,
+              C_offset,
+              n_bs,
+              m_bs,
+              k_bs,
+              false,
+              false,
+              n_bs,
+              lda,
+              ldc);
+        }
+      }
+      if constexpr (has_bias) {
+        add_bias(C_offset, bias + nb_start, m_bs, n_bs, ldc);
+      }
+      free(bi_offset);
     }
-    if constexpr (has_bias) {
-      add_bias(C_offset, bias + nb_start, m_bs, n_bs, ldc);
+  }
+}
+
+// dequant per channel
+template <bool has_bias, int BLOCK_M>
+void woq_gemm_intrinsic(
+    BFloat16* A,
+    uint8_t* B,
+    BFloat16* C,
+    int M,
+    int N,
+    int K,
+    int lda,
+    int ldb,
+    int ldc,
+    float* scale,
+    float* zero_point,
+    float* bias = NULL) {
+#define PTR_OFFSET(base, offset0, offset1, stride0) \
+  (base) + (offset0) * (stride0) + (offset1)
+
+  const int MB = (M + BLOCK_M - 1) / BLOCK_M, NB = (N + BLOCK_N - 1) / BLOCK_N,
+            KB = (K + BLOCK_K - 1) / BLOCK_K;
+
+#pragma omp parallel for collapse(2)
+  for (int mb = 0; mb < MB; mb++) {
+    for (int nb = 0; nb < NB; nb++) {
+      int mb_start = mb * BLOCK_M;
+      int m_bs = std::min(BLOCK_M, M - mb_start);
+      int nb_start = nb * BLOCK_N;
+      int n_bs = std::min(BLOCK_N, N - nb_start);
+      BFloat16* C_offset = PTR_OFFSET(C, mb_start, nb_start, ldc);
+      float* bi_offset =
+          (float*)aligned_alloc(64, BLOCK_K * BLOCK_N * sizeof(float));
+      float* ci_offset = (float*)aligned_alloc(64, m_bs * n_bs * sizeof(float));
+      zero_fill(ci_offset, m_bs, n_bs, n_bs);
+      if (m_bs == BLOCK_M && n_bs == BLOCK_N) {
+        for (int kb = 0; kb < KB; kb++) {
+          int kb_start = kb * BLOCK_K;
+          int k_bs = std::min(BLOCK_K, K - kb_start);
+          BFloat16* A_offset = PTR_OFFSET(A, mb_start, kb_start, lda);
+          uint8_t* B_offset = B + nb_start / 2 * K + kb_start * n_bs / 2;
+          if (kb != KB - 1) {
+            small_gemm_smallm<BLOCK_M, BLOCK_N, PREFETCH_K, true>(
+                A_offset,
+                B_offset,
+                ci_offset,
+                lda,
+                n_bs,
+                n_bs,
+                BLOCK_N,
+                k_bs,
+                scale + nb_start,
+                zero_point + nb_start);
+          } else { // last block in K, add bias
+            small_gemm_smallm<BLOCK_M, BLOCK_N, PREFETCH_K, true, has_bias>(
+                A_offset,
+                B_offset,
+                ci_offset,
+                lda,
+                n_bs,
+                n_bs,
+                BLOCK_N,
+                k_bs,
+                scale + nb_start,
+                zero_point + nb_start,
+                bias + nb_start);
+          }
+        }
+      } else { // edge case
+        float* ai_offset =
+            (float*)aligned_alloc(64, m_bs * BLOCK_K * sizeof(float));
+        for (int kb = 0; kb < KB; kb++) {
+          int kb_start = kb * BLOCK_K;
+          int k_bs = std::min(BLOCK_K, K - kb_start);
+          BFloat16* A_offset = PTR_OFFSET(A, mb_start, kb_start, lda);
+          uint8_t* B_offset = B + nb_start / 2 * K + kb_start * n_bs / 2;
+          cvt_bf16_to_fp32(ai_offset, A_offset, m_bs, k_bs, k_bs, lda);
+          dequant(
+              B_offset,
+              bi_offset,
+              k_bs,
+              n_bs,
+              scale + nb_start,
+              zero_point + nb_start);
+          dot_update( // libxsmm is col major
+              bi_offset,
+              ai_offset,
+              ci_offset,
+              n_bs,
+              m_bs,
+              k_bs,
+              false,
+              false,
+              n_bs,
+              k_bs,
+              n_bs);
+        }
+        if constexpr (has_bias) {
+          add_bias(ci_offset, bias + nb_start, m_bs, n_bs, n_bs);
+        }
+        free(ai_offset);
+      }
+      cvt_fp32_to_bf16(C_offset, ci_offset, m_bs, n_bs, ldc, n_bs);
+      free(ci_offset);
+      free(bi_offset);
     }
-    free(bi_offset);
   }
 }
 
@@ -760,8 +1429,8 @@ void woq_gemm_brgemm(
     int lda,
     int ldb,
     int ldc,
-    float* zero_point,
     float* scale,
+    float* zero_point,
     float* bias = NULL) {
 #define PTR_OFFSET(base, offset0, offset1, stride0) \
   (base) + (offset0) * (stride0) + (offset1)
@@ -790,8 +1459,8 @@ void woq_gemm_brgemm(
             bi_offset,
             k_bs,
             n_bs,
-            zero_point + nb_start,
-            scale + nb_start);
+            scale + nb_start,
+            zero_point + nb_start);
         if (m_bs == BLOCK_M && n_bs == BLOCK_N && k_bs == BLOCK_K) {
           dot_tile_update<BLOCK_N, BLOCK_M, BLOCK_K>(
               bi_offset, A_offset, C_offset, false, false, n_bs, lda, ldc);
@@ -818,6 +1487,239 @@ void woq_gemm_brgemm(
   }
 }
 
+// dequant per channel
+// for large M
+template <bool has_bias, int BLOCK_M>
+void woq_gemm_brgemm(
+    BFloat16* A,
+    int8_t* B,
+    BFloat16* C,
+    int M,
+    int N,
+    int K,
+    int lda,
+    int ldb,
+    int ldc,
+    float* scale,
+    float* zero_point,
+    float* bias = NULL) {
+#define PTR_OFFSET(base, offset0, offset1, stride0) \
+  (base) + (offset0) * (stride0) + (offset1)
+
+  // Number of blocks
+  const int MB = (M + BLOCK_M - 1) / BLOCK_M;
+  const int NB = (N + BLOCK_N - 1) / BLOCK_N;
+  const int KB = (K + BLOCK_K - 1) / BLOCK_K;
+
+#pragma omp parallel for collapse(2)
+  for (int mb = 0; mb < MB; mb++) {
+    for (int nb = 0; nb < NB; nb++) {
+      int mb_start = mb * BLOCK_M;
+      int m_bs = std::min(BLOCK_M, M - mb_start);
+      int nb_start = nb * BLOCK_N;
+      int n_bs = std::min(BLOCK_N, N - nb_start);
+      BFloat16* C_offset = PTR_OFFSET(C, mb_start, nb_start, ldc);
+      BFloat16* bi_offset =
+          (BFloat16*)aligned_alloc(64, BLOCK_K * n_bs * sizeof(BFloat16));
+      float* ci_offset = (float*)aligned_alloc(64, m_bs * n_bs * sizeof(float));
+      zero_fill(ci_offset, m_bs, n_bs, n_bs);
+      auto compute_block = [&](int kb) {
+        int kb_start = kb * BLOCK_K;
+        int k_bs = std::min(BLOCK_K, K - kb_start);
+        BFloat16* A_offset = PTR_OFFSET(A, mb_start, kb_start, lda);
+        int8_t* B_offset = B + nb_start * K + kb_start * n_bs;
+        dequant(
+            B_offset,
+            bi_offset,
+            k_bs,
+            n_bs,
+            scale + nb_start,
+            zero_point + nb_start);
+        // MKL gemm
+        // C := alpha*op(A) *op(B) + beta*C
+        // op(A) is m-by-k, op(B) is k-by-n, C is m-by-n.
+        cblas_gemm_bf16bf16f32(
+            CblasRowMajor, // Row/col major
+            CblasNoTrans, // Trans A
+            CblasNoTrans, // Trans B
+            m_bs, // M
+            n_bs, // N
+            k_bs, // K
+            1.f, // alpha = 1.0
+            (const MKL_BF16*)A_offset, // A
+            lda, // lda
+            (const MKL_BF16*)bi_offset, // B
+            n_bs, // ldb
+            1.f, // beta = 1.0 as we need to accumulate
+            ci_offset, // C
+            n_bs); // ldc
+      };
+      int kb = 0;
+      for (; kb < KB; kb++) {
+        compute_block(kb);
+      }
+      if constexpr (has_bias) {
+        add_bias(ci_offset, bias + nb_start, m_bs, n_bs, n_bs);
+      }
+      cvt_fp32_to_bf16(C_offset, ci_offset, m_bs, n_bs, ldc, n_bs);
+      free(ci_offset);
+      free(bi_offset);
+    }
+  }
+}
+
+// dequant per channel
+// for large M
+template <bool has_bias, int BLOCK_M>
+void woq_gemm_brgemm(
+    float* A,
+    uint8_t* B,
+    float* C,
+    int M,
+    int N,
+    int K,
+    int lda,
+    int ldb,
+    int ldc,
+    float* scale,
+    float* zero_point,
+    float* bias = NULL) {
+#define PTR_OFFSET(base, offset0, offset1, stride0) \
+  (base) + (offset0) * (stride0) + (offset1)
+
+  const int MB = (M + BLOCK_M - 1) / BLOCK_M, NB = (N + BLOCK_N - 1) / BLOCK_N,
+            KB = (K + BLOCK_K - 1) / BLOCK_K;
+
+#pragma omp parallel for collapse(2)
+  for (int mb = 0; mb < MB; mb++) {
+    for (int nb = 0; nb < NB; nb++) {
+      int mb_start = mb * BLOCK_M;
+      int m_bs = std::min(BLOCK_M, M - mb_start);
+      int nb_start = nb * BLOCK_N;
+      int n_bs = std::min(BLOCK_N, N - nb_start);
+      float* C_offset = PTR_OFFSET(C, mb_start, nb_start, ldc);
+      zero_fill(C_offset, m_bs, n_bs, ldc);
+      float* bi_offset =
+          (float*)aligned_alloc(64, BLOCK_K * BLOCK_N * sizeof(float));
+      for (int kb = 0; kb < KB; kb++) {
+        int kb_start = kb * BLOCK_K;
+        int k_bs = std::min(BLOCK_K, K - kb_start);
+        float* A_offset = PTR_OFFSET(A, mb_start, kb_start, lda);
+        uint8_t* B_offset = B + nb_start / 2 * K + kb_start * n_bs / 2;
+        dequant(
+            B_offset,
+            bi_offset,
+            k_bs,
+            n_bs,
+            scale + nb_start,
+            zero_point + nb_start);
+        if (m_bs == BLOCK_M && n_bs == BLOCK_N && k_bs == BLOCK_K) {
+          dot_tile_update<BLOCK_N, BLOCK_M, BLOCK_K>(
+              bi_offset, A_offset, C_offset, false, false, n_bs, lda, ldc);
+        } else {
+          dot_update( // libxsmm is col major
+              bi_offset,
+              A_offset,
+              C_offset,
+              n_bs,
+              m_bs,
+              k_bs,
+              false,
+              false,
+              n_bs,
+              lda,
+              ldc);
+        }
+      }
+      if constexpr (has_bias) {
+        add_bias(C_offset, bias + nb_start, m_bs, n_bs, ldc);
+      }
+      free(bi_offset);
+    }
+  }
+}
+
+// dequant per channel
+// for large M
+template <bool has_bias, int BLOCK_M>
+void woq_gemm_brgemm(
+    BFloat16* A,
+    uint8_t* B,
+    BFloat16* C,
+    int M,
+    int N,
+    int K,
+    int lda,
+    int ldb,
+    int ldc,
+    float* scale,
+    float* zero_point,
+    float* bias = NULL) {
+#define PTR_OFFSET(base, offset0, offset1, stride0) \
+  (base) + (offset0) * (stride0) + (offset1)
+
+  // Number of blocks
+  const int MB = (M + BLOCK_M - 1) / BLOCK_M;
+  const int NB = (N + BLOCK_N - 1) / BLOCK_N;
+  const int KB = (K + BLOCK_K - 1) / BLOCK_K;
+
+#pragma omp parallel for collapse(2)
+  for (int mb = 0; mb < MB; mb++) {
+    for (int nb = 0; nb < NB; nb++) {
+      int mb_start = mb * BLOCK_M;
+      int m_bs = std::min(BLOCK_M, M - mb_start);
+      int nb_start = nb * BLOCK_N;
+      int n_bs = std::min(BLOCK_N, N - nb_start);
+      BFloat16* C_offset = PTR_OFFSET(C, mb_start, nb_start, ldc);
+      BFloat16* bi_offset =
+          (BFloat16*)aligned_alloc(64, BLOCK_K * n_bs * sizeof(BFloat16));
+      float* ci_offset = (float*)aligned_alloc(64, m_bs * n_bs * sizeof(float));
+      zero_fill(ci_offset, m_bs, n_bs, n_bs);
+      auto compute_block = [&](int kb) {
+        int kb_start = kb * BLOCK_K;
+        int k_bs = std::min(BLOCK_K, K - kb_start);
+        BFloat16* A_offset = PTR_OFFSET(A, mb_start, kb_start, lda);
+        uint8_t* B_offset = B + nb_start / 2 * K + kb_start * n_bs / 2;
+        dequant(
+            B_offset,
+            bi_offset,
+            k_bs,
+            n_bs,
+            scale + nb_start,
+            zero_point + nb_start);
+        // MKL gemm
+        // C := alpha*op(A) *op(B) + beta*C
+        // op(A) is m-by-k, op(B) is k-by-n, C is m-by-n.
+        cblas_gemm_bf16bf16f32(
+            CblasRowMajor, // Row/col major
+            CblasNoTrans, // Trans A
+            CblasNoTrans, // Trans B
+            m_bs, // M
+            n_bs, // N
+            k_bs, // K
+            1.f, // alpha = 1.0
+            (const MKL_BF16*)A_offset, // A
+            lda, // lda
+            (const MKL_BF16*)bi_offset, // B
+            n_bs, // ldb
+            1.f, // beta = 1.0 as we need to accumulate
+            ci_offset, // C
+            n_bs); // ldc
+      };
+      int kb = 0;
+      for (; kb < KB; kb++) {
+        compute_block(kb);
+      }
+      if constexpr (has_bias) {
+        add_bias(ci_offset, bias + nb_start, m_bs, n_bs, n_bs);
+      }
+      cvt_fp32_to_bf16(C_offset, ci_offset, m_bs, n_bs, ldc, n_bs);
+      free(ci_offset);
+      free(bi_offset);
+    }
+  }
+}
+
 // per tensor
 template <bool has_bias, int BLOCK_M>
 void woq_gemm_brgemm_per_tensor(
@@ -830,8 +1732,8 @@ void woq_gemm_brgemm_per_tensor(
     int lda,
     int ldb,
     int ldc,
-    float zero_point,
     float scale,
+    float zero_point,
     float* bias = NULL) {
 #define PTR_OFFSET(base, offset0, offset1, stride0) \
   (base) + (offset0) * (stride0) + (offset1)
@@ -855,7 +1757,7 @@ void woq_gemm_brgemm_per_tensor(
         int k_bs = std::min(BLOCK_K, K - kb_start);
         float* A_offset = PTR_OFFSET(A, mb_start, kb_start, lda);
         int8_t* B_offset = B + nb_start * K + kb_start * n_bs;
-        dequant(B_offset, bi_offset, k_bs, n_bs, zero_point, scale);
+        dequant(B_offset, bi_offset, k_bs, n_bs, scale, zero_point);
         if (m_bs == BLOCK_M && n_bs == BLOCK_N && k_bs == BLOCK_K) {
           dot_tile_update<BLOCK_N, BLOCK_M, BLOCK_K>(
               bi_offset, A_offset, C_offset, false, false, n_bs, lda, ldc);
@@ -882,31 +1784,80 @@ void woq_gemm_brgemm_per_tensor(
   }
 }
 
+template <typename T1, typename T2, bool has_bias, int BM>
+struct Function_matching {
+  static void func_match(
+      T1* A,
+      T2* B,
+      T1* C,
+      int M,
+      int N,
+      int K,
+      int lda,
+      int ldb,
+      int ldc,
+      float* scale,
+      float* zero_point,
+      float* bias = NULL) {
+    switch (M) {
+      case BM:
+        woq_gemm_intrinsic<has_bias, BM>(
+            A, B, C, M, N, K, K, K, N, scale, zero_point, bias);
+        break;
+      default:
+        Function_matching<T1, T2, has_bias, BM - 1>::func_match(
+            A, B, C, M, N, K, lda, ldb, ldc, scale, zero_point, bias);
+        break;
+    }
+  }
+};
+
+template <typename T1, typename T2, bool has_bias>
+struct Function_matching<T1, T2, has_bias, 0> {
+  static void func_match(
+      T1* A,
+      T2* B,
+      T1* C,
+      int M,
+      int N,
+      int K,
+      int lda,
+      int ldb,
+      int ldc,
+      float* scale,
+      float* zero_point,
+      float* bias = NULL) {
+    return; // do nothing
+  }
+};
+
 void woq_gemm_kernel_impl(
     const at::Tensor& self,
     const at::Tensor& weight,
-    const at::Tensor& zero_points_float,
     const at::Tensor& scales_float,
+    const at::Tensor& zero_points_float,
     const at::Tensor& bias,
+    int64_t lowp_mode,
     at::Tensor& output) {
-#if defined(CPU_CAPABILITY_AVX512)
   auto self_ = self.is_contiguous() ? self : self.contiguous();
   const int64_t dim = self.dim();
   auto self_reshaped =
       dim == 2 ? self_ : self_.reshape({-1, self.size(self.dim() - 1)});
   auto M = self_reshaped.size(0);
   auto K = self_reshaped.size(1);
-
-  auto in_ptr = self_.data_ptr<float>();
-  auto weight_ptr = weight.data_ptr<int8_t>();
-  auto out_ptr = output.data_ptr<float>();
-  auto zero_points_float_ptr = zero_points_float.data_ptr<float>();
-  auto scales_float_ptr = scales_float.data_ptr<float>();
   auto N = weight.size(0);
+#if defined(CPU_CAPABILITY_AVX512)
   const auto qtype = weight.qscheme();
 
   // TODO: per-tensor block size tuning
-  if (qtype == c10::kPerTensorAffine) { // per tensor
+  // dequant per tensor
+  // only fp32 activation and int8 weight is supported
+  if (qtype == c10::kPerTensorAffine) {
+    auto in_ptr = self_.data_ptr<float>();
+    auto weight_ptr = weight.data_ptr<int8_t>();
+    auto out_ptr = output.data_ptr<float>();
+    auto scales_float_ptr = scales_float.data_ptr<float>();
+    auto zero_points_float_ptr = zero_points_float.data_ptr<float>();
     if (bias.defined()) {
       auto bias_ = bias.is_contiguous() ? bias : bias.contiguous();
       auto bias_ptr = bias_.data_ptr<float>();
@@ -920,8 +1871,8 @@ void woq_gemm_kernel_impl(
           K,
           K,
           N,
-          zero_points_float_ptr[0],
           scales_float_ptr[0],
+          zero_points_float_ptr[0],
           bias_ptr);
     } else {
       return woq_gemm_brgemm_per_tensor<false, 24>(
@@ -934,227 +1885,367 @@ void woq_gemm_kernel_impl(
           K,
           K,
           N,
-          zero_points_float_ptr[0],
-          scales_float_ptr[0]);
+          scales_float_ptr[0],
+          zero_points_float_ptr[0]);
     }
-  } else if (qtype == c10::kPerChannelAffine) { // per channel
-    // TODO: per-channel block size tuning
-    if (bias.defined()) { // case with bias
-      auto bias_ = bias.is_contiguous() ? bias : bias.contiguous();
-      auto bias_ptr = bias_.data_ptr<float>();
-      if (M <= 4) {
-        switch (M) {
-          case 1:
-            return woq_gemm_intrinsic<true, 1>(
-                in_ptr,
-                weight_ptr,
-                out_ptr,
-                M,
-                N,
-                K,
-                K,
-                K,
-                N,
-                zero_points_float_ptr,
-                scales_float_ptr,
-                bias_ptr);
-            break;
-          case 2:
-            return woq_gemm_intrinsic<true, 2>(
-                in_ptr,
-                weight_ptr,
-                out_ptr,
-                M,
-                N,
-                K,
-                K,
-                K,
-                N,
-                zero_points_float_ptr,
-                scales_float_ptr,
-                bias_ptr);
-            break;
-          case 3:
-            return woq_gemm_intrinsic<true, 3>(
-                in_ptr,
-                weight_ptr,
-                out_ptr,
-                M,
-                N,
-                K,
-                K,
-                K,
-                N,
-                zero_points_float_ptr,
-                scales_float_ptr,
-                bias_ptr);
-            break;
-          case 4:
-            return woq_gemm_intrinsic<true, 4>(
-                in_ptr,
-                weight_ptr,
-                out_ptr,
-                M,
-                N,
-                K,
-                K,
-                K,
-                N,
-                zero_points_float_ptr,
-                scales_float_ptr,
-                bias_ptr);
-            break;
+  }
+  // TODO: per-channel block size tuning
+  // dequant per channel
+  // activation of both fp32 and bf16, weight of int8 is supported
+  else if (qtype == c10::kPerChannelAffine) {
+    auto weight_ptr = weight.data_ptr<int8_t>();
+    auto scales_float_ptr = scales_float.data_ptr<float>();
+    auto zero_points_float_ptr = zero_points_float.data_ptr<float>();
+    if (self_.scalar_type() == at::kFloat) {
+      auto in_ptr = self_.data_ptr<float>();
+      auto out_ptr = output.data_ptr<float>();
+      if (bias.defined()) { // case with bias
+        auto bias_ = bias.is_contiguous() ? bias : bias.contiguous();
+        auto bias_ptr = bias_.data_ptr<float>();
+        if (M <= 4) { // small M
+          Function_matching<float, int8_t, true, 4>::func_match(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr,
+              bias_ptr);
+          return;
+        } else { // large M
+          return woq_gemm_brgemm<true, 196>(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr,
+              bias_ptr);
         }
-      } else if (M < 196) { // small M
-        return woq_gemm_brgemm<true>(
-            in_ptr,
-            weight_ptr,
-            out_ptr,
-            M,
-            N,
-            K,
-            K,
-            K,
-            N,
-            zero_points_float_ptr,
-            scales_float_ptr,
-            bias_ptr);
-      } else { // large M
-        return woq_gemm_brgemm<true, 196>(
-            in_ptr,
-            weight_ptr,
-            out_ptr,
-            M,
-            N,
-            K,
-            K,
-            K,
-            N,
-            zero_points_float_ptr,
-            scales_float_ptr,
-            bias_ptr);
+      } else { // case without bias
+        if (M <= 4) { // small M
+          Function_matching<float, int8_t, false, 4>::func_match(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr);
+          return;
+        } else { // large M
+          return woq_gemm_brgemm<false, 196>(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr);
+        }
       }
-    } else { // case without bias
-      if (M <= 4) {
-        switch (M) {
-          case 1:
-            return woq_gemm_intrinsic<false, 1>(
-                in_ptr,
-                weight_ptr,
-                out_ptr,
-                M,
-                N,
-                K,
-                K,
-                K,
-                N,
-                zero_points_float_ptr,
-                scales_float_ptr);
-            break;
-          case 2:
-            return woq_gemm_intrinsic<false, 2>(
-                in_ptr,
-                weight_ptr,
-                out_ptr,
-                M,
-                N,
-                K,
-                K,
-                K,
-                N,
-                zero_points_float_ptr,
-                scales_float_ptr);
-            break;
-          case 3:
-            return woq_gemm_intrinsic<false, 3>(
-                in_ptr,
-                weight_ptr,
-                out_ptr,
-                M,
-                N,
-                K,
-                K,
-                K,
-                N,
-                zero_points_float_ptr,
-                scales_float_ptr);
-            break;
-          case 4:
-            return woq_gemm_intrinsic<false, 4>(
-                in_ptr,
-                weight_ptr,
-                out_ptr,
-                M,
-                N,
-                K,
-                K,
-                K,
-                N,
-                zero_points_float_ptr,
-                scales_float_ptr);
-            break;
+    } else if (self_.scalar_type() == at::kBFloat16) {
+      auto in_ptr = self_.data_ptr<BFloat16>();
+      auto out_ptr = output.data_ptr<BFloat16>();
+      if (bias.defined()) { // case with bias
+        auto bias_ = bias.is_contiguous() ? bias : bias.contiguous();
+        auto bias_ptr = bias_.data_ptr<float>();
+        if (M <= 4) { // small M
+          return Function_matching<BFloat16, int8_t, true, 4>::func_match(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr,
+              bias_ptr);
+        } else { // large M
+          return woq_gemm_brgemm<true, 196>(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr,
+              bias_ptr);
         }
-      } else if (M < 196) {
-        return woq_gemm_brgemm<false>(
-            in_ptr,
-            weight_ptr,
-            out_ptr,
-            M,
-            N,
-            K,
-            K,
-            K,
-            N,
-            zero_points_float_ptr,
-            scales_float_ptr);
-      } else {
-        return woq_gemm_brgemm<false, 196>(
-            in_ptr,
-            weight_ptr,
-            out_ptr,
-            M,
-            N,
-            K,
-            K,
-            K,
-            N,
-            zero_points_float_ptr,
-            scales_float_ptr);
+      } else { // case without bias
+        if (M <= 4) { // small M
+          return Function_matching<BFloat16, int8_t, false, 4>::func_match(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr);
+        } else { // large M
+          return woq_gemm_brgemm<false, 196>(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr);
+        }
+      }
+    }
+  } else { // kPerChannelAffineFloatQParams
+
+    auto weight_ptr = weight.data_ptr<uint8_t>();
+    auto scales_float_ptr = scales_float.data_ptr<float>();
+    auto zero_points_float_ptr = zero_points_float.data_ptr<float>();
+
+    if (self_.scalar_type() == at::kFloat) {
+      auto in_ptr = self_.data_ptr<float>();
+      auto out_ptr = output.data_ptr<float>();
+      if (bias.defined()) { // case with bias
+        auto bias_ = bias.is_contiguous() ? bias : bias.contiguous();
+        auto bias_ptr = bias_.data_ptr<float>();
+        if (M <= 4) { // small M
+          Function_matching<float, uint8_t, true, 4>::func_match(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr,
+              bias_ptr);
+          return;
+        } else { // large M
+          return woq_gemm_brgemm<true, 196>(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr,
+              bias_ptr);
+        }
+      } else { // case without bias
+        if (M <= 4) { // small M
+          Function_matching<float, uint8_t, false, 4>::func_match(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr);
+          return;
+        } else { // large M
+          return woq_gemm_brgemm<false, 196>(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr);
+        }
+      }
+    } else if (self_.scalar_type() == at::kBFloat16) {
+      auto in_ptr = self_.data_ptr<BFloat16>();
+      auto out_ptr = output.data_ptr<BFloat16>();
+      if (bias.defined()) { // case with bias
+        auto bias_ = bias.is_contiguous() ? bias : bias.contiguous();
+        auto bias_ptr = bias_.data_ptr<float>();
+        if (M <= 4) { // small M
+          return Function_matching<BFloat16, uint8_t, true, 4>::func_match(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr,
+              bias_ptr);
+        } else { // large M
+          return woq_gemm_brgemm<true, 196>(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr,
+              bias_ptr);
+        }
+      } else { // case without bias
+        if (M <= 4) { // small M
+          return Function_matching<BFloat16, uint8_t, false, 4>::func_match(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr);
+        } else { // large M
+          return woq_gemm_brgemm<false, 196>(
+              in_ptr,
+              weight_ptr,
+              out_ptr,
+              M,
+              N,
+              K,
+              K,
+              K,
+              N,
+              scales_float_ptr,
+              zero_points_float_ptr);
+        }
       }
     }
   }
 #else
-  auto w = weight.dequantize();
-  if (bias.defined()) {
-    at::linear_out(output, self, w, bias.detach());
+  if (self.scalar_type() == c10::ScalarType::Float) {
+    auto w = weight.dequantize();
+    if (bias.defined()) {
+      at::linear_out(output, self, w, bias.detach());
+    } else {
+      at::linear_out(output, self, w);
+    }
   } else {
-    at::linear_out(output, self, w);
+    auto w = weight.dequantize();
+    auto x = self.to(c10::ScalarType::Float);
+    auto out = at::linear(x, w);
+    if (bias.defined()) {
+      out = at::add(out, bias);
+    }
+    output = out.to(self.scalar_type());
   }
 
 #endif
 }
 
+void woq_gemm_eltwise_kernel_impl(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const at::Tensor& scales_float,
+    const at::Tensor& zero_points_float,
+    const at::Tensor& bias,
+    const c10::string_view& post_op,
+    const torch::List<c10::optional<at::Scalar>>& scalars,
+    const c10::optional<c10::string_view>& algorithm,
+    int64_t lowp_mode,
+    at::Tensor& output) {
+  // TODO Postop not yet implemented in kernel
+  // Here we apply post op after GEMM
+  woq_gemm_kernel_impl(
+      self,
+      weight,
+      scales_float,
+      zero_points_float,
+      bias,
+      lowp_mode,
+      output);
+  auto postop_func = postop_func_map[post_op](scalars, algorithm);
+  postop_func(output);
+}
+
 at::Tensor woq_linear_packB_impl(
     const at::Tensor& weight,
-    const at::Tensor& zero_points,
-    const at::Tensor& scales) {
+    const at::Tensor& scales,
+    const at::Tensor& zero_points) {
 #if defined(CPU_CAPABILITY_AVX512)
   auto N = weight.size(0);
   auto K = weight.size(1);
   auto weight_size = weight.sizes().vec();
-  auto weight_packed = at::_empty_per_channel_affine_quantized(
-      weight_size,
-      scales,
-      zero_points,
-      1,
-      device(c10::kCPU).dtype(c10::kQInt8));
   auto weight_contig = weight.contiguous();
+  const auto qtype = weight.qscheme();
+  if (weight.scalar_type() == c10::ScalarType::QUInt4x2) { // int4 weight
+    auto weight_packed = at::_empty_per_channel_affine_quantized(
+        weight_size,
+        scales,
+        zero_points,
+        1,
+        device(c10::kCPU).dtype(c10::kQUInt4x2));
+    auto weight_ptr = weight_contig.data_ptr<uint8_t>();
+    auto weightpacked_ptr =
+        reinterpret_cast<uint8_t*>(weight_packed.data_ptr());
+    pack(weight_ptr, weightpacked_ptr, K, N, (K + 1) / 2, true);
+    return weight_packed;
+  } else { // int8 weight
+    auto weight_packed = at::_empty_per_channel_affine_quantized(
+        weight_size,
+        scales,
+        zero_points,
+        1,
+        device(c10::kCPU).dtype(c10::kQInt8));
 
-  auto weight_ptr = weight_contig.data_ptr<int8_t>();
-  auto weightpacked_ptr = reinterpret_cast<int8_t*>(weight_packed.data_ptr());
-  pack(weight_ptr, weightpacked_ptr, K, N, K, true);
-
-  return weight_packed;
+    auto weight_ptr = weight_contig.data_ptr<int8_t>();
+    auto weightpacked_ptr = reinterpret_cast<int8_t*>(weight_packed.data_ptr());
+    pack(weight_ptr, weightpacked_ptr, K, N, K, true);
+    return weight_packed;
+  }
 #else
   return weight;
 #endif
@@ -1164,81 +2255,117 @@ at::Tensor woq_linear_unpackB_impl(const at::Tensor& weight) {
 #if defined(CPU_CAPABILITY_AVX512)
   auto N = weight.size(0);
   auto K = weight.size(1);
-  std::vector<int32_t> weight_zero_points_int32(1, 0);
   const auto qtype = weight.qscheme();
-  if (qtype == c10::kPerTensorAffine) {
-    weight_zero_points_int32[0] = weight.q_zero_point();
-  } else if (qtype == c10::kPerChannelAffine) {
-    weight_zero_points_int32.resize(N, 0);
-    for (const auto i : c10::irange(N)) {
-      weight_zero_points_int32[i] =
-          weight.q_per_channel_zero_points()[i].item<int32_t>();
+
+  if (weight.scalar_type() == c10::ScalarType::QUInt4x2) { // int4 weight
+    std::vector<float> weight_scales_float(1, 0.0);
+    if (qtype == c10::kPerChannelAffineFloatQParams) {
+      weight_scales_float.resize(N, 0.0);
+      for (const auto i : c10::irange(N)) {
+        weight_scales_float[i] = weight.q_per_channel_scales()[i].item<float>();
+      }
     }
+    at::Tensor scales = at::empty(
+        {static_cast<long>(weight_scales_float.size())},
+        at::device(c10::kCPU).dtype(c10::kFloat));
+    std::copy(
+        weight_scales_float.begin(),
+        weight_scales_float.end(),
+        scales.data_ptr<float>());
+
+    std::vector<float> weight_zero_points_float(1, 0); // zero_points is float
+    if (qtype == c10::kPerChannelAffineFloatQParams) {
+      weight_zero_points_float.resize(N, 0);
+      for (const auto i : c10::irange(N)) {
+        weight_zero_points_float[i] =
+            weight.q_per_channel_zero_points()[i].item<float>();
+      }
+    }
+    at::Tensor zero_points = at::empty(
+        {static_cast<long>(weight_zero_points_float.size())},
+        at::device(c10::kCPU).dtype(c10::kFloat));
+    std::copy(
+        weight_zero_points_float.begin(),
+        weight_zero_points_float.end(),
+        zero_points.data_ptr<float>());
+
+    auto weight_size = weight.sizes().vec();
+    auto weight_unpacked = at::_empty_per_channel_affine_quantized(
+        weight_size,
+        scales,
+        zero_points,
+        0,
+        device(c10::kCPU).dtype(c10::kQUInt4x2));
+
+    auto weight_contig = weight.contiguous();
+
+    auto weight_ptr = weight_contig.data_ptr<uint8_t>();
+    auto weight_unpacked_ptr =
+        reinterpret_cast<uint8_t*>(weight_unpacked.data_ptr());
+    unpack(weight_ptr, weight_unpacked_ptr, K, N, K, true);
+    return weight_unpacked;
+  } else { // int8 weight
+    std::vector<float> weight_scales_float(1, 0.0);
+    if (qtype == c10::kPerTensorAffine) {
+      weight_scales_float[0] = weight.q_scale();
+    } else if (qtype == c10::kPerChannelAffine) {
+      weight_scales_float.resize(N, 0.0);
+      for (const auto i : c10::irange(N)) {
+        weight_scales_float[i] = weight.q_per_channel_scales()[i].item<float>();
+      }
+    }
+    at::Tensor scales = at::empty(
+        {static_cast<long>(weight_scales_float.size())},
+        at::device(c10::kCPU).dtype(c10::kFloat));
+    std::copy(
+        weight_scales_float.begin(),
+        weight_scales_float.end(),
+        scales.data_ptr<float>());
+
+    std::vector<int32_t> weight_zero_points_int32(1, 0); // zero points is int32
+    if (qtype == c10::kPerTensorAffine) {
+      weight_zero_points_int32[0] = weight.q_zero_point();
+    } else if (qtype == c10::kPerChannelAffine) {
+      weight_zero_points_int32.resize(N, 0);
+      for (const auto i : c10::irange(N)) {
+        weight_zero_points_int32[i] =
+            weight.q_per_channel_zero_points()[i].item<int32_t>();
+      }
+    }
+    at::Tensor zero_points = at::empty(
+        {static_cast<long>(weight_zero_points_int32.size())},
+        at::device(c10::kCPU).dtype(c10::kInt));
+    std::copy(
+        weight_zero_points_int32.begin(),
+        weight_zero_points_int32.end(),
+        zero_points.data_ptr<int32_t>());
+
+    auto weight_size = weight.sizes().vec();
+    auto weight_unpacked = at::_empty_per_channel_affine_quantized(
+        weight_size,
+        scales,
+        zero_points,
+        0,
+        device(c10::kCPU).dtype(c10::kQInt8));
+
+    auto weight_contig = weight.contiguous();
+
+    auto weight_ptr = weight_contig.data_ptr<int8_t>();
+    auto weight_unpacked_ptr =
+        reinterpret_cast<int8_t*>(weight_unpacked.data_ptr());
+    unpack(weight_ptr, weight_unpacked_ptr, K, N, K, true);
+    return weight_unpacked;
   }
 
-  at::Tensor zero_points = at::empty(
-      {static_cast<long>(weight_zero_points_int32.size())},
-      at::device(c10::kCPU).dtype(c10::kInt));
-  std::copy(
-      weight_zero_points_int32.begin(),
-      weight_zero_points_int32.end(),
-      zero_points.data_ptr<int32_t>());
-
-  std::vector<float> weight_scales_float(1, 0.0);
-  if (qtype == c10::kPerTensorAffine) {
-    weight_scales_float[0] = weight.q_scale();
-  } else if (qtype == c10::kPerChannelAffine) {
-    weight_scales_float.resize(N, 0.0);
-    for (const auto i : c10::irange(N)) {
-      weight_scales_float[i] = weight.q_per_channel_scales()[i].item<float>();
-    }
-  }
-
-  at::Tensor scales = at::empty(
-      {static_cast<long>(weight_scales_float.size())},
-      at::device(c10::kCPU).dtype(c10::kFloat));
-  std::copy(
-      weight_scales_float.begin(),
-      weight_scales_float.end(),
-      scales.data_ptr<float>());
-
-  auto weight_size = weight.sizes().vec();
-  auto weight_unpacked = at::_empty_per_channel_affine_quantized(
-      weight_size,
-      scales,
-      zero_points,
-      1,
-      device(c10::kCPU).dtype(c10::kQInt8));
-
-  auto weight_contig = weight.contiguous();
-
-  auto weight_ptr = weight_contig.data_ptr<int8_t>();
-  auto weight_unpacked_ptr =
-      reinterpret_cast<int8_t*>(weight_unpacked.data_ptr());
-  unpack(weight_ptr, weight_unpacked_ptr, K, N, K, true);
-  return weight_unpacked;
 #else
   return weight;
 #endif
 }
-} // anonymous namespace
+} // namespace
 
 REGISTER_DISPATCH(woq_gemm_kernel_stub, &woq_gemm_kernel_impl);
+REGISTER_DISPATCH(woq_gemm_eltwise_kernel_stub, &woq_gemm_eltwise_kernel_impl);
 REGISTER_DISPATCH(woq_linear_unpackB_stub, &woq_linear_unpackB_impl);
 REGISTER_DISPATCH(woq_linear_packB_stub, &woq_linear_packB_impl);
 } // namespace cpu
 } // namespace torch_ipex
-
-namespace std {
-template <>
-struct hash<torch_ipex::cpu::DotMicroKernelKey> {
-  std::size_t operator()(const torch_ipex::cpu::DotMicroKernelKey& key) const {
-    std::size_t h = std::hash<bool>()(key.trans_a);
-    h = std::hash<bool>()(key.trans_b) ^ (h << 1);
-    h = std::hash<int>()(key.lda) ^ (h << 1);
-    h = std::hash<int>()(key.ldb) ^ (h << 1);
-    h = std::hash<int>()(key.ldc) ^ (h << 1);
-    return h;
-  }
-};
-} // namespace std

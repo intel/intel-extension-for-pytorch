@@ -1,26 +1,33 @@
-import unittest, copy
+import unittest
+import copy
 from itertools import product
 
 import torch
-import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 
+
 class TestRNNTUpdateBatch(TestCase):
-    def _test_org(self, hidden, hidden_prime, x, batch_size, max_symbol, blank_id, loop_cnt):
+    def _test_org(
+        self, hidden, hidden_prime, x, batch_size, max_symbol, blank_id, loop_cnt
+    ):
         f = x[:, 0, :]
 
-        max_lens = torch.tensor([self.max_len-1 for i in range(batch_size)], dtype=torch.int64)
+        max_lens = torch.tensor(
+            [self.max_len - 1 for i in range(batch_size)], dtype=torch.int64
+        )
 
         time_idxs = torch.zeros((batch_size), dtype=torch.long)
-        out_lens = torch.tensor([i for i in range(batch_size)], dtype=torch.long)
+        out_lens = torch.tensor(list(i for i in range(batch_size)), dtype=torch.long)
         blank_vec = torch.zeros((batch_size), dtype=torch.long)
         not_blank = torch.zeros((batch_size), dtype=torch.int)
         symbols_added = torch.zeros((batch_size), dtype=torch.long)
-        label_row = torch.tensor([i for i in range(batch_size)])
+        label_row = torch.tensor(list(i for i in range(batch_size)))
         label_col = torch.zeros((batch_size), dtype=torch.long)
-        label_tensor = torch.tensor([self._SOS]).repeat(batch_size, self.max_len*max_symbol)
+        label_tensor = torch.tensor([self._SOS]).repeat(
+            batch_size, self.max_len * max_symbol
+        )
 
-        k = torch.tensor([i for i in range(batch_size)], dtype=torch.long)
+        k = torch.tensor(list(i for i in range(batch_size)), dtype=torch.long)
         # TODO: randomly set k to blank_id (28)
 
         for i in range(loop_cnt):
@@ -42,7 +49,9 @@ class TestRNNTUpdateBatch(TestCase):
             hidden[1][:, idx, :] = hidden_prime[1][:, idx, :]
 
             label_col += not_blank
-            label_tensor.index_put_([label_row, label_col], (k-self._SOS)*not_blank, accumulate=True)
+            label_tensor.index_put_(
+                [label_row, label_col], (k - self._SOS) * not_blank, accumulate=True
+            )
 
             symbols_added += not_blank
 
@@ -58,25 +67,41 @@ class TestRNNTUpdateBatch(TestCase):
                 fetch_time_idxs = time_idxs.min(max_lens)
                 f = x[list(range(x.size(0))), fetch_time_idxs, :]
 
-        return blank_vec, blankness, label_col, time_idxs, symbols_added, not_blank, label_tensor, hidden, f
+        return (
+            blank_vec,
+            blankness,
+            label_col,
+            time_idxs,
+            symbols_added,
+            not_blank,
+            label_tensor,
+            hidden,
+            f,
+        )
 
-    def _test_rnnt_update_batch_kernel(self, hidden, hidden_prime, x, batch_size, max_symbol, blank_id, loop_cnt):
+    def _test_rnnt_update_batch_kernel(
+        self, hidden, hidden_prime, x, batch_size, max_symbol, blank_id, loop_cnt
+    ):
         f = x[:, 0, :]
 
         time_idxs = torch.zeros((batch_size), dtype=torch.int)
-        out_lens = torch.tensor([i for i in range(batch_size)], dtype=torch.int)
+        out_lens = torch.tensor(list(i for i in range(batch_size)), dtype=torch.int)
         blank_vec_out = torch.zeros((batch_size), dtype=torch.int)
         not_blank = torch.zeros((batch_size), dtype=torch.int)
         blankness = torch.zeros((batch_size), dtype=torch.int)
 
         symbols_added = torch.zeros((batch_size), dtype=torch.int)
         label_col = torch.zeros((batch_size), dtype=torch.int)
-        label_tensor = torch.empty((batch_size, self.max_len*max_symbol), dtype=torch.long).fill_(self._SOS)
+        label_tensor = torch.empty(
+            (batch_size, self.max_len * max_symbol), dtype=torch.long
+        ).fill_(self._SOS)
 
-        k = torch.tensor([i for i in range(batch_size)], dtype=torch.long)
+        k = torch.tensor(list(i for i in range(batch_size)), dtype=torch.long)
         label_to_put = torch.zeros((batch_size), dtype=torch.long)
 
-        label_for_next_loop = torch.tensor([self._SOS for i in range(batch_size)], dtype=torch.long)
+        label_for_next_loop = torch.tensor(
+            [self._SOS for i in range(batch_size)], dtype=torch.long
+        )
         for i in range(loop_cnt):
             finished = torch.ops.torch_ipex.rnnt_update_batch(
                 k,
@@ -100,12 +125,23 @@ class TestRNNTUpdateBatch(TestCase):
                 blank_id,
                 batch_size,
                 self._SOS,
-                self.max_len)
+                self.max_len,
+            )
 
             if finished:
                 break
 
-        return blank_vec_out, blankness, label_col, time_idxs, symbols_added, not_blank, label_tensor, hidden, f
+        return (
+            blank_vec_out,
+            blankness,
+            label_col,
+            time_idxs,
+            symbols_added,
+            not_blank,
+            label_tensor,
+            hidden,
+            f,
+        )
 
     def test_rnnt_update_batch(self):
         self._SOS = -1
@@ -116,15 +152,58 @@ class TestRNNTUpdateBatch(TestCase):
         max_symbols = [30]
         blank_ids = [1, 21]
 
-        for batch_size, max_symbol, blank_id, loop_cnt, dtype in list(product(batch_sizes, max_symbols, blank_ids, loop_cnts, dtypes)):
-
+        for batch_size, max_symbol, blank_id, loop_cnt, dtype in list(
+            product(batch_sizes, max_symbols, blank_ids, loop_cnts, dtypes)
+        ):
             x_org = torch.randn([self.max_len, batch_size, 2], dtype=dtype)
             x = copy.deepcopy(x_org)
-            hidden = [torch.zeros([2, batch_size, 320], dtype=dtype), torch.zeros([2, batch_size, 320], dtype=dtype)]
-            hidden_prime = [torch.randn([2, batch_size, 320], dtype=dtype), torch.randn([2, batch_size, 320], dtype=dtype)]
+            hidden = [
+                torch.zeros([2, batch_size, 320], dtype=dtype),
+                torch.zeros([2, batch_size, 320], dtype=dtype),
+            ]
+            hidden_prime = [
+                torch.randn([2, batch_size, 320], dtype=dtype),
+                torch.randn([2, batch_size, 320], dtype=dtype),
+            ]
 
-            blank_vec_org, blankness_org, label_col_org, time_idxs_org, symbols_added_org, not_blank_org, label_tensor_org, hidden_org, f_org = self._test_org(hidden, hidden_prime, x_org.transpose(0, 1), batch_size, max_symbol, blank_id, loop_cnt)
-            blank_vec_out, blankness_out, label_col, time_idxs, symbols_added, not_blank, label_tensor, hidden, f = self._test_rnnt_update_batch_kernel(hidden, hidden_prime, x.transpose(0,1), batch_size, max_symbol, blank_id, loop_cnt)
+            (
+                blank_vec_org,
+                blankness_org,
+                label_col_org,
+                time_idxs_org,
+                symbols_added_org,
+                not_blank_org,
+                label_tensor_org,
+                hidden_org,
+                f_org,
+            ) = self._test_org(
+                hidden,
+                hidden_prime,
+                x_org.transpose(0, 1),
+                batch_size,
+                max_symbol,
+                blank_id,
+                loop_cnt,
+            )
+            (
+                blank_vec_out,
+                blankness_out,
+                label_col,
+                time_idxs,
+                symbols_added,
+                not_blank,
+                label_tensor,
+                hidden,
+                f,
+            ) = self._test_rnnt_update_batch_kernel(
+                hidden,
+                hidden_prime,
+                x.transpose(0, 1),
+                batch_size,
+                max_symbol,
+                blank_id,
+                loop_cnt,
+            )
             self.assertEqual(blank_vec_org, blank_vec_out)
             self.assertEqual(blankness_org, blankness_out)
             self.assertEqual(label_col_org, label_col)
@@ -134,6 +213,7 @@ class TestRNNTUpdateBatch(TestCase):
             self.assertEqual(label_tensor_org, label_tensor)
             self.assertEqual(hidden_org, hidden)
             self.assertEqual(f_org, f)
+
 
 class TestRNNTEmbedding(TestCase):
     def _test_org(self, y, embedding):
@@ -146,14 +226,12 @@ class TestRNNTEmbedding(TestCase):
     def _test_rnnt_embedding_kernel(self, y_in, embedding):
         batch_size = y_in.shape[0]
         embedding_dim = embedding.weight.shape[1]
-        y = torch.empty([batch_size, y_in.shape[1], embedding_dim], dtype=embedding.weight.dtype)
+        y = torch.empty(
+            [batch_size, y_in.shape[1], embedding_dim], dtype=embedding.weight.dtype
+        )
         torch.ops.torch_ipex.rnnt_embedding(
-            embedding.weight,
-            y_in,
-            y,
-            self._SOS,
-            batch_size,
-            embedding_dim)
+            embedding.weight, y_in, y, self._SOS, batch_size, embedding_dim
+        )
         return y
 
     def test_rnnt_embedding(self):
@@ -171,5 +249,6 @@ class TestRNNTEmbedding(TestCase):
 
             self.assertEqual(y_embed_org, y_embed)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test = unittest.main()

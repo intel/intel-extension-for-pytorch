@@ -1,43 +1,220 @@
 .. meta::
    :description: This website introduces Intel® Extension for PyTorch*
-   :keywords: Intel optimization, PyTorch, Intel® Extension for PyTorch*, GPU, discrete GPU, Intel discrete GPU
+   :keywords: Intel optimization, PyTorch, Intel® Extension for PyTorch*, LLM
 
-Welcome to Intel® Extension for PyTorch* Documentation
-######################################################
+============================================================================
+Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started
+============================================================================
 
-Intel® Extension for PyTorch* extends PyTorch* with up-to-date features optimizations for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel X\ :sup:`e`\  Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch* `xpu` device, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs with PyTorch*.
+Intel® Extension for PyTorch* extends optimizations to large language models (LLM). Optimizations are at development and experimental phase at this moment. You are welcomed to have a try with these optimizations on 4th Gen Intel® Xeon® Scalable processors.
 
-Intel® Extension for PyTorch* provides optimizations for both eager mode and graph mode, however, compared to eager mode, graph mode in PyTorch* normally yields better performance from optimization techniques, such as operation fusion. Intel® Extension for PyTorch* amplifies them with more comprehensive graph optimizations. Therefore we recommend you to take advantage of Intel® Extension for PyTorch* with `TorchScript <https://pytorch.org/docs/stable/jit.html>`_ whenever your workload supports it. You could choose to run with `torch.jit.trace()` function or `torch.jit.script()` function, but based on our evaluation, `torch.jit.trace()` supports more workloads so we recommend you to use `torch.jit.trace()` as your first choice.
+System Requirements
+===================
 
-The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts users can enable it dynamically by importing `intel_extension_for_pytorch`.
+.. list-table::
+   :widths: auto
+   :header-rows: 0
+   :stub-columns: 1
 
-Intel® Extension for PyTorch* is structured as shown in the following figure:
+   * - Hardware
+     - 4th Gen Intel® Xeon® Scalable processors
+   * - OS
+     - CentOS/RHEL 8
+   * - Linux Kernel
+     - Intel® 4th Gen Xeon® Platinum: 5.15.0; Intel® 4th Gen Xeon® Max: 5.19.0
+   * - Python
+     - 3.9, conda is required.
+   * - Compiler
+     - Preset in the compilation script below, if compile from source
 
-.. figure:: ../images/intel_extension_for_pytorch_structure.png
-  :width: 800
-  :align: center
-  :alt: Architecture of Intel® Extension for PyTorch*
+Installation
+============
 
-|
+Prebuilt wheel file are available for Python 3.9. Alternatively, a script is provided to compile from source.
 
-Optimizations for both eager mode and graph mode contribute to extra performance accelerations with the extension. In eager mode, the PyTorch frontend is extended with custom Python modules (such as fusion modules), optimal optimizers, and INT8 quantization APIs. Further performance boost is available by converting the eager-mode model into graph mode via extended graph fusion passes. In the graph mode, the fusions reduce operator/kernel invocation overheads, and thus increase performance. On CPU, Intel® Extension for PyTorch* dispatches the operators into their underlying kernels automatically based on ISA that it detects and leverages vectorization and matrix acceleration units available on Intel hardware. Intel® Extension for PyTorch* runtime extension brings better efficiency with finer-grained thread runtime control and weight sharing. On GPU, optimized operators and kernels are implemented and registered through PyTorch dispatching mechanism. These operators and kernels are accelerated from native vectorization feature and matrix calculation feature of Intel GPU hardware. Intel® Extension for PyTorch* for GPU utilizes the `DPC++ <https://github.com/intel/llvm#oneapi-dpc-compiler>`_ compiler that supports the latest `SYCL* <https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html>`_ standard and also a number of extensions to the SYCL* standard, which can be found in the `sycl/doc/extensions <https://github.com/intel/llvm/tree/sycl/sycl/doc/extensions>`_ directory.
+Install From Prebuilt Wheel Files
+---------------------------------
 
-.. note:: GPU features are not included in CPU only packages.
+.. code:: shell
 
-Intel® Extension for PyTorch* has been released as an open–source project at `Github <https://github.com/intel/intel-extension-for-pytorch>`_. Source code is available at `xpu-master branch <https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master>`_. Check `the tutorial <https://intel.github.io/intel-extension-for-pytorch/xpu/latest/>`_ for detailed information. Due to different development schedule, optimizations for CPU only might have a newer code base. Source code is available at `master branch <https://github.com/intel/intel-extension-for-pytorch/tree/master>`_. Check `the CPU tutorial <https://intel.github.io/intel-extension-for-pytorch/cpu/latest/>`_ for detailed information on the CPU side.
+  python -m pip install torch==2.1.0.dev20230711+cpu torchvision==0.16.0.dev20230711+cpu torchaudio==2.1.0.dev20230711+cpu --index-url https://download.pytorch.org/whl/nightly/cpu
+  python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.1.0.dev0%2Bcpu.llm-cp39-cp39-linux_x86_64.whl
+  conda install -y libstdcxx-ng=12 -c conda-forge
 
-.. toctree::
-   :hidden:
-   :maxdepth: 1
+Compile From Source
+-------------------
 
-   tutorials/getting_started
-   tutorials/features
-   tutorials/releases
-   tutorials/installation
-   tutorials/examples
-   tutorials/api_doc
-   tutorials/performance_tuning
-   tutorials/performance
-   tutorials/blogs_publications
-   tutorials/contribution
-   tutorials/license
+.. code:: shell
+
+  wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/scripts/compile_bundle.sh
+  bash compile_bundle.sh
+
+Launch Examples
+===============
+
+Supported Models
+----------------
+
+The following 3 models are supported. When running the example scripts, it is needed to replace the place holder *<MODEL_ID>* in example launch commands with:
+
+.. list-table::
+   :widths: auto
+   :header-rows: 0
+   :stub-columns: 1
+
+   * - GPT-J
+     - "EleutherAI/gpt-j-6b"
+   * - GPT-Neox
+     - "EleutherAI/gpt-neox-20b"
+   * - Llama 2
+     - Model directory path output from the `transformers conversion tool <https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/convert_llama_weights_to_hf.py>`_.* Verified `meta-llama/Llama-2-7b-chat <https://huggingface.co/meta-llama/Llama-2-7b-chat>`_ and `meta-llama/Llama-2-13b-chat <https://huggingface.co/meta-llama/Llama-2-13b-chat>`_.
+
+\* Llama 2 model conversion steps:
+
+  1. Follow `instructions <https://github.com/facebookresearch/llama#access-on-hugging-face>`_ to download model files for conversion.
+  2. Decompress the downloaded model file.
+  3. Follow `instructions <https://github.com/facebookresearch/llama-recipes#model-conversion-to-hugging-face>`_ to convert the model.
+  4. Launch example scripts with the place holder *<MODEL_ID>* substituted by the *\-\-output_dir* argument value of the conversion script.
+
+Install Dependencies
+--------------------
+
+.. code:: shell
+
+  conda install -y gperftools -c conda-forge
+  conda install -y intel-openmp
+  python -m pip install transformers==4.28.1 cpuid accelerate datasets sentencepiece protobuf==3.20.3
+
+  # [Optional] install neural-compressor for GPT-J INT8 only
+  python -m pip install neural-compressor==2.2
+
+  # [Optional] The following is only for DeepSpeed case
+  git clone https://github.com/delock/DeepSpeedSYCLSupport
+  cd DeepSpeedSYCLSupport
+  git checkout gma/run-opt-branch
+  python -m pip install -r requirements/requirements.txt
+  python setup.py install
+  cd ../
+  git clone https://github.com/oneapi-src/oneCCL.git
+  cd oneCCL
+  mkdir build
+  cd build
+  cmake ..
+  make -j install
+  source _install/env/setvars.sh
+  cd ../..
+
+.. note::
+
+  If an error complaining *ninja* is not found when compiling deepspeed, please use conda and pip command to uninstall all ninja packages, and reinstall it with pip.
+
+Run Examples
+------------
+
+The following 5 python scripts are provided in Github repo `example directory <https://github.com/intel/intel-extension-for-pytorch/tree/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/>`_ to launch inference workloads with supported models.
+
+- run_generation.py
+- run_generation_with_deepspeed.py
+- run_gpt-j_int8.py
+- run_gpt-neox_int8.py
+- run_llama_int8.py
+
+Preparations
+^^^^^^^^^^^^
+
+A separate *prompt.json* file is required to run performance benchmarks. You can use the command below to download a sample file. For simple testing, an argument *\-\-prompt* is provided by the scripts to take a text for processing.
+
+To get these Python scripts, you can either get the entire Github repository down with git command, or use the following wget commands to get individual scripts.
+
+.. code:: shell
+
+  # Get the example scripts with git command
+  git clone https://github.com/intel/intel-extension-for-pytorch.git
+  cd intel-extension-for-pytorch
+  git checkout v2.1.0.dev+cpu.llm
+  cd examples/cpu/inference/python/llm
+
+  # Alternatively, get individual example scripts
+  wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_generation.py
+  wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_generation_with_deepspeed.py
+  wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_gpt-j_int8.py
+  wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_gpt-neox_int8.py
+  wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_llama_int8.py
+
+  # Get the sample prompt.json
+  # Make sure the downloaded prompt.json file is under the same directory as that of the python scripts mentioned above.
+  wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
+
+The following environment variables are required to achieve a good performance on 4th Gen Intel® Xeon® Scalable processors.
+
+.. code:: shell
+
+  export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so.6
+
+  # Setup environment variables for performance on Xeon
+  export KMP_BLOCKTIME=INF
+  export KMP_TPAUSE=0
+  export KMP_SETTINGS=1
+  export KMP_AFFINITY=granularity=fine,compact,1,0
+  export KMP_FORJOIN_BARRIER_PATTERN=dist,dist
+  export KMP_PLAIN_BARRIER_PATTERN=dist,dist
+  export KMP_REDUCTION_BARRIER_PATTERN=dist,dist
+  export LD_PRELOAD=${LD_PRELOAD}:${CONDA_PREFIX}/lib/libiomp5.so # Intel OpenMP
+
+  # Tcmalloc is a recommended malloc implementation that emphasizes fragmentation avoidance and scalable concurrency support.
+  export LD_PRELOAD=${LD_PRELOAD}:${CONDA_PREFIX}/lib/libtcmalloc.so
+
+Single Instance Performance
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code:: shell
+
+  # Get prompt file to the path of scripts
+  mv PATH/TO/prompt.json WORK_DIR
+
+  # bfloat16 benchmark
+  OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run_generation.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --jit
+
+  # int8 benchmark
+  ## (1) Do quantization to get the quantized model
+  mkdir saved_results
+
+  ## GPT-J quantization
+  python run_gpt-j_int8.py --ipex-smooth-quant --lambada --output-dir "saved_results" --jit --int8-bf16-mixed -m <GPTJ MODEL_ID>
+  ## Llama 2 quantization
+  python run_llama_int8.py --ipex-smooth-quant --lambada --output-dir "saved_results" --jit --int8-bf16-mixed -m <LLAMA MODEL_ID>
+  ## GPT-NEOX quantization
+  python run_gpt-neox_int8.py --ipex-weight-only-quantization --lambada --output-dir "saved_results" --jit --int8 -m <GPT-NEOX MODEL_ID>
+
+  ## (2) Run int8 performance test (note that GPT-NEOX uses --int8 instead of --int8-bf16-mixed)
+  OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_<MODEL>_int8.py -m <MODEL_ID> --quantized-model-path "./saved_results/best_model.pt" --benchmark --jit --int8-bf16-mixed
+
+Single Instance Accuracy
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code:: shell
+
+  # bfloat16
+  OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run_generation.py --accuracy-only -m <MODEL_ID> --dtype bfloat16 --ipex --jit --lambada
+
+  # Quantization as a performance part
+  # (1) Do quantization to get the quantized model as mentioned above
+  # (2) Run int8 accuracy test (note that GPT-NEOX uses --int8 instead of --int8-bf16-mixed)
+  OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_<MODEL>_int8.py -m <MODEL ID> --quantized-model-path "./saved_results/best_model.pt" --accuracy-only --jit --int8-bf16-mixed --lambada
+
+Distributed Performance with DeepSpeed (autoTP)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code:: shell
+
+  export DS_SHM_ALLREDUCE=1
+  unset KMP_AFFINITY
+
+  # Get prompt file to the path of scripts
+  mv PATH/TO/prompt.json WORK_DIR
+
+  # Run GPTJ/LLAMA with bfloat16  DeepSpeed
+  deepspeed --bind_cores_to_rank run_generation_with_deepspeed.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --jit
+
+  # Run GPT-NeoX with ipex weight only quantization
+  deepspeed --bind_cores_to_rank run_generation_with_deepspeed.py --benchmark -m EleutherAI/gpt-neox-20b --dtype float32 --ipex --jit --ipex-weight-only-quantization

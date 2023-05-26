@@ -1,4 +1,4 @@
-import unittest, copy
+import unittest
 import itertools
 import torch
 import intel_extension_for_pytorch as ipex
@@ -9,10 +9,12 @@ import math
 
 try:
     import torchvision
+
     HAS_TORCHVISION = True
 except ImportError:
     HAS_TORCHVISION = False
 skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
+
 
 def bilinear_interpolate(data, y, x, snap_border=False):
     height, width = data.shape
@@ -45,25 +47,47 @@ def bilinear_interpolate(data, y, x, snap_border=False):
                 val += wx * wy * data[yp, xp]
     return val
 
+
 def fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1, aligned=False):
-    return ipex.nn.modules._roi_align.RoIAlign((pool_h, pool_w), spatial_scale=spatial_scale,
-                        sampling_ratio=sampling_ratio, aligned=aligned)(x, rois)
+    return ipex.nn.modules._roi_align.RoIAlign(
+        (pool_h, pool_w),
+        spatial_scale=spatial_scale,
+        sampling_ratio=sampling_ratio,
+        aligned=aligned,
+    )(x, rois)
 
-def torchvision_fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1, aligned=False):
-    return torchvision.ops.RoIAlign((pool_h, pool_w), spatial_scale=spatial_scale,
-                        sampling_ratio=sampling_ratio, aligned=aligned)(x, rois)
 
-def expected_fn(in_data, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1, aligned=False,
-                dtype=torch.float64):
+def torchvision_fn(
+    x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1, aligned=False
+):
+    return torchvision.ops.RoIAlign(
+        (pool_h, pool_w),
+        spatial_scale=spatial_scale,
+        sampling_ratio=sampling_ratio,
+        aligned=aligned,
+    )(x, rois)
 
+
+def expected_fn(
+    in_data,
+    rois,
+    pool_h,
+    pool_w,
+    spatial_scale=1,
+    sampling_ratio=-1,
+    aligned=False,
+    dtype=torch.float64,
+):
     n_channels = in_data.size(1)
     out_data = torch.zeros(rois.size(0), n_channels, pool_h, pool_w, dtype=dtype)
 
-    offset = 0.5 if aligned else 0.
+    offset = 0.5 if aligned else 0.0
 
     for r, roi in enumerate(rois):
         batch_idx = int(roi[0])
-        j_begin, i_begin, j_end, i_end = (x.item() * spatial_scale - offset for x in roi[1:])
+        j_begin, i_begin, j_end, i_end = (
+            x.item() * spatial_scale - offset for x in roi[1:]
+        )
 
         roi_h = i_end - i_begin
         roi_w = j_end - j_begin
@@ -78,35 +102,45 @@ def expected_fn(in_data, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-
                 grid_w = sampling_ratio if sampling_ratio > 0 else int(np.ceil(bin_w))
 
                 for channel in range(0, n_channels):
-
                     val = 0
                     for iy in range(0, grid_h):
                         y = start_h + (iy + 0.5) * bin_h / grid_h
                         for ix in range(0, grid_w):
                             x = start_w + (ix + 0.5) * bin_w / grid_w
-                            val += bilinear_interpolate(in_data[batch_idx, channel, :, :], y, x, snap_border=True)
+                            val += bilinear_interpolate(
+                                in_data[batch_idx, channel, :, :],
+                                y,
+                                x,
+                                snap_border=True,
+                            )
                     val /= grid_h * grid_w
 
                     out_data[r, channel, i, j] = val
     return out_data
 
-class RoIAlignTester(TestCase):
 
+class RoIAlignTester(TestCase):
     def test_roialign(self):
         pool_size = 5
         # n_channels % (pool_size ** 2) == 0 required for PS opeartions.
-        n_channels = 2 * (pool_size ** 2)
+        n_channels = 2 * (pool_size**2)
         for datatype in [torch.double, torch.float32, torch.float16]:
             x = torch.rand(2, n_channels, 10, 10, dtype=datatype)
             gt_x = x.float().clone().detach().requires_grad_()
-            rois = torch.tensor([[0, 0, 0, 9, 9],  # format is (xyxy)
-                                 [0, 0, 5, 4, 9],
-                                 [0, 5, 5, 9, 9],
-                                 [1, 0, 0, 9, 9]],
-                                dtype=datatype)
+            rois = torch.tensor(
+                [
+                    [0, 0, 0, 9, 9],  # format is (xyxy)
+                    [0, 0, 5, 4, 9],
+                    [0, 5, 5, 9, 9],
+                    [1, 0, 0, 9, 9],
+                ],
+                dtype=datatype,
+            )
 
             pool_h, pool_w = pool_size, pool_size
-            gt_y = expected_fn(gt_x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+            gt_y = expected_fn(
+                gt_x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
+            )
             gt_y.mean().backward()
 
             # forward
@@ -124,10 +158,17 @@ class RoIAlignTester(TestCase):
             # backward
             y1.mean().backward()
             self.assertTrue(x1.grad.dtype == datatype)
-            self.assertTrue(torch.allclose(gt_x.grad.to(x1.dtype), x1.grad, rtol=1e-5, atol=1e-5))
+            self.assertTrue(
+                torch.allclose(gt_x.grad.to(x1.dtype), x1.grad, rtol=1e-5, atol=1e-5)
+            )
 
             # test channels last
-            x2 = x.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+            x2 = (
+                x.clone()
+                .detach()
+                .to(memory_format=torch.channels_last)
+                .requires_grad_()
+            )
             y2 = fn(x2, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
             self.assertTrue(y2.dtype == datatype)
             self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
@@ -136,63 +177,97 @@ class RoIAlignTester(TestCase):
             y2.mean().backward()
             self.assertTrue(x2.grad.dtype == datatype)
             self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
-            self.assertTrue(torch.allclose(gt_x.grad.to(x2.dtype), x2.grad, rtol=1e-5, atol=1e-5))
+            self.assertTrue(
+                torch.allclose(gt_x.grad.to(x2.dtype), x2.grad, rtol=1e-5, atol=1e-5)
+            )
 
-        #test autocast
+        # test autocast
         with torch.cpu.amp.autocast():
             x3 = x.clone().bfloat16().requires_grad_()
-            y3 = fn(x3, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+            y3 = fn(
+                x3, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
+            )
             y3.mean().backward()
             self.assertTrue(y3.dtype == torch.bfloat16)
             self.assertTrue(torch.allclose(gt_y.to(y3.dtype), y3, rtol=1e-2, atol=1e-2))
             self.assertTrue(x3.grad.dtype == torch.bfloat16)
-            self.assertTrue(torch.allclose(gt_x.grad.to(x3.dtype), x3.grad, rtol=1e-5, atol=1e-5))
+            self.assertTrue(
+                torch.allclose(gt_x.grad.to(x3.dtype), x3.grad, rtol=1e-5, atol=1e-5)
+            )
 
-            x4 = x.clone().bfloat16().to(memory_format=torch.channels_last).requires_grad_()
-            y4 = fn(x4, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+            x4 = (
+                x.clone()
+                .bfloat16()
+                .to(memory_format=torch.channels_last)
+                .requires_grad_()
+            )
+            y4 = fn(
+                x4, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
+            )
             y4.mean().backward()
             self.assertTrue(y4.dtype == torch.bfloat16)
             self.assertTrue(torch.allclose(gt_y.to(y4.dtype), y4, rtol=1e-2, atol=1e-2))
             self.assertTrue(x4.grad.dtype == torch.bfloat16)
-            self.assertTrue(torch.allclose(gt_x.grad.to(x4.dtype), x4.grad, rtol=1e-5, atol=1e-5))
+            self.assertTrue(
+                torch.allclose(gt_x.grad.to(x4.dtype), x4.grad, rtol=1e-5, atol=1e-5)
+            )
 
     @skipIfNoTorchVision
     def test_torchvision_roialign(self):
         pool_size = 5
         # n_channels % (pool_size ** 2) == 0 required for PS opeartions.
-        n_channels = 2 * (pool_size ** 2)
+        n_channels = 2 * (pool_size**2)
         for datatype in [torch.double, torch.float32, torch.float16]:
             x = torch.rand(2, n_channels, 10, 10, dtype=datatype)
             gt_x = x.clone().detach().requires_grad_()
-            rois = torch.tensor([[0, 0, 0, 9, 9],  # format is (xyxy)
-                                 [0, 0, 5, 4, 9],
-                                 [0, 5, 5, 9, 9],
-                                 [1, 0, 0, 9, 9]],
-                                dtype=datatype)
+            rois = torch.tensor(
+                [
+                    [0, 0, 0, 9, 9],  # format is (xyxy)
+                    [0, 0, 5, 4, 9],
+                    [0, 5, 5, 9, 9],
+                    [1, 0, 0, 9, 9],
+                ],
+                dtype=datatype,
+            )
 
             pool_h, pool_w = pool_size, pool_size
-            gt_y = expected_fn(gt_x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+            gt_y = expected_fn(
+                gt_x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
+            )
             gt_y.mean().backward()
 
             # forward
             with torch.no_grad():
                 x0 = x.clone().detach()
-                y0 = torchvision_fn(x0, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+                y0 = torchvision_fn(
+                    x0, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
+                )
             self.assertTrue(y0.dtype == datatype)
             self.assertTrue(torch.allclose(gt_y.to(y0.dtype), y0, rtol=1e-2, atol=1e-2))
 
             x1 = x.clone().detach().requires_grad_()
-            y1 = torchvision_fn(x1, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+            y1 = torchvision_fn(
+                x1, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
+            )
             self.assertTrue(y1.dtype == datatype)
             self.assertTrue(torch.allclose(gt_y.to(y1.dtype), y1, rtol=1e-2, atol=1e-2))
 
             y1.mean().backward()
             self.assertTrue(x1.grad.dtype == datatype)
-            self.assertTrue(torch.allclose(gt_x.grad.to(x1.dtype), x1.grad, rtol=1e-5, atol=1e-5))
+            self.assertTrue(
+                torch.allclose(gt_x.grad.to(x1.dtype), x1.grad, rtol=1e-5, atol=1e-5)
+            )
 
             # test channels last
-            x2 = x.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
-            y2 = torchvision_fn(x2, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+            x2 = (
+                x.clone()
+                .detach()
+                .to(memory_format=torch.channels_last)
+                .requires_grad_()
+            )
+            y2 = torchvision_fn(
+                x2, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
+            )
             self.assertTrue(y2.dtype == datatype)
             self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
             self.assertTrue(torch.allclose(gt_y.to(y2.dtype), y2, rtol=1e-2, atol=1e-2))
@@ -200,73 +275,115 @@ class RoIAlignTester(TestCase):
             y2.mean().backward()
             self.assertTrue(x2.grad.dtype == datatype)
             self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
-            self.assertTrue(torch.allclose(gt_x.grad.to(x2.dtype), x2.grad, rtol=1e-5, atol=1e-5))
+            self.assertTrue(
+                torch.allclose(gt_x.grad.to(x2.dtype), x2.grad, rtol=1e-5, atol=1e-5)
+            )
 
-        #test autocast
+        # test autocast
         with torch.cpu.amp.autocast():
             x3 = x.clone().bfloat16().requires_grad_()
-            y3 = torchvision_fn(x3, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+            y3 = torchvision_fn(
+                x3, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
+            )
             y3.mean().backward()
             self.assertTrue(y3.dtype == torch.bfloat16)
             self.assertTrue(torch.allclose(gt_y.to(y3.dtype), y3, rtol=1e-2, atol=1e-2))
             self.assertTrue(x3.grad.dtype == torch.bfloat16)
-            self.assertTrue(torch.allclose(gt_x.grad.to(x3.dtype), x3.grad, rtol=1e-5, atol=1e-5))
+            self.assertTrue(
+                torch.allclose(gt_x.grad.to(x3.dtype), x3.grad, rtol=1e-5, atol=1e-5)
+            )
 
-            x4 = x.clone().bfloat16().to(memory_format=torch.channels_last).requires_grad_()
-            y4 = torchvision_fn(x4, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+            x4 = (
+                x.clone()
+                .bfloat16()
+                .to(memory_format=torch.channels_last)
+                .requires_grad_()
+            )
+            y4 = torchvision_fn(
+                x4, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
+            )
             y4.mean().backward()
             self.assertTrue(y4.dtype == torch.bfloat16)
             self.assertTrue(torch.allclose(gt_y.to(y4.dtype), y4, rtol=1e-2, atol=1e-2))
             self.assertTrue(x4.grad.dtype == torch.bfloat16)
-            self.assertTrue(torch.allclose(gt_x.grad.to(x4.dtype), x4.grad, rtol=1e-5, atol=1e-5))
+            self.assertTrue(
+                torch.allclose(gt_x.grad.to(x4.dtype), x4.grad, rtol=1e-5, atol=1e-5)
+            )
 
     @skipIfNoTorchVision
     def test_torchvision_roialign_torchcompile(self):
         pool_size = 5
-        n_channels = 2 * (pool_size ** 2)
+        n_channels = 2 * (pool_size**2)
         x = torch.rand(2, n_channels, 10, 10)
-        rois = torch.tensor([[0, 0, 0, 9, 9],  # format is (xyxy)
-                             [0, 0, 5, 4, 9],
-                             [0, 5, 5, 9, 9],
-                             [1, 0, 0, 9, 9]])
+        rois = torch.tensor(
+            [
+                [0, 0, 0, 9, 9],  # format is (xyxy)
+                [0, 0, 5, 4, 9],
+                [0, 5, 5, 9, 9],
+                [1, 0, 0, 9, 9],
+            ]
+        )
         pool_h, pool_w = pool_size, pool_size
 
         # TODO: add dynamic tests when 'ipex' backend supports it.
-        for dtype, backend, dynamic in itertools.product([torch.float32, torch.bfloat16], ['ipex', 'inductor'], [False]):
+        for dtype, backend, dynamic in itertools.product(
+            [torch.float32, torch.bfloat16], ["ipex", "inductor"], [False]
+        ):
             torch._dynamo.reset()
-            torchcompile_torchvision_fn = torch.compile(torchvision_fn, backend=backend, dynamic=dynamic)
+            torchcompile_torchvision_fn = torch.compile(
+                torchvision_fn, backend=backend, dynamic=dynamic
+            )
             x = x.to(dtype=dtype)
             rois = rois.to(dtype=dtype)
             # forward
-            with torch.cpu.amp.autocast(enabled=(dtype==torch.bfloat16)), torch.no_grad():
-                y0 = torchvision_fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
-                y1 = torchcompile_torchvision_fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+            with torch.cpu.amp.autocast(
+                enabled=(dtype == torch.bfloat16)
+            ), torch.no_grad():
+                y0 = torchvision_fn(
+                    x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
+                )
+                y1 = torchcompile_torchvision_fn(
+                    x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
+                )
                 self.assertEqual(y0, y1)
                 self.assertTrue(y1.dtype == dtype)
 
     @skipIfNoTorchVision
     def test_roialign_torchcompile(self):
         pool_size = 5
-        n_channels = 2 * (pool_size ** 2)
+        n_channels = 2 * (pool_size**2)
         x = torch.rand(2, n_channels, 10, 10)
-        rois = torch.tensor([[0, 0, 0, 9, 9],  # format is (xyxy)
-                             [0, 0, 5, 4, 9],
-                             [0, 5, 5, 9, 9],
-                             [1, 0, 0, 9, 9]])
+        rois = torch.tensor(
+            [
+                [0, 0, 0, 9, 9],  # format is (xyxy)
+                [0, 0, 5, 4, 9],
+                [0, 5, 5, 9, 9],
+                [1, 0, 0, 9, 9],
+            ]
+        )
         pool_h, pool_w = pool_size, pool_size
         torch._dynamo.allow_in_graph(ipex.nn.modules._roi_align.RoIAlign)
 
-        for dtype, backend, dynamic in itertools.product([torch.float32, torch.bfloat16], ['ipex', 'inductor'], [True, False]):
+        for dtype, backend, dynamic in itertools.product(
+            [torch.float32, torch.bfloat16], ["ipex", "inductor"], [True, False]
+        ):
             torch._dynamo.reset()
-            torchcompile_fn = torch.compile(torchvision_fn, backend=backend, dynamic=dynamic)
+            torchcompile_fn = torch.compile(
+                fn, backend=backend, dynamic=dynamic
+            )
             x = x.to(dtype=dtype)
             rois = rois.to(dtype=dtype)
             # forward
-            with torch.cpu.amp.autocast(enabled=(dtype==torch.bfloat16)), torch.no_grad():
+            with torch.cpu.amp.autocast(
+                enabled=(dtype == torch.bfloat16)
+            ), torch.no_grad():
                 y0 = fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
-                y1 = torchcompile_fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+                y1 = torchcompile_fn(
+                    x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
+                )
                 self.assertEqual(y0, y1)
                 self.assertTrue(y1.dtype == dtype)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test = unittest.main()
