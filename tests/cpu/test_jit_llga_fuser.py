@@ -7,7 +7,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from test_ao_jit_llga_utils import (
     JitLlgaTestCase,
-    run_tests,
     LLGA_FUSION_GROUP,
     llga_fp32_bf16_test_env,
     get_eltwise_fn,
@@ -406,7 +405,6 @@ class TestOp(JitLlgaTestCase):
 
         graph, _ = self.checkTrace(m, [x, y])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
-
 
     @llga_fp32_bf16_test_env
     def test_bmm_div(self):

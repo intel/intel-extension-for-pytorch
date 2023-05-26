@@ -12,7 +12,8 @@ from torch.ao.quantization import (
 import copy
 
 import intel_extension_for_pytorch as ipex
-from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
+from test_ao_jit_llga_utils import JitLlgaTestCase, LLGA_FUSION_GROUP
+from torch.testing._internal.common_utils import run_tests
 from torch.ao.nn.quantized.modules.utils import _quantize_weight
 from intel_extension_for_pytorch.quantization import prepare, convert
 

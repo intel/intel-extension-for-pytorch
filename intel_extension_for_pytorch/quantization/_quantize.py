@@ -11,9 +11,6 @@ from torch.ao.quantization.quantization_mappings import (
 import torch.fx.experimental.optimization as optimization
 from torch.ao.nn.quantized.modules.utils import _quantize_weight
 import torch.ao.nn.quantized.dynamic as nnqd
-from torch.ao.quantization.quantization_mappings import (
-    get_default_dynamic_quant_module_mappings,
-)
 
 import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.cpu.utils.linear_bn_folding import linear_bn_fuse
