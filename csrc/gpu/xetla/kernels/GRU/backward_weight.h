@@ -38,64 +38,47 @@ struct bpk_config_t {
   start_y_b_##id = start_k;                             \
   brgemm_arg_##id.inner_loop_count = (wg_tile_k + sg_tile_k - 1) / sg_tile_k;
 
-#define BPK_BRGEMM_CALL(op_id, ptr_a, ptr_b)                        \
-  brgemm_arg_##op_id.matA_base_desc.init(                           \
-      ptr_a,                                                        \
-      boundary_k,                                                   \
-      boundary_m,                                                   \
-      is_col_major_a ? matrix_m : matrix_k,                         \
-      start_x_a,                                                    \
-      start_y_a);                                                   \
-  brgemm_arg_##op_id.matB_base_desc.init(                           \
-      ptr_b,                                                        \
-      boundary_n_##op_id,                                           \
-      boundary_k,                                                   \
-      matrix_n_##op_id,                                             \
-      start_x_b_##op_id,                                            \
-      start_y_b_##op_id);                                           \
-  brgemm_op_##op_id::call(g, &brgemm_arg_##op_id, &matAcc_##op_id); \
+#define BPK_BRGEMM_CALL(op_id, ptr_a, ptr_b)                          \
+  brgemm_arg_##op_id.matA_base_desc.init(                             \
+      {ptr_a},                                                        \
+      {boundary_k, boundary_m, is_col_major_a ? matrix_m : matrix_k}, \
+      {start_x_a, start_y_a});                                        \
+  brgemm_arg_##op_id.matB_base_desc.init(                             \
+      {ptr_b},                                                        \
+      {boundary_n_##op_id, boundary_k, matrix_n_##op_id},             \
+      {start_x_b_##op_id, start_y_b_##op_id});                        \
+  brgemm_op_##op_id(g, matAcc_##op_id, brgemm_arg_##op_id);           \
   SW_BARRIER();
 
-#define BPK_MATC_STORE_GLOBAL(id, ptr_c)                                     \
-  matC_base_desc.init(                                                       \
-      ptr_c,                                                                 \
-      boundary_n_##id,                                                       \
-      boundary_m,                                                            \
-      matrix_n_##id,                                                         \
-      start_n_##id + brgemm_op_##id::get_matC_offset_x(g),                   \
-      start_m + brgemm_op_##id::get_matC_offset_y(g));                       \
-  matC_##id.init_tdesc(matC_base_desc.get_tdesc());                          \
-  tile_op::elemwise_cvt<matC_t##id, matAcc_t##id>(&matC_##id, &matAcc_##id); \
-  matC_##id.store();
+#define BPK_MATC_STORE_GLOBAL(id, ptr_c)            \
+  matC_base_desc.init(                              \
+      {ptr_c},                                      \
+      {boundary_n_##id, boundary_m, matrix_n_##id}, \
+      {start_n_##id, start_m});                     \
+  epilogue##id(g, matAcc_##id, matC_base_desc, epilogue_args_##id);
 
-#define BPK_DESC_INIT(id, ptr)   \
-  bpi_desc.init(                 \
-      ptr,                       \
-      boundary_m,                \
-      boundary_k,                \
-      matrix_m,                  \
-      start_y_a + tile_offset_m, \
-      start_x_a + 0 * sg_tile_k);
+#define BPK_DESC_INIT(id, ptr)            \
+  bpi_desc.init(                          \
+      {ptr},                              \
+      {boundary_m, boundary_k, matrix_m}, \
+      {start_y_a + tile_offset_m, start_x_a + 0 * sg_tile_k});
 
-#define BIAS_STORE_GLOBAL(id, ptr)                    \
-  bias_desc.init(                                     \
-      ptr,                                            \
-      boundary_m,                                     \
-      1,                                              \
-      matrix_m,                                       \
-      start_m + brgemm_op_##id::get_matC_offset_y(g), \
-      0);                                             \
-  bias_##id.init_tdesc(bias_desc.get_tdesc());        \
-  bias_##id.store();                                  \
+#define BIAS_STORE_GLOBAL(id, ptr)                         \
+  bias_desc.init(                                          \
+      {ptr},                                               \
+      {boundary_m, 1, matrix_m},                           \
+      {start_m + brgemm_t_##id::get_matC_offset_y(g), 0}); \
+  bias_payload.init(bias_desc);                            \
+  tile_store(bias_##id, bias_payload);                     \
   SW_BARRIER();
 
 #define BIAS_REDUCE(id)                                                \
   for (int j = 0; j < block_x_num; j++) {                              \
     for (int l = 0; l < block_y_num; l++) {                            \
       for (int k = 0; k < matA_bpi_t::block_size_y; k++) {             \
-        bias_##id.reg.xetpp_select<matA_bpi_t::block_size_x, 1>(       \
+        bias_##id.reg.xetla_select<matA_bpi_t::block_size_x, 1>(       \
             j * matA_bpi_t::block_size_x) +=                           \
-            matBPI_##id.reg.xetpp_select<matA_bpi_t::block_size_x, 1>( \
+            matBPI_##id.reg.xetla_select<matA_bpi_t::block_size_x, 1>( \
                 matA_bpi_t::block_elems * (j + l * block_x_num) +      \
                 k * matA_bpi_t::block_size_x);                         \
       }                                                                \
@@ -127,136 +110,132 @@ template <
 struct gru_layer_bpk {
   static constexpr uint32_t prefetch_distance = 3;
   using perf_tuning_knob =
-      brgemm_perf_tuning_knob_t<periodic_sync_interval, prefetch_distance>;
+      perf_tuning_knob_t<16, prefetch_distance, periodic_sync_interval>;
+
+  using compute_attr = compute_attr_t<T, T, Act_T>;
+  using compute_policy =
+      compute_policy_default_xmx<compute_attr, perf_tuning_knob, gpu_arch::Xe>;
 
   static constexpr uint32_t tg_size_x =
       (wg_tile_n_0 + sg_tile_n_0 - 1) / sg_tile_n_0;
   static constexpr uint32_t tg_size_y = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
-  using worktile_t = xetpp_worktile_t<tg_size_x * tg_size_y>;
-  using tile_attr_0 = brgemm_tile_attr_t<
-      wg_tile_m,
-      wg_tile_n_0,
-      sg_tile_m,
-      sg_tile_n_0,
-      sg_tile_k>;
-  using tile_attr_1 = brgemm_tile_attr_t<
-      wg_tile_m,
-      wg_tile_n_1,
-      sg_tile_m,
-      sg_tile_n_1,
-      sg_tile_k>;
+  // using worktile_t = xetla_worktile_t<tg_size_x * tg_size_y>;
+  using tile_shape_0 = tile_shape_t<
+      wg_tile_n_0, // workgroup size in N dim
+      wg_tile_m, //	workgroup size in M dim
+      sg_tile_n_0, //	subgroup size in N dim
+      sg_tile_m>; //	subgroup size in M dim
+  using tile_shape_1 =
+      tile_shape_t<wg_tile_n_1, wg_tile_m, sg_tile_n_1, sg_tile_m>;
   static constexpr bool is_col_major_b_0 =
       layout_hidden == mem_layout::col_major;
   static constexpr bool is_col_major_b_1 =
       layout_input == mem_layout::col_major;
   static constexpr bool is_col_major_a = layout_err == mem_layout::col_major;
 
-  using brgemm_mem_attr_0 =
-      brgemm_mem_attr_t<layout_err, layout_hidden, mem_loc_bpi, mem_loc_hidden>;
-  using brgemm_mem_attr_1 =
-      brgemm_mem_attr_t<layout_err, layout_input, mem_loc_bpi, mem_loc_input>;
+  using mem_desc_weight_t = mem_desc_t<T, layout_weight, mem_loc_weight>;
+  using mem_desc_bias_t = mem_desc_t<Act_T, layout_bias, mem_loc_bias>;
+  using mem_desc_err_t = mem_desc_t<T, layout_err, mem_loc_err>;
+  using mem_desc_bpi_t = mem_desc_t<T, mem_layout::row_major, mem_loc_bpi>;
+  using mem_desc_input_t = mem_desc_t<T, layout_input, mem_loc_input>;
+  using mem_desc_hidden_t = mem_desc_t<T, layout_hidden, mem_loc_hidden>;
 
-  using brgemm_op_0 = xetpp_brgemm_t<
-      worktile_t,
-      T,
-      T,
-      Act_T,
-      Act_T,
-      Act_T,
-      tile_attr_0,
-      brgemm_mem_attr_0,
-      __XETPP_TILE_NS::accum_op::MMAOp,
-      gpu_arch::Xe>;
-  using brgemm_op_1 = xetpp_brgemm_t<
-      worktile_t,
-      T,
-      T,
-      Act_T,
-      Act_T,
-      Act_T,
-      tile_attr_1,
-      brgemm_mem_attr_1,
-      __XETPP_TILE_NS::accum_op::MMAOp,
-      gpu_arch::Xe>;
-  using tile_op = __XETPP_TILE_NS::xetpp_tile_op_t<gpu_arch::Xe>;
+  using epilogue0_t = epilogue_t<
+      epilogue_policy_tile_op<
+          subgroup::chained_tile_op_t<>,
+          result_overwrite,
+          gpu_arch::Xe>,
+      tile_shape_0,
+      mem_desc_weight_t>;
+  using epilogue1_t = epilogue_t<
+      epilogue_policy_tile_op<
+          subgroup::chained_tile_op_t<>,
+          result_overwrite,
+          gpu_arch::Xe>,
+      tile_shape_1,
+      mem_desc_weight_t>;
+  using epilogue_args_0_t = typename epilogue0_t::arguments_t;
+  using epilogue_args_1_t = typename epilogue1_t::arguments_t;
 
-  using brgemm_arguments_hidden = typename brgemm_op_0::arguments_t;
-  using brgemm_arguments_input = typename brgemm_op_1::arguments_t;
+  using brgemm_t_0 =
+      brgemm_t<compute_policy, tile_shape_0, mem_desc_err_t, mem_desc_input_t>;
+  using brgemm_t_1 =
+      brgemm_t<compute_policy, tile_shape_1, mem_desc_err_t, mem_desc_hidden_t>;
 
-  using matAcc_t0 = typename brgemm_op_0::matAcc_t;
-  using matAcc_t1 = typename brgemm_op_1::matAcc_t;
-  using block_attr = __XETPP_TILE_NS::
-      block_config_t<__XETPP_TILE_NS::accum_op::MMAOp, gpu_arch::Xe>;
-  static constexpr uint32_t block_size_y_a =
-      (block_attr::block_size_y_a > sg_tile_k) ? sg_tile_k
-                                               : block_attr::block_size_y_a;
-  using matA_load_0_t = __XETPP_TILE_NS::xetpp_tile_load_t<
-      T,
+  using worker_scope_t = typename brgemm_t_0::work_group_t;
+
+  using brgemm_arguments_hidden = typename brgemm_t_0::arguments_t;
+  using brgemm_arguments_input = typename brgemm_t_1::arguments_t;
+
+  using matAcc_t0 = typename brgemm_t_0::matAcc_t;
+  using matAcc_t1 = typename brgemm_t_1::matAcc_t;
+
+  using matAcc_desc_t0 = typename brgemm_t_0::matAcc_tile_desc_t;
+  using matAcc_desc_t1 = typename brgemm_t_1::matAcc_tile_desc_t;
+
+  using block_attr =
+      get_load_block_size_auto<T, sg_tile_m, sg_tile_k, gpu_arch::Xe>;
+
+  using matA_tile_desc_t = tile_desc_t<
       sg_tile_m,
       sg_tile_k,
-      block_attr::block_bytes_x_a / sizeof(Act_T),
-      block_size_y_a,
+      block_attr::block_size_x,
+      block_attr::block_size_y,
+      reg_layout::tiled>;
+  using matA_load_0_t = tile_t<T, matA_tile_desc_t>;
+  using matA_payload_0_t = mem_payload_t<
+      T,
+      matA_tile_desc_t,
+      msg_type_v<matA_tile_desc_t, mem_space::global>,
       mem_layout::row_major,
       mem_space::global,
-      gpu_arch::Xe,
-      __XETPP_TILE_NS::reg_layout::tiled>;
-  using matA_bpi_t = __XETPP_TILE_NS::xetpp_tile_t<
-      Act_T,
-      matA_load_0_t::reg_tile_size_x,
-      matA_load_0_t::reg_tile_size_y,
-      matA_load_0_t::block_size_x,
-      matA_load_0_t::block_size_y,
-      gpu_arch::Xe,
-      __XETPP_TILE_NS::reg_layout::tiled>;
+      gpu_arch::Xe>;
 
-  using matC_t0 = __XETPP_TILE_NS::xetpp_tile_store_t<
+  using matA_bpi_t = tile_t<Act_T, matA_tile_desc_t>;
+
+  using matC_payload_t0 = mem_payload_t<
       T,
-      matAcc_t0::reg_tile_size_x,
-      matAcc_t0::reg_tile_size_y,
-      matAcc_t0::block_size_x,
-      matAcc_t0::block_size_y,
+      matAcc_desc_t0,
+      msg_type_v<matAcc_desc_t0, mem_loc_weight>,
       layout_weight,
       mem_loc_weight,
-      __XETPP_TILE_NS::store_op::normal,
-      gpu_arch::Xe,
-      __XETPP_TILE_NS::reg_layout::tiled>;
-  using matC_t1 = __XETPP_TILE_NS::xetpp_tile_store_t<
+      gpu_arch::Xe>;
+  using matC_t0 = tile_t<T, matAcc_desc_t0>;
+  using matC_payload_t1 = mem_payload_t<
       T,
-      matAcc_t1::reg_tile_size_x,
-      matAcc_t1::reg_tile_size_y,
-      matAcc_t1::block_size_x,
-      matAcc_t1::block_size_y,
+      matAcc_desc_t1,
+      msg_type_v<matAcc_desc_t1, mem_loc_weight>,
       layout_weight,
       mem_loc_weight,
-      __XETPP_TILE_NS::store_op::normal,
-      gpu_arch::Xe,
-      __XETPP_TILE_NS::reg_layout::tiled>;
+      gpu_arch::Xe>;
+  using matC_t1 = tile_t<T, matAcc_desc_t1>;
 
-  using bias_t = __XETPP_TILE_NS::xetpp_tile_store_t<
-      Act_T,
-      matA_bpi_t::reg_tile_size_x,
+  using bias_desc_t = tile_desc_t<
+      matA_bpi_t::tile_size_x,
       1,
       matA_bpi_t::block_size_x,
       1,
+      reg_layout::tiled>;
+  using bias_t = tile_t<Act_T, bias_desc_t>;
+  using bias_payload_t = mem_payload_t<
+      Act_T,
+      bias_desc_t,
+      msg_type_v<bias_desc_t, mem_loc_bias>,
       layout_bias,
       mem_loc_bias,
-      __XETPP_TILE_NS::store_op::normal,
-      gpu_arch::Xe,
-      __XETPP_TILE_NS::reg_layout::tiled>;
-  using prefetch_t = __XETPP_TILE_NS::xetpp_tile_prefetch_t<
+      gpu_arch::Xe>;
+
+  using prefetch_t = prefetch_payload_t<
       T,
-      1,
-      matA_load_0_t::reg_tile_size_x,
-      matA_load_0_t::reg_tile_size_y,
+      tile_desc_t<matA_load_0_t::tile_size_x, matA_load_0_t::tile_size_y, 1, 1>,
       mem_layout::row_major,
       mem_space::global,
+      1, /*tg_size_x=1*/
       gpu_arch::Xe>;
-  using load_update_config = __XETPP_TILE_NS::mem_update_config_t<
-      __XETPP_TILE_NS::tdesc_update_dir::y_dir,
-      __XETPP_TILE_NS::offset_mode::const_offset,
-      1>;
+  static constexpr tdesc_update_dir load_update_config =
+      tdesc_update_dir::y_dir;
 
-  static void inline call(xetpp_exec_item<3> ei, bpk_config_t<T, Act_T>* args) {
+  static void inline call(xetla_exec_item<3> ei, bpk_config_t<T, Act_T>* args) {
     int batch_size, input_size, hidden_size;
     batch_size = args->batch_size;
     input_size = args->input_size;
@@ -264,24 +243,38 @@ struct gru_layer_bpk {
 
     matC_t0 matC_0; /// for W_h* grads
     matC_t1 matC_1; /// for W_i* grads
+    matC_payload_t0 matC_payload_0; /// for W_h* grads
+    matC_payload_t1 matC_payload_1; /// for W_i* grads
 
     matA_load_0_t matBPI_load_0, matBPI_load_1; /// load data src0
+    matA_payload_0_t matBPI_payload_0, matBPI_payload_1;
+
     matA_bpi_t matBPI_0, matBPI_1; /// dst = cvt<src0 * src1>
-    prefetch_t prefetch0, prefetch1;
-    brgemm_mem_desc_t<T, layout_weight, mem_loc_weight> matC_base_desc;
-    brgemm_mem_desc_t<T, mem_layout::row_major, mem_space::global> bpi_desc;
-    brgemm_mem_desc_t<Act_T, layout_bias, mem_loc_bias> bias_desc;
+    mem_desc_weight_t matC_base_desc;
+    mem_desc_bpi_t bpi_desc;
+    mem_desc_bias_t bias_desc;
+
+    brgemm_t_0 brgemm_op_0;
+    brgemm_t_1 brgemm_op_1;
     brgemm_arguments_hidden brgemm_arg_0;
     brgemm_arguments_input brgemm_arg_1;
+
+    epilogue0_t epilogue0;
+    epilogue1_t epilogue1;
+
+    epilogue_args_0_t epilogue_args_0{};
+    epilogue_args_1_t epilogue_args_1{};
+
     matAcc_t0 matAcc_0;
     matAcc_t1 matAcc_1;
 
     bias_t bias_0, bias_1;
+    bias_payload_t bias_payload;
 
     int matrix_n_0, start_x_b_0, start_y_b_0;
     int matrix_n_1, start_x_b_1, start_y_b_1;
-    int start_n_0 = ei.get_group(0) * wg_tile_n_0;
-    int start_n_1 = ei.get_group(0) * wg_tile_n_1;
+    int start_n_0 = ei.get_group(2) * wg_tile_n_0;
+    int start_n_1 = ei.get_group(2) * wg_tile_n_1;
     int start_m = ei.get_group(1) * wg_tile_m;
     int start_k = 0;
     int boundary_n_0, boundary_n_1, boundary_m, boundary_k;
@@ -309,66 +302,62 @@ struct gru_layer_bpk {
     int gate_nums = 3;
     int layer_input_size = batch_size * input_size;
     int seq_len = args->sequence_length;
-    matAcc_0.init_value(0);
-    matAcc_1.init_value(0);
-    int block_x_num = matA_bpi_t::reg_tile_size_x / matA_bpi_t::block_size_x;
-    int block_y_num = matA_bpi_t::reg_tile_size_y / matA_bpi_t::block_size_y;
-    bias_0.init_value(0);
-    bias_1.init_value(0);
-    matBPI_0.init_value(0);
-    matBPI_1.init_value(0);
-    worktile_t g;
-    g.init(ei.get_local_linear_id());
+    matAcc_0.init(0);
+    matAcc_1.init(0);
+    int block_x_num = matA_bpi_t::tile_size_x / matA_bpi_t::block_size_x;
+    int block_y_num = matA_bpi_t::tile_size_y / matA_bpi_t::block_size_y;
+    bias_0.init(0);
+    bias_1.init(0);
+    matBPI_0.init(0);
+    matBPI_1.init(0);
+    worker_scope_t g(ei.get_local_linear_id());
+
     for (unsigned seq_id = 0; seq_id < seq_len; ++seq_id) {
       BPK_DESC_INIT(
           0, args->err_ptr1 + (seq_len - 1 - seq_id) * io_size * gate_nums);
-      matBPI_load_0.init_tdesc(bpi_desc.get_tdesc());
-      prefetch0.init_tdesc(bpi_desc.get_tdesc(), 0);
-      prefetch0.template update_prefetch_tdesc<load_update_config>(sg_tile_k);
-      matBPI_load_0.template load<cache_hint::cached, cache_hint::cached>();
-      matBPI_load_0.template update_load_tdesc<load_update_config>(sg_tile_k);
+      matBPI_payload_0.init(bpi_desc);
+      prefetch_t prefetch0(bpi_desc);
+      prefetch0.template update_tdesc<load_update_config>(sg_tile_k);
+      tile_load(matBPI_load_0, matBPI_payload_0);
+      matBPI_payload_0.template update_tdesc<load_update_config>(sg_tile_k);
       BPK_DESC_INIT(
           1, args->err_ptr0 + (seq_len - 1 - seq_id) * io_size * gate_nums);
-      matBPI_load_1.init_tdesc(bpi_desc.get_tdesc());
-      prefetch1.init_tdesc(bpi_desc.get_tdesc(), 0);
-      prefetch1.template update_prefetch_tdesc<load_update_config>(sg_tile_k);
-      matBPI_load_1.template load<cache_hint::cached, cache_hint::cached>();
-      matBPI_load_1.template update_load_tdesc<load_update_config>(sg_tile_k);
+      matBPI_payload_1.init(bpi_desc);
+      prefetch_t prefetch1(bpi_desc);
+      prefetch1.template update_tdesc<load_update_config>(sg_tile_k);
+      tile_load(matBPI_load_1, matBPI_payload_1);
+      matBPI_payload_1.template update_tdesc<load_update_config>(sg_tile_k);
       matBPI_1.reg +=
-          xetpp_cvt<Act_T, T, matA_bpi_t::reg_tile_elems>(matBPI_load_0.reg);
+          xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(matBPI_load_0.reg);
       SW_BARRIER();
       matBPI_0.reg +=
-          xetpp_cvt<Act_T, T, matA_bpi_t::reg_tile_elems>(matBPI_load_1.reg);
+          xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(matBPI_load_1.reg);
       SW_BARRIER();
 #pragma unroll
       for (int i = 0; i < prefetch_distance; i++) {
-        prefetch0
-            .template prefetch_tile<cache_hint::cached, cache_hint::cached>();
-        prefetch0.template update_prefetch_tdesc<load_update_config>(sg_tile_k);
-        prefetch1
-            .template prefetch_tile<cache_hint::cached, cache_hint::cached>();
-        prefetch1.template update_prefetch_tdesc<load_update_config>(sg_tile_k);
+        tile_prefetch(prefetch0);
+        prefetch0.template update_tdesc<load_update_config>(sg_tile_k);
+        tile_prefetch(prefetch1);
+        prefetch1.template update_tdesc<load_update_config>(sg_tile_k);
       }
       for (int i = 1; i < (wg_tile_k + sg_tile_k - 1) / sg_tile_k; i++) {
-        matBPI_load_0.template load<cache_hint::cached, cache_hint::cached>();
-        matBPI_load_0.template update_load_tdesc<load_update_config>(sg_tile_k);
-        prefetch0
-            .template prefetch_tile<cache_hint::cached, cache_hint::cached>();
-        prefetch0.template update_prefetch_tdesc<load_update_config>(sg_tile_k);
+        tile_load(matBPI_load_0, matBPI_payload_0);
+        matBPI_payload_0.template update_tdesc<load_update_config>(sg_tile_k);
+        tile_prefetch(prefetch0);
+        prefetch0.template update_tdesc<load_update_config>(sg_tile_k);
         // MAT_LOAD_GLOBAL(0, args->err_ptr1 + (seq_len - 1 - seq_id) * io_size
         // * gate_nums);    /// err
         matBPI_1.reg +=
-            xetpp_cvt<Act_T, T, matA_bpi_t::reg_tile_elems>(matBPI_load_0.reg);
+            xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(matBPI_load_0.reg);
         SW_BARRIER();
-        matBPI_load_1.template load<cache_hint::cached, cache_hint::cached>();
-        matBPI_load_1.template update_load_tdesc<load_update_config>(sg_tile_k);
-        prefetch1
-            .template prefetch_tile<cache_hint::cached, cache_hint::cached>();
-        prefetch1.template update_prefetch_tdesc<load_update_config>(sg_tile_k);
+        tile_load(matBPI_load_1, matBPI_payload_1);
+        matBPI_payload_1.template update_tdesc<load_update_config>(sg_tile_k);
+        tile_prefetch(prefetch1);
+        prefetch1.template update_tdesc<load_update_config>(sg_tile_k);
         // MAT_LOAD_GLOBAL(0, args->err_ptr0 + (seq_len - 1 - seq_id) * io_size
         // * gate_nums);    /// err
         matBPI_0.reg +=
-            xetpp_cvt<Act_T, T, matA_bpi_t::reg_tile_elems>(matBPI_load_1.reg);
+            xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(matBPI_load_1.reg);
         SW_BARRIER();
       }
 
@@ -424,7 +413,7 @@ struct perf_kernel_xcoder_gru_bpk {
   /// @param sequence_length
   /// @param layer_size
   static void inline run(
-      xetpp_exec_item<3> ei,
+      xetla_exec_item<3> ei,
       input_T* err0_ptr,
       input_T* err1_ptr,
       input_T* layer_ptr,
@@ -438,10 +427,6 @@ struct perf_kernel_xcoder_gru_bpk {
       int hidden_size,
       int sequence_length,
       int layer_size) {
-    using namespace __XETPP_NS;
-    using namespace __XETPP_BRGEMM_NS;
-    using namespace __XETPP_GEMM_NS;
-
     constexpr uint32_t fused_op_wg_n_0 = wg_tile_n_0_t;
     constexpr uint32_t fused_op_wg_n_1 = wg_tile_n_1_t;
     constexpr uint32_t fused_op_wg_m = wg_tile_m_t;
@@ -470,6 +455,7 @@ struct perf_kernel_xcoder_gru_bpk {
         fused_op_sg_m,
         fused_op_sg_k>;
     bpk_config_t<input_T, Act_T> args;
+
     int layer_input_size = batch_size * input_size;
     int hidden_io_size = batch_size * hidden_size;
     int input_weight_size = input_size * hidden_size;
@@ -479,7 +465,7 @@ struct perf_kernel_xcoder_gru_bpk {
     int gate_nums = 3;
 
     // args.debug_ptr = debug_ptr;
-    int layer_id = ei.get_group(2);
+    int layer_id = ei.get_group(0);
     args.sequence_length = sequence_length;
 
     if (layer_id != 0 && layer_id < layer_size) {
@@ -547,7 +533,7 @@ struct kernel_xcoder_gru_bpk {
   /// @param sequence_length
   /// @param layer_size
   static void inline run(
-      xetpp_exec_item<3> ei,
+      xetla_exec_item<3> ei,
       input_T* err0_ptr,
       input_T* err1_ptr,
       input_T* layer_ptr,
@@ -561,10 +547,6 @@ struct kernel_xcoder_gru_bpk {
       int hidden_size,
       int sequence_length,
       int layer_size) {
-    using namespace __XETPP_NS;
-    using namespace __XETPP_BRGEMM_NS;
-    using namespace __XETPP_GEMM_NS;
-
     constexpr uint32_t fused_op_wg_n_0 = wg_tile_n_0_t;
     constexpr uint32_t fused_op_wg_n_1 = wg_tile_n_1_t;
     constexpr uint32_t fused_op_wg_m = wg_tile_m_t;
@@ -681,7 +663,7 @@ void gru_backward_weight_impl(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(Range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-      xetpp_exec_item ei(item);
+      xetla_exec_item ei(item);
 
       using xcoder_gru_bpk_op = perf_kernel_xcoder_gru_bpk<
           typename gru_bpk_config_t::input_T,

@@ -45,56 +45,32 @@ struct fwd_config_t {
   bool is_first_cell = false;
 };
 /// weights 704 x 3 , 384
-#define PART_BRGEMM_CALL(op_id, acc0_ptr, m, k, n, ptr_a, ptr_b1)       \
-  wg_tile_k = k;                                                        \
-  boundary_k = wg_tile_k;                                               \
-  boundary_m = (start_m + wg_tile_m) > m ? m : (start_m + wg_tile_m);   \
-  boundary_n = (start_n + wg_tile_n) > n ? n : (start_n + wg_tile_n);   \
-  pitch_a = is_col_major_a ? m : k;                                     \
-  start_x_a = is_col_major_a ? start_m : start_k;                       \
-  start_y_a = is_col_major_a ? start_k : start_m;                       \
-                                                                        \
-  pitch_b = is_col_major_b ? k : n;                                     \
-  start_x_b = is_col_major_b ? start_k : start_n;                       \
-  start_y_b = is_col_major_b ? start_n : start_k;                       \
-  brgemm_arg.inner_loop_count =                                         \
-      (wg_tile_k + sg_tile_k_##op_id - 1) / sg_tile_k_##op_id;          \
-  brgemm_arg.matA_base_desc.init(                                       \
-      ptr_a, boundary_k, boundary_m, pitch_a, start_x_a, start_y_a);    \
-  brgemm_arg.matB_base_desc.init(                                       \
-      ptr_b1, boundary_n, boundary_k, pitch_b, start_x_b, start_y_b);   \
-                                                                        \
-  brgemm_op::call(g, &(brgemm_arg), acc0_ptr /*, acc1_ptr, acc2_ptr*/); \
+#define PART_BRGEMM_CALL(op_id, acc0_ptr, m, k, n, ptr_a, ptr_b1)           \
+  wg_tile_k = k;                                                            \
+  boundary_k = wg_tile_k;                                                   \
+  boundary_m = (start_m + wg_tile_m) > m ? m : (start_m + wg_tile_m);       \
+  boundary_n = (start_n + wg_tile_n) > n ? n : (start_n + wg_tile_n);       \
+  pitch_a = is_col_major_a ? m : k;                                         \
+  start_x_a = is_col_major_a ? start_m : start_k;                           \
+  start_y_a = is_col_major_a ? start_k : start_m;                           \
+                                                                            \
+  pitch_b = is_col_major_b ? k : n;                                         \
+  start_x_b = is_col_major_b ? start_k : start_n;                           \
+  start_y_b = is_col_major_b ? start_n : start_k;                           \
+  brgemm_arg.inner_loop_count =                                             \
+      (wg_tile_k + sg_tile_k_##op_id - 1) / sg_tile_k_##op_id;              \
+  brgemm_arg.matA_base_desc.init(                                           \
+      {ptr_a}, {boundary_k, boundary_m, pitch_a}, {start_x_a, start_y_a});  \
+  brgemm_arg.matB_base_desc.init(                                           \
+      {ptr_b1}, {boundary_n, boundary_k, pitch_b}, {start_x_b, start_y_b}); \
+                                                                            \
+  brgemm_op(g, acc0_ptr, brgemm_arg /*, acc1_ptr, acc2_ptr*/);              \
   SW_BARRIER();
 
-#define MATC_STORE(acc_id, prt_c)                                  \
-  matC_base_desc.init(                                             \
-      prt_c,                                                       \
-      boundary_n,                                                  \
-      boundary_m,                                                  \
-      hidden_size,                                                 \
-      start_n + ei.get_local_id(0) * sg_tile_n,                    \
-      start_m + ei.get_local_id(1) * sg_tile_m);                   \
-  matC.init_tdesc(matC_base_desc.get_tdesc());                     \
-  tile_op::elemwise_cvt<matC_t, matAcc_t>(&matC, &matAcc##acc_id); \
-  matC.store();
-
-#define MATH_STORE(acc_id)                                         \
-  xetpp_fill_tdesc<T>(                                             \
-      matH_base_desc.xetpp_format<uint32_t>(),                     \
-      write_base_ptr,                                              \
-      boundary_n,                                                  \
-      wg_tile_m,                                                   \
-      local_pitch,                                                 \
-      start_n + brgemm_op::get_matC_offset_x(g),                   \
-      brgemm_op::get_matC_offset_y(g));                            \
-  matH.init_tdesc(matH_base_desc);                                 \
-  tile_op::elemwise_cvt<matH_t, matAcc_t>(&matH, &matAcc##acc_id); \
-  matH.store();
-
-using namespace __XETPP_NS;
-using namespace __XETPP_BRGEMM_NS;
-using namespace __XETPP_GEMM_NS;
+#define MATC_STORE(acc_id, ptr_c)                                          \
+  matC_base_desc.init(                                                     \
+      {ptr_c}, {boundary_n, boundary_m, hidden_size}, {start_n, start_m}); \
+  epilogue(g, matAcc##acc_id, matC_base_desc, epilogue_args);
 
 template <
     typename T,
@@ -114,133 +90,96 @@ template <
     mem_space mem_loc_weight = mem_space::global,
     mem_space mem_loc_workspace = mem_space::global,
     mem_space mem_loc_out = mem_space::global,
-    uint32_t periodic_sync_in_iters = 0>
+    uint32_t periodic_sync_interval = 0>
 struct gru_cell {
   static constexpr bool is_from_local_hidden =
       mem_loc_hidden == mem_space::local;
   static constexpr bool is_col_major_a = layout_input == mem_layout::col_major;
   static constexpr bool is_col_major_b = layout_weight == mem_layout::col_major;
-  static constexpr uint32_t prefetch_distance = 0;
+  static constexpr uint32_t prefetch_distance = 3;
   static constexpr uint32_t l3_kslicing = 0;
-  static constexpr embedded_kind embedded_op_kind =
-      layout_input == mem_layout::col_major
-      ? embedded_kind::cooperative_slm_tran_a
-      : embedded_kind::none;
-  using tile_attr = brgemm_tile_attr_t<
-      wg_tile_m,
-      wg_tile_n,
-      sg_tile_m,
-      sg_tile_n,
-      sg_tile_k_0>;
-  using perf_tuning_knob =
-      brgemm_perf_tuning_knob_t<periodic_sync_in_iters, prefetch_distance>;
-  using gemm_attr =
-      gemm_attr_t<tile_attr, perf_tuning_knob, l3_kslicing, embedded_op_kind>;
-  using mem_update_config_input = __XETPP_TILE_NS::mem_update_config_t<
-      is_col_major_a ? __XETPP_TILE_NS::tdesc_update_dir::y_dir
-                     : __XETPP_TILE_NS::tdesc_update_dir::x_dir>;
-  using mem_update_config_weight = __XETPP_TILE_NS::mem_update_config_t<
-      is_col_major_b ? __XETPP_TILE_NS::tdesc_update_dir::x_dir
-                     : __XETPP_TILE_NS::tdesc_update_dir::y_dir>;
 
-  using mem_desc_t =
-      brgemm_mem_desc_t<T, mem_layout::row_major, mem_space::global>;
+  using perf_tuning_knob = perf_tuning_knob_t<
+      sg_tile_k_0,
+      prefetch_distance,
+      periodic_sync_interval>;
 
-  using mask_desc_t =
-      brgemm_mem_desc_t<Act_T, mem_layout::row_major, mem_space::global>;
+  using compute_attr = compute_attr_t<T, T, Act_T>;
+  using compute_policy =
+      compute_policy_default_xmx<compute_attr, perf_tuning_knob, gpu_arch::Xe>;
+  using mem_desc_a_t = mem_desc_t<T, layout_input, mem_loc_input>;
+  using mem_desc_b_t = mem_desc_t<T, layout_weight, mem_loc_weight>;
+  // Org the compute shape for sub-matrix
+  using tile_shape = tile_shape_t<
+      wg_tile_n, // workgroup size in N dim
+      wg_tile_m, //	workgroup size in M dim
+      sg_tile_n, //	subgroup size in N dim
+      sg_tile_m>; //	subgroup size in M dim
+  using brgemm_op_t =
+      brgemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
-  using brgemm_mem_attr = brgemm_mem_attr_t<
-      layout_input,
-      layout_weight,
-      mem_loc_input,
-      mem_loc_weight,
-      offset_mode::const_offset,
-      offset_mode::const_offset,
-      1,
-      1>;
+  using worker_scope_t = typename brgemm_op_t::work_group_t;
 
-  using embedded_op_attr = embedded_op_attr_t<
-      T,
-      T,
-      tile_attr,
-      layout_input,
-      layout_weight,
-      mem_loc_input,
-      mem_loc_weight,
-      perf_tuning_knob::prefetch_distance>;
-  static constexpr uint32_t tg_size_x = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
-  static constexpr uint32_t tg_size_y = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
-  using worktile_t = xetpp_worktile_t<tg_size_x * tg_size_y>;
-  using arch_attr = arch_attr_t<gpu_arch::Xe>;
+  using brgemm_arguments = typename brgemm_op_t::arguments_t;
 
-  using brgemm_op = xetpp_brgemm_t<
-      worktile_t,
-      T,
-      T,
-      T,
-      T,
-      Act_T,
-      tile_attr,
-      brgemm_mem_attr,
-      accum_op::MMAOp,
-      gpu_arch::Xe,
-      perf_tuning_knob>;
-  using tile_op = xetpp_tile_op_t<gpu_arch::Xe>;
-  using brgemm_arguments_input = typename brgemm_op::arguments_t;
+  using matAcc_t = typename brgemm_op_t::matAcc_t;
 
-  using matAcc_t = typename brgemm_op::matAcc_t;
-  using matC_t = __XETPP_TILE_NS::xetpp_tile_store_t<
-      T,
-      matAcc_t::reg_tile_size_x,
-      matAcc_t::reg_tile_size_y,
+  using mem_desc_c_t = mem_desc_t<T, layout_out, mem_loc_out>;
+  using mem_desc_mask_t = mem_desc_t<Act_T, layout_out, mem_loc_out>;
+  // define arguments for each epilogue_tile_op in chained_tile_op_t<>
+
+  using epilogue_t = epilogue_t<
+      epilogue_policy_tile_op<
+          subgroup::chained_tile_op_t<>,
+          result_overwrite,
+          gpu_arch::Xe>,
+      tile_shape,
+      mem_desc_c_t>;
+  using epilogue_args_t = typename epilogue_t::arguments_t;
+
+  using mat_tile_desc_t = tile_desc_t<
+      matAcc_t::tile_size_x,
+      matAcc_t::tile_size_y,
       matAcc_t::block_size_x,
       matAcc_t::block_size_y,
-      layout_out,
-      mem_loc_workspace,
-      __XETPP_TILE_NS::store_op::normal,
-      gpu_arch::Xe,
-      __XETPP_TILE_NS::reg_layout::tiled>;
+      reg_layout::tiled>;
 
-  using matH_t = __XETPP_TILE_NS::xetpp_tile_store_t<
+  using mat_t = tile_t<T, mat_tile_desc_t>;
+  using mat_hidden_payload_t = mem_payload_t<
       T,
-      matAcc_t::reg_tile_size_x,
-      matAcc_t::reg_tile_size_y,
-      matAcc_t::block_size_x,
-      matAcc_t::block_size_y,
-      layout_out,
-      mem_loc_out,
-      __XETPP_TILE_NS::store_op::normal,
-      gpu_arch::Xe,
-      __XETPP_TILE_NS::reg_layout::tiled>;
-
-  using mat_t = __XETPP_TILE_NS::xetpp_tile_load_t<
-      T,
-      matAcc_t::reg_tile_size_x,
-      matAcc_t::reg_tile_size_y,
-      matAcc_t::block_size_x,
-      matAcc_t::block_size_y,
+      mat_tile_desc_t,
+      msg_type_v<mat_tile_desc_t, mem_loc_hidden>,
       layout_hidden,
       mem_loc_hidden,
-      gpu_arch::Xe,
-      __XETPP_TILE_NS::reg_layout::tiled>;
+      gpu_arch::Xe>;
 
-  using mask_t = xetpp_tile_load_t<
+  using matC_payload_t = mem_payload_t<
+      T,
+      mat_tile_desc_t,
+      msg_type_v<mat_tile_desc_t, mem_loc_out>,
+      layout_out,
+      mem_loc_out,
+      gpu_arch::Xe>;
+
+  using mask_t = tile_t<Act_T, mat_tile_desc_t>;
+
+  using mask_payload_t = mem_payload_t<
       Act_T,
-      matAcc_t::reg_tile_size_x,
-      matAcc_t::reg_tile_size_y,
-      matAcc_t::block_size_x,
-      matAcc_t::block_size_y,
-      mem_layout::row_major,
-      mem_space::global,
-      gpu_arch::Xe,
-      __XETPP_TILE_NS::reg_layout::tiled>;
+      mat_tile_desc_t,
+      msg_type_v<mat_tile_desc_t, mem_loc_out>,
+      layout_out,
+      mem_loc_out,
+      gpu_arch::Xe>;
 
-  static void inline call(xetpp_exec_item<3> ei, fwd_config_t<T, Act_T>* args) {
-    matH_t matH;
-    matC_t matC;
+  static void inline call(xetla_exec_item<3> ei, fwd_config_t<T, Act_T>* args) {
+    // matC_t matH;
+    mat_t matC;
+    mat_t mat_hidden;
+    mat_hidden_payload_t mat_hidden_payload;
+    // mat_tile_desc_t matC_tile_desc;
 
-    mem_desc_t matC_base_desc;
-    mem_desc_t matH_base_desc;
+    mem_desc_c_t matC_base_desc;
+    // mem_desc_c_t matH_base_desc;
     matAcc_t matAcc0;
     matAcc_t matAcc1;
     matAcc_t matAcc2;
@@ -249,11 +188,13 @@ struct gru_cell {
     input_size = args->input_size;
     hidden_size = args->hidden_size;
 
-    brgemm_arguments_input brgemm_arg;
+    brgemm_arguments brgemm_arg;
+    brgemm_op_t brgemm_op;
     // brgemm_arguments_hidden brgemm_arg_1;
 
-    worktile_t g;
-    g.init(ei.get_local_linear_id());
+    worker_scope_t g(ei.get_local_linear_id());
+    epilogue_t epilogue;
+    epilogue_args_t epilogue_args{};
 
     int start_m = ei.get_group(1) * wg_tile_m;
     int start_n = args->group_offset * wg_tile_n;
@@ -261,7 +202,7 @@ struct gru_cell {
     int boundary_m, boundary_n, boundary_k;
     int local_pitch = ((hidden_size + wg_tile_n - 1) / wg_tile_n) * wg_tile_n;
     int wg_tile_k;
-    mat_t mat_hidden;
+
     SW_BARRIER();
 
     int pitch_a, start_x_a, start_y_a;
@@ -272,32 +213,32 @@ struct gru_cell {
     init_acc_with_bias(
         args->B_ir_ptr,
         args->B_hr_ptr,
-        &matAcc0,
+        matAcc0,
         boundary_n,
         args->hidden_size,
-        start_n + brgemm_op::get_matC_offset_x(g),
+        start_n + brgemm_op_t::get_matC_offset_x(g),
         start_m);
     init_acc_with_bias(
         args->B_iz_ptr,
         args->B_hz_ptr,
-        &matAcc1,
+        matAcc1,
         boundary_n,
         args->hidden_size,
-        start_n + brgemm_op::get_matC_offset_x(g),
+        start_n + brgemm_op_t::get_matC_offset_x(g),
         start_m);
     init_acc_with_bias(
         args->B_hn_ptr,
-        &matAcc2,
+        matAcc2,
         boundary_n,
         args->hidden_size,
-        start_n + brgemm_op::get_matC_offset_x(g),
+        start_n + brgemm_op_t::get_matC_offset_x(g),
         start_m);
 
     SW_BARRIER();
     // caculate Mat_Wi_ * Mat_X(t)
     PART_BRGEMM_CALL(
         0,
-        &matAcc0,
+        matAcc0,
         batch_size,
         input_size,
         hidden_size,
@@ -307,19 +248,19 @@ struct gru_cell {
 
     PART_BRGEMM_CALL(
         0,
-        &matAcc0,
+        matAcc0,
         batch_size,
         hidden_size,
         hidden_size,
         args->hx_ptr,
         args->W_hr_ptr);
-    tile_op::elemwise_op<matAcc_t, post_kind::sigmoid>(matAcc0);
+    subgroup::elemwise_op<matAcc_t, post_kind::sigmoid>(matAcc0);
     SW_BARRIER();
     MATC_STORE(0, args->reset_gate_ptr);
 
     PART_BRGEMM_CALL(
         0,
-        &matAcc2,
+        matAcc2,
         batch_size,
         hidden_size,
         hidden_size,
@@ -332,25 +273,25 @@ struct gru_cell {
 
     init_acc_with_bias(
         args->B_in_ptr,
-        &matAcc0,
+        matAcc0,
         boundary_n,
         args->hidden_size,
-        start_n + brgemm_op::get_matC_offset_x(g),
+        start_n + brgemm_op_t::get_matC_offset_x(g),
         start_m);
     PART_BRGEMM_CALL(
         0,
-        &matAcc0,
+        matAcc0,
         batch_size,
         input_size,
         hidden_size,
         args->layer_ptr,
         args->W_in_ptr);
     matAcc2.reg = matAcc2.reg + matAcc0.reg;
-    tile_op::elemwise_op<matAcc_t, post_kind::tanh>(matAcc2);
+    subgroup::elemwise_op<matAcc_t, post_kind::tanh>(matAcc2);
     // caculate Mat_Wh_ * Mat_h(t)
     PART_BRGEMM_CALL(
         0,
-        &matAcc1,
+        matAcc1,
         batch_size,
         input_size,
         hidden_size,
@@ -359,23 +300,22 @@ struct gru_cell {
     // caculate Mat_Wh_ * Mat_h(t)
     PART_BRGEMM_CALL(
         0,
-        &matAcc1,
+        matAcc1,
         batch_size,
         hidden_size,
         hidden_size,
         args->hx_ptr,
         args->W_hz_ptr);
-    tile_op::elemwise_op<matAcc_t, post_kind::sigmoid>(matAcc1);
+    subgroup::elemwise_op<matAcc_t, post_kind::sigmoid>(matAcc1);
     SW_BARRIER();
     matC_base_desc.init(
-        args->hx_ptr,
-        boundary_n,
-        boundary_m,
-        hidden_size,
-        start_n + ei.get_local_id(0) * sg_tile_n,
-        start_m + ei.get_local_id(1) * sg_tile_m);
-    mat_hidden.init_tdesc(matC_base_desc.get_tdesc());
-    mat_hidden.template load<cache_hint::cached, cache_hint::cached>();
+        {args->hx_ptr},
+        {boundary_n, boundary_m, hidden_size},
+        {start_n + ei.get_local_id(2) * sg_tile_n,
+         start_m + ei.get_local_id(1) * sg_tile_m});
+    mat_hidden_payload.init(matC_base_desc);
+    tile_load<cache_hint::cached, cache_hint::cached>(
+        mat_hidden, mat_hidden_payload);
     SW_BARRIER();
 
     /// calculate reset gate: r_t = \sigma(X_t W_ir + h_{t - 1} W_hr)
@@ -393,21 +333,22 @@ struct gru_cell {
       MATC_STORE(2, args->layer_output);
     }
     if (args->is_first_cell) {
-      tile_op::elemwise_cvt<matAcc_t, mat_t>(&matAcc0, &mat_hidden);
+      subgroup::elemwise_cvt(matAcc0, mat_hidden);
       MATC_STORE(0, args->h0);
     }
     if (args->mask_ptr != nullptr) {
       mask_t drop_mask;
-      mask_desc_t mask_base_desc;
+      mem_desc_mask_t mask_base_desc;
+      mask_payload_t mask_payload;
       mask_base_desc.init(
-          args->mask_ptr,
-          boundary_n,
-          boundary_m,
-          hidden_size,
-          start_n + ei.get_local_id(0) * sg_tile_n,
-          start_m + ei.get_local_id(1) * sg_tile_m);
-      drop_mask.init_tdesc(mask_base_desc.get_tdesc());
-      drop_mask.template load<cache_hint::cached, cache_hint::cached>();
+          {args->mask_ptr},
+          {boundary_n, boundary_m, hidden_size},
+          {start_n + ei.get_local_id(2) * sg_tile_n,
+           start_m + ei.get_local_id(1) * sg_tile_m});
+      mask_payload.init(mask_base_desc);
+      tile_load<cache_hint::cached, cache_hint::cached>(
+          drop_mask, mask_payload);
+      // drop_mask.template load<cache_hint::cached, cache_hint::cached>();
       matAcc2.reg = matAcc2.reg * drop_mask.reg;
     }
 
@@ -417,84 +358,75 @@ struct gru_cell {
 
   static void inline init_acc_with_bias(
       Act_T* bias_ptr,
-      matAcc_t* matAcc_ptr,
+      matAcc_t& matAcc,
       uint32_t boundary_n,
       uint32_t matrix_n,
       int start_n,
       int start_m) {
     /// if bias_add, init matAcc with bias 1D data.
-    xetpp_tdescriptor bias_base_desc;
-    xetpp_fill_tdesc<Act_T>(
-        bias_base_desc.xetpp_format<uint32_t>(),
-        bias_ptr,
-        boundary_n,
-        1,
-        matrix_n,
-        start_n,
-        0);
-    using bias_t = xetpp_tile_load_t<
-        Act_T,
-        matAcc_t::reg_tile_size_x,
+    using bias_tile_desc_t = tile_desc_t<
+        matAcc_t::tile_size_x,
         1,
         matAcc_t::block_size_x,
         1,
+        reg_layout::tiled>;
+    using bias_t = tile_t<Act_T, bias_tile_desc_t>;
+
+    using bias_payload_t = mem_payload_t<
+        Act_T,
+        bias_tile_desc_t,
+        msg_type_v<bias_tile_desc_t, mem_space::global>,
         mem_layout::row_major,
         mem_space::global,
-        gpu_arch::Xe,
-        reg_layout::tiled>;
+        gpu_arch::Xe>;
+
     bias_t bias;
-    bias.init_tdesc(bias_base_desc);
-    bias.template load<cache_hint::cached, cache_hint::cached>();
-    matAcc_ptr->init_value(&bias);
+    bias_payload_t bias_payload;
+    bias_payload.init(bias_ptr, boundary_n, 1, matrix_n, start_n, 0);
+    subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+        bias, bias_payload);
+    subgroup::row_broadcast(matAcc, bias);
+    // matAcc.init(bias);
   }
 
   static void inline init_acc_with_bias(
       Act_T* bias1_ptr,
       Act_T* bias2_ptr,
-      matAcc_t* matAcc_ptr,
+      matAcc_t& matAcc,
       uint32_t boundary_n,
       uint32_t matrix_n,
       int start_n,
       int start_m) {
     /// if bias_add, init matAcc with bias 1D data.
-    xetpp_tdescriptor bias1_base_desc;
-    xetpp_fill_tdesc<Act_T>(
-        bias1_base_desc.xetpp_format<uint32_t>(),
-        bias1_ptr,
-        boundary_n,
-        1,
-        matrix_n,
-        start_n,
-        0);
-
-    xetpp_tdescriptor bias2_base_desc;
-    xetpp_fill_tdesc<Act_T>(
-        bias2_base_desc.xetpp_format<uint32_t>(),
-        bias2_ptr,
-        boundary_n,
-        1,
-        matrix_n,
-        start_n,
-        0);
-    using bias_t = xetpp_tile_load_t<
-        Act_T,
-        matAcc_t::reg_tile_size_x,
+    using bias_tile_desc_t = tile_desc_t<
+        matAcc_t::tile_size_x,
         1,
         matAcc_t::block_size_x,
         1,
+        reg_layout::tiled>;
+    using bias_t = tile_t<Act_T, bias_tile_desc_t>;
+
+    using bias_payload_t = mem_payload_t<
+        Act_T,
+        bias_tile_desc_t,
+        msg_type_v<bias_tile_desc_t, mem_space::global>,
         mem_layout::row_major,
         mem_space::global,
-        gpu_arch::Xe,
-        reg_layout::tiled>;
+        gpu_arch::Xe>;
+
     bias_t bias1;
     bias_t bias2;
-    bias1.init_tdesc(bias1_base_desc);
-    bias1.template load<cache_hint::cached, cache_hint::cached>();
-    bias2.init_tdesc(bias2_base_desc);
-    bias2.template load<cache_hint::cached, cache_hint::cached>();
+    bias_payload_t bias_payload;
+    bias_payload.init(bias1_ptr, boundary_n, 1, matrix_n, start_n, 0);
+    subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+        bias1, bias_payload);
+    bias_payload.init(bias2_ptr, boundary_n, 1, matrix_n, start_n, 0);
+    subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+        bias2, bias_payload);
     SW_BARRIER();
     bias1.reg = bias1.reg + bias2.reg;
-    matAcc_ptr->init_value(&bias1);
+    subgroup::row_broadcast(matAcc, bias1);
+    // matAcc.init(bias1);
   }
 };
 
@@ -531,7 +463,7 @@ struct kernel_gru_cell_fusion {
       mem_space::global,
       mem_space::global,
       mem_space::global,
-      mem_space::local, // TODO: support slm
+      mem_space::global, // TODO: support slm
       0>;
 
   /// @brief
@@ -563,7 +495,7 @@ struct kernel_gru_cell_fusion {
   /// @param workspace_ptr    all of the output per gru cell
 
   static void inline call(
-      xetpp_exec_item<3> ei,
+      xetla_exec_item<3> ei,
       input_T* layer_ptr,
       input_T* hx_ptr,
       input_T* i_weights,
@@ -736,8 +668,8 @@ void gru_forward_impl(
   for (int seq = 0; seq < sequence_size + layer_size - 1; seq++) {
     auto cgf = DPCPP_Q_CGF(cgh) {
       cgh.parallel_for(Range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-        xetpp_exec_item ei(item);
-        int layer_idx = ei.get_group(2);
+        xetla_exec_item ei(item);
+        int layer_idx = ei.get_group(0);
         int hidden_io_size = batch_size * hidden_size;
         int input_weight_offset = layer_idx <= 1
             ? layer_idx * input_size * hidden_size * 3
@@ -753,8 +685,9 @@ void gru_forward_impl(
             layer_idx != 0 ? (input_T*)dropout_buffer +
                     (layer_idx - 1) * sequence_size * hidden_io_size
                            : (input_T*)layer_ptr, /* inputs*/
-            (input_T*)hx_ptr + layer_idx * hidden_size * batch_size, /* hidden*/
-            (input_T*)i_weights + input_weight_offset, /*weights*/
+            (input_T*)hx_ptr + layer_idx * hidden_size * batch_size,
+            /*
+hidden*/ (input_T*)i_weights + input_weight_offset, /*weights*/
             (input_T*)h_weights + hidden_weight_offset, /*weights*/
             (Act_T*)i_biases + bias_offset, /*Bias*/
             (Act_T*)h_biases + bias_offset, /*Bias*/
