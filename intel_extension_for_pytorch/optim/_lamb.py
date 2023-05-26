@@ -78,9 +78,8 @@ class Lamb(torch.optim.Optimizer):
                     if len(state) == 0:
                         state['step'] = 0
                         buffer_dtype = p.dtype if p.dtype is torch.float64 else torch.float
-                        select_device = 'cpu' if p.device.type == 'cpu' else 'xpu'
-                        state['exp_avg'] = torch.zeros(p.shape, dtype=buffer_dtype, device=select_device)
-                        state['exp_avg_sq'] = torch.zeros(p.shape, dtype=buffer_dtype, device=select_device)
+                        state['exp_avg'] = torch.zeros(p.shape, dtype=buffer_dtype, device=p.device)
+                        state['exp_avg_sq'] = torch.zeros(p.shape, dtype=buffer_dtype, device=p.device)
 
                     exp_avgs.append(state["exp_avg"])
                     exp_avg_sqs.append(state["exp_avg_sq"])

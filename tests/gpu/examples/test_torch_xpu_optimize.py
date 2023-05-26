@@ -20,7 +20,6 @@ TEST_MODULE_CONVERT_LIST = [
     torch.nn.LSTM,
 ]
 
-# TODO: for now, only support SGD and AdamW
 SUPPORTED_FUSION_OPTIMIZER = ['Adam', 'SGD', 'AdamW', 'Lars', 'Lamb']
 
 
