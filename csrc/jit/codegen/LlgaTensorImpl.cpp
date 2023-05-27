@@ -89,6 +89,8 @@ data_type LlgaTensorDesc::getLlgaDataType(at::ScalarType dt) const {
       return data_type::f32;
     case at::ScalarType::BFloat16:
       return data_type::bf16;
+    case at::ScalarType::Bool:
+      return data_type::boolean;
     case at::kInt:
       return data_type::s32;
     case at::ScalarType::QInt8:
@@ -122,6 +124,8 @@ at::ScalarType LlgaTensorDesc::aten_scalar_type() const {
       return at::ScalarType::Float;
     case data_type::bf16:
       return at::ScalarType::BFloat16;
+    case data_type::boolean:
+      return at::ScalarType::Bool;
     case data_type::s32:
       return at::kInt;
     case data_type::s8:
